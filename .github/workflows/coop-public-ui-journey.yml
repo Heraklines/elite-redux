@@ -166,7 +166,7 @@ jobs:
             exit 1
           fi
           echo "Public-UI TypeScript slice is clean; repository baseline reported $diagnostics unrelated diagnostics"
-          pnpm exec biome check \
+          pnpm exec biome check --diagnostic-level=error --max-diagnostics=none \
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \

@@ -7,7 +7,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { assertMarketCoverage, assertMarketPurchaseConverged } from "./market-journey.mjs";
+import {
+  assertMarketCoverage,
+  assertMarketPurchaseConverged,
+  findPairedMarketOutcome,
+} from "./market-journey.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -72,6 +76,42 @@ function purchaseProof(ownerSeat, wave) {
     partySlot: 0,
   });
 }
+
+test("post-turn market detection accepts one actionable owner plus its read-only watcher ledger", () => {
+  const observations = [
+    observation({ localSeat: 0, ownerSeat: 1, marketOpen: false, stock: 99, money: 5_000, quantity: 0, wave: 10 }),
+    observation({ localSeat: 1, ownerSeat: 1, marketOpen: true, stock: 3, money: 5_000, quantity: 0, wave: 10 }),
+  ];
+  const clients = observations.map((market, index) => ({
+    label: `seat-${index}`,
+    evidence: {
+      findLastMarket: (_from, predicate) => (predicate(market) ? { observation: market } : null),
+    },
+  }));
+  assert.deepEqual(findPairedMarketOutcome(clients, { "seat-0": 10, "seat-1": 20 }), {
+    kind: "reward",
+    surfaceId: "biome-market",
+  });
+
+  observations[1].marketOpen = false;
+  assert.equal(findPairedMarketOutcome(clients, { "seat-0": 10, "seat-1": 20 }), null);
+});
+
+test("campaign routes the asymmetric market projection before the symmetric semantic checkpoint", async () => {
+  const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
+  assert.match(campaign, /const marketOutcome = findPairedMarketOutcome\(clients, from\)/u);
+  const drive = campaign.slice(
+    campaign.indexOf("async function driveOnePendingSurface("),
+    campaign.indexOf("function createBattleRegisteredInteractionDriver("),
+  );
+  const marketProjection = drive.indexOf('driver.name === "biome-shop"');
+  const symmetricProjection = drive.indexOf("driver.v2SurfaceId", marketProjection);
+  assert.ok(marketProjection >= 0 && symmetricProjection > marketProjection);
+  assert.match(
+    drive,
+    /driver\.market\?\.mode === "target-held"[\s\S]*?driveTargetedMarket\(rig, cursors, driver\.market\)[\s\S]*?driveMarketLeave\(rig, cursors\)/u,
+  );
+});
 
 test("Wide Lens projection is exact for both stable owner-seat orientations", () => {
   const guestOwned = purchaseProof(1, 10);

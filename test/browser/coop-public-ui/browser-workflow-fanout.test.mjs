@@ -53,6 +53,18 @@ for (const { file, fanout } of workflows) {
   });
 }
 
+test("browser build gates report every blocking Biome diagnostic without legacy lint noise", async () => {
+  for (const { file } of workflows) {
+    const workflow = await readFile(resolve(root, file), "utf8");
+    const build = jobBlock(workflow, "browser-build");
+    assert.match(
+      build,
+      /pnpm exec biome check --diagnostic-level=error --max-diagnostics=none/u,
+      `${file} must expose the actual blocking error instead of exhausting Biome's default diagnostic cap`,
+    );
+  }
+});
+
 test("journey bundle resolves one validated asset SHA even when the GitHub API is unavailable", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const build = jobBlock(workflow, "browser-build");

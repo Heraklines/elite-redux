@@ -6408,3 +6408,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The contract now matches that exact remote formatter output. The already-running fresh-wave, half-wipe, Mystery, and
   navigation journeys remain sealed to their immutable SHAs and are deliberately not cancelled. This checkpoint changes
   no production behavior and all executable revalidation remains on GitHub-hosted runners.
+
+## 2026-07-31 - The wave-10 market red was an asymmetric-observer harness gap
+
+- Exact `54d1969b3` navigation run `30638367645` completed nine continuous waves and opened the natural wave-10 market.
+  The guest owner exposed an actionable `biome-market` with 15 options at Authority V2 revision 51; the host watcher
+  retained the same addressed catalog in its read-only `browser-market` apply ledger, and both sides control-installed
+  the revision. The campaign nevertheless timed out in `SelectModifierPhase` because its post-turn classifier required
+  the owner-only semantic grid on both browsers.
+- Post-turn classification now recognizes the paired detailed market projections, then leaves address, interaction-pin,
+  catalog, and single-owner validation to the existing fail-closed market proof before any key is sent. The dispatcher
+  also bypasses the generic symmetric semantic checkpoint for this intentionally asymmetric UI. Both target-purchase
+  and ordinary-leave policies now use the same paired projection and public confirmation path.
+- Failure-first Node coverage models an actionable owner plus read-only watcher and rejects a pair with no open owner;
+  a source contract binds the market route ahead of the symmetric checkpoint. No local test, build, or browser run is
+  used; the exact checkpoint will qualify on GitHub-hosted runners before the 30-wave journey is repeated.
+- The journey and campaign build gates now request only unlimited error-level Biome diagnostics. Their previous default
+  diagnostic cap printed hundreds of legacy lint infos while hiding the single blocking error, turning a fast static
+  failure into an opaque red. This changes reporting only: the same files and the same `biome check` exit status remain.

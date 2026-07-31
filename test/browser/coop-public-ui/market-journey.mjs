@@ -223,6 +223,24 @@ async function waitForMarket(client, from, predicate, description) {
   });
 }
 
+/**
+ * Classify the asymmetric market boundary from the detailed public observer. The market owner
+ * exposes the actionable `biome-market` semantic surface, while the watcher deliberately remains
+ * on MESSAGE and exposes only its read-only `browser-market` apply-ledger projection. Requiring a
+ * semantic surface on both browsers therefore mistakes the correct watcher UI for a softlock.
+ *
+ * This helper only routes the boundary; `readMarketPair` remains the fail-closed convergence proof
+ * for address, interaction pin, catalog, and the single actionable owner before any input is sent.
+ */
+export function findPairedMarketOutcome(clients, from) {
+  const events = clients.map(client => client.evidence.findLastMarket(from[client.label] ?? 0, () => true));
+  if (events.some(event => event?.observation == null)) {
+    return null;
+  }
+  const hasActionableOwner = events.some(event => event.observation.localOwner && event.observation.marketOpen);
+  return hasActionableOwner ? { kind: "reward", surfaceId: "biome-market" } : null;
+}
+
 async function readMarketPair(rig, from, pinnedInteraction = null) {
   const clients = Object.values(rig.clients);
   const events = await Promise.all(
@@ -230,7 +248,9 @@ async function readMarketPair(rig, from, pinnedInteraction = null) {
       waitForMarket(
         client,
         from[client.label] ?? 0,
-        observation => pinnedInteraction == null || observation.pinnedInteraction === pinnedInteraction,
+        observation =>
+          (pinnedInteraction == null || observation.pinnedInteraction === pinnedInteraction)
+          && (!observation.localOwner || observation.marketOpen),
         "addressed biome-market projection",
       ),
     ),
@@ -382,6 +402,25 @@ async function leaveMarket(owner, pinnedInteraction) {
     "market leave confirmation",
   );
   await owner.press("Space", "market-confirm-leave");
+}
+
+/** Leave a natural market without buying, while retaining the same paired projection proof. */
+export async function driveMarketLeave(rig, from) {
+  const snapshot = await readMarketPair(rig, from);
+  await snapshot.owner.checkpoint("market-before-normal-leave");
+  await leaveMarket(snapshot.owner, snapshot.pinnedInteraction);
+  return {
+    address: snapshot.byLabel[snapshot.owner.label].address,
+    ownerLabel: snapshot.owner.label,
+    ownerSeat: snapshot.byLabel[snapshot.owner.label].ownerSeat,
+    pinnedInteraction: snapshot.pinnedInteraction,
+    targetId: null,
+    targetStatus: "skipped",
+    targetReason: "policy-leave",
+    purchases: [],
+    leaveRequestedViaPublicConfirmation: true,
+    continuation: null,
+  };
 }
 
 /**

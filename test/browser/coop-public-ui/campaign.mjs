@@ -24,7 +24,12 @@ import {
   SHARED_SESSION_TERMINAL,
 } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
-import { assertMarketCoverage, driveTargetedMarket } from "./market-journey.mjs";
+import {
+  assertMarketCoverage,
+  driveMarketLeave,
+  driveTargetedMarket,
+  findPairedMarketOutcome,
+} from "./market-journey.mjs";
 
 const START_PHASE = /Start Phase (\w+)/u;
 const OUTCOME_PROGRESS_PHASE = /Start Phase ([A-Za-z0-9]+Phase)/u;
@@ -1352,10 +1357,12 @@ export async function waitForOutcomeBounded(
     // assertSharedSurface("reward"). Wait for the sealed browser observer on BOTH clients and carry
     // the exact surface identity to the battle driver. The between-wave dispatcher performs the
     // full owner/watcher/state proof before sending any input.
-    for (const surfaceId of ["biome-market", "reward-shop"]) {
-      if (clients.every(client => client.evidence.findLastSemanticSurface(from[client.label], surfaceId) != null)) {
-        return { kind: "reward", surfaceId };
-      }
+    const marketOutcome = findPairedMarketOutcome(clients, from);
+    if (marketOutcome != null) {
+      return marketOutcome;
+    }
+    if (clients.every(client => client.evidence.findLastSemanticSurface(from[client.label], "reward-shop") != null)) {
+      return { kind: "reward", surfaceId: "reward-shop" };
     }
     const successorWave = findSharedSuccessorWavePresentation(rig, from);
     if (successorWave != null) {
@@ -3665,6 +3672,11 @@ async function driveOnePendingSurface(
       mechanicalBoundary = await checkpointAsymmetricAbilitySurface(rig, driver, cursors, client);
     } else if (driver.asymmetricSurface) {
       mechanicalBoundary = await checkpointAsymmetricRegisteredSurface(rig, driver, cursors, client);
+    } else if (driver.name === "biome-shop") {
+      // The owner exposes an actionable semantic grid; the watcher intentionally stays on MESSAGE
+      // and exposes its read-only browser-market apply ledger. Both leave and purchase drivers below
+      // use that asymmetric paired projection, so the generic two-semantic-surface checkpoint would
+      // wait forever on the correct watcher UI.
     } else if (driver.v2SurfaceId) {
       mechanicalBoundary = await checkpointPairedMechanicalSurface(rig, driver.v2SurfaceId, cursors, client);
     }
@@ -3683,8 +3695,11 @@ async function driveOnePendingSurface(
         localSeat: client.publicSeat,
         targetId: "no",
       });
-    } else if (driver.name === "biome-shop" && driver.market?.mode === "target-held") {
-      stats.market = await driveTargetedMarket(rig, cursors, driver.market);
+    } else if (driver.name === "biome-shop") {
+      stats.market =
+        driver.market?.mode === "target-held"
+          ? await driveTargetedMarket(rig, cursors, driver.market)
+          : await driveMarketLeave(rig, cursors);
     } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
       const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
