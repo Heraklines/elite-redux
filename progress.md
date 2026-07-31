@@ -6555,3 +6555,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   its visible, point-legal roster at level 100 and pauses incidental evolution, while retaining ordinary keyboard
   combat and the exact Healing Wish, Revival Blessing, and Stormglass UI paths. No campaign success rule excuses an
   early terminal; the exact journey must still prove both registered surfaces and its declared wave boundary.
+
+## 2026-07-31 - Registered interaction proof reached its boundary but the capped fixture tripped the EXP assertion
+
+- Exact `d48b57500` registered-interactions run `30649936595` completed Revival, one synchronized faint replacement,
+  the reward boundary, and Stormglass owner/watcher presentation plus commit, then reached the shared wave-2 command
+  frontier. Authority revision 11 retired after the replica's `controlInstalled` receipt; no product wait or desync
+  caused the red.
+- The driver correctly counted one cleared wave but its generic progression assertion still required an EXP entry.
+  The exact registered fixture now starts at level 100, where no EXP presentation is valid. This is classified as a
+  harness assertion defect. The mandatory EXP cue is now omitted only for the three explicitly level-100 campaign
+  profiles (navigation, Mystery gauntlet, and registered interactions); ledger equality and every registered-surface
+  success requirement remain mandatory.
+
+## 2026-07-31 - Next-turn passive watcher release requalified in two real browsers
+
+- Exact `d48b57500` half-wipe run `30649931982` is green. The replica rendered the wiped seat's turn-1 sequence,
+  accepted the retained settled-turn state, crossed the bounded passive-watcher deferral, and observed the survivor's
+  turn-2 command and continuation. The journey passed in 10m13s with no terminal error.
+- This closes the product defect from `30647720506`: a signed `TURN N` image may authorize only `COMMAND N` or
+  `COMMAND N+1`, while the regression continues to reject an unstated `N+2` jump. Focused gate `30649903313` is also
+  fully green on the same SHA.

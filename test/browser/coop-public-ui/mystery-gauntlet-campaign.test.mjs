@@ -515,7 +515,7 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   assert.match(campaign, /assertMysteryFixtureParty\(rig, 1\)[\s\S]*mystery fixture level-100 parties proven/u);
   assert.match(
     campaign,
-    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required\)/u,
+    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required \|\| policy\.registeredInteractions\.required\)/u,
     "the level-100 Mystery fixture must retain ledger equality without inventing an EXP cue",
   );
   assert.match(

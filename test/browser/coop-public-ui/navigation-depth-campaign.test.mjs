@@ -180,7 +180,7 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
   assert.match(
     campaign,
-    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required\)\s*&&\s*\(battleKind\.battleType === "WILD"/u,
+    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required \|\| policy\.registeredInteractions\.required\)\s*&&\s*\(battleKind\.battleType === "WILD"/u,
     "the level-100 navigation fixture must retain ledger equality without inventing an EXP cue",
   );
   assert.match(headlessSoak, /\[coop-soak:wave-start\]/u);
