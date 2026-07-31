@@ -6605,3 +6605,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - This red is classified as a harness-fixture defect. The exact-build navigation roster now carries four ordinary
   level-up attacks per species with multiple damage types, and only the navigation profile cycles those visible
   usable moves by battle turn. Production Authority V2, battle mechanics, and other campaign policies are unchanged.
+- The push-triggered exact-SHA fresh-wave2 run `30660334843` is green on `41d28ffbe`: the sealed bundle passed its
+  remote owned-file type/format and browser boundary checks, then two real browsers cleared the ordinary wave-2
+  journey. Focused run `30660334822` did not execute tests because the integration manifest still named the prior
+  train base; that red is classified as CI metadata, and the manifest now advances to the exact `41d28ffbe` tip.
