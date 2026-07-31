@@ -65,5 +65,20 @@
       "evil",
       "villain"
     ]
+  },
+  "volo_1": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Pokemon Wielder",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/016stsb2/Volo",
+    "spriteKey": "volo_1",
+    "tags": [
+      "hisui",
+      "wielder",
+      "trainer",
+      "cynthia"
+    ]
   }
 }
