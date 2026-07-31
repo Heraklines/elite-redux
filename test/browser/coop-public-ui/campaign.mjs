@@ -4254,13 +4254,14 @@ async function advanceToNextWaveCommand(
   // longitudinal navigation profile can encounter the same chain between two geographic frontiers. Give each
   // observer-proven public action one ordinary surface allowance; never refresh from keepalives, phase names, or
   // time alone. The immutable ceiling remains derived from the finite required Mystery surface count.
-  const registeredSurfaceProgressBudget = policy.mysteryGauntlet.required || policy.navigation.required
-    ? createRegisteredSurfaceProgressBudget(
-        betweenWaveTimeoutMs,
-        rig.config.timeoutMs,
-        policy.mysteryGauntlet.minSurfaces,
-      )
-    : null;
+  const registeredSurfaceProgressBudget =
+    policy.mysteryGauntlet.required || policy.navigation.required
+      ? createRegisteredSurfaceProgressBudget(
+          betweenWaveTimeoutMs,
+          rig.config.timeoutMs,
+          policy.mysteryGauntlet.minSurfaces,
+        )
+      : null;
   const recordRegisteredSurfaceProgress = kind => {
     if (registeredSurfaceProgressBudget == null) {
       return;
