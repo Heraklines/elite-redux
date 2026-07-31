@@ -264,6 +264,13 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     }
     this.coopPresentationPreparing = false;
     try {
+      // The authority reaches EncounterPhase.runEncounter(), whose initSession() refreshes the
+      // visible biome/wave HUD from the newly-created Battle. The presentation-only replica
+      // deliberately bypasses that mechanical entrypoint, so refresh the same cosmetic label
+      // only after the signed carrier has installed the destination Battle and arena. Without
+      // this, both engines can reach COMMAND N+1 with the same state digest while the replica
+      // still visibly reports wave N after a World Map transition.
+      globalScene.updateBiomeWaveText();
       globalScene.playBgm(undefined, true);
       this.startPresentationIntro(true);
     } catch (error) {

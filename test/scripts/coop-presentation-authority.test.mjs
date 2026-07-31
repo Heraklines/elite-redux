@@ -261,6 +261,7 @@ test("the host's ordinary NewBattle tail is routed by the exact committed biome 
 test("a projected Mystery surface refreshes and proves its authoritative HUD wave", () => {
   const battleScene = read("src/battle-scene.ts");
   const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
+  const newBiome = read("src/phases/new-biome-encounter-phase.ts");
   const observer = read("scripts/coop-browser-entry.ts");
   const evidence = read("test/browser/coop-public-ui/evidence.mjs");
   const campaign = read("test/browser/coop-public-ui/campaign.mjs");
@@ -274,6 +275,11 @@ test("a projected Mystery surface refreshes and proves its authoritative HUD wav
     runtime,
     /case "mystery": \{[\s\S]+globalScene\.updateBiomeWaveText\(\)[\s\S]+phaseManager\.create\(\s*"CoopReplayMePhase"/u,
     "the immutable Mystery projector refreshes cosmetics after its wave material is installed",
+  );
+  assert.match(
+    newBiome,
+    /private startGuestPresentation\(\): void \{[\s\S]+globalScene\.updateBiomeWaveText\(\);[\s\S]+globalScene\.playBgm/u,
+    "the presentation-only new-biome replica refreshes its signed destination wave before rendering the encounter",
   );
   assert.match(
     observer,

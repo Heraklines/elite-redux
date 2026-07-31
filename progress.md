@@ -6576,3 +6576,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - This closes the product defect from `30647720506`: a signed `TURN N` image may authorize only `COMMAND N` or
   `COMMAND N+1`, while the regression continues to reject an unstated `N+2` jump. Focused gate `30649903313` is also
   fully green on the same SHA.
+
+## 2026-07-31 - New-biome replica retained the old visible wave after mechanical convergence
+
+- Exact `49faf5449` navigation-depth-30 run `30648456991` cleared waves 1-10, completed a host-owned Biome Market
+  purchase and party application, committed the guest-owned World Map choice, entered biome 1, and reached the wave-11
+  command frontier on both browsers. Their arena and state digest matched exactly, but the authoritative renderer's
+  HUD displayed wave 11 while the replica still displayed wave 10.
+- This red is classified as a product presentation defect. `NewBiomeEncounterPhase` deliberately gives the replica a
+  presentation-only path and therefore bypasses `EncounterPhase.runEncounter() -> initSession()`, the host path that
+  refreshes the visible biome/wave label. After the signed destination carrier is applied and before presentation
+  starts, the replica now refreshes that cosmetic label from the already-authoritative Battle and arena. No mechanical
+  state, progression, or local successor is derived by the repair.
