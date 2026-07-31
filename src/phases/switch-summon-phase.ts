@@ -54,6 +54,11 @@ export class SwitchSummonPhase extends SummonPhase {
     super.start();
   }
 
+  /** Exposes queued solo replacement reservations without leaking mutable phase state. */
+  public targetsPlayerPartySlot(slotIndex: number): boolean {
+    return this.player && this.slotIndex === slotIndex;
+  }
+
   preSummon(): void {
     if (!this.player) {
       // Partner attribution only applies in a partnered DOUBLE: in a TRIPLE vs one
@@ -142,6 +147,19 @@ export class SwitchSummonPhase extends SummonPhase {
     // `undefined` inside a delayed call - the phase never ended and the battle
     // hard-froze. Bail out cleanly before touching the missing Pokemon.
     if (!switchedInPokemon) {
+      this.end();
+      return;
+    }
+
+    // A simultaneous solo double/triple KO can leave a stale second summon
+    // targeting the slot already consumed by an earlier replacement. Never
+    // swap that now-fainted outgoing Pokemon back in over the valid summon.
+    if (
+      this.player
+      && !globalScene.gameMode.isCoop
+      && !globalScene.gameMode.isShowdown
+      && (!switchedInPokemon.isAllowedInBattle() || switchedInPokemon.isOnField())
+    ) {
       this.end();
       return;
     }

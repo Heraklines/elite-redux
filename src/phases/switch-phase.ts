@@ -1,5 +1,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   captureCoopFaintSwitchOperationBinding,
@@ -24,8 +25,10 @@ import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-regist
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
 import { BattlePhase } from "#phases/battle-phase";
 import { PartyOption, PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
+import i18next from "i18next";
 
 /** Co-op (#633): how long the WATCHER waits for the owner's relayed replacement choice. */
 const COOP_SWITCH_WAIT_MS = 300_000;
@@ -73,6 +76,13 @@ export class SwitchPhase extends BattlePhase {
 
     // Skip modal switch if impossible (no remaining party members that aren't already in battle)
     if (this.isModal && globalScene.getPokemonAllowedInBattle().every(p => p.isOnField())) {
+      return super.end();
+    }
+
+    // Two player Pokemon can faint before either forced replacement has been
+    // summoned. Reserve each queued party slot so both pickers cannot select
+    // the same sole bench Pokemon against the still-unmodified party array.
+    if (this.isModal && this.isSoloPlayerBattle() && !this.hasUnreservedSoloReplacement()) {
       return super.end();
     }
 
@@ -332,6 +342,20 @@ export class SwitchPhase extends BattlePhase {
       return;
     }
 
+    const soloReplacementFilter =
+      this.isModal && this.isSoloPlayerBattle()
+        ? (pokemon: PlayerPokemon) => {
+            const nonFaintedResult = PartyUiHandler.FilterNonFainted(pokemon);
+            if (nonFaintedResult != null) {
+              return nonFaintedResult;
+            }
+            const slotIndex = globalScene.getPlayerParty().indexOf(pokemon);
+            return this.isSoloReplacementSlotReserved(slotIndex)
+              ? i18next.t("partyUiHandler:cantBeUsed", { pokemonName: getPokemonNameWithAffix(pokemon, false) })
+              : null;
+          }
+        : PartyUiHandler.FilterNonFainted;
+
     globalScene.ui.setMode(
       UiMode.PARTY,
       this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
@@ -353,8 +377,28 @@ export class SwitchPhase extends BattlePhase {
         }
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       },
-      PartyUiHandler.FilterNonFainted,
+      soloReplacementFilter,
     );
+  }
+
+  private isSoloPlayerBattle(): boolean {
+    return !globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown;
+  }
+
+  private isSoloReplacementSlotReserved(slotIndex: number): boolean {
+    return (
+      slotIndex >= 0
+      && globalScene.phaseManager.hasPhaseOfType("SwitchSummonPhase", phase => phase.targetsPlayerPartySlot(slotIndex))
+    );
+  }
+
+  private hasUnreservedSoloReplacement(): boolean {
+    return globalScene
+      .getPlayerParty()
+      .some(
+        (pokemon, slotIndex) =>
+          pokemon.isAllowedInBattle() && !pokemon.isOnField() && !this.isSoloReplacementSlotReserved(slotIndex),
+      );
   }
 
   /**

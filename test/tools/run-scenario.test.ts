@@ -2543,8 +2543,11 @@ function autopilotTick(game: GameManager, st: RunState): void {
     if (dispatchMenu(game, st, phaseName, mode)) {
       st.lastDrivenPhase = phase ?? null;
       st.lastDrivenMode = mode;
-      st.lastDrivenPartyCallback =
-        mode === UiMode.PARTY ? ((handler as unknown as { selectCallback?: unknown }).selectCallback ?? null) : null;
+      // Remember the callback for the appearance we just drove. A successful party
+      // selection may synchronously clear or replace handler.selectCallback before
+      // processInput returns; reading it again here makes the still-visible old prompt
+      // look new and can submit the same sole reserve twice.
+      st.lastDrivenPartyCallback = mode === UiMode.PARTY ? partyCallback : null;
       st.stallSince = 0;
       st.stallMode = null;
     }
@@ -4338,6 +4341,53 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(result.outcome).not.toBe("error");
     expect(result.log).toContain("faint-switch");
     expect(result.autoFirstLog).toEqual([]);
+  }, 180_000);
+
+  it("the combat autopilot submits the sole reserve once after separate double knockouts", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "doubles sole-reserve replacement callback regression",
+      run: { wave: 146, level: 100, difficulty: "hell", enemyAi: "hardest", double: true },
+      party: [
+        { species: SpeciesId.MAGIKARP, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.FEEBAS, moves: [MoveId.SPLASH] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.TACKLE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.RAYQUAZA,
+            level: 500,
+            moves: [MoveId.HYPER_BEAM],
+            ability: AbilityId.HONEY_GATHER,
+            passiveAbility: AbilityId.HONEY_GATHER,
+          },
+          {
+            species: SpeciesId.RAYQUAZA,
+            level: 500,
+            moves: [MoveId.HYPER_BEAM],
+            ability: AbilityId.HONEY_GATHER,
+            passiveAbility: AbilityId.HONEY_GATHER,
+          },
+        ],
+      },
+      start: { playerHpPct: 1, player2HpPct: 1 },
+      script: [
+        {
+          move: "SPLASH",
+          move2: "SPLASH",
+          enemyMove: "HYPER_BEAM",
+          enemyTarget: BattlerIndex.PLAYER,
+          enemyMove2: "HYPER_BEAM",
+          enemyTarget2: BattlerIndex.PLAYER_2,
+        },
+      ],
+    };
+    const { result } = await runInlineRun(phaserGame, spec, 1);
+    expect(result.outcome).not.toBe("error");
+    expect(result.log.match(/faint-switch/g)).toHaveLength(1);
+    expect(result.waves[0]?.turns).toBeGreaterThan(1);
   }, 180_000);
 
   it("the combat autopilot drives consecutive triple faint replacements", async () => {
