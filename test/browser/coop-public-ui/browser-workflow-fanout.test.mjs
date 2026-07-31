@@ -221,11 +221,12 @@ test("journey starter fixtures require both the exact build and exact per-page U
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {
-  const [workflow, registry, selectStarter, starterHandler, config, harness, journeys] = await Promise.all([
+  const [workflow, registry, selectStarter, starterHandler, pokemon, config, harness, journeys] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
     readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
     readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "src/field/pokemon.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
@@ -264,6 +265,11 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
     selectStarter,
     /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*initBattle\([\s\S]*fixturePauseEvolutions/u,
     "launch separates initial level from the evolution-pause policy",
+  );
+  assert.match(
+    pokemon,
+    /public pauseEvolutions = false;/u,
+    "freshly constructed authority mons and serialized replicas share one explicit evolution flag",
   );
   assert.match(
     selectStarter,

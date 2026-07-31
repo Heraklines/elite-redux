@@ -395,7 +395,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   /** The wave index at which this Pokémon was met/encountered */
   public metWave: number;
   public luck: number;
-  public pauseEvolutions: boolean;
+  public pauseEvolutions = false;
   public pokerus: boolean;
   /**
    * Indicates whether this Pokémon has left or is about to leave the field
