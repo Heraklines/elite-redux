@@ -20,8 +20,8 @@ import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonData } from "#system/pokemon-data";
 import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import type { BattleMessageUiHandler } from "#ui/handlers/battle-message-ui-handler";
+import { fadeOutSoundIfActive } from "#utils/sound-fade";
 import i18next from "i18next";
-import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
 const PROGRESSION_STEP_WATCHDOG_MS = 15_000;
 const EVOLUTION_STEP_WATCHDOG_MS = 45_000;
@@ -148,9 +148,7 @@ class CoopEvolutionPresentation {
       );
     } finally {
       signal.removeEventListener("abort", abort);
-      if (this.bgm != null) {
-        SoundFade.fadeOut(globalScene, this.bgm, 100);
-      }
+      fadeOutSoundIfActive(globalScene, this.bgm);
       this.flashOverlay?.destroy();
       if (this.modeTransitionStarted) {
         const restored = globalScene.ui.setModeForceTransition(UiMode.MESSAGE).catch(() => undefined);

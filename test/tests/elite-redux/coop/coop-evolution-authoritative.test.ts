@@ -18,10 +18,10 @@ import {
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesId } from "#enums/species-id";
-import { fadeOutEvolutionBgmIfActive } from "#phases/evolution-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { fadeOutSoundIfActive } from "#utils/sound-fade";
 import Phaser from "phaser";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,8 +57,8 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
     const activeSound = { pendingRemove: false } as AnySound;
     const completedSound = { pendingRemove: true } as AnySound;
 
-    fadeOutEvolutionBgmIfActive(scene, activeSound);
-    fadeOutEvolutionBgmIfActive(scene, completedSound);
+    fadeOutSoundIfActive(scene, activeSound);
+    fadeOutSoundIfActive(scene, completedSound);
 
     expect(fadeOut).toHaveBeenCalledOnce();
     expect(fadeOut).toHaveBeenCalledWith(scene, activeSound, 100);

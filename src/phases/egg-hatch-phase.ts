@@ -16,8 +16,8 @@ import { EggCounterContainer } from "#ui/egg-counter-container";
 import type { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
 import { PokemonInfoContainer } from "#ui/pokemon-info-container";
 import { fixedInt, getFrameMs, randInt } from "#utils/common";
+import { fadeOutSoundIfActive } from "#utils/sound-fade";
 import i18next from "i18next";
-import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
 /**
  * Class that represents egg hatching
@@ -310,9 +310,7 @@ export class EggHatchPhase extends Phase {
   doHatch(): void {
     this.canSkip = false;
     this.hatched = true;
-    if (this.evolutionBgm) {
-      SoundFade.fadeOut(globalScene, this.evolutionBgm, fixedInt(100));
-    }
+    fadeOutSoundIfActive(globalScene, this.evolutionBgm, fixedInt(100));
     for (let e = 0; e < 5; e++) {
       globalScene.time.delayedCall(fixedInt(375 * e), () =>
         globalScene.playSound("se/egg_hatch", { volume: 1 - e * 0.2 }),
