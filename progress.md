@@ -6223,3 +6223,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local public-source qualification is 193/193 green, campaign/public boundary checks are green, changed-file Biome is
   clean, and `git diff --check` is clean. TypeScript, Authority V2 Vitest, and real Chromium execution remain remote-only;
   the next exact-SHA roll must prove the focused gate, Mystery, registered interactions, and the new navigation journey.
+
+## 2026-07-31 - Retained evolution presentation follows immutable state
+
+- The exact two-browser evolution journey proved a real presentation race: later authoritative turn state had already
+  reconciled the guest party to the evolved species before the retained wave-progression cutscene replayed. The old
+  renderer required the live party member to remain in its pre-evolution form, skipped the evolution cue, and continued
+  mechanically without desyncing.
+- Evolution progression events now retain complete immutable pre- and post-evolution PokemonData images. Admission
+  validates both images against the same Pokemon id and their stated species/form identities. Replay still rejects a
+  live party identity that matches neither committed side, but renders the cutscene from detached reconstructed images,
+  so later mechanical snapshots cannot erase or alter the ordered visual result. Both temporary Pokemon are asset-loaded,
+  never inserted into the party, and destroyed after success, cancellation, or reconstruction failure.
+- Failure-first static coverage went red on the missing pre-image, then the complete 395-test public-browser source suite
+  and public boundary check passed. Authority V2 Vitest and the exact two-browser evolution journey remain remote-only.

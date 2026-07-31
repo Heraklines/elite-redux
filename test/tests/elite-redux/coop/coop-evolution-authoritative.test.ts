@@ -6,7 +6,7 @@
 // Co-op authoritative EVOLUTION (#633 B6). In authoritative co-op the GUEST is a pure renderer; the
 // HOST owns evolution. A guest-side evolve would construct a per-client mon (its own RNG id / form path /
 // per-client-bound held items) and diverge. Evolution is now retained on WAVE_ADVANCE / ME_TERMINAL as a
-// complete immutable post-Pokemon image and replayed before DATA applies; full two-browser identity parity
+// complete immutable pre/post Pokemon images and replayed before DATA applies; full two-browser identity parity
 // is mandatory in the 30-wave public campaign. This focused file keeps only the leaf guest-mechanics gate
 // and the exact PokemonData wire-image round trip. It deliberately makes no obsolete resync claim.
 
@@ -101,7 +101,7 @@ describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - immutable V2 pr
     expect(isCoopAuthoritativeGuestGated()).toBe(false);
   });
 
-  it("B6: one exact evolved PokemonData image reconstructs without local evolution mechanics", async () => {
+  it("B6: exact pre/post PokemonData images reconstruct without local evolution mechanics", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const scene = game.scene;
 
@@ -110,6 +110,7 @@ describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - immutable V2 pr
     const after = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.CHARMELEON), 17);
     after.id = before.id;
     after.coopOwner = "guest";
+    const prePokemon = JSON.parse(JSON.stringify(new PokemonData(before))) as Record<string, unknown>;
     const postPokemon = JSON.parse(JSON.stringify(new PokemonData(after))) as Record<string, unknown>;
     const event = {
       k: "evolution" as const,
@@ -121,6 +122,7 @@ describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - immutable V2 pr
       toSpeciesId: after.species.speciesId,
       toFormIndex: after.formIndex,
       toSpriteKey: after.getSpriteKey(true),
+      prePokemon,
       postPokemon,
     };
     expect(isValidWaveProgressionPresentation(event), "the complete event passes the V2 wire validator").toBe(true);
@@ -133,6 +135,14 @@ describe.skipIf(!RUN)("co-op authoritative evolution (#633 B6) - immutable V2 pr
     expect(reconstructed.formIndex).toBe(after.formIndex);
     expect(reconstructed.getSpriteKey(true)).toBe(event.toSpriteKey);
 
+    const reconstructedBefore = new PokemonData(event.prePokemon).toPokemon(undefined, event.partySlot);
+    Phaser.Math.RND.state(rndState);
+    expect(reconstructedBefore.id).toBe(before.id);
+    expect(reconstructedBefore.species.speciesId).toBe(SpeciesId.CHARMANDER);
+    expect(reconstructedBefore.formIndex).toBe(before.formIndex);
+    expect(reconstructedBefore.getSpriteKey(true)).toBe(event.fromSpriteKey);
+
+    reconstructedBefore.destroy();
     reconstructed.destroy();
     before.destroy();
     after.destroy();

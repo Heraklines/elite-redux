@@ -119,6 +119,8 @@ export type CoopWaveProgressionPresentationV2 =
       readonly toSpeciesId: number;
       readonly toFormIndex: number;
       readonly toSpriteKey: string;
+      /** Exact immutable PokemonData immediately before this evolution. */
+      readonly prePokemon: Readonly<Record<string, unknown>>;
       /** Exact immutable PokemonData immediately after this evolution (supports multiple evolutions per wave). */
       readonly postPokemon: Readonly<Record<string, unknown>>;
     };
@@ -317,7 +319,7 @@ function isBoundedSpriteKey(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 256;
 }
 
-function isEvolutionPostPokemon(
+function isEvolutionPokemonImage(
   value: unknown,
   pokemonId: number,
   speciesId: number,
@@ -370,7 +372,8 @@ export function isValidWaveProgressionPresentation(value: unknown): value is Coo
       && isSafePositiveInt(event.toSpeciesId)
       && isSafeNonNegInt(event.toFormIndex)
       && isBoundedSpriteKey(event.toSpriteKey)
-      && isEvolutionPostPokemon(event.postPokemon, event.pokemonId, event.toSpeciesId, event.toFormIndex)
+      && isEvolutionPokemonImage(event.prePokemon, event.pokemonId, event.fromSpeciesId, event.fromFormIndex)
+      && isEvolutionPokemonImage(event.postPokemon, event.pokemonId, event.toSpeciesId, event.toFormIndex)
       && (event.fromSpeciesId !== event.toSpeciesId
         || event.fromFormIndex !== event.toFormIndex
         || event.fromSpriteKey !== event.toSpriteKey)

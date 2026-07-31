@@ -42,10 +42,10 @@ class CoopWaveProgressionPresentationCancelled extends Error {
 }
 
 /**
- * A mechanics-free evolution cutscene backed by two exact Pokemon images: the live pre-evolution renderer
- * and an ephemeral Pokemon reconstructed from this event's immutable post-evolution image. It deliberately owns
+ * A mechanics-free evolution cutscene backed by two exact ephemeral Pokemon images reconstructed from the
+ * event's immutable pre/post material. It deliberately owns
  * no evolution choice, mutation, account write, move learning, or successor; those already happened once on
- * the authority. The temporary Pokemon is never inserted into the party and is destroyed after presentation.
+ * the authority. Neither temporary Pokemon is inserted into the party; both are destroyed after presentation.
  */
 class CoopEvolutionPresentation {
   private readonly before: PlayerPokemon;
@@ -78,7 +78,7 @@ class CoopEvolutionPresentation {
       if (signal.aborted) {
         this.cancel();
       }
-      await this.awaitExternal(this.after.loadAssets());
+      await this.awaitExternal(Promise.all([this.before.loadAssets(), this.after.loadAssets()]));
       this.assertActive();
       this.modeTransitionStarted = true;
       const enterMode = globalScene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
@@ -678,21 +678,44 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     event: Extract<CoopWaveProgressionPresentationV2, { k: "evolution" }>,
     signal: AbortSignal,
   ): Promise<void> {
-    if (
-      pokemon.species.speciesId !== event.fromSpeciesId
-      || pokemon.formIndex !== event.fromFormIndex
-      || pokemon.getSpriteKey(true) !== event.fromSpriteKey
-    ) {
-      throw new Error("retained evolution pre-image does not match the live renderer");
+    const liveMatchesPreImage =
+      pokemon.species.speciesId === event.fromSpeciesId
+      && pokemon.formIndex === event.fromFormIndex
+      && pokemon.getSpriteKey(true) === event.fromSpriteKey;
+    const liveMatchesPostImage =
+      pokemon.species.speciesId === event.toSpeciesId
+      && pokemon.formIndex === event.toFormIndex
+      && pokemon.getSpriteKey(true) === event.toSpriteKey;
+    if (!liveMatchesPreImage && !liveMatchesPostImage) {
+      throw new Error(
+        `retained evolution live renderer matches neither committed image: actual=${pokemon.species.speciesId}/${pokemon.formIndex}/${pokemon.getSpriteKey(true)} expected=${event.fromSpeciesId}/${event.fromFormIndex}/${event.fromSpriteKey}|${event.toSpeciesId}/${event.toFormIndex}/${event.toSpriteKey}`,
+      );
     }
     const rndState = Phaser.Math.RND.state();
-    let evolved: PlayerPokemon;
+    let before: PlayerPokemon | null = null;
+    let evolved: PlayerPokemon | null = null;
     try {
+      before = new PokemonData(event.prePokemon).toPokemon(undefined, event.partySlot) as PlayerPokemon;
       evolved = new PokemonData(event.postPokemon).toPokemon(undefined, event.partySlot) as PlayerPokemon;
+    } catch (error) {
+      before?.destroy();
+      evolved?.destroy();
+      throw error;
     } finally {
       Phaser.Math.RND.state(rndState);
     }
+    if (before == null || evolved == null) {
+      throw new Error("retained evolution images could not be reconstructed");
+    }
     try {
+      if (
+        before.id !== event.pokemonId
+        || before.species.speciesId !== event.fromSpeciesId
+        || before.formIndex !== event.fromFormIndex
+        || before.getSpriteKey(true) !== event.fromSpriteKey
+      ) {
+        throw new Error("retained evolution pre-image does not match its immutable party material");
+      }
       if (
         evolved.id !== event.pokemonId
         || evolved.species.speciesId !== event.toSpeciesId
@@ -703,14 +726,15 @@ export class CoopWaveProgressionReplayPhase extends Phase {
       }
       coopLog(
         "progression",
-        `GUEST retained evolution start wave=${this.wave} slot=${event.partySlot} species=${event.fromSpeciesId}->${event.toSpeciesId}`,
+        `GUEST retained evolution start wave=${this.wave} slot=${event.partySlot} species=${event.fromSpeciesId}->${event.toSpeciesId} live=${liveMatchesPreImage ? "pre" : "post"}`,
       );
-      await new CoopEvolutionPresentation(pokemon, evolved).play(signal);
+      await new CoopEvolutionPresentation(before, evolved).play(signal);
       coopLog(
         "progression",
         `GUEST retained evolution complete wave=${this.wave} slot=${event.partySlot} species=${event.fromSpeciesId}->${event.toSpeciesId}`,
       );
     } finally {
+      before.destroy();
       evolved.destroy();
     }
   }

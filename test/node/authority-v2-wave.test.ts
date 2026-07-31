@@ -436,9 +436,24 @@ describe("material completeness validation", () => {
         toSpeciesId: 5,
         toFormIndex: 0,
         toSpriteKey: "pkmn__charmeleon",
+        prePokemon: { id: 42, player: true, species: 4, formIndex: 0 },
         postPokemon: { id: 42, player: true, species: 5, formIndex: 0 },
       }),
     ).toBe(true);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "evolution",
+        partySlot: 1,
+        pokemonId: 42,
+        fromSpeciesId: 4,
+        fromFormIndex: 0,
+        fromSpriteKey: "pkmn__charmander",
+        toSpeciesId: 5,
+        toFormIndex: 0,
+        toSpriteKey: "pkmn__charmeleon",
+        postPokemon: { id: 42, player: true, species: 5, formIndex: 0 },
+      }),
+    ).toBe(false);
     expect(
       isValidWaveProgressionPresentation({
         k: "exp",
@@ -474,6 +489,7 @@ describe("material completeness validation", () => {
         toSpeciesId: 4,
         toFormIndex: 0,
         toSpriteKey: "same",
+        prePokemon: { id: 42, player: true, species: 4, formIndex: 0 },
         postPokemon: { id: 42, player: true, species: 4, formIndex: 0 },
       }),
     ).toBe(false);
@@ -488,7 +504,23 @@ describe("material completeness validation", () => {
         toSpeciesId: 5,
         toFormIndex: 0,
         toSpriteKey: "pkmn__charmeleon",
+        prePokemon: { id: 42, player: true, species: 4, formIndex: 0 },
         postPokemon: { id: 99, player: true, species: 5, formIndex: 0 },
+      }),
+    ).toBe(false);
+    expect(
+      isValidWaveProgressionPresentation({
+        k: "evolution",
+        partySlot: 1,
+        pokemonId: 42,
+        fromSpeciesId: 4,
+        fromFormIndex: 0,
+        fromSpriteKey: "pkmn__charmander",
+        toSpeciesId: 5,
+        toFormIndex: 0,
+        toSpriteKey: "pkmn__charmeleon",
+        prePokemon: { id: 99, player: true, species: 4, formIndex: 0 },
+        postPokemon: { id: 42, player: true, species: 5, formIndex: 0 },
       }),
     ).toBe(false);
   });

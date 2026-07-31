@@ -39,6 +39,7 @@ export class EvolutionPhase extends Phase {
   private readonly coopPreEvolutionSpeciesId: number;
   private readonly coopPreEvolutionFormIndex: number;
   private readonly coopPreEvolutionSpriteKey: string;
+  private readonly coopPreEvolutionPokemon: Readonly<Record<string, unknown>>;
 
   private evolution: SpeciesFormEvolution | null;
   /**
@@ -91,6 +92,7 @@ export class EvolutionPhase extends Phase {
     this.coopPreEvolutionSpeciesId = pokemon.species.speciesId;
     this.coopPreEvolutionFormIndex = pokemon.formIndex;
     this.coopPreEvolutionSpriteKey = pokemon.getSpriteKey(true);
+    this.coopPreEvolutionPokemon = JSON.parse(JSON.stringify(new PokemonData(pokemon))) as Record<string, unknown>;
   }
 
   validate(): boolean {
@@ -593,6 +595,7 @@ export class EvolutionPhase extends Phase {
             toSpeciesId: this.pokemon.species.speciesId,
             toFormIndex: this.pokemon.formIndex,
             toSpriteKey: this.pokemon.getSpriteKey(true),
+            prePokemon: this.coopPreEvolutionPokemon,
             postPokemon: JSON.parse(JSON.stringify(new PokemonData(this.pokemon))) as Record<string, unknown>,
           });
         }

@@ -977,14 +977,19 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
   );
   assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
   assert.match(
+    waveAdapter,
+    /readonly prePokemon: Readonly<Record<string, unknown>>;[\s\S]+readonly postPokemon: Readonly<Record<string, unknown>>;/u,
+    "an evolution commit retains complete immutable before and after Pokemon images",
+  );
+  assert.match(
     progressionReplay,
-    /new PokemonData\(event\.postPokemon\)\.toPokemon[\s\S]+new CoopEvolutionPresentation\(pokemon, evolved\)\.play\(signal\)/u,
-    "the guest evolution cutscene uses immutable post-image material and never re-runs evolution mechanics",
+    /liveMatchesPreImage[\s\S]+liveMatchesPostImage[\s\S]+new PokemonData\(event\.prePokemon\)\.toPokemon[\s\S]+new PokemonData\(event\.postPokemon\)\.toPokemon[\s\S]+new CoopEvolutionPresentation\(before, evolved\)\.play\(signal\)/u,
+    "the guest evolution cutscene validates the live replica but renders only immutable before/after material",
   );
   assert.match(
     evolution,
-    /postPokemon: JSON\.parse\(JSON\.stringify\(new PokemonData\(this\.pokemon\)\)\)/u,
-    "each evolution retains its own complete intermediate post-image rather than borrowing final wave state",
+    /this\.coopPreEvolutionPokemon = JSON\.parse\(JSON\.stringify\(new PokemonData\(pokemon\)\)\)[\s\S]+prePokemon: this\.coopPreEvolutionPokemon[\s\S]+postPokemon: JSON\.parse\(JSON\.stringify\(new PokemonData\(this\.pokemon\)\)\)/u,
+    "each evolution retains its own complete intermediate pre/post images rather than borrowing live wave state",
   );
   assert.match(
     progressionReplay,
