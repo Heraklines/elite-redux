@@ -3908,7 +3908,7 @@ test("the animations-on campaign extends a live between-wave renderer without we
   );
   assert.match(
     campaignDriver,
-    /betweenWaveBudget\?\.observe\(\) \?\? mysteryProgressBudget\?\.deadline\(\) \?\? fixedDeadline/u,
+    /betweenWaveBudget\?\.observe\(\) \?\? registeredSurfaceProgressBudget\?\.deadline\(\) \?\? fixedDeadline/u,
   );
   assert.doesNotMatch(
     campaignDriver,
