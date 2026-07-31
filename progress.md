@@ -6352,3 +6352,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Source contracts cover the zero-target receipt gate, non-CONTROL state reconstruction, both UI admission call chains,
   and the receipt-to-ledger retry edge. TypeScript, formatting, source contracts, engine shards, and the exact four-wave
   depth campaign will all run remotely on GitHub; no local tests are used.
+
+## 2026-07-31 - Passive-watcher qualification isolates a formatter-only red
+
+- Exact-SHA focused run `30636335692` at `5a3e5fd25` passed every selected production shard (P2, S4, B12, C3, T2,
+  and A1), every co-op source contract, and every node-pure contract. Remote type analysis reported no diagnostic in
+  any changed file. Its sole red was Biome's one-line layout for the retained TURN state reconstruction.
+- Push journey `30636335686` stopped at the same owned-file formatter gate before building Chromium, so it is not
+  gameplay evidence. The exact four-wave depth campaign `30636361412` independently built the production bundle and
+  remains sealed to `5a3e5fd25`; its workflow does not cancel on a newer branch push.
+- The runtime line now matches the remote formatter output exactly. The ownership train advances to `5a3e5fd25`; this
+  metadata/format checkpoint changes no behavior and will be committed without local hooks. All requalification remains
+  on GitHub-hosted runners.

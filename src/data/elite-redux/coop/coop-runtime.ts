@@ -9603,9 +9603,8 @@ export function readRetainedCoopV2CommandEntryPresentation(
   }
   let authoritativeState: CoopAuthoritativeBattleStateV1 | null = null;
   if (source.kind === "TURN_COMMIT") {
-    authoritativeState = reconstructCoopV2TurnResolution(
-      source.material.payload as TurnResolutionImage,
-    )?.authoritativeState ?? null;
+    authoritativeState =
+      reconstructCoopV2TurnResolution(source.material.payload as TurnResolutionImage)?.authoritativeState ?? null;
   } else if (source.kind === "REPLACEMENT_COMMIT") {
     authoritativeState = reconstructCoopV2ReplacementCheckpoint(source)?.checkpoint.authoritativeState ?? null;
   } else if (source.kind === "INTERACTION_COMMIT") {
