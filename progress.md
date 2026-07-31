@@ -6486,3 +6486,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The workflow now honors the explicit `faint_owner_seat` input (default `guest-seat`) independently of invitation
   direction. A source contract rejects reintroducing requester-based half-wipe inversion. This is harness-only; the
   failed run contains no product desync or half-wipe execution evidence.
+
+## 2026-07-31 - Detailed-market compatibility matches the remote formatter
+
+- The two `a4e5878d4` journey builders stopped on the same two line-wrap diagnostics in `market-journey.mjs`; TypeScript
+  was clean and neither run reached Chromium. The helper now matches the exact remote Biome layout. This checkpoint is
+  formatting-only and all executable revalidation remains remote.
