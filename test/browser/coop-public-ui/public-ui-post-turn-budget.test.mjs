@@ -501,6 +501,38 @@ test("default post-turn watchdog survives the measured two-browser Explosion ani
   assert.ok(refreshedDeadline < budget.hardDeadline(), "the immutable absolute ceiling remains independent");
 });
 
+test("active authority and replay evolution presentations survive the measured two-browser render interval", () => {
+  for (const phase of ["EvolutionPhase", "CoopWaveProgressionReplayPhase"]) {
+    let nowMs = 1_000;
+    const authority = { label: "authority", evidence: new FakeEvidence("authority") };
+    const renderer = { label: "renderer", evidence: new FakeEvidence("renderer") };
+    const rig = { clients: { authority, renderer } };
+    const budget = createPublicBattleProgressBudget(rig, { authority: 0, renderer: 0 }, 1_000, {
+      now: () => nowMs,
+    });
+
+    authority.evidence.push({
+      at: at(nowMs),
+      kind: "browser-surface2",
+      observation: {
+        operationClass: "battle-progress",
+        surfaceId: "battle:evolution",
+        phase,
+        phaseInstance: 28,
+        ready: { awaitingActionInput: false },
+      },
+    });
+    const refreshedDeadline = budget.observe();
+
+    nowMs += 201_000;
+    assert.ok(
+      nowMs < refreshedDeadline,
+      `run 30618446194's 201s ${phase} render must not expire the post-turn watchdog`,
+    );
+    assert.ok(refreshedDeadline < budget.hardDeadline(), "evolution remains bounded by the absolute circuit breaker");
+  }
+});
+
 test("repeated semantic projections cannot refresh the same causal progress token", () => {
   let nowMs = 1_000;
   const authority = { label: "authority", evidence: new FakeEvidence("authority") };

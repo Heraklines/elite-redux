@@ -77,6 +77,12 @@ const SPINDA_SPECIES_ID = 327;
 // watchdog below the 15-minute absolute ceiling, but above that measured two-Chromium animation
 // gap so a progressing production turn is not mislabeled as a sync failure.
 const POST_TURN_PROGRESS_ALLOWANCE_MS = 150_000;
+// Exact-SHA run 30618446194 measured 201s from the authority's active EvolutionPhase opening to
+// its immutable evolution event on a standard two-Chromium runner. That interval is one continuous,
+// visibly active cutscene rather than a stalled relay. Give only the exact non-actionable evolution
+// surface enough rolling budget to finish; readiness becoming actionable is a distinct progress token,
+// and the independent 15-minute post-turn ceiling remains the final circuit breaker.
+const EVOLUTION_PRESENTATION_PROGRESS_ALLOWANCE_MS = 360_000;
 // This is an absolute circuit breaker, not the normal liveness timeout. Exact-SHA run
 // 29792007134 was still producing and replaying unique turn events when the previous six-minute
 // wall-clock ceiling fired; TURN_COMMIT landed 31s after that false abort. The rolling
@@ -246,6 +252,17 @@ function recordPostTurnBudgetExtension(progress, previousDeadlineMs, deadlineMs,
   });
 }
 
+function postTurnProgressAllowance(progress, defaultAllowanceMs) {
+  const observation = progress.event.kind === "browser-surface2" ? progress.event.observation : null;
+  const isActiveEvolutionPresentation =
+    observation?.surfaceId === "battle:evolution"
+    && ["EvolutionPhase", "CoopWaveProgressionReplayPhase"].includes(observation.phase)
+    && observation.ready?.awaitingActionInput === false;
+  return isActiveEvolutionPresentation
+    ? Math.max(defaultAllowanceMs, EVOLUTION_PRESENTATION_PROGRESS_ALLOWANCE_MS)
+    : defaultAllowanceMs;
+}
+
 /**
  * Keep public command/post-turn waits alive only while the real addressed battle is making causal
  * progress. Two Chromium game loops can heavily dilate launch and animations on the standard
@@ -285,7 +302,8 @@ export function createPublicBattleProgressBudget(
 
     if (latestProgress != null) {
       const previousDeadlineMs = deadlineMs;
-      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, latestProgress.eventAtMs + progressAllowanceMs));
+      const allowanceMs = postTurnProgressAllowance(latestProgress, progressAllowanceMs);
+      deadlineMs = Math.min(hardDeadlineMs, Math.max(deadlineMs, latestProgress.eventAtMs + allowanceMs));
       if (deadlineMs > previousDeadlineMs) {
         recordPostTurnBudgetExtension(latestProgress, previousDeadlineMs, deadlineMs, hardDeadlineMs);
       }
