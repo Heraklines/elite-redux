@@ -4002,7 +4002,7 @@ function latestCommandObservation(client, wave) {
   return observation?.operationClass === "command" && observation.address?.wave === wave ? observation : null;
 }
 
-/** Prove an exact initial-save fixture produced three level-100 mons for each real player's seat. */
+/** Prove an exact initial-save fixture produced three level-100, evolution-paused mons per real seat. */
 function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
   const observations = Object.values(rig.clients).map(client => ({
     label: client.label,
@@ -4020,10 +4020,11 @@ function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
       if (
         owned.length !== 3
         || owned.some(slot => slot.level !== 100)
+        || owned.some(slot => slot.pauseEvolutions !== true)
         || JSON.stringify(species) !== JSON.stringify(expectedSpecies)
       ) {
         throw new Error(
-          `[campaign-${context}] ${label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level })))}`,
+          `[campaign-${context}] ${label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level, pauseEvolutions: slot.pauseEvolutions })))}`,
         );
       }
     }
@@ -4032,6 +4033,7 @@ function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
       speciesId: slot.speciesId,
       coopOwner: slot.coopOwner,
       level: slot.level,
+      pauseEvolutions: slot.pauseEvolutions,
     }));
   });
   if (JSON.stringify(projections[0]) !== JSON.stringify(projections[1])) {

@@ -1473,6 +1473,7 @@ function observeSemanticSurface(): void {
         hp: pokemon.hp,
         maxHp: pokemon.getMaxHp(),
         level: pokemon.level,
+        pauseEvolutions: pokemon.pauseEvolutions,
         allowedInBattle: pokemon.isAllowedInBattle(),
         replacementEligible: false,
       }));
@@ -1725,6 +1726,7 @@ function observeSemanticSurface(): void {
               hp: pokemon.hp,
               maxHp: pokemon.getMaxHp(),
               level: pokemon.level,
+              pauseEvolutions: pokemon.pauseEvolutions,
               allowedInBattle,
               replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
             };

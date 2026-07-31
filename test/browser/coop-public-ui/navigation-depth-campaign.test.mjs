@@ -14,12 +14,12 @@ import {
 
 function party() {
   return [
-    { slot: 0, speciesId: 86, coopOwner: "host", level: 100 },
-    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100 },
-    { slot: 2, speciesId: 351, coopOwner: "host", level: 100 },
-    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100 },
-    { slot: 4, speciesId: 327, coopOwner: "host", level: 100 },
-    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100 },
+    { slot: 0, speciesId: 86, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 2, speciesId: 351, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 4, speciesId: 327, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100, pauseEvolutions: true },
   ];
 }
 
@@ -161,7 +161,10 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
     /getCoopBrowserLongitudinalFixtureStartingLevel[\s\S]*isCoopBrowserNavigationFixtureActive\(\)[\s\S]*\? 100 : null/u,
   );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
-  assert.match(starterPhase, /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels\)/u);
+  assert.match(
+    starterPhase,
+    /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null\)/u,
+  );
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);
   assert.match(observer, /level: pokemon\.level/u);

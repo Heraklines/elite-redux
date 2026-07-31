@@ -341,7 +341,7 @@ export class SelectStarterPhase extends Phase {
           }
           return;
         }
-        this.initBattle(merged, true, owners, undefined, fixtureStartingLevels);
+        this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null);
       });
       return;
     }
@@ -382,7 +382,7 @@ export class SelectStarterPhase extends Phase {
         failCoopSharedSession("fresh co-op save slot changed before starter materialization");
         return;
       }
-      this.initBattle(merged, true, owners, undefined, fixtureStartingLevels);
+      this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null);
     });
   }
 
@@ -687,7 +687,8 @@ export class SelectStarterPhase extends Phase {
    * @param coopOwners - Co-op only (#633, P2): per-launch-mon owner tag, parallel to `starters`.
    *   The merged party is interleaved (host0, guest0, host1, ...), so `coopOwners[i]` is the
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
-   * @param startingLevels - Dev scenarios only: optional per-slot construction levels.
+   * @param startingLevels - Test/dev launch only: optional per-slot construction levels.
+   * @param pauseEvolutions - Test/dev launch only: persistently pause evolution on the constructed party.
    */
   initBattle(
     starters: Starter[],
@@ -695,6 +696,7 @@ export class SelectStarterPhase extends Phase {
     coopOwners?: CoopRole[],
     showdownManifests?: ShowdownMonManifest[],
     startingLevels?: readonly number[],
+    pauseEvolutions = false,
   ) {
     const cappedStarters = enforceErBlackShinyStarterLimit(starters);
     if (cappedStarters.some((starter, index) => starter !== starters[index])) {
@@ -755,6 +757,13 @@ export class SelectStarterPhase extends Phase {
         starterIvs,
         starterNature,
       );
+      if (pauseEvolutions) {
+        // Longitudinal navigation/interaction fixtures deliberately trade progression coverage for fast,
+        // survivable travel coverage. The fork can level beyond 100, so a level-100 base species still
+        // evolves after wave one unless this initial-save flag is explicit. Normal campaign profiles never
+        // pass this switch and remain the authority for real evolution presentation/synchronization.
+        starterPokemon.pauseEvolutions = true;
+      }
       if (starter.moveset) {
         starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);
       }

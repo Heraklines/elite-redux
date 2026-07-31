@@ -52,12 +52,12 @@ const root = resolve(import.meta.dirname, "../../..");
 
 test("Mystery interaction qualification proves its six level-100 fixture mons on both browsers", () => {
   const party = [
-    { slot: 0, speciesId: 86, coopOwner: "host", level: 100 },
-    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100 },
-    { slot: 2, speciesId: 351, coopOwner: "host", level: 100 },
-    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100 },
-    { slot: 4, speciesId: 327, coopOwner: "host", level: 100 },
-    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100 },
+    { slot: 0, speciesId: 86, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 2, speciesId: 351, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 4, speciesId: 327, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100, pauseEvolutions: true },
   ];
   const records = [];
   const makeClient = label => ({
@@ -486,7 +486,15 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
     );
   }
   assert.match(starterHandler, /getCoopBrowserCampaignFixtureStarters\(\)/u);
-  assert.match(starterPhase, /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels\)/u);
+  assert.match(
+    starterPhase,
+    /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null\)/u,
+  );
+  assert.match(
+    starterPhase,
+    /if \(pauseEvolutions\)[\s\S]*starterPokemon\.pauseEvolutions = true/u,
+    "the level-100 fixture must not manufacture post-wave evolution coverage",
+  );
   assert.match(
     harness,
     /renderProfile === "mystery-gauntlet"[\s\S]*difficultyId === "mystery"[\s\S]*set\("coopfixture", "campaign-survival"\)/u,
