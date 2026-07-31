@@ -233,7 +233,11 @@ async function waitForMarket(client, from, predicate, description) {
  * for address, interaction pin, catalog, and the single actionable owner before any input is sent.
  */
 export function findPairedMarketOutcome(clients, from) {
-  const events = clients.map(client => client.evidence.findLastMarket(from[client.label] ?? 0, () => true));
+  const events = clients.map(client =>
+    typeof client.evidence.findLastMarket === "function"
+      ? client.evidence.findLastMarket(from[client.label] ?? 0, () => true)
+      : null,
+  );
   if (events.some(event => event?.observation == null)) {
     return null;
   }

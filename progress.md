@@ -6438,3 +6438,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Navigation-depth-30 run `30643301581` and half-wipe run `30643304926` remain immutable attempts on `4a7a1682c`; they
   may independently reach Chromium if their build workers had not yet evaluated the old layout. All replacement
   qualification remains on GitHub-hosted runners, with no local executable validation.
+
+## 2026-07-31 - Market classification remains compatible with focused outcome fixtures
+
+- Exact `5283e3abf` focused qualification `30643671783` is fully green, and its journey bundle built successfully.
+  Fresh-wave2 `30643671353` and half-wipe `30643717683` reached their real Chromium jobs.
+- Mystery campaign builder `30643720907` exposed a focused-contract regression before bundle creation: older bounded
+  outcome fixtures intentionally implement only the evidence channels they exercise, so the new market classifier's
+  unconditional `findLastMarket` call threw instead of simply reporting “not a market.”
+- Market routing now treats a missing optional detailed-market reader as no market evidence. Production browser sinks
+  still provide the method, and `readMarketPair` remains mandatory before any market input. This restores fixture
+  compatibility without weakening the real owner/watcher/address proof.
