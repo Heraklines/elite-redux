@@ -4559,5 +4559,137 @@
     "trainerSprite": "pokestar_invader_alien",
     "victoryDialogue": "...We have to leave this planet with the mothership...",
     "weight": 5
+  },
+  "TRAINER_70026": {
+    "battleBgm": "battle_kanto_champion",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "...",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70026,
+    "introDialogue": "...",
+    "maxWave": 199,
+    "minWave": 181,
+    "name": "Red EX",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HEAT_WAVE",
+          "AIR_SLASH",
+          "DRACO_METEOR",
+          "EARTH_POWER"
+        ],
+        "sanityOff": true,
+        "species": 10095,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SOLAR_BEAM",
+          "WEATHER_BALL",
+          "SLUDGE_BOMB",
+          "MATCHA_GOTCHA"
+        ],
+        "sanityOff": true,
+        "species": 10093,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PLASMA_FISTS",
+          "FAKE_OUT",
+          "SPARK",
+          "VOLT_SWITCH"
+        ],
+        "sanityOff": true,
+        "species": 10586
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "YAWN",
+          "EXTREME_SPEED",
+          "EXPLOSION",
+          "DARKEST_LARIAT"
+        ],
+        "species": 143,
+        "vitamins": {
+          "hp": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "SHEER_COLD",
+          "RAZOR_WIND",
+          "BLEAKWIND_STORM",
+          "EARTH_POWER"
+        ],
+        "sanityOff": true,
+        "species": 10618,
+        "vitamins": {
+          "def": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "POISON_JAB",
+          "THOUSAND_ARROWS",
+          "FELL_STINGER",
+          "MEGAHORN"
+        ],
+        "sanityOff": true,
+        "species": 10097
+      }
+    ],
+    "trainerClass": "CHAMPION",
+    "trainerSprite": "red_masters_ex",
+    "victoryDialogue": "...",
+    "weight": 5
   }
 }
