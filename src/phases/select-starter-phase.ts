@@ -5,6 +5,7 @@ import {
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
   getCoopBrowserLongitudinalFixtureStartingLevel,
+  isCoopBrowserEvolutionFixtureActive,
   shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -17,6 +18,7 @@ import {
   enforceErBlackShinyStarterLimit,
 } from "#data/elite-redux/er-black-shinies";
 import { isErCustomTrainerDevForceArmed, setErCustomTrainerDevForce } from "#data/elite-redux/er-custom-trainers";
+import { getLevelTotalExp } from "#data/exp";
 import { PokemonMove } from "#moves/pokemon-move";
 import { installErCustomTrainerForCurrentWave } from "#phases/er-custom-trainer-install";
 
@@ -759,6 +761,12 @@ export class SelectStarterPhase extends Phase {
         starterIvs,
         starterNature,
       );
+      if (isCoopBrowserEvolutionFixtureActive() && i === 0) {
+        // Initial-save-only deterministic evolution fixture: preserve a normal level-up/evolution
+        // path while avoiding runtime EXP overrides. Wave one's ordinary battle award supplies the
+        // final point, after which the production LevelUpPhase owns the evolution and its V2 capture.
+        starterPokemon.exp = getLevelTotalExp(starterLevel + 1, starterPokemon.species.growthRate) - 1;
+      }
       if (pauseEvolutions) {
         // Longitudinal navigation/interaction fixtures deliberately trade progression coverage for fast,
         // survivable travel coverage. The fork can level beyond 100, so a level-100 base species still

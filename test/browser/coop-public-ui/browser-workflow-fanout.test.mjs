@@ -265,6 +265,11 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
     /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*initBattle\([\s\S]*fixturePauseEvolutions/u,
     "launch separates initial level from the evolution-pause policy",
   );
+  assert.match(
+    selectStarter,
+    /isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*i === 0[\s\S]*starterPokemon\.exp = getLevelTotalExp\(starterLevel \+ 1, starterPokemon\.species\.growthRate\) - 1/u,
+    "the exact initial-save fixture primes one Seel one EXP below its next level",
+  );
   assert.match(starterHandler, /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*seedTeamFromStarters/u);
   assert.match(config, /"evolution-sync"/u);
   assert.match(
