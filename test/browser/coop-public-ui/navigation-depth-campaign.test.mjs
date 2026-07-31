@@ -158,12 +158,16 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(registry, /get\("coopfixture"\) === "navigation-depth-30"/u);
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel[\s\S]*isCoopBrowserNavigationFixtureActive\(\)[\s\S]*\? 100 : null/u,
+    /getCoopBrowserLongitudinalFixtureStartingLevel[\s\S]*isCoopBrowserNavigationFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
+  );
+  assert.match(
+    registry,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
   );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
   assert.match(
     starterPhase,
-    /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null\)/u,
+    /const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions\)/u,
   );
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);
