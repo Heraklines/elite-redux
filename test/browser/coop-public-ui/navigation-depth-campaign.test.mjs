@@ -166,6 +166,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
   assert.match(
+    registry,
+    /getCoopBrowserNavigationFixtureStarters[\s\S]*MoveId\.ICE_BEAM[\s\S]*MoveId\.HEADBUTT[\s\S]*MoveId\.WEATHER_BALL[\s\S]*MoveId\.POWDER_SNOW[\s\S]*MoveId\.BODY_SLAM[\s\S]*MoveId\.PSYBEAM[\s\S]*MoveId\.SUCKER_PUNCH/u,
+    "the longitudinal fixture must expose legal multi-type attacks instead of one permanent immunity trap",
+  );
+  assert.match(
     starterPhase,
     /const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions\)/u,
   );
@@ -178,6 +183,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(workflow, /COOP_UI_REQUIRE_NAVIGATION_DEPTH:[^\n]*navigation-depth-30/u);
   assert.match(campaign, /\[coop-soak:\$\{kind\}\]/u);
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
+  assert.match(
+    campaign,
+    /cycleIndex: policy\.navigation\.required \? turn - 1 : 0/u,
+    "the navigation-only driver must cycle the observer-proven coverage set across a real multi-turn battle",
+  );
   assert.match(
     campaign,
     /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required \|\| policy\.registeredInteractions\.required\)\s*&&\s*\(battleKind\.battleType === "WILD"/u,

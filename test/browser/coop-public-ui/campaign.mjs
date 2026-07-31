@@ -1569,10 +1569,12 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
           : (client, commandPurpose, commandEvent) =>
               driveBestCampaignMove(client, commandPurpose, {
                 timeoutMs: rig.config.timeoutMs,
-                // A later turn proves the previous command resolved; it does not prove the
-                // strongest move was ineffective. Alternate only when a caller has explicit
-                // failure/immunity evidence instead of weakening every ordinary round.
+                // Ordinary campaigns keep choosing the strongest visible move. The sealed
+                // navigation fixture deliberately exposes a legal multi-type coverage set and
+                // cycles it like a human responding to an immunity; otherwise one immune trainer
+                // can consume the entire four-hour geography journey without testing navigation.
                 commandEvent,
+                cycleIndex: policy.navigation.required ? turn - 1 : 0,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },

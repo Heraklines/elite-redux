@@ -280,11 +280,20 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
     return null;
   }
   const specs = [
-    { speciesId: SpeciesId.SEEL, moveId: MoveId.WATER_GUN },
-    { speciesId: SpeciesId.CASTFORM, moveId: MoveId.WATER_GUN },
-    { speciesId: SpeciesId.SPINDA, moveId: MoveId.TACKLE },
+    {
+      speciesId: SpeciesId.SEEL,
+      moveset: [MoveId.ICE_BEAM, MoveId.HEADBUTT, MoveId.BRINE, MoveId.AQUA_JET],
+    },
+    {
+      speciesId: SpeciesId.CASTFORM,
+      moveset: [MoveId.HEADBUTT, MoveId.WEATHER_BALL, MoveId.EMBER, MoveId.POWDER_SNOW],
+    },
+    {
+      speciesId: SpeciesId.SPINDA,
+      moveset: [MoveId.BODY_SLAM, MoveId.PSYBEAM, MoveId.SUCKER_PUNCH, MoveId.TACKLE],
+    },
   ];
-  return specs.map(({ speciesId, moveId }) => ({
+  return specs.map(({ speciesId, moveset }) => ({
     speciesId,
     shiny: false,
     variant: 0,
@@ -292,7 +301,7 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
     abilityIndex: 0,
     passive: false,
     nature: Nature.MODEST,
-    moveset: [moveId] as StarterMoveset,
+    moveset: moveset as StarterMoveset,
     pokerus: false,
     ivs: new Array(6).fill(31),
   }));

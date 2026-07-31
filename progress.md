@@ -6592,3 +6592,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   manifest did not yet declare the newly modified `new-biome-encounter-phase.ts`. This is classified as CI metadata,
   not a product or test failure; the sorted exact path is now owned and the focused qualification is redispatched by
   the metadata push.
+
+## 2026-07-31 - Navigation wave-25 red was a one-move immunity trap
+
+- Exact `a20428d60` navigation run `30652762674` proved the previous HUD repair, both alternating-owner Biome
+  Markets, Wide Lens application, Crossroads Stay and Leave, both World Maps, two new-biome command frontiers, the
+  wave-20 trainer boss, and two Mystery encounters before stopping on wave 25 after twelve rounds.
+- This was not a sync stall. Both browsers completed every ordered command and presentation receipt through
+  `TURN/e1828373232871355/w25/t12`, applied identical revision 405, and opened the shared turn-13 command frontier.
+  The trace instead showed both level-100 fixtures using their only move, Water Gun, into a Water-immune Tympole on
+  every round (`It doesn't affect Foe Tympole!`) while the opponent remained at full HP.
+- This red is classified as a harness-fixture defect. The exact-build navigation roster now carries four ordinary
+  level-up attacks per species with multiple damage types, and only the navigation profile cycles those visible
+  usable moves by battle turn. Production Authority V2, battle mechanics, and other campaign policies are unchanged.
