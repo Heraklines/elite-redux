@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "82e5ff17b1fa8a7483ad887220bef4193a04d531",
+  "baseSha": "561b4f3ee2f9b15e7db7f085049029807ef0fa2f",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -174,6 +174,7 @@
     "src/phases/show-party-exp-bar-phase.ts",
     "src/phases/showdown-result-phase.ts",
     "src/phases/summon-phase.ts",
+    "src/phases/switch-biome-phase.ts",
     "src/phases/switch-phase.ts",
     "src/phases/switch-summon-phase.ts",
     "src/phases/the-bargain-phase.ts",

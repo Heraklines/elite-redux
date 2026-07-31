@@ -3615,7 +3615,11 @@ test("a projected biome transition also accepts a Mystery interaction as its exa
   assert.match(admission, /control\.kind === "SHARED_INTERACTION"/u);
   assert.match(admission, /control\.operationId === successor\.operationId/u);
   assert.match(admission, /permit\.nextWave === material\.wave/u);
-  assert.match(admission, /material\.turn === 1/u);
+  assert.doesNotMatch(
+    admission,
+    /material\.turn === 1/u,
+    "the biome bridge must admit the signed ME_PRESENT address at destination turn 0",
+  );
   assert.doesNotMatch(
     admission,
     /permit\.(?:historyRecorded|switchPrepared)/u,
@@ -3624,9 +3628,10 @@ test("a projected biome transition also accepts a Mystery interaction as its exa
 
   const preparation = switchBiomePhase.slice(interactionPreparationStart, interactionReleaseStart);
   assert.match(preparation, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
-  assert.match(
+  assert.doesNotMatch(
     preparation,
-    /destinationBattle\.waveIndex !== material\.wave[\s\S]*?destinationBattle\.turn !== material\.turn/u,
+    /destinationBattle\.turn !== material\.turn|material\.turn !== 1/u,
+    "the structural shell proves the destination wave while interaction DATA owns its exact turn",
   );
   const release = switchBiomePhase.slice(interactionReleaseStart, commandReleaseStart);
   assert.match(release, /markCoopBiomeTransitionHistoryRecorded\(permit\.operationId\)/u);

@@ -1081,6 +1081,91 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
     });
   }, 120_000);
 
+  it("SwitchBiome prepares a signed destination Mystery shell at pre-battle turn zero", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);
+
+    await withClient(rig.guestCtx, () => {
+      const sourceWave = rig.guestScene.currentBattle.waveIndex;
+      const nextWave = sourceWave + 1;
+      const sourceBiomeId = rig.guestScene.arena.biomeId;
+      const destinationBiomeId = BiomeId.VOLCANO;
+      const permitOperationId = coopAuthoritativeBiomeTransitionOperationId(sourceWave);
+      const permitAddress = permitOperationId == null ? null : parseCoopOperationId(permitOperationId);
+      expect(permitAddress).not.toBeNull();
+      expect(
+        armCoopBiomeTransitionTailPermit({
+          operationId: permitOperationId!,
+          sessionEpoch: permitAddress!.epoch,
+          revision: 1,
+          wave: sourceWave,
+          sourceBiomeId,
+          destinationBiomeId,
+          nextWave,
+        }),
+      ).toBe(true);
+
+      const phase = new SwitchBiomePhase(destinationBiomeId, sourceWave, true);
+      const boundary = { live: true };
+      syntheticBoundaries.add(boundary);
+      (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => boundary.live;
+      const current = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
+      phase.start();
+      expect(getCoopBiomeTransitionTailPermit()).toMatchObject({ switchAdopted: true });
+
+      const interactionOperationId = makeCoopOperationId(permitAddress!.epoch, 1, 88_000, "ME_PRESENT");
+      const successor = {
+        sessionEpoch: permitAddress!.epoch,
+        revision: 2,
+        kind: "INTERACTION_COMMIT",
+        operationId: interactionOperationId,
+        nextControl: {
+          kind: "SHARED_INTERACTION",
+          operationId: interactionOperationId,
+          ownerSeatId: 1,
+          epoch: permitAddress!.epoch,
+          wave: nextWave,
+          turn: 0,
+          surfaceClass: "op:me",
+          operationKind: "ME_PRESENT",
+          successor: {
+            operationKinds: [
+              "BARGAIN_PRESENT",
+              "COLO_PICK",
+              "ME_PRESENT",
+              "ME_TERMINAL",
+              "REWARD_PRESENT",
+              "SHOP_PRESENT",
+            ],
+            operationIds: null,
+          },
+        },
+        interactionStateMaterial: {
+          wave: nextWave,
+          turn: 0,
+          stateTick: 1,
+        },
+      } as const;
+      const bridge = phase as unknown as {
+        canPrepareForCoopV2InteractionMaterial(claim: unknown): boolean;
+        prepareForCoopV2InteractionMaterial(claim: unknown): boolean;
+      };
+      const sourceBattle = rig.guestScene.currentBattle;
+      expect(
+        bridge.canPrepareForCoopV2InteractionMaterial(successor),
+        "ME_PRESENT at N+1/t0 is the signed first destination surface",
+      ).toBe(true);
+      expect(bridge.prepareForCoopV2InteractionMaterial(successor)).toBe(true);
+      expect(rig.guestScene.currentBattle).not.toBe(sourceBattle);
+      expect(rig.guestScene.currentBattle.waveIndex).toBe(nextWave);
+      expect(
+        getCoopBiomeTransitionTailPermit(),
+        "pre-DATA shell creation retains the exact permit until immutable interaction state is installed",
+      ).toMatchObject({ switchAdopted: true, historyRecorded: false, switchPrepared: false });
+      current.mockRestore();
+    });
+  }, 120_000);
+
   it("stale Crossroads and biome-market callbacks cannot relay, mutate, or advance after replacement", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const rig = await buildDuo(game, createScheduledCoopPair({ automatic: true }), setCoopRuntime, toCoop);

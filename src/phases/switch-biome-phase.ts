@@ -209,7 +209,6 @@ export class SwitchBiomePhase extends BattlePhase {
       && control.epoch === successor.sessionEpoch
       && control.wave === material.wave
       && control.turn === material.turn
-      && material.turn === 1
       && material.stateTick > 0
       && permit != null
       && permit.switchAdopted
@@ -232,29 +231,26 @@ export class SwitchBiomePhase extends BattlePhase {
       return false;
     }
     if (currentBattle.waveIndex === material.wave) {
-      const alreadyPrepared = currentBattle.turn === material.turn;
-      this.coopDestinationBattleCreated ||= alreadyPrepared;
-      return alreadyPrepared;
+      // The signed interaction image owns the exact turn. In particular, ME_PRESENT legitimately opens
+      // at destination turn 0 before any battle turn exists, so the structural shell proves only wave
+      // identity here and DATA installs the immutable turn immediately afterwards.
+      this.coopDestinationBattleCreated = true;
+      return true;
     }
     if (
       this.coopDestinationBattleCreated
       || currentBattle.waveIndex !== permit.wave
       || material.wave !== permit.nextWave
       || material.wave !== currentBattle.waveIndex + 1
-      || material.turn !== 1
     ) {
       return false;
     }
     try {
       const destinationBattle = globalScene.newCoopV2ProjectedBattle();
-      if (
-        globalScene.currentBattle !== destinationBattle
-        || destinationBattle.waveIndex !== material.wave
-        || destinationBattle.turn !== material.turn
-      ) {
+      if (globalScene.currentBattle !== destinationBattle || destinationBattle.waveIndex !== material.wave) {
         throw new Error(
-          `interaction destination Battle address mismatch expected=${material.wave}:${material.turn} `
-            + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
+          `interaction destination Battle wave mismatch expected=${material.wave} `
+            + `actual=${destinationBattle.waveIndex}`,
         );
       }
       this.coopDestinationBattleCreated = true;
