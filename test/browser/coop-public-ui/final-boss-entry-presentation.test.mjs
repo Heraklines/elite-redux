@@ -6,14 +6,19 @@ const runtime = await readFile(new URL("../../../src/data/elite-redux/coop/coop-
 const replay = await readFile(new URL("../../../src/phases/coop-replay-turn-phase.ts", import.meta.url), "utf8");
 const replayPhases = await readFile(new URL("../../../src/phases/coop-replay-phases.ts", import.meta.url), "utf8");
 
-test("a late turn-one renderer reads and reasserts its exact retired command prefix", () => {
+test("a late renderer reads and reasserts its exact retained command source", () => {
   assert.match(runtime, /export function readRetainedCoopV2CommandEntryPresentation\(/u);
   assert.match(runtime, /runtime\.v2ControlLedger\.sourceEntryOf\(control\)/u);
-  assert.match(runtime, /source\?\.kind !== "CONTROL_COMMIT"/u);
+  assert.match(runtime, /source == null \|\| !controlsEqual\(source\.nextControl, control\)/u);
+  assert.match(runtime, /source\.kind === "CONTROL_COMMIT"/u);
   assert.match(runtime, /material\?\.kind !== "command-open"/u);
-  assert.match(runtime, /!controlsEqual\(source\.nextControl, control\)/u);
   assert.match(runtime, /events: structuredClone\(material\.entryPresentation\)/u);
   assert.match(runtime, /authoritativeState: structuredClone\(material\.authoritativeState\)/u);
+  assert.match(runtime, /!runtime\.v2ControlLedger\.isMaterialApplied\(control\)/u);
+  assert.match(runtime, /source\.kind === "TURN_COMMIT"[\s\S]*reconstructCoopV2TurnResolution/u);
+  assert.match(runtime, /source\.kind === "REPLACEMENT_COMMIT"[\s\S]*reconstructCoopV2ReplacementCheckpoint/u);
+  assert.match(runtime, /source\.kind === "INTERACTION_COMMIT"[\s\S]*decodeCoopV2InteractionEnvelope/u);
+  assert.match(runtime, /events: \[\][\s\S]*authoritativeState: structuredClone\(authoritativeState\)/u);
   assert.match(runtime, /controlOperationId: source\.operationId/u);
 
   const readIndex = replay.indexOf("readRetainedCoopV2CommandEntryPresentation(this.sourceWave, this.turn)");
@@ -48,6 +53,10 @@ test("entry presentation restores the signed state after every visual cue and be
   assert.ok(restoreIndex >= 0, "the finalizer must restore mechanics after presentation drains");
   assert.ok(watermarkIndex > restoreIndex, "render proof cannot precede the exact-state restore");
   assert.ok(controlIndex > restoreIndex, "command control cannot precede the exact-state restore");
+  assert.match(
+    finalizer,
+    /noteConsumedCommandPresentation\(this\.controlOperationId\)[\s\S]*retryCoopV2PendingAuthorityAtSafeBoundary\(\)/u,
+  );
   assert.match(
     finalizer,
     /coopAppliedStateTick\(\) === state\.tick[\s\S]*reapplyAcceptedCoopAuthoritativeBattleState\(state, true\)/u,

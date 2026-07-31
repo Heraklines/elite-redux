@@ -6334,3 +6334,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Exact `aa8ea27b0` qualification otherwise closed green: focused gate `30633595723` and fresh-wave2 journey
   `30633595876` passed. The observer repair will qualify remotely with the next Authority V2 exact-SHA batch; no local
   test or build is used.
+
+## 2026-07-31 - A passive replica receipts the exact command source before retirement
+
+- Exact depth campaign `30621198797` exposed the remaining zero-input authority hole. On the guest replica after its
+  half of the field wiped, replacement revision 16 was admitted, marked `materialApplied`, marked `controlInstalled`,
+  and retired in the same millisecond. No `CoopFinalizeEntryPresentationPhase` existed for that source operation.
+  Revisions 17 and 18 then arrived; the wave successor superseded the speculative turn, but remained admitted forever.
+- Command projection now treats the complete retained source entry—not only `CONTROL_COMMIT`—as its re-presentation
+  identity. An ordinary co-op replica with zero locally owned command targets defers `controlInstalled` until an
+  address-exact passive watcher records the source operation's presentation receipt. TurnInit and its direct
+  CommandPhase bypass both recognize that requirement. Showdown/tournament versus sessions are explicitly excluded.
+- A late watcher recovers the immutable, materially applied state only from validated TURN, REPLACEMENT, or INTERACTION
+  source material, verifies exact wave/turn/tick, restores that image through the ordinary presentation finalizer, and
+  records an empty cosmetic prefix because the source renderer already owns its cues. The finalizer immediately retries
+  the ordered ledger after recording the receipt, so the deferred source can retire without a transport timer.
+- Source contracts cover the zero-target receipt gate, non-CONTROL state reconstruction, both UI admission call chains,
+  and the receipt-to-ledger retry edge. TypeScript, formatting, source contracts, engine shards, and the exact four-wave
+  depth campaign will all run remotely on GitHub; no local tests are used.

@@ -634,8 +634,8 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     turnInit,
-    /inspectCoopV2CommandPresentationRequirement\(wave, turn\)[\s\S]+commandPresentation\.kind === "awaiting-source"[\s\S]+commandPresentation\.kind === "presentation"[\s\S]+hasConsumedCommandPresentation\(commandPresentation\.operationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
-    "V2 queues a prefix consumer only while a command source is absent or its CONTROL prefix is unconsumed",
+    /inspectCoopV2CommandPresentationRequirement\(wave, turn\)[\s\S]+commandPresentation\.kind === "awaiting-source"[\s\S]+commandPresentation\.kind === "presentation"[\s\S]+commandPresentation\.kind === "passive-watcher"[\s\S]+hasConsumedCommandPresentation\(commandPresentation\.operationId\)[\s\S]+"CoopReplayTurnPhase"[\s\S]+wave,[\s\S]+true,/u,
+    "V2 queues a prefix consumer while a source is absent or its active/passive presentation is unconsumed",
   );
   assert.match(
     turnInit,
@@ -655,7 +655,7 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     replayPhases,
-    /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+noteConsumedCommandPresentation[\s\S]+this\.end\(\)/u,
+    /class CoopFinalizeEntryPresentationPhase[\s\S]+inspectCoopPresentationOutcomes[\s\S]+noteRenderedThrough[\s\S]+noteConsumedCommandPresentation[\s\S]+retryCoopV2PendingAuthorityAtSafeBoundary\(\)[\s\S]+this\.end\(\)/u,
     "the last queued phase must prove every outcome before command control can open",
   );
   assert.match(
@@ -677,8 +677,13 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   assert.match(stream, /consumedCommandPresentationOperations = new Set<string>/u);
   assert.match(
     runtime,
-    /inspectCoopV2CommandPresentationRequirement[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.kind === "CONTROL_COMMIT"[\s\S]+decodeControlOpenEntry\(source\)[\s\S]+kind: "covered-by-source"/u,
-    "the command source distinguishes a replayable CONTROL prefix from an already-presented TURN successor",
+    /inspectCoopV2CommandPresentationRequirement[\s\S]+sourceEntryOf\(control\)[\s\S]+source\.kind === "CONTROL_COMMIT"[\s\S]+decodeControlOpenEntry\(source\)[\s\S]+authorityRole === "replica"[\s\S]+!runtime\.controller\.isVersusSession\(\)[\s\S]+commandTargetsOwnedBySeat\(control, runtime\.controller\.localSeatId\)\.length === 0[\s\S]+kind: "passive-watcher"[\s\S]+kind: "covered-by-source"/u,
+    "the command source distinguishes replayable CONTROL, passive spectator, and locally proved successors",
+  );
+  assert.match(
+    runtime,
+    /readRetainedCoopV2CommandEntryPresentation[\s\S]+isMaterialApplied\(control\)[\s\S]+source\.kind === "TURN_COMMIT"[\s\S]+reconstructCoopV2TurnResolution[\s\S]+source\.kind === "REPLACEMENT_COMMIT"[\s\S]+reconstructCoopV2ReplacementCheckpoint[\s\S]+source\.kind === "INTERACTION_COMMIT"[\s\S]+decodeCoopV2InteractionEnvelope[\s\S]+authoritativeState\.wave !== wave[\s\S]+events: \[\][\s\S]+controlOperationId: source\.operationId/u,
+    "a late passive watcher recovers only its materially applied immutable source state",
   );
   assert.match(
     runtime,
@@ -692,8 +697,8 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
   );
   assert.match(
     runtime,
-    /claim\.addressedByCurrent[\s\S]+isMaterialApplied\(current\)[\s\S]+inspectCoopV2CommandPresentationRequirement\(state\.wave, state\.turn, runtime\)[\s\S]+!runtime\.battleStream\.hasConsumedCommandPresentation\(presentation\.operationId\)[\s\S]+return "presentation-required"[\s\S]+return "ready"/u,
-    "a parked post-replacement command cannot become actionable before its CONTROL prefix is receipted",
+    /claim\.addressedByCurrent[\s\S]+isMaterialApplied\(current\)[\s\S]+inspectCoopV2CommandPresentationRequirement\(state\.wave, state\.turn, runtime\)[\s\S]+presentation\.kind === "presentation"[\s\S]+presentation\.kind === "passive-watcher"[\s\S]+!runtime\.battleStream\.hasConsumedCommandPresentation\(presentation\.operationId\)[\s\S]+return "presentation-required"[\s\S]+return "ready"/u,
+    "a TurnInit-bypassing command cannot become actionable before its active or passive prefix is receipted",
   );
   assert.match(
     command,

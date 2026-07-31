@@ -7162,11 +7162,11 @@ function buildCoopV2LiveSeams(
         // Each phase's address/session predicate remains the authority gate, and its release is idempotent;
         // an unrelated phase cannot spend the entry and a real replay receives the immutable prefix once.
         const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
-        if (
-          sourceEntry?.kind === "CONTROL_COMMIT"
+        const sourceMaterialApplied =
+          sourceEntry != null
           && controlsEqual(sourceEntry.nextControl, control)
-          && runtime.v2ControlLedger.isMaterialApplied(control)
-        ) {
+          && runtime.v2ControlLedger.isMaterialApplied(control);
+        if (sourceMaterialApplied && sourceEntry != null) {
           releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry);
         }
         // The entry states every human actor, while this authenticated replica proves only its numeric-seat
@@ -7187,6 +7187,23 @@ function buildCoopV2LiveSeams(
               reason:
                 `awaiting ${missing.length}/${localCommands.length} local-seat real CommandPhase proofs `
                 + `(frontier=${control.commands.length}) for ${controlId}`,
+            };
+          }
+          if (
+            runtime.controller.authorityRole === "replica"
+            && !runtime.controller.isVersusSession()
+            && localCommands.length === 0
+            && sourceMaterialApplied
+            && sourceEntry != null
+            && !runtime.battleStream.hasConsumedCommandPresentation(sourceEntry.operationId)
+          ) {
+            // A wiped/passive seat has no CommandPhase with which to prove that the exact source result
+            // reached a real renderer boundary. Retiring here lets a following WAVE/TERMINAL supersede the
+            // still-running replacement/turn presentation, which is the wave-2 half-wipe deadlock. Hold the
+            // ordered source until TurnInit's passive watcher crosses its exact-state presentation fence.
+            return {
+              kind: "deferred",
+              reason: `awaiting passive command watcher presentation receipt ${sourceEntry.operationId}`,
             };
           }
           if (surfaces.wave) {
@@ -9419,7 +9436,7 @@ export function enterCoopV2CommandControlBoundary(
   if (claim.addressedByCurrent && current != null && runtime.v2ControlLedger.isMaterialApplied(current)) {
     const presentation = inspectCoopV2CommandPresentationRequirement(state.wave, state.turn, runtime);
     if (
-      presentation.kind === "presentation"
+      (presentation.kind === "presentation" || presentation.kind === "passive-watcher")
       && !runtime.battleStream.hasConsumedCommandPresentation(presentation.operationId)
     ) {
       // TurnInit ordinarily creates the presentation-only replay before either CommandPhase. A replacement
@@ -9464,7 +9481,7 @@ export function isCoopV2ControlCutoverActive(runtime: CoopRuntime | null = activ
   return runtime != null && coopV2ControlCutovers.has(runtime);
 }
 
-/** Whether the complete V2 graph can carry the sealed pre-command presentation on CONTROL_COMMIT. */
+/** Whether the complete V2 graph can prove every sealed or passive pre-command presentation boundary. */
 export function isCoopV2CommandEntryPresentationActive(runtime: CoopRuntime | null = active): boolean {
   return isCoopV2ControlCutoverActive(runtime);
 }
@@ -9473,6 +9490,7 @@ export type CoopV2CommandPresentationRequirement =
   | { readonly kind: "awaiting-source" }
   | { readonly kind: "awaiting-replacement-carrier"; readonly operationId: string }
   | { readonly kind: "presentation"; readonly operationId: string }
+  | { readonly kind: "passive-watcher"; readonly operationId: string }
   | { readonly kind: "covered-by-source"; readonly operationId: string };
 
 /**
@@ -9482,8 +9500,8 @@ export type CoopV2CommandPresentationRequirement =
  * cursor with a newer state tick. More importantly, a command frontier has two different legal sources:
  *
  * - a CONTROL_COMMIT owns a distinct sealed pre-command prefix which TurnInit must replay exactly once;
- * - TURN/REPLACEMENT/etc. can state COMMAND_FRONTIER directly, after their own ordered renderer/finalizer
- *   already crossed every presentation event owned by that entry.
+ * - TURN/REPLACEMENT/etc. can state COMMAND_FRONTIER directly. A seat with a local actor proves that source
+ *   through its CommandPhase; a passive replica must still cross an exact-state watcher fence.
  *
  * Treating the second case as "CONTROL_COMMIT has not arrived yet" creates an impossible wait. Keep the
  * distinction closed here so callers can wait only when the source is genuinely absent, replay only a
@@ -9516,9 +9534,21 @@ export function inspectCoopV2CommandPresentationRequirement(
   if (source == null || !controlsEqual(source.nextControl, control)) {
     return { kind: "awaiting-source" };
   }
-  return source.kind === "CONTROL_COMMIT" && decodeControlOpenEntry(source)?.kind === "command-open"
-    ? { kind: "presentation", operationId: source.operationId }
-    : { kind: "covered-by-source", operationId: source.operationId };
+  if (source.kind === "CONTROL_COMMIT" && decodeControlOpenEntry(source)?.kind === "command-open") {
+    return { kind: "presentation", operationId: source.operationId };
+  }
+  if (
+    source.kind !== "CONTROL_COMMIT"
+    && runtime != null
+    && runtime.controller.authorityRole === "replica"
+    && !runtime.controller.isVersusSession()
+    && commandTargetsOwnedBySeat(control, runtime.controller.localSeatId).length === 0
+  ) {
+    // The source's ordinary renderer owns its cues, but this authenticated seat has no local CommandPhase
+    // proof at the stated frontier. Require one exact-state passive watcher fence before control can retire.
+    return { kind: "passive-watcher", operationId: source.operationId };
+  }
+  return { kind: "covered-by-source", operationId: source.operationId };
 }
 
 /**
@@ -9553,20 +9583,47 @@ export function readRetainedCoopV2CommandEntryPresentation(
     return null;
   }
   const source = runtime.v2ControlLedger.sourceEntryOf(control);
-  const material = source == null ? null : decodeControlOpenEntry(source);
+  if (source == null || !controlsEqual(source.nextControl, control)) {
+    return null;
+  }
+  if (source.kind === "CONTROL_COMMIT") {
+    const material = decodeControlOpenEntry(source);
+    if (material?.kind !== "command-open" || material.wave !== wave || material.turn !== turn) {
+      return null;
+    }
+    return {
+      events: structuredClone(material.entryPresentation),
+      stateTick: material.authoritativeState.tick,
+      authoritativeState: structuredClone(material.authoritativeState),
+      controlOperationId: source.operationId,
+    };
+  }
+  if (!runtime.v2ControlLedger.isMaterialApplied(control)) {
+    return null;
+  }
+  let authoritativeState: CoopAuthoritativeBattleStateV1 | null = null;
+  if (source.kind === "TURN_COMMIT") {
+    authoritativeState = reconstructCoopV2TurnResolution(
+      source.material.payload as TurnResolutionImage,
+    )?.authoritativeState ?? null;
+  } else if (source.kind === "REPLACEMENT_COMMIT") {
+    authoritativeState = reconstructCoopV2ReplacementCheckpoint(source)?.checkpoint.authoritativeState ?? null;
+  } else if (source.kind === "INTERACTION_COMMIT") {
+    authoritativeState = decodeCoopV2InteractionEnvelope(source)?.envelope.authoritativeState ?? null;
+  }
   if (
-    source?.kind !== "CONTROL_COMMIT"
-    || material?.kind !== "command-open"
-    || material.wave !== wave
-    || material.turn !== turn
-    || !controlsEqual(source.nextControl, control)
+    authoritativeState == null
+    || !Number.isSafeInteger(authoritativeState.tick)
+    || authoritativeState.tick <= 0
+    || authoritativeState.wave !== wave
+    || authoritativeState.turn !== turn
   ) {
     return null;
   }
   return {
-    events: structuredClone(material.entryPresentation),
-    stateTick: material.authoritativeState.tick,
-    authoritativeState: structuredClone(material.authoritativeState),
+    events: [],
+    stateTick: authoritativeState.tick,
+    authoritativeState: structuredClone(authoritativeState),
     controlOperationId: source.operationId,
   };
 }

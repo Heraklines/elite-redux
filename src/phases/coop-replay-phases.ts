@@ -3234,6 +3234,14 @@ export class CoopFinalizeEntryPresentationPhase extends Phase {
     this.streamer.noteRenderedThrough(this.turn, this.throughCount, this.sourceWave);
     if (this.controlOperationId != null) {
       this.streamer.noteConsumedCommandPresentation(this.controlOperationId);
+      const completedEntries = retryCoopV2PendingAuthorityAtSafeBoundary();
+      if (completedEntries > 0) {
+        coopLog(
+          "v2-control",
+          `passive presentation receipt completed ${completedEntries} ordered V2 entr${completedEntries === 1 ? "y" : "ies"} `
+            + `after ${this.controlOperationId}`,
+        );
+      }
     }
     coopLog(
       "replay",

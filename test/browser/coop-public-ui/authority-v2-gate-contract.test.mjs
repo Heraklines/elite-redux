@@ -936,23 +936,32 @@ test("recovery rebuilds wave terminals and installs a multi-target command super
     "only an exact recovery bootstrap bypasses the ordinary all-target-live wait",
   );
   const retainedSource = liveProject.indexOf("v2ControlLedger.sourceEntryOf(control)");
-  const requiresControlCommit = liveProject.indexOf('sourceEntry?.kind === "CONTROL_COMMIT"', retainedSource);
+  const requiresExactSource = liveProject.indexOf("controlsEqual(sourceEntry.nextControl, control)", retainedSource);
   const requiresAppliedMaterial = liveProject.indexOf("v2ControlLedger.isMaterialApplied(control)", retainedSource);
   const releasesExactConsumer = liveProject.indexOf(
     "releaseCoopV2ParkedTurnBoundary(runtime, sourceEntry)",
     retainedSource,
   );
   const waitsForCommandProofs = liveProject.indexOf("const missing = localCommands.filter", retainedSource);
+  const waitsForPassiveWatcher = liveProject.indexOf("localCommands.length === 0", waitsForCommandProofs);
+  const requiresPassiveReceipt = liveProject.indexOf(
+    "hasConsumedCommandPresentation(sourceEntry.operationId)",
+    waitsForPassiveWatcher,
+  );
   assert.ok(retainedSource >= 0, "command projection retains the immutable source entry");
   assert.ok(
-    requiresControlCommit > retainedSource
-      && requiresAppliedMaterial > requiresControlCommit
+    requiresExactSource > retainedSource
+      && requiresAppliedMaterial > requiresExactSource
       && releasesExactConsumer > requiresAppliedMaterial,
-    "only a materially applied CONTROL_COMMIT is re-presented to its exact current consumer",
+    "only the exact materially applied command source is re-presented to its current consumer",
   );
   assert.ok(
     waitsForCommandProofs > releasesExactConsumer,
     "the retained presentation handoff occurs before command proof can leave the entry pending",
+  );
+  assert.ok(
+    waitsForPassiveWatcher > waitsForCommandProofs && requiresPassiveReceipt > waitsForPassiveWatcher,
+    "a zero-target replica cannot retire command control before its exact source presentation receipt",
   );
 });
 

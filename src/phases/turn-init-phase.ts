@@ -135,15 +135,15 @@ export class TurnInitPhase extends FieldPhase {
     const commandPresentation = inspectCoopV2CommandPresentationRequirement(wave, turn);
     const needsCommandPresentation = isCoopV2CommandEntryPresentationActive()
       ? commandPresentation.kind === "awaiting-source"
-        || (commandPresentation.kind === "presentation"
+        || ((commandPresentation.kind === "presentation" || commandPresentation.kind === "passive-watcher")
           && !streamer?.hasConsumedCommandPresentation(commandPresentation.operationId))
       : turn === 1 && !streamer?.hasConsumedEntryPresentationThroughWave(wave);
     if (needsCommandPresentation) {
       // A standalone V2 command-open carries every cue recorded before its exact frontier, including
       // later-turn replacement hazards/abilities. Consume and prove that complete prefix before either real
-      // command opens. A TURN_COMMIT that directly states N+1 already crossed its own ordered renderer and
-      // must not wait for a second CONTROL_COMMIT that can never exist. The operation watermark prevents both
-      // live packets and a same-turn TurnInit re-entry from displaying a real prefix twice.
+      // command opens. A non-CONTROL source never waits for a second CONTROL_COMMIT; a passive replica instead
+      // consumes its complete retained state with an empty watcher prefix after the ordinary source renderer.
+      // The operation watermark prevents live packets or same-turn TurnInit re-entry from proving it twice.
       globalScene.phaseManager.pushNew("CoopReplayTurnPhase", turn, 0, undefined, wave, true);
     }
     globalScene.getField().forEach((pokemon, fieldIndex) => {
