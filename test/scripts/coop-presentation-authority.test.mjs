@@ -1024,6 +1024,21 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
   );
   assert.match(
     progressionReplay,
+    /menu:evolving[\s\S]+callbackDelay: 1000,[\s\S]+prompt: false[\s\S]+heartbeat\("intro-text"\)/u,
+    "the retained evolution intro follows native presentation and advances without invented human input",
+  );
+  assert.match(
+    progressionReplay,
+    /menu:evolutionDone[\s\S]+callbackDelay: null,[\s\S]+prompt: true,[\s\S]+promptDelay: 4000[\s\S]+heartbeat\("completion-text"\)/u,
+    "only the retained evolution completion line exposes the native delayed human prompt",
+  );
+  assert.match(
+    progressionReplay,
+    /globalScene\.ui\.showText\(text, null, resolve, callbackDelay, prompt, promptDelay\)/u,
+    "the cancellable renderer preserves the UI handler's callback and prompt-delay semantics",
+  );
+  assert.match(
+    progressionReplay,
     /cycleCancelled\.value = true[\s\S]+for \(const cancel of \[\.\.\.this\.cancellationHooks\]\)/u,
     "a cancelled evolution stops its recursive animation and every owned callback",
   );

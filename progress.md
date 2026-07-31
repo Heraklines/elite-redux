@@ -6272,3 +6272,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first source coverage now requires the public animation callback, propagation through every recursive call,
   and the retained renderer heartbeat at every real morph completion. Local source/static qualification follows before
   the exact evolution journey is dispatched again; co-op Vitest and Chromium execution remain remote-only.
+
+## 2026-07-31 - Retained evolution text follows the native input contract
+
+- Exact-SHA focused gate `30627091328` at `3cd92e591` is fully green, including remote TypeScript, source contracts,
+  and the selected P/A/B engine shards. Push journey `30627091315` also passed the complete fresh-wave2 two-browser
+  path. This proves the morph-cycle callback and its retirement guard without weakening ordinary launch or battle.
+- Dedicated evolution run `30627156388` reached the reconstructed guest cutscene but exposed a distinct input-parity
+  defect before the morph began. The retained renderer made the introductory “is evolving” line an actionable prompt;
+  the native authority renderer types that line and automatically continues after its callback delay. The evidence
+  showed `scene-ready`, then an actionable `battle:evolution` surface, no public input at the old submitted-turn
+  address, and a watchdog at `scene-ready`. The harness correctly refused to guess across the address boundary.
+- Retained evolution now mirrors native text semantics exactly: the intro automatically advances after its one-second
+  callback delay, while the completion line alone publishes a human prompt after the native four-second prompt delay.
+  The cancellable wrapper carries callback delay, prompt flag, and prompt delay separately, so presentation parity no
+  longer depends on a harness pressing an input the authority never required.
+- Failure-first coverage went red on the invented intro prompt and now seals all six UI arguments plus both call-site
+  contracts. The next exact browser rerun must reach per-cycle heartbeats and visibly advance the final completion
+  prompt before the progression ledger can pass.

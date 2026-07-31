@@ -97,7 +97,10 @@ class CoopEvolutionPresentation {
       heartbeat("mode-ready");
       this.setup();
       heartbeat("scene-ready");
-      await this.showTimedText(i18next.t("menu:evolving", { pokemonName: getPokemonNameWithAffix(this.before) }), 1000);
+      await this.showTimedText(i18next.t("menu:evolving", { pokemonName: getPokemonNameWithAffix(this.before) }), {
+        callbackDelay: 1000,
+        prompt: false,
+      });
       this.assertActive();
       heartbeat("intro-text");
       this.before.cry();
@@ -172,7 +175,11 @@ class CoopEvolutionPresentation {
           pokemonName: getPokemonNameWithAffix(this.before),
           evolvedPokemonName: this.after.name,
         }),
-        4000,
+        {
+          callbackDelay: null,
+          prompt: true,
+          promptDelay: 4000,
+        },
       );
       this.assertActive();
       heartbeat("completion-text");
@@ -318,9 +325,20 @@ class CoopEvolutionPresentation {
     return sprite;
   }
 
-  private showTimedText(text: string, delay: number): Promise<void> {
+  private showTimedText(
+    text: string,
+    {
+      callbackDelay,
+      prompt,
+      promptDelay,
+    }: {
+      readonly callbackDelay: number | null;
+      readonly prompt: boolean;
+      readonly promptDelay?: number;
+    },
+  ): Promise<void> {
     return this.cancellable<void>(resolve => {
-      globalScene.ui.showText(text, null, resolve, delay, true);
+      globalScene.ui.showText(text, null, resolve, callbackDelay, prompt, promptDelay);
     });
   }
 
