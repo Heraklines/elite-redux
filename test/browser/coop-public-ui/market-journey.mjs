@@ -27,6 +27,11 @@ function catalogKey(observation) {
   );
 }
 
+export function partyTargetSlot(selectedOptionId) {
+  const selected = /^party-slot:(\d+)$/u.exec(selectedOptionId ?? "");
+  return selected == null ? null : Number(selected[1]);
+}
+
 /**
  * Seal the campaign-level market contract after every visited market has reached its
  * next public command surface. A two-parity run is only green when Wide Lens was paid
@@ -318,11 +323,10 @@ async function selectPartyTarget(owner, from, partySlot) {
     timeoutMs: owner.config.timeoutMs,
     description: "market party-target picker",
   });
-  const selected = /^cursor:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
-  if (selected == null) {
+  let cursor = partyTargetSlot(event.observation.selectedOptionId);
+  if (cursor == null) {
     throw new Error(`${owner.label}: party-target picker exposed no selected party slot`);
   }
-  let cursor = Number(selected[1]);
   while (cursor !== partySlot) {
     const key = cursor < partySlot ? "ArrowDown" : "ArrowUp";
     const eventIndex = event.index;
@@ -331,7 +335,7 @@ async function selectPartyTarget(owner, from, partySlot) {
       sink => {
         const next = sink.findLastSemanticSurface(from, "party:reward-target");
         return next?.index > eventIndex
-          && next.observation.selectedOptionId === `cursor:${cursor + (key === "ArrowDown" ? 1 : -1)}`
+          && next.observation.selectedOptionId === `party-slot:${cursor + (key === "ArrowDown" ? 1 : -1)}`
           ? next
           : null;
       },

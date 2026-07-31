@@ -6520,3 +6520,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Its fixture then genuinely lost at the start of wave 2, so campaign bookkeeping reported zero cleared waves even
   though both target UI-to-relay-to-authority chains were complete. This is provisionally classified as harness-profile
   survivability/bookkeeping, not a co-op desync; the exact `b6eb9a8f3` rerun will confirm it before its rule is changed.
+
+## 2026-07-31 - Navigation market red was an obsolete semantic ID in the browser driver
+
+- Exact `5283e3abf` navigation-depth-30 run `30643714786` cleared nine continuous waves, defeated the natural wave-10
+  boss, and opened the guest-owned Biome Market at the matching Authority V2 address. The guest selected Wide Lens and
+  production opened an actionable `party:reward-target` surface with all six party slots and `selectedOptionId` equal
+  to `party-slot:0`.
+- The market journey still parsed the retired `cursor:0` spelling, despite the general campaign and sealed semantic
+  observer already using `party-slot:*`. It therefore threw two seconds after the correct picker appeared. The driver
+  now consumes the public PARTY semantic identity and its focused contract explicitly rejects the obsolete spelling.
+- This red is classified as harness-only. No market, interaction, or Authority V2 production code changed. The same
+  exact navigation journey will be rerun on GitHub-hosted Chromium after the focused remote contract is green.

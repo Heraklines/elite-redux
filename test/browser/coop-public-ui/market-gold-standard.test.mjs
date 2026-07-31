@@ -7,7 +7,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { assertMarketCoverage, assertMarketPurchaseConverged, findPairedMarketOutcome } from "./market-journey.mjs";
+import {
+  assertMarketCoverage,
+  assertMarketPurchaseConverged,
+  findPairedMarketOutcome,
+  partyTargetSlot,
+} from "./market-journey.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -72,6 +77,13 @@ function purchaseProof(ownerSeat, wave) {
     partySlot: 0,
   });
 }
+
+test("held-item targeting consumes the public PARTY semantic identity", () => {
+  assert.equal(partyTargetSlot("party-slot:0"), 0);
+  assert.equal(partyTargetSlot("party-slot:5"), 5);
+  assert.equal(partyTargetSlot("cursor:0"), null);
+  assert.equal(partyTargetSlot(null), null);
+});
 
 test("post-turn market detection accepts one actionable owner plus its read-only watcher ledger", () => {
   const observations = [
