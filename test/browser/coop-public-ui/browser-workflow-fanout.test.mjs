@@ -252,8 +252,8 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
-    "the level applies only while constructing the exact initial save",
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 99[\s\S]*\? 100[\s\S]*: null/u,
+    "evolution starts below the level cap while longitudinal fixtures remain level 100",
   );
   assert.match(
     registry,

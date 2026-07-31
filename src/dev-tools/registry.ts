@@ -301,8 +301,8 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
 /**
  * Point-legal party for the short retained-evolution two-browser proof.
  *
- * The exact launch boundary starts these ordinary starters at level 100. Initial-save construction
- * primes the first merged Seel one EXP below level 101 so ordinary wave-one EXP deterministically
+ * The exact launch boundary starts these ordinary starters at level 99. Initial-save construction
+ * primes the first merged Seel one EXP below level 100 so ordinary wave-one EXP deterministically
  * crosses a level boundary and invokes the natural evolution gate. Unlike the survival/navigation
  * fixtures, evolution is deliberately not paused. After the visible starter confirmation, every
  * command and prompt remains an ordinary keyboard-driven production path.
@@ -332,11 +332,11 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
 
 /** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
-  return isCoopBrowserCampaignFixtureActive()
-    || isCoopBrowserNavigationFixtureActive()
-    || isCoopBrowserEvolutionFixtureActive()
-    ? 100
-    : null;
+  return isCoopBrowserEvolutionFixtureActive()
+    ? 99
+    : isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive()
+      ? 100
+      : null;
 }
 
 /** Survival/navigation lanes suppress incidental evolution; the dedicated evolution lane must not. */
