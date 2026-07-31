@@ -413,6 +413,47 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
   });
 
+  it("a settled turn image releases its passive watcher at the next command turn only", async () => {
+    await startCoopGuest();
+    const controller = getCoopController();
+    expect(controller).not.toBeNull();
+    const state = coopEngine.captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(state).not.toBeNull();
+    expect(coopEngine.applyCoopAuthoritativeBattleState(state!, true)).toBe(true);
+    const successor = {
+      sessionEpoch: controller!.sessionEpoch,
+      revision: 5,
+      kind: "TURN_COMMIT",
+      operationId: `TURN/e${controller!.sessionEpoch}/w${state!.wave}/t${state!.turn}`,
+      nextControl: {
+        kind: "COMMAND_FRONTIER",
+        epoch: controller!.sessionEpoch,
+        wave: state!.wave,
+        turn: state!.turn + 1,
+        commands: [],
+      },
+      turnStateMaterial: {
+        wave: state!.wave,
+        turn: state!.turn,
+        stateTick: state!.tick,
+      },
+    } as const;
+    const nextTurn = new CoopReplayTurnPhase(state!.turn + 1, 0, undefined, state!.wave, true);
+    expect(
+      nextTurn.releaseForCoopV2Control(successor),
+      "the exact settled source image authorizes its one-turn-ahead passive watcher",
+    ).toBe(true);
+
+    const skippedTurn = new CoopReplayTurnPhase(state!.turn + 2, 0, undefined, state!.wave, true);
+    expect(
+      skippedTurn.releaseForCoopV2Control({
+        ...successor,
+        nextControl: { ...successor.nextControl, turn: state!.turn + 2 },
+      }),
+      "a source image cannot authorize a passive watcher after an unstated command turn",
+    ).toBe(false);
+  });
+
   it.each([
     ["pending", undefined],
     ["failed", { kind: "failed" as const, reason: "ability-watchdog-expired" }],

@@ -334,14 +334,20 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
   return isCoopBrowserEvolutionFixtureActive()
     ? 6
-    : isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive()
+    : isCoopBrowserRegisteredInteractionFixtureActive()
+        || isCoopBrowserCampaignFixtureActive()
+        || isCoopBrowserNavigationFixtureActive()
       ? 100
       : null;
 }
 
 /** Survival/navigation lanes suppress incidental evolution; the dedicated evolution lane must not. */
 export function shouldPauseCoopBrowserLongitudinalFixtureEvolutions(): boolean {
-  return isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive();
+  return (
+    isCoopBrowserRegisteredInteractionFixtureActive()
+    || isCoopBrowserCampaignFixtureActive()
+    || isCoopBrowserNavigationFixtureActive()
+  );
 }
 
 /**

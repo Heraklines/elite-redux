@@ -9615,7 +9615,7 @@ export function readRetainedCoopV2CommandEntryPresentation(
     || !Number.isSafeInteger(authoritativeState.tick)
     || authoritativeState.tick <= 0
     || authoritativeState.wave !== wave
-    || authoritativeState.turn !== turn
+    || (authoritativeState.turn !== turn && authoritativeState.turn + 1 !== turn)
   ) {
     return null;
   }

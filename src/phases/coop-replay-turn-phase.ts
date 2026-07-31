@@ -313,11 +313,12 @@ export class CoopReplayTurnPhase extends Phase {
         || coveredState.turn !== sourceStateMaterial.turn
         || coveredState.tick !== coopAppliedStateTick()
         || coveredState.wave !== this.sourceWave
-        || coveredState.turn !== this.turn)
+        || (coveredState.turn !== this.turn && coveredState.turn + 1 !== this.turn))
     ) {
       // TURN/REPLACEMENT/INTERACTION may close a speculative prefix wait only after the complete image from
-      // THIS successor has been accepted. Wave/turn alone is insufficient: two sequential replacements share
-      // that address, and the first image must not release the second commit's command frontier.
+      // THIS successor has been accepted. The signed source image can legitimately be one turn behind the
+      // command frontier it authorizes (a settled turn N opens command N+1). Larger gaps and wrong waves stay
+      // closed; two sequential replacements at one address remain distinguished by the exact state tick.
       return false;
     }
     const prefix: CoopEntryPresentationPrefix =

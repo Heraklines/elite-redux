@@ -6532,3 +6532,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now consumes the public PARTY semantic identity and its focused contract explicitly rejects the obsolete spelling.
 - This red is classified as harness-only. No market, interaction, or Authority V2 production code changed. The same
   exact navigation journey will be rerun on GitHub-hosted Chromium after the focused remote contract is green.
+
+## 2026-07-31 - Half-wiped passive watcher exposed a source/target turn-domain deadlock
+
+- Exact `4b44ebbe3` half-wipe run `30647720506` crossed the empty replacement close and opened the survivor's
+  turn-2 command. The wiped replica rendered all 18 turn-1 events and applied the exact turn-1 state, but its
+  entry-only turn-2 watcher could never receipt `TURN/e1828368476812334/w1/t1`; V2 remained at frontier `2/2/1`
+  while redeliveries correctly repeated the same `controlDeferred` result.
+- The release validator required the immutable source image's turn to equal both its signed material turn and the
+  successor command turn. That is impossible for the ordinary `TURN N -> COMMAND N+1` edge. The retained-state
+  reader repeated the same false equality, so neither immediate release nor recovery could close the watcher.
+- Non-control command successors now accept only the exact source tick at the same wave and either the same turn or
+  its immediate next command turn. A focused two-engine regression proves `N -> N+1` and rejects an unstated `N ->
+  N+2` jump. This is classified as a product authority defect; the exact half-wipe journey must requalify remotely.
+
+## 2026-07-31 - Registered-interaction fixture is not survivable enough to reach its own second surface
+
+- Exact `b6eb9a8f3` registered-interactions run `30646864860` repeated the profile failure without a network or V2
+  wait: both browsers made six synchronized turns, completed one Revival choice, then naturally wiped on wave 1.
+  Stormglass is installed at the later wave start, so this fixture cannot satisfy its declared coverage contract.
+- This red is classified as harness-profile survivability, not product. The build-and-URL-gated fixture now starts
+  its visible, point-legal roster at level 100 and pauses incidental evolution, while retaining ordinary keyboard
+  combat and the exact Healing Wish, Revival Blessing, and Stormglass UI paths. No campaign success rule excuses an
+  early terminal; the exact journey must still prove both registered surfaces and its declared wave boundary.

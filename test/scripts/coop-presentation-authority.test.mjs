@@ -664,6 +664,16 @@ test("ordinary co-op and Showdown replay every retained pre-command presentation
     "a non-CONTROL successor closes a speculative prefix only with its own exact accepted state image",
   );
   assert.match(
+    replay,
+    /coveredState\.turn !== this\.turn && coveredState\.turn \+ 1 !== this\.turn/u,
+    "a signed settled-turn image may release only its same-turn or immediate-next command watcher",
+  );
+  assert.match(
+    runtime,
+    /authoritativeState\.turn !== turn && authoritativeState\.turn \+ 1 !== turn/u,
+    "retained recovery uses the same bounded source-to-command turn relation",
+  );
+  assert.match(
     runtime,
     /const replacement = reconstructCoopV2ReplacementCheckpoint\(entry\)[\s\S]+replacementStateMaterial: \{[\s\S]+stateTick: replacement\.checkpoint\.authoritativeState\.tick/u,
     "the runtime binds a replacement successor claim to that commit's immutable state tick",

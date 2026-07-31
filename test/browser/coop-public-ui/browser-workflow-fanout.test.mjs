@@ -226,6 +226,11 @@ test("journey starter fixtures require both the exact build and exact per-page U
     /getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*fixture === "registered-owner"[\s\S]*MoveId\.HEALING_WISH[\s\S]*MoveId\.REVIVAL_BLESSING[\s\S]*MoveId\.WATER_SPOUT[\s\S]*MoveId\.SPLASH/u,
   );
   assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*\? 100/u,
+    "the exact registered-interaction fixture starts overleveled enough to reach Stormglass",
+  );
+  assert.match(
     starterHandler,
     /getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{ allowUncaught: true \}\)/u,
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
