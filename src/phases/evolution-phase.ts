@@ -20,6 +20,20 @@ import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
+/**
+ * Fades an evolution track only while Phaser still owns its audio nodes.
+ *
+ * `SoundManager.play()` destroys one-shot sounds when they naturally complete. A slow evolution
+ * animation can therefore outlive its music, leaving a truthy `AnySound` whose WebAudio gain node
+ * has already been cleared. Passing that stale object to SoundFade reads `sound.volume` and throws.
+ */
+export function fadeOutEvolutionBgmIfActive(scene: Phaser.Scene, sound: AnySound | null, duration = 100): void {
+  if (!sound || sound.pendingRemove) {
+    return;
+  }
+  SoundFade.fadeOut(scene, sound, duration);
+}
+
 export class EvolutionPhase extends Phase {
   // FormChangePhase and its mechanics-free co-op replay inherit from this, but EvolutionPhase is not abstract.
   // We have to use the union here
@@ -415,9 +429,7 @@ export class EvolutionPhase extends Phase {
         this.evolutionBg.setVisible(false);
       },
     });
-    if (this.evolutionBgm) {
-      SoundFade.fadeOut(globalScene, this.evolutionBgm, 100);
-    }
+    fadeOutEvolutionBgmIfActive(globalScene, this.evolutionBgm);
   }
 
   /**
@@ -499,9 +511,7 @@ export class EvolutionPhase extends Phase {
   private onEvolutionComplete(evolvedPokemon: Pokemon) {
     // ER achievements: `this.pokemon` is now the evolved species (Incompatible Hardware: Porygon-Z).
     erRecordAchievementEvolution(this.pokemon);
-    if (this.evolutionBgm) {
-      SoundFade.fadeOut(globalScene, this.evolutionBgm, 100);
-    }
+    fadeOutEvolutionBgmIfActive(globalScene, this.evolutionBgm);
     globalScene.time.delayedCall(250, () => {
       this.pokemon.cry();
       globalScene.time.delayedCall(1250, () => {

@@ -10,6 +10,7 @@
 // is mandatory in the 30-wave public campaign. This focused file keeps only the leaf guest-mechanics gate
 // and the exact PokemonData wire-image round trip. It deliberately makes no obsolete resync claim.
 
+import type { AnySound } from "#app/battle-scene";
 import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   isCoopAuthoritativeGuestGated,
@@ -17,11 +18,13 @@ import {
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesId } from "#enums/species-id";
+import { fadeOutEvolutionBgmIfActive } from "#phases/evolution-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", () => {
   afterEach(() => {
@@ -46,6 +49,20 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
       throw new Error("boom");
     });
     expect(isCoopAuthoritativeGuestGated()).toBe(false);
+  });
+
+  it("does not fade a one-shot evolution track after Phaser has destroyed its audio nodes", () => {
+    const fadeOut = vi.spyOn(SoundFade, "fadeOut").mockImplementation((_scene, sound) => sound);
+    const scene = {} as Phaser.Scene;
+    const activeSound = { pendingRemove: false } as AnySound;
+    const completedSound = { pendingRemove: true } as AnySound;
+
+    fadeOutEvolutionBgmIfActive(scene, activeSound);
+    fadeOutEvolutionBgmIfActive(scene, completedSound);
+
+    expect(fadeOut).toHaveBeenCalledOnce();
+    expect(fadeOut).toHaveBeenCalledWith(scene, activeSound, 100);
+    fadeOut.mockRestore();
   });
 });
 
