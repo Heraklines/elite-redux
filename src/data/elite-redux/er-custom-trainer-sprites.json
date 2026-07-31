@@ -38,6 +38,19 @@
       "galar"
     ]
   },
+  "pokestar_invader_alien": {
+    "author": "Jext",
+    "genders": false,
+    "kind": "other",
+    "label": "Poke Star",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01o4r3wq/Invader+Alien",
+    "spriteKey": "pokestar_invader_alien",
+    "tags": [
+      "pokestar",
+      "alien"
+    ]
+  },
   "volo": {
     "author": "Kyle Dove",
     "genders": false,
