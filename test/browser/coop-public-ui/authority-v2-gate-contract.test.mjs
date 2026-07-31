@@ -3512,7 +3512,7 @@ test("a projected biome transition consumes the exact destination command carrie
   );
   const admission = switchBiomePhase.slice(
     switchBiomePhase.indexOf("public canReleaseForCoopV2Control("),
-    switchBiomePhase.indexOf("public releaseForCoopV2Control("),
+    switchBiomePhase.indexOf("public canPrepareForCoopV2InteractionMaterial("),
   );
   assert.match(admission, /this\.coopAwaitDestinationCarrier/u);
   assert.doesNotMatch(
@@ -3527,7 +3527,7 @@ test("a projected biome transition consumes the exact destination command carrie
   );
   const preparation = switchBiomePhase.slice(
     switchBiomePhase.indexOf("public prepareForCoopV2ControlMaterial("),
-    switchBiomePhase.indexOf("public releaseForCoopV2Control("),
+    switchBiomePhase.indexOf("public canPrepareForCoopV2InteractionMaterial("),
   );
   assert.match(
     preparation,
@@ -3595,6 +3595,59 @@ test("a projected biome transition consumes the exact destination command carrie
       && queueEncounter > materializeArena
       && endSwitch > queueEncounter,
     "post-DATA release prepares the one-shot permit and arena before exposing the encounter tail",
+  );
+});
+
+test("a projected biome transition also accepts a Mystery interaction as its exact destination carrier", () => {
+  const interactionAdmissionStart = switchBiomePhase.indexOf("public canPrepareForCoopV2InteractionMaterial(");
+  const interactionPreparationStart = switchBiomePhase.indexOf("public prepareForCoopV2InteractionMaterial(");
+  const interactionReleaseStart = switchBiomePhase.indexOf("public releaseForCoopV2InteractionMaterial(");
+  const commandReleaseStart = switchBiomePhase.indexOf("public releaseForCoopV2Control(");
+  assert.ok(
+    interactionAdmissionStart >= 0
+      && interactionPreparationStart > interactionAdmissionStart
+      && interactionReleaseStart > interactionPreparationStart
+      && commandReleaseStart > interactionReleaseStart,
+    "SwitchBiome exposes one bounded interaction-carrier transaction before the command carrier",
+  );
+  const admission = switchBiomePhase.slice(interactionAdmissionStart, interactionPreparationStart);
+  assert.match(admission, /successor\.kind === "INTERACTION_COMMIT"/u);
+  assert.match(admission, /control\.kind === "SHARED_INTERACTION"/u);
+  assert.match(admission, /control\.operationId === successor\.operationId/u);
+  assert.match(admission, /permit\.nextWave === material\.wave/u);
+  assert.match(admission, /material\.turn === 1/u);
+  assert.doesNotMatch(
+    admission,
+    /permit\.(?:historyRecorded|switchPrepared)/u,
+    "pre-DATA interaction admission cannot circularly require destination stages",
+  );
+
+  const preparation = switchBiomePhase.slice(interactionPreparationStart, interactionReleaseStart);
+  assert.match(preparation, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
+  assert.match(
+    preparation,
+    /destinationBattle\.waveIndex !== material\.wave[\s\S]*?destinationBattle\.turn !== material\.turn/u,
+  );
+  const release = switchBiomePhase.slice(interactionReleaseStart, commandReleaseStart);
+  assert.match(release, /markCoopBiomeTransitionHistoryRecorded\(permit\.operationId\)/u);
+  assert.match(release, /markCoopBiomeTransitionSwitchPrepared\(permit\.operationId\)/u);
+  assert.match(release, /this\.materializeCoopTransition\(\)/u);
+  assert.match(release, /unshiftNew\("NewBiomeEncounterPhase"\)[\s\S]*?this\.end\(\)/u);
+
+  const interactionApplyStart = coopRuntime.indexOf('if (entry.kind === "INTERACTION_COMMIT")');
+  const interactionApplyEnd = coopRuntime.indexOf('if (entry.kind === "CONTROL_COMMIT")', interactionApplyStart);
+  const interactionApply = coopRuntime.slice(interactionApplyStart, interactionApplyEnd);
+  const prepareIndex = interactionApply.indexOf("prepareCoopV2InteractionStateMaterialConsumer(entry)");
+  const stateApplyIndex = interactionApply.indexOf("const stateApplied =");
+  const releaseIndex = interactionApply.indexOf("releaseCoopV2InteractionStateMaterialConsumer(entry)");
+  assert.ok(
+    prepareIndex >= 0 && stateApplyIndex > prepareIndex && releaseIndex > stateApplyIndex,
+    "the structural Mystery shell is created before DATA and released only after DATA",
+  );
+  assert.match(
+    coopRuntime,
+    /plan\.kind === "mystery" && current\.is\("NewBiomeEncounterPhase"\)[\s\S]*?return false/u,
+    "the projector retains the real new-biome presentation before opening the Mystery selector",
   );
 });
 

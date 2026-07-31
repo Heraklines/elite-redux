@@ -5177,6 +5177,19 @@ function prepareCoopV2InteractionStateMaterialConsumer(entry: CoopAuthorityEntry
   );
 }
 
+/** Release an exact structural interaction consumer only after its immutable destination DATA applied. */
+function releaseCoopV2InteractionStateMaterialConsumer(entry: CoopAuthorityEntry): boolean {
+  const phase = globalScene.phaseManager?.getCurrentPhase() as
+    | {
+        releaseForCoopV2InteractionMaterial?: (successor: CoopV2ControlSuccessorClaim) => boolean;
+      }
+    | undefined;
+  return (
+    phase?.releaseForCoopV2InteractionMaterial == null
+    || phase.releaseForCoopV2InteractionMaterial(coopV2ControlSuccessorClaim(entry))
+  );
+}
+
 /**
  * A command-open state may mutate the engine only when an exact engine consumer exists.
  *
@@ -6850,6 +6863,9 @@ function buildCoopV2LiveSeams(
             return false;
           }
           runtime.v2InteractionStateApplied.add(entry.operationId);
+          if (!releaseCoopV2InteractionStateMaterialConsumer(entry)) {
+            return "deferred";
+          }
           const requiresTerminalProof = requiresCoopV2InteractionTerminalProof(
             material.surfaceClass,
             material.envelope,
@@ -7590,6 +7606,15 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
       coopLog("v2-interaction", `retained live Mystery shell for ordered generation ${controlId}`);
       return true;
     }
+  }
+
+  // A Mystery interaction may be the first surface after a committed World Map biome switch. Its DATA has
+  // already sealed the destination Battle, but NewBiomeEncounterPhase still owns the shared arena-entry
+  // presentation and the one-shot biome permit. Retain that real presentation boundary; its exact terminal
+  // queues MysteryEncounterPhase, after which ordinary projection installs the replay selector.
+  if (plan.kind === "mystery" && current.is("NewBiomeEncounterPhase")) {
+    coopLog("v2-interaction", `retained new-biome presentation before ordered Mystery generation ${controlId}`);
+    return false;
   }
 
   // Crossroads and World Map can already be the exact live sequential phase when the authority's open

@@ -53,6 +53,11 @@ interface CoopV2BiomeCommandSuccessorClaim {
     readonly stateTick: number;
     readonly entryPresentation: readonly unknown[];
   };
+  readonly interactionStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
 }
 
 export class SwitchBiomePhase extends BattlePhase {
@@ -182,6 +187,132 @@ export class SwitchBiomePhase extends BattlePhase {
       );
       return false;
     }
+  }
+
+  /** Prove that a shared interaction is the exact first authoritative surface in the destination biome. */
+  public canPrepareForCoopV2InteractionMaterial(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    const permit = getCoopBiomeTransitionTailPermit();
+    const control = successor.nextControl;
+    const material = successor.interactionStateMaterial;
+    const ambientWave = globalScene.currentBattle?.waveIndex ?? -1;
+    return (
+      this.coopGeneration >= 0
+      && this.coopAwaitDestinationCarrier
+      && coopSessionGeneration() === this.coopGeneration
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && successor.sessionEpoch === getCoopController()?.sessionEpoch
+      && successor.kind === "INTERACTION_COMMIT"
+      && successor.operationId.length > 0
+      && control.kind === "SHARED_INTERACTION"
+      && control.operationId === successor.operationId
+      && material != null
+      && control.epoch === successor.sessionEpoch
+      && control.wave === material.wave
+      && control.turn === material.turn
+      && material.turn === 1
+      && material.stateTick > 0
+      && permit != null
+      && permit.switchAdopted
+      && permit.destinationBiomeId === this.nextBiome
+      && permit.wave === (this.coopSourceWave ?? this.coopWave)
+      && permit.nextWave === material.wave
+      && (ambientWave === permit.wave || ambientWave === permit.nextWave)
+    );
+  }
+
+  /** Build only the destination Battle identity; the interaction entry applies every mechanical field. */
+  public prepareForCoopV2InteractionMaterial(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    if (!this.canPrepareForCoopV2InteractionMaterial(successor)) {
+      return false;
+    }
+    const material = successor.interactionStateMaterial;
+    const permit = getCoopBiomeTransitionTailPermit();
+    const currentBattle = globalScene.currentBattle;
+    if (material == null || permit == null || currentBattle == null) {
+      return false;
+    }
+    if (currentBattle.waveIndex === material.wave) {
+      const alreadyPrepared = currentBattle.turn === material.turn;
+      this.coopDestinationBattleCreated ||= alreadyPrepared;
+      return alreadyPrepared;
+    }
+    if (
+      this.coopDestinationBattleCreated
+      || currentBattle.waveIndex !== permit.wave
+      || material.wave !== permit.nextWave
+      || material.wave !== currentBattle.waveIndex + 1
+      || material.turn !== 1
+    ) {
+      return false;
+    }
+    try {
+      const destinationBattle = globalScene.newCoopV2ProjectedBattle();
+      if (
+        globalScene.currentBattle !== destinationBattle
+        || destinationBattle.waveIndex !== material.wave
+        || destinationBattle.turn !== material.turn
+      ) {
+        throw new Error(
+          `interaction destination Battle address mismatch expected=${material.wave}:${material.turn} `
+            + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
+        );
+      }
+      this.coopDestinationBattleCreated = true;
+      coopLog(
+        "v2-interaction",
+        `SwitchBiomePhase prepared destination interaction shell wave=${permit.wave}->${destinationBattle.waveIndex}`,
+      );
+      return true;
+    } catch (error) {
+      coopWarn("v2-interaction", "SwitchBiomePhase could not prepare its destination interaction shell", error);
+      failCoopSharedSession(
+        `The shared biome transition could not create its authoritative interaction at wave ${material.wave}.`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Finish the signed switch after interaction DATA sealed the N+1 shell, while retaining the ordinary
+   * NewBiome presentation as the only route to the committed Mystery surface.
+   */
+  public releaseForCoopV2InteractionMaterial(successor: CoopV2BiomeCommandSuccessorClaim): boolean {
+    if (!this.canPrepareForCoopV2InteractionMaterial(successor)) {
+      return false;
+    }
+    const material = successor.interactionStateMaterial;
+    if (
+      material == null
+      || globalScene.currentBattle?.waveIndex !== material.wave
+      || globalScene.currentBattle.turn !== material.turn
+    ) {
+      return false;
+    }
+    let permit = getCoopBiomeTransitionTailPermit();
+    if (permit == null) {
+      return false;
+    }
+    if (!permit.historyRecorded) {
+      erRecordBiomeEntry(permit.sourceBiomeId as BiomeId);
+      permit = markCoopBiomeTransitionHistoryRecorded(permit.operationId);
+      if (permit == null) {
+        return false;
+      }
+    }
+    if (!permit.switchPrepared) {
+      permit = markCoopBiomeTransitionSwitchPrepared(permit.operationId);
+      if (permit == null) {
+        return false;
+      }
+    }
+    this.materializeCoopTransition();
+    coopLog(
+      "v2-interaction",
+      `SwitchBiomePhase consumed destination interaction carrier wave=${permit.wave}->${permit.nextWave}`,
+    );
+    globalScene.phaseManager.unshiftNew("NewBiomeEncounterPhase");
+    this.end();
+    return globalScene.phaseManager.getCurrentPhase() !== this;
   }
 
   /**
