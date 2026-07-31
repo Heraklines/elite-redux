@@ -231,6 +231,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
   ]);
+  const browserEntry = await readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8");
 
   assert.match(workflow, /options:[\s\S]*- evolution-sync/u, "manual dispatch exposes the exact evolution journey");
   assert.match(
@@ -306,6 +307,16 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
     "the final evolution oracle must use the same optional-blocking readiness contract as the keyboard driver",
   );
   assert.match(journeys, /kind === "campaign-battle-prompt-advance"/u);
+  assert.match(
+    browserEntry,
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES = new Set\(\["EndEvolutionPhase"\]\)/u,
+    "the observer names the native non-interactive evolution teardown explicitly",
+  );
+  assert.match(
+    browserEntry,
+    /semantic == null && NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES\.has\(phase\)[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
+    "a stale evolution handler closes observation state instead of emitting a fatal unclassified surface",
+  );
   assert.match(journeys, /"evolution-sync": evolutionSync/u);
 });
 

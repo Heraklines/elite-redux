@@ -6321,3 +6321,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   sequential human-input scan.
 - Both mechanisms have failure-first Node coverage. The focused browser source suites pass 56/56; full source/static
   qualification and an exact evolution rerun follow before any product-authority change is mixed into this cycle.
+
+## 2026-07-31 - Native evolution teardown is not a human-input surface
+
+- Exact evolution run `30633649844` at `aa8ea27b0` completed both real evolution prompts, proved the six-entry
+  progression ledger, and converged both clients at the same wave-2 command frontier. Its only fatal evidence was a
+  six-millisecond `EndEvolutionPhase` sample whose still-active `EVOLUTION_SCENE` handler was labeled `unclassified`;
+  `ExpPhase` followed immediately. This was an observer false red, not a product failure.
+- The read-only semantic observer now explicitly suppresses that native non-interactive teardown and clears its prior
+  canonical observation so the next real surface still emits. It does not excuse unknown phases generally and does not
+  press input. Source coverage binds the suppression to `EndEvolutionPhase` and the close-before-return behavior.
+- Exact `aa8ea27b0` qualification otherwise closed green: focused gate `30633595723` and fresh-wave2 journey
+  `30633595876` passed. The observer repair will qualify remotely with the next Authority V2 exact-SHA batch; no local
+  test or build is used.

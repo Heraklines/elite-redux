@@ -557,6 +557,11 @@ const COOP_ABILITY_SURFACE_KIND = {
 
 const COOP_REVIVAL_PHASES = new Set(["RevivalBlessingPhase", "CoopGuestRevivalPhase"]);
 
+// Native terminal phases can briefly retain the preceding UI handler while they tear that scene down.
+// They are engine progress, not human-input surfaces: publishing the stale handler as `unclassified`
+// makes a successful public journey fail merely because the read-only observer sampled the handoff.
+const NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES = new Set(["EndEvolutionPhase"]);
+
 /**
  * Resolve surfaces whose owner is part of the immutable operation, rather than the alternating
  * interaction cursor. Revival follows the Pokemon that used the move; Stormglass is explicitly
@@ -1573,6 +1578,12 @@ function observeSemanticSurface(): void {
             ownerModel: "interaction" as const,
           }
         : classifiedSemantic;
+    if (semantic == null && NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES.has(phase)) {
+      // Close the prior canonical observation so the next genuinely actionable surface is emitted even
+      // when it happens to be byte-identical. Do not mirror or drive the stale transition handler.
+      lastSemanticObservation = "";
+      return;
+    }
     if (semantic == null) {
       const membership = runtime?.membership.snapshot();
       if (runtime == null || membership?.state !== "active") {
