@@ -1409,6 +1409,16 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(harness, /targetId: this\.config\.difficultyOptionId/u);
   assert.match(harness, /guest received difficulty=\$\{this\.config\.difficultyId\}/u);
   assert.match(harness, /difficulty-\$\{this\.config\.difficultyId\}-attested/u);
+  assert.match(
+    harness,
+    /waitForAllLocalCommandsDrivingBattlePrompts[\s\S]*createMysteryNarrationAdvancer[\s\S]*findLastSemanticSurface\([\s\S]*"mystery-encounter"[\s\S]*driveMysteryEncounterChoice/u,
+    "fresh/resume boundaries must route an observed Mystery owner instead of waiting only for CommandPhase",
+  );
+  assert.match(
+    harness,
+    /observation\.ownerSeat === client\.publicSeat[\s\S]*observation\.localSeat === client\.publicSeat[\s\S]*observation\.seatsWithInput\?\.includes\(client\.publicSeat\)[\s\S]*observation\.ready\?\.inputBlocked === false/u,
+    "the short-journey Mystery bridge must remain owner-exact and readiness-gated",
+  );
   assert.match(campaign, /\[2, "mystery"\][\s\S]*\[6, "mystery"\][\s\S]*\[9, "bargain"\][\s\S]*\[10, "mystery"\]/u);
   assert.match(campaign, /async function checkpointAsymmetricBargainSurface\(/u);
   assert.match(campaign, /watcher input-inert mirrored Bargain projection/u);

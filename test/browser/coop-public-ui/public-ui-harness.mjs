@@ -4,7 +4,11 @@
  */
 
 import puppeteer from "puppeteer";
-import { createBattlePromptAdvancer } from "./campaign.mjs";
+import {
+  createBattlePromptAdvancer,
+  createMysteryNarrationAdvancer,
+  driveMysteryEncounterChoice,
+} from "./campaign.mjs";
 import {
   confirmDefaultStarterTeam,
   confirmSeededStarterTeam,
@@ -1959,6 +1963,14 @@ export class DuoPublicUiRig {
     const advanceBattlePrompt = createBattlePromptAdvancer(this, from, {}, purpose, {
       requireSharedCommandAddress: false,
     });
+    // A fresh/resumed battle boundary can legally open a Mystery encounter instead of the next
+    // CommandPhase. The campaign driver already owns the exact public interaction protocol, but the
+    // short public-UI journeys used to wait only for battle narration and therefore parked forever on
+    // an otherwise healthy, actionable owner surface (run 30667207767: both clients converged on the
+    // same wave-2 Uncommon Breed event and correctly named the guest as owner). Reuse the same
+    // semantic option picker and narration pump here; never guess from the phase or press both seats.
+    const advanceMysteryNarration = createMysteryNarrationAdvancer(this, from, {}, `${purpose}-mystery`);
+    const drivenMysteryAppearance = new Map();
     while (Date.now() < progressBudget.observe()) {
       if (
         this.host
@@ -1969,7 +1981,34 @@ export class DuoPublicUiRig {
       ) {
         break;
       }
+      const mysteryOwner = Object.values(this.clients).find(client => {
+        const event = client.evidence.findLastSemanticSurface(from[client.label] ?? 0, "mystery-encounter");
+        const observation = event?.observation;
+        return (
+          event != null
+          && event.index > (drivenMysteryAppearance.get(client.label) ?? -1)
+          && observation?.coop === true
+          && observation.ownerModel === "interaction"
+          && observation.ownerSeat === client.publicSeat
+          && observation.localSeat === client.publicSeat
+          && observation.seatsWithInput?.includes(client.publicSeat)
+          && observation.ready?.handlerActive === true
+          && observation.ready?.inputBlocked === false
+        );
+      });
+      if (mysteryOwner != null) {
+        const appearance = mysteryOwner.evidence.findLastSemanticSurface(
+          from[mysteryOwner.label] ?? 0,
+          "mystery-encounter",
+        );
+        drivenMysteryAppearance.set(mysteryOwner.label, appearance.index);
+        await driveMysteryEncounterChoice(this, mysteryOwner, from);
+        continue;
+      }
       if (await advanceBattlePrompt()) {
+        continue;
+      }
+      if (await advanceMysteryNarration()) {
         continue;
       }
       await delay(100);
