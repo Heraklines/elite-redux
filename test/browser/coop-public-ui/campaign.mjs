@@ -849,9 +849,11 @@ function currentSharedCommandAddress(clients) {
  * human prompt. FaintPhase likewise runs after TurnEnd advances the public address, so its later
  * faint narration is stamped N+1 (public journey 30186100483). Trainer battles likewise render their
  * post-BattleEnd human prompts through TrainerVictoryPhase, MoneyRewardPhase, and ModifierRewardPhase
- * (mystery runs 30366178580 and 30370796112). The exception remains fail-closed: same epoch and wave,
- * exactly the next turn, a closed action-only settlement phase, and this browser must have observed
- * BattleEndPhase or FaintPhase between the scan floor and the prompt.
+ * (mystery runs 30366178580 and 30370796112). A retained evolution is likewise installed after the
+ * guest's BattleEndPhase and exposes its final human prompt at N+1 (evolution run 30628643225).
+ * The exception remains fail-closed: same epoch and wave, exactly the next turn, a closed actionable
+ * successor surface, and an exact structural boundary on this browser between the scan floor and the
+ * prompt. Evolution specifically requires BattleEndPhase; FaintPhase alone cannot authorize it.
  * Arbitrary future-turn battle messages still cannot authorize input.
  */
 function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
@@ -871,21 +873,29 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
     return true;
   }
   const expectedParts = expectedAddress.split(":").map(Number);
+  const isSuccessorSettlementMessage =
+    observation.surfaceId === "battle:message" && NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase);
+  const isSuccessorEvolution =
+    observation.surfaceId === "battle:evolution"
+    && BATTLE_PROMPT_PHASES.get("battle:evolution")?.phases?.has(observation.phase) === true;
   if (
     !hasLiveBattleAddress
     || expectedParts.length !== 3
     || expectedParts.some(part => !Number.isSafeInteger(part))
-    || observation.surfaceId !== "battle:message"
-    || !NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase)
+    || (!isSuccessorSettlementMessage && !isSuccessorEvolution)
     || address.epoch !== expectedParts[0]
     || address.wave !== expectedParts[1]
     || address.turn !== expectedParts[2] + 1
   ) {
     return false;
   }
-  return client.evidence.events
-    .slice(scanFloor, event.index + 1)
-    .some(candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""));
+  const boundaryEvents = client.evidence.events.slice(scanFloor, event.index + 1);
+  if (isSuccessorEvolution) {
+    return boundaryEvents.some(candidate => BATTLE_END_PHASE.test(candidate.text ?? ""));
+  }
+  return boundaryEvents.some(
+    candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""),
+  );
 }
 
 /**

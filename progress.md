@@ -6290,3 +6290,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Failure-first coverage went red on the invented intro prompt and now seals all six UI arguments plus both call-site
   contracts. The next exact browser rerun must reach per-cycle heartbeats and visibly advance the final completion
   prompt before the progression ledger can pass.
+
+## 2026-07-31 - The browser driver admits the exact retained evolution successor
+
+- Exact-SHA focused gate `30628641675` at `53bb9f015` is fully green across remote TypeScript, static/source contracts,
+  and the selected P/A/B engine shards. Push journey `30628641998` also passed fresh-wave2 end to end, so the product
+  prompt-parity repair did not regress ordinary launch, command, progression, or the wave-2 interaction frontier.
+- Exact evolution journey `30628643225` then proved the production cutscene progressed through every morph cycle,
+  reveal, and evolved cry. The guest exposed its real final `battle:evolution` prompt with `awaitingActionInput=true`
+  at V2 turn 2 after `BattleEndPhase`; the submitted command address frozen by the driver was turn 1. The harness sent
+  no input after the prompt appeared and the product watchdog correctly expired at `evolved-cry`. Both clients still
+  converged mechanically at the same reward shop, confirming an observer/driver admission defect rather than a desync.
+- Successor-address admission now accepts `battle:evolution` only at the exact N+1 address, only in `EvolutionPhase` or
+  `CoopWaveProgressionReplayPhase`, and only after that browser has observed `BattleEndPhase` within the current scan
+  window. FaintPhase alone remains insufficient, arbitrary future turns remain denied, and ordinary settlement-message
+  rules are unchanged. The realistic driver test went failure-first at the retained prompt and now passes 57/57.

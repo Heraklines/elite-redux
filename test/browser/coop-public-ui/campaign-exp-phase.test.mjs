@@ -1049,10 +1049,29 @@ test("authority and retained-renderer evolution prompts are driven once through 
     true,
     81,
     true,
-    { epoch: 7, wave: 1, turn: 1 },
+    { epoch: 7, wave: 1, turn: 2 },
     "EVOLUTION_SCENE",
   );
-  assert.equal(await advance(), true, "the retained renderer's independent completion prompt is actionable");
+  assert.equal(
+    await advance(),
+    false,
+    "a successor-address evolution prompt is inert until this browser observes BattleEndPhase",
+  );
+  renderer.evidence.pushConsole("Start Phase BattleEndPhase");
+  renderer.evidence.pushBattleReadiness(
+    "battle:evolution",
+    "CoopWaveProgressionReplayPhase",
+    true,
+    82,
+    true,
+    { epoch: 7, wave: 1, turn: 2 },
+    "EVOLUTION_SCENE",
+  );
+  assert.equal(
+    await advance(),
+    true,
+    "the retained renderer's exact next-turn completion prompt is actionable after BattleEndPhase",
+  );
   assert.equal(await advance(), false, "one renderer prompt generation receives exactly one Action");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
