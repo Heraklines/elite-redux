@@ -764,6 +764,40 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
 });
 
+test("a destructively projected Crossroads Stay recreates its signed N+1 bridge before ending", () => {
+  assert.match(
+    coopRuntime,
+    /const crossroadsStayTerminal =[^;]*surfaceClass === "op:biome"[^;]*operation\?\.kind === "CROSSROADS_PICK"[^;]*payload\?\.optionIndex === 0/u,
+    "the replica terminal-successor handshake includes only the Crossroads Stay result",
+  );
+  assert.match(
+    coopRuntime,
+    /!rewardTerminal && !bargainTerminal && !crossroadsStayTerminal/u,
+    "Crossroads Stay cannot bypass the exact terminal phase handshake",
+  );
+  const terminalStart = crossroadsPhase.indexOf("public installCoopV2TerminalSuccessor(");
+  const queueEnd = crossroadsPhase.indexOf("\n  /**", crossroadsPhase.indexOf("private queueCoopV2NextWaveAwait("));
+  assert.ok(terminalStart >= 0 && queueEnd > terminalStart, "Crossroads exposes one bounded signed-tail installer");
+  const terminal = crossroadsPhase.slice(terminalStart, queueEnd);
+  assert.match(
+    terminal,
+    /operationId !== this\.coopV2ControlOperationId[\s\S]*?successor\.afterOperationId !== operationId[\s\S]*?successor\.wave !== this\.coopSourceWave[\s\S]*?successor\.turn !== this\.coopSourceTurn[\s\S]*?!successor\.allowNextWaveStart/u,
+    "the bridge is bound to the exact Crossroads result address and explicit next-wave permission",
+  );
+  assert.match(
+    terminal,
+    /removeAllPhasesOfType\("NewBattlePhase"\);[\s\S]*?pushNew\("NewBattlePhase", \{[\s\S]*?afterOperationId: wait\.afterOperationId,[\s\S]*?epoch: wait\.epoch,[\s\S]*?wave: wait\.wave,[\s\S]*?turn: wait\.turn/u,
+    "the projected result replaces every unsigned tail with its immutable NewBattle wait",
+  );
+  const applyStart = crossroadsPhase.indexOf("private coopApply(");
+  const applyEnd = crossroadsPhase.indexOf("\n  // ---------------------------------------------------------------------------", applyStart);
+  const apply = crossroadsPhase.slice(applyStart, applyEnd);
+  assert.ok(
+    apply.indexOf("this.queueCoopV2NextWaveAwait(operationId)") < apply.indexOf("this.end()"),
+    "Crossroads cannot end into same-wave TurnInit before the signed N+1 bridge is queued",
+  );
+});
+
 test("a repeated Mystery checksum waits for the ordered V2 presentation before requesting recovery", () => {
   const checksumStart = coopRuntime.indexOf("function wireCoopMeChecksumCheck");
   const checksumEnd = coopRuntime.indexOf("/**\n * Co-op AUTHORITATIVE move-learn forward listener", checksumStart);

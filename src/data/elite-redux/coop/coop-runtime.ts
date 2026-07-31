@@ -5987,8 +5987,9 @@ function markCoopV2ControlMaterialApplied(runtime: CoopRuntime, entry: CoopAutho
 }
 
 /**
- * Arm a destructively projected reward/market/Bargain with the exact structural wait stated by its terminal
- * result. The phase queues that bridge only when its real operation handler proves completion, before it ends.
+ * Arm a destructively projected reward/market/Bargain/Crossroads-Stay with the exact structural wait stated
+ * by its terminal result. The phase queues that bridge only when its real operation handler proves completion,
+ * before it ends.
  */
 function prepareCoopV2InteractionTerminalSuccessor(
   runtime: CoopRuntime,
@@ -5997,13 +5998,15 @@ function prepareCoopV2InteractionTerminalSuccessor(
   envelope: CoopAuthoritativeEnvelopeV1,
 ): boolean {
   const operation = envelope.pendingOperation;
-  const payload = operation?.payload as { readonly terminal?: unknown } | undefined;
+  const payload = operation?.payload as { readonly optionIndex?: unknown; readonly terminal?: unknown } | undefined;
   const rewardTerminal =
     surfaceClass === "op:reward"
     && (operation?.kind === "REWARD" || operation?.kind === "SHOP_BUY")
     && payload?.terminal === true;
   const bargainTerminal = surfaceClass === "op:bargain" && operation?.kind === "BARGAIN";
-  if (!rewardTerminal && !bargainTerminal) {
+  const crossroadsStayTerminal =
+    surfaceClass === "op:biome" && operation?.kind === "CROSSROADS_PICK" && payload?.optionIndex === 0;
+  if (!rewardTerminal && !bargainTerminal && !crossroadsStayTerminal) {
     return true;
   }
   if (entry.nextControl.kind !== "AWAIT_SUCCESSOR") {

@@ -36,6 +36,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   adoptBiomeWatcherChoice,
   armCoopBiomeIntentResend,
@@ -191,6 +192,13 @@ export class ErCrossroadsPhase extends Phase {
   private coopCommitRecoveryToken = 0;
   /** The local terminal mutation is applied once even if publishing its immutable result must retry. */
   private coopAppliedTerminal: { readonly pinned: number; readonly moveOn: boolean } | null = null;
+  /** Exact signed N+1 bridge installed by a replica CROSSROADS_PICK/Stay result before this phase may end. */
+  private coopV2TerminalSettlement: {
+    readonly operationId: string;
+    readonly successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
+    readonly settle: () => boolean;
+  } | null = null;
+  private coopV2NextWaveAwaitQueued = false;
 
   /**
    * Install the exact generation carried by an Authority V2 recovery entry.
@@ -221,6 +229,69 @@ export class ErCrossroadsPhase extends Phase {
     }
     this.coopV2ControlOperationId = operationId;
     this.coopStartCounter = pinned;
+    return true;
+  }
+
+  /**
+   * Bind a committed Stay result to the structural bridge it actually authorizes.
+   *
+   * Ordinary projection can replace the speculative NewBattlePhase with this exact Crossroads generation.
+   * A Stay result must therefore recreate one signed NewBattlePhase before ending; otherwise Phaser derives
+   * TurnInit on the completed wave and the following N+1 command carrier can never find its engine consumer.
+   */
+  public installCoopV2TerminalSuccessor(
+    operationId: string,
+    successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>,
+    settle: () => boolean,
+  ): boolean {
+    if (
+      operationId.length === 0
+      || operationId !== this.coopV2ControlOperationId
+      || successor.afterOperationId !== operationId
+      || successor.epoch !== getCoopController()?.sessionEpoch
+      || successor.wave !== this.coopSourceWave
+      || successor.turn !== this.coopSourceTurn
+      || !successor.allowNextWaveStart
+    ) {
+      return false;
+    }
+    if (
+      this.coopV2TerminalSettlement != null
+      && (this.coopV2TerminalSettlement.operationId !== operationId
+        || JSON.stringify(this.coopV2TerminalSettlement.successor) !== JSON.stringify(successor))
+    ) {
+      return false;
+    }
+    this.coopV2TerminalSettlement ??= {
+      operationId,
+      successor: structuredClone(successor),
+      settle,
+    };
+    return true;
+  }
+
+  /** Replace any unsigned local tail with the immutable result's one N+1 wait before shifting the phase. */
+  private queueCoopV2NextWaveAwait(operationId: string): boolean {
+    const terminal = this.coopV2TerminalSettlement;
+    if (terminal == null) {
+      return true;
+    }
+    const wait = terminal.successor;
+    if (terminal.operationId !== operationId || wait.afterOperationId !== operationId || !wait.allowNextWaveStart) {
+      return false;
+    }
+    if (this.coopV2NextWaveAwaitQueued) {
+      return true;
+    }
+    globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
+    globalScene.phaseManager.pushNew("NewBattlePhase", {
+      afterOperationId: wait.afterOperationId,
+      epoch: wait.epoch,
+      wave: wait.wave,
+      turn: wait.turn,
+    });
+    this.coopV2NextWaveAwaitQueued = true;
+    coopLog("v2-interaction", `queued signed Crossroads next-wave wait after ${operationId}`);
     return true;
   }
 
@@ -1128,7 +1199,16 @@ export class ErCrossroadsPhase extends Phase {
         this.coopAppliedTerminal = { pinned, moveOn };
       }
       if (operationId != null) {
-        settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+        const terminalSettlement = this.coopV2TerminalSettlement;
+        if (
+          terminalSettlement != null
+          && (terminalSettlement.operationId !== operationId || !terminalSettlement.settle())
+        ) {
+          throw new Error(`Crossroads interaction ${operationId} could not record its exact terminal proof`);
+        }
+        if (terminalSettlement == null) {
+          settleCoopV2InteractionOperation(operationId, this.coopOwningRuntime);
+        }
       }
       if (
         authorityCommit
@@ -1139,6 +1219,9 @@ export class ErCrossroadsPhase extends Phase {
           this.coopApply(pinned, moveOn, operationId, true, authoritativeProjection),
         );
         return false;
+      }
+      if (operationId != null && !this.queueCoopV2NextWaveAwait(operationId)) {
+        throw new Error(`Crossroads interaction ${operationId} could not queue its signed next-wave wait`);
       }
       this.end();
       return true;
