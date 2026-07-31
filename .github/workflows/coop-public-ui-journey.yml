@@ -39,6 +39,7 @@ on:
           - fresh-resume
           - reverse-resume
           - faint-replacement
+          - half-wipe
           - commander-skip
           - game-over
           - registered-interactions
@@ -193,6 +194,7 @@ jobs:
             test/browser/coop-public-ui/commander-evidence.test.mjs \
             test/browser/coop-public-ui/config.mjs \
             test/browser/coop-public-ui/evidence.mjs \
+            test/browser/coop-public-ui/faint-replacement-evidence.test.mjs \
             test/browser/coop-public-ui/fatal-console-evidence.test.mjs \
             test/browser/coop-public-ui/game-over-evidence.test.mjs \
             test/browser/coop-public-ui/journeys.mjs \
@@ -251,6 +253,9 @@ jobs:
       - name: Verify browser fan-out checkout isolation
         run: node --test test/browser/coop-public-ui/browser-workflow-fanout.test.mjs
 
+      - name: Verify replica half-wipe public-browser contracts
+        run: node --test test/browser/coop-public-ui/faint-replacement-evidence.test.mjs
+
       - name: Verify sealed preview exact-SHA proxy contracts
         run: node --test test/browser/coop-public-ui/preview-server.test.mjs
 
@@ -294,7 +299,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -392,7 +397,9 @@ jobs:
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
-          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
+          # A public invitation requester becomes the Authority V2 host. The half-wipe fixture must
+          # wipe the opposite, replica-owned seat so it reaches the zero-local-command passive watcher.
+          COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.journey == 'half-wipe' && (inputs.requester_seat == 'guest-seat' && 'host-seat' || 'guest-seat') || inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
           COOP_UI_HOST_LOCALE: en
           # The retained GameOver oracle isolates terminal ordering from the separately-gated

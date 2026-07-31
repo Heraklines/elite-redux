@@ -8,6 +8,67 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { findOwnedActionableReplacementSurface, replacementTargetOptionId } from "./campaign-nav.mjs";
 
+test(
+  "the two-browser half-wipe journey proves replica passive presentation before one-owner continuation",
+  async () => {
+    const [workflow, registry, config, harness, journeys] = await Promise.all([
+      readFile(new URL("../../../.github/workflows/coop-public-ui-journey.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../../src/dev-tools/registry.ts", import.meta.url), "utf8"),
+      readFile(new URL("config.mjs", import.meta.url), "utf8"),
+      readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),
+      readFile(new URL("journeys.mjs", import.meta.url), "utf8"),
+    ]);
+
+    assert.match(workflow, /- half-wipe/u);
+    assert.match(
+      workflow,
+      /inputs\.journey == 'faint-replacement' \|\| inputs\.journey == 'half-wipe'\) && 'faint-replacement'/u,
+      "half-wipe reuses the exact closed faint-fixture bundle identity",
+    );
+    assert.match(
+      workflow,
+      /inputs\.journey == 'half-wipe'[\s\S]*?inputs\.requester_seat == 'guest-seat'[\s\S]*?'host-seat'[\s\S]*?'guest-seat'/u,
+      "the workflow assigns the wipe to the non-requesting replica seat",
+    );
+    assert.match(config, /"half-wipe"/u);
+    assert.match(
+      registry,
+      /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.CROBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?Nature\.JOLLY[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
+      "the gated visible starter material forces one replica wipe without ending the double battle",
+    );
+    assert.match(
+      harness,
+      /this\.config\.journey === "faint-replacement" \|\| this\.config\.journey === "half-wipe"[\s\S]*?"half-wipe-owner"[\s\S]*?"half-wipe-partner"/u,
+    );
+    assert.match(
+      harness,
+      /halfWipeFixture = false[\s\S]*?halfWipeFixture[\s\S]*?CROBAT_SPECIES_ID[\s\S]*?DONDOZO_SPECIES_ID/u,
+      "the driver confirms the exact visible teams before spending battle input",
+    );
+    assert.match(
+      journeys,
+      /async function halfWipe\(rig\)[\s\S]*?startFreshRun\(\{ halfWipeFixture: true \}\)[\s\S]*?driveHalfWipeToNextCommand\(\)/u,
+    );
+
+    const drive = harness.slice(
+      harness.indexOf("async driveHalfWipeToNextCommand("),
+      harness.indexOf("async classifyPostReplacementRoute("),
+    );
+    assert.ok(drive.length > 0, "half-wipe driver must precede post-replacement classification");
+    assert.match(drive, /wiped\.publicRole !== "guest"[\s\S]*?survivor\?\.publicRole !== "host"/u);
+    assert.match(drive, /await wiped\.evidence\.waitFor\(REPLACEMENT_HALF_WIPED_CLOSE/u);
+    assert.match(
+      drive,
+      /partition\?\.owners\.length !== 1[\s\S]*?partition\.owners\[0\]\.label !== survivor\.label[\s\S]*?partition\.omitted\.length !== 1[\s\S]*?partition\.omitted\[0\]\.label !== wiped\.label/u,
+      "the next real command address must name one owner and one omitted replica",
+    );
+    assert.match(drive, /awaiting passive command watcher presentation receipt \(\[\^\\s\]\+\)/u);
+    assert.match(drive, /passive presentation receipt completed 1 ordered V2 entry after \(\[\^\\s\]\+\)/u);
+    assert.match(drive, /deferredOperation == null \|\| deferredOperation !== completedOperation/u);
+    assert.match(drive, /waitForPostTurnOutcome\(secondRound\.outcomeCursors/u);
+  },
+);
+
 test("faint replacement waits for the owned actionable party surface before pressing", async () => {
   const [harness, browserEntry] = await Promise.all([
     readFile(new URL("public-ui-harness.mjs", import.meta.url), "utf8"),

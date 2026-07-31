@@ -467,6 +467,12 @@ async function faintReplacement(rig) {
   }
 }
 
+async function halfWipe(rig) {
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun({ halfWipeFixture: true });
+  await rig.driveHalfWipeToNextCommand();
+}
+
 async function commanderSkip(rig) {
   await rig.pair(rig.config.requesterSeat);
   await rig.startFreshRun({ commanderFixture: true });
@@ -691,6 +697,7 @@ const journeys = {
   "fresh-resume": freshResume,
   "reverse-resume": reverseResume,
   "faint-replacement": faintReplacement,
+  "half-wipe": halfWipe,
   "commander-skip": commanderSkip,
   "game-over": gameOver,
   "evolution-sync": evolutionSync,

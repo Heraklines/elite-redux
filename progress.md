@@ -6364,3 +6364,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The runtime line now matches the remote formatter output exactly. The ownership train advances to `5a3e5fd25`; this
   metadata/format checkpoint changes no behavior and will be committed without local hooks. All requalification remains
   on GitHub-hosted runners.
+
+## 2026-07-31 - Public-browser half-wipe closes the passive-receipt coverage gap
+
+- Exact `54d1969b3` focused qualification `30638326182` is fully green. Its push `fresh-wave2` journey
+  `30638326217`, registered-interactions journey `30638371285`, and evolution journey `30638363377` are also green.
+  The navigation-depth-30, ten-wave Mystery, and corrected four-wave depth runs remain active on that immutable SHA and
+  are deliberately not cancelled.
+- The successful four-wave run at the preceding production patch SHA proved replacement and multi-wave progression, but
+  its fainted replica still had a legal reserve. It therefore never exercised the exact zero-local-command branch added
+  for a completely wiped player. Static and headless coverage alone are not an adequate oracle for that UI-to-relay path.
+- A new build-and-URL-gated `half-wipe` journey visibly selects a lone Memento Crobat for the non-requesting replica and a
+  lone Tackle Dondozo for the authority. After ordinary keyboard commands, it requires the empty replacement close, an
+  exact next-address partition with one authority owner and the replica omitted, matching passive-watcher deferral and
+  presentation-receipt operation IDs, and a subsequent structural command or reward outcome. No runtime state mutation,
+  healing, relay injection, or staging/production fixture exposure is introduced.
+- The workflow owns an explicit failure-first source-contract step for this scenario. All formatting, type analysis,
+  contracts, engine shards, and the two-Chromium journey will execute remotely; no local test, build, or browser run is
+  used.

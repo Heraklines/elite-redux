@@ -75,6 +75,7 @@ const allowedJourneys = new Set([
   "fresh-resume",
   "reverse-resume",
   "faint-replacement",
+  "half-wipe",
   "commander-skip",
   "game-over",
   "registered-interactions",

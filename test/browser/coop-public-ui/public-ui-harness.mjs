@@ -1093,10 +1093,16 @@ export class PublicUiClient {
     }
     if (this.config.journey === "commander-skip") {
       entryUrl.searchParams.set("coopfixture", this.label === this.config.commanderOwnerSeat ? "commander" : "dondozo");
-    } else if (this.config.journey === "faint-replacement") {
+    } else if (this.config.journey === "faint-replacement" || this.config.journey === "half-wipe") {
       entryUrl.searchParams.set(
         "coopfixture",
-        this.label === this.config.faintOwnerSeat ? "faint-owner" : "faint-partner",
+        this.label === this.config.faintOwnerSeat
+          ? this.config.journey === "half-wipe"
+            ? "half-wipe-owner"
+            : "faint-owner"
+          : this.config.journey === "half-wipe"
+            ? "half-wipe-partner"
+            : "faint-partner",
       );
     } else if (this.config.journey === "game-over") {
       entryUrl.searchParams.set("coopfixture", "game-over");
@@ -3485,6 +3491,7 @@ export class DuoPublicUiRig {
   async startFreshRun({
     commanderFixture = false,
     faintFixture = false,
+    halfWipeFixture = false,
     gameOverFixture = false,
     campaignSurvivalFixture = false,
     navigationFixture = false,
@@ -3566,7 +3573,11 @@ export class DuoPublicUiRig {
         Object.values(this.clients).map(async client => {
           const expectedSeededSpecies = commanderFixture
             ? [client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID]
-            : faintFixture
+            : halfWipeFixture
+              ? client.label === this.config.faintOwnerSeat
+                ? [CROBAT_SPECIES_ID]
+                : [DONDOZO_SPECIES_ID]
+              : faintFixture
               ? client.label === this.config.faintOwnerSeat
                 ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                 : [BULBASAUR_SPECIES_ID]
@@ -3856,6 +3867,109 @@ export class DuoPublicUiRig {
       return { route, floor };
     }
     return { route, floor };
+  }
+
+  /**
+   * Prove the real-browser asymmetric continuation after one player's entire half is wiped.
+   *
+   * The dedicated starter fixture makes the configured replica's only battler self-faint while
+   * the authority's single-target attack leaves the double battle alive. No replacement UI is
+   * actionable for the wiped seat. The next ordered command frontier must therefore expose exactly
+   * one public owner, omit exactly the wiped replica, and keep that replica's V2 control entry
+   * deferred until its retained source presentation has produced an address-exact receipt.
+   */
+  async driveHalfWipeToNextCommand() {
+    if (!this.host || !this.guest) {
+      throw new Error("driveHalfWipeToNextCommand requires a fully bound host and guest");
+    }
+    const wiped = this.client(this.config.faintOwnerSeat);
+    const survivor = Object.values(this.clients).find(client => client.label !== wiped.label);
+    if (wiped.publicRole !== "guest" || survivor?.publicRole !== "host") {
+      throw new Error(
+        `half-wipe must target the replica; configured=${wiped.label}/${wiped.publicRole} survivor=${survivor?.label}/${survivor?.publicRole}`,
+      );
+    }
+
+    const firstCommandCursors = Object.fromEntries(
+      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+    );
+    const firstRound = await this.driveSequentialCommandRound(
+      firstCommandCursors,
+      this.config.keys.battle,
+      "half-wipe-memento-round",
+    );
+    const firstOutcome = await this.waitForPostTurnOutcome(firstRound.outcomeCursors, {
+      expectedCommandAddress: firstRound.expectedCommandAddress,
+    });
+    if (firstOutcome.kind !== "command") {
+      throw new Error(`Half-wipe fixture reached ${firstOutcome.kind} instead of its asymmetric next command`);
+    }
+
+    const halfWipeClose = await wiped.evidence.waitFor(REPLACEMENT_HALF_WIPED_CLOSE, {
+      from: firstRound.outcomeCursors[wiped.label],
+      timeoutMs: this.config.timeoutMs,
+      description: "replica empty replacement close after complete half wipe",
+    });
+    wiped.evidence.record("half-wipe-empty-replacement-proof", {
+      closeEventIndex: halfWipeClose.index,
+      publicRole: wiped.publicRole,
+      publicSeat: wiped.publicSeat,
+    });
+
+    const secondRound = await this.driveSequentialCommandRound(
+      firstRound.outcomeCursors,
+      this.config.keys.battle,
+      "half-wipe-survivor-only-round",
+    );
+    await this.assertSequentialCommandFrontier(
+      secondRound,
+      firstRound.outcomeCursors,
+      "half-wipe-survivor-only-command-frontier",
+      { expectedWave: this.activeBattleWave },
+    );
+    const partition = secondRound.commandPartition;
+    if (
+      partition?.owners.length !== 1
+      || partition.owners[0].label !== survivor.label
+      || partition.omitted.length !== 1
+      || partition.omitted[0].label !== wiped.label
+    ) {
+      throw new Error(`Half-wipe command partition did not omit only ${wiped.label}: ${JSON.stringify(partition)}`);
+    }
+
+    const deferred = await wiped.evidence.waitFor(/awaiting passive command watcher presentation receipt ([^\s]+)/u, {
+      from: firstRound.outcomeCursors[wiped.label],
+      timeoutMs: this.config.timeoutMs,
+      description: "replica passive command watcher control deferral",
+    });
+    const completed = await wiped.evidence.waitFor(
+      /passive presentation receipt completed 1 ordered V2 entry after ([^\s]+)/u,
+      {
+        from: firstRound.outcomeCursors[wiped.label],
+        timeoutMs: this.config.timeoutMs,
+        description: "replica passive command watcher presentation receipt",
+      },
+    );
+    const deferredOperation = deferred.text.match(/receipt ([^\s]+)/u)?.[1] ?? null;
+    const completedOperation = completed.text.match(/after ([^\s]+)/u)?.[1] ?? null;
+    if (deferredOperation == null || deferredOperation !== completedOperation) {
+      throw new Error(
+        `Half-wipe passive receipt operation mismatch deferred=${deferredOperation} completed=${completedOperation}`,
+      );
+    }
+    wiped.evidence.record("half-wipe-passive-presentation-proof", {
+      operationId: deferredOperation,
+      deferredEventIndex: deferred.index,
+      completedEventIndex: completed.index,
+      omittedFromCommandAddress: partition.address,
+    });
+
+    const secondOutcome = await this.waitForPostTurnOutcome(secondRound.outcomeCursors, {
+      expectedCommandAddress: secondRound.expectedCommandAddress,
+    });
+    if (secondOutcome.kind !== "command" && secondOutcome.kind !== "reward") {
+      throw new Error(`Half-wipe survivor-only command reached unexpected ${secondOutcome.kind} outcome`);
+    }
   }
 
   /**

@@ -414,19 +414,28 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
 }
 
 /**
- * Materialize the deterministic public faint-replacement precondition in the normal starter UI.
+ * Materialize deterministic public faint/replacement preconditions in the normal starter UI.
  *
  * The configured owner visibly submits a Magikarp lead with Healing Wish plus two legal reserves.
  * Healing Wish makes the first real public command self-faint without depending on a random wave-1
  * enemy, while the other seat receives a one-mon attacking team. The exact build flag and per-page
- * URL value keep this CI-only fixture unreachable in normal local, staging, and production bundles.
+ * The half-wipe variant instead gives the configured replica a lone fast Memento Crobat and its
+ * partner a durable one-target attacker. The Crobat self-faints before ordinary wave-1 enemies, but
+ * Dondozo cannot erase both opposing battlers with one Tackle, so the same battle must continue with
+ * exactly one command owner. The exact build flag and per-page URL value keep every variant
+ * unreachable in normal local, staging, and production bundles.
  */
 export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
   if (!isCoopBrowserFaintFixtureBuild() || typeof location === "undefined") {
     return null;
   }
   const fixture = new URLSearchParams(location.search).get("coopfixture");
-  if (fixture !== "faint-owner" && fixture !== "faint-partner") {
+  if (
+    fixture !== "faint-owner"
+    && fixture !== "faint-partner"
+    && fixture !== "half-wipe-owner"
+    && fixture !== "half-wipe-partner"
+  ) {
     return null;
   }
   const specs =
@@ -439,15 +448,19 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
           { speciesId: SpeciesId.SEEL, moveset: [MoveId.WATER_SPOUT] },
           { speciesId: SpeciesId.RATTATA, moveset: [MoveId.TACKLE] },
         ]
-      : [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }];
-  return specs.map(({ speciesId, moveset }) => ({
+      : fixture === "faint-partner"
+        ? [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }]
+        : fixture === "half-wipe-owner"
+          ? [{ speciesId: SpeciesId.CROBAT, moveset: [MoveId.MEMENTO], nature: Nature.JOLLY }]
+          : [{ speciesId: SpeciesId.DONDOZO, moveset: [MoveId.TACKLE] }];
+  return specs.map(({ speciesId, moveset, nature = Nature.HARDY }) => ({
     speciesId,
     shiny: false,
     variant: 0,
     formIndex: 0,
     abilityIndex: 0,
     passive: false,
-    nature: Nature.HARDY,
+    nature,
     moveset: moveset as StarterMoveset,
     pokerus: false,
     ivs: new Array(6).fill(31),
