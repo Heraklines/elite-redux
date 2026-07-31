@@ -4454,7 +4454,7 @@
     "weight": 5
   },
   "TRAINER_70025": {
-    "battleBgm": "battle_jacinthe",
+    "battleBgm": "battle_legendary_ub",
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "The mothership will be landing very soon...",
