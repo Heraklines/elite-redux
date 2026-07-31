@@ -75,7 +75,7 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
   assert.match(runtime, /capture\.events\.push\(structuredClone\(event\)\)[\s\S]*stage: "authority-recorded"/u);
   assert.match(replay, /stage: "renderer-completed"[\s\S]*stage: "renderer-failed"/u);
   assert.match(replay, /override retire\(\): void[\s\S]*super\.retire\(\)[\s\S]*controller\.abort\(\)/u);
-  assert.match(replay, /Promise\.race\(\[render\(controller\.signal\), aborted\]\)/u);
+  assert.match(replay, /Promise\.race\(\[render\(controller\.signal, armWatchdog\), aborted\]\)/u);
   assert.match(
     replay,
     /showAutoText\([\s\S]*globalScene\.ui\.showText\(text, delay, finish, null, false\)/u,

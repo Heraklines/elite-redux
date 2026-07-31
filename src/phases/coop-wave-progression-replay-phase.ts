@@ -71,7 +71,7 @@ class CoopEvolutionPresentation {
     this.after = after;
   }
 
-  public async play(signal: AbortSignal): Promise<void> {
+  public async play(signal: AbortSignal, heartbeat: (stage: string) => void): Promise<void> {
     const abort = () => this.cancel();
     signal.addEventListener("abort", abort, { once: true });
     try {
@@ -80,6 +80,7 @@ class CoopEvolutionPresentation {
       }
       await this.awaitExternal(Promise.all([this.before.loadAssets(), this.after.loadAssets()]));
       this.assertActive();
+      heartbeat("assets-loaded");
       this.modeTransitionStarted = true;
       const enterMode = globalScene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
       // If cancellation wins while the transition is still pending, restore MESSAGE again after the late
@@ -93,51 +94,70 @@ class CoopEvolutionPresentation {
         .catch(() => undefined);
       await this.awaitExternal(enterMode);
       this.assertActive();
+      heartbeat("mode-ready");
       this.setup();
+      heartbeat("scene-ready");
       await this.showTimedText(i18next.t("menu:evolving", { pokemonName: getPokemonNameWithAffix(this.before) }), 1000);
       this.assertActive();
+      heartbeat("intro-text");
       this.before.cry();
       await this.delay(1000);
       this.assertActive();
+      heartbeat("intro-cry");
       this.bgm = globalScene.playSoundWithoutBgm("evolution");
       await this.tween(this.bgOverlay!, { alpha: 1 }, 1500, 500);
+      this.assertActive();
+      heartbeat("background-fade");
       await this.delay(1000);
       this.assertActive();
+      heartbeat("charge-delay");
       this.videoBg!.setVisible(true).play();
       globalScene.playSound("se/charge");
       globalScene.animations.doSpiralUpward(this.baseBg!, this.container!);
       await this.tween(this.beforeTint!, { alpha: 1 }, 2000);
       this.assertActive();
+      heartbeat("before-tint");
       this.beforeSprite!.setVisible(false);
       await this.delay(1100);
       this.assertActive();
+      heartbeat("beam-delay");
       globalScene.playSound("se/beam");
       globalScene.animations.doArcDownward(this.baseBg!, this.container!);
       await this.delay(1500);
       this.assertActive();
+      heartbeat("arc-delay");
       this.afterTint!.setScale(0.25).setVisible(true);
       // doCycle owns recursive tweens. Its BooleanHolder stops the recursion at the current (<=500 ms)
       // tween boundary, after which assertActive exits without scheduling any later presentation work.
       await globalScene.animations.doCycle(1, 15, this.beforeTint!, this.afterTint!, this.cycleCancelled);
       this.assertActive();
+      heartbeat("cycle-complete");
       globalScene.playSound("se/sparkle");
       this.afterSprite!.setVisible(true);
       globalScene.animations.doCircleInward(this.baseBg!, this.container!);
       await this.delay(900);
       this.assertActive();
+      heartbeat("reveal-delay");
       globalScene.playSound("se/shine");
       globalScene.animations.doSpray(this.baseBg!, this.container!);
       await this.tween(this.flashOverlay!, { alpha: 1 }, 250);
       this.assertActive();
+      heartbeat("flash-in");
       this.bgOverlay!.setAlpha(1);
       this.videoBg!.setVisible(false);
       await this.tween([this.flashOverlay!, this.afterTint!], { alpha: 0 }, 2000, 150);
+      this.assertActive();
+      heartbeat("flash-out");
       await this.tween(this.bgOverlay!, { alpha: 0 }, 250);
+      this.assertActive();
+      heartbeat("background-clear");
       await this.delay(250);
       this.assertActive();
+      heartbeat("settled-form");
       this.after.cry();
       await this.delay(1250);
       this.assertActive();
+      heartbeat("evolved-cry");
       globalScene.playSoundWithoutBgm("evolution_fanfare");
       await this.showTimedText(
         i18next.t("menu:evolutionDone", {
@@ -146,6 +166,8 @@ class CoopEvolutionPresentation {
         }),
         4000,
       );
+      this.assertActive();
+      heartbeat("completion-text");
     } finally {
       signal.removeEventListener("abort", abort);
       fadeOutSoundIfActive(globalScene, this.bgm);
@@ -361,7 +383,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
       }
       const event = this.events[seq];
       try {
-        await this.withWatchdog(event, signal => this.render(event, signal));
+        await this.withWatchdog(event, (signal, heartbeat) => this.render(event, signal, heartbeat));
         if (this.completed) {
           return;
         }
@@ -393,31 +415,49 @@ export class CoopWaveProgressionReplayPhase extends Phase {
 
   private async withWatchdog(
     event: CoopWaveProgressionPresentationV2,
-    render: (signal: AbortSignal) => Promise<void>,
+    render: (signal: AbortSignal, heartbeat: (stage: string) => void) => Promise<void>,
   ): Promise<void> {
     const controller = new AbortController();
     this.renderControllers.add(controller);
     let timeout: ReturnType<typeof setTimeout> | null = null;
     let watchdogFired = false;
+    let lastProgressStage = "start";
     try {
       const watchdogMs = event.k === "evolution" ? EVOLUTION_STEP_WATCHDOG_MS : PROGRESSION_STEP_WATCHDOG_MS;
-      timeout = setTimeout(() => {
-        watchdogFired = true;
-        coopWarn(
-          "progression",
-          `GUEST retained ${event.k} presentation watchdog wave=${this.wave} slot=${event.partySlot}`,
-        );
-        controller.abort();
-        if (event.k !== "evolution") {
-          globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
-          globalScene.partyExpBar.hide().catch(() => undefined);
+      const armWatchdog = (stage: string): void => {
+        if (watchdogFired || controller.signal.aborted) {
+          return;
         }
-      }, watchdogMs);
+        if (timeout != null) {
+          clearTimeout(timeout);
+        }
+        lastProgressStage = stage;
+        if (event.k === "evolution" && stage !== "start") {
+          coopLog(
+            "progression",
+            `GUEST retained evolution heartbeat wave=${this.wave} slot=${event.partySlot} stage=${stage}`,
+          );
+        }
+        timeout = setTimeout(() => {
+          watchdogFired = true;
+          coopWarn(
+            "progression",
+            `GUEST retained ${event.k} presentation watchdog wave=${this.wave} slot=${event.partySlot} `
+              + `stage=${lastProgressStage}`,
+          );
+          controller.abort();
+          if (event.k !== "evolution") {
+            globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
+            globalScene.partyExpBar.hide().catch(() => undefined);
+          }
+        }, watchdogMs);
+      };
+      armWatchdog("start");
       if (event.k === "evolution") {
         // Evolution owns cancellable timers, tweens, the recursive sprite cycle, mode restoration, and its
         // temporary Pokemon. Abort and JOIN that cleanup before WAVE_ADVANCE DATA may apply; unlike the
         // message/EXP APIs below, this renderer has a complete lifecycle contract and must not be detached.
-        await render(controller.signal);
+        await render(controller.signal, armWatchdog);
         if (watchdogFired || controller.signal.aborted) {
           throw new CoopWaveProgressionPresentationCancelled("evolution-presentation-watchdog-expired");
         }
@@ -430,7 +470,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
           { once: true },
         );
       });
-      await Promise.race([render(controller.signal), aborted]);
+      await Promise.race([render(controller.signal, armWatchdog), aborted]);
       if (watchdogFired || controller.signal.aborted) {
         throw new CoopWaveProgressionPresentationCancelled(`${event.k}-presentation-watchdog-expired`);
       }
@@ -452,7 +492,11 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     }
   }
 
-  private render(event: CoopWaveProgressionPresentationV2, signal: AbortSignal): Promise<void> {
+  private render(
+    event: CoopWaveProgressionPresentationV2,
+    signal: AbortSignal,
+    heartbeat: (stage: string) => void,
+  ): Promise<void> {
     const pokemon = this.resolvePokemon(event.partySlot, event.pokemonId);
     if (pokemon == null) {
       return Promise.reject(
@@ -467,7 +511,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     if (event.k === "levelUp") {
       return this.renderLevelUp(pokemon, event, signal);
     }
-    return this.renderEvolution(pokemon, event, signal);
+    return this.renderEvolution(pokemon, event, signal, heartbeat);
   }
 
   private resolvePokemon(partySlot: number, pokemonId: number): PlayerPokemon | null {
@@ -677,6 +721,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     pokemon: PlayerPokemon,
     event: Extract<CoopWaveProgressionPresentationV2, { k: "evolution" }>,
     signal: AbortSignal,
+    heartbeat: (stage: string) => void,
   ): Promise<void> {
     const liveMatchesPreImage =
       pokemon.species.speciesId === event.fromSpeciesId
@@ -728,7 +773,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
         "progression",
         `GUEST retained evolution start wave=${this.wave} slot=${event.partySlot} species=${event.fromSpeciesId}->${event.toSpeciesId} live=${liveMatchesPreImage ? "pre" : "post"}`,
       );
-      await new CoopEvolutionPresentation(before, evolved).play(signal);
+      await new CoopEvolutionPresentation(before, evolved).play(signal, heartbeat);
       coopLog(
         "progression",
         `GUEST retained evolution complete wave=${this.wave} slot=${event.partySlot} species=${event.fromSpeciesId}->${event.toSpeciesId}`,

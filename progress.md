@@ -6237,3 +6237,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   never inserted into the party, and destroyed after success, cancellation, or reconstruction failure.
 - Failure-first static coverage went red on the missing pre-image, then the complete 395-test public-browser source suite
   and public boundary check passed. Authority V2 Vitest and the exact two-browser evolution journey remain remote-only.
+
+## 2026-07-31 - Evolution liveness is measured by renderer progress
+
+- Exact two-browser evolution run `30623035493` at `e67928670` proved the immutable pre/post repair reached the intended
+  path: the replica accepted an already-evolved live party member, reconstructed both committed images, and entered its
+  real `EVOLUTION_SCENE`. It then failed exactly 45 seconds later because the product watchdog treated the complete
+  cutscene as one blind wall-clock step. On the same roughly three-FPS runner, the authority's ordinary native evolution
+  took about 110 seconds while continuing to advance, so the old deadline was a false presentation failure.
+- The evolution renderer now renews its existing 45-second liveness lease only after concrete completed stages: asset
+  load, UI-mode installation, scene construction, each text/delay/tween boundary, the recursive transformation cycle,
+  reveal, and final text. Every renewal is logged with its exact stage. A genuinely stuck stage still aborts, joins all
+  owned timers/tweens/callbacks, restores MESSAGE, and releases no wave DATA early; a slow but advancing browser is no
+  longer killed merely because the whole cinematic exceeds 45 seconds.
+- The failure-first source contract went red before implementation and the focused presentation contract is green after
+  it. Full local source/boundary/format qualification and the exact two-browser evolution rerun are the next proofs;
+  TypeScript and co-op Vitest remain remote-only.

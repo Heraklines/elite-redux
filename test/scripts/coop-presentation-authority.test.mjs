@@ -983,7 +983,7 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
   );
   assert.match(
     progressionReplay,
-    /liveMatchesPreImage[\s\S]+liveMatchesPostImage[\s\S]+new PokemonData\(event\.prePokemon\)\.toPokemon[\s\S]+new PokemonData\(event\.postPokemon\)\.toPokemon[\s\S]+new CoopEvolutionPresentation\(before, evolved\)\.play\(signal\)/u,
+    /liveMatchesPreImage[\s\S]+liveMatchesPostImage[\s\S]+new PokemonData\(event\.prePokemon\)\.toPokemon[\s\S]+new PokemonData\(event\.postPokemon\)\.toPokemon[\s\S]+new CoopEvolutionPresentation\(before, evolved\)\.play\(signal, heartbeat\)/u,
     "the guest evolution cutscene validates the live replica but renders only immutable before/after material",
   );
   assert.match(
@@ -993,8 +993,18 @@ test("protocol 61 binds every structured presentation cue and retained Mystery m
   );
   assert.match(
     progressionReplay,
-    /controller\.abort\(\)[\s\S]+await render\(controller\.signal\)/u,
+    /controller\.abort\(\)[\s\S]+await render\(controller\.signal, armWatchdog\)/u,
     "the evolution watchdog cancels and then joins its renderer instead of releasing DATA from Promise.race",
+  );
+  assert.match(
+    progressionReplay,
+    /let lastProgressStage = "start"[\s\S]+const armWatchdog = \(stage: string\)[\s\S]+clearTimeout\(timeout\)[\s\S]+lastProgressStage = stage[\s\S]+timeout = setTimeout/u,
+    "the evolution watchdog is rolling: every completed renderer stage renews the liveness lease",
+  );
+  assert.match(
+    progressionReplay,
+    /await this\.awaitExternal\(Promise\.all\([\s\S]+heartbeat\("assets-loaded"\)[\s\S]+heartbeat\("mode-ready"\)[\s\S]+heartbeat\("cycle-complete"\)[\s\S]+heartbeat\("completion-text"\)/u,
+    "slow real-browser evolution reports progress across assets, UI transition, animation cycle, and final text",
   );
   assert.match(
     progressionReplay,
