@@ -4250,21 +4250,22 @@ async function advanceToNextWaveCommand(
         ),
       })
     : null;
-  // Mystery difficulty deliberately chains encounters without opening a battle command between them.
-  // Give each observer-proven public action one ordinary surface allowance; never refresh from keepalives,
-  // phase names, or time alone. The immutable ceiling is derived from the profile's required surface count.
-  const mysteryProgressBudget = policy.mysteryGauntlet.required
+  // Mystery difficulty deliberately chains encounters without opening a battle command between them, and the
+  // longitudinal navigation profile can encounter the same chain between two geographic frontiers. Give each
+  // observer-proven public action one ordinary surface allowance; never refresh from keepalives, phase names, or
+  // time alone. The immutable ceiling remains derived from the finite required Mystery surface count.
+  const registeredSurfaceProgressBudget = policy.mysteryGauntlet.required || policy.navigation.required
     ? createRegisteredSurfaceProgressBudget(
         betweenWaveTimeoutMs,
         rig.config.timeoutMs,
         policy.mysteryGauntlet.minSurfaces,
       )
     : null;
-  const recordMysteryProgress = kind => {
-    if (mysteryProgressBudget == null) {
+  const recordRegisteredSurfaceProgress = kind => {
+    if (registeredSurfaceProgressBudget == null) {
       return;
     }
-    const proof = mysteryProgressBudget.noteProgress();
+    const proof = registeredSurfaceProgressBudget.noteProgress();
     for (const client of clients) {
       client.evidence.record("campaign-mystery-progress-budget", { kind, ...proof });
     }
@@ -4283,7 +4284,7 @@ async function advanceToNextWaveCommand(
       ...detail,
     });
 
-  while (Date.now() < (betweenWaveBudget?.observe() ?? mysteryProgressBudget?.deadline() ?? fixedDeadline)) {
+  while (Date.now() < (betweenWaveBudget?.observe() ?? registeredSurfaceProgressBudget?.deadline() ?? fixedDeadline)) {
     if (
       clients.some(
         client =>
@@ -4343,7 +4344,7 @@ async function advanceToNextWaveCommand(
       return { status: "continue", boundary: stats.targetBoundary };
     }
     if (drove) {
-      recordMysteryProgress(`surface:${drove}`);
+      recordRegisteredSurfaceProgress(`surface:${drove}`);
       await reportBetweenWaveProgress("between-wave surface driven", { surface: drove });
       stallSince = 0;
       lastRegisteredSurface = drove;
@@ -4353,7 +4354,7 @@ async function advanceToNextWaveCommand(
     }
 
     if (await advanceBattlePrompt()) {
-      recordMysteryProgress("battle-prompt");
+      recordRegisteredSurfaceProgress("battle-prompt");
       await reportBetweenWaveProgress("between-wave battle prompt advanced");
       stallSince = 0;
       lastRegisteredSurface = null;
@@ -4363,7 +4364,7 @@ async function advanceToNextWaveCommand(
     }
 
     if (await advanceMysteryNarration()) {
-      recordMysteryProgress("mystery-narration");
+      recordRegisteredSurfaceProgress("mystery-narration");
       await reportBetweenWaveProgress("between-wave mystery narration advanced");
       stallSince = 0;
       lastRegisteredSurface = null;

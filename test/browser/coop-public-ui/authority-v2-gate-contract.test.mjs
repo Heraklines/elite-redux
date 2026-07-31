@@ -3917,13 +3917,16 @@ test("the animations-on campaign extends a live between-wave renderer without we
   );
 });
 
-test("the Mystery gauntlet uses progress-proven rolling surface windows under an immutable ceiling", () => {
+test("the Mystery and navigation journeys use progress-proven rolling surface windows under an immutable ceiling", () => {
   assert.match(campaignDriver, /export function createRegisteredSurfaceProgressBudget\(/u);
-  assert.match(campaignDriver, /const mysteryProgressBudget = policy\.mysteryGauntlet\.required/u);
+  assert.match(
+    campaignDriver,
+    /const registeredSurfaceProgressBudget = policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required/u,
+  );
   assert.match(campaignDriver, /policy\.mysteryGauntlet\.minSurfaces/u);
-  assert.match(campaignDriver, /recordMysteryProgress\(`surface:\$\{drove\}`\)/u);
-  assert.match(campaignDriver, /recordMysteryProgress\("mystery-narration"\)/u);
-  assert.match(campaignDriver, /mysteryProgressBudget\?\.deadline\(\)/u);
+  assert.match(campaignDriver, /recordRegisteredSurfaceProgress\(`surface:\$\{drove\}`\)/u);
+  assert.match(campaignDriver, /recordRegisteredSurfaceProgress\("mystery-narration"\)/u);
+  assert.match(campaignDriver, /registeredSurfaceProgressBudget\?\.deadline\(\)/u);
 });
 
 test("campaign speed setup follows semantic title identities across a late title rebuild", () => {

@@ -6609,3 +6609,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   remote owned-file type/format and browser boundary checks, then two real browsers cleared the ordinary wave-2
   journey. Focused run `30660334822` did not execute tests because the integration manifest still named the prior
   train base; that red is classified as CI metadata, and the manifest now advances to the exact `41d28ffbe` tip.
+# 2026-07-31 — navigation wave-13 Mystery deadline classified as harness false red
+
+- Exact-SHA journey `30661550622` on `b70c3271f31188770762b9d01df50da7d63e46ce` reached the wave-10 market, bought Wide Lens, crossed the World Map into biome 1, and continued through authoritative wave 12 without a desync.
+- The driver then crossed a wave-13 Mystery encounter through presentation, party, subprompt, reward, and post-Mystery narration, but its navigation-only fixed between-wave deadline expired while both real browsers were still advancing. The post-failure trace proves the host continued from wave-14 `NextEncounterPhase` into `SummonPhase` with digest `5123359742e0cda9`; this is a harness deadline defect, not a product stall.
+- Scope the existing observer-proven, immutable-ceiling registered-surface budget to the navigation profile as well as the Mystery gauntlet. Keep ordinary short profiles on their fixed deadline and keep keepalives/phase names/time alone ineligible to refresh it.
