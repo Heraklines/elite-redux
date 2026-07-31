@@ -47,6 +47,8 @@ export class CoopGuestCatchFullPhase extends Phase {
   private readonly pokemonName: string;
   private readonly speciesId: number;
   private readonly coopOwningRuntime = getCoopRuntime();
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   /** Re-entrant guard: a drive loop may call start() again while the picker is open. */
   private opened = false;
 
@@ -55,6 +57,8 @@ export class CoopGuestCatchFullPhase extends Phase {
     this.pokemonName = pokemonName;
     this.speciesId = speciesId;
     this.coopV2ControlOperationId = operationId ?? null;
+    this.coopSourceWave = globalScene.currentBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
   }
 
   public override start(): void {
@@ -81,8 +85,6 @@ export class CoopGuestCatchFullPhase extends Phase {
         const mode = globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
           coopLog("replay", `guest catch-full picker PICK slot=${slotIndex} seq=${seq}`);
           const partySlot = slotIndex >= 0 && slotIndex < 6 ? slotIndex : -1;
-          const wave = globalScene.currentBattle?.waveIndex ?? 0;
-          const turn = globalScene.currentBattle?.turn ?? 0;
           const decisionOperationId =
             this.coopV2ControlOperationId == null
               ? null
@@ -100,8 +102,8 @@ export class CoopGuestCatchFullPhase extends Phase {
           armCoopCatchFullIntentResend(
             {
               payload: { type: "decision", speciesId: this.speciesId, partySlot },
-              wave,
-              turn,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
               resend,
             },
             operationBinding,

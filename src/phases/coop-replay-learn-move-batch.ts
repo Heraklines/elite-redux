@@ -64,6 +64,8 @@ export class CoopReplayLearnMoveBatchPhase extends Phase {
   /** Exact renderer scene captured with the phase; promise callbacks must never target the peer engine. */
   private readonly coopOwningScene = globalScene;
   private readonly coopOwningRuntime = getCoopRuntime();
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   private closed = false;
   private coopOperationBinding: CoopLearnMoveOperationBinding | null = null;
   /** Guest-owned proposal retained until the exact immutable result returns. */
@@ -86,6 +88,8 @@ export class CoopReplayLearnMoveBatchPhase extends Phase {
   ) {
     super();
     this.coopV2ControlOperationId = operationId;
+    this.coopSourceWave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = this.coopOwningScene.currentBattle?.turn ?? 0;
   }
 
   public override start(): void {
@@ -173,6 +177,10 @@ export class CoopReplayLearnMoveBatchPhase extends Phase {
 
   public owningScene(): typeof globalScene {
     return this.coopOwningScene;
+  }
+
+  public sourceAddress(): { readonly wave: number; readonly turn: number } {
+    return { wave: this.coopSourceWave, turn: this.coopSourceTurn };
   }
 
   /** Capture the guest runtime's learn-operation domain once for every later async/result callback. */
@@ -365,6 +373,7 @@ export function openCoopLearnMoveBatchPickerInline(
 function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void {
   const { partySlot, learnableIds, ownerIsGuest } = phase.presentation();
   const scene = phase.owningScene();
+  const { wave, turn } = phase.sourceAddress();
   const relay = getCoopInteractionRelay();
   const pokemon = scene.getPlayerParty()[partySlot];
   const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + partySlot;
@@ -497,8 +506,8 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
         armCoopLearnMoveBatchIntentResend(
           {
             payload,
-            wave: scene.currentBattle?.waveIndex ?? 0,
-            turn: scene.currentBattle?.turn ?? 0,
+            wave,
+            turn,
             resend: sendProposal,
           },
           operationBinding,
@@ -526,8 +535,6 @@ function runCoopLearnMoveBatchPicker(phase: CoopReplayLearnMoveBatchPhase): void
             undefined,
             decisionOperationId ?? undefined,
           );
-        const wave = scene.currentBattle?.waveIndex ?? 0;
-        const turn = scene.currentBattle?.turn ?? 0;
         const payload = {
           type: "decision" as const,
           partySlot,

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "65e548eea3de806244e700c133ceb8e0f7288c56",
+  "baseSha": "470cb7ae3fa25e0685bd5689ca67f78884eaac3d",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -132,6 +132,7 @@
     "src/phases/battle-phase.ts",
     "src/phases/biome-shop-phase.ts",
     "src/phases/command-phase.ts",
+    "src/phases/coop-guest-catch-full-phase.ts",
     "src/phases/coop-guest-faint-switch-phase.ts",
     "src/phases/coop-guest-revival-phase.ts",
     "src/phases/coop-presentation-watchdog.ts",

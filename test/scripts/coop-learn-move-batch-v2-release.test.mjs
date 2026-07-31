@@ -168,3 +168,20 @@ test("batch fallback carries one mandatory immutable single-move successor into 
   assert.match(commit, /nextInteraction: \{ kind: "learn-move" as const, wave, turn \}/u);
   assert.match(duo, /the fallback commit names its exact single-move successor in allowedInteractionAddresses/u);
 });
+
+test("both batch panels retain one source address across every UI and relay callback", () => {
+  for (const [name, source] of [
+    ["authority", authority],
+    ["replica", replica],
+  ]) {
+    assert.match(source, /private readonly coopSourceWave: number;/u, `${name} retains its source wave`);
+    assert.match(source, /private readonly coopSourceTurn: number;/u, `${name} retains its source turn`);
+    assert.equal(
+      source.match(/this\.coopOwningScene\.currentBattle\?\.(?:waveIndex|turn)/gu)?.length,
+      2,
+      `${name} reads both coordinates only at construction`,
+    );
+    assert.doesNotMatch(source, /(?:wave|turn): scene\.currentBattle|const (?:wave|turn) = scene\.currentBattle/u);
+  }
+  assert.match(replica, /const \{ wave, turn \} = phase\.sourceAddress\(\);/u);
+});

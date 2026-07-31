@@ -6492,3 +6492,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The two `a4e5878d4` journey builders stopped on the same two line-wrap diagnostics in `market-journey.mjs`; TypeScript
   was clean and neither run reached Chromium. The helper now matches the exact remote Biome layout. This checkpoint is
   formatting-only and all executable revalidation remains remote.
+
+## 2026-07-31 - Catch-full and batch learn retain their source address
+
+- The closed interaction registry audit found three more callback-owned coordinate reads: the guest catch-full picker,
+  the authority batch learn panel, and its projected replica panel. Each already retained its exact runtime/operation
+  domain, but a late human choice or fallback still derived wave/turn from the ambient scene.
+- Each phase generation now captures source wave/turn at construction. Catch-full proposal resend, batch presentation,
+  immutable result, fallback successor, and legacy resend all reuse that address. Focused source contracts enforce that
+  construction is the only scene battle-coordinate read for both batch panels and that catch-full never rereads inside
+  its public callback. The guest catch-full phase is now explicitly owned by this integration train.

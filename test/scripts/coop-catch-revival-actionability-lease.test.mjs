@@ -10,6 +10,7 @@ import { test } from "node:test";
 const root = new URL("../../", import.meta.url);
 const read = path => readFileSync(new URL(path, root), "utf8").replace(/\r\n/gu, "\n");
 const catchFull = read("src/data/elite-redux/coop/coop-catch-full.ts");
+const catchFullGuestPhase = read("src/phases/coop-guest-catch-full-phase.ts");
 const revivalOwner = read("src/phases/revival-blessing-phase.ts");
 const revivalWatcher = read("src/phases/coop-guest-revival-phase.ts");
 const runtime = read("src/data/elite-redux/coop/coop-runtime.ts");
@@ -142,5 +143,15 @@ test("the catch-full duo drives only a manager-owned, control-installed public p
     [...guestDrive.slice(0, publicSelection).matchAll(/current\.start\(\)/gu)].length,
     1,
     "the headless harness restores only its one intentionally suppressed manager start",
+  );
+});
+
+test("guest catch-full resends keep the projected phase's immutable battle address", () => {
+  assert.match(catchFullGuestPhase, /private readonly coopSourceWave: number;/u);
+  assert.match(catchFullGuestPhase, /private readonly coopSourceTurn: number;/u);
+  assert.match(catchFullGuestPhase, /wave: this\.coopSourceWave,\s*turn: this\.coopSourceTurn,/u);
+  assert.doesNotMatch(
+    catchFullGuestPhase,
+    /const wave = globalScene\.currentBattle|const turn = globalScene\.currentBattle/u,
   );
 });

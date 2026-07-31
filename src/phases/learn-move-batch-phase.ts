@@ -185,12 +185,16 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
   /** The scene that constructed this queue-owned phase; async co-op continuations may never consult a peer scene. */
   private readonly coopOwningScene = globalScene;
   private readonly coopOwningRuntime = getCoopRuntime();
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   /** Runtime activations owned by this exact phase generation and cancelled on destructive replacement. */
   private readonly coopRuntimeContinuations = new Set<() => void>();
 
   constructor(partyMemberIndex: number, candidateMoveIds: MoveId[]) {
     super(partyMemberIndex);
     this.candidateMoveIds = candidateMoveIds;
+    this.coopSourceWave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = this.coopOwningScene.currentBattle?.turn ?? 0;
   }
 
   /** Dispatch one continuation only under this phase's exact runtime/scene generation. */
@@ -394,8 +398,8 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       !v2 || this.coopV2ControlOperationId == null
         ? null
         : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);
-    const wave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
-    const turn = this.coopOwningScene.currentBattle?.turn ?? 0;
+    const wave = this.coopSourceWave;
+    const turn = this.coopSourceTurn;
     const payload = fallback
       ? {
           type: "decision" as const,
@@ -530,8 +534,8 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       ownerIsGuest,
     });
     // Tell the partner to open the SAME panel (owner if it owns the mon, else a read-only watcher).
-    const wave = this.coopOwningScene.currentBattle?.waveIndex ?? 0;
-    const turn = this.coopOwningScene.currentBattle?.turn ?? 0;
+    const wave = this.coopSourceWave;
+    const turn = this.coopSourceTurn;
     const operationBinding = captureCoopLearnMoveOperationBinding("host");
     const presentationOperationId = sendCoopLearnMoveBatchPromptWithOperationId(
       relay,
