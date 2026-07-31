@@ -6305,3 +6305,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `CoopWaveProgressionReplayPhase`, and only after that browser has observed `BattleEndPhase` within the current scan
   window. FaintPhase alone remains insufficient, arbitrary future turns remain denied, and ordinary settlement-message
   rules are unchanged. The realistic driver test went failure-first at the retained prompt and now passes 57/57.
+
+## 2026-07-31 - Evolution readiness and staggered replacement are driven from public evidence
+
+- Exact evolution run `30630465252` at `4991e3219` crossed the prior guest-prompt frontier and proved both renderers
+  completed the retained evolution plus the wave-progression ledger. Its final oracle nevertheless rejected the host's
+  actionable `EvolutionPhase` because the always-live handler correctly reported optional `inputBlocked=null`, while
+  the duplicate assertion demanded literal `false`. The oracle now uses the same shared semantic readiness predicate
+  as the keyboard driver, so observation and action cannot disagree about an optional field.
+- The same trace exposed a real harness-caused product fallback: the guest replacement picker opened 16 seconds after
+  the host picker closed, outside the five-second concurrent-faint window. The slow post-replacement checkpoint then
+  moved the guest evidence floor past that unconsumed picker, sent no key, and left the authority to its 60-second
+  safety auto-pick. `driveReplacement` now returns the exact seats it actually drove; the faint tail advances a seat's
+  floor past a picker only when that seat was in that set. A staggered second picker remains visible to the next
+  sequential human-input scan.
+- Both mechanisms have failure-first Node coverage. The focused browser source suites pass 56/56; full source/static
+  qualification and an exact evolution rerun follow before any product-authority change is mixed into this cycle.

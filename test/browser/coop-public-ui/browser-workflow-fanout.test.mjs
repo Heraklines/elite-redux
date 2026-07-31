@@ -300,6 +300,11 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   assert.match(journeys, /surfaceId === "battle:evolution"/u);
   assert.match(journeys, /requireEvolutionPromptProof\(rig\.host, "EvolutionPhase"\)/u);
   assert.match(journeys, /requireEvolutionPromptProof\(rig\.guest, "CoopWaveProgressionReplayPhase"\)/u);
+  assert.match(
+    journeys,
+    /requireEvolutionPromptProof[\s\S]*isActionableSemanticObservation\(event\.observation, \{[\s\S]*requireExplicitUnblocked: true/u,
+    "the final evolution oracle must use the same optional-blocking readiness contract as the keyboard driver",
+  );
   assert.match(journeys, /kind === "campaign-battle-prompt-advance"/u);
   assert.match(journeys, /"evolution-sync": evolutionSync/u);
 });

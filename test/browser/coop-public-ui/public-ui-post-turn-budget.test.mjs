@@ -1422,6 +1422,7 @@ test("faint tail keeps a post-checkpoint one-shot command surface reachable from
       hostEvidence.push(ownedCommand(0));
       guestEvidence.push({ kind: "checkpoint", name: "page-1-replacement-applied" });
       hostEvidence.push({ kind: "checkpoint", name: "page-1-replacement-applied" });
+      return new Set(["guest"]);
     },
   };
 
@@ -1439,6 +1440,39 @@ test("faint tail keeps a post-checkpoint one-shot command surface reachable from
   const guestCommand = guestEvidence.findLastSemanticSurface(result.floor.guest, "command:command");
   assert.ok(hostCommand, "host turn-2 command surface must remain reachable from the post-faint floor");
   assert.ok(guestCommand, "guest turn-2 command surface must remain reachable from the post-faint floor");
+});
+
+test("faint tail leaves a staggered partner picker above the floor until that seat is actually driven", async () => {
+  const hostEvidence = new FakeEvidence("host");
+  const guestEvidence = new FakeEvidence("guest");
+  const host = { label: "host", publicSeat: 0, evidence: hostEvidence, checkpoint: async () => {} };
+  const guest = { label: "guest", publicSeat: 1, evidence: guestEvidence, checkpoint: async () => {} };
+  hostEvidence.push(replacementPicker(0));
+  const rig = {
+    clients: { host, guest },
+    activeBattleWave: 1,
+    config: { timeoutMs: 1_000 },
+    classifyPostReplacementRoute: DuoPublicUiRig.prototype.classifyPostReplacementRoute,
+    async driveReplacement() {
+      // The authority-owned picker was driven, but its partner picker opened only after the bounded
+      // concurrent window. This is the exact ordering from run 30630465252: advancing the guest floor
+      // past this surface strands the real human input and forces the product's timeout fallback.
+      guestEvidence.push(replacementPicker(1));
+      return new Set(["host"]);
+    },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveFaintReplacementTail.call(
+    rig,
+    { kind: "faint", client: host },
+    { host: 0, guest: 0 },
+  );
+
+  assert.equal(result.route, "continuing");
+  assert.ok(
+    guestEvidence.findLastSemanticSurface(result.floor.guest, "party:replacement"),
+    "the undriven guest picker must remain visible to the next sequential human-input scan",
+  );
 });
 
 test("faint tail drives the won-wave reward-to-wave-2 chain when the faint co-wins the wave", async () => {
@@ -1460,6 +1494,7 @@ test("faint tail drives the won-wave reward-to-wave-2 chain when the faint co-wi
       // Won wave: both engines commit WAVE_ADVANCE -> SelectModifierPhase; NO turn-2 command opens.
       hostEvidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
       guestEvidence.push({ kind: "console", text: "%cStart Phase SelectModifierPhase color:green;" });
+      return new Set(["guest"]);
     },
     async assertSharedSurface(surface, _floor, proofName, options) {
       calls.push(["assertSharedSurface", surface, proofName, options.expectedWave]);

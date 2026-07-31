@@ -4,7 +4,12 @@
  */
 
 import { configureRenderProfile, raiseGameSpeed } from "./campaign.mjs";
-import { confirmDefaultStarterTeam, selectOptionById, waitForSemanticSurface } from "./campaign-nav.mjs";
+import {
+  confirmDefaultStarterTeam,
+  isActionableSemanticObservation,
+  selectOptionById,
+  waitForSemanticSurface,
+} from "./campaign-nav.mjs";
 import { loadCampaignPolicy } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
 
@@ -404,9 +409,7 @@ function requireEvolutionPromptProof(client, phase) {
       && event.observation.ownerModel === "local"
       && event.observation.coop === true
       && event.observation.seatsWithInput?.includes(event.observation.localSeat)
-      && event.observation.ready?.handlerActive === true
-      && event.observation.ready?.awaitingActionInput === true
-      && event.observation.ready?.inputBlocked === false,
+      && isActionableSemanticObservation(event.observation, { requireExplicitUnblocked: true }),
   );
   if (surface == null) {
     throw new Error(`${client.label}: no actionable ${phase} evolution surface was observed`);

@@ -3825,14 +3825,23 @@ export class DuoPublicUiRig {
     const faintFloor = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
-    await this.driveReplacement(outcome.client, outcomeCursors);
+    const drivenReplacementSeats = await this.driveReplacement(outcome.client, outcomeCursors);
     // Advance the floor just past each seat's last consumed replacement picker (deterministic,
     // checkpoint-timing independent) so the next round neither re-drives the committed picker nor
     // skips the fresh one-shot surface immediately above it.
     const floor = Object.fromEntries(
       Object.values(this.clients).map(client => {
         const lastPicker = client.evidence.findLastSemanticSurface(faintFloor[client.label], "party:replacement");
-        return [client.label, lastPicker == null ? faintFloor[client.label] : lastPicker.index + 1];
+        // A staggered double faint can open the partner's picker only after the bounded concurrent
+        // detection window. Do not move that seat's scan floor past a surface no keyboard drive consumed:
+        // the next sequential round must see and act on it like the second real player. This is deliberately
+        // keyed by the completed drives, not merely by a picker observation born during a slow checkpoint.
+        return [
+          client.label,
+          lastPicker == null || !drivenReplacementSeats.has(client.label)
+            ? faintFloor[client.label]
+            : lastPicker.index + 1,
+        ];
       }),
     );
     const route = await this.classifyPostReplacementRoute(floor);
@@ -4624,6 +4633,7 @@ export class DuoPublicUiRig {
     // One applied-checkpoint after ALL of this faint window's drives; each drive already bumped
     // replacementCount, so a double faint records two applied replacements.
     await Promise.all(Object.values(this.clients).map(value => value.checkpoint("replacement-applied")));
+    return drivenLabels;
   }
 
   /**
