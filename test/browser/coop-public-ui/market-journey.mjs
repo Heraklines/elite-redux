@@ -233,10 +233,18 @@ async function waitForMarket(client, from, predicate, description) {
  * for address, interaction pin, catalog, and the single actionable owner before any input is sent.
  */
 export function findPairedMarketOutcome(clients, from) {
+  const supportsDetailedMarketEvidence = clients.every(
+    client => typeof client.evidence.findLastMarket === "function",
+  );
+  if (!supportsDetailedMarketEvidence) {
+    return clients.every(
+      client => client.evidence.findLastSemanticSurface(from[client.label] ?? 0, "biome-market") != null,
+    )
+      ? { kind: "reward", surfaceId: "biome-market" }
+      : null;
+  }
   const events = clients.map(client =>
-    typeof client.evidence.findLastMarket === "function"
-      ? client.evidence.findLastMarket(from[client.label] ?? 0, () => true)
-      : null,
+    client.evidence.findLastMarket(from[client.label] ?? 0, () => true),
   );
   if (events.some(event => event?.observation == null)) {
     return null;

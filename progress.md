@@ -6461,3 +6461,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - World Map already retained both coordinates, but its recovery lease still keyed itself to the ambient turn. It now
   uses the retained source turn as well. A browser source contract rejects ambient address reads at these V2 material
   sites. Type, format, contracts, and affected engine shards will run only on GitHub-hosted runners.
+
+## 2026-07-31 - Legacy outcome fixtures keep their explicit market model
+
+- Campaign builder `30644154826` passed every corrected bounded-outcome contract except its purpose-built biome-market
+  fixture. That older double intentionally lacks the detailed market reader and represents both sides through paired
+  semantic surfaces, so treating “method unavailable” as “not a market” erased its expected boundary.
+- The classifier now uses the paired semantic model only when the entire client double lacks detailed market evidence.
+  Real browser sinks all implement the detailed reader and therefore still require an actionable owner plus watcher
+  projection before routing. No production browser can fall back merely because detailed evidence has not arrived yet.
