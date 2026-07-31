@@ -277,11 +277,22 @@ export class SwitchBiomePhase extends BattlePhase {
       return false;
     }
     const material = successor.interactionStateMaterial;
-    if (
-      material == null
-      || globalScene.currentBattle?.waveIndex !== material.wave
-      || globalScene.currentBattle.turn !== material.turn
-    ) {
+    const control = successor.nextControl;
+    const destinationBattle = globalScene.currentBattle;
+    // A Battle shell starts at runtime turn 1, while the first pre-battle Mystery presentation is
+    // deliberately ordered at turn 0. Authoritative DATA is a complete state image, but the battle-state
+    // projector does not rewrite the engine's progression cursor (doing so would let a replica manufacture
+    // phase order). Treat that one typed pre-turn surface as the exact address translation it is; every
+    // ordinary interaction still requires literal wave/turn equality.
+    const exactDestinationAddress =
+      material != null
+      && destinationBattle?.waveIndex === material.wave
+      && (destinationBattle.turn === material.turn
+        || (control.kind === "SHARED_INTERACTION"
+          && control.operationKind === "ME_PRESENT"
+          && material.turn === 0
+          && destinationBattle.turn === 1));
+    if (material == null || !exactDestinationAddress) {
       return false;
     }
     let permit = getCoopBiomeTransitionTailPermit();

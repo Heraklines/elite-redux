@@ -1109,7 +1109,11 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       const boundary = { live: true };
       syntheticBoundaries.add(boundary);
       (phase as unknown as { coopBoundaryStillLive(): boolean }).coopBoundaryStillLive = () => boundary.live;
-      const current = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockReturnValue(phase);
+      let currentPhase = phase as ReturnType<typeof rig.guestScene.phaseManager.getCurrentPhase>;
+      const current = vi.spyOn(rig.guestScene.phaseManager, "getCurrentPhase").mockImplementation(() => currentPhase);
+      const shift = vi.spyOn(rig.guestScene.phaseManager, "shiftPhase").mockImplementation(() => {
+        currentPhase = {} as ReturnType<typeof rig.guestScene.phaseManager.getCurrentPhase>;
+      });
       phase.start();
       expect(getCoopBiomeTransitionTailPermit()).toMatchObject({ switchAdopted: true });
 
@@ -1149,6 +1153,7 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       const bridge = phase as unknown as {
         canPrepareForCoopV2InteractionMaterial(claim: unknown): boolean;
         prepareForCoopV2InteractionMaterial(claim: unknown): boolean;
+        releaseForCoopV2InteractionMaterial(claim: unknown): boolean;
       };
       const sourceBattle = rig.guestScene.currentBattle;
       expect(
@@ -1159,9 +1164,24 @@ describe.skipIf(!RUN)("T2 segmented production-path co-op wave-10 biome transiti
       expect(rig.guestScene.currentBattle).not.toBe(sourceBattle);
       expect(rig.guestScene.currentBattle.waveIndex).toBe(nextWave);
       expect(
+        rig.guestScene.currentBattle.turn,
+        "the real destination Battle shell starts at turn one while ME_PRESENT is ordered pre-turn",
+      ).toBe(1);
+      expect(
         getCoopBiomeTransitionTailPermit(),
         "pre-DATA shell creation retains the exact permit until immutable interaction state is installed",
       ).toMatchObject({ switchAdopted: true, historyRecorded: false, switchPrepared: false });
+      expect(
+        bridge.releaseForCoopV2InteractionMaterial(successor),
+        "the pre-turn Mystery carrier consumes the switch after its immutable state image applies",
+      ).toBe(true);
+      expect(shift, "the guest enters the ordinary new-biome presentation tail").toHaveBeenCalledOnce();
+      expect(getCoopBiomeTransitionTailPermit()).toMatchObject({
+        switchAdopted: true,
+        historyRecorded: true,
+        switchPrepared: true,
+      });
+      shift.mockRestore();
       current.mockRestore();
     });
   }, 120_000);
