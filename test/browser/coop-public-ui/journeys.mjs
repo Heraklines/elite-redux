@@ -357,6 +357,53 @@ async function freshWave2(rig) {
   await freshThroughWave2(rig);
 }
 
+function requireEvolutionPromptProof(client, phase) {
+  const surface = client.evidence.events.find(
+    event =>
+      event.kind === "browser-surface2"
+      && event.observation?.surfaceId === "battle:evolution"
+      && event.observation.phase === phase
+      && event.observation.uiMode === "EVOLUTION_SCENE"
+      && event.observation.ownerModel === "local"
+      && event.observation.coop === true
+      && event.observation.seatsWithInput?.includes(event.observation.localSeat)
+      && event.observation.ready?.handlerActive === true
+      && event.observation.ready?.awaitingActionInput === true
+      && event.observation.ready?.inputBlocked === false,
+  );
+  if (surface == null) {
+    throw new Error(`${client.label}: no actionable ${phase} evolution surface was observed`);
+  }
+  const advance = client.evidence.events.find(
+    event =>
+      event.kind === "campaign-battle-prompt-advance"
+      && event.surfaceId === "battle:evolution"
+      && event.phase === phase
+      && event.inputSeat === client.label,
+  );
+  if (advance == null || advance.readyEventIndex !== surface.index) {
+    throw new Error(`${client.label}: ${phase} evolution prompt was not advanced through its exact readiness event`);
+  }
+  client.evidence.record("evolution-prompt-proof", {
+    phase,
+    surfaceIndex: surface.index,
+    advanceIndex: advance.index,
+    phaseInstance: surface.observation.phaseInstance,
+  });
+}
+
+async function evolutionSync(rig) {
+  await freshThroughWave2(rig);
+  const ledger = rig.assertWaveProgressionLedger(1, "wave-1-evolution-sync", { requireExp: true });
+  if (!ledger.some(entry => entry.event.k === "evolution")) {
+    throw new Error(
+      `wave-1-evolution-sync: expected a retained evolution; kinds=${ledger.map(entry => entry.event.k)}`,
+    );
+  }
+  requireEvolutionPromptProof(rig.host, "EvolutionPhase");
+  requireEvolutionPromptProof(rig.guest, "CoopWaveProgressionReplayPhase");
+}
+
 async function freshResume(rig) {
   await freshThroughWave2(rig);
   await rig.coldReopenAndPair(rig.config.requesterSeat);
@@ -606,6 +653,7 @@ const journeys = {
   "faint-replacement": faintReplacement,
   "commander-skip": commanderSkip,
   "game-over": gameOver,
+  "evolution-sync": evolutionSync,
   "showdown-battle": showdownBattle,
   "resume-scan-isolation": resumeScanIsolation,
   "save-mutations": saveMutations,

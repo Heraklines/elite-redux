@@ -27,6 +27,7 @@ the same address, digest, and continuation surface. Every battle turn also corre
 | `reverse-resume` | Same, but reverse which player sends the lobby request after reopening | Same as `fresh-wave2`; this is the invitation-direction regression |
 | `faint-replacement` | Pair, Resume, submit battle commands, select a legal replacement through the public picker, observe summon/continued battle | A shared save at a deterministic low-HP boundary |
 | `commander-skip` | Pair, New Run, publicly confirm visible Dondozo/Tatsugiri teams, drive only Dondozo's command UI, prove the hidden Commander skip traverses reciprocal `cmd:<wave>:<turn>`, retain rewards, and reach the next shared Commander command boundary | Dedicated CI bundle only; runs both Commander ownership parities on isolated fresh accounts |
+| `evolution-sync` | Pair, New Run, publicly confirm a visible point-legal team, clear wave 1, prove the authority's real EvolutionPhase prompt and the partner's retained CoopWaveProgressionReplayPhase prompt are independently actionable and advanced, compare the immutable evolution ledger, then reach wave 2 command UI | Dedicated build+URL-gated initial-save fixture starts both visible teams at level 100 without pausing evolution; no runtime healing or post-launch mutation |
 | `save-mutations` | Create an exact co-op checkpoint, close/reopen both pages, delete one seat's slot through Load Game and overwrite the other through New Game, require exact CAS-delete ACK + tombstone before replacement persistence, then replace both browser contexts and visibly log in again | Ephemeral accounts in in-memory instances of the real save and P33 Worker modules; never staging or production |
 
 `commander-skip` has one explicit setup-fidelity boundary. Fresh isolated accounts cannot reliably select
@@ -38,6 +39,12 @@ rewards, WebRTC, rendering, and wave continuation all remain production paths. T
 dex/save unlocks, is inert in ordinary local/staging/production bundles, and performs no post-launch
 mutation. This journey proves co-op authority from the configured-party boundary onward; it does not claim
 to test natural collection/unlock acquisition.
+
+`evolution-sync` uses the same double gate with the exact `evolution-sync` bundle and URL token. It applies
+level 100 only while constructing the initial shared save and deliberately leaves evolution enabled; after
+both players confirm the visible legal team, the journey uses ordinary keyboard input and networking. The
+oracle requires the authority and retained renderer to emit the same immutable evolution event, exposes each
+client's exact actionable evolution prompt, advances both with public Space input, and reaches wave 2.
 
 The ten-wave `mystery-gauntlet` campaign has the same narrowly gated setup boundary. Its exact campaign bundle
 accepts only `coopfixture=campaign-survival`, which visibly seeds a per-seat-point-legal Seel/Castform/Spinda team.

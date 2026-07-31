@@ -5,6 +5,7 @@ import {
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
   getCoopBrowserLongitudinalFixtureStartingLevel,
+  shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -322,6 +323,7 @@ export class SelectStarterPhase extends Phase {
     );
     const fixtureStartingLevel = getCoopBrowserLongitudinalFixtureStartingLevel();
     const fixtureStartingLevels = fixtureStartingLevel == null ? undefined : merged.map(() => fixtureStartingLevel);
+    const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions();
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
       // The guest skips the SAVE_SLOT screen - but on the solo path it is that
@@ -341,7 +343,7 @@ export class SelectStarterPhase extends Phase {
           }
           return;
         }
-        this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null);
+        this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions);
       });
       return;
     }
@@ -382,7 +384,7 @@ export class SelectStarterPhase extends Phase {
         failCoopSharedSession("fresh co-op save slot changed before starter materialization");
         return;
       }
-      this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null);
+      this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions);
     });
   }
 

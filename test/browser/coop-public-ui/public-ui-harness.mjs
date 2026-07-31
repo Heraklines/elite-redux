@@ -1085,6 +1085,8 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
     } else if (this.config.journey === "navigation-depth-30") {
       entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
+    } else if (this.config.journey === "evolution-sync") {
+      entryUrl.searchParams.set("coopfixture", "evolution-sync");
     } else if (this.config.journey === "showdown-battle") {
       entryUrl.searchParams.set("coopfixture", "showdown-battle");
       // Showdown remains deliberately disabled for ordinary players while the mode is under

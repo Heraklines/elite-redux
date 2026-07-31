@@ -47,6 +47,7 @@ on:
           - save-mutations
           - market-wide-lens
           - navigation-depth-30
+          - evolution-sync
       requester_seat:
         description: Seat that sends the first lobby invitation
         required: true
@@ -293,7 +294,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || (inputs.journey == 'faint-replacement' && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"

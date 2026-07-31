@@ -220,6 +220,66 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
 });
 
+test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {
+  const [workflow, registry, selectStarter, starterHandler, config, harness, journeys] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- evolution-sync/u, "manual dispatch exposes the exact evolution journey");
+  assert.match(
+    jobBlock(workflow, "browser-build"),
+    /inputs\.journey == 'evolution-sync' && 'evolution-sync'/u,
+    "the sealed browser bundle carries the dedicated fixture identity",
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserEvolutionFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "evolution-sync"/u,
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*isCoopBrowserEvolutionFixtureBuild\(\)[\s\S]*get\("coopfixture"\) === "evolution-sync"/u,
+    "a copied URL token cannot activate the fixture in an ordinary bundle",
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
+    "the level applies only while constructing the exact initial save",
+  );
+  assert.match(
+    registry,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
+    "survival/navigation fixtures remain paused while evolution-sync remains live",
+  );
+  assert.match(
+    selectStarter,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*initBattle\([\s\S]*fixturePauseEvolutions/u,
+    "launch separates initial level from the evolution-pause policy",
+  );
+  assert.match(starterHandler, /getCoopBrowserEvolutionFixtureStarters\(\)[\s\S]*seedTeamFromStarters/u);
+  assert.match(config, /"evolution-sync"/u);
+  assert.match(
+    harness,
+    /this\.config\.journey === "evolution-sync"[\s\S]*searchParams\.set\("coopfixture", "evolution-sync"\)/u,
+  );
+  assert.match(journeys, /async function evolutionSync\(rig\)[\s\S]*freshThroughWave2\(rig\)/u);
+  assert.match(journeys, /event\.k === "evolution"/u, "the immutable wave ledger must contain a real evolution");
+  assert.match(journeys, /surfaceId === "battle:evolution"/u);
+  assert.match(journeys, /requireEvolutionPromptProof\(rig\.host, "EvolutionPhase"\)/u);
+  assert.match(journeys, /requireEvolutionPromptProof\(rig\.guest, "CoopWaveProgressionReplayPhase"\)/u);
+  assert.match(journeys, /kind === "campaign-battle-prompt-advance"/u);
+  assert.match(journeys, /"evolution-sync": evolutionSync/u);
+});
+
 test("registered-interaction journey reaches Revival mid-turn and Stormglass at the next wave through public UI", async () => {
   const [workflow, config, harness, commandPhase, campaign, registry, starterCosts] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),

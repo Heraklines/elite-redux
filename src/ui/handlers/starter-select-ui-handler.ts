@@ -3,6 +3,7 @@ import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import {
   getCoopBrowserCampaignFixtureStarters,
   getCoopBrowserCommanderFixtureStarters,
+  getCoopBrowserEvolutionFixtureStarters,
   getCoopBrowserFaintFixtureStarters,
   getCoopBrowserGameOverFixtureStarters,
   getCoopBrowserNavigationFixtureStarters,
@@ -1778,6 +1779,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
         ?? getCoopBrowserNavigationFixtureStarters()
+        ?? getCoopBrowserEvolutionFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();
       if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
         // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible

@@ -79,6 +79,7 @@ const allowedJourneys = new Set([
   "game-over",
   "registered-interactions",
   "navigation-depth-30",
+  "evolution-sync",
   "showdown-battle",
   "resume-scan-isolation",
   "save-mutations",

@@ -482,8 +482,13 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   );
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*\? 100 : null/u,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
     "the interaction-only Mystery journey cannot randomly wipe before its wave-10 authority boundary",
+  );
+  assert.match(
+    registry,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
+    "survival and navigation fixtures pause incidental evolutions without weakening the dedicated proof lane",
   );
   for (const species of ["SEEL", "CASTFORM", "SPINDA"]) {
     assert.match(
@@ -495,7 +500,7 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   assert.match(starterHandler, /getCoopBrowserCampaignFixtureStarters\(\)/u);
   assert.match(
     starterPhase,
-    /this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixtureStartingLevel != null\)/u,
+    /const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions\)/u,
   );
   assert.match(
     starterPhase,

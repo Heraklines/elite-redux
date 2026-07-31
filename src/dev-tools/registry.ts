@@ -143,6 +143,20 @@ export function isCoopBrowserNavigationFixtureActive(): boolean {
   return new URLSearchParams(location.search).get("coopfixture") === "navigation-depth-30";
 }
 
+/** Whether this exact bundle was built to exercise retained evolution presentation in two browsers. */
+export function isCoopBrowserEvolutionFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync";
+}
+
+/** Require both the immutable evolution bundle and its exact public-journey URL token. */
+export function isCoopBrowserEvolutionFixtureActive(): boolean {
+  if (!isCoopBrowserEvolutionFixtureBuild() || typeof location === "undefined") {
+    return false;
+  }
+  return new URLSearchParams(location.search).get("coopfixture") === "evolution-sync";
+}
+
 /** Whether this exact bundle was built for the Revival + Stormglass public-browser journey. */
 export function isCoopBrowserRegisteredInteractionFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -284,9 +298,49 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
   }));
 }
 
+/**
+ * Point-legal party for the short retained-evolution two-browser proof.
+ *
+ * The exact launch boundary starts these ordinary starters at level 100 so wave-one EXP immediately
+ * crosses Seel's natural evolution threshold. Unlike the survival/navigation fixtures, evolution is
+ * deliberately not paused. After the visible starter confirmation, every command and prompt remains
+ * an ordinary keyboard-driven production path.
+ */
+export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserEvolutionFixtureActive()) {
+    return null;
+  }
+  const specs = [
+    { speciesId: SpeciesId.SEEL, moveId: MoveId.WATER_GUN },
+    { speciesId: SpeciesId.CASTFORM, moveId: MoveId.WATER_GUN },
+    { speciesId: SpeciesId.SPINDA, moveId: MoveId.TACKLE },
+  ];
+  return specs.map(({ speciesId, moveId }) => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.MODEST,
+    moveset: [moveId] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  }));
+}
+
 /** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
-  return isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive() ? 100 : null;
+  return isCoopBrowserCampaignFixtureActive()
+    || isCoopBrowserNavigationFixtureActive()
+    || isCoopBrowserEvolutionFixtureActive()
+    ? 100
+    : null;
+}
+
+/** Survival/navigation lanes suppress incidental evolution; the dedicated evolution lane must not. */
+export function shouldPauseCoopBrowserLongitudinalFixtureEvolutions(): boolean {
+  return isCoopBrowserCampaignFixtureActive() || isCoopBrowserNavigationFixtureActive();
 }
 
 /**

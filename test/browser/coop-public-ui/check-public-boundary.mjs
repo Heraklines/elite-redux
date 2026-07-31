@@ -228,12 +228,14 @@ if (
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "game-over"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival"')
+  || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle"')
   || !fixtureRegistry.includes('get("coopfixture")')
   || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserGameOverFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserCampaignFixtureStarters()")
+  || !starterHandler.includes("getCoopBrowserEvolutionFixtureStarters()")
   || !starterHandler.includes("{ allowUncaught: true }")
 ) {
   failures.push("Browser gameplay checkpoints must require the exact build+URL gate at their visible setup UI");
