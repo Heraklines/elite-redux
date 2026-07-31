@@ -155,7 +155,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-crossroads-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -180,12 +180,17 @@ jobs:
             src/dev-tools/registry.ts \
             src/phases/command-phase.ts \
             src/phases/coop-replay-turn-phase.ts \
+            src/phases/er-ability-capsule-phase.ts \
             src/phases/er-crossroads-phase.ts \
+            src/phases/er-dex-nav-phase.ts \
+            src/phases/er-greater-ability-capsule-phase.ts \
+            src/phases/er-greater-ability-randomizer-phase.ts \
             src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
+            test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-nav.mjs \

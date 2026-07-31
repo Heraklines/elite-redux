@@ -33,9 +33,10 @@ test(
     assert.match(config, /"half-wipe"/u);
     assert.match(
       registry,
-      /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.CROBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?Nature\.JOLLY[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
+      /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.CROBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
       "the gated visible starter material forces one replica wipe without ending the double battle",
     );
+    assert.match(registry, /nature: fixture === "half-wipe-owner" \? Nature\.JOLLY : Nature\.HARDY/u);
     assert.match(
       harness,
       /this\.config\.journey === "faint-replacement" \|\| this\.config\.journey === "half-wipe"[\s\S]*?"half-wipe-owner"[\s\S]*?"half-wipe-partner"/u,

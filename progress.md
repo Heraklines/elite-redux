@@ -6382,3 +6382,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The workflow owns an explicit failure-first source-contract step for this scenario. All formatting, type analysis,
   contracts, engine shards, and the two-Chromium journey will execute remotely; no local test, build, or browser run is
   used.
+
+## 2026-07-31 - Ability results retain their predecessor battle address
+
+- The exact `54d1969b3` ten-wave Mystery campaign `30638375084` crossed five consecutive Mystery encounters and cleared
+  the wave-7 trainer battle before exposing a real production terminal: `Ability result 6 could not enter durable
+  authority`. The authority had correctly retained revision 38 as `ABILITY_PRESENT` at wave 7 turn 3 and explicitly
+  authorized the matching `ABILITY_PICK` operation ID.
+- The Ability Capsule owner ended its picker before retaining the result. That synchronous `end()` launched the next
+  battle, after which `relayEnd()` reread `globalScene.currentBattle` and mislabeled the wave-7 result with the successor
+  battle coordinate. Authority V2 correctly rejected that right-ID/wrong-address result instead of corrupting the log.
+- All four registered ability workflows (Capsule, Greater Capsule, Greater Randomizer, and Dex Nav) now capture wave and
+  turn once at phase construction and reuse that immutable address for presentation, owner result, watcher adoption, and
+  complete-state retention. A source contract rejects any future ambient `currentBattle` reread at these commit sites.
+- Exact `db437b759` half-wipe source contracts and all selected engine shards passed in focused run `30640492858`; its
+  only red was the fixture roster's TypeScript inference after adding the conditional Jolly nature. The fixture now keeps
+  the original homogeneous roster shape and chooses nature in the contextually typed `Starter` projection. Remote
+  qualification and the real Mystery reproduction remain the sole executable validation.

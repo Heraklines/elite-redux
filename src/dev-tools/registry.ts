@@ -451,16 +451,16 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
       : fixture === "faint-partner"
         ? [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }]
         : fixture === "half-wipe-owner"
-          ? [{ speciesId: SpeciesId.CROBAT, moveset: [MoveId.MEMENTO], nature: Nature.JOLLY }]
+          ? [{ speciesId: SpeciesId.CROBAT, moveset: [MoveId.MEMENTO] }]
           : [{ speciesId: SpeciesId.DONDOZO, moveset: [MoveId.TACKLE] }];
-  return specs.map(({ speciesId, moveset, nature = Nature.HARDY }) => ({
+  return specs.map(({ speciesId, moveset }) => ({
     speciesId,
     shiny: false,
     variant: 0,
     formIndex: 0,
     abilityIndex: 0,
     passive: false,
-    nature,
+    nature: fixture === "half-wipe-owner" ? Nature.JOLLY : Nature.HARDY,
     moveset: moveset as StarterMoveset,
     pokerus: false,
     ivs: new Array(6).fill(31),

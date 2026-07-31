@@ -64,6 +64,9 @@ export class ErDexNavPhase extends Phase {
   private picksLeft = ErDexNavPhase.PICK_COUNT;
   private readonly coopIsWatcher: boolean;
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
+  /** Immutable battle address captured before this phase can synchronously advance its continuation. */
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   private readonly coopOwningRuntime = getCoopRuntime();
   private candidateSpeciesIds: number[] | null = null;
   private readonly pickedSpeciesIds: number[] = [];
@@ -76,6 +79,9 @@ export class ErDexNavPhase extends Phase {
     this.partyIndex = partyIndex;
     this.coopSeq = coopSeq;
     this.coopIsWatcher = coopIsWatcher;
+    const sourceBattle = coopSeq >= 0 ? globalScene.currentBattle : null;
+    this.coopSourceWave = sourceBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = sourceBattle?.turn ?? 0;
     this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
@@ -102,8 +108,8 @@ export class ErDexNavPhase extends Phase {
           candidateSpeciesIds: candidates,
           returnPlan: captureCoopNestedInteractionReturnPlan(this.coopSeq),
           localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       );
@@ -295,8 +301,8 @@ export class ErDexNavPhase extends Phase {
           ? undefined
           : {
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
         this.coopOperationBinding,
         operationId ?? undefined,
@@ -329,8 +335,8 @@ export class ErDexNavPhase extends Phase {
               data: relayedData,
               committed: relayedData?.[0] === COOP_ABILITY_OP.DEX_NAV,
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
             this.coopOperationBinding,
           );
@@ -375,8 +381,8 @@ export class ErDexNavPhase extends Phase {
           pinned: this.coopSeq,
           data,
           committed,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       )

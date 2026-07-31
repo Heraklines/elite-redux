@@ -93,6 +93,9 @@ export class ErAbilityCapsulePhase extends Phase {
   private readonly coopIsWatcher: boolean;
   /** Stable owner-runtime selectors carried across every picker callback / watcher await. */
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
+  /** Immutable battle address captured before this phase can synchronously advance its continuation. */
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   /** Exact runtime that owns this phase; never re-read after a picker callback or await. */
   private readonly coopOwningRuntime = getCoopRuntime();
   /** OWNER-side outcome buffer, relayed exactly once at end. Default = CANCEL so EVERY non-commit
@@ -104,6 +107,9 @@ export class ErAbilityCapsulePhase extends Phase {
     this.partyIndex = partyIndex;
     this.coopSeq = coopSeq;
     this.coopIsWatcher = coopIsWatcher;
+    const sourceBattle = coopSeq >= 0 ? globalScene.currentBattle : null;
+    this.coopSourceWave = sourceBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = sourceBattle?.turn ?? 0;
     this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
@@ -127,8 +133,8 @@ export class ErAbilityCapsulePhase extends Phase {
           workflow: "capsule",
           returnPlan: captureCoopNestedInteractionReturnPlan(this.coopSeq),
           localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       );
@@ -355,8 +361,8 @@ export class ErAbilityCapsulePhase extends Phase {
           ? undefined
           : {
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
         this.coopOperationBinding,
         operationId ?? undefined,
@@ -395,8 +401,8 @@ export class ErAbilityCapsulePhase extends Phase {
               data: relayedData,
               committed: relayedData != null && relayedData[0] !== COOP_ABILITY_OP.CANCEL,
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
             this.coopOperationBinding,
           );
@@ -442,8 +448,8 @@ export class ErAbilityCapsulePhase extends Phase {
           pinned: this.coopSeq,
           data,
           committed: op !== COOP_ABILITY_OP.CANCEL,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       )

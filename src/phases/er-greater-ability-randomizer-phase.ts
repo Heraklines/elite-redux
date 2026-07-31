@@ -89,6 +89,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private readonly coopIsWatcher: boolean;
   /** Stable owner-runtime selectors carried across every picker callback / watcher await. */
   private readonly coopOperationBinding: CoopAbilityOperationBinding | null;
+  /** Immutable battle address captured before this phase can synchronously advance its continuation. */
+  private readonly coopSourceWave: number;
+  private readonly coopSourceTurn: number;
   /** Exact runtime that owns this phase; never re-read after a picker callback or await. */
   private readonly coopOwningRuntime = getCoopRuntime();
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
@@ -104,6 +107,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     this.coopSeq = coopSeq;
     this.coopIsWatcher = coopIsWatcher;
     this.choiceCache = choiceCache;
+    const sourceBattle = coopSeq >= 0 ? globalScene.currentBattle : null;
+    this.coopSourceWave = sourceBattle?.waveIndex ?? 0;
+    this.coopSourceTurn = sourceBattle?.turn ?? 0;
     this.coopOperationBinding = coopSeq >= 0 ? captureCoopAbilityOperationBinding() : null;
   }
 
@@ -138,8 +144,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           returnPlan: captureCoopNestedInteractionReturnPlan(this.coopSeq),
           rolledAbilityIds: choices.map(choice => choice.abilityId),
           localRole: "host",
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       );
@@ -332,8 +338,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           ? undefined
           : {
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
         this.coopOperationBinding,
         operationId ?? undefined,
@@ -372,8 +378,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
               data: relayedData,
               committed: relayedData != null && relayedData[0] !== COOP_ABILITY_OP.CANCEL,
               localRole: controller.role,
-              wave: globalScene.currentBattle?.waveIndex ?? 0,
-              turn: globalScene.currentBattle?.turn ?? 0,
+              wave: this.coopSourceWave,
+              turn: this.coopSourceTurn,
             },
             this.coopOperationBinding,
           );
@@ -411,8 +417,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           pinned: this.coopSeq,
           data,
           committed: op !== COOP_ABILITY_OP.CANCEL,
-          wave: globalScene.currentBattle?.waveIndex ?? 0,
-          turn: globalScene.currentBattle?.turn ?? 0,
+          wave: this.coopSourceWave,
+          turn: this.coopSourceTurn,
         },
         this.coopOperationBinding,
       )

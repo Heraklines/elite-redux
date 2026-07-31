@@ -132,6 +132,12 @@ const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", 
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
 const newBattlePhase = readFileSync(new URL("src/phases/new-battle-phase.ts", root), "utf8");
+const abilityPickerPhases = {
+  capsule: readFileSync(new URL("src/phases/er-ability-capsule-phase.ts", root), "utf8"),
+  "greater-capsule": readFileSync(new URL("src/phases/er-greater-ability-capsule-phase.ts", root), "utf8"),
+  "greater-randomizer": readFileSync(new URL("src/phases/er-greater-ability-randomizer-phase.ts", root), "utf8"),
+  "dex-nav": readFileSync(new URL("src/phases/er-dex-nav-phase.ts", root), "utf8"),
+};
 
 function jobBlock(workflow, job) {
   const lines = workflow.split(/\r?\n/gu);
@@ -876,6 +882,28 @@ test("ability result materialization credits the destination runtime even when a
   );
   assert.match(materializer, /isCoopAbilityOperationSettled\(operation\.id, abilityBinding\)/u);
   assert.match(materializer, /armCoopAbilityJournalMaterialization\(operation\.id, abilityBinding\)/u);
+});
+
+test("every ability picker retains its construction address after ending into a successor battle", () => {
+  for (const [workflow, source] of Object.entries(abilityPickerPhases)) {
+    assert.match(source, /private readonly coopSourceWave: number;/u, `${workflow} retains its source wave`);
+    assert.match(source, /private readonly coopSourceTurn: number;/u, `${workflow} retains its source turn`);
+    assert.match(
+      source,
+      /const sourceBattle = coopSeq >= 0 \? globalScene\.currentBattle : null;\s*this\.coopSourceWave = sourceBattle\?\.waveIndex \?\? 0;\s*this\.coopSourceTurn = sourceBattle\?\.turn \?\? 0;/u,
+      `${workflow} captures both coordinates before any asynchronous picker or synchronous end path`,
+    );
+    assert.equal(
+      source.match(/wave: this\.coopSourceWave,\s*turn: this\.coopSourceTurn,/gu)?.length,
+      4,
+      `${workflow} uses its immutable address for presentation, authority result, watcher adoption, and state commit`,
+    );
+    assert.doesNotMatch(
+      source,
+      /wave: globalScene\.currentBattle\?\.waveIndex|turn: globalScene\.currentBattle\?\.turn/u,
+      `${workflow} never re-reads an ambient successor battle for Authority V2 material`,
+    );
+  }
 });
 
 test("correlated recovery is wired through all four production progression fences", () => {
