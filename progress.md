@@ -6470,3 +6470,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The classifier now uses the paired semantic model only when the entire client double lacks detailed market evidence.
   Real browser sinks all implement the detailed reader and therefore still require an actionable owner plus watcher
   projection before routing. No production browser can fall back merely because detailed evidence has not arrived yet.
+
+## 2026-07-31 - Stormglass joins the declared V2 integration ownership set
+
+- Focused planner run `30644395283` stopped before validation because the integration manifest did not yet list
+  `er-stormglass-picker-phase.ts`. The source-address hardening intentionally brings that registered interaction into
+  scope, so the manifest now names it explicitly. This metadata checkpoint changes no runtime behavior.

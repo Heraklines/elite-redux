@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "c5d7eef60a3245435b0a4424c3a745dd88c8ae38",
+  "baseSha": "a4e5878d41ea1cc6d263b74466ce887044365361",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -150,6 +150,7 @@
     "src/phases/er-dex-nav-phase.ts",
     "src/phases/er-greater-ability-capsule-phase.ts",
     "src/phases/er-greater-ability-randomizer-phase.ts",
+    "src/phases/er-stormglass-picker-phase.ts",
     "src/phases/evolution-phase.ts",
     "src/phases/exp-phase.ts",
     "src/phases/form-change-phase.ts",
