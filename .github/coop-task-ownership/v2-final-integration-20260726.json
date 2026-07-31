@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "97f74a0036ab0bb24828876c1767fc5aa51d80e6",
+  "baseSha": "f6c14cc2e5e0a07ed954eda74796e394d31ecad4",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",

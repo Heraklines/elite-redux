@@ -2,7 +2,7 @@ import { globalScene } from "#app/global-scene";
 // #789: registers the co-op controller name tag with the ui-mirror session hook (side effect).
 import "#ui/coop-controller-tag";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { isCoopLocalPresentationInputPhase } from "#data/elite-redux/coop/coop-local-presentation-input";
+import { isCoopLocalPresentationInputSurface } from "#data/elite-redux/coop/coop-local-presentation-input";
 import {
   coopMeBespokeHostDrives,
   coopMeHandoffBattleStarted,
@@ -422,11 +422,13 @@ export class UI extends Phaser.GameObjects.Container {
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
-      // Scan/inspect prompts are renderer-only and belong to each browser independently. They do not
-      // choose shared mechanics or emit an intent, so the ordered interaction freeze must not turn a
-      // visible local prompt into an unpressable session-wide softlock.
-      const localPresentationInput = isCoopLocalPresentationInputPhase(
+      // Registered presentation prompts belong to each browser independently. They do not choose
+      // shared mechanics or emit an intent, so the ordered interaction freeze must not turn a visible
+      // local prompt into an unpressable session-wide softlock. Mode-specific entries keep mechanically
+      // shared overlays in the same phase (for example a branched evolution picker) frozen.
+      const localPresentationInput = isCoopLocalPresentationInputSurface(
         globalScene.phaseManager.getCurrentPhase()?.phaseName,
+        UiMode[this.mode],
       );
       if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance && !localPresentationInput) {
         return false;

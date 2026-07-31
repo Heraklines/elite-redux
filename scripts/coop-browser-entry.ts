@@ -24,7 +24,7 @@ const [
     getCoopRuntime,
     isCoopV2InteractionHumanInputFrozen,
   },
-  { isCoopLocalPresentationInputPhase },
+  { isCoopLocalPresentationInputSurface },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
   { setCoopWaveProgressionPresentationObserver },
@@ -742,7 +742,7 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
         ownerModel: uiMode === "MENU_OPTION_SELECT" ? "local" : "interaction",
       };
     case "CONFIRM":
-      if (isCoopLocalPresentationInputPhase(phase)) {
+      if (isCoopLocalPresentationInputSurface(phase, uiMode)) {
         return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "local" };
       }
       if (phase === "EggLapsePhase") {
@@ -761,6 +761,13 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
         return { surfaceId: "reward:confirm", operationClass: "reward", ownerModel: "interaction" };
       }
       return { surfaceId: `confirm:${phase}`, operationClass: "confirm", ownerModel: "interaction" };
+    case "EVOLUTION_SCENE":
+      // Evolution is rendered twice from one authoritative result: EvolutionPhase owns the real
+      // mutation and CoopWaveProgressionReplayPhase owns the mechanics-free retained presentation.
+      // Both use EvolutionSceneUiHandler and both deliberately arm their own local completion prompt.
+      return phase === "EvolutionPhase" || phase === "CoopWaveProgressionReplayPhase"
+        ? { surfaceId: "battle:evolution", operationClass: "battle-progress", ownerModel: "local" }
+        : null;
     case "MESSAGE":
       if (phase === "ExpPhase") {
         return { surfaceId: "battle:exp", operationClass: "battle-progress", ownerModel: "local" };
@@ -1774,7 +1781,9 @@ function observeSemanticSurface(): void {
             ? awaitingRaw
             : null;
     const promptGeneration =
-      uiMode === "MESSAGE" && typeof readPromptGeneration === "function" ? readPromptGeneration.call(handler) : null;
+      (uiMode === "MESSAGE" || uiMode === "EVOLUTION_SCENE") && typeof readPromptGeneration === "function"
+        ? readPromptGeneration.call(handler)
+        : null;
     const handlerInputBlocked =
       typeof readInputBlocked === "function"
         ? readInputBlocked.call(handler)
@@ -1811,7 +1820,7 @@ function observeSemanticSurface(): void {
       && hostEngineDialogueAdvance
       && interactiveMysteryPhase
       && coopHostMeNarrationAwaitingGuestAck(runtime);
-    const localPresentationInput = isCoopLocalPresentationInputPhase(phase);
+    const localPresentationInput = isCoopLocalPresentationInputSurface(phase, uiMode);
     const v2SurfaceInputBlocked =
       v2InputFrozen && !localPresentationInput && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
     const inputBlocked = v2SurfaceInputBlocked || handlerInputBlocked === true ? true : handlerInputBlocked;

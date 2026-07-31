@@ -121,6 +121,7 @@ class FakeEvidence {
     phaseInstance,
     handlerActive = true,
     address = { epoch: 7, wave: 1, turn: 1 },
+    uiMode = "MESSAGE",
   ) {
     this.events.push({
       index: this.events.length,
@@ -130,7 +131,8 @@ class FakeEvidence {
         coop: true,
         phase,
         phaseInstance,
-        uiMode: "MESSAGE",
+        uiMode,
+        operationClass: "battle-progress",
         ownerModel: "local",
         localSeat: 0,
         seatsWithInput: [0],
@@ -1007,6 +1009,60 @@ test("only ready active local battle narration and EXP instances advance once on
       ["renderer", "battle:message", 4],
     ],
   );
+});
+
+test("authority and retained-renderer evolution prompts are driven once through EVOLUTION_SCENE", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const stats = { battleMessagePrompts: 0, postBattleEvolutionPrompts: 0 };
+  authority.evidence.pushCommandSurface();
+  renderer.evidence.pushCommandSurface();
+  const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "post-wave-evolution");
+
+  authority.evidence.pushBattleReadiness(
+    "battle:evolution",
+    "EvolutionPhase",
+    false,
+    70,
+    true,
+    { epoch: 7, wave: 1, turn: 1 },
+    "EVOLUTION_SCENE",
+  );
+  assert.equal(await advance(), false, "the evolution animation is passive until its exact prompt is armed");
+
+  authority.evidence.pushBattleReadiness(
+    "battle:evolution",
+    "EvolutionPhase",
+    true,
+    71,
+    true,
+    { epoch: 7, wave: 1, turn: 1 },
+    "EVOLUTION_SCENE",
+  );
+  assert.equal(await advance(), true, "the authority's completed evolution prompt is actionable");
+  assert.equal(await advance(), false, "one authority prompt generation receives exactly one Action");
+
+  renderer.evidence.pushBattleReadiness(
+    "battle:evolution",
+    "CoopWaveProgressionReplayPhase",
+    true,
+    81,
+    true,
+    { epoch: 7, wave: 1, turn: 1 },
+    "EVOLUTION_SCENE",
+  );
+  assert.equal(await advance(), true, "the retained renderer's independent completion prompt is actionable");
+  assert.equal(await advance(), false, "one renderer prompt generation receives exactly one Action");
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(stats.postBattleEvolutionPrompts, 2);
 });
 
 test("a staggered sequential command frontier waits for current semantic address convergence", async () => {

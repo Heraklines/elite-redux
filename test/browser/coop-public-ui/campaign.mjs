@@ -46,9 +46,14 @@ const BARGAIN_WATCHER_TERMINAL = /bargain WATCHER: outcome blob received -> conv
 const BATTLE_PROMPT_PHASES = new Map([
   // Battle narration is rendered by MessageUiHandler from several phase classes (SummonPhase,
   // ShowTrainerPhase, replay phases, and MessagePhase itself). The semantic surface's prompt
-  // generation is the actionable identity; EXP accepts the authority phase and its retained V2 renderer.
-  ["battle:message", null],
-  ["battle:exp", new Set(["ExpPhase", "CoopWaveProgressionReplayPhase"])],
+  // generation is the actionable identity. EXP and evolution accept both their authority phase and
+  // retained V2 renderer, but evolution's real input handler remains in EVOLUTION_SCENE.
+  ["battle:message", { phases: null, uiMode: "MESSAGE" }],
+  ["battle:exp", { phases: new Set(["ExpPhase", "CoopWaveProgressionReplayPhase"]), uiMode: "MESSAGE" }],
+  [
+    "battle:evolution",
+    { phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
+  ],
 ]);
 const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "MysteryEncounterPhase",
@@ -944,7 +949,7 @@ export function createBattlePromptAdvancer(
           return false;
         }
         const observation = event.observation;
-        const expectedPhase = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
+        const surfaceContract = BATTLE_PROMPT_PHASES.get(observation.surfaceId);
         const instanceKey = instanceKeyFor(client, observation);
         // Prompt cursors advance after every public Space, but the structural BattleEnd/Faint proof
         // authorizes the entire bounded settlement narration chain. Keep that proof's scan floor at
@@ -954,10 +959,8 @@ export function createBattlePromptAdvancer(
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
           && addressMatches
-          && (expectedPhase == null
-            || observation.phase === expectedPhase
-            || (expectedPhase instanceof Set && expectedPhase.has(observation.phase)))
-          && observation.uiMode === "MESSAGE"
+          && (surfaceContract?.phases == null || surfaceContract.phases.has(observation.phase))
+          && observation.uiMode === surfaceContract?.uiMode
           && observation.ownerModel === "local"
           && observation.coop === true
           && observation.seatsWithInput?.includes(observation.localSeat)
@@ -994,9 +997,11 @@ export function createBattlePromptAdvancer(
       const { surfaceId, phase, phaseInstance } = readyEvent.observation;
       consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
       const statName =
-        phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
-          ? "postBattleExpPrompts"
-          : "battleMessagePrompts";
+        surfaceId === "battle:evolution"
+          ? "postBattleEvolutionPrompts"
+          : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
+            ? "postBattleExpPrompts"
+            : "battleMessagePrompts";
       stats[statName] = (stats[statName] ?? 0) + 1;
       client.evidence.record("campaign-battle-prompt-advance", {
         surfaceId,

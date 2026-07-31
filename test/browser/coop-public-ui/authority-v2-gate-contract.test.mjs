@@ -3885,6 +3885,24 @@ test("the browser observer republishes an unchanged menu after a non-semantic mo
   );
 });
 
+test("the browser observer and public driver close the authoritative evolution prompt surface", () => {
+  assert.match(
+    browserEntry,
+    /case "EVOLUTION_SCENE":[\s\S]*phase === "EvolutionPhase"[\s\S]*phase === "CoopWaveProgressionReplayPhase"[\s\S]*surfaceId: "battle:evolution"/u,
+    "both the mechanics owner and retained renderer must publish a typed evolution surface",
+  );
+  assert.match(
+    campaignDriver,
+    /"battle:evolution",\s*\{ phases: new Set\(\["EvolutionPhase", "CoopWaveProgressionReplayPhase"\]\), uiMode: "EVOLUTION_SCENE" \}/u,
+    "the keyboard-only campaign must accept only the exact evolution phases and UI mode",
+  );
+  assert.match(
+    browserEntry,
+    /\(uiMode === "MESSAGE" \|\| uiMode === "EVOLUTION_SCENE"\) && typeof readPromptGeneration === "function"/u,
+    "both retained-renderer evolution prompts need distinct handler-owned generations",
+  );
+});
+
 test("the browser observer derives interaction ownership from the rendering phase's immutable pin", () => {
   assert.match(
     browserEntry,

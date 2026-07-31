@@ -16,6 +16,7 @@ import {
   isCoopAuthoritativeGuestGated,
   setCoopAuthoritativeGuestPredicate,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { isCoopLocalPresentationInputSurface } from "#data/elite-redux/coop/coop-local-presentation-input";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesId } from "#enums/species-id";
 import { PokemonData } from "#system/pokemon-data";
@@ -63,6 +64,12 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
     expect(fadeOut).toHaveBeenCalledOnce();
     expect(fadeOut).toHaveBeenCalledWith(scene, activeSound, 100);
     fadeOut.mockRestore();
+  });
+
+  it("leases only the local evolution scene, never the mechanically shared branch picker", () => {
+    expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("CoopWaveProgressionReplayPhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "OPTION_SELECT")).toBe(false);
   });
 });
 

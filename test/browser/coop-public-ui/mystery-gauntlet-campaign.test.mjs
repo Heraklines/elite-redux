@@ -417,12 +417,19 @@ test("local presentation input has one registry shared by production and the two
     ].map(path => readFile(resolve(root, path), "utf8")),
   );
   assert.match(registry, /COOP_LOCAL_PRESENTATION_INPUT_PHASES[\s\S]*"ScanIvsPhase"/u);
+  assert.match(
+    registry,
+    /COOP_LOCAL_PRESENTATION_INPUT_SURFACES[\s\S]*"EvolutionPhase"[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*"EVOLUTION_SCENE"/u,
+  );
   assert.match(gate, /\.\.\.COOP_LOCAL_PRESENTATION_INPUT_PHASES/u);
   assert.match(
     ui,
-    /localPresentationInput = isCoopLocalPresentationInputPhase[\s\S]*!hostEngineDialogueAdvance && !localPresentationInput/u,
+    /localPresentationInput = isCoopLocalPresentationInputSurface[\s\S]*UiMode\[this\.mode\][\s\S]*!hostEngineDialogueAdvance && !localPresentationInput/u,
   );
-  assert.match(observer, /case "CONFIRM":[\s\S]*isCoopLocalPresentationInputPhase\(phase\)[\s\S]*ownerModel: "local"/u);
+  assert.match(
+    observer,
+    /case "CONFIRM":[\s\S]*isCoopLocalPresentationInputSurface\(phase, uiMode\)[\s\S]*ownerModel: "local"/u,
+  );
   assert.match(observer, /v2InputFrozen[\s\S]*&& !localPresentationInput/u);
   assert.match(policy, /name: "iv-scanner"[\s\S]*localPerClientSurface: true/u);
   assert.match(campaign, /if \(driver\.localPerClientSurface\)[\s\S]*findLocalActionableIvScannerSurface/u);
