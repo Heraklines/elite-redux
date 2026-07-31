@@ -342,9 +342,9 @@ function oppositeSeat(seat) {
   return seat === "host-seat" ? "guest-seat" : "host-seat";
 }
 
-async function freshThroughWave2(rig) {
+async function freshThroughWave2(rig, freshRunOptions) {
   await rig.pair(rig.config.requesterSeat);
-  await rig.startFreshRun();
+  await rig.startFreshRun(freshRunOptions);
   await rig.driveWaveToReward();
   await rig.leaveRewardsAndReachWave2();
 }
@@ -393,7 +393,7 @@ function requireEvolutionPromptProof(client, phase) {
 }
 
 async function evolutionSync(rig) {
-  await freshThroughWave2(rig);
+  await freshThroughWave2(rig, { evolutionFixture: true });
   const ledger = rig.assertWaveProgressionLedger(1, "wave-1-evolution-sync", { requireExp: true });
   if (!ledger.some(entry => entry.event.k === "evolution")) {
     throw new Error(

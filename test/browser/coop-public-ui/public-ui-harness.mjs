@@ -3469,6 +3469,7 @@ export class DuoPublicUiRig {
     gameOverFixture = false,
     campaignSurvivalFixture = false,
     navigationFixture = false,
+    evolutionFixture = false,
     registeredInteractionsFixture = false,
   } = {}) {
     if (!this.host) {
@@ -3556,11 +3557,13 @@ export class DuoPublicUiRig {
                   ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                   : navigationFixture
                     ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
-                    : registeredInteractionsFixture
-                      ? client.label === "host-seat"
-                        ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
-                        : [BULBASAUR_SPECIES_ID]
-                      : null;
+                    : evolutionFixture
+                      ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                      : registeredInteractionsFixture
+                        ? client.label === "host-seat"
+                          ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
+                          : [BULBASAUR_SPECIES_ID]
+                        : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

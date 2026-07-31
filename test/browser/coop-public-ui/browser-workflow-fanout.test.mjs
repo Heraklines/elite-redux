@@ -271,7 +271,15 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
     harness,
     /this\.config\.journey === "evolution-sync"[\s\S]*searchParams\.set\("coopfixture", "evolution-sync"\)/u,
   );
-  assert.match(journeys, /async function evolutionSync\(rig\)[\s\S]*freshThroughWave2\(rig\)/u);
+  assert.match(
+    harness,
+    /startFreshRun\(\{[\s\S]*evolutionFixture = false[\s\S]*evolutionFixture[\s\S]*SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u,
+    "the public driver proves the exact visible seeded team instead of adding generic starters to it",
+  );
+  assert.match(
+    journeys,
+    /async function evolutionSync\(rig\)[\s\S]*freshThroughWave2\(rig, \{ evolutionFixture: true \}\)/u,
+  );
   assert.match(journeys, /event\.k === "evolution"/u, "the immutable wave ledger must contain a real evolution");
   assert.match(journeys, /surfaceId === "battle:evolution"/u);
   assert.match(journeys, /requireEvolutionPromptProof\(rig\.host, "EvolutionPhase"\)/u);
