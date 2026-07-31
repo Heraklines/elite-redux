@@ -1531,13 +1531,59 @@ test("the short outcome wait names a fully submitted turn as progress", async ()
 test("the outcome wait drains already-buffered completion evidence at its deadline", async () => {
   const authority = fakeClient("authority", ["Start Phase SelectModifierPhase"]);
   const renderer = fakeClient("renderer", ["Start Phase SelectModifierPhase"]);
+  for (const [client, localSeat] of [
+    [authority, 0],
+    [renderer, 1],
+  ]) {
+    client.evidence.events.push({
+      index: client.evidence.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "reward-shop",
+        localSeat,
+        address: { epoch: 7, wave: 1, turn: 1 },
+      },
+    });
+  }
   const rig = {
     host: authority,
     clients: { authority, renderer },
     config: { faintOwnerSeat: "renderer" },
   };
 
-  assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), { kind: "reward" });
+  assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), {
+    kind: "reward",
+    surfaceId: "reward-shop",
+  });
+});
+
+test("the outcome wait preserves a biome market instead of misclassifying its shared phase as rewards", async () => {
+  const authority = fakeClient("authority", ["Start Phase SelectModifierPhase"]);
+  const renderer = fakeClient("renderer", ["Start Phase SelectModifierPhase"]);
+  for (const [client, localSeat] of [
+    [authority, 0],
+    [renderer, 1],
+  ]) {
+    client.evidence.events.push({
+      index: client.evidence.events.length,
+      kind: "browser-surface2",
+      observation: {
+        surfaceId: "biome-market",
+        localSeat,
+        address: { epoch: 7, wave: 10, turn: 2 },
+      },
+    });
+  }
+  const rig = {
+    host: authority,
+    clients: { authority, renderer },
+    config: { faintOwnerSeat: "renderer" },
+  };
+
+  assert.deepEqual(await waitForOutcomeBounded(rig, { authority: 0, renderer: 0 }, 0), {
+    kind: "reward",
+    surfaceId: "biome-market",
+  });
 });
 
 test("an embedded Mystery battle recognizes an exact shared next-wave encounter as healthy progress", async () => {

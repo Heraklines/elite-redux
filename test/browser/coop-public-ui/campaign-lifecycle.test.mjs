@@ -174,6 +174,11 @@ test("workflow reserves artifact-upload headroom and budgets the real-animation 
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: \$\{\{ matrix\.campaign_timeout_ms \}\}/u);
   assert.match(workflow, /COOP_UI_SETUP_HARD_TIMEOUT_MS: "1200000"/u);
   assert.match(workflow, /timeout --signal=INT --kill-after=3m \$\{\{ matrix\.process_timeout \}\}/u);
+  assert.match(
+    workflow,
+    /campaign_pid=\$![\s\S]*\[coop-soak:runner-heartbeat\][\s\S]*tail -n 1 "\$progress_file"[\s\S]*wait "\$campaign_pid"[\s\S]*exit "\$campaign_status"/u,
+    "a shell-side heartbeat keeps the last causal milestone visible even if the Node event loop wedges",
+  );
   assert.match(workflow, /if: always\(\)[\s\S]*Upload compact campaign diagnosis first/u);
 });
 
@@ -185,6 +190,18 @@ test("campaign setup has a causal first-command deadline and progress marker", a
   );
   assert.match(campaign, /setup stage failed before first shared command surface/u);
   assert.match(campaign, /setup stage completed within immutable deadline/u);
+  for (const milestone of [
+    "wave battle started",
+    "battle turn started",
+    "battle commands submitted",
+    "battle turn outcome observed",
+    "wave battle reached post-battle boundary",
+  ]) {
+    assert.ok(
+      campaign.includes(milestone),
+      `potentially long browser wait leaves the synchronous causal milestone: ${milestone}`,
+    );
+  }
 });
 
 test("cold journeys preserve simultaneous disconnect while staggering renderer boot per virtual device", async () => {

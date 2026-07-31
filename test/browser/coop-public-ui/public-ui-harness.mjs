@@ -3945,7 +3945,7 @@ export class DuoPublicUiRig {
         },
       ),
       this.guest.evidence.waitFor(
-        /guest replay turn=1: (?:ABORT phantom turn \(retained gameOver WAVE_ADVANCE wave=1 settledTurn=1\) - dissolving parked pump|retained gameOver terminal supersedes unresolved replay at safe event boundary -> end)/u,
+        /guest replay turn=1: (?:ABORT phantom turn \(retained (?:gameOver WAVE_ADVANCE|Authority V2 gameOver) wave=1 settledTurn=1\) - dissolving parked pump|retained gameOver terminal supersedes unresolved replay at safe event boundary -> end)/u,
         {
           from: outcomeCursors[this.guest.label],
           timeoutMs: this.config.timeoutMs,

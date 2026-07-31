@@ -522,7 +522,27 @@ jobs:
           done
           COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99 \
             timeout --signal=INT --kill-after=3m ${{ matrix.process_timeout }} node \
-            test/browser/coop-public-ui/run-campaign.mjs
+            test/browser/coop-public-ui/run-campaign.mjs &
+          campaign_pid=$!
+          (
+            while kill -0 "$campaign_pid" 2>/dev/null; do
+              sleep 60
+              kill -0 "$campaign_pid" 2>/dev/null || break
+              progress_file="$(find dev-logs/coop-public-ui -type f -name campaign-progress.jsonl -print -quit 2>/dev/null || true)"
+              if [ -n "$progress_file" ]; then
+                printf '[coop-soak:runner-heartbeat] pid=%s latest=%s\n' "$campaign_pid" "$(tail -n 1 "$progress_file")"
+              else
+                printf '[coop-soak:runner-heartbeat] pid=%s latest=campaign-progress-not-created\n' "$campaign_pid"
+              fi
+            done
+          ) &
+          heartbeat_pid=$!
+          set +e
+          wait "$campaign_pid"
+          campaign_status=$?
+          kill "$heartbeat_pid" 2>/dev/null || true
+          wait "$heartbeat_pid" 2>/dev/null || true
+          exit "$campaign_status"
 
       # The environment seal is small, decisive audit evidence - upload it as its own artifact
       # (always, even if the run fails/times out before the evidence uploads below) so audit #920

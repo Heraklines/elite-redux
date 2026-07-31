@@ -21,7 +21,6 @@ import {
   GAME_OVER_PHASE,
   LOCAL_COMMAND,
   loadCampaignPolicy,
-  REWARD_PHASE,
   SHARED_SESSION_TERMINAL,
 } from "./campaign-policy.mjs";
 import { delay } from "./evidence.mjs";
@@ -1332,8 +1331,16 @@ export async function waitForOutcomeBounded(
     ) {
       return { kind: "wipe" };
     }
-    if (clients.every(client => client.evidence.find(REWARD_PHASE, from[client.label]))) {
-      return { kind: "reward" };
+    // SelectModifierPhase is shared by the ordinary reward shop and the every-ten-waves biome
+    // market. A phase-name match therefore cannot classify the public surface: navigation run
+    // 30589285987 reached a healthy, synchronized biome market and was then falsely forced through
+    // assertSharedSurface("reward"). Wait for the sealed browser observer on BOTH clients and carry
+    // the exact surface identity to the battle driver. The between-wave dispatcher performs the
+    // full owner/watcher/state proof before sending any input.
+    for (const surfaceId of ["biome-market", "reward-shop"]) {
+      if (clients.every(client => client.evidence.findLastSemanticSurface(from[client.label], surfaceId) != null)) {
+        return { kind: "reward", surfaceId };
+      }
     }
     const successorWave = findSharedSuccessorWavePresentation(rig, from);
     if (successorWave != null) {
@@ -1466,12 +1473,12 @@ export async function waitForOutcomeBounded(
 
 /**
  * Drive one battle wave: attack-first per turn, one fallback move-cycle, faints handled.
- * Returns "reward" when the wave is won and the shop is open, or "wipe" when the shared
- * session ends (game-over) mid-battle. Throws only on a genuine softlock (no reward, no
- * wipe, no progress within budget) - named distinctly from a wipe so a lost wave reads as
- * evidence, not a harness bug.
+ * Returns "reward" when the ordinary reward shop is open, "between-wave" when a registered
+ * post-battle surface such as the biome market is already open, or "wipe" when the shared session
+ * ends (game-over) mid-battle. Throws only on a genuine softlock (no reward, no wipe, no progress
+ * within budget) - named distinctly from a wipe so a lost wave reads as evidence, not a harness bug.
  */
-async function driveBattleWave(rig, policy, stats) {
+async function driveBattleWave(rig, policy, stats, reportProgress = async () => {}) {
   const clients = Object.values(rig.clients);
   let commandCursors = fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? 0);
   let pendingCommandProof = null;
@@ -1483,27 +1490,45 @@ async function driveBattleWave(rig, policy, stats) {
     rig.host.evidence.record("campaign-successor-wave-presentation", outcome.boundary);
     return "transition";
   };
+  const finishPostBattleSurface = async (outcome, cursors, proofName) => {
+    if (outcome.surfaceId === "biome-market") {
+      // BiomeShopPhase deliberately uses SelectModifierPhase as its phaseName, but it is a distinct
+      // registered interaction. Preserve it untouched for advanceToNextWaveCommand, whose biome-shop
+      // driver proves the paired V2 projection and its actual owner before driving the market.
+      rig.host.evidence.record("campaign-between-wave-surface", {
+        surfaceId: outcome.surfaceId,
+        wave: stats.wave,
+        proofName,
+      });
+      return "between-wave";
+    }
+    if (outcome.surfaceId !== "reward-shop") {
+      throw new Error(`[campaign-outcome] unsupported post-battle surface ${String(outcome.surfaceId)}`);
+    }
+    await rig.assertSharedSurface("reward", cursors, proofName, {
+      expectedWave: rig.activeBattleWave,
+    });
+    await rig.assertRetainedContinuation(cursors, proofName);
+    return "reward";
+  };
   for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
+    await reportProgress("battle turn started", {
+      wave: stats.wave,
+      ordinal: stats.ordinal,
+      turn,
+    });
     if (pendingCommandProof != null) {
       // The previous round's "next command" may have been a wave-end transient (renderer-local
       // CommandPhase superseded by the authoritative reward flow). Probe the wave-end markers
       // once BEFORE pressing more battle keys, so no key is ever driven into the reward shop.
       const superseded = await waitForOutcomeBounded(rig, pendingCommandProof.cursors, 1, {});
       if (superseded?.kind === "reward") {
-        await rig.assertSharedSurface(
-          "reward",
-          pendingCommandProof.cursors,
-          `${pendingCommandProof.name}-superseded-by-reward`,
-          {
-            expectedWave: rig.activeBattleWave,
-          },
-        );
-        await rig.assertRetainedContinuation(
+        return finishPostBattleSurface(
+          superseded,
           pendingCommandProof.cursors,
           `${pendingCommandProof.name}-superseded-by-reward`,
         );
-        return "reward";
       }
       if (superseded?.kind === "wipe") {
         return "wipe";
@@ -1531,6 +1556,12 @@ async function driveBattleWave(rig, policy, stats) {
       },
     );
     const { outcomeCursors, expectedCommandAddress, commandPartition } = commandRound;
+    await reportProgress("battle commands submitted", {
+      wave: stats.wave,
+      ordinal: stats.ordinal,
+      turn,
+      expectedCommandAddress,
+    });
     if (pendingCommandProof != null) {
       try {
         await rig.assertSequentialCommandFrontier(commandRound, pendingCommandProof.cursors, pendingCommandProof.name, {
@@ -1553,17 +1584,11 @@ async function driveBattleWave(rig, policy, stats) {
         // frontier never converged because the wave actually ENDED, honor the real outcome.
         const superseded = await waitForOutcomeBounded(rig, pendingCommandProof.cursors, 1, {});
         if (superseded?.kind === "reward") {
-          await rig.assertSharedSurface(
-            "reward",
-            pendingCommandProof.cursors,
-            `${pendingCommandProof.name}-superseded-by-reward`,
-            { expectedWave: rig.activeBattleWave },
-          );
-          await rig.assertRetainedContinuation(
+          return finishPostBattleSurface(
+            superseded,
             pendingCommandProof.cursors,
             `${pendingCommandProof.name}-superseded-by-reward`,
           );
-          return "reward";
         }
         if (superseded?.kind === "wipe") {
           return "wipe";
@@ -1661,15 +1686,18 @@ async function driveBattleWave(rig, policy, stats) {
           + `or next command within budget (${fallbackDetail}); latest phase=${parked?.name ?? "unknown"}`,
       );
     }
+    await reportProgress("battle turn outcome observed", {
+      wave: stats.wave,
+      ordinal: stats.ordinal,
+      turn,
+      outcome: outcome.kind,
+      surfaceId: outcome.surfaceId ?? null,
+    });
     if (outcome.kind === "wipe") {
       return "wipe";
     }
     if (outcome.kind === "reward") {
-      await rig.assertSharedSurface("reward", from, `wave-${stats.wave}-turn-${turn}-reward`, {
-        expectedWave: rig.activeBattleWave,
-      });
-      await rig.assertRetainedContinuation(from, `wave-${stats.wave}-turn-${turn}-reward`);
-      return "reward";
+      return finishPostBattleSurface(outcome, from, `wave-${stats.wave}-turn-${turn}-${outcome.surfaceId}`);
     }
     if (outcome.kind === "wave-transition") {
       return finishSuccessorWaveTransition(outcome, from);
@@ -4473,7 +4501,19 @@ export async function runCampaign(rig) {
       // begin here, not after the battle. Next-command/terminal detection uses the
       // post-battle cursor the advancer captures internally.
       const surfaceCursors = fromEach(clients, client => client.evidence.cursor());
-      const battleResult = await driveBattleWave(rig, policy, stats);
+      await progress.note("wave battle started", {
+        wave: waveNo,
+        ordinal,
+        battleKind,
+      });
+      const battleResult = await driveBattleWave(rig, policy, stats, (message, detail) =>
+        progress.note(message, detail),
+      );
+      await progress.note("wave battle reached post-battle boundary", {
+        wave: waveNo,
+        ordinal,
+        battleResult,
+      });
       if (battleResult === "wipe") {
         status = "wipe";
         await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-wiped`)));

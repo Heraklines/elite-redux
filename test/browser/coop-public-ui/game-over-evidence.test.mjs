@@ -106,6 +106,7 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     "kind=TERMINAL_COMMIT result=admitted",
     "bootstrap wave=1 outcome=gameOver wake=1",
     "ignore raw waveResolved for correctness wave=1 outcome=gameOver",
+    "Authority V2 gameOver",
     "retained gameOver terminal supersedes unresolved replay at safe event boundary",
     "DATA applied rev=",
     "kind=TERMINAL_COMMIT .* outcome=applied control=TERMINAL/",
