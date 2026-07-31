@@ -196,12 +196,22 @@ test("campaign setup has a causal first-command deadline and progress marker", a
     "battle commands submitted",
     "battle turn outcome observed",
     "wave battle reached post-battle boundary",
+    "between-wave surface driven",
+    "between-wave battle prompt advanced",
+    "between-wave mystery narration advanced",
+    "between-wave command frontier reached",
+    "between-wave terminal reached",
   ]) {
     assert.ok(
       campaign.includes(milestone),
       `potentially long browser wait leaves the synchronous causal milestone: ${milestone}`,
     );
   }
+  assert.match(
+    campaign,
+    /advanceToNextWaveCommand\([\s\S]*\(message, detail\) => progress\.note\(message, detail\)/u,
+    "the between-wave driver streams its causal milestones through the campaign progress log",
+  );
 });
 
 test("cold journeys preserve simultaneous disconnect while staggering renderer boot per virtual device", async () => {

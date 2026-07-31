@@ -4159,7 +4159,15 @@ export function assertNavigationCoverage(coverage, marketCoverage, battleKinds, 
  * (COOP_UI_AUTO_FIRST=1) presses through logging `[auto-first] <phase>` - the exact
  * loud-fail / auto-first contract the headless autopilot enforces.
  */
-async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surfaceCursors, navigationCoverage = null) {
+async function advanceToNextWaveCommand(
+  rig,
+  policy,
+  waveOrdinal,
+  stats,
+  surfaceCursors,
+  navigationCoverage = null,
+  onProgress = async () => {},
+) {
   const clients = Object.values(rig.clients);
   const dispatch = buildDispatchTable(policy);
   const handledIndex = new Map();
@@ -4223,6 +4231,15 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
   let lastPhaseProgress = phaseProgressSignature(clients);
   let lastRegisteredSurface = null;
   let drivenSurfacePhaseSignature = null;
+  const reportBetweenWaveProgress = (message, detail = {}) =>
+    onProgress(message, {
+      sourceWave: stats.wave,
+      ordinal: waveOrdinal,
+      activeWave: rig.activeBattleWave,
+      latestMysteryWave: stats.mysteryEvents.at(-1)?.wave ?? null,
+      surfaceCount: stats.surfaces.length,
+      ...detail,
+    });
 
   while (Date.now() < (betweenWaveBudget?.observe() ?? mysteryProgressBudget?.deadline() ?? fixedDeadline)) {
     if (
@@ -4232,6 +4249,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
           || client.evidence.find(GAME_OVER_PHASE, commandCursors[client.label]),
       )
     ) {
+      await reportBetweenWaveProgress("between-wave terminal reached");
       return { status: "terminal" };
     }
 
@@ -4255,6 +4273,10 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
           stateDigest: boundary.stateDigest,
         };
       }
+      await reportBetweenWaveProgress("between-wave command frontier reached", {
+        destinationWave: boundary.wave,
+        destinationTurn: boundary.turn,
+      });
       return { status: "continue", boundary };
     }
 
@@ -4272,10 +4294,15 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
     );
     if (drove === "target-reached") {
       rig.activeBattleWave = stats.targetBoundary.wave;
+      await reportBetweenWaveProgress("between-wave target frontier reached", {
+        destinationWave: stats.targetBoundary.wave,
+        destinationTurn: stats.targetBoundary.turn,
+      });
       return { status: "continue", boundary: stats.targetBoundary };
     }
     if (drove) {
       recordMysteryProgress(`surface:${drove}`);
+      await reportBetweenWaveProgress("between-wave surface driven", { surface: drove });
       stallSince = 0;
       lastRegisteredSurface = drove;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -4285,6 +4312,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
 
     if (await advanceBattlePrompt()) {
       recordMysteryProgress("battle-prompt");
+      await reportBetweenWaveProgress("between-wave battle prompt advanced");
       stallSince = 0;
       lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -4294,6 +4322,7 @@ async function advanceToNextWaveCommand(rig, policy, waveOrdinal, stats, surface
 
     if (await advanceMysteryNarration()) {
       recordMysteryProgress("mystery-narration");
+      await reportBetweenWaveProgress("between-wave mystery narration advanced");
       stallSince = 0;
       lastRegisteredSurface = null;
       lastPhaseProgress = phaseProgressSignature(clients);
@@ -4532,6 +4561,7 @@ export async function runCampaign(rig) {
         stats,
         surfaceCursors,
         policy.navigation.required ? navigationCoverage : null,
+        (message, detail) => progress.note(message, detail),
       );
       if (policy.navigation.required) {
         navigationCoverage.waveSurfaces.push({ wave: waveNo, surfaces: [...stats.surfaces] });
