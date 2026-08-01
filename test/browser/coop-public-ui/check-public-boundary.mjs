@@ -228,6 +228,7 @@ if (
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "faint-replacement"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "game-over"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival"')
+  || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "navigation-depth-30"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle"')
   || !fixtureRegistry.includes('get("coopfixture")')
@@ -235,8 +236,11 @@ if (
   || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserGameOverFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserCampaignFixtureStarters()")
+  || !starterHandler.includes("getCoopBrowserNavigationFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserEvolutionFixtureStarters()")
-  || !starterHandler.includes("{ allowUncaught: true }")
+  || !starterHandler.includes("allowUncaught: true")
+  || !starterHandler.includes("allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters")
+  || !starterHandler.includes("!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)")
 ) {
   failures.push("Browser gameplay checkpoints must require the exact build+URL gate at their visible setup UI");
 }
