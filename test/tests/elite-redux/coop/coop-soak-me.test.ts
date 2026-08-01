@@ -163,7 +163,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
     logs.flush();
   }, 600_000);
 
-  it("surveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0", async () => {
+  it("surveys TWO waves PAST an authoritative ME with NO post-ME pin leak (no spurious second ME), findings=0", async () => {
     // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC): before this landed, surveying waves AFTER a
     // HOST-OWNED ME STALLED - the guest's next-wave replay re-diverted a SPURIOUS SECOND ME and the wave's
     // owner/watcher handshake never converged. ROOT CAUSE (a HARNESS LEAK, not a production bug): in
@@ -196,11 +196,15 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
         + `findings=${result.findings.length} MEs=${JSON.stringify(result.mysteryEncounters)} skips=${JSON.stringify(result.skips)}`,
     );
 
-    // EXACTLY ONE ME was driven (the designated wave-15 host-owned ME); the guest never re-diverted a spurious
-    // SECOND ME on wave 16/17 (the leak's signature - it surfaced as an undrivable stray or a stall).
+    // EXACTLY ONE ME was driven at the designated wave; the guest never re-diverted a spurious SECOND ME on
+    // wave 16/17 (the leak's signature - it surfaced as an undrivable stray or a stall). Ownership is derived
+    // from the accumulated interaction counter, not the wave number: optional reward/market continuations can
+    // legitimately change which seat owns wave 15 without changing the pin-clear contract this test proves.
     expect(result.mysteryEncounters.length, "exactly one ME driven - no spurious post-ME second ME").toBe(1);
     expect(result.mysteryEncounters[0].wave, "the one ME was the designated wave-15 ME").toBe(ME_WAVE);
-    expect(result.mysteryEncounters[0].path, "wave 15 is HOST-OWNED by counter parity").toBe("host-owned");
+    const me = result.mysteryEncounters[0];
+    const expectedOwner = me.interactionStart % 2 === 0 ? "host-owned" : "guest-owned";
+    expect(me.path, `wave 15 owner follows interaction counter ${me.interactionStart} parity`).toBe(expectedOwner);
     expect(
       result.skips.mysteryEncounterWaveHit,
       "no undrivable stray ME was counted on the post-ME waves (the leak's signature)",

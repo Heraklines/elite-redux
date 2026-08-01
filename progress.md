@@ -6645,3 +6645,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   product invoked the new bounded seam. The helper now intercepts both signatures and calls the nested
   target callback at the new argument position. This is a harness-wiring correction; the run's other
   multiwave tests and the exact product UI transition contract passed.
+
+## 2026-08-01 - Aggregate B11/C3 reds classified as stale test contracts
+
+- Aggregate B11 used a second one-off TM market driver that also intercepted only the retired
+  `setModeWithoutClear` seam. The production phase therefore correctly requested the new bounded PARTY
+  surface, but the synthetic test never answered it and falsely reported that no pinned market continuation
+  was queued. The test now observes both signatures and resolves the exact same public party callback.
+- Aggregate C3 drove all 17 requested waves, exactly one Mystery Encounter, and two complete post-Mystery
+  waves with zero digest findings or checksum assertions. Its only failure hard-coded wave 15 as host-owned.
+  Authority ownership is selected by accumulated interaction-counter parity, not wave number; optional
+  reward and biome-market continuations can legitimately alter that counter. Soak evidence now records the
+  exact `interactionStart`, and the continuation assertion verifies the observed path against its parity.
+  The separate focused cases still require one host-owned and one guest-owned Mystery path explicitly.

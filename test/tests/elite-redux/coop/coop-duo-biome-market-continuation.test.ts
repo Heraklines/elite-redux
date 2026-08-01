@@ -703,12 +703,18 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
         await pumpDuoDestinations(rig, 4);
 
         // (4) OWNER buys the TM through the REAL public BIOME_SHOP UI. The nested party sub-pick reuses the
-        // proven reward plumbing; auto-answer the ONE PARTY open the way the green reward owner driver does
-        // (setModeWithoutClear, NOT the forbidden setModeBoundedWhen).
+        // proven reward plumbing; auto-answer the ONE PARTY open the way the green reward owner driver does.
+        // Production now opens nested reward PARTY surfaces through the bounded-without-clear seam so a lost
+        // fade cannot leave the underlying market handler inert. Observe both seams while old fixtures remain,
+        // but restore both immediately after the one public callback is resolved.
         await waitForMode(rig.hostCtx, UiMode.BIOME_SHOP, "host biome market");
         await withClient(rig.hostCtx, async () => {
-          const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+          const ui = globalScene.ui as unknown as {
+            setModeWithoutClear: (...args: unknown[]) => unknown;
+            setModeWithoutClearBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
+          };
           const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+          const realSetModeWithoutClearBoundedWhen = ui.setModeWithoutClearBoundedWhen.bind(ui);
           ui.setModeWithoutClear = (...args: unknown[]): unknown => {
             if (args[0] === UiMode.PARTY) {
               ui.setModeWithoutClear = realSetModeWithoutClear; // one-shot: restore before picking
@@ -716,6 +722,16 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
               return;
             }
             return realSetModeWithoutClear(...args);
+          };
+          ui.setModeWithoutClearBoundedWhen = (...args: unknown[]) => {
+            if (args[0] === UiMode.PARTY) {
+              ui.setModeWithoutClear = realSetModeWithoutClear;
+              ui.setModeWithoutClearBoundedWhen = realSetModeWithoutClearBoundedWhen;
+              // [mode, timeout, phaseFence, partyMode, initialSlot, targetCallback, ...filters]
+              (args[5] as (slotIndex: number, option: number) => void)(0, 0);
+              return Promise.resolve("completed");
+            }
+            return realSetModeWithoutClearBoundedWhen(...args);
           };
           try {
             expect(
@@ -727,6 +743,7 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
             }
           } finally {
             ui.setModeWithoutClear = realSetModeWithoutClear;
+            ui.setModeWithoutClearBoundedWhen = realSetModeWithoutClearBoundedWhen;
           }
         });
 
