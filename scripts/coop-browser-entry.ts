@@ -1582,9 +1582,9 @@ function observeSemanticSurface(): void {
           }
         : classifiedSemantic;
     if (
-      semantic == null &&
-      (NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES.has(phase) ||
-        NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS.has(`${phase}:${uiMode}`))
+      semantic == null
+      && (NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES.has(phase)
+        || NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS.has(`${phase}:${uiMode}`))
     ) {
       // Close the prior canonical observation so the next genuinely actionable surface is emitted even
       // when it happens to be byte-identical. Do not mirror or drive the stale transition handler.
