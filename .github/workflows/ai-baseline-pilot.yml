@@ -15,6 +15,21 @@ on:
         required: true
         default: false
         type: boolean
+      control_kernel:
+        description: Private Kaggle kernel containing the random-init control output
+        required: false
+        default: michaelferjani/er-ai-fw-v5-matched-control-gpu-20260731
+        type: string
+      transfer_kernel:
+        description: Private Kaggle kernel containing the Showdown-transfer output
+        required: false
+        default: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
+        type: string
+      tree_run_id:
+        description: Actions run containing the diagnostic tree-ensemble artifact
+        required: false
+        default: ""
+        type: string
   push:
     branches:
       - codex/combat-ai-baselines-20260728
@@ -284,4 +299,8 @@ jobs:
     if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_benchmark
     name: Dispatch mirrored ghost benchmark
     uses: ./.github/workflows/ai-mirrored-benchmark.yml
+    with:
+      control_kernel: ${{ inputs.control_kernel }}
+      transfer_kernel: ${{ inputs.transfer_kernel }}
+      tree_run_id: ${{ inputs.tree_run_id }}
     secrets: inherit
