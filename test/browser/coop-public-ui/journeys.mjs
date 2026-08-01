@@ -349,12 +349,12 @@ function oppositeSeat(seat) {
 
 function assertEvolutionFixtureParty(rig) {
   const expected = [
-    { slot: 0, speciesId: 10, coopOwner: "host", level: 15, pauseEvolutions: false },
-    { slot: 1, speciesId: 10, coopOwner: "guest", level: 15, pauseEvolutions: false },
-    { slot: 2, speciesId: 351, coopOwner: "host", level: 15, pauseEvolutions: false },
-    { slot: 3, speciesId: 351, coopOwner: "guest", level: 15, pauseEvolutions: false },
-    { slot: 4, speciesId: 327, coopOwner: "host", level: 15, pauseEvolutions: false },
-    { slot: 5, speciesId: 327, coopOwner: "guest", level: 15, pauseEvolutions: false },
+    { slot: 0, speciesId: 10, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 1, speciesId: 10, coopOwner: "guest", level: 6, pauseEvolutions: false },
+    { slot: 2, speciesId: 351, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 3, speciesId: 351, coopOwner: "guest", level: 6, pauseEvolutions: false },
+    { slot: 4, speciesId: 327, coopOwner: "host", level: 6, pauseEvolutions: false },
+    { slot: 5, speciesId: 327, coopOwner: "guest", level: 6, pauseEvolutions: false },
   ];
   for (const client of Object.values(rig.clients)) {
     const surface = client.evidence.events.findLast(

@@ -272,7 +272,12 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 15[\s\S]*\? 100[\s\S]*: null/u,
+    /SpeciesId\.CATERPIE, moveId: MoveId\.MAKE_IT_RAIN/u,
+    "the level-6 evolution subject ends the battle quickly enough to survive to its ordinary EXP award",
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserEvolutionFixtureActive\(\)[\s\S]*\? 6[\s\S]*\? 100[\s\S]*: null/u,
     "evolution starts below the level cap while longitudinal fixtures remain level 100",
   );
   assert.match(
@@ -317,7 +322,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     journeys,
-    /function assertEvolutionFixtureParty\(rig[\s\S]*speciesId: 10[\s\S]*level: 15[\s\S]*pauseEvolutions: false[\s\S]*freshRunOptions\?\.evolutionFixture[\s\S]*assertEvolutionFixtureParty\(rig/u,
+    /function assertEvolutionFixtureParty\(rig[\s\S]*speciesId: 10[\s\S]*level: 6[\s\S]*pauseEvolutions: false[\s\S]*freshRunOptions\?\.evolutionFixture[\s\S]*assertEvolutionFixtureParty\(rig/u,
     "the journey proves the exact launch material before it spends a battle input",
   );
   assert.match(journeys, /event\.k === "evolution"/u, "the immutable wave ledger must contain a real evolution");

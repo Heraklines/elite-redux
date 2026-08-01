@@ -785,9 +785,9 @@ export class SelectStarterPhase extends Phase {
         && starterPokemon.species.speciesId === SpeciesId.CATERPIE
       ) {
         // Initial-save-only deterministic evolution fixture: preserve a normal level-up/evolution
-        // path while avoiding runtime EXP overrides. The exact fixture starts it high enough to
-        // survive wave one because run 30698490946 proved both level-6 copies can legitimately faint
-        // before the party EXP award. Wave one's ordinary award supplies the final point, after which the
+        // path while avoiding runtime EXP overrides. The exact fixture gives both active copies one
+        // strong spread move because run 30698490946 proved Tackle can leave them exposed long enough
+        // to faint. Wave one's ordinary award supplies the final point, after which the
         // production LevelUpPhase owns the evolution and its V2 capture.
         starterPokemon.exp = getLevelTotalExp(starterLevel + 1, starterPokemon.species.growthRate) - 1;
         primedEvolutionFixtureSubject = true;

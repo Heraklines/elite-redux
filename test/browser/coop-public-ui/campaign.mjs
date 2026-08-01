@@ -4506,7 +4506,10 @@ export async function runCampaign(rig) {
     await progress.note("public lobby pairing complete");
     await rig.startFreshRun({
       campaignSurvivalFixture: policy.mysteryGauntlet.required,
-      navigationFixture: policy.navigation.required,
+      // The market-only 20-wave profile uses the same exact level-100 seeded party as the
+      // navigation-depth profile. Keeping the selected journey identity reaches the URL gate, but
+      // setup must also choose the seeded-team confirmer instead of trying to add default starters.
+      navigationFixture: policy.navigation.required || policy.market.requiredPurchases > 0,
       registeredInteractionsFixture: policy.registeredInteractions.required,
     });
     await progress.note("fresh co-op run reached its first shared command surface");

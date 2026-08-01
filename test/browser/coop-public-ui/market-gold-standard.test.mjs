@@ -203,6 +203,11 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
     "the market route must never be disguised as probe and silently lose its survival fixture",
   );
   assert.match(
+    await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    /navigationFixture: policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0/u,
+    "the market campaign must confirm its already-seeded level-100 team instead of adding default starters",
+  );
+  assert.match(
     harness,
     /this\.config\.journey === "navigation-depth-30" \|\| this\.config\.journey === "market-wide-lens"[\s\S]*entryUrl\.searchParams\.set\("coopfixture", "navigation-depth-30"\)/u,
   );

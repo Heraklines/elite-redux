@@ -315,10 +315,11 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
 /**
  * Point-legal party for the short retained-evolution two-browser proof.
  *
- * The exact launch boundary starts these ordinary starters at level 15. Initial-save construction
- * primes the first merged Caterpie one EXP below level 16 so ordinary wave-one EXP crosses a real
- * level boundary and invokes its already-eligible natural evolution gate. Level 15 is deliberate:
- * exact-SHA run 30698490946 proved that level-6 leads can both legitimately faint before the award.
+ * The exact launch boundary starts these ordinary starters at level 6. Initial-save construction
+ * primes the first merged Caterpie one EXP below level 7 so ordinary wave-one EXP crosses a real
+ * level boundary and invokes its natural evolution gate. Both active Caterpie use a strong, accurate
+ * spread move: exact-SHA run 30698490946 proved that Tackle can leave the level-6 leads exposed long
+ * enough for both to faint, while run 30700124673 proved level 15 receives zero wave-one EXP.
  * Unlike the survival/navigation
  * fixtures, evolution is deliberately not paused. After the visible starter confirmation, every
  * command and prompt remains an ordinary keyboard-driven production path.
@@ -328,7 +329,7 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
     return null;
   }
   const specs = [
-    { speciesId: SpeciesId.CATERPIE, moveId: MoveId.TACKLE },
+    { speciesId: SpeciesId.CATERPIE, moveId: MoveId.MAKE_IT_RAIN },
     { speciesId: SpeciesId.CASTFORM, moveId: MoveId.WATER_GUN },
     { speciesId: SpeciesId.SPINDA, moveId: MoveId.TACKLE },
   ];
@@ -349,7 +350,7 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
 /** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
   return isCoopBrowserEvolutionFixtureActive()
-    ? 15
+    ? 6
     : isCoopBrowserRegisteredInteractionFixtureActive()
         || isCoopBrowserCampaignFixtureActive()
         || isCoopBrowserNavigationFixtureActive()
@@ -448,7 +449,8 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
  * enemy, while the other seat receives a one-mon attacking team.
  * The half-wipe variant instead gives the configured replica a lone Inner Focus Memento Zubat and
  * its partner a one-target Damp attacker. The Zubat self-faints before ordinary wave-1 enemies, while
- * Psyduck's primary Damp slot prevents a random enemy Self-Destruct/Explosion from erasing the whole
+ * Psyduck's second ability slot is Damp in the Elite Redux species table and prevents a random enemy
+ * Self-Destruct/Explosion from erasing the whole
  * wild side under the journey. Tackle cannot erase both opposing battlers, so the same battle must
  * continue with exactly one command owner. The exact build flag and per-page URL value keep every variant
  * unreachable in normal local, staging, and production bundles.
@@ -486,7 +488,7 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
     shiny: false,
     variant: 0,
     formIndex: 0,
-    abilityIndex: 0,
+    abilityIndex: fixture === "half-wipe-partner" ? 1 : 0,
     passive: false,
     nature: fixture === "half-wipe-owner" ? Nature.JOLLY : Nature.HARDY,
     moveset: moveset as StarterMoveset,

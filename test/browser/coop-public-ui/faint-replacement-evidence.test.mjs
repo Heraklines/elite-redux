@@ -37,6 +37,11 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   );
   assert.match(registry, /nature: fixture === "half-wipe-owner" \? Nature\.JOLLY : Nature\.HARDY/u);
   assert.match(
+    registry,
+    /abilityIndex: fixture === "half-wipe-partner" \? 1 : 0/u,
+    "the fixture selects Psyduck's actual Damp slot instead of assuming its primary is Damp",
+  );
+  assert.match(
     harness,
     /this\.config\.journey === "faint-replacement" \|\| this\.config\.journey === "half-wipe"[\s\S]*?"half-wipe-owner"[\s\S]*?"half-wipe-partner"/u,
   );
