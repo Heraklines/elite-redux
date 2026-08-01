@@ -1703,9 +1703,7 @@ function observeSemanticSurface(): void {
       // The guest's actionable pre-binding resume prompt is intentionally observable at epoch zero. Every
       // other P33 surface must use the accepted frame axes above; otherwise a provisional generation-zero
       // runtime can masquerade as authenticated gameplay.
-      const membership = preBindingGuestLaunchMessage
-        ? runtime.membership.snapshot()
-        : observedMembershipAxes(runtime);
+      const membership = preBindingGuestLaunchMessage ? runtime.membership.snapshot() : observedMembershipAxes(runtime);
       if (membership == null || (membership.state !== "active" && !preBindingGuestLaunchMessage)) {
         return;
       }
