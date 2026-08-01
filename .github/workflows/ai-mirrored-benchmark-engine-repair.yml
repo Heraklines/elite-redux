@@ -4,6 +4,11 @@ name: AI Mirrored Benchmark Engine Repair (Non-Production)
 # intact but whose hardest-engine adapter failed. It only downloads artifacts,
 # runs combat, and uploads a combined report.
 on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-mirrored-benchmark-engine-repair.yml"
   workflow_dispatch:
     inputs:
       prior_run_id:
@@ -42,7 +47,7 @@ jobs:
         with:
           name: ai-mirrored-benchmark-shard-${{ matrix.shard }}
           path: ai-gauntlet
-          run-id: ${{ inputs.prior_run_id }}
+          run-id: ${{ inputs.prior_run_id || '30694811394' }}
           github-token: ${{ github.token }}
       - name: Remove any incomplete hardest-engine output
         shell: bash
