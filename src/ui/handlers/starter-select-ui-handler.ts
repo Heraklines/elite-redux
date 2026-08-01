@@ -1,6 +1,7 @@
 import type { Ability } from "#abilities/ability";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import {
+  getCoopBrowserAbilityCapsuleFixtureStarters,
   getCoopBrowserCampaignFixtureStarters,
   getCoopBrowserCommanderFixtureStarters,
   getCoopBrowserEvolutionFixtureStarters,
@@ -1781,6 +1782,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ?? getCoopBrowserFaintFixtureStarters()
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
+        ?? getCoopBrowserAbilityCapsuleFixtureStarters()
         ?? coopBrowserNavigationStarters
         ?? getCoopBrowserEvolutionFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();

@@ -238,6 +238,50 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
 });
 
+test("Ability Capsule journey forces and proves the nested reward Summary route in two real browsers", async () => {
+  const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- ability-capsule/u, "manual dispatch exposes the focused journey");
+  assert.match(workflow, /inputs\.journey == 'ability-capsule' && 'ability-capsule'/u);
+  assert.match(workflow, /COOP_UI_REQUIRE_ABILITY_CAPSULE:.*ability-capsule/u);
+  assert.match(workflow, /COOP_UI_REWARD_INSPECT_SUMMARY:.*ability-capsule/u);
+  assert.match(config, /"ability-capsule"/u, "the public driver accepts only the named journey");
+  assert.match(
+    registry,
+    /isCoopBrowserAbilityCapsuleFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "ability-capsule"/u,
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserAbilityCapsuleFixtureActive\(\)[\s\S]*get\("coopfixture"\) === "ability-capsule"/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserAbilityCapsuleFixtureStarters\(\)[\s\S]*SpeciesId\.GARCHOMP[\s\S]*MoveId\.WATER_SPOUT/u,
+  );
+  assert.match(starterHandler, /getCoopBrowserAbilityCapsuleFixtureStarters\(\)/u);
+  assert.match(harness, /this\.config\.journey === "ability-capsule"[\s\S]*set\("coopfixture", "ability-capsule"\)/u);
+  assert.match(harness, /abilityCapsuleFixture[\s\S]*GARCHOMP_SPECIES_ID/u);
+  assert.match(
+    selectModifier,
+    /isCoopBrowserAbilityCapsuleFixtureActive\(\)[\s\S]*coopRewardWave\(\) === 1[\s\S]*modifierTypes\.ER_ABILITY_CAPSULE/u,
+    "the option authority removes random reward-pool coverage",
+  );
+  assert.match(policy, /COOP_UI_REQUIRE_ABILITY_CAPSULE/u);
+  assert.match(policy, /COOP_UI_REWARD_INSPECT_SUMMARY/u);
+  assert.match(campaign, /targetId: "party-option:summary"[\s\S]*surfaceId: "summary"/u);
+  assert.match(campaign, /campaign-reward-summary-inspection/u);
+  assert.match(campaign, /campaign-ability-capsule-coverage/u);
+});
+
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {
   const [workflow, registry, selectStarter, starterHandler, pokemon, config, harness, journeys] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),

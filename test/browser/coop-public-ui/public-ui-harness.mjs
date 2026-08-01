@@ -81,6 +81,7 @@ const SPINDA_SPECIES_ID = 327;
 const MEWTWO_SPECIES_ID = 150;
 const ZACIAN_SPECIES_ID = 888;
 const ZAMAZENTA_SPECIES_ID = 889;
+const GARCHOMP_SPECIES_ID = 445;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -1119,6 +1120,8 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", "game-over");
     } else if (this.config.journey === "registered-interactions") {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
+    } else if (this.config.journey === "ability-capsule") {
+      entryUrl.searchParams.set("coopfixture", "ability-capsule");
     } else if (this.config.journey === "navigation-depth-30" || this.config.journey === "market-wide-lens") {
       entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
     } else if (this.config.journey === "evolution-sync") {
@@ -3546,6 +3549,7 @@ export class DuoPublicUiRig {
     navigationFixture = false,
     evolutionFixture = false,
     registeredInteractionsFixture = false,
+    abilityCapsuleFixture = false,
   } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -3642,7 +3646,9 @@ export class DuoPublicUiRig {
                           ? client.label === "host-seat"
                             ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                             : [BULBASAUR_SPECIES_ID]
-                          : null;
+                          : abilityCapsuleFixture
+                            ? [GARCHOMP_SPECIES_ID]
+                            : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

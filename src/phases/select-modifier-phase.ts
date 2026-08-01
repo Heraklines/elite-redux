@@ -1,6 +1,7 @@
-import { consumePendingDevShop } from "#app/dev-tools/registry";
+import { consumePendingDevShop, isCoopBrowserAbilityCapsuleFixtureActive } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
@@ -556,6 +557,25 @@ export class SelectModifierPhase extends BattlePhase {
     // Remember the option axis for startCoopWatch (the host on a guest-owned ME watches the pick but is
     // the option OWNER, so it must NOT adopt - it keeps its own rolled+streamed list).
     this.coopAdoptsOptions = coopIsWatcher;
+
+    // Exact-build real-browser checkpoint: make the first ordinary wave reward an Ability Capsule
+    // so the public driver deterministically exercises PARTY -> SUMMARY -> PARTY before applying it.
+    // Only the option authority installs this immutable pool; its peer adopts the streamed list.
+    // The build flag and URL token are both required, leaving every normal staging/production run inert.
+    if (
+      coopController != null
+      && !coopIsWatcher
+      && isCoopBrowserAbilityCapsuleFixtureActive()
+      && this.coopRewardWave() === 1
+      && this.coopRewardSurface == null
+      && !this.rerollCount
+      && !this.isCopy
+    ) {
+      this.customModifierSettings = {
+        guaranteedModifierTypeFuncs: [modifierTypes.ER_ABILITY_CAPSULE],
+        fillRemaining: false,
+      };
+    }
 
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a

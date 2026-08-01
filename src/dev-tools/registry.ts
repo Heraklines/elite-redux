@@ -176,6 +176,20 @@ export function isCoopBrowserRegisteredInteractionFixtureActive(): boolean {
   return fixture === "registered-owner" || fixture === "registered-partner";
 }
 
+/** Whether this exact bundle was built for the nested Ability Capsule reward journey. */
+export function isCoopBrowserAbilityCapsuleFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "ability-capsule";
+}
+
+/** Require both the immutable Ability Capsule bundle and its exact public-journey URL token. */
+export function isCoopBrowserAbilityCapsuleFixtureActive(): boolean {
+  if (!isCoopBrowserAbilityCapsuleFixtureBuild() || typeof location === "undefined") {
+    return false;
+  }
+  return new URLSearchParams(location.search).get("coopfixture") === "ability-capsule";
+}
+
 /** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
 export function isCoopBrowserShowdownFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -405,6 +419,34 @@ export function getCoopBrowserRegisteredInteractionFixtureStarters(): Starter[] 
     pokerus: false,
     ivs: new Array(6).fill(31),
   }));
+}
+
+/**
+ * One ordinary target per seat for the exact Ability Capsule reward journey.
+ *
+ * Garchomp has multiple selectable Elite Redux abilities and remains inside the normal co-op
+ * starter budget. The public browser still confirms it through the ordinary starter screen; the
+ * fixture only removes reward-pool randomness so the journey can always traverse
+ * PARTY -> SUMMARY -> PARTY -> Ability Capsule through real keyboard input.
+ */
+export function getCoopBrowserAbilityCapsuleFixtureStarters(): Starter[] | null {
+  if (!isCoopBrowserAbilityCapsuleFixtureActive()) {
+    return null;
+  }
+  return [
+    {
+      speciesId: SpeciesId.GARCHOMP,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.HARDY,
+      moveset: [MoveId.WATER_SPOUT] as StarterMoveset,
+      pokerus: false,
+      ivs: new Array(6).fill(31),
+    },
+  ];
 }
 
 /**

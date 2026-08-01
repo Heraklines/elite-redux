@@ -158,6 +158,7 @@ export function loadCampaignPolicy() {
   const targetWaves = envInteger("COOP_UI_CAMPAIGN_WAVES", 30);
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
   const registeredInteractionsRequired = envBoolean("COOP_UI_REQUIRE_REGISTERED_INTERACTIONS", false);
+  const abilityCapsuleRequired = envBoolean("COOP_UI_REQUIRE_ABILITY_CAPSULE", false);
   const navigationRequired = envBoolean("COOP_UI_REQUIRE_NAVIGATION_DEPTH", false);
   const crossroadsRoute = envKeys("COOP_UI_CROSSROADS_ROUTE", ["stay", "leave", "stay", "leave"]);
   if (crossroadsRoute.length === 0 || crossroadsRoute.some(choice => choice !== "stay" && choice !== "leave")) {
@@ -185,6 +186,10 @@ export function loadCampaignPolicy() {
       // The exact registered-interaction fixture uses this to choose Revival Blessing as soon as
       // its user replaces the deterministic self-faint. Zero keeps ordinary campaign move policy.
       preferredMoveId: envInteger("COOP_UI_PREFERRED_MOVE_ID", 0) || null,
+    },
+    abilityCapsule: {
+      required: abilityCapsuleRequired,
+      inspectSummary: envBoolean("COOP_UI_REWARD_INSPECT_SUMMARY", false),
     },
     navigation: {
       required: navigationRequired,
@@ -360,6 +365,7 @@ export function buildDispatchTable(policy) {
       owner: { marker: REWARD_OWNER },
       keys: [],
       partySlot: policy.rewardTargetSlot,
+      inspectSummary: policy.abilityCapsule.inspectSummary,
     },
     {
       name: "biome-shop",

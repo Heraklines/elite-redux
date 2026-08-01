@@ -6688,3 +6688,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   before the binding-ready callback rebinds or constructs Authority V2. Regressions still fail closed.
 - The P33 controller tests now reproduce the asymmetric provisional view (`local=1, peer=0`) and require
   the partner's generation-1 hello to appear in the accepted membership snapshot.
+
+## 2026-08-01 — player-log closure: nested reward Summary and hot-rejoin generation
+
+- Player evidence showed two separate blind spots: Ability Capsule could consume the PARTY action latch before
+  SUMMARY became actionable, and same-tab reload/rejoin retained a provisional peer generation from the first
+  `/coop/v3/rejoin` response. The latter rejected every genuine generation-2 replica receipt and eventually
+  failed command-control installation at wave 13.
+- Production fixes now use the bounded nested UI transition and carry the authenticated sender generation in
+  P33 hello so the peer axis advances monotonically before Authority V2 leases are rebound.
+- Added an exact-build `ability-capsule` two-browser campaign: both players visibly confirm Garchomp, wave 1
+  deterministically offers Ability Capsule, the reward owner opens `PARTY -> SUMMARY`, backs out to the exact
+  same addressed PARTY selector, applies the capsule, completes the real ability choice, and reaches wave 2.
+- The pre-existing `fresh-resume` journey was not representative of browser reload: it destroys sessionStorage,
+  waits the cold-rejoin grace, and creates a new lobby. A same-tab `/coop/v3/rejoin` journey remains the next
+  closure item after the focused Ability Capsule proof.

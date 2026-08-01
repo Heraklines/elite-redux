@@ -79,6 +79,7 @@ const allowedJourneys = new Set([
   "commander-skip",
   "game-over",
   "registered-interactions",
+  "ability-capsule",
   "market-wide-lens",
   "navigation-depth-30",
   "evolution-sync",

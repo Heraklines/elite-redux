@@ -3361,13 +3361,78 @@ async function dismissRewardTargetRejection(rig, owner, boundary, targetSlot) {
   );
 }
 
+/**
+ * Exercise the exact nested path reported by players: open Summary from the reward-owned PARTY
+ * submenu, return to the unchanged addressed selector, and reopen the same mon's action menu.
+ * Gameplay is driven only through public keys; the CI observer is read-only evidence.
+ */
+async function inspectRewardPartySummary(rig, owner, boundary, targetSlot, optionEvent) {
+  const summaryCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:summary",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: optionEvent.index,
+  });
+  const summary = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(summaryCursor, "summary");
+      const observation = candidate?.observation;
+      return candidate != null
+        && observation?.phase === "SelectModifierPhase"
+        && observation.uiMode === "SUMMARY"
+        && observation.ownerModel === "local"
+        && observation.ready?.handlerActive === true
+        && observation.ready?.inputBlocked !== true
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "reward target nested Summary became actionable" },
+  );
+  await owner.checkpoint("reward-target-summary-open");
+
+  const restoreCursor = owner.evidence.cursor();
+  await owner.press("Backspace", "campaign-reward-target-summary-back");
+  const restored = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(restoreCursor, "party:reward-target");
+      const observation = candidate?.observation;
+      return candidate != null
+        && JSON.stringify(observation?.address) === JSON.stringify(boundary.authority.address)
+        && observation.selectedOptionId === `party-slot:${targetSlot}`
+        && observation.ready?.handlerActive === true
+        && observation.ready?.inputBlocked !== true
+        && observation.ready?.awaitingActionInput !== true
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "exact reward PARTY selector restored after Summary" },
+  );
+  owner.evidence.record("campaign-reward-summary-inspection", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    partySlot: targetSlot,
+    summaryEventIndex: summary.index,
+    restoredEventIndex: restored.index,
+  });
+  return openRewardPartyApply(rig, owner, boundary, targetSlot);
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0);
   const candidateSlots = target.slots;
   let event = boundary.ownerEvent;
   for (const targetSlot of candidateSlots) {
     event = await moveRewardPartyCursor(rig, owner, event, targetSlot);
-    const optionEvent = await openRewardPartyApply(rig, owner, boundary, targetSlot);
+    let optionEvent = await openRewardPartyApply(rig, owner, boundary, targetSlot);
+    if (
+      driver.inspectSummary === true
+      && !owner.evidence.events.some(event => event.kind === "campaign-reward-summary-inspection")
+    ) {
+      optionEvent = await inspectRewardPartySummary(rig, owner, boundary, targetSlot, optionEvent);
+    }
     owner.evidence.record("campaign-reward-target-action", {
       address: boundary.authority.address,
       ownerSeat: owner.publicSeat,
@@ -3376,8 +3441,24 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       selectedOptionId: optionEvent.observation.selectedOptionId,
       optionIds: optionEvent.observation.optionIds,
     });
+    const applyOptionId = optionEvent.observation.optionIds?.includes("party-option:apply")
+      ? "party-option:apply"
+      : null;
+    if (applyOptionId == null) {
+      throw new Error(
+        `[campaign-reward-target] no APPLY option after selecting slot ${targetSlot}: `
+          + `${JSON.stringify(optionEvent.observation.optionIds)}`,
+      );
+    }
     const applyCursor = owner.evidence.cursor();
-    await owner.press("Space", `campaign-reward-target-apply-${optionEvent.observation.selectedOptionId}`);
+    await selectOptionById(owner, {
+      surfaceId: "party:reward-target",
+      targetId: applyOptionId,
+      navKeys: ["ArrowDown", "ArrowUp"],
+      submitKey: "Space",
+      timeoutMs: rig.config.timeoutMs,
+      fromCursor: optionEvent.index,
+    });
     const outcome = await owner.evidence.waitForCondition(
       sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
       { timeoutMs: rig.config.timeoutMs, description: `reward target ${targetSlot} accepted or visibly rejected` },
@@ -4491,6 +4572,7 @@ export async function runCampaign(rig) {
     renderProfile: policy.renderProfile,
     mysteryGauntlet: policy.mysteryGauntlet,
     registeredInteractions: policy.registeredInteractions,
+    abilityCapsule: policy.abilityCapsule,
     navigation: policy.navigation,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
   });
@@ -4511,6 +4593,7 @@ export async function runCampaign(rig) {
       // setup must also choose the seeded-team confirmer instead of trying to add default starters.
       navigationFixture: policy.navigation.required || policy.market.requiredPurchases > 0,
       registeredInteractionsFixture: policy.registeredInteractions.required,
+      abilityCapsuleFixture: policy.abilityCapsule.required,
     });
     await progress.note("fresh co-op run reached its first shared command surface");
     if (rig.config.expectReclaim) {
@@ -4788,6 +4871,34 @@ export async function runCampaign(rig) {
         client.evidence.record("campaign-registered-interaction-coverage", proof);
       }
     }
+    if (policy.abilityCapsule.required) {
+      const events = clients.flatMap(client => client.evidence.events);
+      const summaryInspections = events.filter(event => event.kind === "campaign-reward-summary-inspection");
+      const capsuleTargets = events.filter(
+        event => event.kind === "campaign-reward-target-action" && event.rewardId === "ER_ABILITY_CAPSULE",
+      );
+      const capsuleChoices = events.filter(
+        event => event.kind === "campaign-ability-choice" && event.phase === "ErAbilityCapsulePhase",
+      );
+      if (summaryInspections.length !== 1 || capsuleTargets.length !== 1 || capsuleChoices.length !== 1) {
+        throw new Error(
+          "[campaign-ability-capsule] exact journey did not prove Summary return and capsule application: "
+            + JSON.stringify({
+              summaryInspections: summaryInspections.length,
+              capsuleTargets: capsuleTargets.length,
+              capsuleChoices: capsuleChoices.length,
+            }),
+        );
+      }
+      const proof = {
+        summary: summaryInspections[0],
+        target: capsuleTargets[0],
+        choice: capsuleChoices[0],
+      };
+      for (const client of clients) {
+        client.evidence.record("campaign-ability-capsule-coverage", proof);
+      }
+    }
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await rig.assertCurrentPresentationLedger(`campaign-final-wave-${wavesCleared}-presentation-ledger`);
       assertRetainedEvolutionPresentationParity(rig, policy);
@@ -4807,6 +4918,7 @@ export async function runCampaign(rig) {
       marketCoverage,
       mysteryCoverage,
       registeredInteractionCoverage,
+      abilityCapsule: policy.abilityCapsule,
       navigationCoverage,
     });
     await progress.writeStageRollup().catch(() => {});

@@ -43,6 +43,7 @@ on:
           - commander-skip
           - game-over
           - registered-interactions
+          - ability-capsule
           - showdown-battle
           - resume-scan-isolation
           - save-mutations
@@ -155,7 +156,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -185,8 +186,10 @@ jobs:
             src/phases/er-dex-nav-phase.ts \
             src/phases/er-greater-ability-capsule-phase.ts \
             src/phases/er-greater-ability-randomizer-phase.ts \
+            src/phases/select-modifier-phase.ts \
             src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \
+            src/ui/handlers/party-ui-handler.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
@@ -304,7 +307,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -429,7 +432,7 @@ jobs:
           COOP_UI_CAMPAIGN_MODE: ${{ inputs.journey == 'navigation-depth-30' && 'nightly' || 'gating' }}
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || '2700000' }}
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
-          COOP_UI_REWARD_MODE: leave
+          COOP_UI_REWARD_MODE: ${{ inputs.journey == 'ability-capsule' && 'pick-first' || 'leave' }}
           COOP_UI_RAISE_SPEED: "1"
           COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
@@ -443,6 +446,8 @@ jobs:
           # One exact, point-legal journey deterministically self-faints, revives through the real
           # PARTY submenu, clears wave 1, then chooses the host's newly-held Stormglass at wave 2.
           COOP_UI_REQUIRE_REGISTERED_INTERACTIONS: ${{ inputs.journey == 'registered-interactions' && '1' || '0' }}
+          COOP_UI_REQUIRE_ABILITY_CAPSULE: ${{ inputs.journey == 'ability-capsule' && '1' || '0' }}
+          COOP_UI_REWARD_INSPECT_SUMMARY: ${{ inputs.journey == 'ability-capsule' && '1' || '0' }}
           COOP_UI_PREFERRED_MOVE_ID: ${{ inputs.journey == 'registered-interactions' && '863' || '0' }}
           # A measured 537 MB screenshot-enabled CDP performance trace starved two real 10x clients.
           # Normal two-player fidelity keeps PNGs, semantic/network JSONL, key latency, render and
@@ -467,10 +472,10 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" ]]; then
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs &
             campaign_pid=$!
             (

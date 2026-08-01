@@ -403,5 +403,7 @@
     "workers/er-save-api/wrangler.staging.toml",
     "workers/er-save-api/wrangler.toml"
   ],
-  "lockedSchemaFiles": []
+  "lockedSchemaFiles": [
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ]
 }
