@@ -445,9 +445,10 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
  * Healing Wish makes the first real public command self-faint without depending on a random wave-1
  * enemy, while the other seat receives a one-mon attacking team.
  * The half-wipe variant instead gives the configured replica a lone Inner Focus Memento Zubat and
- * its partner a durable one-target attacker. The Zubat self-faints before ordinary wave-1 enemies, but
- * Dondozo cannot erase both opposing battlers with one Tackle, so the same battle must continue with
- * exactly one command owner. The exact build flag and per-page URL value keep every variant
+ * its partner a one-target Damp attacker. The Zubat self-faints before ordinary wave-1 enemies, while
+ * Psyduck's primary Damp slot prevents a random enemy Self-Destruct/Explosion from erasing the whole
+ * wild side under the journey. Tackle cannot erase both opposing battlers, so the same battle must
+ * continue with exactly one command owner. The exact build flag and per-page URL value keep every variant
  * unreachable in normal local, staging, and production bundles.
  */
 export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
@@ -477,7 +478,7 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
         ? [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }]
         : fixture === "half-wipe-owner"
           ? [{ speciesId: SpeciesId.ZUBAT, moveset: [MoveId.MEMENTO] }]
-          : [{ speciesId: SpeciesId.DONDOZO, moveset: [MoveId.TACKLE] }];
+          : [{ speciesId: SpeciesId.PSYDUCK, moveset: [MoveId.TACKLE] }];
   return specs.map(({ speciesId, moveset }) => ({
     speciesId,
     shiny: false,

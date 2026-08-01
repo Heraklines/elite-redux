@@ -32,7 +32,7 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   assert.match(config, /"half-wipe"/u);
   assert.match(
     registry,
-    /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.ZUBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
+    /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.ZUBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?SpeciesId\.PSYDUCK[\s\S]*?MoveId\.TACKLE/u,
     "the gated visible starter material forces one replica wipe without ending the double battle",
   );
   assert.match(registry, /nature: fixture === "half-wipe-owner" \? Nature\.JOLLY : Nature\.HARDY/u);
@@ -56,6 +56,11 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   );
   assert.ok(drive.length > 0, "half-wipe driver must precede post-replacement classification");
   assert.match(drive, /wiped\.publicRole !== "guest"[\s\S]*?survivor\?\.publicRole !== "host"/u);
+  assert.match(
+    drive,
+    /survivorActor\?\.speciesId !== PSYDUCK_SPECIES_ID[\s\S]*survivorActor\.abilityId !== DAMP_ABILITY_ID[\s\S]*survivorActor\.abilityActive !== true[\s\S]*survivorActor\.abilitySuppressed === true[\s\S]*half-wipe-survivor-ability-proof/u,
+    "the public browser proves active Damp before relying on an explosive-move-proof fixture",
+  );
   assert.match(drive, /await wiped\.evidence\.waitFor\(REPLACEMENT_HALF_WIPED_CLOSE/u);
   assert.match(
     drive,

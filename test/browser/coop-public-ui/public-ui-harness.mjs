@@ -68,8 +68,10 @@ const RENDEZVOUS_RECOVERY_RETRY_POINT =
   /\[coop:rendezvous\] RENDEZVOUS RECOVERY RETRY point=([^\s]+)(?: attempt=\d+\/\d+)? after \d+ms/u;
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
+const PSYDUCK_SPECIES_ID = 54;
 const MAGIKARP_SPECIES_ID = 129;
 const ZUBAT_SPECIES_ID = 41;
+const DAMP_ABILITY_ID = 6;
 const INNER_FOCUS_ABILITY_ID = 39;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
@@ -3620,7 +3622,7 @@ export class DuoPublicUiRig {
             : halfWipeFixture
               ? client.label === this.config.faintOwnerSeat
                 ? [ZUBAT_SPECIES_ID]
-                : [DONDOZO_SPECIES_ID]
+                : [PSYDUCK_SPECIES_ID]
               : faintFixture
                 ? client.label === this.config.faintOwnerSeat
                   ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
@@ -3933,6 +3935,25 @@ export class DuoPublicUiRig {
         `half-wipe must target the replica; configured=${wiped.label}/${wiped.publicRole} survivor=${survivor?.label}/${survivor?.publicRole}`,
       );
     }
+
+    const survivorCommand = [...survivor.evidence.events]
+      .reverse()
+      .find(event => event.kind === "browser-surface2" && event.observation?.operationClass === "command");
+    const survivorActor = survivorCommand?.observation?.partySlots?.find(
+      slot => slot.active === true && slot.coopOwner === survivor.publicRole,
+    );
+    if (
+      survivorActor?.speciesId !== PSYDUCK_SPECIES_ID
+      || survivorActor.abilityId !== DAMP_ABILITY_ID
+      || survivorActor.abilityActive !== true
+      || survivorActor.abilitySuppressed === true
+    ) {
+      throw new Error(`Half-wipe survivor Damp fixture mismatch ${JSON.stringify(survivorActor ?? null)}`);
+    }
+    survivor.evidence.record("half-wipe-survivor-ability-proof", {
+      surfaceIndex: survivorCommand.index,
+      actor: survivorActor,
+    });
 
     const firstCommandCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
