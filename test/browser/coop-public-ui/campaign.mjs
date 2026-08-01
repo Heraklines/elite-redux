@@ -4080,13 +4080,7 @@ function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind, expect
 }
 
 export function assertNavigationFixtureParty(rig, wave = 1) {
-  return assertLongitudinalFixtureParty(
-    rig,
-    wave,
-    "navigation",
-    "campaign-navigation-level100-party",
-    [150, 888, 889],
-  );
+  return assertLongitudinalFixtureParty(rig, wave, "navigation", "campaign-navigation-level100-party", [150, 888, 889]);
 }
 
 export function assertMysteryFixtureParty(rig, wave = 1) {
