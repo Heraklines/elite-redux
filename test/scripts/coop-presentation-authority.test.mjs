@@ -1134,4 +1134,9 @@ test("the headless replay pump drains every immutable presentation phase used by
       `${phaseName} must be drained before the headless harness can call a replay turn complete`,
     );
   }
+  assert.match(
+    harness,
+    /const rendererCtx = peerCtx == null \? undefined : peerContextByScene\.get\(peerCtx\.scene\)[\s\S]+await inRenderer\(async \(\) => \{[\s\S]+cur\.start\(\);[\s\S]+await drainLoopback\(\)/u,
+    "every async replay phase resume is pinned to the renderer browser before it can end a phase queue",
+  );
 });

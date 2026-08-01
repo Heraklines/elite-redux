@@ -3661,7 +3661,23 @@ export async function driveGuestReplayTurn(
     pumpHostVictoryTail?: boolean;
   } = {},
 ): Promise<void> {
-  await maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false);
+  const peerCtx = peerContextByScene.get(guestScene as object);
+  // `driveGuestReplayTurn` is normally entered through a long-lived guest `withClient` scope. A
+  // simultaneous two-engine pump can temporarily install the host while this async loop is suspended,
+  // however. Production has two independent JS realms, so every resumed renderer start/end still belongs
+  // to the guest browser. Recover that exact owner from the bidirectional peer map and pin each synchronous
+  // phase-manager mutation plus its destination drain. Without this pin an absent-actor HP replay can call
+  // `this.end()` against the HOST phase manager, leaving the guest forever current on
+  // CoopHpDrainReplayPhase even though the guest artifact still contains the actor.
+  const rendererCtx = peerCtx == null ? undefined : peerContextByScene.get(peerCtx.scene);
+  const inRenderer = async <T>(fn: () => T | Promise<T>): Promise<T> =>
+    rendererCtx == null ? await fn() : await withClient(rendererCtx, fn);
+  const inRendererSync = <T>(fn: () => T): T =>
+    rendererCtx == null ? fn() : withClientSync(rendererCtx, fn);
+
+  await inRenderer(() =>
+    maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false),
+  );
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
   // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
   // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). A
@@ -3669,42 +3685,47 @@ export async function driveGuestReplayTurn(
   // phase manager too. Starting it detached can appear to work while authority is already buffered, but if
   // the frame arrives later this driver sees the unrelated synthetic TitlePhase and returns while the
   // detached replay remains parked—an impossible browser execution that produced false convergence.
-  const current = guestScene.phaseManager.getCurrentPhase();
-  const realBoundary = realGuestCommandBoundaries.get(guestScene);
-  let replay: Phase;
+  let replay!: Phase;
   let replayStarted = false;
-  if (current?.phaseName === "CoopReplayTurnPhase") {
-    replay = current;
-  } else {
-    replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-    if (
-      realBoundary?.wave === guestScene.currentBattle.waveIndex
-      && guestScene.currentBattle.turn === turn
-      && current?.phaseName === "CommandPhase"
-    ) {
-      // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
-      // engine-focused tests supply commands to the host relay directly, so replace the now-proven guest
-      // command surface with the authoritative replay through the REAL phase manager. Clearing the local
-      // command-resolution tail is the same structural diversion TurnStart performs in production; most
-      // importantly, replay.end() now advances ITS OWN queue instead of an unrelated stale NewBattle tail.
-      guestScene.phaseManager.clearPhaseQueue();
-      guestScene.phaseManager.unshiftPhase(replay);
-      guestScene.phaseManager.shiftPhase();
-      replayStarted = true;
+  inRendererSync(() => {
+    const current = guestScene.phaseManager.getCurrentPhase();
+    const realBoundary = realGuestCommandBoundaries.get(guestScene);
+    if (current?.phaseName === "CoopReplayTurnPhase") {
+      replay = current;
     } else {
-      // Preserve any legitimate queued tail, but make this replay the actual current phase. PhaseInterceptor
-      // suppresses automatic startCurrentPhase in tests, so the drain loop below starts it exactly once.
-      guestScene.phaseManager.unshiftPhase(replay);
-      guestScene.phaseManager.shiftPhase();
-      replayStarted = true;
+      replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
+      if (
+        realBoundary?.wave === guestScene.currentBattle.waveIndex
+        && guestScene.currentBattle.turn === turn
+        && current?.phaseName === "CommandPhase"
+      ) {
+        // The production guest reaches CoopReplayTurnPhase through TurnStart after public commands. These
+        // engine-focused tests supply commands to the host relay directly, so replace the now-proven guest
+        // command surface with the authoritative replay through the REAL phase manager. Clearing the local
+        // command-resolution tail is the same structural diversion TurnStart performs in production; most
+        // importantly, replay.end() now advances ITS OWN queue instead of an unrelated stale NewBattle tail.
+        guestScene.phaseManager.clearPhaseQueue();
+        guestScene.phaseManager.unshiftPhase(replay);
+        guestScene.phaseManager.shiftPhase();
+        replayStarted = true;
+      } else {
+        // Preserve any legitimate queued tail, but make this replay the actual current phase. PhaseInterceptor
+        // suppresses automatic startCurrentPhase in tests, so the drain loop below starts it exactly once.
+        guestScene.phaseManager.unshiftPhase(replay);
+        guestScene.phaseManager.shiftPhase();
+        replayStarted = true;
+      }
     }
-  }
+  });
   if (!replayStarted) {
     manuallyStartedDuoPhases.add(replay);
-    replay.start();
+    await inRenderer(async () => {
+      replay.start();
+      await drainLoopback();
+    });
+  } else {
+    await inRenderer(() => drainLoopback());
   }
-  await drainLoopback();
-  const peerCtx = peerContextByScene.get(guestScene as object);
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
   // stuck is a genuine hang. Equivalent to the old name-based check for the non-continuation callers (their
@@ -3747,12 +3768,14 @@ export async function driveGuestReplayTurn(
     }
     lastPhase = cur;
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    if (cur !== startedPhase) {
-      startedPhase = cur;
-      manuallyStartedDuoPhases.add(cur);
-      cur.start();
-    }
-    await drainLoopback();
+    await inRenderer(async () => {
+      if (cur !== startedPhase) {
+        startedPhase = cur;
+        manuallyStartedDuoPhases.add(cur);
+        cur.start();
+      }
+      await drainLoopback();
+    });
     // A replica phase may have just emitted tailRequest / a compatibility ACK whose authority-side
     // handling produces its immediate successor. Keep the authority browser's event loop alive exactly
     // as production does even when the guest phase advanced during the local drain: returning at that
@@ -3767,7 +3790,7 @@ export async function driveGuestReplayTurn(
       } else {
         await withClient(peerCtx, () => drainLoopback());
       }
-      await drainLoopback();
+      await inRenderer(() => drainLoopback());
     }
     // A real PARTY picker is an actionable human-input frontier, not a replay hang. Public-input tests must
     // regain control only after the address-exact V2 successor has been started; otherwise they cannot press
