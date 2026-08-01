@@ -85,6 +85,7 @@ import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers"
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
 import { Nature } from "#enums/nature";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
 import { getErShinyLabEquippedNameForSpecies, getErShinyLabSavedLookForSpecies } from "#sprites/er-shiny-lab-sprite-fx";
@@ -734,6 +735,7 @@ export class SelectStarterPhase extends Phase {
     // harness runs both clients in one process, where a global read here poisons the host's
     // party with the guest's stash (caught by showdown-duo.test.ts).
     const ownManifests = globalScene.gameMode.isShowdown ? (showdownManifests ?? null) : null;
+    let primedEvolutionFixtureSubject = false;
     starters.forEach((starter: Starter, i: number) => {
       if (!i && Overrides.STARTER_SPECIES_OVERRIDE) {
         starter.speciesId = Overrides.STARTER_SPECIES_OVERRIDE;
@@ -777,11 +779,18 @@ export class SelectStarterPhase extends Phase {
         starterIvs,
         starterNature,
       );
-      if (isCoopBrowserEvolutionFixtureActive() && i === 0) {
+      if (
+        isCoopBrowserEvolutionFixtureActive()
+        && !primedEvolutionFixtureSubject
+        && starterPokemon.species.speciesId === SpeciesId.CATERPIE
+      ) {
         // Initial-save-only deterministic evolution fixture: preserve a normal level-up/evolution
-        // path while avoiding runtime EXP overrides. Wave one's ordinary battle award supplies the
-        // final point, after which the production LevelUpPhase owns the evolution and its V2 capture.
+        // path while avoiding runtime EXP overrides. The exact fixture starts it high enough to
+        // survive wave one because run 30698490946 proved both level-6 copies can legitimately faint
+        // before the party EXP award. Wave one's ordinary award supplies the final point, after which the
+        // production LevelUpPhase owns the evolution and its V2 capture.
         starterPokemon.exp = getLevelTotalExp(starterLevel + 1, starterPokemon.species.growthRate) - 1;
+        primedEvolutionFixtureSubject = true;
       }
       if (pauseEvolutions) {
         // Longitudinal navigation/interaction fixtures deliberately trade progression coverage for fast,

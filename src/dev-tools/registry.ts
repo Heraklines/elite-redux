@@ -315,9 +315,11 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
 /**
  * Point-legal party for the short retained-evolution two-browser proof.
  *
- * The exact launch boundary starts these ordinary starters at level 6. Initial-save construction
- * primes the first merged Caterpie one EXP below level 7 so ordinary wave-one EXP deterministically
- * crosses a level boundary and invokes the natural evolution gate. Unlike the survival/navigation
+ * The exact launch boundary starts these ordinary starters at level 15. Initial-save construction
+ * primes the first merged Caterpie one EXP below level 16 so ordinary wave-one EXP crosses a real
+ * level boundary and invokes its already-eligible natural evolution gate. Level 15 is deliberate:
+ * exact-SHA run 30698490946 proved that level-6 leads can both legitimately faint before the award.
+ * Unlike the survival/navigation
  * fixtures, evolution is deliberately not paused. After the visible starter confirmation, every
  * command and prompt remains an ordinary keyboard-driven production path.
  */
@@ -347,7 +349,7 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
 /** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
   return isCoopBrowserEvolutionFixtureActive()
-    ? 6
+    ? 15
     : isCoopBrowserRegisteredInteractionFixtureActive()
         || isCoopBrowserCampaignFixtureActive()
         || isCoopBrowserNavigationFixtureActive()
