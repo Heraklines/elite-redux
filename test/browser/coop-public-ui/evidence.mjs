@@ -1970,6 +1970,17 @@ export class EvidenceSink {
             return { key, length: value.length, sha256 };
           }),
       );
+      const sessionStorageMetadata = await Promise.all(
+        Object.keys(sessionStorage)
+          .sort()
+          .map(async key => {
+            const value = sessionStorage.getItem(key) ?? "";
+            const sha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+              .map(byte => byte.toString(16).padStart(2, "0"))
+              .join("");
+            return { key, length: value.length, sha256 };
+          }),
+      );
       return {
         title: document.title,
         url: location.href,
@@ -1987,6 +1998,7 @@ export class EvidenceSink {
           visible: input.getClientRects().length > 0,
         })),
         storage,
+        sessionStorage: sessionStorageMetadata,
       };
     });
     if (dom.canvases.length === 0 || dom.canvases.some(canvas => canvas.width <= 0 || canvas.height <= 0)) {

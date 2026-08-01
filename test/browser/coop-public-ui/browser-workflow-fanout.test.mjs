@@ -170,6 +170,34 @@ test("journey push defaults to fresh-wave2 while manual milestone runs retain fr
   );
 });
 
+test("same-tab rejoin journey preserves browser storage and proves a post-rejoin battle", async () => {
+  const [workflow, config, evidence, harness, journeys] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- same-tab-rejoin/u);
+  assert.match(config, /"same-tab-rejoin"/u);
+  assert.match(evidence, /Object\.keys\(sessionStorage\)[\s\S]*sessionStorage: sessionStorageMetadata/u);
+  assert.match(
+    harness,
+    /async reloadInPlace\(\)[\s\S]*page\.reload\([\s\S]*async sameTabReloadAndRejoin\(\)/u,
+    "the route must reload the existing tab rather than replace its context",
+  );
+  assert.match(harness, /pokerogue:coop:p33-reload-resume:v1/u);
+  assert.match(harness, /expectedLifecycle: "reload-rejoin"/u);
+  assert.match(harness, /findResponse\("\/coop\/v3\/rejoin"[\s\S]*status: 200[\s\S]*method: "POST"/u);
+  assert.match(harness, /P33 peer generation advanced \\d\+->\\d\+ on authenticated hello/u);
+  assert.match(
+    journeys,
+    /async function sameTabRejoin\(rig\)[\s\S]*sameTabReloadAndRejoin\(\)[\s\S]*resumeRun\(\{ expectedWave: 2 \}\)[\s\S]*driveWaveToReward\(\)[\s\S]*connection-generation-mismatch/u,
+    "the oracle must drive real post-rejoin mechanics and reject the player's stale-generation symptom",
+  );
+});
+
 test("exact GameOver gate runs the retained guest-renderer phase-queue regression", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const build = jobBlock(workflow, "browser-build");
@@ -277,7 +305,8 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   );
   assert.match(policy, /COOP_UI_REQUIRE_ABILITY_CAPSULE/u);
   assert.match(policy, /COOP_UI_REWARD_INSPECT_SUMMARY/u);
-  assert.match(campaign, /targetId: "party-option:summary"[\s\S]*surfaceId: "summary"/u);
+  assert.match(campaign, /targetId: "party-option:summary"/u);
+  assert.match(campaign, /findLastSemanticSurface\(summaryCursor, "summary"\)/u);
   assert.match(campaign, /campaign-reward-summary-inspection/u);
   assert.match(campaign, /campaign-ability-capsule-coverage/u);
 });

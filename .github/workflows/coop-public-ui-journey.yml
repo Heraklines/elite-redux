@@ -37,6 +37,7 @@ on:
           - probe
           - fresh-wave2
           - fresh-resume
+          - same-tab-rejoin
           - reverse-resume
           - faint-replacement
           - half-wipe
@@ -340,7 +341,7 @@ jobs:
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
     # remain healthy for roughly 48 minutes on the constrained ~3-fps runner; a 35-minute outer job ceiling
     # previously cancelled it mid-ShowAbilityPhase while both peers were connected and assertion-clean.
-    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'same-tab-rejoin') && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:

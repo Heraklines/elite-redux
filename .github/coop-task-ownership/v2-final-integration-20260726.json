@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "01db758603a9dbdae07a6da2ea6efd7b73fe44c4",
+  "baseSha": "37c8bb10cea24798ac472872b5a3e0ba40c06566",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -403,7 +403,5 @@
     "workers/er-save-api/wrangler.staging.toml",
     "workers/er-save-api/wrangler.toml"
   ],
-  "lockedSchemaFiles": [
-    "src/data/elite-redux/coop/coop-transport.ts"
-  ]
+  "lockedSchemaFiles": []
 }

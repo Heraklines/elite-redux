@@ -6703,3 +6703,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The pre-existing `fresh-resume` journey was not representative of browser reload: it destroys sessionStorage,
   waits the cold-rejoin grace, and creates a new lobby. A same-tab `/coop/v3/rejoin` journey remains the next
   closure item after the focused Ability Capsule proof.
+- Added that missing `same-tab-rejoin` journey: it hashes and attests the tab handoff, reloads both existing tabs,
+  forbids a fallback lobby announce, requires two successful `/coop/v3/rejoin` calls and generation-2 bindings,
+  observes the authenticated hello complete the provisional peer-generation axis, resumes wave 2, and completes
+  another battle while rejecting every `connection-generation-mismatch` receipt.

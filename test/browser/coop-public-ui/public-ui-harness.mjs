@@ -1145,6 +1145,26 @@ export class PublicUiClient {
     await this.open();
   }
 
+  /** Reload the same real tab, preserving its production sessionStorage handoff. */
+  async reloadInPlace() {
+    if (this.page == null) {
+      throw new Error(`${this.label}: cannot reload a missing page`);
+    }
+    this.evidence.record("same-tab-reload", { reason: "exercise production P33 reload handoff" });
+    this.pageGeneration += 1;
+    this.pageCursor = this.evidence.cursor();
+    this.evidence.networkState.account = null;
+    this.evidence.networkState.lobby = null;
+    this.evidence.networkState.coopRunStatus = null;
+    this.evidence.networkState.apiFailure = null;
+    this.publicRole = null;
+    this.publicSeat = null;
+    this.lobbySurfaceCursor = this.pageCursor;
+    await this.page.reload({ waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
+    await this.page.waitForSelector("#app canvas", { timeout: this.config.bootTimeoutMs });
+    return this.pageCursor;
+  }
+
   /** Close the old page without starting the replacement renderer yet. */
   async prepareReopen() {
     this.evidence.record("reopen", { reason: "cold browser page using same isolated context" });
@@ -1630,7 +1650,7 @@ export class PublicUiClient {
     return this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`, opts);
   }
 
-  async enterCoopLobby() {
+  async enterCoopLobby({ expectedLifecycle = "announce" } = {}) {
     await this.evidence.waitFor(TITLE_PHASE, {
       from: this.pageCursor,
       timeoutMs: this.config.timeoutMs,
@@ -1660,12 +1680,15 @@ export class PublicUiClient {
       timeoutMs: this.config.timeoutMs,
       fromCursor: modeCursor,
     });
-    await this.evidence.waitFor(/start announce name=/u, {
+    const lifecyclePattern =
+      expectedLifecycle === "reload-rejoin" ? /start reload-rejoin code=/u : /start announce name=/u;
+    await this.evidence.waitFor(lifecyclePattern, {
       from: announceCursor,
       timeoutMs: this.config.timeoutMs,
-      description: "public co-op lobby announce",
+      description:
+        expectedLifecycle === "reload-rejoin" ? "public same-tab co-op reload rejoin" : "public co-op lobby announce",
     });
-    await this.checkpoint("lobby-announced");
+    await this.checkpoint(expectedLifecycle === "reload-rejoin" ? "lobby-rejoined" : "lobby-announced");
   }
 
   async enterShowdownLobby() {
@@ -5149,6 +5172,74 @@ export class DuoPublicUiRig {
       await delay(releaseRemainderMs);
     }
     await this.pair(requesterSeat);
+  }
+
+  /**
+   * Reload both current tabs without replacing their browser contexts, then use the real
+   * sessionStorage-backed `/coop/v3/rejoin` route. No lobby request is allowed on this path.
+   */
+  async sameTabReloadAndRejoin() {
+    const clients = Object.values(this.clients);
+    const handoffKey = "pokerogue:coop:p33-reload-resume:v1";
+    const before = await Promise.all(
+      clients.map(client => client.checkpoint("same-tab-rejoin-before", { full: true })),
+    );
+    for (const [index, dom] of before.entries()) {
+      const handoffs = dom?.sessionStorage?.filter(item => item.key === handoffKey) ?? [];
+      if (handoffs.length !== 1 || handoffs[0].length <= 0 || !/^[0-9a-f]{64}$/u.test(handoffs[0].sha256)) {
+        throw new Error(`${clients[index].label}: exact P33 reload handoff was not present before browser reload`);
+      }
+    }
+
+    // Keep both real device renderers independent while avoiding simultaneous cold Phaser boot on
+    // the four-core runner. The first seat remains inside the Worker's hot-rejoin grace throughout.
+    for (const client of clients) {
+      await client.reloadInPlace();
+    }
+    await this.loginBoth();
+    const roleCursors = Object.fromEntries(clients.map(client => [client.label, client.evidence.cursor()]));
+    await Promise.all(clients.map(client => client.enterCoopLobby({ expectedLifecycle: "reload-rejoin" })));
+    this.pairRoleCursors = roleCursors;
+    await this.completePairingBinding();
+    await this.assertPairingFunctionalFingerprintMatch(roleCursors);
+
+    const bindings = clients.map(client => client.evidence.findLastBinding(roleCursors[client.label]));
+    for (const [index, client] of clients.entries()) {
+      const rejoin = client.evidence.findResponse("/coop/v3/rejoin", {
+        from: roleCursors[client.label],
+        status: 200,
+        method: "POST",
+      });
+      if (rejoin == null) {
+        throw new Error(`${client.label}: same-tab route did not complete /coop/v3/rejoin`);
+      }
+      const announce = client.evidence.findResponse("/coop/v3/lobby/announce", {
+        from: roleCursors[client.label],
+        method: "POST",
+      });
+      if (announce != null) {
+        throw new Error(`${client.label}: same-tab reload incorrectly minted a second lobby presence`);
+      }
+      if ((bindings[index]?.observation.connectionGeneration ?? 0) < 2) {
+        throw new Error(
+          `${client.label}: same-tab rejoin retained generation ${bindings[index]?.observation.connectionGeneration ?? "none"}`,
+        );
+      }
+    }
+    const peerAdvance = clients
+      .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
+      .find(event => /P33 peer generation advanced \d+->\d+ on authenticated hello/u.test(event.text ?? ""));
+    if (peerAdvance == null) {
+      throw new Error("same-tab rejoin never completed the provisional peer-generation axis from authenticated hello");
+    }
+    for (const client of clients) {
+      client.evidence.record("same-tab-rejoin-generation-proof", {
+        connectionGeneration: client.evidence.findLastBinding(roleCursors[client.label])?.observation
+          .connectionGeneration,
+        peerAdvanceEvidenceIndex: peerAdvance.index,
+      });
+    }
+    return roleCursors;
   }
 
   async coldReplaceContextsAndLogin() {

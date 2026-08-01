@@ -73,6 +73,7 @@ const allowedJourneys = new Set([
   "probe",
   "fresh-wave2",
   "fresh-resume",
+  "same-tab-rejoin",
   "reverse-resume",
   "faint-replacement",
   "half-wipe",
