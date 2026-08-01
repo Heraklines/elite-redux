@@ -852,8 +852,8 @@ function registerAutomaticTarget(game: GameManager, mon: Pokemon, log: string[])
   log.push(`slot${mon.getBattlerIndex()}: ${MoveId[queued.move]} [automatic target]`);
 }
 
-/** Whether `moveId` is in this mon's REAL moveset with PP left (mirrors MoveHelper.getMovePosition). */
-function moveInUsableMoveset(mon: Pokemon, moveId: MoveId): boolean {
+/** Whether `moveId` is in this mon's real moveset with PP left (mirrors MoveHelper.getMovePosition). */
+function moveInMovesetWithPp(mon: Pokemon, moveId: MoveId): boolean {
   return mon.getMoveset().some(m => m.moveId === moveId && m.ppUsed < m.getMovePp());
 }
 
@@ -960,7 +960,7 @@ function applyAction(
   const forced = resolveMove(action.move) ?? forcedMove;
   let moveId = forced;
   if (moveId == null) {
-    const usable = mon.getMoveset().find(m => m.ppUsed < m.getMovePp());
+    const usable = mon.getMoveset().find(m => m.isUsable(mon, false, true)[0]);
     moveId = usable ? usable.moveId : MoveId.STRUGGLE;
   }
   // Singles never open SelectTargetPhase, so do not leave a target prompt queued
@@ -973,7 +973,7 @@ function applyAction(
         ? undefined
         : (action.target as BattlerIndex);
   const tera = !!action.tera;
-  const inMoveset = moveInUsableMoveset(mon, moveId);
+  const inMoveset = moveInMovesetWithPp(mon, moveId);
   const syntheticStruggle = moveId === MoveId.STRUGGLE && !mon.getMoveset().some(move => move.moveId === moveId);
 
   if (syntheticStruggle) {
@@ -2866,14 +2866,14 @@ function engineHardestAction(game: GameManager): TurnAction {
     const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
       candidate => candidate.kind !== "shift",
     );
-    const proxy = Object.create(actor) as EnemyPokemon;
-    proxy.aiType = AiType.SMART;
-    proxy.hasTrainer = () => true;
-    proxy.getNextTargets = moveId => EnemyPokemon.prototype.getNextTargets.call(proxy, moveId);
-    const switchCandidate = engineHardestSwitchCandidate(game, actor, proxy, candidates);
-    const chosen = switchCandidate ?? engineHardestMoveCandidate(game, proxy, candidates);
+    const switchCandidate = engineHardestSwitchCandidate(game, actor, candidates);
+    const chosen = switchCandidate ?? engineHardestMoveCandidate(game, actor, candidates);
     if (!chosen) {
-      continue;
+      throw new Error(
+        `engine-hardest-v1 produced no legal action for actor slot ${actorSlot}; candidates=${candidates
+          .map(candidate => candidate.id)
+          .join(",")}`,
+      );
     }
     setCandidateAction(game, action, actorSlot, chosen);
     earlier.push({
@@ -2889,7 +2889,6 @@ function engineHardestAction(game: GameManager): TurnAction {
 function engineHardestSwitchCandidate(
   game: GameManager,
   actor: Pokemon,
-  proxy: EnemyPokemon,
   candidates: readonly ErCombatCandidate[],
 ): ErCombatCandidate | null {
   if (actor.isTrapped() || actor.getMoveQueue().length > 0) {
@@ -2914,10 +2913,11 @@ function engineHardestSwitchCandidate(
     .map(candidate => ({ candidate, score: scorePokemon(game.scene.getPlayerParty()[candidate.partyIndex]) }))
     .sort((a, b) => b.score - a.score || a.candidate.partyIndex - b.candidate.partyIndex);
   const activeScore = scorePokemon(actor);
-  const profile = getErAiProfile(proxy);
+  const aiActor = actor as unknown as EnemyPokemon;
+  const profile = getErAiProfile(aiActor);
   let threshold = profile.active ? profile.switchThreshold : 3;
   if (profile.active) {
-    const threat = erAssessThreat(proxy);
+    const threat = erAssessThreat(aiActor);
     if (threat.incomingKO && !threat.outspeeds) {
       threshold *= ER_DOOMED_SWITCH_THRESHOLD_MULT;
     }
@@ -2933,12 +2933,12 @@ function engineHardestSwitchCandidate(
 
 function engineHardestMoveCandidate(
   game: GameManager,
-  proxy: EnemyPokemon,
+  actor: Pokemon,
   candidates: readonly ErCombatCandidate[],
 ): ErCombatCandidate | null {
-  const nextMove = EnemyPokemon.prototype.getNextMove.call(proxy);
+  const nextMove = chooseEngineHardestMove(actor);
   enginePlayerSwitchCounter = Math.max(enginePlayerSwitchCounter - 1, 0);
-  const moveSlot = proxy.getMoveset().findIndex(move => move.moveId === nextMove.move);
+  const moveSlot = actor.getMoveset().findIndex(move => move.moveId === nextMove.move);
   const targets = nextMove.targets
     .map(target => perspectiveTargetRef(game.scene, "player", target))
     .filter((target): target is ErCombatTargetRef => target != null);
@@ -2950,7 +2950,50 @@ function engineHardestMoveCandidate(
       && !candidate.tera
       && (candidate.targetMode === "random" || sameTargetSet(candidate.targets, targets)),
   );
-  return matches.length === 1 ? matches[0] : null;
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  throw new Error(
+    `engine-hardest-v1 decision did not map to exactly one legal candidate: actor=${actor.getNameToRender()} `
+      + `move=${MoveId[nextMove.move]} slot=${moveSlot} targets=${targets
+        .map(target => `${target.side}:${target.activeSlot}`)
+        .join(",")} matches=${matches.length}`,
+  );
+}
+
+/** Run the enemy chooser against the real battler so tags such as Disable retain identity semantics. */
+function chooseEngineHardestMove(actor: Pokemon): TurnMove {
+  const aiActor = actor as unknown as EnemyPokemon;
+  const aiTypeDescriptor = Object.getOwnPropertyDescriptor(actor, "aiType");
+  const getNextTargetsDescriptor = Object.getOwnPropertyDescriptor(actor, "getNextTargets");
+  const originalMoveQueue = actor.getMoveQueue().slice();
+
+  Object.defineProperty(actor, "aiType", {
+    configurable: true,
+    writable: true,
+    value: AiType.SMART,
+  });
+  Object.defineProperty(actor, "getNextTargets", {
+    configurable: true,
+    writable: true,
+    value: (moveId: MoveId) => EnemyPokemon.prototype.getNextTargets.call(aiActor, moveId),
+  });
+
+  try {
+    return EnemyPokemon.prototype.getNextMove.call(aiActor);
+  } finally {
+    actor.summonData.moveQueue = originalMoveQueue;
+    if (aiTypeDescriptor) {
+      Object.defineProperty(actor, "aiType", aiTypeDescriptor);
+    } else {
+      delete (actor as Pokemon & { aiType?: AiType }).aiType;
+    }
+    if (getNextTargetsDescriptor) {
+      Object.defineProperty(actor, "getNextTargets", getNextTargetsDescriptor);
+    } else {
+      delete (actor as Pokemon & { getNextTargets?: EnemyPokemon["getNextTargets"] }).getNextTargets;
+    }
+  }
 }
 
 function setCandidateAction(
