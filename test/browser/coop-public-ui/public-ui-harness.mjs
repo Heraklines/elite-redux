@@ -75,6 +75,9 @@ const SEEL_SPECIES_ID = 86;
 const CATERPIE_SPECIES_ID = 10;
 const CASTFORM_SPECIES_ID = 351;
 const SPINDA_SPECIES_ID = 327;
+const MEWTWO_SPECIES_ID = 150;
+const ZACIAN_SPECIES_ID = 888;
+const ZAMAZENTA_SPECIES_ID = 889;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -3626,7 +3629,7 @@ export class DuoPublicUiRig {
                   : campaignSurvivalFixture
                     ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                     : navigationFixture
-                      ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
+                      ? [MEWTWO_SPECIES_ID, ZACIAN_SPECIES_ID, ZAMAZENTA_SPECIES_ID]
                       : evolutionFixture
                         ? [CATERPIE_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                         : registeredInteractionsFixture

@@ -268,9 +268,14 @@ export function getCoopBrowserCampaignFixtureStarters(): Starter[] | null {
 }
 
 /**
- * Point-legal, replacement-capable party for the navigation-only 30-wave browser journey.
+ * Replacement-capable party for the navigation-only 30-wave browser journey.
  *
- * These are ordinary legal level-up moves with enough PP for longitudinal play. The level is
+ * These are ordinary legal level-up moves with enough PP for longitudinal play. This fixture is
+ * deliberately stronger than the ordinary five-point co-op starter budget: Elite Redux scales the
+ * opponents to a level-100 launch, so the previous Seel/Castform/Spinda roster legitimately wiped at
+ * wave 7 before it could exercise either market or a biome boundary. The exact browser build is the
+ * only caller allowed to render this over-budget team, and the public UI still displays and confirms
+ * all three starters before launch. The level is
  * deliberately not carried in the public Starter payload: the exact-build launch boundary below
  * applies it once while constructing the initial shared save, after both humans visibly confirm
  * this normal starter screen. No later battle healing or mutation hook exists.
@@ -281,16 +286,16 @@ export function getCoopBrowserNavigationFixtureStarters(): Starter[] | null {
   }
   const specs = [
     {
-      speciesId: SpeciesId.SEEL,
-      moveset: [MoveId.ICE_BEAM, MoveId.HEADBUTT, MoveId.BRINE, MoveId.AQUA_JET],
+      speciesId: SpeciesId.MEWTWO,
+      moveset: [MoveId.SWIFT, MoveId.PSYCHO_CUT, MoveId.AURA_SPHERE, MoveId.PSYCHIC],
     },
     {
-      speciesId: SpeciesId.CASTFORM,
-      moveset: [MoveId.HEADBUTT, MoveId.WEATHER_BALL, MoveId.EMBER, MoveId.POWDER_SNOW],
+      speciesId: SpeciesId.ZACIAN,
+      moveset: [MoveId.SACRED_SWORD, MoveId.IRON_HEAD, MoveId.CRUNCH, MoveId.MOONBLAST],
     },
     {
-      speciesId: SpeciesId.SPINDA,
-      moveset: [MoveId.BODY_SLAM, MoveId.PSYBEAM, MoveId.SUCKER_PUNCH, MoveId.TACKLE],
+      speciesId: SpeciesId.ZAMAZENTA,
+      moveset: [MoveId.SLASH, MoveId.IRON_HEAD, MoveId.CRUNCH, MoveId.MOONBLAST],
     },
   ];
   return specs.map(({ speciesId, moveset }) => ({

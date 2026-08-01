@@ -4035,12 +4035,11 @@ function latestCommandObservation(client, wave) {
 }
 
 /** Prove an exact initial-save fixture produced three level-100, evolution-paused mons per real seat. */
-function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
+function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind, expectedSpecies) {
   const observations = Object.values(rig.clients).map(client => ({
     label: client.label,
     observation: latestCommandObservation(client, wave),
   }));
-  const expectedSpecies = [86, 327, 351];
   const projections = observations.map(({ label, observation }) => {
     const party = observation?.partySlots;
     if (!Array.isArray(party) || party.length !== 6) {
@@ -4081,11 +4080,17 @@ function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind) {
 }
 
 export function assertNavigationFixtureParty(rig, wave = 1) {
-  return assertLongitudinalFixtureParty(rig, wave, "navigation", "campaign-navigation-level100-party");
+  return assertLongitudinalFixtureParty(
+    rig,
+    wave,
+    "navigation",
+    "campaign-navigation-level100-party",
+    [150, 888, 889],
+  );
 }
 
 export function assertMysteryFixtureParty(rig, wave = 1) {
-  return assertLongitudinalFixtureParty(rig, wave, "mystery", "campaign-mystery-level100-party");
+  return assertLongitudinalFixtureParty(rig, wave, "mystery", "campaign-mystery-level100-party", [86, 327, 351]);
 }
 
 /** Capture the raw arena/presentation view at a paired command frontier; the mechanical digest remains primary. */

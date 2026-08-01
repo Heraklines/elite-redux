@@ -210,6 +210,8 @@ export interface ShowdownPresetBuildEntry {
 interface SeedTeamOptions {
   /** Only the exact browser-fixture caller may render a locked starter in the visible team strip. */
   allowUncaught?: boolean;
+  /** Only the exact longitudinal browser fixture may exceed the normal starter budget. */
+  allowOverValueLimit?: boolean;
 }
 
 interface LanguageSetting {
@@ -1773,23 +1775,27 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           this.seedTeamFromStarters(showdownBuild.seedStarters);
         }
       }
+      const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters();
       const coopBrowserStarters =
         getCoopBrowserCommanderFixtureStarters()
         ?? getCoopBrowserFaintFixtureStarters()
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
-        ?? getCoopBrowserNavigationFixtureStarters()
+        ?? coopBrowserNavigationStarters
         ?? getCoopBrowserEvolutionFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();
       if (globalScene.gameMode.isCoop && coopBrowserStarters != null) {
         // CI checkpoint only: materialize the otherwise account-locked species in the NORMAL visible
         // starter UI. The browser still submits and confirms this team through public keys, and the
         // registry requires both the exact dedicated build flag and this client's exact URL fixture.
-        this.seedTeamFromStarters(coopBrowserStarters, { allowUncaught: true });
+        this.seedTeamFromStarters(coopBrowserStarters, {
+          allowUncaught: true,
+          allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters,
+        });
       }
 
       // Roster-pick mode: hide the party point-budget label and paint the initial marks.
-      this.valueLimitLabel.setVisible(!this.rosterPickMode);
+      this.valueLimitLabel.setVisible(!this.rosterPickMode && coopBrowserNavigationStarters == null);
       if (this.rosterPickMode) {
         // Opened as an OVERLAY over the create designer (a high-z handler); this screen
         // is registered early (low z), so raise it to the top or it renders BEHIND the
@@ -7411,7 +7417,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
         for (const e of entries) {
           const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
-          if (!this.tryUpdateValue(cost, true)) {
+          if (!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)) {
             break; // remaining starters would exceed the value limit
           }
           // Showdown (B7 item 15): re-seed this line's saved Field Stage / held item into

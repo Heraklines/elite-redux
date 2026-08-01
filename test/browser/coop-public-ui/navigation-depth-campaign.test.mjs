@@ -14,12 +14,12 @@ import {
 
 function party() {
   return [
-    { slot: 0, speciesId: 86, coopOwner: "host", level: 100, pauseEvolutions: true },
-    { slot: 1, speciesId: 86, coopOwner: "guest", level: 100, pauseEvolutions: true },
-    { slot: 2, speciesId: 351, coopOwner: "host", level: 100, pauseEvolutions: true },
-    { slot: 3, speciesId: 351, coopOwner: "guest", level: 100, pauseEvolutions: true },
-    { slot: 4, speciesId: 327, coopOwner: "host", level: 100, pauseEvolutions: true },
-    { slot: 5, speciesId: 327, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 0, speciesId: 150, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 1, speciesId: 150, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 2, speciesId: 888, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 3, speciesId: 888, coopOwner: "guest", level: 100, pauseEvolutions: true },
+    { slot: 4, speciesId: 889, coopOwner: "host", level: 100, pauseEvolutions: true },
+    { slot: 5, speciesId: 889, coopOwner: "guest", level: 100, pauseEvolutions: true },
   ];
 }
 
@@ -178,8 +178,14 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
   assert.match(
     registry,
-    /getCoopBrowserNavigationFixtureStarters[\s\S]*MoveId\.ICE_BEAM[\s\S]*MoveId\.HEADBUTT[\s\S]*MoveId\.WEATHER_BALL[\s\S]*MoveId\.POWDER_SNOW[\s\S]*MoveId\.BODY_SLAM[\s\S]*MoveId\.PSYBEAM[\s\S]*MoveId\.SUCKER_PUNCH/u,
-    "the longitudinal fixture must expose legal multi-type attacks instead of one permanent immunity trap",
+    /getCoopBrowserNavigationFixtureStarters[\s\S]*SpeciesId\.MEWTWO[\s\S]*MoveId\.AURA_SPHERE[\s\S]*SpeciesId\.ZACIAN[\s\S]*MoveId\.SACRED_SWORD[\s\S]*SpeciesId\.ZAMAZENTA[\s\S]*MoveId\.MOONBLAST/u,
+    "the longitudinal fixture must expose strong legal multi-type attacks instead of testing starter-budget survivability",
+  );
+  assert.match(starterHandler, /allowOverValueLimit:\s*coopBrowserStarters === coopBrowserNavigationStarters/u);
+  assert.match(starterHandler, /!options\.allowOverValueLimit && !this\.tryUpdateValue\(cost, true\)/u);
+  assert.match(
+    starterHandler,
+    /valueLimitLabel\.setVisible\(!this\.rosterPickMode && coopBrowserNavigationStarters == null\)/u,
   );
   assert.match(
     starterPhase,
