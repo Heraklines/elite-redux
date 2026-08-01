@@ -1,0 +1,63 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: fixed
+run_mode: calibrated-release
+calibration_id: me-host-guest-asym-double-faint
+target_sha: 00f50a597e9fc39e3c28ac23ea20d2def374f59f
+checked_out_sha: 00f50a597e9fc39e3c28ac23ea20d2def374f59f
+base_seed: 20260801
+campaign_seed: fixed-in-test (matrix candidate 20260801 not consumed)
+run: 30701786179 (workflow source 00f50a597e9fc39e3c28ac23ea20d2def374f59f)
+timestamp: 2026-08-01T13-33-36Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] PRE-HEAL unexpected wave=12 where=post-turn fields=[saveDataDigest] :: saveDataDigest:host="74f907d95a23fc70"/guest="8f5ca5946096d9bb"
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->10
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: 8_000_013, termSeq: -1, wasOwner: false }
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:224:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1) > drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m58642[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-me.test.ts:224:3[39m
+
+[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:166:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0
+[31m[1mAssertionError[22m: wave 15 is HOST-OWNED by counter parity: expected 'guest-owned' to be 'host-owned' // Object.is equality[39m
+
+Expected: [32m"[7mho[27mst-owned"[39m
+Received: [31m"[7mgue[27mst-owned"[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m203:89[22m[39m
+    [90m201|[39m     expect(result.mysteryEncounters.length, "exactly one ME driven - n…
+    [90m202|[39m     expect(result.mysteryEncounters[0].wave, "the one ME was the desig…
+    [90m203|[39m     expect(result.mysteryEncounters[0].path, "wave 15 is HOST-OWNED by…
+    [90m   |[39m                                                                                         [31m^[39m
+    [90m204|[39m     [34mexpect[39m(
+    [90m205|[39m       result[33m.[39mskips[33m.[39mmysteryEncounterWaveHit[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m6 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 13:29:22
+[2m   Duration [22m 253.84s[2m (transform 58.46s, setup 83.21s, import 1.05s, tests 261.21s, environment 2.98s)[22m
+
