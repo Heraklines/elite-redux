@@ -916,6 +916,46 @@ function selectSyntheticStruggle(
   log.push(`slot${idx}: STRUGGLE [synthetic command; moveset preserved]`);
 }
 
+/** Route a voluntary switch through the exact actor's public COMMAND and PARTY prompts. */
+function selectVoluntarySwitch(game: GameManager, partyIndex: number, idx: BattlerIndex, log: string[]): void {
+  const battle = game.scene.currentBattle;
+  const turn = battle.turn;
+  const commandCommitted = () =>
+    game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[idx] != null;
+  const matchesActor = () =>
+    game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
+    && (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === idx;
+  game.onNextPrompt(
+    "CommandPhase",
+    UiMode.COMMAND,
+    () => {
+      const handler = game.scene.ui.getHandler() as CommandUiHandler;
+      handler.setCursor(2);
+      return handler.processInput(Button.ACTION);
+    },
+    commandCommitted,
+    false,
+    {
+      allowOutOfOrder: true,
+      debugLabel: `switch command actor=${idx} party=${partyIndex}`,
+      matchFn: matchesActor,
+    },
+  );
+  game.onNextPrompt(
+    "CommandPhase",
+    UiMode.PARTY,
+    () => drivePartySelection(game, partyIndex),
+    commandCommitted,
+    false,
+    {
+      allowOutOfOrder: true,
+      debugLabel: `switch party actor=${idx} party=${partyIndex}`,
+      matchFn: matchesActor,
+    },
+  );
+  log.push(`slot${idx}: switch -> party[${partyIndex}]`);
+}
+
 /**
  * Command one player mon for the turn: switch / ball / run / move (+ optional
  * tera). A scripted MOVE already in the mon's real moveset routes through the
@@ -939,8 +979,7 @@ function applyAction(
     return;
   }
   if (action.switch != null) {
-    game.doSwitchPokemon(action.switch);
-    log.push(`slot${idx}: switch -> party[${action.switch}]`);
+    selectVoluntarySwitch(game, action.switch, idx, log);
     return;
   }
   if (action.ball != null) {
@@ -4579,6 +4618,36 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(game.scene.getPlayerField()[0].species.speciesId, "PIKACHU should be active after the switch").toBe(
       SpeciesId.PIKACHU,
     );
+  }, 180_000);
+
+  it("simultaneous voluntary switches route each doubles slot through its own party prompt", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "actor-keyed doubles switches",
+      run: { level: 100, difficulty: "hell", enemyAi: "hardest", double: true },
+      party: [
+        { species: SpeciesId.SNORLAX, moves: [MoveId.TACKLE] },
+        { species: SpeciesId.PIKACHU, moves: [MoveId.THUNDERBOLT] },
+        { species: SpeciesId.BLISSEY, moves: [MoveId.SEISMIC_TOSS] },
+        { species: SpeciesId.RAICHU, moves: [MoveId.THUNDERBOLT] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          { species: SpeciesId.CHANSEY, level: 100, moves: [MoveId.SPLASH] },
+          { species: SpeciesId.SHUCKLE, level: 100, moves: [MoveId.SPLASH] },
+        ],
+      },
+      script: [{ switch: 2, switch2: 3 }],
+    };
+    normalizeSpec(spec);
+    const game = await launchScenario(phaserGame, spec, {});
+    doPlayerActions(game, spec.script?.[0], null, []);
+    await game.phaseInterceptor.to("EnemyCommandPhase", false);
+    expect([game.scene.currentBattle.turnCommands[0], game.scene.currentBattle.turnCommands[1]]).toMatchObject([
+      { command: Command.POKEMON, cursor: 2 },
+      { command: Command.POKEMON, cursor: 3 },
+    ]);
   }, 180_000);
 
   it("a pivot move selects a bench replacement instead of the withdrawn source", async () => {

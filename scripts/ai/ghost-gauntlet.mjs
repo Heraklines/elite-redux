@@ -171,13 +171,12 @@ export function buildGhostSelfPlayScenario(fixture, episodeIndex) {
   return {
     v: 1,
     name: `Ghost self-play ${player.id} vs ${enemy.id}`,
-    notes:
-      "Combat-only training episode from source-disjoint sanitized winning ghosts. Difficulty metadata, saved movesets, and reconstructable per-Pokemon held items are preserved.",
+    notes: `Combat-only training episode from source-disjoint sanitized winning ghosts. Roster difficulty stratum: ${difficulty}. Saved movesets and reconstructable per-Pokemon held items are preserved.`,
     run: {
       wave: 199,
       level: 200,
       seed,
-      difficulty,
+      difficulty: "hell",
       enemyAi: "hardest",
       ...(format === "single" ? { double: false } : {}),
       ...(format === "double" ? { double: true } : {}),

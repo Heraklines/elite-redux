@@ -104,6 +104,9 @@ const withoutEnemyLevel = member => {
   return rest;
 };
 assert.equal(forward.run.seed, reverse.run.seed);
+assert.equal(forward.run.difficulty, "hell");
+assert.equal(reverse.run.difficulty, "hell");
+assert.match(forward.notes, /Roster difficulty stratum: hell\./);
 assert.deepEqual(forward.party, reverse.enemy.party.map(withoutEnemyLevel));
 assert.deepEqual(reverse.party, forward.enemy.party.map(withoutEnemyLevel));
 assert.ok(
