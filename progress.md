@@ -6658,3 +6658,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   reward and biome-market continuations can legitimately alter that counter. Soak evidence now records the
   exact `interactionStart`, and the continuation assertion verifies the observed path against its parity.
   The separate focused cases still require one host-owned and one guest-owned Mystery path explicitly.
+- Focused run `30720160001` stopped in the ownership planner before setup because the integration manifest
+  omitted the two existing test paths changed by this correction. This is CI metadata only; both exact paths
+  are now declared and the train base advances to the rejected commit for a clean remote qualification.
