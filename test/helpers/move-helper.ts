@@ -21,6 +21,9 @@ import { expect, vi } from "vitest";
  * Helper to handle using a Pokemon's moves.
  */
 export class MoveHelper extends GameManagerHelper {
+  /** Last public move selection rejected by CommandPhase, retained for soft-lock diagnostics. */
+  public lastRejectedSelection: string | null = null;
+
   /**
    * Intercepts {@linkcode MoveEffectPhase} and mocks the phase's move's
    * accuracy to -1, guaranteeing a hit.
@@ -78,19 +81,57 @@ export class MoveHelper extends GameManagerHelper {
       );
     }
 
-    this.game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
-      this.game.scene.ui.setMode(
-        UiMode.FIGHT,
-        (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
-      );
-    });
-    this.game.onNextPrompt("CommandPhase", UiMode.FIGHT, () => {
-      (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
-        Command.FIGHT,
-        movePosition,
-        MoveUseMode.NORMAL,
-      );
-    });
+    const battle = this.game.scene.currentBattle;
+    const turn = battle.turn;
+    const commandCommitted = () =>
+      this.game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[pkmIndex] != null;
+    const matchesActor = () =>
+      this.game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
+      && (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === pkmIndex;
+    this.lastRejectedSelection = null;
+
+    this.game.onNextPrompt(
+      "CommandPhase",
+      UiMode.COMMAND,
+      () => {
+        this.game.scene.ui.setMode(
+          UiMode.FIGHT,
+          (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
+        );
+      },
+      commandCommitted,
+      false,
+      {
+        allowOutOfOrder: true,
+        debugLabel: `command actor=${pkmIndex}`,
+        matchFn: matchesActor,
+      },
+    );
+    this.game.onNextPrompt(
+      "CommandPhase",
+      UiMode.FIGHT,
+      () => {
+        const phase = this.game.scene.phaseManager.getCurrentPhase() as CommandPhase;
+        const pokemon = phase.getPokemon();
+        const accepted = phase.handleCommand(Command.FIGHT, movePosition, MoveUseMode.NORMAL);
+        if (!accepted) {
+          const pokemonMove = pokemon.getMoveset()[movePosition];
+          const [, reason] = pokemon.trySelectMove(movePosition, false);
+          this.lastRejectedSelection =
+            `actor=${pkmIndex} pokemon=${pokemon.species.name} move=${MoveId[pokemonMove?.moveId ?? MoveId.NONE]} `
+            + `slot=${movePosition} pp=${pokemonMove ? pokemonMove.getMovePp() - pokemonMove.ppUsed : "missing"} `
+            + `reason=${JSON.stringify(reason)}`;
+        }
+        return accepted;
+      },
+      commandCommitted,
+      false,
+      {
+        allowOutOfOrder: true,
+        debugLabel: `fight actor=${pkmIndex} moveSlot=${movePosition}`,
+        matchFn: matchesActor,
+      },
+    );
 
     if (targetIndex !== null) {
       this.game.selectTarget(movePosition, targetIndex, pkmIndex);
@@ -128,20 +169,58 @@ export class MoveHelper extends GameManagerHelper {
 
     this.game.scene.getPlayerParty()[pkmIndex].isTerastallized = false;
 
-    this.game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
-      this.game.scene.ui.setMode(
-        UiMode.FIGHT,
-        (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
-        Command.TERA,
-      );
-    });
-    this.game.onNextPrompt("CommandPhase", UiMode.FIGHT, () => {
-      (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
-        Command.TERA,
-        movePosition,
-        MoveUseMode.NORMAL,
-      );
-    });
+    const battle = this.game.scene.currentBattle;
+    const turn = battle.turn;
+    const commandCommitted = () =>
+      this.game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[pkmIndex] != null;
+    const matchesActor = () =>
+      this.game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
+      && (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === pkmIndex;
+    this.lastRejectedSelection = null;
+
+    this.game.onNextPrompt(
+      "CommandPhase",
+      UiMode.COMMAND,
+      () => {
+        this.game.scene.ui.setMode(
+          UiMode.FIGHT,
+          (this.game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
+          Command.TERA,
+        );
+      },
+      commandCommitted,
+      false,
+      {
+        allowOutOfOrder: true,
+        debugLabel: `tera command actor=${pkmIndex}`,
+        matchFn: matchesActor,
+      },
+    );
+    this.game.onNextPrompt(
+      "CommandPhase",
+      UiMode.FIGHT,
+      () => {
+        const phase = this.game.scene.phaseManager.getCurrentPhase() as CommandPhase;
+        const pokemon = phase.getPokemon();
+        const accepted = phase.handleCommand(Command.TERA, movePosition, MoveUseMode.NORMAL);
+        if (!accepted) {
+          const pokemonMove = pokemon.getMoveset()[movePosition];
+          const [, reason] = pokemon.trySelectMove(movePosition, false);
+          this.lastRejectedSelection =
+            `actor=${pkmIndex} pokemon=${pokemon.species.name} move=${MoveId[pokemonMove?.moveId ?? MoveId.NONE]} `
+            + `slot=${movePosition} pp=${pokemonMove ? pokemonMove.getMovePp() - pokemonMove.ppUsed : "missing"} `
+            + `reason=${JSON.stringify(reason)}`;
+        }
+        return accepted;
+      },
+      commandCommitted,
+      false,
+      {
+        allowOutOfOrder: true,
+        debugLabel: `tera fight actor=${pkmIndex} moveSlot=${movePosition}`,
+        matchFn: matchesActor,
+      },
+    );
 
     if (targetIndex !== null) {
       this.game.selectTarget(movePosition, targetIndex, pkmIndex);

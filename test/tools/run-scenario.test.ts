@@ -870,19 +870,47 @@ function selectSyntheticStruggle(
     targets: target == null ? getMoveTargets(mon, MoveId.STRUGGLE).targets : [target],
     useMode: MoveUseMode.NORMAL,
   };
-  game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
-    void game.scene.ui.setMode(
-      UiMode.FIGHT,
-      (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
-    );
-  });
-  game.onNextPrompt("CommandPhase", UiMode.FIGHT, () =>
-    (game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
-      Command.FIGHT,
-      -1,
-      MoveUseMode.NORMAL,
-      turnMove,
-    ),
+  const battle = game.scene.currentBattle;
+  const turn = battle.turn;
+  const commandCommitted = () =>
+    game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[idx] != null;
+  const matchesActor = () =>
+    game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
+    && (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === idx;
+  game.onNextPrompt(
+    "CommandPhase",
+    UiMode.COMMAND,
+    () => {
+      void game.scene.ui.setMode(
+        UiMode.FIGHT,
+        (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
+      );
+    },
+    commandCommitted,
+    false,
+    {
+      allowOutOfOrder: true,
+      debugLabel: `synthetic command actor=${idx}`,
+      matchFn: matchesActor,
+    },
+  );
+  game.onNextPrompt(
+    "CommandPhase",
+    UiMode.FIGHT,
+    () =>
+      (game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
+        Command.FIGHT,
+        -1,
+        MoveUseMode.NORMAL,
+        turnMove,
+      ),
+    commandCommitted,
+    false,
+    {
+      allowOutOfOrder: true,
+      debugLabel: `synthetic fight actor=${idx}`,
+      matchFn: matchesActor,
+    },
   );
   log.push(`slot${idx}: STRUGGLE [synthetic command; moveset preserved]`);
 }
@@ -2569,6 +2597,24 @@ function autopilotTick(game: GameManager, st: RunState): void {
     return;
   }
 
+  // Multi-slot command menus are asynchronous. A late FIGHT/COMMAND surface from
+  // the previous field slot can otherwise cover the next slot's CommandPhase and
+  // leave every actor-keyed prompt correctly refusing to submit against the wrong
+  // Pokemon. Restore the public command menu for the phase's actual actor; the
+  // matching prompt then continues through the same UI path as a player.
+  if (COMBAT_BATCH && phaseName === "CommandPhase" && (mode === UiMode.COMMAND || mode === UiMode.FIGHT)) {
+    const phaseActor = (phase as CommandPhase).getFieldIndex();
+    const handlerActor = (handler as unknown as { fieldIndex?: number }).fieldIndex;
+    if (handlerActor != null && handlerActor !== phaseActor) {
+      void game.scene.ui.setMode(UiMode.COMMAND, phaseActor);
+      st.log.push(`command surface realigned: slot${handlerActor} -> slot${phaseActor}`);
+      st.lastDrivenPhase = null;
+      st.lastDrivenMode = null;
+      st.lastDrivenPartyCallback = null;
+      return;
+    }
+  }
+
   // Repeatable dismiss modes: a block-timer gates them (egg-summary-ui-handler.ts:222,
   // blockExit for ~1s), so press EACH tick until they clear — NOT sig-guarded.
   if (mode === UiMode.EGG_HATCH_SUMMARY) {
@@ -3495,6 +3541,8 @@ async function playWaveTurns(
         )
         .join(", ");
       const currentPhase = game.scene.phaseManager.getCurrentPhase();
+      const commandActor =
+        currentPhase?.phaseName === "CommandPhase" ? (currentPhase as CommandPhase).getFieldIndex() : null;
       const targetActor =
         currentPhase?.phaseName === "SelectTargetPhase"
           ? (currentPhase as SelectTargetPhase).getPokemon().getBattlerIndex()
@@ -3513,12 +3561,20 @@ async function playWaveTurns(
           targets: move.targets,
           useMode: MoveUseMode[move.useMode],
         })),
+        moves: mon.getMoveset().map((move, moveSlot) => ({
+          moveSlot,
+          move: MoveId[move.moveId],
+          pp: move.getMovePp() - move.ppUsed,
+          usable: move.isUsable(mon, false, true),
+        })),
         command: game.scene.currentBattle.turnCommands[mon.getBattlerIndex()] ?? null,
       }));
       throw new Error(
         `${e instanceof Error ? e.message : String(e)}`
           + `\nEpisode: ${activeAiEpisodeId || "(none)"}`
+          + `\nCurrent command actor: ${commandActor ?? "(none)"}`
           + `\nCurrent target actor: ${targetActor ?? "(none)"}; handlerActive=${game.scene.ui.getHandler()?.active === true}; overlayActive=${uiDebug.overlayActive === true}`
+          + `\nLast rejected move: ${game.move.lastRejectedSelection ?? "(none)"}`
           + `\nPlayer field: ${JSON.stringify(fieldDebug)}`
           + `\nRecent phases: ${game.phaseInterceptor.log.slice(-30).join(" -> ")}`
           + `\nRecent combat actions: ${st.log.slice(-12).join(" | ") || "(none)"}`
