@@ -484,6 +484,7 @@ const AI_HAS_CUSTOM_OPPONENT = !!(
   || AI_OPPONENT_NEURAL_CLIENT
   || AI_OPPONENT_POLICY_MODE !== "engine-hardest"
 );
+const AI_HAS_DUAL_SEAT_CAPTURE = AI_HAS_CUSTOM_OPPONENT || AI_RECORD_ENGINE_BASELINE;
 
 const POLICY_SOURCES: ReadonlySet<string> = new Set<ErCombatPolicySource>([
   "human-v1",
@@ -1036,7 +1037,7 @@ function appendCommittedDecision(options: AppendCommittedDecisionOptions): ErCom
 }
 
 function preparePlayerDecisionObservations(game: GameManager): Map<number, ErCombatDecisionRecord["observation"]> {
-  if (!AI_DATA_OUT || AI_RECORD_ENGINE_BASELINE) {
+  if (!AI_DATA_OUT) {
     return new Map();
   }
   return new Map(
@@ -1057,7 +1058,7 @@ async function recordCommittedPlayerTurn(
   metadata: PolicyCaptureMetadata,
   observations: ReadonlyMap<number, ErCombatDecisionRecord["observation"]>,
 ): Promise<void> {
-  if (!AI_DATA_OUT || AI_RECORD_ENGINE_BASELINE) {
+  if (!AI_DATA_OUT) {
     return;
   }
   await game.phaseInterceptor.to("EnemyCommandPhase", false);
@@ -1077,7 +1078,7 @@ async function recordCommittedPlayerTurn(
     const chosen = appendCommittedDecision({
       game,
       perspective: "player",
-      ...(AI_HAS_CUSTOM_OPPONENT ? { episodeId: `${activeAiEpisodeId}:seat-player` } : {}),
+      ...(AI_HAS_DUAL_SEAT_CAPTURE ? { episodeId: `${activeAiEpisodeId}:seat-player` } : {}),
       actorSlot,
       jointActionId,
       earlier,
@@ -1131,6 +1132,7 @@ async function recordEngineBaselineTurn(game: GameManager): Promise<void> {
     const chosen = appendCommittedDecision({
       game,
       perspective: "enemy",
+      episodeId: `${activeAiEpisodeId}:seat-enemy`,
       actorSlot,
       jointActionId,
       earlier,
@@ -2334,10 +2336,10 @@ function drivePartySelection(game: GameManager, slot: number): boolean {
     optionsMode?: boolean;
   };
   if (state.optionsMode === true) {
-    const sendOut = state.options?.indexOf(PartyOption.SEND_OUT) ?? -1;
-    if (state.cursor === slot && sendOut >= 0) {
+    const switchOption = partySwitchOption(state.options);
+    if (state.cursor === slot && switchOption >= 0) {
       // `setCursor` addresses the options cursor while this submenu is open.
-      handler.setCursor(sendOut);
+      handler.setCursor(switchOption);
       return game.scene.ui.processInput(Button.ACTION);
     }
     // Consecutive triple replacements can reopen with the prior active slot's
@@ -2354,12 +2356,17 @@ function drivePartySelection(game: GameManager, slot: number): boolean {
   if (game.scene.ui.getMode() !== UiMode.PARTY || !handler.active) {
     return true;
   }
-  const sendOut = state.options?.indexOf(PartyOption.SEND_OUT) ?? -1;
-  if (state.optionsMode !== true || sendOut < 0) {
+  const switchOption = partySwitchOption(state.options);
+  if (state.optionsMode !== true || switchOption < 0) {
     return false;
   }
-  handler.setCursor(sendOut);
+  handler.setCursor(switchOption);
   return game.scene.ui.processInput(Button.ACTION);
+}
+
+function partySwitchOption(options: PartyOption[] | undefined): number {
+  const sendOut = options?.indexOf(PartyOption.SEND_OUT) ?? -1;
+  return sendOut >= 0 ? sendOut : (options?.indexOf(PartyOption.PASS_BATON) ?? -1);
 }
 
 /** Use the production party filter to avoid repeatedly choosing a bench mon this exact prompt rejects. */
@@ -2373,9 +2380,13 @@ function partySlotCanSendOut(handler: PartyUiHandler, pokemon: Pokemon): boolean
 function partySlotCanReplace(game: GameManager, handler: PartyUiHandler, pokemon: Pokemon, index: number): boolean {
   const battlerCount = game.scene.currentBattle.getBattlerCount();
   const isNormalBench = index >= battlerCount;
-  const fieldIndex = (handler as unknown as { fieldIndex?: number }).fieldIndex;
+  const handlerState = handler as unknown as { fieldIndex?: number; partyUiMode?: PartyUiMode };
   const isOrphanedSoloPrefix =
-    !game.scene.gameMode.isCoop && !game.scene.gameMode.isShowdown && index !== fieldIndex && !pokemon.isOnField();
+    handlerState.partyUiMode === PartyUiMode.FAINT_SWITCH
+    && !game.scene.gameMode.isCoop
+    && !game.scene.gameMode.isShowdown
+    && index !== handlerState.fieldIndex
+    && !pokemon.isOnField();
   return (
     (isNormalBench || isOrphanedSoloPrefix) && pokemon.isAllowedInBattle() && partySlotCanSendOut(handler, pokemon)
   );
@@ -4173,7 +4184,7 @@ function appendAiEpisodeTerminal(result: {
   finalWave: number;
   wavesCleared: number;
 }): void {
-  if (AI_HAS_CUSTOM_OPPONENT) {
+  if (AI_HAS_DUAL_SEAT_CAPTURE) {
     appendAiEpisodeTerminalForSeat(`${activeAiEpisodeId}:seat-player`, result, false);
     appendAiEpisodeTerminalForSeat(`${activeAiEpisodeId}:seat-enemy`, result, true);
     return;

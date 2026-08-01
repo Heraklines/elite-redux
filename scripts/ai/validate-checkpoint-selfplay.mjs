@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 
-const [decisionsPath, resultPath, expectedEpisodesArg, expectedPolicySource = "checkpoint-neural-v4"] =
-  process.argv.slice(2);
+const [
+  decisionsPath,
+  resultPath,
+  expectedEpisodesArg,
+  expectedPlayerSource = "checkpoint-neural-v4",
+  expectedEnemySource = expectedPlayerSource,
+] = process.argv.slice(2);
 const expectedEpisodes = Number.parseInt(expectedEpisodesArg ?? "", 10);
 if (!decisionsPath || !resultPath || !Number.isInteger(expectedEpisodes) || expectedEpisodes < 1) {
   console.error(
-    "usage: node scripts/ai/validate-checkpoint-selfplay.mjs DECISIONS.jsonl RESULT.json EXPECTED_EPISODES [POLICY_SOURCE]",
+    "usage: node scripts/ai/validate-checkpoint-selfplay.mjs DECISIONS.jsonl RESULT.json EXPECTED_EPISODES [PLAYER_SOURCE] [ENEMY_SOURCE]",
   );
   process.exit(2);
 }
@@ -21,8 +26,9 @@ const decisions = records.filter(record => record.kind === "combat_decision");
 const terminals = records.filter(record => record.kind === "episode_terminal");
 const expectedTerminals = expectedEpisodes * 2;
 
-if (!result.complete || !result.combatOnly || result.opponentController !== "custom-policy") {
-  throw new Error("self-play result did not preserve the complete combat-only custom-policy boundary");
+const expectedOpponentController = expectedEnemySource === "engine-hardest-v1" ? "engine-hardest-v1" : "custom-policy";
+if (!result.complete || !result.combatOnly || result.opponentController !== expectedOpponentController) {
+  throw new Error("self-play result did not preserve the complete combat-only opponent boundary");
 }
 if (result.episodeCount !== expectedEpisodes || result.progressionPhaseEntries !== 0) {
   throw new Error(
@@ -47,7 +53,9 @@ for (const decision of decisions) {
     throw new Error(`decision has no seat identity: ${decision.episodeId}`);
   }
   decisionsBySeat[seat]++;
-  if (decision.policySource !== expectedPolicySource || decision.policyTarget !== true) {
+  const expectedSource = seat === "player" ? expectedPlayerSource : expectedEnemySource;
+  const expectedTarget = expectedSource !== "engine-hardest-v1";
+  if (decision.policySource !== expectedSource || decision.policyTarget !== expectedTarget) {
     throw new Error(`decision crossed the checkpoint policy firewall: ${decision.decisionId}`);
   }
   if (!decision.candidates.some(candidate => candidate.id === decision.chosenCandidateId)) {
