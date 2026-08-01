@@ -1493,20 +1493,20 @@ function observeSemanticSurface(): void {
       lastSemanticPhase = currentPhase;
       semanticPhaseInstance += 1;
     }
-    // A P33 guest intentionally remains at epoch zero until it accepts the host's immutable resume offer.
-    // Its Title/MESSAGE callback is therefore a real pre-binding human boundary, not impossible narration:
-    // hiding it makes a keyboard-only oracle race localized text rendering and press before the callback is
-    // actionable. Other epoch-zero Title messages remain local setup noise and stay suppressed.
-    const preBindingGuestLaunchMessage =
+    // A fresh P33 controller cannot have an accepted gameplay binding until the host chooses New Game/Resume
+    // and (for Resume) the guest accepts the offer. Those Title/MESSAGE callbacks are therefore legitimate
+    // pre-binding human boundaries on BOTH roles: the host owns save discovery while the guest can remain at
+    // epoch zero awaiting the immutable offer. Every non-title gameplay surface still fails closed below.
+    const preBindingLaunchMessage =
       phase === "TitlePhase"
       && uiMode === "MESSAGE"
       && runtime != null
-      && runtime.controller.role === "guest"
-      && runtime.controller.sessionEpoch === 0;
+      && runtime.controller.hasAuthenticatedPairing
+      && runtime.controller.p33FrameContext() == null;
     if (
       phase === "TitlePhase"
       && uiMode === "MESSAGE"
-      && !preBindingGuestLaunchMessage
+      && !preBindingLaunchMessage
       && (runtime == null || runtime.controller.sessionEpoch <= 0)
     ) {
       return;
@@ -1700,11 +1700,10 @@ function observeSemanticSurface(): void {
     let connectionGeneration: number | null = null;
     let seatsWithInput: number[] = [0];
     if (runtime != null) {
-      // The guest's actionable pre-binding resume prompt is intentionally observable at epoch zero. Every
-      // other P33 surface must use the accepted frame axes above; otherwise a provisional generation-zero
-      // runtime can masquerade as authenticated gameplay.
-      const membership = preBindingGuestLaunchMessage ? runtime.membership.snapshot() : observedMembershipAxes(runtime);
-      if (membership == null || (membership.state !== "active" && !preBindingGuestLaunchMessage)) {
+      // The exact launch prompt above is intentionally observable before the binding transaction. Every other
+      // P33 surface must use the accepted frame axes; otherwise provisional membership can masquerade as play.
+      const membership = preBindingLaunchMessage ? runtime.membership.snapshot() : observedMembershipAxes(runtime);
+      if (membership == null || (membership.state !== "active" && !preBindingLaunchMessage)) {
         return;
       }
       coop = true;

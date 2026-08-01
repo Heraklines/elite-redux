@@ -422,8 +422,8 @@ test("public co-op launch waits for an actionable save decision and chooses sema
   );
   assert.match(
     browserEntry,
-    /phase === "TitlePhase"[\s\S]*?&& uiMode === "MESSAGE"[\s\S]*?&& !preBindingGuestLaunchMessage[\s\S]*?&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
-    "the semantic observer suppresses unbound title narration except the real pre-binding guest launch handler",
+    /phase === "TitlePhase"[\s\S]*?&& uiMode === "MESSAGE"[\s\S]*?&& !preBindingLaunchMessage[\s\S]*?&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
+    "the semantic observer suppresses unbound title narration except an authenticated P33 launch handler",
   );
   assert.match(
     publicUiHarness,
@@ -459,13 +459,13 @@ test("public co-op launch waits for an actionable save decision and chooses sema
 
   assert.match(
     browserEntry,
-    /const preBindingGuestLaunchMessage =[\s\S]*?phase === "TitlePhase"[\s\S]*?uiMode === "MESSAGE"[\s\S]*?runtime\.controller\.role === "guest"[\s\S]*?runtime\.controller\.sessionEpoch === 0/u,
-    "the read-only oracle identifies the legitimate guest launch prompt before P33 binds its positive epoch",
+    /const preBindingLaunchMessage =[\s\S]*?phase === "TitlePhase"[\s\S]*?uiMode === "MESSAGE"[\s\S]*?hasAuthenticatedPairing[\s\S]*?p33FrameContext\(\) == null/u,
+    "the read-only oracle identifies both legitimate launch roles before P33 accepts a gameplay binding",
   );
   assert.match(
     browserEntry,
-    /membership\.state !== "active" && !preBindingGuestLaunchMessage/u,
-    "only the exact pre-binding guest launch prompt bypasses active-membership surface suppression",
+    /membership\.state !== "active" && !preBindingLaunchMessage/u,
+    "only the exact pre-binding P33 launch prompt bypasses accepted-membership surface suppression",
   );
 });
 

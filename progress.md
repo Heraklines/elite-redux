@@ -6741,3 +6741,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   authenticated membership snapshot are both actionable, then expose the Worker's real local generation.
 - The journey now proves the rejoin HTTP/hello boundary first, drives Resume through ordinary public keys, and
   only then asserts generation >= 2 on both accepted gameplay bindings before completing a post-reload battle.
+- Pairing and launch are deliberately distinct proofs: provisional P33 role/seat discovery can keep the
+  self-healing lobby moving, and the exact Title/MESSAGE save decision remains keyboard-actionable on either
+  role before a gameplay binding exists. All battle/interaction observers still require the accepted P33 frame
+  axes, and `findBinding()` filters out provisional pairing-role observations.
