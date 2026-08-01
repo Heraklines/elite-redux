@@ -463,7 +463,34 @@ jobs:
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
           if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
-            node test/browser/coop-public-ui/run-campaign.mjs
+            node test/browser/coop-public-ui/run-campaign.mjs &
+            campaign_pid=$!
+            (
+              heartbeat_count=0
+              while kill -0 "$campaign_pid" 2>/dev/null; do
+                sleep 60
+                kill -0 "$campaign_pid" 2>/dev/null || break
+                heartbeat_count=$((heartbeat_count + 1))
+                progress_file="$(find dev-logs/coop-public-ui -type f -name campaign-progress.jsonl -print -quit 2>/dev/null || true)"
+                if [ -n "$progress_file" ]; then
+                  latest="$(tail -n 1 "$progress_file")"
+                else
+                  latest="campaign-progress-not-created"
+                fi
+                printf '[coop-journey:runner-heartbeat] pid=%s latest=%s\n' "$campaign_pid" "$latest"
+                if (( heartbeat_count % 5 == 0 )); then
+                  notice="$(printf '%s' "$latest" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')"
+                  printf '::notice title=Co-op journey heartbeat::%s\n' "$notice"
+                fi
+              done
+            ) &
+            heartbeat_pid=$!
+            set +e
+            wait "$campaign_pid"
+            campaign_status=$?
+            kill "$heartbeat_pid" 2>/dev/null || true
+            wait "$heartbeat_pid" 2>/dev/null || true
+            exit "$campaign_status"
           else
             node test/browser/coop-public-ui/run.mjs
           fi

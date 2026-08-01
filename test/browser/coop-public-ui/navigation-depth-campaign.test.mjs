@@ -200,6 +200,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(workflow, /navigation-depth-30' && 240/u);
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS:[^\n]*13800000/u);
   assert.match(workflow, /COOP_UI_REQUIRE_NAVIGATION_DEPTH:[^\n]*navigation-depth-30/u);
+  assert.match(
+    workflow,
+    /campaign_pid=\$![\s\S]*tail -n 1 "\$progress_file"[\s\S]*\[coop-journey:runner-heartbeat\][\s\S]*::notice title=Co-op journey heartbeat::[\s\S]*wait "\$campaign_pid"[\s\S]*exit "\$campaign_status"/u,
+    "long public journeys must expose their latest causal milestone without changing the driver",
+  );
   assert.match(campaign, /\[coop-soak:\$\{kind\}\]/u);
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
   assert.match(
