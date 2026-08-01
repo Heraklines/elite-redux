@@ -26,6 +26,26 @@ describe("Black Shiny starter-select contracts", () => {
     });
   });
 
+  it("prefers each Redux species' slug atlas over its numeric custom-id atlas", () => {
+    const sableyeRedux = {
+      speciesId: 10736,
+      getSpriteAtlasPath: () => "elite-redux/sableye_redux/front",
+      getSpriteKey: () => "er__sableye_redux",
+    } as unknown as PokemonSpecies;
+    const tsareenaRedux = {
+      speciesId: 10790,
+      getSpriteAtlasPath: () => "elite-redux/tsareena_redux/front",
+      getSpriteKey: () => "er__tsareena_redux",
+    } as unknown as PokemonSpecies;
+
+    expect(getErBlackShinySpriteSource(sableyeRedux, false, 0)?.atlasPath).toBe(
+      "black/elite-redux/sableye_redux/front",
+    );
+    expect(getErBlackShinySpriteSource(tsareenaRedux, false, 0)?.atlasPath).toBe(
+      "black/elite-redux/tsareena_redux/front",
+    );
+  });
+
   it("requires the Black flag on top of an epic shiny selection", () => {
     expect(isErBlackShinyStarterSelection({ shiny: true, variant: 2, erBlackShiny: true })).toBe(true);
     expect(isErBlackShinyStarterSelection({ shiny: true, variant: 1, erBlackShiny: true })).toBe(false);

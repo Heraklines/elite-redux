@@ -13,6 +13,7 @@
 // =============================================================================
 
 import type { AbAttr } from "#data/abilities/ab-attrs";
+import { allMoves } from "#data/data-lists";
 import { SetArenaTagOnHitAbAttr } from "#data/elite-redux/abilities/set-arena-effect-on-hit";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ER_ABILITY_ARCHETYPES } from "#data/elite-redux/er-ability-archetypes";
@@ -61,6 +62,14 @@ describe("ER - Creeping Thorns hazard (wiring)", () => {
     expect(trap, "Caltrops move should add an arena trap").toBeDefined();
     expect(trap?.tagType).toBe(ArenaTagType.CREEPING_THORNS);
   });
+
+  it("Needle Arm deploys Creeping Thorns instead of flinching", () => {
+    const move = allMoves[MoveId.NEEDLE_ARM];
+    const trap = move.getAttrs("AddArenaTrapTagAttr")[0] as AddArenaTrapTagAttr;
+    expect(trap?.tagType).toBe(ArenaTagType.CREEPING_THORNS);
+    expect(move.getAttrs("FlinchAttr")).toHaveLength(0);
+    expect(move.chance).toBe(100);
+  });
 });
 
 describe.skipIf(!RUN)("ER - Creeping Thorns hazard (behavior)", () => {
@@ -106,5 +115,22 @@ describe.skipIf(!RUN)("ER - Creeping Thorns hazard (behavior)", () => {
 
     // The foe's contact move deployed Creeping Thorns on ITS OWN (attacker) side.
     expect(game.scene.arena.getTagOnSide(ArenaTagType.CREEPING_THORNS, ArenaTagSide.ENEMY)).toBeDefined();
+  });
+
+  it("Creeping Thorns and Stealth Rock moves fail when the other is on that side", () => {
+    const player = { isPlayer: () => true } as never;
+    const needleArmTrap = allMoves[MoveId.NEEDLE_ARM].getAttrs("AddArenaTrapTagAttr")[0] as AddArenaTrapTagAttr;
+    const stealthRockTrap = allMoves[MoveId.STEALTH_ROCK].getAttrs("AddArenaTrapTagAttr")[0] as AddArenaTrapTagAttr;
+
+    game.scene.arena.addTag(ArenaTagType.STEALTH_ROCK, 0, MoveId.STEALTH_ROCK, 0, ArenaTagSide.ENEMY, true);
+    expect(needleArmTrap.getCondition()(player, player, allMoves[MoveId.NEEDLE_ARM])).toBe(false);
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY)).toBeDefined();
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.CREEPING_THORNS, ArenaTagSide.ENEMY)).toBeUndefined();
+
+    game.scene.arena.removeTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY, true);
+    game.scene.arena.addTag(ArenaTagType.CREEPING_THORNS, 0, MoveId.NEEDLE_ARM, 0, ArenaTagSide.ENEMY, true);
+    expect(stealthRockTrap.getCondition()(player, player, allMoves[MoveId.STEALTH_ROCK])).toBe(false);
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.CREEPING_THORNS, ArenaTagSide.ENEMY)).toBeDefined();
+    expect(game.scene.arena.getTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY)).toBeUndefined();
   });
 });

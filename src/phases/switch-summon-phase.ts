@@ -30,6 +30,26 @@ import { SummonPhase } from "#phases/summon-phase";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import i18next from "i18next";
 
+/**
+ * Revalidate a player replacement when its queued summon finally executes.
+ * Two simultaneous faint pickers can briefly save the same bench index; after
+ * the first party swap, that index contains the first fainted lead. Never seat
+ * that stale entry (or an already-fielded mon); fall through to a legal reserve.
+ */
+export function resolvePlayerSwitchSlot(
+  party: readonly Pokemon[],
+  requestedSlot: number,
+  battlerCount: number,
+): number {
+  const requested = party[requestedSlot];
+  if (requestedSlot >= battlerCount && requested?.isAllowedInBattle() === true && !requested.isOnField()) {
+    return requestedSlot;
+  }
+  return party.findIndex(
+    (pokemon, index) => index >= battlerCount && pokemon.isAllowedInBattle() && !pokemon.isOnField(),
+  );
+}
+
 export class SwitchSummonPhase extends SummonPhase {
   public readonly phaseName: "SwitchSummonPhase" | "ReturnPhase" = "SwitchSummonPhase";
   private readonly switchType: SwitchType;
@@ -188,7 +208,10 @@ export class SwitchSummonPhase extends SummonPhase {
 
   switchAndSummon() {
     const party = this.player ? this.getParty() : globalScene.getEnemyParty();
-    const switchedInPokemon: Pokemon | undefined = party[this.slotIndex];
+    const resolvedSlotIndex = this.player
+      ? resolvePlayerSwitchSlot(party, this.slotIndex, globalScene.currentBattle.getBattlerCount())
+      : this.slotIndex;
+    const switchedInPokemon: Pokemon | undefined = party[resolvedSlotIndex];
     this.lastPokemon = this.getPokemon();
 
     if (
@@ -321,7 +344,7 @@ export class SwitchSummonPhase extends SummonPhase {
       }
     }
 
-    party[this.slotIndex] = this.lastPokemon;
+    party[resolvedSlotIndex] = this.lastPokemon;
     party[this.fieldIndex] = switchedInPokemon;
     this.coopReplacementMaterialized = this.coopReplacementBinding != null;
     const showTextAndSummon = () => {

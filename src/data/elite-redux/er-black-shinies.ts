@@ -86,8 +86,8 @@ export function getErBlackShinySpriteSource(
 ): ErBlackShinySpriteSource | null {
   const plainAtlasPath = species.getSpriteAtlasPath(female, formIndex, false, 0);
   const atlasPath =
-    (formIndex === 0 ? erBlackSpritePath(species.speciesId, false) : null)
-    ?? erBlackSpritePathFromBase(plainAtlasPath);
+    erBlackSpritePathFromBase(plainAtlasPath)
+    ?? (formIndex === 0 ? erBlackSpritePath(species.speciesId, false) : null);
   if (!atlasPath) {
     return null;
   }

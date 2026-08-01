@@ -59,6 +59,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
   protected viewPartyXPosition = 0;
 
   protected blockInput = true;
+  private viewPartyNavigationGeneration = 0;
 
   constructor() {
     super(UiMode.MYSTERY_ENCOUNTER);
@@ -158,17 +159,32 @@ export class MysteryEncounterUiHandler extends UiHandler {
         if (cursor === this.viewPartyIndex) {
           // Handle view party
           success = true;
+          const navigationGeneration = ++this.viewPartyNavigationGeneration;
+          this.blockInput = true;
           const overrideSettings: OptionSelectSettings = {
             ...this.overrideSettings,
             slideInDescription: false,
           };
-          globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
-            globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings);
-            setTimeout(() => {
-              this.setCursor(this.viewPartyIndex);
-              this.unblockInput();
-            }, 300);
-          });
+          globalScene.ui
+            .setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
+              // Reactivate only after the ME handler has actually been shown again.
+              // The old fixed 300ms timeout could run against PARTY (or a superseded
+              // transition), leaving the returned selector visible but inert.
+              this.blockInput = true;
+              globalScene.ui
+                .setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings)
+                .then(() => {
+                  if (
+                    navigationGeneration === this.viewPartyNavigationGeneration
+                    && globalScene.ui.getMode() === UiMode.MYSTERY_ENCOUNTER
+                  ) {
+                    this.setCursor(this.viewPartyIndex);
+                    this.unblockInput();
+                  }
+                })
+                .catch(error => console.error("Failed to restore Mystery Encounter UI after viewing party", error));
+            })
+            .catch(error => console.error("Failed to open the party from Mystery Encounter UI", error));
         } else if (
           this.blockInput
           || (!this.optionsMeetsReqs[cursor]

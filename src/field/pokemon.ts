@@ -1206,41 +1206,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // vs path `elite-redux/{slug}/front`), so the old id→path string-replace
     // produced a wrong path (`er/{slug}`) and 404'd. The override is authoritative.
     const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
-    // ER Black Shinies (#349): use the generated t4 atlas when it exists
-    // (base form only — forms fall back to the interim tint).
-    if (isErBlackShiny(this) && formIndex === 0) {
-      const black = erBlackSpritePath(this.species.speciesId, false);
+    const speciesForm = this.getSpeciesForm(ignoreOverride, true);
+    const female = this.getGender(ignoreOverride, true) === Gender.FEMALE;
+    // ER Black Shinies (#349): prefer generated slug atlases for Redux forms,
+    // then fall back to a numeric atlas for ordinary base species.
+    if (isErBlackShiny(this)) {
+      // Redux custom IDs also have numeric generated entries. Their slug atlas
+      // is authoritative and must win over the numeric fallback.
+      const plainPath = speciesForm.getSpriteAtlasPath(female, formIndex, false, 0);
+      const black =
+        erBlackSpritePathFromBase(plainPath)
+        ?? (formIndex === 0 ? erBlackSpritePath(this.species.speciesId, false) : null);
       if (black) {
         return black;
       }
     }
-    const basePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
-      this.getGender(ignoreOverride, true) === Gender.FEMALE,
-      formIndex,
-      this.shiny,
-      this.variant,
-    );
-    // ER CUSTOM black shinies (#349/#393): slug-based atlases are keyed by
-    // their PLAIN base path (elite-redux/{slug}/front ->
-    // black/elite-redux/{slug}/front). No formIndex gate: Redux FORMS of
-    // vanilla species resolve to a slug path too. CRITICAL: black shinies ARE
-    // shiny, so `basePath` is the SHINY path (elite-redux/{slug}/shiny-3) and
-    // never matched the manifest - every Redux black shiny fell back to the
-    // tint placeholder. Look up with shiny=false (black art replaces the
-    // shiny look entirely).
-    if (isErBlackShiny(this)) {
-      const plainPath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
-        this.getGender(ignoreOverride, true) === Gender.FEMALE,
-        formIndex,
-        false,
-        0,
-      );
-      const blackCustom = erBlackSpritePathFromBase(plainPath);
-      if (blackCustom) {
-        return blackCustom;
-      }
-    }
-    return basePath;
+    return speciesForm.getSpriteAtlasPath(female, formIndex, this.shiny, this.variant);
   }
 
   /**
@@ -1274,38 +1255,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // instead of the bogus `back/er/{slug}` the id→path replace produced (which
     // 404'd → missing player back sprite → battle softlock).
     const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
+    const speciesForm = this.getSpeciesForm(ignoreOverride, true);
+    const female = this.getGender(ignoreOverride, true) === Gender.FEMALE;
     // ER Black Shinies (#349): generated t4 atlas (front or back) when present.
-    if (isErBlackShiny(this) && formIndex === 0) {
-      const black = erBlackSpritePath(this.species.speciesId, !!back);
+    if (isErBlackShiny(this)) {
+      const plainBattlePath = speciesForm.getSpriteAtlasPath(female, formIndex, false, 0, back);
+      const black =
+        erBlackSpritePathFromBase(plainBattlePath)
+        ?? (formIndex === 0 ? erBlackSpritePath(this.species.speciesId, !!back) : null);
       if (black) {
         return black;
       }
     }
-    const baseBattlePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
-      this.getGender(ignoreOverride, true) === Gender.FEMALE,
-      formIndex,
-      this.shiny,
-      this.variant,
-      back,
-    );
-    // ER CUSTOM black shinies (#349/#393): slug-based scheme, keyed by the
-    // PLAIN base path. As in getSpriteAtlasPath: black shinies are shiny, so
-    // the shiny battle path (elite-redux/{slug}/shiny-back-3) never matched
-    // the front/back manifest keys - resolve with shiny=false instead.
-    if (isErBlackShiny(this)) {
-      const plainBattlePath = this.getSpeciesForm(ignoreOverride, true).getSpriteAtlasPath(
-        this.getGender(ignoreOverride, true) === Gender.FEMALE,
-        formIndex,
-        false,
-        0,
-        back,
-      );
-      const blackCustom = erBlackSpritePathFromBase(plainBattlePath);
-      if (blackCustom) {
-        return blackCustom;
-      }
-    }
-    return baseBattlePath;
+    return speciesForm.getSpriteAtlasPath(female, formIndex, this.shiny, this.variant, back);
   }
 
   getSpriteId(ignoreOverride?: boolean): string {

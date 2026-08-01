@@ -3139,8 +3139,8 @@ export class BoostHealAttr extends HealAttr {
  */
 export class HealOnAllyAttr extends HealAttr {
   override canApply(user: Pokemon, target: Pokemon, _move: Move, _args?: any[]): boolean {
-    // Don't trigger if not targeting an ally
-    return target === user.getAlly() && super.canApply(user, target, _move, _args);
+    // A triple battle has two allies; getAlly() only returns the first one.
+    return user.getAllies().includes(target) && super.canApply(user, target, _move, _args);
   }
 
   override apply(user: Pokemon, target: Pokemon, _move: Move, _args: any[]): boolean {
@@ -8186,6 +8186,15 @@ export class AddArenaTrapTagAttr extends AddArenaTagAttr {
   getCondition(): MoveConditionFunc {
     return (user, _target, _move) => {
       const side = this.selfSideTarget === user.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+      const mutuallyExclusiveTag =
+        this.tagType === ArenaTagType.CREEPING_THORNS
+          ? ArenaTagType.STEALTH_ROCK
+          : this.tagType === ArenaTagType.STEALTH_ROCK
+            ? ArenaTagType.CREEPING_THORNS
+            : undefined;
+      if (mutuallyExclusiveTag && globalScene.arena.getTagOnSide(mutuallyExclusiveTag, side)) {
+        return false;
+      }
       const tag = globalScene.arena.getTagOnSide(this.tagType, side) as EntryHazardTag;
       if (!tag) {
         return true;
@@ -12082,8 +12091,8 @@ export function initMoves() {
       .partial() // Does not lock the user properly, does not increase damage correctly
       .attr(ConsecutiveUseDoublePowerAttr, 5, true, true, MoveId.DEFENSE_CURL)
       .ballBombMove(),
-    new AttackMove(MoveId.NEEDLE_ARM, PokemonType.GRASS, MoveCategory.PHYSICAL, 60, 100, 15, 30, 0, 3) //
-      .attr(FlinchAttr),
+    new AttackMove(MoveId.NEEDLE_ARM, PokemonType.GRASS, MoveCategory.PHYSICAL, 60, 100, 15, 100, 0, 3) //
+      .attr(AddArenaTrapTagAttr, ArenaTagType.CREEPING_THORNS, 0, false, false),
     new SelfStatusMove(MoveId.SLACK_OFF, PokemonType.NORMAL, -1, 5, -1, 0, 3) //
       .attr(HealAttr, 0.5)
       .triageMove(),

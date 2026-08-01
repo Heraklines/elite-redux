@@ -7,6 +7,7 @@ import type { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
+import type { PartyUiHandler } from "#ui/party-ui-handler";
 import i18next from "i18next";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -123,6 +124,33 @@ describe("Mystery Encounter Phases", () => {
       await vi.waitFor(() => expect(option.onPreOptionPhase).toHaveBeenCalledTimes(2));
 
       option.onPreOptionPhase = originalPreOption;
+    });
+
+    it("re-arms encounter options after viewing and closing the party", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.TRAINING_SESSION, [
+        SpeciesId.CHARIZARD,
+        SpeciesId.VOLCARONA,
+      ]);
+      game.onNextPrompt("MysteryEncounterPhase", UiMode.MESSAGE, () => {
+        (game.scene.ui.getHandler() as MessageUiHandler).processInput(Button.ACTION);
+      });
+      await game.phaseInterceptor.to("MysteryEncounterPhase");
+
+      const phase = game.scene.phaseManager.getCurrentPhase() as MysteryEncounterPhase;
+      const selectSpy = vi.spyOn(phase, "handleOptionSelect").mockReturnValue(true);
+      const handler = game.scene.ui.getHandler() as MysteryEncounterUiHandler;
+      handler.unblockInput();
+      const viewPartyIndex = game.scene.currentBattle.mysteryEncounter!.options.length;
+      handler.setCursor(viewPartyIndex);
+      expect(handler.processInput(Button.ACTION)).toBe(true);
+      expect(game.scene.ui.getMode()).toBe(UiMode.PARTY);
+
+      (game.scene.ui.getHandler() as PartyUiHandler).processInput(Button.CANCEL);
+      await vi.waitFor(() => expect(game.scene.ui.getMode()).toBe(UiMode.MYSTERY_ENCOUNTER));
+
+      handler.setCursor(0);
+      expect(handler.processInput(Button.ACTION), "returned encounter options accept input").toBe(true);
+      expect(selectSpy).toHaveBeenCalledTimes(1);
     });
   });
 

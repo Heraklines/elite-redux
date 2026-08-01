@@ -74,6 +74,14 @@ for (const draft of ER_SPECIES) {
     if (baseId !== undefined) {
       MEGA_HEAD_COUNT.set(baseId, count);
     }
+    // Most megas are runtime forms and therefore retain their base species id,
+    // but ER also contains standalone custom mega species (for example Mawile
+    // Redux B Mega). Keep their own mapped id too, without changing a vanilla
+    // base species' normal-form head count when both ids are the same.
+    const megaId = ER_ID_MAP.species[(draft as { id: number }).id];
+    if (megaId !== undefined && megaId !== baseId) {
+      BASE_HEAD_COUNT.set(megaId, count);
+    }
     continue;
   }
   const pkId = ER_ID_MAP.species[(draft as { id: number }).id];

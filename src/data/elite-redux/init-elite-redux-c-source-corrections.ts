@@ -199,7 +199,7 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_CAMOUFLAGE", { accuracy: 100 }],
   ["MOVE_LUSTER_PURGE", { power: 95 }],
   ["MOVE_MIST_BALL", { power: 95 }],
-  ["MOVE_NEEDLE_ARM", { power: 95, pp: 15, chance: 30 }],
+  ["MOVE_NEEDLE_ARM", { power: 95, pp: 15, chance: 100 }],
   ["MOVE_BLAST_BURN", { power: 150, accuracy: 90 }],
   ["MOVE_HYDRO_CANNON", { power: 150, accuracy: 90 }],
   ["MOVE_ASTONISH", { chance: 100 }], // ER: Ghost Fake Out — guaranteed first-turn flinch (#221)

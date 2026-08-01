@@ -13,6 +13,7 @@ import { globalScene } from "#app/global-scene";
 import { allAbilities } from "#data/data-lists";
 import { ErMultiHeadedAbAttr, getErHeadCount } from "#data/elite-redux/archetypes/multi-headed";
 import { ErAbilityId } from "#enums/er-ability-id";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -55,6 +56,7 @@ describe.skipIf(!RUN)("ER Multi-Headed head count", () => {
     // hardcoded vanilla set, so it used to fall back to the 2-head default.
     // (Pentadug/Pentawug/Wugtrio/Iron Jugulis/Hydrapple are likewise covered.)
     expect(headCountOf(SpeciesId.SANDY_SHOCKS)).toBe(3);
+    expect(headCountOf(ErSpeciesId.MAWILE_REDUX_B_MEGA as SpeciesId)).toBe(3);
   });
 
   it("the Multi-Headed ability is wired with ErMultiHeadedAbAttr (not 2x AddSecondStrike)", () => {

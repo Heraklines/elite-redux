@@ -34,8 +34,7 @@ function activeFieldHasDraftAbility(draftId: number, predicate?: (holder: Pokemo
  * Lunar Affinity is consulted by that pipeline itself; calling hasAbility here
  * recurses when its holder also owns another lunar/moon/star-named ability.
  */
-function activeFieldHasRawDraftAbility(draftId: number, predicate?: (holder: Pokemon) => boolean): boolean {
-  const abilityId = erAbilityId(draftId);
+function activeFieldHasRawAbility(abilityId: AbilityId | undefined, predicate?: (holder: Pokemon) => boolean): boolean {
   return (
     abilityId !== undefined
     && globalScene
@@ -47,6 +46,10 @@ function activeFieldHasRawDraftAbility(draftId: number, predicate?: (holder: Pok
           && holder.getAbilitySources().some(source => source.ability.id === abilityId),
       )
   );
+}
+
+function activeFieldHasRawDraftAbility(draftId: number, predicate?: (holder: Pokemon) => boolean): boolean {
+  return activeFieldHasRawAbility(erAbilityId(draftId), predicate);
 }
 
 const FOOD_SPECIES_NAMES = new Set([
@@ -105,7 +108,7 @@ export function isSuppressedByRequestedFieldAbility(pokemon: Pokemon, abilityId:
   const auraArmor = erAbilityId(1021);
   if (
     (abilityId === battleAura || abilityId === auraArmor)
-    && globalScene.getField(true).some(holder => holder.isOpponent(pokemon) && holder.hasAbility(AbilityId.AURA_BREAK))
+    && activeFieldHasRawAbility(AbilityId.AURA_BREAK, holder => holder.isOpponent(pokemon))
   ) {
     return true;
   }
