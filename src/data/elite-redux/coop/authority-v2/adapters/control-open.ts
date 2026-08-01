@@ -83,15 +83,15 @@ export interface CoopInteractionOpenMaterialV2 {
 }
 
 /**
- * Complete replacement boundary for a player faint on a winning turn. Some engine paths run the real
- * SwitchPhase during same-wave settlement; others retain it across rewards and run it before the next
- * encounter. The turn result authorizes these alternatives but never invents a picker. This capsule is
- * authored only when the real phase reaches either exact address.
+ * Complete replacement boundary for a player faint whose real SwitchPhase was not already stated by a
+ * retained REPLACEMENT head. Besides winning-turn settlement and a picker retained into the next encounter,
+ * entry effects can resolve before the new battle's first command frontier exists. The predecessor explicitly
+ * authorizes CONTROL_COMMIT at that address; this capsule is authored only when the real phase reaches it.
  */
 export interface CoopReplacementOpenMaterialV2 {
   readonly kind: "replacement-open";
   /** Why the ordinary TURN/REPLACEMENT head could not state this picker before its real phase existed. */
-  readonly origin: "settled-wave" | "pre-encounter";
+  readonly origin: "settled-wave" | "pre-encounter" | "turn-resolve";
   readonly wave: number;
   readonly turn: number;
   /** Complete state at the exact pre-picker boundary (the next enemy party may not exist yet). */
@@ -135,7 +135,10 @@ export function classifyReplacementOpenCursor(
   if (material.origin === "settled-wave") {
     return currentWave === material.wave && currentTurn + 1 === material.turn ? "advance-one" : "invalid";
   }
-  return currentWave + 1 === material.wave && material.turn === 1 ? "await-destination" : "invalid";
+  if (material.origin === "pre-encounter") {
+    return currentWave + 1 === material.wave && material.turn === 1 ? "await-destination" : "invalid";
+  }
+  return "invalid";
 }
 
 export type CoopControlOpenMaterialV2 =
@@ -300,7 +303,7 @@ export function isCompleteReplacementOpenMaterial(value: unknown): value is Coop
   const control = value.control as unknown as Extract<CoopNextControl, { kind: "REPLACEMENT" }>;
   return (
     value.kind === "replacement-open"
-    && (value.origin === "settled-wave" || value.origin === "pre-encounter")
+    && (value.origin === "settled-wave" || value.origin === "pre-encounter" || value.origin === "turn-resolve")
     && isPositiveSafeInt(value.wave)
     && isPositiveSafeInt(value.turn)
     && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)

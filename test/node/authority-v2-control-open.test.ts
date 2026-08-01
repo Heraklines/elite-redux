@@ -549,6 +549,36 @@ describe("authority-v2 explicit command-open boundary", () => {
     expect(controlAllowsSuccessorEntry(wrongAddressWait, wrongAddressWait.afterOperationId, committed)).toBe(false);
   });
 
+  it("admits an exact turn-resolve picker before the first command frontier exists", () => {
+    const open = replacementMaterial({
+      origin: "turn-resolve",
+      turn: 1,
+      authoritativeState: state({ turn: 1 }),
+      control: replacementControl({ turn: 1 }),
+    });
+    const committed = {
+      ...buildReplacementOpenEntry({
+        context,
+        operationId: `V2/CONTROL/REPLACEMENT/${open.control.operationId}`,
+        material: open,
+      }),
+      revision: 10,
+    } satisfies CoopAuthorityEntry;
+    const battleEntryWait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "wave-3-reward-terminal",
+      epoch: context.sessionEpoch,
+      wave: 3,
+      turn: 1,
+      allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+
+    expect(controlAllowsSuccessorEntry(battleEntryWait, battleEntryWait.afterOperationId, committed)).toBe(true);
+    expect(decodeReplacementOpenEntry(committed)?.origin).toBe("turn-resolve");
+  });
+
   it("keeps a settled-wave replacement chain open only to its next picker or wave commit", () => {
     const wait = {
       kind: "AWAIT_SUCCESSOR" as const,
@@ -609,5 +639,10 @@ describe("replacement-open cursor ownership", () => {
     expect(classifyReplacementOpenCursor(preEncounter, 5, 1)).toBe("ready");
     expect(classifyReplacementOpenCursor(preEncounter, 5, 2)).toBe("invalid");
     expect(classifyReplacementOpenCursor(preEncounter, 3, 2)).toBe("invalid");
+
+    const turnResolve = { origin: "turn-resolve" as const, wave: 5, turn: 1 };
+    expect(classifyReplacementOpenCursor(turnResolve, 5, 1)).toBe("ready");
+    expect(classifyReplacementOpenCursor(turnResolve, 4, 1)).toBe("invalid");
+    expect(classifyReplacementOpenCursor(turnResolve, 5, 2)).toBe("invalid");
   });
 });

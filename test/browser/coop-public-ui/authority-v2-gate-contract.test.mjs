@@ -2000,7 +2000,7 @@ test("ordinary replacement projection has an immutable fallback when cosmetic fa
 test("a won-wave faint reopens replacement only through one exact phase-owned CONTROL_COMMIT", () => {
   assert.match(
     controlOpenAdapter,
-    /interface CoopReplacementOpenMaterialV2[\s\S]*origin: "settled-wave" \| "pre-encounter"[\s\S]*authoritativeState:[\s\S]*control:/u,
+    /interface CoopReplacementOpenMaterialV2[\s\S]*origin: "settled-wave" \| "pre-encounter" \| "turn-resolve"[\s\S]*authoritativeState:[\s\S]*control:/u,
   );
   assert.match(controlOpenAdapter, /buildReplacementOpenEntry[\s\S]*replacementOpenMaterialDigest/u);
   assert.match(
@@ -2054,9 +2054,11 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   const establish = coopRuntime.slice(establishStart, establishEnd);
   assert.match(establish, /const sameWaveSettlement =/u);
   assert.match(establish, /const preEncounter =/u);
+  assert.match(establish, /const sameAddressTurnResolve =/u);
   assert.match(establish, /exactReplacementPermit/u);
   assert.match(establish, /current\.allowedKinds\.includes\("CONTROL_COMMIT"\)/u);
   assert.match(establish, /preEncounter && state\.enemyParty\.length > 0/u);
+  assert.match(establish, /sameAddressTurnResolve \? "turn-resolve"/u);
   assert.match(establish, /pendingHostWaveTransitions\.get\(state\.wave\)/u);
   assert.match(establish, /commitHostReplacementOpen/u);
   assert.match(

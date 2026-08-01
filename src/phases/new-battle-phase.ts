@@ -132,7 +132,7 @@ interface CoopV2NextWaveCommandClaim {
     readonly stateTick: number;
   };
   readonly replacementOpenMaterial?: {
-    readonly origin: "settled-wave" | "pre-encounter";
+    readonly origin: "settled-wave" | "pre-encounter" | "turn-resolve";
     readonly wave: number;
     readonly turn: number;
     readonly stateTick: number;

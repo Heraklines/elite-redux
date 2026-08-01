@@ -261,6 +261,7 @@
     "test/browser/coop-public-ui/showdown-browser-evidence.test.mjs",
     "test/browser/coop-public-ui/wave-progression-presentation-evidence.test.mjs",
     "test/node/authority-v2-command-frontier.test.ts",
+    "test/node/authority-v2-control-open.test.ts",
     "test/node/authority-v2-control.test.ts",
     "test/node/authority-v2-cutover-interaction.test.ts",
     "test/node/authority-v2-cutover-replacement.test.ts",

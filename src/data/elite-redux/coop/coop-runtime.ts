@@ -5037,7 +5037,7 @@ interface CoopV2ControlSuccessorClaim {
     readonly stateTick: number;
   };
   readonly replacementOpenMaterial?: {
-    readonly origin: "settled-wave" | "pre-encounter";
+    readonly origin: "settled-wave" | "pre-encounter" | "turn-resolve";
     readonly wave: number;
     readonly turn: number;
     readonly stateTick: number;
@@ -8771,9 +8771,9 @@ const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_BASE = 9_000;
 const COOP_WINNING_TURN_REPLACEMENT_OCCURRENCE_SPAN = 1_000;
 
 /**
- * Bind a real SwitchPhase to its ordered replacement head. Ordinary turn faints reuse the REPLACEMENT
- * already stated by TURN/REPLACEMENT_COMMIT. A winning-turn switch that cannot be known at turn capture
- * instead authors a complete replacement-open CONTROL_COMMIT at its real same-wave or pre-encounter phase.
+ * Bind a real SwitchPhase to its ordered replacement head. Ordinary settled turn faints reuse the REPLACEMENT
+ * already stated by TURN/REPLACEMENT_COMMIT. A switch that occurs before that head can exist instead authors a
+ * complete replacement-open CONTROL_COMMIT at its real settlement, pre-encounter, or turn-resolve address.
  */
 export function establishCoopV2ReplacementControlBoundary(input: {
   readonly ownerSeatId: number;
@@ -8814,6 +8814,13 @@ export function establishCoopV2ReplacementControlBoundary(input: {
       permit =>
         permit.materialKind === "replacement-open" && permit.wave === battle.waveIndex && permit.turn === battle.turn,
     ) === true;
+  const sameAddressTurnResolve =
+    input.sourceAddress.wave === battle.waveIndex
+    && input.sourceAddress.turn === battle.turn
+    && current?.kind === "AWAIT_SUCCESSOR"
+    && ((current.wave === battle.waveIndex && current.turn === battle.turn)
+      || (current.allowNextWaveStart && current.wave + 1 === battle.waveIndex && battle.turn === 1))
+    && (current.allowedControlAddresses == null || exactReplacementPermit);
   // A staged won-wave turn explicitly lists same-turn replacement-open beside WAVE_ADVANCE: whichever real
   // engine phase occurs first consumes the edge. A next-wave retained switch may use a broad CONTROL wait,
   // unless that predecessor declared an exact closed control-address list (which must name replacement-open).
@@ -8821,7 +8828,7 @@ export function establishCoopV2ReplacementControlBoundary(input: {
   if (
     current?.kind !== "AWAIT_SUCCESSOR"
     || !current.allowedKinds.includes("CONTROL_COMMIT")
-    || (!sameWaveSettlement && !preEncounter)
+    || (!sameWaveSettlement && !preEncounter && !sameAddressTurnResolve)
     || (sameWaveSettlement && !exactReplacementPermit)
     || (preEncounter
       && !(
@@ -8870,7 +8877,7 @@ export function establishCoopV2ReplacementControlBoundary(input: {
   };
   const material: CoopReplacementOpenMaterialV2 = {
     kind: "replacement-open",
-    origin: preEncounter ? "pre-encounter" : "settled-wave",
+    origin: preEncounter ? "pre-encounter" : sameAddressTurnResolve ? "turn-resolve" : "settled-wave",
     wave: state.wave,
     turn: state.turn,
     authoritativeState: state,
