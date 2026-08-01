@@ -34,7 +34,9 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { pokemonFormChanges } from "#data/pokemon-forms";
+import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -158,6 +160,28 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // globalScene was stolen by the guest ctor; re-point it to the host for the rest of the run.
     expect(globalScene).toBe(guestScene);
     logs.flush();
+  }, 120_000);
+
+  it("guest-owned field Pokemon keep their active ability on the authoritative engine", async () => {
+    await game.classicMode.startBattle(SpeciesId.CROBAT, SpeciesId.CROBAT);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
+    });
+
+    await withClient(rig.hostCtx, () => {
+      const [hostOwned, guestOwned] = rig.hostScene.getPlayerField();
+      expect(hostOwned.coopOwner).toBe("host");
+      expect(guestOwned.coopOwner).toBe("guest");
+      expect(hostOwned.getAbility().id).toBe(AbilityId.INNER_FOCUS);
+      expect(guestOwned.getAbility().id).toBe(AbilityId.INNER_FOCUS);
+      expect(hostOwned.canApplyAbility()).toBe(true);
+      expect(guestOwned.canApplyAbility()).toBe(true);
+      expect(hostOwned.canAddTag(BattlerTagType.FLINCHED)).toBe(false);
+      expect(guestOwned.canAddTag(BattlerTagType.FLINCHED)).toBe(false);
+      expect(hostOwned.addTag(BattlerTagType.FLINCHED, 1, MoveId.FAKE_OUT, 1)).toBe(false);
+      expect(guestOwned.addTag(BattlerTagType.FLINCHED, 1, MoveId.FAKE_OUT, 1)).toBe(false);
+    });
   }, 120_000);
 
   it("a guest form preimage continuation queues only on its captured engine while the host stays ambient", async () => {
