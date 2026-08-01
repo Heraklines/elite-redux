@@ -41,10 +41,15 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     /const ZUBAT_SPECIES_ID = 41;[\s\S]*gameOverFixture[\s\S]*\? \[ZUBAT_SPECIES_ID\]/u,
     "the public driver must attest the same Zubat party that the fixture materializes",
   );
+  assert.match(harness, /const INNER_FOCUS_ABILITY_ID = 39;/u);
+  const gameOverDriveStart = harness.indexOf("  async driveWaveToGameOver() {");
+  const gameOverDriveEnd = harness.indexOf("\n  async ", gameOverDriveStart + 1);
+  assert.ok(gameOverDriveStart >= 0 && gameOverDriveEnd > gameOverDriveStart);
+  const gameOverDrive = harness.slice(gameOverDriveStart, gameOverDriveEnd);
   assert.match(
-    harness,
-    /INNER_FOCUS_ABILITY_ID = 39[\s\S]*game-over-ability-proof[\s\S]*abilityId !== INNER_FOCUS_ABILITY_ID[\s\S]*abilityActive !== true/u,
-    "the browser proves the active fixture ability before submitting either Memento",
+    gameOverDrive,
+    /active\.length !== 2[\s\S]*slot\.speciesId !== ZUBAT_SPECIES_ID[\s\S]*slot\.abilityId !== INNER_FOCUS_ABILITY_ID[\s\S]*slot\.abilityActive !== true[\s\S]*slot\.abilitySuppressed === true[\s\S]*GameOver fixture ability mismatch[\s\S]*game-over-ability-proof/u,
+    "the browser validates and records the active fixture ability before submitting either Memento",
   );
   assert.match(
     transport,
