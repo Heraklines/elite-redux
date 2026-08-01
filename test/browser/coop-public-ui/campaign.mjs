@@ -36,7 +36,9 @@ const OUTCOME_PROGRESS_PHASE = /Start Phase ([A-Za-z0-9]+Phase)/u;
 const OUTCOME_PROGRESS_AUTHORITY = /\[coop:turn\] host recorder: append turn=\d+ seq=\d+/u;
 const OUTCOME_PROGRESS_RENDERER = /\[coop:replay\] guest replay turn=\d+: live increment seq=\d+\.\.\d+/u;
 const OUTCOME_PROGRESS_RESOLUTION = /\[coop:replay\] guest (?:RECV turnResolution|awaitTurn turn=\d+ RESOLVE)/u;
-const TURN_PROGRESS = /Start Phase TurnStartPhase|host recorder: begin turn=/u;
+const TURN_PROGRESS =
+  /Start Phase (?:TurnStartPhase|CoopTurnCommitPhase)|host recorder: (?:begin|append|finalize) turn=|guest (?:RECV live battleEvent|RECV turnResolution) turn=/u;
+const REPLACEMENT_PHASE_START = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
 const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set([
@@ -996,6 +998,15 @@ export function createBattlePromptAdvancer(
       const latestSurface = client.evidence.findLastSemanticSurface(cursors.get(client.label) ?? 0);
       if (latestSurface?.index !== readyEvent.index) {
         cursors.set(client.label, readyEvent.index + 1);
+        continue;
+      }
+      // The semantic mirror is frame-driven and can lag the production phase boundary on a heavily
+      // throttled browser. In market-wide-lens 30691739712, SwitchPhase had already started but the
+      // last semantic observation was still the preceding MessagePhase for another ten seconds. A
+      // stale prompt Space then entered the replacement party and opened Summary on the fainted slot.
+      // A replacement phase start is not ownership proof, but it is conclusive proof that this old
+      // battle prompt no longer authorizes input. Wait for the exact owned party surface instead.
+      if (client.evidence.find(REPLACEMENT_PHASE_START, readyEvent.index + 1)) {
         continue;
       }
       // A live party picker (faint replacement OR a Mystery-encounter `selectPokemonForOption`

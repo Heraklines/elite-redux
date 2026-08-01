@@ -1052,6 +1052,21 @@ test("only ready active local battle narration and EXP instances advance once on
   );
 });
 
+test("a replacement phase supersedes a lagging semantic battle prompt before the party mirror arrives", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const stats = { battleMessagePrompts: 0, postBattleExpPrompts: 0 };
+  const advance = createBattlePromptAdvancer(rig, { authority: 0, renderer: 0 }, stats, "wave-4-turn-2");
+
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 24);
+  authority.evidence.pushConsole("Start Phase SwitchPhase");
+
+  assert.equal(await advance(), false);
+  assert.deepEqual(authority.presses, [], "the stale prompt key must not enter the replacement party UI");
+  assert.equal(stats.battleMessagePrompts, 0);
+});
+
 test("authority and retained-renderer evolution prompts are driven once through EVOLUTION_SCENE", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
@@ -1995,6 +2010,23 @@ test("fallback stops retrying when an earlier key visibly enters the turn", asyn
     { keysSent: suppression?.keysSent, keysSuppressed: suppression?.keysSuppressed },
     { keysSent: 1, keysSuppressed: 3 },
   );
+});
+
+test("recorded turn work suppresses fallback even when the initial TurnStart marker predates the evidence floor", async () => {
+  const authority = fakeClient("authority", [
+    "[coop:turn] host recorder: append turn=2 seq=0 k=moveUsed total=1 live=true",
+  ]);
+  const renderer = fakeClient("renderer", ["[coop:replay] guest RECV live battleEvent turn=2 seq=0 k=moveUsed"]);
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+
+  assert.deepEqual(clientsAwaitingTurnProgress(rig, from), []);
+  assert.deepEqual(
+    await driveBattleFallback(rig, ["Space", "ArrowRight", "Space", "Space"], from, "fallback"),
+    [],
+  );
+  assert.deepEqual(authority.presses, []);
+  assert.deepEqual(renderer.presses, []);
 });
 
 test("fallback treats only the exact next owned command address as submitted-turn progress", async () => {
