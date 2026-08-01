@@ -45,7 +45,6 @@ import {
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
-  presentedFieldMon,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -157,6 +156,8 @@ describe.skipIf(!RUN)(
       });
 
       const turn = rig.hostScene.currentBattle.turn;
+      const hostLeadId = rig.hostScene.getPlayerParty()[0].id;
+      const guestLeadId = rig.hostScene.getPlayerParty()[1].id;
       resyncProbe = installCoopResyncProbe(rig.guestRuntime);
 
       // TURN 1 on the HOST: the host lead SPLASHes (harmless); the foe's spread ROCK_SLIDE KOs the 1-HP host
@@ -166,12 +167,10 @@ describe.skipIf(!RUN)(
         game.move.select(MoveId.SPLASH, COOP_HOST_FIELD_INDEX);
         await game.phaseInterceptor.to("CoopTurnCommitPhase");
       });
-      const hostLead = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
-      expect(hostLead == null || hostLead.isFainted(), "the HOST-owned lead fainted this turn").toBe(true);
-      const guestLead = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-      expect(guestLead != null && !guestLead.isFainted(), "the GUEST-owned lead survived (the run continues)").toBe(
-        true,
-      );
+      const hostLead = rig.hostScene.getPlayerParty().find(mon => mon.id === hostLeadId);
+      expect(hostLead?.isFainted(), "the HOST-owned lead fainted this turn").toBe(true);
+      const guestLead = rig.hostScene.getPlayerParty().find(mon => mon.id === guestLeadId);
+      expect(guestLead != null && !guestLead.isFainted(), "the GUEST-owned lead survived (the run continues)").toBe(true);
 
       // THE PATH UNDER TEST: cross to the next CommandPhase. The host-owned SwitchPhase opens with NO legal
       // same-owner replacement. PRE-FIX it opens the modal FAINT_SWITCH picker whose only mons are fainted or
@@ -188,32 +187,38 @@ describe.skipIf(!RUN)(
         "the host crossed into the next turn's command flow - the wiped-half faint picker CLOSED (no stuck-in-menu stall)",
       ).toBe(true);
 
-      // The host slot (0) got NO replacement (the fainted mon stays at party[0], off-field, no summon); the
-      // guest's lead still holds slot 1.
-      const hostSlot0 = presentedFieldMon(rig.hostScene, COOP_HOST_FIELD_INDEX);
+      // The host owner got NO replacement (the fainted mon stays at party[0], off-field, no summon); the
+      // guest's lead remains active. A faint in doubles may run ToggleDoublePositionPhase and compact the
+      // survivor from field index 1 to index 0, so field indices are presentation positions—not ownership.
+      const hostOwnedActive = rig.hostScene
+        .getPlayerField()
+        .filter(mon => mon?.coopOwner === "host" && mon.isOnField() && !mon.isFainted());
       expect(
-        hostSlot0 == null || hostSlot0.fainted,
-        "the wiped host slot got no replacement (that player is out) - it holds the fainted mon, not a fresh summon",
-      ).toBe(true);
-      expect(
-        presentedFieldMon(rig.hostScene, COOP_GUEST_FIELD_INDEX)?.speciesId,
-        "the guest's lead still occupies its slot - the battle continues asymmetric (#828)",
-      ).toBe(SpeciesId.SNORLAX);
+        hostOwnedActive,
+        "the wiped host owner got no replacement (that player is out)",
+      ).toEqual([]);
+      const activeGuestLead = rig.hostScene
+        .getPlayerField()
+        .find(mon => mon?.id === guestLeadId && mon.coopOwner === "guest" && mon.isOnField() && !mon.isFainted());
+      expect(activeGuestLead?.species.speciesId, "the guest's lead remains active - the battle continues asymmetric (#828)").toBe(
+        SpeciesId.SNORLAX,
+      );
 
-      // GUEST replays turn 1 + converges: its lead survives on slot 1, the host slot is empty on the guest too.
+      // GUEST replays turn 1 + converges: its lead survives and the host owner has no active field mon there too.
       await withClient(rig.guestCtx, async () => {
         await driveGuestReplayTurn(rig.guestScene, turn);
       });
       withClientSync(rig.guestCtx, () => {
+        const guestActiveLead = rig.guestScene
+          .getPlayerField()
+          .find(mon => mon?.id === guestLeadId && mon.coopOwner === "guest" && mon.isOnField() && !mon.isFainted());
+        expect(guestActiveLead?.species.speciesId, "the guest sees its own lead still on-field").toBe(SpeciesId.SNORLAX);
         expect(
-          presentedFieldMon(rig.guestScene, COOP_GUEST_FIELD_INDEX)?.speciesId,
-          "the guest sees its own lead still on-field",
-        ).toBe(SpeciesId.SNORLAX);
-        const hostSlot = presentedFieldMon(rig.guestScene, COOP_HOST_FIELD_INDEX);
-        expect(
-          hostSlot == null || hostSlot.fainted,
-          "the guest sees the wiped host slot as empty/fainted (converged with the host)",
-        ).toBe(true);
+          rig.guestScene
+            .getPlayerField()
+            .filter(mon => mon?.coopOwner === "host" && mon.isOnField() && !mon.isFainted()),
+          "the guest sees no active host-owned mon (converged with the host)",
+        ).toEqual([]);
       });
 
       // ZERO forced resyncs across the wiped-half faint crossing (a resync is a player-facing divergence).
