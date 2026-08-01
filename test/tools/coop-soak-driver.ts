@@ -166,6 +166,7 @@ import {
   remirrorWave,
   type ShopPhaseSeam,
   settleDuoPromise,
+  startCurrentDuoPhaseOnce,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
   startGuestMeShopOwner,
@@ -2397,6 +2398,25 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       const guestAcknowledged = await driveEncounterPresentationPublicInput(rig.guestCtx, "guest");
       if (hostAcknowledged || guestAcknowledged) {
         await pumpDuoDestinations(rig, 1);
+      }
+      // Production replaceWithCoopAuthoritativePhase() starts the replacement-created retained-prefix replay
+      // immediately. PhaseInterceptor suppresses that start in engine tests. Cross the same lifecycle edge
+      // through the harness's global object-identity ledger before inspecting the host's replacement phase;
+      // otherwise the guest never reaches its reciprocal command rendezvous and the host falsely exhausts
+      // retries even though every frame was delivered (seed 20470560, wave 37).
+      const guestCurrent = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
+      if (guestCurrent?.phaseName === "CoopReplayTurnPhase") {
+        const started = await withClient(rig.guestCtx, async () => {
+          const didStart = startCurrentDuoPhaseOnce(rig.guestScene, guestCurrent);
+          await drainLoopback();
+          return didStart;
+        });
+        if (started) {
+          actionScript.push(
+            `wave ${transitionSourceWave}: headless scheduler started replacement-installed retained replay`,
+          );
+          await pumpDuoDestinations(rig, 1);
+        }
       }
       const hostPhase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as {
         readonly phaseName?: string;

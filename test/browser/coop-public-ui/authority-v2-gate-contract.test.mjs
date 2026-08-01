@@ -3418,6 +3418,11 @@ test("a chained biome picker preserves its exact interaction coordinate through 
     /hostPinBeforeMap >= 0 && hostPinBeforeMap !== hostCounter[\s\S]*guestPinBeforeMap >= 0 && guestPinBeforeMap !== guestCounter[\s\S]*hostEffectivePin = hostPinBeforeMap >= 0 \? hostPinBeforeMap : hostCounter[\s\S]*guestEffectivePin = guestPinBeforeMap >= 0 \? guestPinBeforeMap : guestCounter[\s\S]*hostEffectivePin !== guestEffectivePin/u,
     "the soak compares effective map addresses while permitting the authority's valid pre-bind lifecycle state",
   );
+  assert.match(
+    soakDriver,
+    /guestCurrent\?\.phaseName === "CoopReplayTurnPhase"[\s\S]*startCurrentDuoPhaseOnce\(rig\.guestScene, guestCurrent\)[\s\S]*headless scheduler started replacement-installed retained replay/u,
+    "the headless soak starts a production-installed retained replay exactly once before reciprocal command rendezvous",
+  );
   const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
   const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);
   assert.notEqual(readyStart, -1, "SelectBiome exposes one bounded public-control proof");

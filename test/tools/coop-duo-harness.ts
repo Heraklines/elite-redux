@@ -1932,6 +1932,22 @@ async function pumpHostVictoryTail(hostCtx: ClientCtx, started: WeakSet<Phase>):
 const manuallyStartedDuoPhases = new WeakSet<Phase>();
 
 /**
+ * Start one exact headless phase with the same object-identity semantics as production PhaseManager.
+ * PhaseInterceptor intentionally suppresses PhaseManager.startCurrentPhase(), so an Authority V2 phase
+ * installed asynchronously by production code becomes current-but-unstarted in engine tests. Long-running
+ * reciprocal drivers can cross that boundary outside driveClientPhaseQueueTo; they must use this ledger
+ * instead of calling start() directly and risking a second invocation of an already-live async phase.
+ */
+export function startCurrentDuoPhaseOnce(scene: BattleScene, phase: Phase): boolean {
+  if (scene.phaseManager.getCurrentPhase() !== phase || manuallyStartedDuoPhases.has(phase)) {
+    return false;
+  }
+  manuallyStartedDuoPhases.add(phase);
+  phase.start();
+  return true;
+}
+
+/**
  * The initial command objects are adopted after the solo engine already constructed them, before the duo
  * scheduler can bind every reciprocal Promise continuation to its destination realm. If that one bootstrap
  * start resolves while the peer realm is ambient, production would resume in the owning browser but this
