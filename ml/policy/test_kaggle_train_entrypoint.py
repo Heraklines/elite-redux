@@ -61,6 +61,18 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
         self.assertEqual(command[command.index("--token-vocabulary") + 1], str(vocabulary))
         self.assertNotIn("--transfer-data", command)
 
+    def test_initial_checkpoint_is_forwarded_for_er_finetuning(self) -> None:
+        initial_model = Path("bundle/initial-model")
+        command = build_training_command(
+            Path("bundle"),
+            Path("output"),
+            PROFILES["baseline"],
+            17,
+            init_model_dir=initial_model,
+        )
+        self.assertEqual(command[command.index("--init-model-dir") + 1], str(initial_model))
+        self.assertNotIn("--transfer-data", command)
+
     def write_bundle(self, root: Path) -> None:
         payload = root / "data" / "decisions.jsonl"
         payload.parent.mkdir(parents=True)

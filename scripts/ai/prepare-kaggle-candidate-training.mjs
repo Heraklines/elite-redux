@@ -15,10 +15,11 @@ const [
   transferArg,
   transferPretrainEpochsArg,
   tokenVocabularyArg,
+  initModelArg,
 ] = process.argv.slice(2);
 if (!dataArg || !dictionaryArg || !outputArg) {
   console.error(
-    "usage: node scripts/ai/prepare-kaggle-candidate-training.mjs DATA_DIR DICTIONARY_JSON OUTPUT_ZIP [PROFILE] [SEEDS] [TRANSFER_DIR] [TRANSFER_PRETRAIN_EPOCHS] [TOKEN_VOCABULARY_JSON]",
+    "usage: node scripts/ai/prepare-kaggle-candidate-training.mjs DATA_DIR DICTIONARY_JSON OUTPUT_ZIP [PROFILE] [SEEDS] [TRANSFER_DIR] [TRANSFER_PRETRAIN_EPOCHS] [TOKEN_VOCABULARY_JSON] [INIT_MODEL_DIR]",
   );
   process.exit(1);
 }
@@ -47,6 +48,7 @@ const transferRoot = transferArg && transferArg !== "-" ? resolve(root, transfer
 const dictionaryPath = resolve(root, dictionaryArg);
 const tokenVocabularyPath =
   tokenVocabularyArg && tokenVocabularyArg !== "-" ? resolve(root, tokenVocabularyArg) : undefined;
+const initModelRoot = initModelArg && initModelArg !== "-" ? resolve(root, initModelArg) : undefined;
 const outputPath = resolve(root, outputArg);
 if (basename(outputPath) !== "er-ai-training-bundle.zip") {
   throw new Error(`Kaggle training bundle must be named er-ai-training-bundle.zip: ${outputPath}`);
@@ -87,6 +89,23 @@ if (!(await stat(dictionaryPath)).isFile()) {
 }
 if (tokenVocabularyPath && !(await stat(tokenVocabularyPath)).isFile()) {
   throw new Error(`token vocabulary is not a file: ${tokenVocabularyPath}`);
+}
+let initModelPaths = [];
+if (initModelRoot) {
+  if (!(await stat(initModelRoot)).isDirectory()) {
+    throw new Error(`initial model is not a directory: ${initModelRoot}`);
+  }
+  const configPath = resolve(initModelRoot, "config.json");
+  const config = JSON.parse(await readFile(configPath, "utf8"));
+  const weightsName = config.weights;
+  if (config.schemaVersion !== 4 || typeof weightsName !== "string" || basename(weightsName) !== weightsName) {
+    throw new Error("initial model must be a schema-v4 config with one local weights filename");
+  }
+  const weightsPath = resolve(initModelRoot, weightsName);
+  if (!(await stat(weightsPath)).isFile()) {
+    throw new Error(`initial model weights are missing: ${weightsPath}`);
+  }
+  initModelPaths = [configPath, weightsPath];
 }
 const decisionPaths = (await walk(dataRoot)).filter(path => path.endsWith(".jsonl"));
 if (decisionPaths.length === 0) {
@@ -136,6 +155,12 @@ if (tokenVocabularyPath) {
     sha256: sha256(vocabulary),
   });
 }
+for (const path of initModelPaths) {
+  const content = await readFile(path);
+  const archivePath = `initial-model/${basename(path)}`;
+  zip.file(archivePath, content);
+  manifestFiles.push({ path: archivePath, bytes: content.length, sha256: sha256(content) });
+}
 for (const path of sourcePaths) {
   const content = await readFile(path);
   const archivePath = portableRelative(root, path);
@@ -156,6 +181,7 @@ const manifest = {
   transferShards: transferPaths.length,
   transferPretrainEpochs: transferPaths.length > 0 ? transferPretrainEpochs : 0,
   fixedTokenVocabulary: tokenVocabularyPath ? basename(tokenVocabularyPath) : null,
+  initialModel: initModelRoot ? basename(initModelRoot) : null,
   files: manifestFiles.sort((a, b) => a.path.localeCompare(b.path)),
 };
 zip.file("bundle-manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);

@@ -20,7 +20,7 @@ from typing import Any
 
 import numpy as np
 import torch
-from safetensors.torch import save_file
+from safetensors.torch import load_file, save_file
 from torch import Tensor, nn
 from torch.utils.data import DataLoader, Dataset
 
@@ -263,7 +263,11 @@ def vocabulary_hash(vocabulary: list[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def load_fixed_token_vocabulary(path: Path, required_vocabulary: list[str]) -> list[str]:
+def load_fixed_token_vocabulary(
+    path: Path,
+    required_vocabulary: list[str],
+    allow_unknown_tokens: bool = False,
+) -> list[str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     vocabulary = payload.get("tokenVocabulary") if isinstance(payload, dict) else payload
     if not isinstance(vocabulary, list) or not all(isinstance(token, str) for token in vocabulary):
@@ -273,13 +277,52 @@ def load_fixed_token_vocabulary(path: Path, required_vocabulary: list[str]) -> l
     if vocabulary[:2] != [PAD_TOKEN, UNKNOWN_TOKEN]:
         raise ValueError(f"fixed token vocabulary must begin with {PAD_TOKEN!r}, {UNKNOWN_TOKEN!r}")
     missing = sorted(set(required_vocabulary) - set(vocabulary))
-    if missing:
+    if missing and not allow_unknown_tokens:
         raise ValueError(f"fixed token vocabulary is missing {len(missing)} required tokens: {missing[:5]}")
     if isinstance(payload, dict) and payload.get("tokenVocabularySha256"):
         actual_hash = vocabulary_hash(vocabulary)
         if payload["tokenVocabularySha256"] != actual_hash:
             raise ValueError("fixed token vocabulary hash does not match its contents")
     return vocabulary
+
+
+def load_initial_model_config(model_dir: Path) -> dict[str, Any]:
+    config_path = model_dir / "config.json"
+    if not config_path.is_file():
+        raise ValueError(f"initial model is missing {config_path}")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    if config.get("schemaVersion") != 4 or config.get("model") != "er-domain-candidate-transformer-v4":
+        raise ValueError("initial model is not an ER candidate-transformer-v4 checkpoint")
+    weights = config.get("weights")
+    if not isinstance(weights, str) or Path(weights).name != weights or not (model_dir / weights).is_file():
+        raise ValueError("initial model config does not reference one local weights file")
+    return config
+
+
+def initialize_from_checkpoint(
+    model: CandidateSetTransformer,
+    model_dir: Path,
+    initial_config: dict[str, Any],
+    dictionary_hash: str,
+    token_vocabulary: list[str],
+) -> dict[str, Any]:
+    expected_architecture = asdict(model.config)
+    if initial_config.get("architecture") != expected_architecture:
+        raise ValueError(
+            f"initial model architecture mismatch: expected {expected_architecture}, "
+            f"got {initial_config.get('architecture')}"
+        )
+    if initial_config.get("dictionaryHash") != dictionary_hash:
+        raise ValueError("initial model dictionary hash does not match the training data dictionary")
+    if initial_config.get("tokenVocabulary") != token_vocabulary:
+        raise ValueError("initial model token vocabulary does not exactly match the resumed vocabulary")
+    weights_path = model_dir / initial_config["weights"]
+    model.load_state_dict(load_file(str(weights_path), device="cpu"), strict=True)
+    return {
+        "modelDir": str(model_dir),
+        "weightsSha256": hashlib.sha256(weights_path.read_bytes()).hexdigest(),
+        "configSha256": hashlib.sha256((model_dir / "config.json").read_bytes()).hexdigest(),
+    }
 
 
 def make_examples(
@@ -722,9 +765,21 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     decisions = er_decisions + transfer_decisions
     terminals = er_terminals + transfer_terminals
     required_vocabulary, _ = build_token_vocabulary(decisions, dictionary)
-    token_vocabulary = (
-        load_fixed_token_vocabulary(args.token_vocabulary, required_vocabulary)
+    initial_config = load_initial_model_config(args.init_model_dir) if args.init_model_dir is not None else None
+    fixed_vocabulary_path = (
+        args.token_vocabulary
         if args.token_vocabulary is not None
+        else args.init_model_dir / "config.json"
+        if args.init_model_dir is not None
+        else None
+    )
+    token_vocabulary = (
+        load_fixed_token_vocabulary(
+            fixed_vocabulary_path,
+            required_vocabulary,
+            allow_unknown_tokens=args.init_model_dir is not None,
+        )
+        if fixed_vocabulary_path is not None
         else required_vocabulary
     )
     token_to_id = {token: index for index, token in enumerate(token_vocabulary)}
@@ -769,6 +824,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.amp and not amp_enabled:
         raise ValueError("--amp requires a CUDA device")
     model = CandidateSetTransformer(config, feature_mean, feature_std).to(device)
+    initialized_from = (
+        initialize_from_checkpoint(
+            model,
+            args.init_model_dir,
+            initial_config,
+            str(dictionary_coverage["sha256"]),
+            token_vocabulary,
+        )
+        if args.init_model_dir is not None and initial_config is not None
+        else None
+    )
+    model.to(device)
+
     def make_optimizer() -> torch.optim.Optimizer:
         return torch.optim.AdamW(
             model.parameters(),
@@ -810,6 +878,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     best_state: dict[str, Tensor] | None = None
     best_metric = math.inf
     selection_metric_name: str | None = None
+    best_epoch: int | None = None
     stale_epochs = 0
     started = time.perf_counter()
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
@@ -829,6 +898,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             print(f"transfer epoch {epoch:03d}: loss={metrics['loss']:.4f}", flush=True)
         optimizer = make_optimizer()
         scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
+    initial_validation: dict[str, float | None] | None = None
+    if initialized_from is not None:
+        initial_validation = evaluate(model, validation_loader, device)
+        selection_metric_name, best_metric = checkpoint_selection_metric(initial_validation)
+        best_state = copy.deepcopy({key: value.detach().cpu() for key, value in model.state_dict().items()})
+        best_epoch = 0
     for epoch in range(1, args.epochs + 1):
         train_metrics = train_epoch(
             model,
@@ -863,6 +938,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         if current_metric < best_metric - args.min_delta:
             best_metric = current_metric
             best_state = copy.deepcopy({key: value.detach().cpu() for key, value in model.state_dict().items()})
+            best_epoch = epoch
             stale_epochs = 0
         else:
             stale_epochs += 1
@@ -901,14 +977,14 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "domains": list(DOMAIN_NAMES),
         "tokenVocabularySize": len(token_vocabulary),
         "tokenVocabularySha256": token_vocabulary_sha256,
-        "tokenVocabularySource": "fixed" if args.token_vocabulary is not None else "derived",
+        "tokenVocabularySource": "fixed" if fixed_vocabulary_path is not None else "derived",
         "parameters": parameter_count(model),
         "seed": args.seed,
         "device": str(device),
         "mixedPrecision": amp_enabled,
         "fastKernels": args.fast_kernels,
         "trainSeconds": time.perf_counter() - started,
-        "bestEpoch": min(history, key=lambda row: checkpoint_selection_metric(row["validation"])[1])["epoch"],
+        "bestEpoch": best_epoch,
         "checkpointSelection": {"metric": selection_metric_name, "best": best_metric},
         "objective": {
             "policy": "trajectory-conditioned listwise candidate cross entropy",
@@ -943,6 +1019,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "transferJsonlSha256": dataset_hash(transfer_jsonl_files(args.transfer_data)) if args.transfer_data else None,
         },
         "validation": final_metrics,
+        "initialValidation": initial_validation,
+        "initializedFrom": initialized_from,
         "pretrainHistory": pretrain_history,
         "history": history,
         "artifacts": {"weights": weights_path.name, "config": "config.json", "report": "report.json"},
@@ -981,6 +1059,11 @@ def parse_args() -> argparse.Namespace:
         "--token-vocabulary",
         type=Path,
         help="optional fixed vocabulary/config used to keep transfer ablations architecture-matched",
+    )
+    parser.add_argument(
+        "--init-model-dir",
+        type=Path,
+        help="strictly resume a compatible v4 checkpoint; unseen dynamic tokens map to UNK",
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=20260730)

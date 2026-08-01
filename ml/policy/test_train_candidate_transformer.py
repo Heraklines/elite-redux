@@ -6,8 +6,10 @@ import unittest
 from pathlib import Path
 
 import torch
+from safetensors.torch import save_file
 from torch.utils.data import DataLoader
 
+from candidate_transformer import CandidateSetTransformer, CandidateTransformerConfig
 from train_candidate_transformer import (
     DecisionDataset,
     TOKEN_GROUP_NAMES,
@@ -15,6 +17,7 @@ from train_candidate_transformer import (
     checkpoint_selection_metric,
     collate,
     evaluate,
+    initialize_from_checkpoint,
     load_fixed_token_vocabulary,
     load_transfer_records,
     make_examples,
@@ -39,6 +42,51 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
             path.write_text(json.dumps({"tokenVocabulary": fixed, "tokenVocabularySha256": "bad"}), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "hash does not match"):
                 load_fixed_token_vocabulary(path, required)
+
+    def test_checkpoint_resume_is_exact_and_unknown_tokens_do_not_resize_vocabulary(self) -> None:
+        fixed = ["<PAD>", "<UNK>", "action:move"]
+        with tempfile.TemporaryDirectory() as directory:
+            model_dir = Path(directory)
+            config = CandidateTransformerConfig(
+                feature_count=3,
+                token_vocabulary_size=len(fixed),
+                d_model=8,
+                layers=1,
+                heads=2,
+                feedforward=16,
+                history_length=1,
+                trajectory_layers=1,
+            )
+            source = CandidateSetTransformer(config)
+            with torch.no_grad():
+                source.policy_head[-1].bias.fill_(2.5)
+            save_file(
+                {key: value.detach().contiguous() for key, value in source.state_dict().items()},
+                str(model_dir / "model.safetensors"),
+            )
+            payload = {
+                "schemaVersion": 4,
+                "model": "er-domain-candidate-transformer-v4",
+                "architecture": source.config.__dict__,
+                "dictionaryHash": "a" * 64,
+                "tokenVocabulary": fixed,
+                "weights": "model.safetensors",
+            }
+            (model_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            resumed = CandidateSetTransformer(config)
+            metadata = initialize_from_checkpoint(resumed, model_dir, payload, "a" * 64, fixed)
+            self.assertEqual(resumed.policy_head[-1].bias.tolist(), [2.5])
+            self.assertEqual(len(metadata["weightsSha256"]), 64)
+
+            vocabulary = load_fixed_token_vocabulary(
+                model_dir / "config.json",
+                [*fixed, "new-runtime-state-token"],
+                allow_unknown_tokens=True,
+            )
+            self.assertEqual(vocabulary, fixed)
+            with self.assertRaisesRegex(ValueError, "dictionary hash"):
+                initialize_from_checkpoint(resumed, model_dir, payload, "b" * 64, fixed)
 
     def test_validation_excludes_non_policy_targets_from_imitation_metrics(self) -> None:
         candidates = [{"id": "move:a", "kind": "move"}, {"id": "move:b", "kind": "move"}]

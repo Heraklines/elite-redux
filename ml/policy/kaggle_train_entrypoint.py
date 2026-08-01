@@ -195,6 +195,7 @@ def build_training_command(
     transfer_data: Path | None = None,
     transfer_pretrain_epochs: int | None = None,
     token_vocabulary: Path | None = None,
+    init_model_dir: Path | None = None,
 ) -> list[str]:
     dictionary = bundle_root / "dictionary" / "er-combat-data-dictionary.json"
     data_dir = bundle_root / "data"
@@ -252,6 +253,8 @@ def build_training_command(
         )
     if token_vocabulary is not None:
         command.extend(["--token-vocabulary", str(token_vocabulary)])
+    if init_model_dir is not None:
+        command.extend(["--init-model-dir", str(init_model_dir)])
     return command
 
 
@@ -270,6 +273,7 @@ def run_training(
     trainer = bundle_root / "ml" / "policy" / "train_candidate_transformer.py"
     transfer_data = bundle_root / "transfer-data"
     token_vocabulary = bundle_root / "vocabulary" / "token-vocabulary.json"
+    init_model_dir = bundle_root / "initial-model"
     has_transfer_data = transfer_data.is_dir() and any(
         path.name.endswith(".jsonl")
         or path.name.endswith(".jsonl.gz")
@@ -290,6 +294,7 @@ def run_training(
             transfer_data if has_transfer_data else None,
             transfer_pretrain_epochs,
             token_vocabulary if token_vocabulary.is_file() else None,
+            init_model_dir if (init_model_dir / "config.json").is_file() else None,
         )
         subprocess.run(command, check=True, cwd=bundle_root)
         report = json.loads((seed_output / "report.json").read_text(encoding="utf-8"))

@@ -115,6 +115,7 @@ import {
   type ErCombatDatasetRecord,
   type ErCombatDecisionRecord,
   type ErCombatMoveCandidate,
+  type ErCombatPolicySource,
   type ErCombatTargetRef,
 } from "#data/elite-redux/ai/combat-contract";
 import {
@@ -403,22 +404,51 @@ let activeAiSourcePartitionId = activeAiSplitGroupId;
 let enginePlayerSwitchCounter = 0;
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
 const AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS = new Set<number>();
+const AI_CUSTOM_OPPONENT_KNOWN_PLAYER_IDS = new Set<number>();
 const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
 const AI_NEURAL_MODEL_DIR = (process.env.ER_AI_NEURAL_POLICY_MODEL ?? "").trim();
 const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
 const AI_POLICY_EPSILON = Number(process.env.ER_AI_POLICY_EPSILON ?? "0");
+const AI_POLICY_SOURCE_OVERRIDE = (process.env.ER_AI_POLICY_SOURCE ?? "").trim();
+const AI_POLICY_TARGET_OVERRIDE = (process.env.ER_AI_POLICY_TARGET ?? "").trim();
+const AI_OPPONENT_MODEL_PATH = (process.env.ER_AI_OPPONENT_POLICY_MODEL ?? "").trim();
+const AI_OPPONENT_NEURAL_MODEL_DIR = (process.env.ER_AI_OPPONENT_NEURAL_POLICY_MODEL ?? "").trim();
+const AI_OPPONENT_POLICY_MODE = (process.env.ER_AI_OPPONENT_POLICY_MODE ?? "engine-hardest").trim();
+const AI_OPPONENT_POLICY_EPSILON = Number(process.env.ER_AI_OPPONENT_POLICY_EPSILON ?? "0");
+const AI_OPPONENT_POLICY_SOURCE_OVERRIDE = (process.env.ER_AI_OPPONENT_POLICY_SOURCE ?? "").trim();
+const AI_OPPONENT_POLICY_TARGET_OVERRIDE = (process.env.ER_AI_OPPONENT_POLICY_TARGET ?? "").trim();
 const RUN_TEST_TIMEOUT_MS = Number(process.env.ER_RUN_TEST_TIMEOUT_MS ?? "1200000");
 if (AI_MODEL_PATH && AI_NEURAL_MODEL_DIR) {
   throw new Error("ER_AI_POLICY_MODEL and ER_AI_NEURAL_POLICY_MODEL are mutually exclusive");
 }
+if (AI_OPPONENT_MODEL_PATH && AI_OPPONENT_NEURAL_MODEL_DIR) {
+  throw new Error("ER_AI_OPPONENT_POLICY_MODEL and ER_AI_OPPONENT_NEURAL_POLICY_MODEL are mutually exclusive");
+}
 if (AI_RECORD_ENGINE_BASELINE && (!COMBAT_BATCH || !AI_DATA_OUT)) {
   throw new Error("ER_AI_RECORD_ENGINE_BASELINE requires ER_RUN_COMBAT_BATCH and ER_RUN_AI_DATA_OUT");
+}
+if (AI_RECORD_ENGINE_BASELINE && (AI_OPPONENT_MODEL_PATH || AI_OPPONENT_NEURAL_MODEL_DIR)) {
+  throw new Error("engine baseline capture and a learned opponent policy are mutually exclusive");
 }
 if (!["first-usable", "smart-default", "engine-hardest"].includes(AI_POLICY_MODE)) {
   throw new Error(`unsupported ER_AI_POLICY_MODE: ${AI_POLICY_MODE}`);
 }
+if (!["engine-hardest", "first-usable"].includes(AI_OPPONENT_POLICY_MODE)) {
+  throw new Error(`unsupported ER_AI_OPPONENT_POLICY_MODE: ${AI_OPPONENT_POLICY_MODE}`);
+}
 if (!Number.isFinite(AI_POLICY_EPSILON) || AI_POLICY_EPSILON < 0 || AI_POLICY_EPSILON > 1) {
   throw new Error(`ER_AI_POLICY_EPSILON must be between 0 and 1: ${AI_POLICY_EPSILON}`);
+}
+if (!Number.isFinite(AI_OPPONENT_POLICY_EPSILON) || AI_OPPONENT_POLICY_EPSILON < 0 || AI_OPPONENT_POLICY_EPSILON > 1) {
+  throw new Error(`ER_AI_OPPONENT_POLICY_EPSILON must be between 0 and 1: ${AI_OPPONENT_POLICY_EPSILON}`);
+}
+for (const [name, value] of [
+  ["ER_AI_POLICY_TARGET", AI_POLICY_TARGET_OVERRIDE],
+  ["ER_AI_OPPONENT_POLICY_TARGET", AI_OPPONENT_POLICY_TARGET_OVERRIDE],
+] as const) {
+  if (value && value !== "0" && value !== "1") {
+    throw new Error(`${name} must be 0 or 1: ${value}`);
+  }
 }
 if (!Number.isInteger(RUN_TEST_TIMEOUT_MS) || RUN_TEST_TIMEOUT_MS < 1) {
   throw new Error(`ER_RUN_TEST_TIMEOUT_MS must be a positive integer: ${RUN_TEST_TIMEOUT_MS}`);
@@ -440,6 +470,55 @@ const AI_TREE_MODEL = loadAiTreeModel(AI_MODEL_PATH);
 const AI_NEURAL_CLIENT = AI_NEURAL_MODEL_DIR
   ? new AiNeuralPolicyClient(AI_NEURAL_MODEL_DIR, ER_COMBAT_FEATURE_NAMES.length)
   : null;
+const AI_OPPONENT_TREE_MODEL = loadAiTreeModel(AI_OPPONENT_MODEL_PATH);
+const AI_OPPONENT_NEURAL_CLIENT = AI_OPPONENT_NEURAL_MODEL_DIR
+  ? AI_NEURAL_CLIENT && AI_OPPONENT_NEURAL_MODEL_DIR === AI_NEURAL_MODEL_DIR
+    ? AI_NEURAL_CLIENT
+    : new AiNeuralPolicyClient(AI_OPPONENT_NEURAL_MODEL_DIR, ER_COMBAT_FEATURE_NAMES.length)
+  : null;
+const AI_NEURAL_CLIENTS = [AI_NEURAL_CLIENT, AI_OPPONENT_NEURAL_CLIENT]
+  .filter((client): client is AiNeuralPolicyClient => client != null)
+  .filter((client, index, clients) => clients.indexOf(client) === index);
+const AI_HAS_CUSTOM_OPPONENT = !!(
+  AI_OPPONENT_TREE_MODEL
+  || AI_OPPONENT_NEURAL_CLIENT
+  || AI_OPPONENT_POLICY_MODE !== "engine-hardest"
+);
+
+const POLICY_SOURCES: ReadonlySet<string> = new Set<ErCombatPolicySource>([
+  "human-v1",
+  "smart-default-v1",
+  "scripted",
+  "forced-move",
+  "first-usable",
+  "tree-model-v1",
+  "epsilon-tree-v1",
+  "checkpoint-tree-v1",
+  "engine-hardest-v1",
+  "neural-model-v2",
+  "epsilon-neural-v2",
+  "trajectory-neural-v3",
+  "epsilon-trajectory-neural-v3",
+  "checkpoint-neural-v4",
+  "search-relabel-v1",
+  "advantage-relabel-v1",
+]);
+
+function policySourceOverride(name: string, value: string): ErCombatPolicySource | null {
+  if (!value) {
+    return null;
+  }
+  if (!POLICY_SOURCES.has(value)) {
+    throw new Error(`${name} is not a recognized combat policy source: ${value}`);
+  }
+  return value as ErCombatPolicySource;
+}
+
+const AI_POLICY_SOURCE = policySourceOverride("ER_AI_POLICY_SOURCE", AI_POLICY_SOURCE_OVERRIDE);
+const AI_OPPONENT_POLICY_SOURCE = policySourceOverride(
+  "ER_AI_OPPONENT_POLICY_SOURCE",
+  AI_OPPONENT_POLICY_SOURCE_OVERRIDE,
+);
 
 function computeWaves(): number {
   const env = Number(process.env.ER_RUN_WAVES);
@@ -912,6 +991,7 @@ interface PolicyCaptureMetadata {
 interface AppendCommittedDecisionOptions extends PolicyCaptureMetadata {
   game: GameManager;
   perspective: CombatCapturePerspective;
+  episodeId?: string;
   actorSlot: number;
   jointActionId: string;
   earlier: readonly ErCombatEarlierChoice[];
@@ -920,7 +1000,8 @@ interface AppendCommittedDecisionOptions extends PolicyCaptureMetadata {
 }
 
 function appendCommittedDecision(options: AppendCommittedDecisionOptions): ErCombatCandidate | null {
-  const { game, perspective, actorSlot, jointActionId, earlier, observation, candidates, ...metadata } = options;
+  const { game, perspective, episodeId, actorSlot, jointActionId, earlier, observation, candidates, ...metadata } =
+    options;
   const battle = game.scene.currentBattle;
   const flatSlot = perspective === "enemy" ? battle.arrangement.enemyOffset + actorSlot : actorSlot;
   const command = battle.turnCommands[flatSlot];
@@ -939,7 +1020,7 @@ function appendCommittedDecision(options: AppendCommittedDecisionOptions): ErCom
     buildSha: AI_BUILD_SHA,
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
-    episodeId: activeAiEpisodeId,
+    episodeId: episodeId ?? activeAiEpisodeId,
     splitGroupId: activeAiSplitGroupId,
     sourcePartitionId: activeAiSourcePartitionId,
   });
@@ -996,6 +1077,7 @@ async function recordCommittedPlayerTurn(
     const chosen = appendCommittedDecision({
       game,
       perspective: "player",
+      ...(AI_HAS_CUSTOM_OPPONENT ? { episodeId: `${activeAiEpisodeId}:seat-player` } : {}),
       actorSlot,
       jointActionId,
       earlier,
@@ -2801,7 +2883,7 @@ function engineHardestMoveCandidate(
   enginePlayerSwitchCounter = Math.max(enginePlayerSwitchCounter - 1, 0);
   const moveSlot = proxy.getMoveset().findIndex(move => move.moveId === nextMove.move);
   const targets = nextMove.targets
-    .map(target => perspectiveTargetRef(game, "player", target))
+    .map(target => perspectiveTargetRef(game.scene, "player", target))
     .filter((target): target is ErCombatTargetRef => target != null);
   const matches = candidates.filter(
     candidate =>
@@ -2874,6 +2956,56 @@ function deterministicPolicyFraction(key: string): number {
   return (hash >>> 0) / 0x1_0000_0000;
 }
 
+function chooseTreeCandidate(
+  model: ErTreeModelArtifact,
+  observation: ErCombatDecisionRecord["observation"],
+  candidates: ErCombatCandidate[],
+  epsilon: number,
+  policyKey: string,
+): ErCombatCandidate | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+  const ranked = candidates
+    .map(candidate => ({
+      candidate,
+      score: scoreErTreeModel(model, extractErCombatCandidateFeatures(observation, candidate)),
+    }))
+    .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
+  const explore = epsilon > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < epsilon;
+  const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
+  return (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate ?? null;
+}
+
+async function chooseNeuralCandidate(
+  client: AiNeuralPolicyClient,
+  contextId: string,
+  observation: ErCombatDecisionRecord["observation"],
+  candidates: ErCombatCandidate[],
+  epsilon: number,
+  policyKey: string,
+): Promise<ErCombatCandidate | null> {
+  if (candidates.length === 0) {
+    return null;
+  }
+  const features = candidates.map(candidate => extractErCombatCandidateFeatures(observation, candidate));
+  const tokenGroups = candidates.map(candidate => extractErCombatCandidateTokenGroups(observation, candidate));
+  const scores = await client.score(contextId, features, tokenGroups);
+  if (scores.length !== candidates.length) {
+    throw new Error(`neural policy returned ${scores.length} scores for ${candidates.length} candidates`);
+  }
+  const ranked = candidates
+    .map((candidate, index) => ({ candidate, score: scores[index] }))
+    .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
+  const explore = epsilon > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < epsilon;
+  const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
+  const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate ?? null;
+  if (chosen) {
+    client.commit(contextId, features, tokenGroups, candidates.indexOf(chosen));
+  }
+  return chosen;
+}
+
 function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAction {
   const observation = snapshotErCombatObservation(game.scene);
   const action: TurnAction = {};
@@ -2890,16 +3022,8 @@ function treeModelAction(game: GameManager, model: ErTreeModelArtifact): TurnAct
     const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
       candidate => candidate.kind !== "shift",
     );
-    const ranked = candidates
-      .map(candidate => ({
-        candidate,
-        score: scoreErTreeModel(model, extractErCombatCandidateFeatures(observation, candidate)),
-      }))
-      .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
     const policyKey = `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}`;
-    const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
-    const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
-    const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
+    const chosen = chooseTreeCandidate(model, observation, candidates, AI_POLICY_EPSILON, policyKey);
     if (!chosen) {
       continue;
     }
@@ -2930,20 +3054,18 @@ async function neuralModelAction(game: GameManager, client: AiNeuralPolicyClient
     if (candidates.length === 0) {
       continue;
     }
-    const features = candidates.map(candidate => extractErCombatCandidateFeatures(observation, candidate));
-    const tokenGroups = candidates.map(candidate => extractErCombatCandidateTokenGroups(observation, candidate));
-    const scores = await client.score(activeAiEpisodeId, features, tokenGroups);
-    if (scores.length !== candidates.length) {
-      throw new Error(`neural policy returned ${scores.length} scores for ${candidates.length} candidates`);
-    }
-    const ranked = candidates
-      .map((candidate, index) => ({ candidate, score: scores[index] }))
-      .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
     const policyKey = `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}`;
-    const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
-    const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
-    const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
-    client.commit(activeAiEpisodeId, features, tokenGroups, candidates.indexOf(chosen));
+    const chosen = await chooseNeuralCandidate(
+      client,
+      `${activeAiEpisodeId}:seat-player`,
+      observation,
+      candidates,
+      AI_POLICY_EPSILON,
+      policyKey,
+    );
+    if (!chosen) {
+      continue;
+    }
     setCandidateAction(game, action, actorSlot, chosen);
     earlier.push({
       kind: chosen.kind,
@@ -2972,23 +3094,194 @@ async function unattendedPolicyAction(game: GameManager): Promise<TurnAction> {
   return smartDefaultAction(game);
 }
 
-function unattendedPolicyMetadata(): PolicyCaptureMetadata {
+function policyTarget(override: string, fallback: boolean): boolean {
+  return override ? override === "1" : fallback;
+}
+
+function defaultUnattendedPolicySource(): ErCombatPolicySource {
   if (AI_TREE_MODEL) {
-    return {
-      policySource: AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1",
-      policyTarget: false,
-    };
+    return AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1";
   }
   if (AI_NEURAL_CLIENT) {
-    return {
-      policySource: AI_POLICY_EPSILON > 0 ? "epsilon-trajectory-neural-v3" : "trajectory-neural-v3",
-      policyTarget: true,
-    };
+    return AI_POLICY_EPSILON > 0 ? "epsilon-trajectory-neural-v3" : "trajectory-neural-v3";
   }
   if (AI_POLICY_MODE === "engine-hardest") {
-    return { policySource: "engine-hardest-v1", policyTarget: false };
+    return "engine-hardest-v1";
   }
-  return { policySource: "smart-default-v1", policyTarget: false };
+  return "smart-default-v1";
+}
+
+function unattendedPolicyMetadata(): PolicyCaptureMetadata {
+  return {
+    policySource: AI_POLICY_SOURCE ?? defaultUnattendedPolicySource(),
+    policyTarget: policyTarget(AI_POLICY_TARGET_OVERRIDE, !!AI_NEURAL_CLIENT),
+  };
+}
+
+function customOpponentPolicyMetadata(): PolicyCaptureMetadata {
+  if (AI_OPPONENT_TREE_MODEL) {
+    return {
+      policySource: AI_OPPONENT_POLICY_SOURCE ?? "checkpoint-tree-v1",
+      policyTarget: policyTarget(AI_OPPONENT_POLICY_TARGET_OVERRIDE, true),
+    };
+  }
+  if (AI_OPPONENT_NEURAL_CLIENT) {
+    return {
+      policySource: AI_OPPONENT_POLICY_SOURCE ?? "checkpoint-neural-v4",
+      policyTarget: policyTarget(AI_OPPONENT_POLICY_TARGET_OVERRIDE, true),
+    };
+  }
+  return {
+    policySource: AI_OPPONENT_POLICY_SOURCE ?? "first-usable",
+    policyTarget: policyTarget(AI_OPPONENT_POLICY_TARGET_OVERRIDE, false),
+  };
+}
+
+function resolveCandidateTargets(
+  game: GameManager,
+  actor: Pokemon,
+  candidate: ErCombatMoveCandidate,
+  perspective: CombatCapturePerspective,
+): BattlerIndex[] {
+  if (candidate.targetMode === "random" || candidate.targets.length === 0) {
+    return getMoveTargets(actor, candidate.moveId).targets as BattlerIndex[];
+  }
+  const selfField = perspective === "player" ? game.scene.getPlayerField() : game.scene.getEnemyField();
+  const opponentField = perspective === "player" ? game.scene.getEnemyField() : game.scene.getPlayerField();
+  return candidate.targets.map(target => {
+    const field = target.side === "self" ? selfField : opponentField;
+    const pokemon = field.find(mon => mon.id === target.entityId);
+    const battlerIndex = pokemon?.getBattlerIndex();
+    if (pokemon == null || battlerIndex == null || !pokemon.isActive(true)) {
+      throw new Error(`candidate target is no longer active: ${JSON.stringify(target)}`);
+    }
+    return battlerIndex;
+  });
+}
+
+function commitOpponentCandidate(
+  game: GameManager,
+  actorSlot: number,
+  actor: Pokemon,
+  candidate: ErCombatCandidate,
+): void {
+  const battle = game.scene.currentBattle;
+  const flatSlot = battle.arrangement.enemyOffset + actorSlot;
+  if (candidate.kind === "switch") {
+    battle.turnCommands[flatSlot] = {
+      command: Command.POKEMON,
+      cursor: candidate.partyIndex,
+      args: [candidate.transfer === "baton"],
+      skip: false,
+    };
+    return;
+  }
+  if (candidate.kind === "shift") {
+    battle.turnCommands[flatSlot] = {
+      command: Command.SHIFT,
+      cursor: candidate.targetActorSlot,
+      skip: false,
+    };
+    return;
+  }
+  if (candidate.tera) {
+    battle.preTurnCommands[flatSlot] = { command: Command.TERA };
+  }
+  battle.turnCommands[flatSlot] = {
+    command: Command.FIGHT,
+    cursor: candidate.moveSlot,
+    move: {
+      move: candidate.moveId,
+      targets: resolveCandidateTargets(game, actor, candidate, "enemy"),
+      useMode: MoveUseMode.NORMAL,
+    },
+    skip: false,
+  };
+}
+
+async function chooseCustomOpponentCandidate(
+  observation: ErCombatDecisionRecord["observation"],
+  candidates: ErCombatCandidate[],
+  actorSlot: number,
+): Promise<ErCombatCandidate | null> {
+  const policyKey = `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}:enemy`;
+  if (AI_OPPONENT_TREE_MODEL) {
+    return chooseTreeCandidate(AI_OPPONENT_TREE_MODEL, observation, candidates, AI_OPPONENT_POLICY_EPSILON, policyKey);
+  }
+  if (AI_OPPONENT_NEURAL_CLIENT) {
+    return await chooseNeuralCandidate(
+      AI_OPPONENT_NEURAL_CLIENT,
+      `${activeAiEpisodeId}:seat-enemy`,
+      observation,
+      candidates,
+      AI_OPPONENT_POLICY_EPSILON,
+      policyKey,
+    );
+  }
+  return candidates[0] ?? null;
+}
+
+async function driveCustomOpponentCommandPhase(
+  game: GameManager,
+  earlier: ErCombatEarlierChoice[],
+  jointActionId: string,
+): Promise<void> {
+  await game.phaseInterceptor.to("EnemyCommandPhase", false);
+  const phase = game.scene.phaseManager.getCurrentPhase() as { getFieldIndex(): number };
+  const actorSlot = phase.getFieldIndex();
+  const actor = game.scene.getEnemyField()[actorSlot];
+  if (actor == null || !actor.isActive(true) || actor.isFainted() || hasAutomaticQueuedCommand(actor)) {
+    await game.phaseInterceptor.to("EnemyCommandPhase");
+    return;
+  }
+  const observation = snapshotErCombatObservation(game.scene, {
+    perspective: "enemy",
+    knownOpponentEntityIds: AI_CUSTOM_OPPONENT_KNOWN_PLAYER_IDS,
+  });
+  const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier, "enemy");
+  const chosen = await chooseCustomOpponentCandidate(observation, candidates, actorSlot);
+  if (!chosen) {
+    throw new Error(`custom opponent policy produced no legal command for enemy slot ${actorSlot}`);
+  }
+  commitOpponentCandidate(game, actorSlot, actor, chosen);
+  if (AI_DATA_OUT) {
+    const captured = appendCommittedDecision({
+      game,
+      perspective: "enemy",
+      episodeId: `${activeAiEpisodeId}:seat-enemy`,
+      actorSlot,
+      jointActionId,
+      earlier,
+      observation,
+      candidates,
+      ...customOpponentPolicyMetadata(),
+    });
+    if (captured?.id !== chosen.id) {
+      throw new Error(`custom opponent committed ${captured?.id ?? "nothing"}, expected ${chosen.id}`);
+    }
+  }
+  earlier.push({
+    kind: chosen.kind,
+    id: chosen.id,
+    ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+    ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+  });
+  game.phaseInterceptor.shiftPhase();
+}
+
+/** Commit a second arbitrary policy through the enemy seat without invoking the engine chooser. */
+async function driveCustomOpponentPolicyTurn(game: GameManager): Promise<void> {
+  if (!AI_HAS_CUSTOM_OPPONENT) {
+    return;
+  }
+  game.scene.getPlayerField().forEach(mon => AI_CUSTOM_OPPONENT_KNOWN_PLAYER_IDS.add(mon.id));
+  const phaseCount = game.scene.getEnemyField().length;
+  const earlier: ErCombatEarlierChoice[] = [];
+  const { waveIndex: wave, turn } = game.scene.currentBattle;
+  const jointActionId = `${activeAiEpisodeId}:${wave}:${turn}:enemy`;
+  for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex++) {
+    await driveCustomOpponentCommandPhase(game, earlier, jointActionId);
+  }
 }
 
 function isTerminalRunPhase(game: GameManager): boolean {
@@ -3148,12 +3441,16 @@ async function playWaveTurns(
     doPlayerActions(game, action, opts.forcedMove ?? null, st.log);
     await recordCommittedPlayerTurn(game, captureMetadata, playerDecisionObservations);
     if (action && hasEnemyForce(action)) {
-      if (AI_RECORD_ENGINE_BASELINE) {
-        throw new Error("engine-hardest baseline capture cannot label a scripted enemy command");
+      if (AI_RECORD_ENGINE_BASELINE || AI_HAS_CUSTOM_OPPONENT) {
+        throw new Error("a configured opponent policy cannot be combined with a scripted enemy command");
       }
       await forceEnemyActions(game, action, st.log);
     }
-    await recordEngineBaselineTurn(game);
+    if (AI_HAS_CUSTOM_OPPONENT) {
+      await driveCustomOpponentPolicyTurn(game);
+    } else {
+      await recordEngineBaselineTurn(game);
+    }
     let combatBoundary: Awaited<ReturnType<typeof toCombatBatchTurnBoundary>> | null = null;
     try {
       if (COMBAT_BATCH) {
@@ -3531,7 +3828,8 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
           version: 1,
           complete,
           combatOnly: true,
-          hardestTrainerAi: true,
+          hardestTrainerAi: !AI_HAS_CUSTOM_OPPONENT,
+          opponentController: AI_HAS_CUSTOM_OPPONENT ? "custom-policy" : "engine-hardest-v1",
           progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
           expectedEpisodeCount: batch.episodes.length,
           episodeCount: results.length,
@@ -3547,8 +3845,10 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
   for (const episode of batch.episodes) {
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
-    AI_NEURAL_CLIENT?.reset(activeAiEpisodeId);
+    AI_NEURAL_CLIENT?.reset(`${activeAiEpisodeId}:seat-player`);
+    AI_OPPONENT_NEURAL_CLIENT?.reset(`${activeAiEpisodeId}:seat-enemy`);
     AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS.clear();
+    AI_CUSTOM_OPPONENT_KNOWN_PLAYER_IDS.clear();
     enginePlayerSwitchCounter = 0;
     activeAiSplitGroupId = episode.splitGroupId?.trim() || episode.id;
     activeAiSourcePartitionId = episode.sourcePartitionId?.trim() || activeAiSplitGroupId;
@@ -3644,7 +3944,8 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
         version: 1,
         complete: true,
         combatOnly: true,
-        hardestTrainerAi: true,
+        hardestTrainerAi: !AI_HAS_CUSTOM_OPPONENT,
+        opponentController: AI_HAS_CUSTOM_OPPONENT ? "custom-policy" : "engine-hardest-v1",
         progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
         expectedEpisodeCount: batch.episodes.length,
         episodeCount: results.length,
@@ -3663,12 +3964,14 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
   beforeAll(
     async () => {
       phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
-      await AI_NEURAL_CLIENT?.start();
+      await Promise.all(AI_NEURAL_CLIENTS.map(client => client.start()));
     },
-    AI_NEURAL_CLIENT ? 30_000 : 10_000,
+    AI_NEURAL_CLIENT || AI_OPPONENT_NEURAL_CLIENT ? 30_000 : 10_000,
   );
 
-  afterAll(() => AI_NEURAL_CLIENT?.stop());
+  afterAll(() => {
+    AI_NEURAL_CLIENTS.forEach(client => client.stop());
+  });
 
   // biome-ignore format: keep the large established scenario-runner callback stable
   it(`plays scenario: ${SPEC?.name || RAW}`, async () => {
@@ -3870,7 +4173,20 @@ function appendAiEpisodeTerminal(result: {
   finalWave: number;
   wavesCleared: number;
 }): void {
-  const outcome = AI_RECORD_ENGINE_BASELINE
+  if (AI_HAS_CUSTOM_OPPONENT) {
+    appendAiEpisodeTerminalForSeat(`${activeAiEpisodeId}:seat-player`, result, false);
+    appendAiEpisodeTerminalForSeat(`${activeAiEpisodeId}:seat-enemy`, result, true);
+    return;
+  }
+  appendAiEpisodeTerminalForSeat(activeAiEpisodeId, result, AI_RECORD_ENGINE_BASELINE);
+}
+
+function appendAiEpisodeTerminalForSeat(
+  episodeId: string,
+  result: { outcome: string; startWave: number; finalWave: number; wavesCleared: number },
+  invert: boolean,
+): void {
+  const outcome = invert
     ? result.outcome === "victory"
       ? "player-wiped"
       : result.outcome === "player-wiped"
@@ -3883,13 +4199,13 @@ function appendAiEpisodeTerminal(result: {
     buildSha: AI_BUILD_SHA,
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
-    episodeId: activeAiEpisodeId,
+    episodeId,
     splitGroupId: activeAiSplitGroupId,
     sourcePartitionId: activeAiSourcePartitionId,
     outcome,
     startWave: result.startWave,
     finalWave: result.finalWave,
-    wavesCleared: AI_RECORD_ENGINE_BASELINE ? +(outcome === "victory") : result.wavesCleared,
+    wavesCleared: invert ? +(outcome === "victory") : result.wavesCleared,
     truncated: !["victory", "player-wiped"].includes(result.outcome),
   });
 }

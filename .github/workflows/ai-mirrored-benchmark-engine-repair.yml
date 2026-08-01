@@ -1,0 +1,97 @@
+name: AI Mirrored Benchmark Engine Repair (Non-Production)
+
+# Completes a prior benchmark whose expensive neural/tree/smart artifacts are
+# intact but whose hardest-engine adapter failed. It only downloads artifacts,
+# runs combat, and uploads a combined report.
+on:
+  workflow_dispatch:
+    inputs:
+      prior_run_id:
+        description: Actions run containing the six intact benchmark shard artifacts
+        required: true
+        default: "30694811394"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ai-mirrored-benchmark-engine-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Hardest-engine repair shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Restore completed controller legs from the prior run
+        uses: actions/download-artifact@v6
+        with:
+          name: ai-mirrored-benchmark-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          run-id: ${{ inputs.prior_run_id }}
+          github-token: ${{ github.token }}
+      - name: Remove any incomplete hardest-engine output
+        shell: bash
+        run: rm -f "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
+      - name: Play corrected hardest-engine baseline
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy engine-hardest
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-mirrored-benchmark-repaired-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          retention-days: 14
+          if-no-files-found: error
+
+  report:
+    if: always() && github.repository == 'Heraklines/elite-redux'
+    name: Repaired five-controller benchmark report
+    needs: repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-mirrored-benchmark-repaired-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+      - name: Summarize held-out per-tier and macro win rates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/mirrored-benchmark.json \
+            ai-report/mirrored-benchmark.md
+          cat ai-report/mirrored-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-mirrored-benchmark-repaired-report
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
