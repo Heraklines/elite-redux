@@ -241,6 +241,10 @@ if (
   || !starterHandler.includes("allowUncaught: true")
   || !starterHandler.includes("allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters")
   || !starterHandler.includes("!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)")
+  || !selectStarterPhase.includes("const navigationFixtureActive = isCoopBrowserNavigationFixtureActive()")
+  || !selectStarterPhase.includes(
+    "cost: navigationFixtureActive ? 0 : globalScene.gameData.getSpeciesStarterValue(s.speciesId)",
+  )
 ) {
   failures.push("Browser gameplay checkpoints must require the exact build+URL gate at their visible setup UI");
 }

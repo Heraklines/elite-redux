@@ -7,6 +7,7 @@ import {
   getCoopBrowserLongitudinalFixtureStartingLevel,
   getCoopBrowserNavigationFixtureStartingMoney,
   isCoopBrowserEvolutionFixtureActive,
+  isCoopBrowserNavigationFixtureActive,
   shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -250,10 +251,17 @@ export class SelectStarterPhase extends Phase {
       // rebuilds our mons EXACTLY (same form / IVs / nature / ability / moves) and
       // both clients' merged launch parties are byte-identical (a prerequisite for
       // the shared-seed lockstep).
+      const navigationFixtureActive = isCoopBrowserNavigationFixtureActive();
       controller.setLocalRoster(
         starters.map<CoopRosterEntry>(s => ({
           speciesId: s.speciesId,
-          cost: globalScene.gameData.getSpeciesStarterValue(s.speciesId),
+          // The exact build+URL-gated navigation lane deliberately renders three over-budget
+          // level-100 starters so its continuous 30-wave proof tests geography and interactions,
+          // not fresh-account survivability. The visible starter handler already admits that exact
+          // fixture; mirror it through the otherwise production-strict five-point roster by making
+          // only its launch-envelope budget metadata free. The complete serialized starter remains
+          // authoritative, so both browsers still construct the identical requested party.
+          cost: navigationFixtureActive ? 0 : globalScene.gameData.getSpeciesStarterValue(s.speciesId),
           starter: serializeCoopStarter(s),
         })),
       );
