@@ -107,6 +107,19 @@ function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
 }
 
+/**
+ * Start a battle round at each browser's current public frontier.
+ *
+ * A seat with no live battler correctly exposes only a passive command watcher. Falling back to
+ * cursor zero for that omitted seat resurrects old reward/GameOver evidence, so the sequential
+ * driver mistakes a historical wave boundary for a partial current terminal and never drives the
+ * remaining real owner. Preserve an owned command itself when present; otherwise begin at the
+ * current tail, exactly where a human starts observing this new battle.
+ */
+export function initialBattleCommandCursors(clients) {
+  return fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? client.evidence.cursor());
+}
+
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
 const HOST_RETAINED_EVOLUTION =
   /\[coop:progression\] HOST progression capture wave=(\d+) seq=\d+ k=evolution slot=(\d+) species=(\d+)->(\d+)/u;
@@ -1512,7 +1525,7 @@ export async function waitForOutcomeBounded(
  */
 async function driveBattleWave(rig, policy, stats, reportProgress = async () => {}) {
   const clients = Object.values(rig.clients);
-  let commandCursors = fromEach(clients, client => findOwnedCommandFrontier(client, 0)?.index ?? 0);
+  let commandCursors = initialBattleCommandCursors(clients);
   let pendingCommandProof = null;
   const fallbackWindow = Math.min(rig.config.timeoutMs, 15_000);
   const finishSuccessorWaveTransition = (outcome, cursors) => {

@@ -6,7 +6,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { createAnimationProgressBudget, createBattlePromptAdvancer, driveConfirmedLeave } from "./campaign.mjs";
+import {
+  createAnimationProgressBudget,
+  createBattlePromptAdvancer,
+  driveConfirmedLeave,
+  initialBattleCommandCursors,
+} from "./campaign.mjs";
 import { findOwnedActionableTargetSurface } from "./campaign-nav.mjs";
 import { marketObservationView } from "./evidence.mjs";
 import { assertMarketPurchaseConverged, planMarketGridKeys } from "./market-journey.mjs";
@@ -1036,6 +1041,77 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(frontier.projection, "authoritative-collection-close");
   assert.equal(firstEvidence.events.at(-1).kind, "sequential-command-frontier-proof");
   assert.equal(secondEvidence.events.at(-1).projection, "omitted");
+});
+
+test("a passive command watcher starts at the current tail instead of resurrecting an old reward", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 4, turn: 1 };
+  const authorityEvidence = new FakeEvidence("authority");
+  const watcherEvidence = new FakeEvidence("watcher");
+  authorityEvidence.push({ kind: "console", text: "Start Phase SelectModifierPhase" });
+  watcherEvidence.push({ kind: "console", text: "Start Phase SelectModifierPhase" });
+  authorityEvidence.push(ownedCommand(0, address));
+  watcherEvidence.push({
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:watcher",
+      phase: "CoopReplayTurnPhase",
+      uiMode: "MESSAGE",
+      address,
+      localSeat: 1,
+      seatsWithInput: [],
+      ready: { handlerActive: false },
+    },
+  });
+  const authority = {
+    label: "authority",
+    publicRole: "host",
+    publicSeat: 0,
+    evidence: authorityEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("authority");
+      authorityEvidence.push({
+        kind: "browser-surface2",
+        observation: {
+          operationClass: "battle-progress",
+          surfaceId: "battle:message",
+          phase: "MovePhase",
+          localRole: "host",
+          address,
+        },
+      });
+    },
+  };
+  const watcher = {
+    label: "watcher",
+    publicRole: "guest",
+    publicSeat: 1,
+    evidence: watcherEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      throw new Error("a passive watcher must not receive a command key");
+    },
+  };
+  const rig = {
+    clients: { authority, watcher },
+    lastSharedSurfaceAddress: new Map(),
+    config: { timeoutMs: 1_000 },
+  };
+  const cursors = initialBattleCommandCursors(Object.values(rig.clients));
+
+  assert.deepEqual(cursors, { authority: 1, watcher: 2 });
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    cursors,
+    ["Space", "Space", "Space"],
+    "post-half-wipe-turn",
+  );
+
+  assert.deepEqual(order, ["authority"]);
+  assert.deepEqual(result.commandPartition.owners.map(owner => owner.label), ["authority"]);
+  assert.deepEqual(result.commandPartition.omitted, [{ label: "watcher", seat: 1 }]);
 });
 
 test("campaign deferred frontiers consume the sequential round's authoritative owner partition", () => {
