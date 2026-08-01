@@ -568,7 +568,7 @@ describe("authority-v2 explicit command-open boundary", () => {
       kind: "AWAIT_SUCCESSOR" as const,
       afterOperationId: "wave-3-reward-terminal",
       epoch: context.sessionEpoch,
-      wave: 3,
+      wave: 4,
       turn: 1,
       allowedKinds: ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
       allowNextWaveStart: false,
