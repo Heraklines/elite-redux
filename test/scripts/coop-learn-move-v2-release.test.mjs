@@ -107,6 +107,36 @@ test("every host-owned prompt and decline continuation re-enters its captured V2
   );
 });
 
+test("guest-owned decisions confirm on the owner and cannot wait on host presentation input before retention", () => {
+  const guestOwner = section(learnMove, "private coopGuestForwardOwnedLearnMove(", "/**\n   * ER Omniform");
+  const stopMirror = guestOwner.indexOf("mirror?.endSession()");
+  const stopPrompt = guestOwner.indexOf('i18next.t("battle:learnMoveStopTeaching"', stopMirror);
+  const stopConfirm = guestOwner.indexOf("UiMode.CONFIRM", stopPrompt);
+  const finalDecline = guestOwner.indexOf("finish(pokemon.getMaxMoveCount())", stopConfirm);
+  assert.ok(
+    stopMirror >= 0 && stopPrompt > stopMirror && stopConfirm > stopPrompt && finalDecline > stopConfirm,
+    "the owner confirms a cancellation before the immutable decline proposal is sent",
+  );
+
+  const application = section(
+    learnMove,
+    "private applyPreparedCoopV2LearnMoveDecision(",
+    "/**\n   * Close and retain one host-authored V2 decision",
+  );
+  assert.match(application, /this\.applyLearnMoveMutation\(forgetSlot, pokemon\)/u);
+  assert.match(application, /this\.endAfterCoopLearnMoveDecision\(\)/u);
+  assert.doesNotMatch(
+    application,
+    /showText(?:Promise)?\(/u,
+    "a non-owner host presentation prompt cannot sit between admitted intent and immutable retention",
+  );
+
+  const result = section(learnMove, "private async applyForgetResult(", "/**\n   * Co-op AUTHORITATIVE dispatch");
+  const immediateV2 = result.indexOf("this.applyPreparedCoopV2LearnMoveDecision(");
+  const legacyNarration = result.indexOf("showTextPromise(", immediateV2);
+  assert.ok(immediateV2 >= 0 && legacyNarration > immediateV2, "V2 exits before the legacy input-gated narration");
+});
+
 test("exact host/guest owner material is the sole replica release and duplicate delivery is idempotent", () => {
   const settle = section(
     runtime,

@@ -415,6 +415,33 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   }
 
   /**
+   * Apply a prepared guest-owned result without waiting on presentation input from the host watcher.
+   *
+   * The guest already made the complete human decision before its proposal was admitted. Replaying the
+   * usual learn/not-learned narration on the authoritative host before retention is unsafe: the host is not
+   * the interaction owner, so no owner input can release that message and the admitted proposal remains
+   * permanently in-flight. Apply the mechanical result, queue any move-triggered form change, and let the
+   * ordinary V2 terminal capture/close/commit sequence publish the immutable result immediately.
+   */
+  private applyPreparedCoopV2LearnMoveDecision(forgetSlot: number, pokemon: Pokemon): boolean {
+    const pending = this.coopPendingV2Decision;
+    if (pending == null || !isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)) {
+      return false;
+    }
+    if (forgetSlot >= 0 && forgetSlot < pokemon.getMaxMoveCount()) {
+      this.applyLearnMoveMutation(forgetSlot, pokemon);
+      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
+    }
+    void this.runInCoopV2Runtime(async () => {
+      await globalScene.ui.setMode(this.messageMode);
+      this.endAfterCoopLearnMoveDecision();
+    }).catch(() => {
+      failCoopSharedSession(`Learn-move result ${pending.operationId} could not reach its exact V2 terminal`);
+    });
+    return true;
+  }
+
+  /**
    * Close and retain one host-authored V2 decision in the only safe order.
    *
    * The state image is captured after the learn/decline has fully rendered but before a successor can mutate
@@ -610,6 +637,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * timeout result never hangs - it keeps the mon's current moves and ends.
    */
   private async applyForgetResult(moveIndex: number, move: Move, pokemon: Pokemon): Promise<void> {
+    if (this.applyPreparedCoopV2LearnMoveDecision(moveIndex, pokemon)) {
+      return;
+    }
     if (moveIndex >= 0 && moveIndex < pokemon.getMaxMoveCount()) {
       // Build the same "1... 2... and Poof! forgot X. And..." chain the owner sees, so the
       // result message matches (read the forgotten move's name BEFORE setMove replaces it).
@@ -1120,16 +1150,47 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       failCoopSharedSession(`Guest-owned learn-move picker for slot ${slot} lost its runtime binding`);
       return;
     }
-    // Render the REAL interactive move-forget picker (the shared #563 screen). beginSession("owner", ...)
-    // so the HOST's read-only mirror follows this client's live cursor (cosmetic).
-    void globalScene.ui
-      .setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, (moveIndex: number) =>
-        finish(moveIndex),
-      )
-      .then(() => {
-        mirror?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
-        notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
-      });
+    // Render the REAL interactive move-forget picker (the shared #563 screen). A cancel is not yet a
+    // mechanical decision: preserve the normal stop-teaching confirmation on the owning guest, and only
+    // propose the decline after that human confirms it. End the cursor mirror before opening CONFIRM so
+    // those guest-only presentation buttons cannot release a host-side watcher message.
+    const openPicker = (): void => {
+      void globalScene.ui
+        .setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, (moveIndex: number) => {
+          if (moveIndex !== pokemon.getMaxMoveCount()) {
+            finish(moveIndex);
+            return;
+          }
+          mirror?.endSession();
+          void this.runInCoopV2Runtime(async () => {
+            await globalScene.ui.setMode(this.messageMode);
+            await globalScene.ui.showTextPromise(
+              i18next.t("battle:learnMoveStopTeaching", { moveName: move.name }),
+              undefined,
+              false,
+            );
+            await globalScene.ui.setModeWithoutClear(
+              UiMode.CONFIRM,
+              () => {
+                globalScene.ui.setMode(this.messageMode);
+                finish(pokemon.getMaxMoveCount());
+              },
+              () => {
+                globalScene.ui.setMode(this.messageMode);
+                openPicker();
+              },
+            );
+            notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+          }).catch(() => {
+            failCoopSharedSession(`Guest learn-move decline for slot ${slot} lost its exact V2 phase`);
+          });
+        })
+        .then(() => {
+          mirror?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+          notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+        });
+    };
+    openPicker();
   }
 
   /**
@@ -1370,22 +1431,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     await this.runInCoopV2Runtime(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }
 
-  /**
-   * This teaches the Pokemon the new move and ends the phase.
-   * When a Pokemon forgets a move and learns a new one, its 'Learn Move' message is significantly longer.
-   *
-   * Pokemon with a `moveset.length < 4`
-   * > [Pokemon] learned [MoveName]
-   *
-   * Pokemon with a `moveset.length > 4`
-   * > 1... 2... and 3... and Poof!
-   * > [Pokemon] forgot how to use [MoveName]
-   * > And...
-   * > [Pokemon] learned [MoveName]!
-   * @param move The Move to be learned
-   * @param Pokemon The Pokemon learning the move
-   */
-  async learnMove(index: number, move: Move, pokemon: Pokemon, textMessage?: string) {
+  /** Apply only the mechanically authoritative portion of learning a move. */
+  private applyLearnMoveMutation(index: number, pokemon: Pokemon): void {
     const v2DecisionOwnsContinuation =
       this.coopPendingV2Decision != null && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding);
     if (this.learnMoveType === LearnMoveType.TM) {
@@ -1423,6 +1470,25 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     initMoveAnim(this.moveId).then(() => {
       loadMoveAnimAssets([this.moveId], true);
     });
+  }
+
+  /**
+   * This teaches the Pokemon the new move and ends the phase.
+   * When a Pokemon forgets a move and learns a new one, its 'Learn Move' message is significantly longer.
+   *
+   * Pokemon with a `moveset.length < 4`
+   * > [Pokemon] learned [MoveName]
+   *
+   * Pokemon with a `moveset.length > 4`
+   * > 1... 2... and 3... and Poof!
+   * > [Pokemon] forgot how to use [MoveName]
+   * > And...
+   * > [Pokemon] learned [MoveName]!
+   * @param move The Move to be learned
+   * @param Pokemon The Pokemon learning the move
+   */
+  async learnMove(index: number, move: Move, pokemon: Pokemon, textMessage?: string) {
+    this.applyLearnMoveMutation(index, pokemon);
     globalScene.ui.setMode(this.messageMode);
     const learnMoveText = i18next.t("battle:learnMove", {
       pokemonName: getPokemonNameWithAffix(pokemon),
