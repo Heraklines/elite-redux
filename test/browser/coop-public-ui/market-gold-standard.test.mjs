@@ -174,6 +174,7 @@ test("gold-standard coverage requires both owner parities and a later command af
 
 test("journey workflow enables the continuous two-parity contract and trace-off public lane", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
   assert.match(
     workflow,
     /COOP_UI_CAMPAIGN_WAVES: \$\{\{ inputs\.journey == 'navigation-depth-30' && '30' \|\| '20' \}\}/u,
@@ -186,7 +187,15 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
     workflow,
     /COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: \$\{\{ \(inputs\.journey == 'market-wide-lens' \|\| inputs\.journey == 'navigation-depth-30'\) && '1' \|\| '0' \}\}/u,
   );
-  assert.match(workflow, /COOP_UI_MARKET_SECOND_PURCHASE: "1"/u);
+  assert.match(workflow, /COOP_UI_MARKET_SECOND_PURCHASE: "0"/u);
+  assert.match(
+    workflow,
+    /\(inputs\.journey == 'navigation-depth-30' \|\| inputs\.journey == 'market-wide-lens'\) && 'navigation-depth-30'/u,
+  );
+  assert.match(
+    harness,
+    /this\.config\.journey === "navigation-depth-30" \|\| this\.config\.journey === "market-wide-lens"[\s\S]*entryUrl\.searchParams\.set\("coopfixture", "navigation-depth-30"\)/u,
+  );
   assert.match(workflow, /COOP_UI_CHROME_TRACE: \$\{\{ inputs\.chrome_trace && '1' \|\| '0' \}\}/u);
   assert.match(workflow, /node test\/browser\/coop-public-ui\/run-campaign\.mjs/u);
   assert.match(workflow, /node test\/browser\/coop-public-ui\/check-campaign-boundary\.mjs/u);

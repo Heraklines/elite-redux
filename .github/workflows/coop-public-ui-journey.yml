@@ -304,7 +304,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'navigation-depth-30' && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -421,7 +421,7 @@ jobs:
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
           # The continuous wave-1 -> wave-20 profile naturally reaches the wave-10 guest-owned
           # and wave-20 host-owned markets (boss auto-grants do not consume an interaction).
-          # Both visits must buy Wide Lens, return to the same grid, leave normally and prove
+          # Each visit must buy Wide Lens once, return to the same grid, leave normally and prove
           # the following public command surface. This is one real run, so no save/runtime
           # fixture or cross-job aggregation can counterfeit the owner alternation.
           COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || '20' }}
@@ -432,7 +432,9 @@ jobs:
           COOP_UI_RAISE_SPEED: "1"
           COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
-          COOP_UI_MARKET_SECOND_PURCHASE: "1"
+          # One purchase per market proves both owner parities without attempting a fourth copy
+          # after the held-item stack reaches its cap of three across the two visits.
+          COOP_UI_MARKET_SECOND_PURCHASE: "0"
           COOP_UI_MARKET_REQUIRED_PURCHASES: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && '2' || '0' }}
           COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && '1' || '0' }}
           COOP_UI_REQUIRE_NAVIGATION_DEPTH: ${{ inputs.journey == 'navigation-depth-30' && '1' || '0' }}

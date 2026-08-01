@@ -170,12 +170,15 @@ the real party picker, chooses `COOP_UI_MARKET_PARTY_SLOT`, confirms APPLY, prov
 held-item quantity, and one stock-ledger decrement on both clients, then verifies the market stayed open.
 It buys the same already-proven compatible held item again when stock/money permit, then leaves through
 the normal confirmation and requires both clients to converge on the next public command surface. The
-`market-wide-lens` workflow uses one continuous fresh wave-1 -> wave-20 run with
+`market-wide-lens` workflow uses the exact-build level-100 navigation fixture for one continuous fresh
+wave-1 -> wave-20 run with
 `COOP_UI_MARKET_REQUIRED_PURCHASES=2` and `COOP_UI_MARKET_REQUIRE_BOTH_OWNER_SEATS=1`: the wave-10 market
 is guest-owned and the wave-20 market is host-owned under the natural interaction schedule. The market
 stock is seed-dependent, so a run without affordable Wide Lens stock at both parities fails loudly and
 remains evidence for checkpoint calibration; the driver never substitutes another item or mutates stock
-while claiming Wide Lens coverage.
+while claiming Wide Lens coverage. It buys exactly once per market: attempting two purchases at both
+visits can exceed the held-item stack cap during wave 20 and measures an impossible fourth purchase rather
+than the authoritative market continuation.
 
 Dropping or reordering a WebRTC market terminal is intentionally not injected by this public driver. Doing
 so would require mutating the page's private DataChannel, which violates the human-equivalent boundary.
