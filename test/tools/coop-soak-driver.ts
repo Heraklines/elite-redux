@@ -334,9 +334,11 @@ export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
       SpeciesId.METAGROSS,
       SpeciesId.GARCHOMP,
     ],
-    // EXPLOSION is used by the deterministic wave-2 self-KO leg below. It is issued through the real guest
-    // command relay and real move/faint/switch phases; the remaining slots preserve normal combat.
-    moveset: [MoveId.EXPLOSION, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
+    // MEMENTO is used by the deterministic wave-2 self-KO leg below. Unlike Explosion it leaves the enemy
+    // battle alive, so the real guest-owned faint replacement must open before progression can continue.
+    // It is issued through the real guest command relay and real move/faint/switch phases; the remaining
+    // slots preserve normal combat.
+    moveset: [MoveId.MEMENTO, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
     heldItems: undefined,
   },
 };
@@ -787,11 +789,13 @@ function resolveChosenMove(
   // ONE slot per wave, so real combat both drains PP and can Encore/Disable the fixed pick; filtering by the
   // selectable set means we never hand the FIGHT menu an illegal move (which soft-locks it open).
   const selectable = moveset.filter(m => m.isUsable(mon, false, true)[0]);
-  // The level profile owns one dedicated wave-2 Explosion leg. Outside that leg, repeatedly rolling
-  // Explosion is not representative combat: a seed can make the last surviving mon self-KO on an early
-  // trash wave and collapse the intended wave-30..50 faint/replacement survey. Prefer every other legal
-  // move, but retain Explosion as the honest last resort when it is the only selectable command.
-  const survivableSelectable = avoidSelfKo ? selectable.filter(m => m.moveId !== MoveId.EXPLOSION) : selectable;
+  // The level profile owns one dedicated wave-2 Memento leg. Outside that leg, repeatedly rolling either
+  // self-KO move is not representative combat: a seed can make the last surviving mon faint on an early
+  // trash wave and collapse the intended wave-30..50 survey. Prefer every other legal move, but retain a
+  // self-KO move as the honest last resort when it is the only selectable command.
+  const survivableSelectable = avoidSelfKo
+    ? selectable.filter(m => m.moveId !== MoveId.EXPLOSION && m.moveId !== MoveId.MEMENTO)
+    : selectable;
   const preferredSelectable = survivableSelectable.length > 0 ? survivableSelectable : selectable;
   // #843 EFFECTIVENESS-AWARE: with REAL enemies a fixed-slot move can be TYPE-IMMUNE against the wave's real
   // species (e.g. SHADOW_BALL/Ghost vs a Normal-type = 0x), which deals ZERO damage forever and NO-PARK
@@ -1605,30 +1609,32 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // guest mon-command still rides the REAL relay the host applies for the guest slot.
       const commandScene = fidelity === "production" ? rig.guestScene : rig.hostScene;
       // The faint-heavy profile must guarantee its namesake coverage instead of waiting for late-run damage
-      // RNG. On wave 2 the guest lead sends a genuine Explosion through this production command relay. The
+      // RNG. On wave 2 the guest lead sends a genuine Memento through this production command relay. Unlike
+      // Explosion, Memento leaves the opposing field alive, so the guest-owned replacement UI/commit cannot
+      // be skipped by an immediate wave victory. The
       // normal move, self-faint, guest-owned replacement relay and operation journal then execute unchanged.
       if (profile === "level" && wave === LEVEL_FORCED_FAINT_WAVE && turn === 1) {
         const guestMon = commandScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
-        const explosionSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.EXPLOSION) ?? -1;
-        if (explosionSlot >= 0 && moveSlots.includes(explosionSlot)) {
-          const offeredExplosion =
-            offer?.moves.find(move => move.moveId === MoveId.EXPLOSION)
-            ?? offer?.moves.find(move => move.slot === explosionSlot);
-          const explosionTargets = offeredExplosion?.targetSets[0];
-          if (explosionTargets == null) {
-            return fail("desync", wave, "host did not offer the guest's locally legal Explosion command");
+        const mementoSlot = guestMon?.getMoveset().findIndex(move => move?.moveId === MoveId.MEMENTO) ?? -1;
+        if (mementoSlot >= 0 && moveSlots.includes(mementoSlot)) {
+          const offeredMemento =
+            offer?.moves.find(move => move.moveId === MoveId.MEMENTO)
+            ?? offer?.moves.find(move => move.slot === mementoSlot);
+          const mementoTargets = offeredMemento?.targetSets[0];
+          if (mementoTargets == null) {
+            return fail("desync", wave, "host did not offer the guest's locally legal Memento command");
           }
-          actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest EXPLOSION self-KO`);
+          actionScript.push(`wave ${wave} turn ${turn}: forced-faint guest MEMENTO self-KO`);
           hitMode(UiMode.COMMAND);
           hitMode(UiMode.FIGHT);
           return {
             command: Command.FIGHT,
-            cursor: explosionSlot,
-            moveId: MoveId.EXPLOSION,
-            targets: [...explosionTargets],
+            cursor: mementoSlot,
+            moveId: MoveId.MEMENTO,
+            targets: [...mementoTargets],
           };
         }
-        fail("no-park", wave, "level forced-faint leg could not issue Explosion from the guest lead");
+        fail("no-park", wave, "level forced-faint leg could not issue Memento from the guest lead");
       }
       // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
       // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick

@@ -3423,6 +3423,11 @@ test("a chained biome picker preserves its exact interaction coordinate through 
     /guestCurrent\?\.phaseName === "CoopReplayTurnPhase"[\s\S]*startCurrentDuoPhaseOnce\(rig\.guestScene, guestCurrent\)[\s\S]*headless scheduler started replacement-installed retained replay/u,
     "the headless soak starts a production-installed retained replay exactly once before reciprocal command rendezvous",
   );
+  assert.match(
+    soakDriver,
+    /moveset: \[MoveId\.MEMENTO,[\s\S]*forced-faint guest MEMENTO self-KO/u,
+    "the guaranteed faint leg leaves the battle alive so it must traverse the replacement authority surface",
+  );
   const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
   const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);
   assert.notEqual(readyStart, -1, "SelectBiome exposes one bounded public-control proof");
