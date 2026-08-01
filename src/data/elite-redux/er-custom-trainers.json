@@ -4693,6 +4693,7 @@
     "weight": 5
   },
   "TRAINER_70027": {
+    "battleBgm": "battle_plasma_boss",
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "You truly have a kind heart...one that resonates with others.",
