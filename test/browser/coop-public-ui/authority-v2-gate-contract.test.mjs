@@ -790,7 +790,10 @@ test("a destructively projected Crossroads Stay recreates its signed N+1 bridge 
     "the projected result replaces every unsigned tail with its immutable NewBattle wait",
   );
   const applyStart = crossroadsPhase.indexOf("private coopApply(");
-  const applyEnd = crossroadsPhase.indexOf("\n  // ---------------------------------------------------------------------------", applyStart);
+  const applyEnd = crossroadsPhase.indexOf(
+    "\n  // ---------------------------------------------------------------------------",
+    applyStart,
+  );
   const apply = crossroadsPhase.slice(applyStart, applyEnd);
   assert.ok(
     apply.indexOf("this.queueCoopV2NextWaveAwait(operationId)") < apply.indexOf("this.end()"),
