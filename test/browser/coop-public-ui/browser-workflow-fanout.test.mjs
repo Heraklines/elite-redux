@@ -310,7 +310,12 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     journeys,
+    /async function evolutionSync\(rig\)[\s\S]*rig\.pair\(rig\.config\.requesterSeat\)[\s\S]*rig\.startFreshRun\(\{ evolutionFixture: true \}\)[\s\S]*assertEvolutionFixtureParty\(rig\)[\s\S]*rig\.driveWaveToReward\(\)/u,
+  );
+  assert.doesNotMatch(
+    journeys,
     /async function evolutionSync\(rig\)[\s\S]*freshThroughWave2\(rig, \{ evolutionFixture: true \}\)/u,
+    "the focused evolution proof must stop at its authoritative reward successor, before unrelated wave-two RNG",
   );
   assert.match(
     journeys,

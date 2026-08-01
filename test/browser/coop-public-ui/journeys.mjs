@@ -433,7 +433,14 @@ function requireEvolutionPromptProof(client, phase) {
 }
 
 async function evolutionSync(rig) {
-  await freshThroughWave2(rig, { evolutionFixture: true });
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun({ evolutionFixture: true });
+  assertEvolutionFixtureParty(rig);
+  // The first authoritative reward is the ordered successor of the retained
+  // evolution. Reaching it proves the evolution released wave progression;
+  // entering wave two would add an unrelated, legitimate Mystery roll to this
+  // focused presentation contract.
+  await rig.driveWaveToReward();
   const ledger = rig.assertWaveProgressionLedger(1, "wave-1-evolution-sync", { requireExp: true });
   if (!ledger.some(entry => entry.event.k === "evolution")) {
     throw new Error(
