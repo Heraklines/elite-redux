@@ -4182,10 +4182,10 @@ export class DuoPublicUiRig {
       authorityCommit.index >= hostSettled.index
       || hostSettled.index >= hostRaw.index
       || guestAdmission.index >= guestBootstrap.index
-      || guestBootstrap.index >= guestRaw.index
-      || guestRaw.index >= guestReplayReleased.index
-      || guestReplayReleased.index >= guestDataApplied.index
+      || guestBootstrap.index >= guestDataApplied.index
+      || guestAdmission.index >= guestReplayReleased.index
       || guestDataApplied.index >= guestGameOver.index
+      || guestReplayReleased.index >= guestGameOver.index
       || guestGameOver.index >= guestControlApplied.index
       || authorityCommit.index >= authorityRelease.index
     ) {

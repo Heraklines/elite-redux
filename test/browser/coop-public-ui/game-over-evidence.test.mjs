@@ -100,6 +100,16 @@ test("GameOver journey uses visible starters, real command input, and exact reta
     /expectSharedTerminalAfterPairedGameOver[\s\S]*POST_GAME_OVER_PHASE[\s\S]*stable post-GameOver visual boundary[\s\S]*stable-post-game-over-visual-proof[\s\S]*paired-post-game-over-stable/u,
     "the final screenshot must follow both completed GameOver fades, not the transient faint narration",
   );
+  assert.match(
+    gameOverDriver,
+    /guestAdmission\.index >= guestBootstrap\.index[\s\S]*guestBootstrap\.index >= guestDataApplied\.index[\s\S]*guestAdmission\.index >= guestReplayReleased\.index[\s\S]*guestDataApplied\.index >= guestGameOver\.index[\s\S]*guestReplayReleased\.index >= guestGameOver\.index[\s\S]*guestGameOver\.index >= guestControlApplied\.index/u,
+    "the terminal oracle enforces the V2 causal DAG without inventing a total order for independent evidence",
+  );
+  assert.doesNotMatch(
+    gameOverDriver,
+    /guestBootstrap\.index >= guestRaw\.index|guestRaw\.index >= guestReplayReleased\.index|guestReplayReleased\.index >= guestDataApplied\.index/u,
+    "the ignored legacy raw hint and the two valid replay-release schedules are not V2 ordering authorities",
+  );
   for (const exactEvidence of [
     "PARITY kind=TERMINAL_COMMIT rev=",
     "settled WAVE_ADVANCE committed wave=1",
