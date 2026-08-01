@@ -45,6 +45,7 @@ import {
   type CoopShopBuyPayload,
   isCoopInteractionSuccessorRef,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
@@ -1489,28 +1490,74 @@ export function adoptRewardWatcherChoice(
       return { adopt: false, reason: "host-duplicate" };
     }
 
-    // Once the durability journal wins one action in this pinned FIFO, it leads the remainder of the
-    // interaction. Ignore raw legacy echoes (or raw later actions that raced ahead) and await their tagged
-    // committed envelope. This prevents a reordered echo from being mistaken for the next ordinal.
-    if (s.journalLeadingStarts.has(params.pinned) && params.action.operationId !== opId) {
-      return { adopt: false, reason: "await-journal" };
-    }
-
-    // The live sink sets this one-shot proof only after the complete result state was installed. Authority
-    // V2 deliberately bypasses the legacy guest revision/applied-id cursor, so the proof MUST be consumed
-    // before consulting that cursor. Reversing this order stranded V2 reward actions in
-    // "await-authoritative-envelope" even though their immutable result had already materialized.
-    if (params.action.operationId === opId && s.pendingJournalMaterializations.delete(opId)) {
-      ws.ordinal += 1;
+    // The live sink sets this one-shot proof only after the complete result state was installed. A continuing
+    // V2 shop result can destructively project its successor before the obsolete phase's async waiter runs.
+    // In that case the old phase correctly refuses to touch the new UI, but its local watcher ordinal cannot
+    // remain behind: the next terminal would otherwise be rejected forever as a future operation. Recover the
+    // exact ordinal from the immutable operation address, and fast-forward only when EVERY skipped operation
+    // has its own materialization proof. The globally ordered journal has already applied those state images;
+    // this cursor is merely catching up with them. Raw/legacy actions have no such proof and keep the strict
+    // no-gap behavior below.
+    const taggedOperationId = params.action.operationId;
+    if (taggedOperationId != null && s.pendingJournalMaterializations.has(taggedOperationId)) {
+      const tagged = parseCoopOperationId(taggedOperationId);
+      const streamBase = coopRewardOperationActionSlot(params.pinned, 0, params.rewardSurface);
+      const taggedOrdinal = tagged == null || streamBase == null ? -1 : tagged.pinnedSeq - streamBase;
+      if (
+        tagged == null
+        || tagged.epoch !== s.epoch
+        || tagged.owner !== ownerSeat
+        || tagged.kind !== kindFor(params.surface)
+        || !Number.isSafeInteger(taggedOrdinal)
+        || taggedOrdinal < 0
+        || taggedOrdinal >= COOP_REWARD_SURFACE_ACTION_STRIDE
+      ) {
+        return { adopt: false, reason: "invalid-materialized-operation-address" };
+      }
+      if (taggedOrdinal < ws.ordinal) {
+        s.pendingJournalMaterializations.delete(taggedOperationId);
+        return { adopt: false, reason: "duplicate" };
+      }
+      for (let ordinalToProve = ws.ordinal; ordinalToProve < taggedOrdinal; ordinalToProve++) {
+        const skippedOperationId = makeCoopOperationId(
+          s.epoch,
+          ownerSeat,
+          coopRewardOperationActionSlot(params.pinned, ordinalToProve, params.rewardSurface)!,
+          kindFor(params.surface),
+        );
+        if (!s.pendingJournalMaterializations.has(skippedOperationId)) {
+          return { adopt: false, reason: "await-prior-materialization" };
+        }
+      }
+      const skipped = taggedOrdinal - ws.ordinal;
+      for (let ordinalToConsume = ws.ordinal; ordinalToConsume <= taggedOrdinal; ordinalToConsume++) {
+        s.pendingJournalMaterializations.delete(
+          makeCoopOperationId(
+            s.epoch,
+            ownerSeat,
+            coopRewardOperationActionSlot(params.pinned, ordinalToConsume, params.rewardSurface)!,
+            kindFor(params.surface),
+          ),
+        );
+      }
+      ws.ordinal = taggedOrdinal + 1;
       roleState.lastAdoptedStart = Math.max(roleState.lastAdoptedStart, params.pinned);
       if (params.terminal) {
         markWatcherTerminal(ws, params.pinned, presentationGeneration);
       }
       coopLog(
         "reward",
-        `${params.surface} op WATCHER materialize retained choice=${params.action.choice} terminal=${params.terminal} id=${opId}`,
+        `${params.surface} op WATCHER materialize retained choice=${params.action.choice} terminal=${params.terminal} `
+          + `skippedObsolete=${skipped} id=${taggedOperationId}`,
       );
-      return { adopt: true, operationId: opId, authoritativeProjection: true };
+      return { adopt: true, operationId: taggedOperationId, authoritativeProjection: true };
+    }
+
+    // Once the durability journal wins one action in this pinned FIFO, it leads the remainder of the
+    // interaction. Ignore raw legacy echoes (or raw later actions that raced ahead) and await their tagged
+    // committed envelope. This prevents a reordered echo from being mistaken for the next ordinal.
+    if (s.journalLeadingStarts.has(params.pinned) && taggedOperationId !== opId) {
+      return { adopt: false, reason: "await-journal" };
     }
 
     // The legacy journal consumes its surface-local ledger before the safe phase loop resumes. An untagged

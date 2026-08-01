@@ -92,6 +92,14 @@ export class CoopUiMirror {
 
   /** Open a shared-screen mirror session. `mode` binds it; `seq` ids it on the wire. */
   beginSession(role: MirrorRole, mode: number, seq: number): void {
+    // A continuing shop result can reopen/rebind the same logical reward screen on only one peer. The wire
+    // sequence still denotes the same cosmetic session, so restarting its local `n` at zero would make the
+    // other peer discard every post-purchase cursor input as a duplicate until the old high-water mark was
+    // reached. Treat an identical begin as a resume; a genuinely new interaction/reroll has a different seq.
+    if (this.session?.role === role && this.session.mode === mode && this.session.seq === seq) {
+      coopLog("interaction", `uiMirror resumeSession role=${role} mode=${mode} seq=${seq} n=${this.session.n}`);
+      return;
+    }
     try {
       uiMirrorSessionHook?.(true, role);
     } catch {

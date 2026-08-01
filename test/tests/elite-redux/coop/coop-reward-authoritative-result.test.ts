@@ -16,6 +16,7 @@ import {
 import { createCoopRuntimeOpState, setActiveCoopRuntimeOpState } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   adoptRewardWatcherChoice,
+  armCoopRewardJournalMaterialization,
   captureCoopRewardOperationBinding,
   captureCoopRewardResultState,
   commitCoopRewardOptionsPresentation,
@@ -498,6 +499,89 @@ describe("P33 retained reward/shop authoritative results", () => {
     ).toEqual(marketData);
     hostManager.dispose();
     guestManager.dispose();
+  });
+
+  it("a guest terminal catches up materialized shop actions whose superseded phases could not consume them", () => {
+    const pinned = 1;
+    const operations = [0, 1, 2, 3].map(
+      index =>
+        commitRewardOwnerIntent({
+          surface: "reward",
+          pinned,
+          label: index === 3 ? "reward" : "shop",
+          choice: 0,
+          data: index === 3 ? [0, 0, 3] : [1, 2, 0, 3],
+          terminal: index === 3,
+          localRole: "guest",
+          wave: 2,
+          turn: 4,
+        })!,
+    );
+    expect(operations.map(operation => operation.operationId)).toEqual([
+      expect.stringMatching(/:REWARD:100000$/),
+      expect.stringMatching(/:REWARD:100001$/),
+      expect.stringMatching(/:REWARD:100002$/),
+      expect.stringMatching(/:REWARD:100003$/),
+    ]);
+    for (const operation of operations) {
+      armCoopRewardJournalMaterialization(operation.operationId, pinned);
+    }
+
+    const terminal = adoptRewardWatcherChoice({
+      surface: "reward",
+      pinned,
+      action: { choice: 0, data: [0, 0, 3], operationId: operations[3].operationId },
+      terminal: true,
+      localRole: "guest",
+      wave: 2,
+      turn: 4,
+    });
+
+    expect(terminal).toEqual({
+      adopt: true,
+      operationId: operations[3].operationId,
+      authoritativeProjection: true,
+    });
+  });
+
+  it("cannot fast-forward a reward consumer across an unproven materialization gap", () => {
+    const pinned = 1;
+    const first = commitRewardOwnerIntent({
+      surface: "reward",
+      pinned,
+      label: "shop",
+      choice: 0,
+      data: [1, 2, 0, 3],
+      terminal: false,
+      localRole: "guest",
+      wave: 2,
+      turn: 4,
+    })!;
+    const second = commitRewardOwnerIntent({
+      surface: "reward",
+      pinned,
+      label: "shop",
+      choice: 0,
+      data: [1, 2, 0, 3],
+      terminal: false,
+      localRole: "guest",
+      wave: 2,
+      turn: 4,
+    })!;
+    expect(first.operationId).toMatch(/:REWARD:100000$/);
+    armCoopRewardJournalMaterialization(second.operationId, pinned);
+
+    expect(
+      adoptRewardWatcherChoice({
+        surface: "reward",
+        pinned,
+        action: { choice: 0, data: [1, 2, 0, 3], operationId: second.operationId },
+        terminal: false,
+        localRole: "guest",
+        wave: 2,
+        turn: 4,
+      }),
+    ).toEqual({ adopt: false, reason: "await-prior-materialization" });
   });
 
   it("dropped then retried and duplicated results apply state and project exactly once", async () => {

@@ -1796,6 +1796,7 @@ export class SelectModifierPhase extends BattlePhase {
     // Prepare the typed intent BEFORE publishing its compatibility carrier. In retained-result mode this
     // does not commit state; the host executes once and captures the complete post-action result later.
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
+    const terminalAction = isCoopRewardActionTerminal("reward", label, choice, wire);
     const prepared = commitRewardOwnerIntent(
       {
         surface: "reward",
@@ -1805,7 +1806,7 @@ export class SelectModifierPhase extends BattlePhase {
         label,
         choice,
         data: wire,
-        terminal: isCoopRewardActionTerminal("reward", label, choice, wire),
+        terminal: terminalAction,
         localRole: controller.role,
         wave: this.coopRewardWave(),
         turn: this.coopRewardTurn(),
@@ -1936,11 +1937,11 @@ export class SelectModifierPhase extends BattlePhase {
           "v2-proposal",
           `retained reward proposal seq=${this.coopInteractionStart} id=${prepared.operationId} status=${lease}`,
         );
-        this.coopAwaitAuthoritativeResult(prepared.operationId);
+        this.coopAwaitAuthoritativeResult(prepared.operationId, terminalAction);
         return true;
       }
       sendProposal();
-      this.coopAwaitAuthoritativeResult(prepared.operationId);
+      this.coopAwaitAuthoritativeResult(prepared.operationId, terminalAction);
       return true;
     }
     if (isCoopDebug()) {
@@ -2101,12 +2102,17 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   /** GUEST intent owner: remain parked until the retained host result has applied, then project its UI tail. */
-  private coopAwaitAuthoritativeResult(operationId: string): void {
+  private coopAwaitAuthoritativeResult(operationId: string, terminal: boolean): void {
     if (this.coopAwaitingAuthorityResults.has(operationId)) {
       return;
     }
     this.coopAwaitingAuthorityResults.add(operationId);
-    this.coopEndMirror();
+    // A continuing purchase temporarily parks the handler in MESSAGE but remains in the same logical cursor
+    // stream. Keep its monotonically increasing mirror index alive across the authoritative round-trip. The
+    // mode fence makes it inert while parked. Terminals close the stream permanently as before.
+    if (terminal) {
+      this.coopEndMirror();
+    }
     void globalScene.ui.setMode(UiMode.MESSAGE);
     this.coopRewardOperationBinding ??= captureCoopRewardOperationBinding();
     void (async () => {

@@ -118,6 +118,30 @@ describe("co-op live-cursor mirror (#633)", () => {
     watcher.dispose();
   });
 
+  it("an owner-only reopen of the same shop session preserves its cursor high-water mark", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopUiMirror(host);
+    const watcher = new CoopUiMirror(guest);
+    const eng = makeEngine(MODE);
+    watcher.attach(eng);
+
+    owner.beginSession("owner", MODE, SEQ);
+    watcher.beginSession("watcher", MODE, SEQ);
+    owner.relayOwnerButton(40, MODE);
+    await flush();
+
+    // Authority V2 may rebind/reopen the continuing shop only on its input owner. This identical begin must
+    // resume at n=1, not restart at n=0 (which the still-live watcher would correctly reject as a duplicate).
+    owner.beginSession("owner", MODE, SEQ);
+    owner.relayOwnerButton(41, MODE);
+    await flush();
+
+    expect(eng.applied).toEqual([40, 41]);
+
+    owner.dispose();
+    watcher.dispose();
+  });
+
   it("the mode-resync barrier drops a button when the watcher's screen drifted", async () => {
     const { host, guest } = createLoopbackPair();
     const watcher = new CoopUiMirror(guest);
