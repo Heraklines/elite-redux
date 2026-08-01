@@ -42,6 +42,7 @@ on:
       - "test/tools/run-scenario.test.ts"
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
