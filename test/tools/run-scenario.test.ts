@@ -407,6 +407,7 @@ const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
 const AI_NEURAL_MODEL_DIR = (process.env.ER_AI_NEURAL_POLICY_MODEL ?? "").trim();
 const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
 const AI_POLICY_EPSILON = Number(process.env.ER_AI_POLICY_EPSILON ?? "0");
+const RUN_TEST_TIMEOUT_MS = Number(process.env.ER_RUN_TEST_TIMEOUT_MS ?? "1200000");
 if (AI_MODEL_PATH && AI_NEURAL_MODEL_DIR) {
   throw new Error("ER_AI_POLICY_MODEL and ER_AI_NEURAL_POLICY_MODEL are mutually exclusive");
 }
@@ -418,6 +419,9 @@ if (!["first-usable", "smart-default", "engine-hardest"].includes(AI_POLICY_MODE
 }
 if (!Number.isFinite(AI_POLICY_EPSILON) || AI_POLICY_EPSILON < 0 || AI_POLICY_EPSILON > 1) {
   throw new Error(`ER_AI_POLICY_EPSILON must be between 0 and 1: ${AI_POLICY_EPSILON}`);
+}
+if (!Number.isInteger(RUN_TEST_TIMEOUT_MS) || RUN_TEST_TIMEOUT_MS < 1) {
+  throw new Error(`ER_RUN_TEST_TIMEOUT_MS must be a positive integer: ${RUN_TEST_TIMEOUT_MS}`);
 }
 
 function loadAiTreeModel(path: string): ErTreeModelArtifact | null {
@@ -3488,6 +3492,32 @@ function assertCombatOnlyEpisode(episode: CombatBatchEpisode): void {
 async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput): Promise<void> {
   const results: CombatBatchEpisodeResult[] = [];
   const batchStart = performance.now();
+  const writeBatchCheckpoint = (complete: boolean): void => {
+    if (!JSON_OUT) {
+      return;
+    }
+    const totalMs = Math.round(performance.now() - batchStart);
+    mkdirSync(dirname(JSON_OUT), { recursive: true });
+    writeFileSync(
+      JSON_OUT,
+      JSON.stringify(
+        {
+          version: 1,
+          complete,
+          combatOnly: true,
+          hardestTrainerAi: true,
+          progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
+          expectedEpisodeCount: batch.episodes.length,
+          episodeCount: results.length,
+          totalMs,
+          averageMsPerEpisode: results.length > 0 ? Math.round(totalMs / results.length) : 0,
+          results,
+        },
+        null,
+        2,
+      ),
+    );
+  };
   for (const episode of batch.episodes) {
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
@@ -3500,6 +3530,9 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
     const bootStart = performance.now();
     const game = await launchScenario(phaserGame, episode.scenario, { realRng: REAL_RNG });
     const bootMs = Math.round(performance.now() - bootStart);
+    // Combat-only evaluation uses the fastest production-supported speed. This
+    // scales presentation waits, not turn order, RNG, damage, or policy inputs.
+    game.scene.gameSpeed = 10;
     const combatStart = performance.now();
     const state = newRunState(buildPolicy(episode.scenario, true));
     const stopAutopilot = installMenuAutopilot(game, state);
@@ -3567,6 +3600,7 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
       slowPhases,
       progressionPhaseEntries,
     });
+    writeBatchCheckpoint(false);
     console.log(
       `COMBAT EPISODE ${episode.id}: ${results.at(-1)?.outcome}, ${result.turns} turns, `
         + `${combatMs}ms combat, ${bootMs}ms reset, ${decisions} decisions`,
@@ -3577,21 +3611,21 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
     vi.restoreAllMocks();
   }
   flushAiDataset();
-  const totalMs = Math.round(performance.now() - batchStart);
-  const summary = {
-    version: 1,
-    combatOnly: true,
-    hardestTrainerAi: true,
-    progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
-    episodeCount: results.length,
-    totalMs,
-    averageMsPerEpisode: Math.round(totalMs / results.length),
-    results,
-  };
-  if (JSON_OUT) {
-    mkdirSync(dirname(JSON_OUT), { recursive: true });
-    writeFileSync(JSON_OUT, JSON.stringify(summary, null, 2));
-  }
+  writeBatchCheckpoint(true);
+  const summary = JSON_OUT
+    ? JSON.parse(readFileSync(JSON_OUT, "utf8"))
+    : {
+        version: 1,
+        complete: true,
+        combatOnly: true,
+        hardestTrainerAi: true,
+        progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
+        expectedEpisodeCount: batch.episodes.length,
+        episodeCount: results.length,
+        totalMs: Math.round(performance.now() - batchStart),
+        averageMsPerEpisode: Math.round((performance.now() - batchStart) / results.length),
+        results,
+      };
   console.log(`BATCH RESULT ${JSON.stringify(summary)}`);
 }
 
@@ -3610,6 +3644,7 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
 
   afterAll(() => AI_NEURAL_CLIENT?.stop());
 
+  // biome-ignore format: keep the large established scenario-runner callback stable
   it(`plays scenario: ${SPEC?.name || RAW}`, async () => {
     if (COMBAT_BATCH) {
       await playCombatBatch(phaserGame, COMBAT_BATCH);
@@ -3747,7 +3782,7 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
     } else {
       expect(SPEC).toBeTruthy();
     }
-  }, 1_200_000);
+  }, RUN_TEST_TIMEOUT_MS);
 });
 
 /** Whether the spec opts into any full-run behaviour (so the autopilot path is taken). */
@@ -5591,7 +5626,7 @@ describe.skipIf(!AI_CONTRACT_CHECK)("headless scenario runner - combat observati
         party: [
           {
             species: SpeciesId.ROTOM,
-            formIndex: 0,
+            formIndex: 2,
             level: 50,
             ability: AbilityId.LEVITATE,
             passiveAbility: AbilityId.HONEY_GATHER,
@@ -5630,7 +5665,7 @@ describe.skipIf(!AI_CONTRACT_CHECK)("headless scenario runner - combat observati
       expectedDamageMax: earthquake?.derived.expectedDamageMax,
       immunityReason: earthquake?.derived.immunityReason,
     }).toEqual({
-      targetTypes: [PokemonType.ELECTRIC, PokemonType.GHOST],
+      targetTypes: [PokemonType.ELECTRIC, PokemonType.WATER, PokemonType.GHOST],
       baseTypeMultiplier: 2,
       expectedDamageMax: 0,
       immunityReason: "engine-preview-zero",

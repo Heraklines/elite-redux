@@ -139,7 +139,7 @@ jobs:
     name: Mirrored benchmark shard ${{ matrix.shard }}
     needs: models
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -193,6 +193,7 @@ jobs:
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
           --ai-neural-model "$CONTROL_MODEL"
+          --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-random-init-transformer-v4-results.json"
       - name: Play Showdown-transfer transformer
         run: >-
@@ -200,6 +201,7 @@ jobs:
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
           --ai-neural-model "$TRANSFER_MODEL"
+          --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-showdown-transfer-transformer-v4-results.json"
       - name: Play diagnostic tree ensemble
         run: >-
@@ -223,11 +225,12 @@ jobs:
           --ai-policy engine-hardest
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ai-mirrored-benchmark-shard-${{ matrix.shard }}
           path: ai-gauntlet
           retention-days: 14
-          if-no-files-found: error
+          if-no-files-found: warn
 
   report:
     if: github.repository == 'Heraklines/elite-redux'

@@ -8,7 +8,7 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     "Usage: node scripts/run-combat-batch.mjs @batch.json "
       + "[--turns N] [--json-out FILE] [--ai-data-out FILE] "
       + "[--ai-model FILE] [--ai-neural-model DIR] [--ai-policy MODE] [--ai-epsilon P] "
-      + "[--record-engine-baseline] [--real-rng]",
+      + "[--record-engine-baseline] [--real-rng] [--test-timeout-ms N]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -30,6 +30,7 @@ let aiPolicy;
 let aiEpsilon;
 let recordEngineBaseline = false;
 let realRng = false;
+let testTimeoutMs;
 for (let index = 1; index < argv.length; index++) {
   const arg = argv[index];
   if (arg === "--turns") {
@@ -59,6 +60,12 @@ for (let index = 1; index < argv.length; index++) {
     recordEngineBaseline = true;
   } else if (arg === "--real-rng") {
     realRng = true;
+  } else if (arg === "--test-timeout-ms") {
+    testTimeoutMs = argv[++index];
+    if (!Number.isInteger(Number(testTimeoutMs)) || Number(testTimeoutMs) < 1) {
+      console.error("--test-timeout-ms must be a positive integer");
+      process.exit(1);
+    }
   } else {
     console.error(`unknown arg: ${arg}`);
     process.exit(1);
@@ -100,6 +107,9 @@ if (recordEngineBaseline) {
 }
 if (realRng) {
   env.ER_RUN_REAL_RNG = "1";
+}
+if (testTimeoutMs) {
+  env.ER_RUN_TEST_TIMEOUT_MS = testTimeoutMs;
 }
 
 const result = spawnSync(
