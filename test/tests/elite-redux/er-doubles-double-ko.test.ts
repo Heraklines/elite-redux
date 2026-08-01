@@ -25,12 +25,25 @@ import { SpeciesId } from "#enums/species-id";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
-import { SwitchSummonPhase } from "#phases/switch-summon-phase";
+import type { Pokemon } from "#field/pokemon";
+import { resolvePlayerSwitchSlot, SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+describe("ER simultaneous player double-KO replacement", () => {
+  it("replaces a stale duplicate pick with the next living off-field reserve", () => {
+    const mon = (allowed: boolean, onField: boolean): Pokemon =>
+      ({ isAllowedInBattle: () => allowed, isOnField: () => onField }) as unknown as Pokemon;
+    const party = [mon(false, false), mon(false, false), mon(false, false), mon(true, true), mon(true, false)];
+
+    // Slot 3 was the first pick. By the time the second summon executes it is
+    // already on the field, so slot 4 must be used instead.
+    expect(resolvePlayerSwitchSlot(party, 3, 2)).toBe(4);
+  });
+});
 
 describe.skipIf(!RUN)("ER doubles double-KO freeze (#400)", () => {
   let phaserGame: Phaser.Game;

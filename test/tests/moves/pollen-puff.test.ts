@@ -41,6 +41,9 @@ describe("Moves - Pollen Puff", () => {
 
     await game.phaseInterceptor.to("BerryPhase");
 
+    // This must prove that healing actually occurred; the old upper-bound-only
+    // assertion also passed when Pollen Puff damaged the ally down to 0 HP.
+    expect(rightPokemon.hp).toBeGreaterThan(1);
     // Pollen Puff heals with a ratio of 0.5, as long as Pollen Puff triggers only once the pokemon will always be <= (0.5 * Max HP) + 1
     expect(rightPokemon.hp).toBeLessThanOrEqual(0.5 * rightPokemon.getMaxHp() + 1);
   });

@@ -127,9 +127,12 @@ export class HatchedPokemonContainer extends Phaser.GameObjects.Container {
    */
   private checkIconId(female: boolean, formIndex: number, shiny: boolean, variant: number) {
     if (this.icon.frame.name !== this.species.getIconId(female, formIndex, shiny, variant)) {
-      console.log(`${this.species.name}'s variant icon does not exist. Replacing with default.`);
-      this.icon.setTexture(this.species.getIconAtlasKey(formIndex, false, variant));
-      this.icon.setFrame(this.species.getIconId(female, formIndex, false, variant));
+      console.log(`${this.species.name}'s form/variant icon does not exist. Replacing with base icon.`);
+      // Retrying the same form index only swaps shiny -> normal and still leaves
+      // Phaser's green/black missing-texture tile when an injected ER form has a
+      // front sprite but no dedicated icon atlas (for example Partner Fidough).
+      this.icon.setTexture(this.species.getIconAtlasKey(0, false, 0));
+      this.icon.setFrame(this.species.getIconId(female, 0, false, 0));
     }
   }
 }

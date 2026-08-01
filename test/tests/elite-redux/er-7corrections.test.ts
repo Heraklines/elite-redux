@@ -153,6 +153,22 @@ describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)"
     expect(isSuppressedByRequestedFieldAbility(subject, lunarNamedAbility!.id)).toBe(true);
   });
 
+  it("Aura Break suppression resolves raw field sources without re-entering hasAbility", () => {
+    const battleAura = ER_ID_MAP.abilities[637] as AbilityId;
+    const subject = {} as Pokemon;
+    const holder = {
+      hp: 1,
+      isOpponent: (pokemon: Pokemon) => pokemon === subject,
+      getAbilitySources: () => [{ ability: { id: AbilityId.AURA_BREAK } }],
+      hasAbility: () => {
+        throw new Error("Aura Break must not recurse through hasAbility");
+      },
+    } as unknown as Pokemon;
+    vi.spyOn(game.scene, "getField").mockReturnValue([holder]);
+
+    expect(isSuppressedByRequestedFieldAbility(subject, battleAura)).toBe(true);
+  });
+
   it("4-7. Composite abilities invoke the nativized constituents (not the removed type-grants)", () => {
     expect(MANUAL_COMPOSITE_PARTS[ER_WATERBORNE_ABILITY_ID].constituents).toContain(ErAbilityId.HYDRATE);
     expect(MANUAL_COMPOSITE_PARTS[ER_DRAGONFRUIT_ABILITY_ID].constituents).toContain(ErAbilityId.DRACONIZE);
