@@ -38,6 +38,33 @@
       "galar"
     ]
   },
+  "pokestar_invader_alien": {
+    "author": "Jext",
+    "genders": false,
+    "kind": "other",
+    "label": "Poke Star",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01o4r3wq/Invader+Alien",
+    "spriteKey": "pokestar_invader_alien",
+    "tags": [
+      "pokestar",
+      "alien"
+    ]
+  },
+  "red_masters_ex": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Champion_Red_Ex",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01zoe17k/Red",
+    "spriteKey": "red_masters_ex",
+    "tags": [
+      "champion",
+      "red",
+      "masters-ex"
+    ]
+  },
   "volo": {
     "author": "Kyle Dove",
     "genders": false,
@@ -51,6 +78,21 @@
       "cynthia",
       "evil",
       "villain"
+    ]
+  },
+  "volo_1": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "Pokemon Wielder",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/016stsb2/Volo",
+    "spriteKey": "volo_1",
+    "tags": [
+      "hisui",
+      "wielder",
+      "trainer",
+      "cynthia"
     ]
   }
 }

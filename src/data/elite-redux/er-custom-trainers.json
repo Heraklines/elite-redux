@@ -4017,7 +4017,7 @@
     "id": 70022,
     "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
     "maxWave": 199,
-    "minWave": 181,
+    "minWave": 180,
     "name": "Volo",
     "team": [
       {
@@ -4109,6 +4109,12 @@
       },
       {
         "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          }
+        ],
         "level": null,
         "moves": [
           "DRAGON_CLAW",
@@ -4117,7 +4123,7 @@
           "EXCALIBUR"
         ],
         "sanityOff": true,
-        "species": 10134
+        "species": 445
       },
       {
         "abilitySlot": 1,
@@ -4170,7 +4176,7 @@
     "id": 70023,
     "introDialogue": "If you want to keep this world from disappearing, then face me in battle!",
     "maxWave": 199,
-    "minWave": 181,
+    "minWave": 180,
     "name": "Volo",
     "team": [
       {
@@ -4200,7 +4206,7 @@
         }
       },
       {
-        "abilitySlot": 0,
+        "abilitySlot": 2,
         "heldItems": [
           {
             "count": 2,
@@ -4248,6 +4254,12 @@
       },
       {
         "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
         "level": null,
         "moves": [
           "FOCUS_BLAST",
@@ -4327,7 +4339,7 @@
     "weight": 5
   },
   "TRAINER_70024": {
-    "battleBgm": "battle_kalos_champion",
+    "battleBgm": "battle_jacinthe",
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "Très bien! Let us waste no time moving onto the next battle, yes?",
@@ -4439,6 +4451,245 @@
     "trainerClass": "SBCLEADER",
     "trainerSprite": "jacinthe_1",
     "victoryDialogue": "The agony of defeat is nothing compared to the joy of witnessing such magnificent might!",
+    "weight": 5
+  },
+  "TRAINER_70025": {
+    "battleBgm": "battle_legendary_ub",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "The mothership will be landing very soon...",
+    "difficulties": [
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70025,
+    "introDialogue": "This world is at maximum capacity. Therefore, we must eliminate all humans and Pokemon. Simple.",
+    "maxWave": 160,
+    "minWave": 120,
+    "name": "Invader Alien",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDER",
+          "HURRICANE",
+          "SHOCK_WAVE",
+          "ENCORE"
+        ],
+        "species": 587
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDERCLAP",
+          "PSYCHIC",
+          "SHADOW_BALL",
+          "TELEPORT"
+        ],
+        "species": 606
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "CREEPING_THORNS",
+          "CEASELESS_EDGE",
+          "EXPLOSION",
+          "SAPPY_SEED"
+        ],
+        "species": 598
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SHORE_UP",
+          "OUTBURST",
+          "EARTH_POWER",
+          "DIAMOND_STORM"
+        ],
+        "species": 526
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BOLT_STRIKE",
+          "ROCK_WRECKER",
+          "ICICLE_CRASH",
+          "MOUNTAIN_CHUNK"
+        ],
+        "species": 995
+      }
+    ],
+    "trainerClass": "POKESTAR",
+    "trainerSprite": "pokestar_invader_alien",
+    "victoryDialogue": "...We have to leave this planet with the mothership...",
+    "weight": 5
+  },
+  "TRAINER_70026": {
+    "battleBgm": "battle_kanto_champion",
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "...",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70026,
+    "introDialogue": "...",
+    "maxWave": 199,
+    "minWave": 181,
+    "name": "Red EX",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HEAT_WAVE",
+          "AIR_SLASH",
+          "DRACO_METEOR",
+          "EARTH_POWER"
+        ],
+        "sanityOff": true,
+        "species": 10095,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SOLAR_BEAM",
+          "WEATHER_BALL",
+          "SLUDGE_BOMB",
+          "MATCHA_GOTCHA"
+        ],
+        "sanityOff": true,
+        "species": 10093,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PLASMA_FISTS",
+          "FAKE_OUT",
+          "SPARK",
+          "VOLT_SWITCH"
+        ],
+        "sanityOff": true,
+        "species": 10586
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "YAWN",
+          "EXTREME_SPEED",
+          "EXPLOSION",
+          "DARKEST_LARIAT"
+        ],
+        "species": 143,
+        "vitamins": {
+          "hp": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "SHEER_COLD",
+          "RAZOR_WIND",
+          "BLEAKWIND_STORM",
+          "EARTH_POWER"
+        ],
+        "sanityOff": true,
+        "species": 10618,
+        "vitamins": {
+          "def": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "POISON_JAB",
+          "THOUSAND_ARROWS",
+          "FELL_STINGER",
+          "MEGAHORN"
+        ],
+        "sanityOff": true,
+        "species": 10097
+      }
+    ],
+    "trainerClass": "CHAMPION",
+    "trainerSprite": "red_masters_ex",
+    "victoryDialogue": "...",
     "weight": 5
   }
 }
