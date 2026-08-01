@@ -2970,9 +2970,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // prefix plus one defensive re-projection while still failing loudly on a genuinely recursive surface.
       if (guestCommandRequired && guestCommand != null) {
         for (let projectionPass = 0; projectionPass < 2; projectionPass++) {
-          const projectedReplay = withClientSync(rig.guestCtx, () =>
-            rig.guestScene.phaseManager.getCurrentPhase(),
-          );
+          const projectedReplay = withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.getCurrentPhase());
           if (projectedReplay?.phaseName !== "CoopReplayTurnPhase") {
             break;
           }

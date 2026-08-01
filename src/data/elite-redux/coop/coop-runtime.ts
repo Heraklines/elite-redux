@@ -408,9 +408,9 @@ import {
   COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
-  COOP_QUIZ_CHOICE_KINDS,
   COOP_ME_SUB_CHOICE_KINDS,
   COOP_ME_TERM_SEQ_BASE,
+  COOP_QUIZ_CHOICE_KINDS,
   COOP_REJOIN_SYNC_SEQ_BASE,
   COOP_REVIVAL_CHOICE_KINDS,
   COOP_REVIVAL_SEQ_BASE,
@@ -5725,9 +5725,8 @@ export function coopV2AuthorityProposalWaitSpec(
         // remote-input control. The real relay wait supplies its current question sequence; accept it only
         // when that sequence is one of the immutable streamed questions. This keeps later questions exact
         // without widening the 8.5M family to unrelated counters or indices.
-        const questionCount = plan.presentation.subPrompt?.kind === "quiz"
-          ? Math.min(plan.presentation.subPrompt.questions.length, 16)
-          : 0;
+        const questionCount =
+          plan.presentation.subPrompt?.kind === "quiz" ? Math.min(plan.presentation.subPrompt.questions.length, 16) : 0;
         if (questionCount === 0) {
           return null;
         }
