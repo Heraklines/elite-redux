@@ -36,6 +36,11 @@ on:
         required: true
         default: "5400000"
         type: string
+      resume_results:
+        description: Resume exact-prefix shard checkpoints from additional_repair_run_id
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -69,7 +74,16 @@ jobs:
           path: ai-gauntlet
           run-id: ${{ inputs.prior_run_id || '30694811394' }}
           github-token: ${{ github.token }}
+      - name: Restore resumable hardest-engine checkpoint
+        if: inputs.resume_results
+        uses: actions/download-artifact@v6
+        with:
+          name: ai-mirrored-benchmark-repaired-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          run-id: ${{ inputs.additional_repair_run_id }}
+          github-token: ${{ github.token }}
       - name: Remove any incomplete hardest-engine output
+        if: ${{ !inputs.resume_results }}
         shell: bash
         run: rm -f "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
       - name: Play corrected hardest-engine baseline
@@ -78,6 +92,7 @@ jobs:
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
           --ai-policy engine-hardest
+          ${{ inputs.resume_results && '--resume' || '' }}
           --test-timeout-ms "${{ inputs.test_timeout_ms || '5400000' }}"
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
       - uses: actions/upload-artifact@v4

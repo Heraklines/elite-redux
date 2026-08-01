@@ -179,7 +179,7 @@ import type { ErMapUiHandler } from "#ui/handlers/er-map-ui-handler";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import { PartyOption, type PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -393,6 +393,7 @@ const QUIET = process.env.ER_RUN_QUIET === "1"; // suppress per-turn STATE spam
 const AUTO_FIRST = process.env.ER_RUN_AUTO_FIRST === "1"; // press through unknown menus (option 0 / cancel)
 const JSON_OUT = (process.env.ER_RUN_JSON_OUT ?? "").trim(); // machine-readable result path
 const AI_DATA_OUT = (process.env.ER_RUN_AI_DATA_OUT ?? "").trim();
+const RESUME_COMBAT_BATCH = process.env.ER_RUN_RESUME_COMBAT_BATCH === "1";
 const AI_RECORD_ENGINE_BASELINE =
   process.env.ER_AI_RECORD_ENGINE_BASELINE === "1" || process.env.ER_AI_RECORD_ENGINE_TEACHER === "1";
 const AI_BUILD_SHA = (process.env.ER_AI_BUILD_SHA ?? process.env.GITHUB_SHA ?? "local").trim();
@@ -3851,6 +3852,61 @@ interface CombatBatchEpisodeResult {
   progressionPhaseEntries: number;
 }
 
+interface CombatBatchCheckpoint {
+  version: 1;
+  complete: boolean;
+  combatOnly: true;
+  hardestTrainerAi: boolean;
+  opponentController: string;
+  progressionPhaseEntries: number;
+  expectedEpisodeCount: number;
+  episodeCount: number;
+  totalMs: number;
+  averageMsPerEpisode: number;
+  results: CombatBatchEpisodeResult[];
+}
+
+function loadCombatBatchCheckpoint(batch: CombatBatchInput): CombatBatchCheckpoint | null {
+  if (!RESUME_COMBAT_BATCH) {
+    return null;
+  }
+  if (!JSON_OUT || !existsSync(JSON_OUT)) {
+    throw new Error("combat batch resume requires an existing ER_RUN_JSON_OUT checkpoint");
+  }
+  if (AI_DATA_OUT) {
+    throw new Error("combat batch resume is not supported while recording policy data");
+  }
+  const checkpoint = JSON.parse(readFileSync(JSON_OUT, "utf8")) as Partial<CombatBatchCheckpoint>;
+  const expectedOpponent = AI_HAS_CUSTOM_OPPONENT ? "custom-policy" : "engine-hardest-v1";
+  if (
+    checkpoint.version !== 1
+    || checkpoint.combatOnly !== true
+    || checkpoint.expectedEpisodeCount !== batch.episodes.length
+    || checkpoint.opponentController !== expectedOpponent
+    || checkpoint.hardestTrainerAi !== !AI_HAS_CUSTOM_OPPONENT
+    || !Array.isArray(checkpoint.results)
+    || checkpoint.episodeCount !== checkpoint.results.length
+    || typeof checkpoint.totalMs !== "number"
+    || !Number.isFinite(checkpoint.totalMs)
+    || checkpoint.totalMs < 0
+    || checkpoint.results.length > batch.episodes.length
+  ) {
+    throw new Error("combat batch resume checkpoint does not match the requested batch or controller");
+  }
+  for (const [index, result] of checkpoint.results.entries()) {
+    if (result?.id !== batch.episodes[index]?.id) {
+      throw new Error(
+        `combat batch resume checkpoint is not an exact episode prefix at index ${index}: `
+          + `${result?.id ?? "(missing)"} != ${batch.episodes[index]?.id ?? "(missing)"}`,
+      );
+    }
+  }
+  if (checkpoint.complete !== (checkpoint.results.length === batch.episodes.length)) {
+    throw new Error("combat batch resume checkpoint has an inconsistent complete flag");
+  }
+  return checkpoint as CombatBatchCheckpoint;
+}
+
 function combatBatchFailureContext(game: GameManager, st: RunState): string {
   const handler = game.scene.ui.getHandler() as unknown as Record<string, unknown>;
   const prompts = (
@@ -3923,13 +3979,15 @@ function assertCombatOnlyEpisode(episode: CombatBatchEpisode): void {
 }
 
 async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput): Promise<void> {
-  const results: CombatBatchEpisodeResult[] = [];
+  const checkpoint = loadCombatBatchCheckpoint(batch);
+  const results: CombatBatchEpisodeResult[] = checkpoint ? [...checkpoint.results] : [];
+  const priorTotalMs = checkpoint?.totalMs ?? 0;
   const batchStart = performance.now();
   const writeBatchCheckpoint = (complete: boolean): void => {
     if (!JSON_OUT) {
       return;
     }
-    const totalMs = Math.round(performance.now() - batchStart);
+    const totalMs = priorTotalMs + Math.round(performance.now() - batchStart);
     mkdirSync(dirname(JSON_OUT), { recursive: true });
     writeFileSync(
       JSON_OUT,
@@ -3952,7 +4010,7 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
       ),
     );
   };
-  for (const episode of batch.episodes) {
+  for (const episode of batch.episodes.slice(results.length)) {
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
     AI_NEURAL_CLIENT?.reset(`${activeAiEpisodeId}:seat-player`);
@@ -4059,8 +4117,8 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
         progressionPhaseEntries: results.reduce((total, result) => total + result.progressionPhaseEntries, 0),
         expectedEpisodeCount: batch.episodes.length,
         episodeCount: results.length,
-        totalMs: Math.round(performance.now() - batchStart),
-        averageMsPerEpisode: Math.round((performance.now() - batchStart) / results.length),
+        totalMs: priorTotalMs + Math.round(performance.now() - batchStart),
+        averageMsPerEpisode: Math.round((priorTotalMs + performance.now() - batchStart) / results.length),
         results,
       };
   console.log(`BATCH RESULT ${JSON.stringify(summary)}`);

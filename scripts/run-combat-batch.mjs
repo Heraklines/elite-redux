@@ -12,7 +12,7 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
       + "[--opponent-ai-model FILE] [--opponent-ai-neural-model DIR] "
       + "[--opponent-ai-policy MODE] [--opponent-ai-epsilon P] "
       + "[--opponent-ai-source SOURCE] [--opponent-ai-policy-target 0|1] "
-      + "[--record-engine-baseline] [--real-rng] [--test-timeout-ms N]",
+      + "[--record-engine-baseline] [--real-rng] [--resume] [--test-timeout-ms N]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -42,6 +42,7 @@ let opponentAiSource;
 let opponentAiPolicyTarget;
 let recordEngineBaseline = false;
 let realRng = false;
+let resume = false;
 let testTimeoutMs;
 for (let index = 1; index < argv.length; index++) {
   const arg = argv[index];
@@ -105,6 +106,8 @@ for (let index = 1; index < argv.length; index++) {
     recordEngineBaseline = true;
   } else if (arg === "--real-rng") {
     realRng = true;
+  } else if (arg === "--resume") {
+    resume = true;
   } else if (arg === "--test-timeout-ms") {
     testTimeoutMs = argv[++index];
     if (!Number.isInteger(Number(testTimeoutMs)) || Number(testTimeoutMs) < 1) {
@@ -119,6 +122,10 @@ for (let index = 1; index < argv.length; index++) {
 
 if (!Number.isInteger(Number(turns)) || Number(turns) < 1) {
   console.error("--turns must be a positive integer");
+  process.exit(1);
+}
+if (resume && !jsonOut) {
+  console.error("--resume requires --json-out");
   process.exit(1);
 }
 
@@ -178,6 +185,9 @@ if (recordEngineBaseline) {
 }
 if (realRng) {
   env.ER_RUN_REAL_RNG = "1";
+}
+if (resume) {
+  env.ER_RUN_RESUME_COMBAT_BATCH = "1";
 }
 if (testTimeoutMs) {
   env.ER_RUN_TEST_TIMEOUT_MS = testTimeoutMs;
