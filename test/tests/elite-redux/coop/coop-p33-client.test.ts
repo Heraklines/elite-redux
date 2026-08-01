@@ -616,7 +616,7 @@ describe("authenticated P33 browser client", () => {
   it("uses the tab-scoped run handoff before announce and reconnects the paired account after reload", async () => {
     const urls: string[] = [];
     const store: CoopP33ReloadResumeStore = {
-      load: vi.fn(() => ({ version: 1, code: "PAIR33", accountId: identity.accountId })),
+      load: vi.fn(() => ({ version: 1 as const, code: "PAIR33", accountId: identity.accountId })),
       save: vi.fn(),
       clear: vi.fn(),
     };
@@ -655,7 +655,7 @@ describe("authenticated P33 browser client", () => {
   it("clears an ended tab handoff and falls back to a normal authenticated announce", async () => {
     const urls: string[] = [];
     const store: CoopP33ReloadResumeStore = {
-      load: vi.fn(() => ({ version: 1, code: "ENDED33", accountId: identity.accountId })),
+      load: vi.fn(() => ({ version: 1 as const, code: "ENDED33", accountId: identity.accountId })),
       save: vi.fn(),
       clear: vi.fn(),
     };
