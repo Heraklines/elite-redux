@@ -1,0 +1,52 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:8ccf994dde649e8d182e6767fcf9968698a796d4:run-30717283634.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@30331ms -> title-shown@40673ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     VqTpwkVZ1JWlIicqgygQYzI9
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:8ccf994dde649e8d182e6767fcf9968698a796d4:run-30717283634.1","source":"github","sha":"8ccf994dde649e8d182e6767fcf9968698a796d4","workflow":{"provider":"github-actions","runId":"30717283634","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[20:48:18.731] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:48:19.976] LOG: [ER] build {"version":1,"id":"github:8ccf994dde649e8d182e6767fcf9968698a796d4:run-30717283634.1","source":"github","sha":"8ccf994dde649e8d182e6767fcf9968698a796d4","workflow":{"provider":"github-actions","runId":"30717283634","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[20:48:20.237] LOG: [dev-tools] loaded — 739 scenarios + Send Logs button
+[20:48:45.402] DEBUG: Destroying loading scene
+[20:48:45.402] DEBUG: Destroyed loading scene
+[20:48:45.854] LOG: Seed: VqTpwkVZ1JWlIicqgygQYzI9
+[20:48:45.854] LOG: Wave Seed: VqTpwkVZ1JWlIicqgygQYzI9 0
+[20:48:54.191] LOG: %cStart Phase LoginPhase color:green;
+[20:48:54.456] LOG: Client Session: QsZPrJQW7HFjrJK0ADYY0wLI0rAMwZbv
+[20:48:55.722] ERROR: TypeError: Cannot read properties of undefined (reading 'hasVariants')
+TypeError: Cannot read properties of undefined (reading 'hasVariants')
+    at generateEggProperties (https://elite-redux-staging.pages.dev/assets/arena-BL3m7f_6.js:1:249143)
+    at https://elite-redux-staging.pages.dev/assets/arena-BL3m7f_6.js:1:249403
+    at BattleScene.executeWithSeedOffset (https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1065:13323)
+    at new Egg (https://elite-redux-staging.pages.dev/assets/arena-BL3m7f_6.js:1:249376)
+    at EggData.toEgg (https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1007:95143)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1007:127670
+    at Array.map (<anonymous>)
+    at GameData.initParsedSystem (https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1007:127661)
+    at GameData.initSystem (https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1007:129073)
+    at GameData.loadSystem (https://elite-redux-staging.pages.dev/assets/battle-scene-BM1oiRSt.js:1007:122244)
+[20:48:55.723] LOG: %cStart Phase TitlePhase color:green;
+[20:48:55.724] LOG: Getting Session Slot id: %d 0
+[20:48:55.750] LOG: use seasonal splash messages true
+[20:49:13.785] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[20:49:14.319] WARN: [coop:lobby] start failed: this account already has an active co-op presence
+[20:49:14.322] LOG: [coop:lobby] cancel (id=none connecting=false)
+[20:49:20.682] LOG: %cStart Phase TitlePhase color:green;
+[20:49:20.684] LOG: Getting Session Slot id: %d 0
+[20:49:20.721] LOG: use seasonal splash messages true
+[20:49:22.031] LOG: [coop:lobby] start announce name=test4 protocol=p33
+[20:49:23.760] WARN: [coop:lobby] start failed: this account already has an active co-op presence
+[20:49:23.763] LOG: [coop:lobby] cancel (id=none connecting=false)
+
+----- REPLAY TRACE (JSON) -----
+(none)
