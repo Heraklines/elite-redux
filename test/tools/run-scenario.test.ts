@@ -1174,7 +1174,9 @@ async function recordEngineBaselineTurn(game: GameManager): Promise<void> {
     return;
   }
   game.scene.getPlayerField().forEach(mon => AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS.add(mon.id));
-  const phaseCount = game.scene.getEnemyField().length;
+  // TurnInitPhase queues one EnemyCommandPhase per currently active enemy.
+  // Fainted field occupants do not receive a command phase.
+  const phaseCount = game.scene.getEnemyField().filter(mon => mon.isActive()).length;
   const earlier: ErCombatEarlierChoice[] = [];
   const wave = game.scene.currentBattle.waveIndex;
   const turn = game.scene.currentBattle.turn;
@@ -1191,7 +1193,10 @@ async function recordEngineBaselineTurn(game: GameManager): Promise<void> {
           perspective: "enemy",
           knownOpponentEntityIds: AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS,
         });
-    const candidates = automatic ? [] : enumerateErCombatCandidates(game.scene, actorSlot, earlier, "enemy");
+    // Native AI seats choose independently and may commit the same switch target.
+    // Preserve earlier choices as observation context, but map the committed
+    // command against the unconstrained legal surface the engine actually saw.
+    const candidates = automatic ? [] : enumerateErCombatCandidates(game.scene, actorSlot, [], "enemy");
 
     await game.phaseInterceptor.to("EnemyCommandPhase");
     if (automatic) {
@@ -2396,7 +2401,11 @@ function driveLearnMoveSummary(game: GameManager, st: RunState): void {
  * screen can be active while its fade or internal block still rejects input, so
  * `false` deliberately leaves the current prompt/autopilot appearance retryable.
  */
-function drivePartySelection(game: GameManager, slot: number): boolean {
+function drivePartySelection(
+  game: GameManager,
+  slot: number,
+  acceptedOptions: readonly PartyOption[] = [PartyOption.SEND_OUT, PartyOption.PASS_BATON],
+): boolean {
   const handler = game.scene.ui.getHandler() as PartyUiHandler;
   const state = handler as unknown as {
     cursor?: number;
@@ -2404,10 +2413,10 @@ function drivePartySelection(game: GameManager, slot: number): boolean {
     optionsMode?: boolean;
   };
   if (state.optionsMode === true) {
-    const switchOption = partySwitchOption(state.options);
-    if (state.cursor === slot && switchOption >= 0) {
+    const selectionOption = partySelectionOption(state.options, acceptedOptions);
+    if (state.cursor === slot && selectionOption >= 0) {
       // `setCursor` addresses the options cursor while this submenu is open.
-      handler.setCursor(switchOption);
+      handler.setCursor(selectionOption);
       return game.scene.ui.processInput(Button.ACTION);
     }
     // Consecutive triple replacements can reopen with the prior active slot's
@@ -2424,17 +2433,22 @@ function drivePartySelection(game: GameManager, slot: number): boolean {
   if (game.scene.ui.getMode() !== UiMode.PARTY || !handler.active) {
     return true;
   }
-  const switchOption = partySwitchOption(state.options);
-  if (state.optionsMode !== true || switchOption < 0) {
+  const selectionOption = partySelectionOption(state.options, acceptedOptions);
+  if (state.optionsMode !== true || selectionOption < 0) {
     return false;
   }
-  handler.setCursor(switchOption);
+  handler.setCursor(selectionOption);
   return game.scene.ui.processInput(Button.ACTION);
 }
 
-function partySwitchOption(options: PartyOption[] | undefined): number {
-  const sendOut = options?.indexOf(PartyOption.SEND_OUT) ?? -1;
-  return sendOut >= 0 ? sendOut : (options?.indexOf(PartyOption.PASS_BATON) ?? -1);
+function partySelectionOption(options: PartyOption[] | undefined, acceptedOptions: readonly PartyOption[]): number {
+  for (const acceptedOption of acceptedOptions) {
+    const optionIndex = options?.indexOf(acceptedOption) ?? -1;
+    if (optionIndex >= 0) {
+      return optionIndex;
+    }
+  }
+  return -1;
 }
 
 /** Use the production party filter to avoid repeatedly choosing a bench mon this exact prompt rejects. */
@@ -2469,7 +2483,7 @@ function driveParty(game: GameManager, st: RunState, phaseName: string): boolean
     if (slot < 0) {
       throw new Error("Revival Blessing opened its party target menu without a fainted Pokemon");
     }
-    const handled = drivePartySelection(game, slot);
+    const handled = drivePartySelection(game, slot, [PartyOption.REVIVE]);
     if (handled) {
       st.log.push(`revival-blessing -> party[${slot}]`);
     }
@@ -2505,7 +2519,7 @@ function driveParty(game: GameManager, st: RunState, phaseName: string): boolean
     return handled;
   }
   // Reward party-target (SelectModifierPhase): apply the reward to the lead.
-  const handled = drivePartySelection(game, 0);
+  const handled = drivePartySelection(game, 0, [PartyOption.APPLY]);
   if (handled) {
     st.log.push("reward-target → lead");
   }
@@ -4622,6 +4636,26 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(game.scene.getPlayerField()[0].species.speciesId, "PIKACHU should be active after the switch").toBe(
       SpeciesId.PIKACHU,
     );
+  }, 180_000);
+
+  it("Revival Blessing selects the REVIVE party option through the public UI", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "revival blessing party routing",
+      run: { level: 100, difficulty: "hell", enemyAi: "hardest" },
+      party: [
+        { species: SpeciesId.MEW, moves: [MoveId.MEMENTO] },
+        { species: SpeciesId.RABSCA, moves: [MoveId.REVIVAL_BLESSING, MoveId.HYPER_BEAM] },
+      ],
+      enemy: { kind: "wild", wild: { species: SpeciesId.CHANSEY, level: 1, moves: [MoveId.SPLASH] } },
+      script: [
+        { move: "MEMENTO", enemyMove: "SPLASH" },
+        { move: "REVIVAL_BLESSING", enemyMove: "SPLASH" },
+        { move: "HYPER_BEAM", enemyMove: "SPLASH" },
+      ],
+    };
+    const { game } = await runInlineRun(phaserGame, spec, 1);
+    expect(game.scene.getPlayerParty()[0].isFainted(), "Memento user should have been revived").toBe(false);
   }, 180_000);
 
   it("simultaneous voluntary switches route each doubles slot through its own party prompt", async () => {
