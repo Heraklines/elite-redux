@@ -880,6 +880,11 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
     2,
     "only the two explicit no-replacement paths may publish an empty presentation without a summon recorder",
   );
+  assert.match(
+    switchPhase,
+    /const battleLegalParty = globalScene\.getPokemonAllowedInBattle\(\);[\s\S]+const v2HalfWipeNeedsNullReplacement =[\s\S]+battleLegalParty\.length > 0[\s\S]+isCoopV2ReplacementCutoverActive\(\)[\s\S]+!v2HalfWipeNeedsNullReplacement[\s\S]+battleLegalParty\.every\(p => p\.isOnField\(\)\)/u,
+    "one surviving partner already on field cannot bypass the ordered V2 null-replacement result",
+  );
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 

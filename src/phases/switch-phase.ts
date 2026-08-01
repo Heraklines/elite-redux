@@ -96,8 +96,19 @@ export class SwitchPhase extends BattlePhase {
   start() {
     super.start();
 
-    // Skip modal switch if impossible (no remaining party members that aren't already in battle)
-    if (this.isModal && globalScene.getPokemonAllowedInBattle().every(p => p.isOnField())) {
+    // Skip modal switch if impossible (no remaining party members that aren't already in battle). A V2
+    // half-wipe is the exception: the surviving partner can be the only battle-legal mon and already on
+    // field, while this defeated owner's REPLACEMENT head still requires an explicit null result before
+    // command control may open. Let the co-op owner branch below seal that typed no-replacement result.
+    const battleLegalParty = globalScene.getPokemonAllowedInBattle();
+    const v2HalfWipeNeedsNullReplacement =
+      this.isModal
+      && battleLegalParty.length > 0
+      && globalScene.gameMode.isCoop
+      && getCoopController() != null
+      && getCoopNetcodeMode() === "authoritative"
+      && isCoopV2ReplacementCutoverActive();
+    if (this.isModal && !v2HalfWipeNeedsNullReplacement && battleLegalParty.every(p => p.isOnField())) {
       return super.end();
     }
 

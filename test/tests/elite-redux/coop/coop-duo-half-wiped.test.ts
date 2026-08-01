@@ -118,15 +118,15 @@ describe.skipIf(!RUN)(
       }));
     }
 
-    it("host's whole half wiped: its own faint closes the picker, run continues with the guest (no stall, no resync)", async () => {
+    it("host's whole half wiped with only the guest lead alive: typed null replacement reaches command", async () => {
       // A full SIX-mon party, host EVEN slots / guest ODD (the soak's 3-per-player ownership).
       await game.classicMode.startBattle(
         SpeciesId.GENGAR, // 0 host  (FRAIL lead at 1 HP; the foe KOs it - host is then OUT)
         SpeciesId.SNORLAX, // 1 guest (BULKY lead; SURVIVES the spread ROCK_SLIDE - the guest fights on)
         SpeciesId.LAPRAS, // 2 host  (bench - pre-fainted)
-        SpeciesId.CHARIZARD, // 3 guest (bench - alive)
+        SpeciesId.CHARIZARD, // 3 guest (bench - pre-fainted; only the guest lead survives)
         SpeciesId.BLASTOISE, // 4 host  (bench - pre-fainted)
-        SpeciesId.VENUSAUR, // 5 guest (bench - alive)
+        SpeciesId.VENUSAUR, // 5 guest (bench - pre-fainted; reproduces the every-legal-mon-is-on-field guard)
       );
       const pair = createLoopbackPair();
       const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
@@ -140,10 +140,11 @@ describe.skipIf(!RUN)(
         }
       }
 
-      // WIPE the HOST's whole bench (slots 2 + 4) on BOTH engines, and put the host lead (slot 0) at 1 HP,
-      // so when the foe KOs it the host has NO legal same-owner replacement (its half is entirely fainted).
+      // WIPE every bench slot on BOTH engines and put the host lead (slot 0) at 1 HP. When the foe KOs it,
+      // the guest lead is the only battle-legal mon and is already on field. The old vanilla impossibility
+      // guard returned here before V2 could commit the host slot's required typed null replacement.
       for (const scene of [rig.hostScene, rig.guestScene]) {
-        for (const benchSlot of [2, 4]) {
+        for (const benchSlot of [2, 3, 4, 5]) {
           const mon = scene.getPlayerParty()[benchSlot];
           mon.hp = 0;
           // FaintPhase-free KO: mirror the fainted-bench state the two engines are set up to reconcile.
@@ -175,7 +176,7 @@ describe.skipIf(!RUN)(
       // THE PATH UNDER TEST: cross to the next CommandPhase. The host-owned SwitchPhase opens with NO legal
       // same-owner replacement. PRE-FIX it opens the modal FAINT_SWITCH picker whose only mons are fainted or
       // partner-owned (all blocked) and NEVER resolves -> this to() TIMES OUT (the stuck-in-menu stall).
-      // POST-FIX the phase closes itself (relays a no-pick + super.end()), so the host crosses cleanly.
+      // POST-FIX the phase closes itself, commits the no-pick result, and lets the successor command open.
       await withClient(rig.hostCtx, async () => {
         await game.phaseInterceptor.to("CommandPhase");
       });
