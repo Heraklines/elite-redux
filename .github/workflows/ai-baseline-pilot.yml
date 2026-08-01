@@ -10,6 +10,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_benchmark:
+        description: Run the source-account-held-out mirrored five-controller benchmark
+        required: true
+        default: false
+        type: boolean
   push:
     branches:
       - codex/combat-ai-baselines-20260728
@@ -533,3 +538,9 @@ jobs:
           path: ai-kaggle/er-ai-training-bundle.zip
           retention-days: 30
           if-no-files-found: error
+
+  mirrored-benchmark:
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_benchmark
+    name: Dispatch mirrored ghost benchmark
+    uses: ./.github/workflows/ai-mirrored-benchmark.yml
+    secrets: inherit

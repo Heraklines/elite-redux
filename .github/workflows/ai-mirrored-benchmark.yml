@@ -2,6 +2,25 @@ name: AI Mirrored Ghost Benchmark (Non-Production)
 
 # Artifact-only research lane. It cannot deploy or reach a game environment.
 on:
+  workflow_call:
+    inputs:
+      control_kernel:
+        required: false
+        default: michaelferjani/er-ai-fw-v5-matched-control-gpu-20260731
+        type: string
+      transfer_kernel:
+        required: false
+        default: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
+        type: string
+      tree_run_id:
+        required: false
+        default: "30588067756"
+        type: string
+    secrets:
+      KAGGLE_USERNAME:
+        required: true
+      KAGGLE_KEY:
+        required: true
   workflow_dispatch:
     inputs:
       control_kernel:
