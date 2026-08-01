@@ -340,6 +340,13 @@ export function withCanonicalCombatCandidateId<T extends ErCombatCandidateInput>
   return { ...candidate, id: canonicalCombatCandidateId(candidate) };
 }
 
+export function committedTurnTargetIndices(command: {
+  targets?: readonly number[] | undefined;
+  move?: { targets?: readonly number[] | undefined } | undefined;
+}): readonly number[] {
+  return command.targets ?? command.move?.targets ?? [];
+}
+
 /** Fail closed before a malformed row becomes training data. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each branch independently validates one contract invariant.
 export function validateCombatDecisionRecord(record: ErCombatDecisionRecord): string[] {

@@ -5,6 +5,7 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import {
+  committedTurnTargetIndices,
   ER_COMBAT_CONTRACT_VERSION,
   type ErCombatCandidate,
   type ErCombatDecisionRecord,
@@ -106,7 +107,7 @@ export function findCommittedCombatCandidate(
   if (command.command !== Command.FIGHT || command.move == null) {
     return null;
   }
-  const committedTargets = command.move.targets
+  const committedTargets = committedTurnTargetIndices(command)
     .map(target => perspectiveTargetRef(scene, perspective, target))
     .filter((target): target is ErCombatTargetRef => target != null);
   const tera = battle.preTurnCommands[flatSlot]?.command === Command.TERA;

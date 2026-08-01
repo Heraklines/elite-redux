@@ -5,6 +5,7 @@
 
 import {
   canonicalCombatCandidateId,
+  committedTurnTargetIndices,
   ER_COMBAT_CONTRACT_VERSION,
   type ErCombatDecisionRecord,
   type ErCombatMoveCandidate,
@@ -46,6 +47,11 @@ describe("ER combat AI contract", () => {
   const tokenRow = (candidateId: string) => ({
     candidateId,
     groups: { actor: [], targets: [], destination: [], field: [], action: ["action:test"] },
+  });
+
+  it("reads resolved interactive targets before move-default targets", () => {
+    expect(committedTurnTargetIndices({ targets: [3], move: { move: 1, targets: [], useMode: 1 } })).toEqual([3]);
+    expect(committedTurnTargetIndices({ move: { move: 1, targets: [2, 3], useMode: 1 } })).toEqual([2, 3]);
   });
 
   it("uses semantic target identity rather than target order", () => {
