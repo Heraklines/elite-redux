@@ -162,6 +162,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   );
   assert.match(
     registry,
+    /getCoopBrowserNavigationFixtureStartingMoney[\s\S]*isCoopBrowserNavigationFixtureActive\(\) \? 100_000 : null/u,
+    "the exact navigation bundle receives enough initial-save money to make both market-owner purchases deterministic",
+  );
+  assert.match(
+    registry,
     /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
   );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
@@ -173,6 +178,12 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(
     starterPhase,
     /const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions\)/u,
+  );
+  assert.equal(
+    (starterPhase.match(/if \(fixtureStartingMoney != null\) \{\s*globalScene\.money = fixtureStartingMoney;\s*\}/gu) ?? [])
+      .length,
+    2,
+    "both the legacy fallback and authoritative host set the fixture purse before initial battle construction",
   );
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);

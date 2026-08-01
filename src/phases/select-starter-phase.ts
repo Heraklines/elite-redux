@@ -5,6 +5,7 @@ import {
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
   getCoopBrowserLongitudinalFixtureStartingLevel,
+  getCoopBrowserNavigationFixtureStartingMoney,
   isCoopBrowserEvolutionFixtureActive,
   shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
 } from "#app/dev-tools/registry";
@@ -325,6 +326,7 @@ export class SelectStarterPhase extends Phase {
     );
     const fixtureStartingLevel = getCoopBrowserLongitudinalFixtureStartingLevel();
     const fixtureStartingLevels = fixtureStartingLevel == null ? undefined : merged.map(() => fixtureStartingLevel);
+    const fixtureStartingMoney = getCoopBrowserNavigationFixtureStartingMoney();
     const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions();
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
@@ -344,6 +346,9 @@ export class SelectStarterPhase extends Phase {
             failCoopSharedSession("guest could not adopt the exact fresh-launch checkpoint");
           }
           return;
+        }
+        if (fixtureStartingMoney != null) {
+          globalScene.money = fixtureStartingMoney;
         }
         this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions);
       });
@@ -385,6 +390,9 @@ export class SelectStarterPhase extends Phase {
         getCoopBattleStreamer()?.sendLaunchSnapshotAbort(COOP_LAUNCH_WAVE, "slot-raced");
         failCoopSharedSession("fresh co-op save slot changed before starter materialization");
         return;
+      }
+      if (fixtureStartingMoney != null) {
+        globalScene.money = fixtureStartingMoney;
       }
       this.initBattle(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions);
     });

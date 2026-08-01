@@ -350,6 +350,11 @@ export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null 
       : null;
 }
 
+/** Initial-save-only purse for the four-hour navigation lane's repeated real biome-market purchases. */
+export function getCoopBrowserNavigationFixtureStartingMoney(): number | null {
+  return isCoopBrowserNavigationFixtureActive() ? 100_000 : null;
+}
+
 /** Survival/navigation lanes suppress incidental evolution; the dedicated evolution lane must not. */
 export function shouldPauseCoopBrowserLongitudinalFixtureEvolutions(): boolean {
   return (
