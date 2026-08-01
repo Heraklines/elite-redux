@@ -80,7 +80,9 @@ test("journey bundle resolves one validated asset SHA even when the GitHub API i
 test("every two-browser journey gives each real Chromium its own display and persistent cache", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const journey = jobBlock(workflow, "primary-journey");
+  const reverse = jobBlock(workflow, "reverse-journey");
   assert.match(journey, /COOP_UI_HEADLESS: "0"/u);
+  assert.match(journey, /COOP_UI_PROXY_PRODUCTION_ASSETS: "1"/u);
   assert.match(journey, /COOP_UI_SEAT_PROFILE_DIR: \$\{\{ runner\.temp \}\}\/coop-seat-profiles/u);
   assert.match(journey, /Xvfb :98[\s\S]*Xvfb :99/u);
   assert.match(journey, /COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99/u);
@@ -89,6 +91,7 @@ test("every two-browser journey gives each real Chromium its own display and per
     /export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99[\s\S]*if \[\[/u,
     "the display assignment must cover both conditional journey entrypoints",
   );
+  assert.match(reverse, /COOP_UI_PROXY_PRODUCTION_ASSETS: "1"/u);
 });
 
 test("campaign asset proxy is explicit for non-surface profiles and remains off for the production surface oracle", async () => {

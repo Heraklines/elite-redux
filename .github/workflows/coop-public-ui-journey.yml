@@ -394,6 +394,11 @@ jobs:
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
+          # Ordinary journeys test UI -> relay -> Authority V2 behavior, not CDN availability. Serve the
+          # same immutable ER_ASSETS_SHA through the sealed preview's byte-bounded same-origin cache so a
+          # transient jsDelivr CORS/error response cannot counterfeit hundreds of product failures. The
+          # animations-enabled campaign surface remains the dedicated direct-production asset oracle.
+          COOP_UI_PROXY_PRODUCTION_ASSETS: "1"
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           # run-campaign.mjs consumes the same base config but owns its own campaign policy;
@@ -562,6 +567,7 @@ jobs:
           COOP_UI_BASE_URL: http://127.0.0.1:4176/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback
+          COOP_UI_PROXY_PRODUCTION_ASSETS: "1"
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           COOP_UI_JOURNEY: reverse-resume
