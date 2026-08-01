@@ -988,7 +988,10 @@ async function recordCommittedPlayerTurn(
     if (!actor?.isActive(true) || actor.isFainted()) {
       continue;
     }
-    const observation = observations.get(actorSlot) ?? snapshotErCombatObservation(scene);
+    const observation = observations.get(actorSlot);
+    if (observation == null) {
+      continue;
+    }
     const candidates = enumerateErCombatCandidates(scene, actorSlot, earlier);
     const chosen = appendCommittedDecision({
       game,
