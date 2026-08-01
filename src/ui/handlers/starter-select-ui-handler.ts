@@ -7093,6 +7093,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       baseStride: 18,
       maxWidth: 104,
     });
+    // Extra badges are pooled lazily, so they are appended after the move-info
+    // overlay unless explicitly re-layered. Keep every third+ type beneath the
+    // overlay just like the two fixed badges.
+    for (const icon of this.extraTypeIcons) {
+      this.starterSelectContainer.moveBelow(icon, this.moveInfoOverlay);
+    }
   }
 
   popStarter(index: number): void {

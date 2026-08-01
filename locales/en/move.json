@@ -1205,7 +1205,7 @@
   },
   "needleArm": {
     "name": "Needle Arm",
-    "effect": "The user attacks by wildly swinging its thorny arms. This may also make the target flinch."
+    "effect": "The user attacks with thorny arms and sets Creeping Thorns on the target's side. Fails if Stealth Rock is already there."
   },
   "slackOff": {
     "name": "Slack Off",

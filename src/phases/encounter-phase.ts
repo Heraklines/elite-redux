@@ -7,7 +7,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
-import { fieldPositionForSlot, formatById } from "#data/battle-format";
+import { compactEligiblePartyIntoActiveSlots, fieldPositionForSlot, formatById } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
@@ -2060,11 +2060,10 @@ export class EncounterPhase extends BattlePhase {
     }
 
     if (this.loaded) {
-      // RELOAD (loaded): the lead is already restored to the field, but the NON-lead field slots
-      // are not - on a >1-wide format only the leftmost mon reappeared, so a triple came back
-      // "1v3". Place each additional on-field slot DIRECTLY (no re-summon, so on-summon abilities
-      // like Intimidate never re-fire). Starts at slot 1 so binary singles are a no-op, and the
-      // `isOnField` guard keeps it idempotent for any slot already present (e.g. a restored double).
+      // RELOAD (loaded): only part of the active prefix may have been restored,
+      // and a just-fainted member can still occupy one of those seats. Repair
+      // the solo field projection DIRECTLY (no re-summon, so entry abilities
+      // such as Intimidate never re-fire).
       const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
       const party = globalScene.getPlayerParty();
       // Launch/resume snapshots are captured before the host's summon chain. That is true for classic co-op
@@ -2075,13 +2074,33 @@ export class EncounterPhase extends BattlePhase {
       if (authoritativeGuest) {
         playerPresentationReady = materializeCoopLoadedPlayerFieldReady(presentationBoundaryIsLive);
       } else {
-        for (let i = 1; i < playerCapacity && i < party.length; i++) {
+        // A save can be captured after an active member faints but before the
+        // replacement has been moved into the party's active prefix. Restore
+        // that core invariant first, or a loaded triple with party[2] fainted
+        // renders only two battlers despite healthy reserves in party[4]/[5].
+        for (let i = 0; i < Math.min(playerCapacity, party.length); i++) {
+          if (!party[i].isAllowedInBattle() && party[i].isOnField()) {
+            party[i].leaveField();
+          }
+        }
+        compactEligiblePartyIntoActiveSlots(party, playerCapacity, pokemon => pokemon.isAllowedInBattle());
+
+        // Remove any wider-format remnants before materializing the restored
+        // seats. This is presentation-only: no summon phases or entry effects.
+        for (let i = playerCapacity; i < party.length; i++) {
+          if (party[i].isOnField()) {
+            party[i].leaveField();
+          }
+        }
+        for (let i = 0; i < playerCapacity && i < party.length; i++) {
           const pokemon = party[i];
-          if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
+          if (!pokemon?.isAllowedInBattle()) {
             continue;
           }
-          globalScene.field.add(pokemon);
-          pokemon.fieldSetup();
+          if (!pokemon.isOnField()) {
+            globalScene.field.add(pokemon);
+            pokemon.fieldSetup();
+          }
           pokemon.setFieldPosition(fieldPositionForSlot(i, playerCapacity));
           pokemon.setVisible(true);
           pokemon.showInfo();

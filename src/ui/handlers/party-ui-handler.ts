@@ -59,6 +59,49 @@ const DISCARD_BUTTON_X = 60;
 const DISCARD_BUTTON_X_DOUBLES = 64;
 const DISCARD_BUTTON_Y = -73;
 const DISCARD_BUTTON_Y_DOUBLES = -58;
+const DISCARD_BUTTON_Y_TRIPLES = -33;
+
+/** Resolve vertical focus in the item-management layout for any field width. */
+export function resolveItemManageVerticalCursor(
+  cursor: number,
+  slotCount: number,
+  battlerCount: number,
+  direction: Button.UP | Button.DOWN,
+): number {
+  const activeCount = Math.min(slotCount, Math.max(1, battlerCount));
+  const lastActive = activeCount - 1;
+  const hasBench = slotCount > activeCount;
+
+  if (direction === Button.UP) {
+    if (cursor === 6) {
+      return hasBench ? slotCount - 1 : 7;
+    }
+    if (cursor === 7) {
+      return lastActive;
+    }
+    if (hasBench && cursor === activeCount) {
+      return 7;
+    }
+    if (cursor > 0 && cursor < 6) {
+      return cursor - 1;
+    }
+    return 6;
+  }
+
+  if (cursor === 6) {
+    return 0;
+  }
+  if (cursor === 7) {
+    return hasBench ? activeCount : 6;
+  }
+  if (cursor === lastActive) {
+    return 7;
+  }
+  if (cursor < slotCount - 1) {
+    return cursor + 1;
+  }
+  return 6;
+}
 
 const defaultMessage = i18next.t("partyUiHandler:choosePokemon");
 
@@ -462,10 +505,11 @@ export class PartyUiHandler extends MessageUiHandler {
     this.showMovePp = args.length > 6 && args[6];
 
     this.partyContainer.setVisible(true);
+    const multiFormat = globalScene.currentBattle.getBattlerCount() > 1;
     if (this.isItemManageMode()) {
-      this.partyBg.setTexture(`party_bg${globalScene.currentBattle.double ? "_double_manage" : ""}`);
+      this.partyBg.setTexture(`party_bg${multiFormat ? "_double_manage" : ""}`);
     } else {
-      this.partyBg.setTexture(`party_bg${globalScene.currentBattle.double ? "_double" : ""}`);
+      this.partyBg.setTexture(`party_bg${multiFormat ? "_double" : ""}`);
     }
 
     this.populatePartySlots();
@@ -1394,41 +1438,15 @@ export class PartyUiHandler extends MessageUiHandler {
       // being selected when scrolling up from the first inactive party member or down from the last active one.
       case Button.UP:
         if (this.isItemManageMode()) {
-          if (this.cursor === 1) {
-            success = this.setCursor(globalScene.currentBattle.double ? 0 : 7);
-            break;
-          }
-          if (this.cursor === 2) {
-            success = this.setCursor(globalScene.currentBattle.double ? 7 : 1);
-            break;
-          }
-          if (this.cursor === 6) {
-            success = this.setCursor(slotCount <= globalScene.currentBattle.getBattlerCount() ? 7 : slotCount - 1);
-            break;
-          }
-          if (this.cursor === 7) {
-            success = this.setCursor(globalScene.currentBattle.double && slotCount > 1 ? 1 : 0);
-            break;
-          }
+          success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
+          break;
         }
         success = this.setCursor(this.cursor ? (this.cursor < 6 ? this.cursor - 1 : slotCount - 1) : 6);
         break;
       case Button.DOWN:
         if (this.isItemManageMode()) {
-          if (this.cursor === 0) {
-            success = this.setCursor(globalScene.currentBattle.double && slotCount > 1 ? 1 : 7);
-            break;
-          }
-          if (this.cursor === 1) {
-            success = this.setCursor(globalScene.currentBattle.double ? 7 : slotCount > 2 ? 2 : 6);
-            break;
-          }
-          if (this.cursor === 7) {
-            success = this.setCursor(
-              slotCount > globalScene.currentBattle.getBattlerCount() ? globalScene.currentBattle.getBattlerCount() : 6,
-            );
-            break;
-          }
+          success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
+          break;
         }
         success = this.setCursor(this.cursor < 6 ? (this.cursor < slotCount - 1 ? this.cursor + 1 : 6) : 0);
         break;
@@ -2454,7 +2472,7 @@ class PartySlot extends Phaser.GameObjects.Container {
 
     this.slotBgKey = this.isBenched
       ? "party_slot"
-      : isItemManageMode && globalScene.currentBattle.double
+      : isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1
         ? "party_slot_main_short"
         : "party_slot_main";
     const fullSlotBgKey = this.pokemon.hp ? this.slotBgKey : `${this.slotBgKey}${"_fnt"}`;
@@ -2494,7 +2512,7 @@ class PartySlot extends Phaser.GameObjects.Container {
     let descriptionLabelPosition = { x: 32, y: 46 };
 
     // If in item management mode, the active slots are shorter
-    if (isItemManageMode && globalScene.currentBattle.double && !this.isBenched) {
+    if (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1 && !this.isBenched) {
       namePosition.y -= 8;
       levelLabelPosition.y -= 8;
       hpBarPosition.y -= 8;
@@ -2865,9 +2883,10 @@ class PartyDiscardModeButton extends Phaser.GameObjects.Container {
         this.discardIcon.displayWidth = this.textBox.text.length * 9 + 3;
         break;
     }
+    const battlerCount = globalScene.currentBattle.getBattlerCount();
     this.setPosition(
-      globalScene.currentBattle.double ? DISCARD_BUTTON_X_DOUBLES : DISCARD_BUTTON_X,
-      globalScene.currentBattle.double ? DISCARD_BUTTON_Y_DOUBLES : DISCARD_BUTTON_Y,
+      battlerCount > 1 ? DISCARD_BUTTON_X_DOUBLES : DISCARD_BUTTON_X,
+      battlerCount >= 3 ? DISCARD_BUTTON_Y_TRIPLES : battlerCount > 1 ? DISCARD_BUTTON_Y_DOUBLES : DISCARD_BUTTON_Y,
     );
   }
 

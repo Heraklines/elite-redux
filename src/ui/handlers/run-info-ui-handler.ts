@@ -22,6 +22,7 @@ import { getVariantTint } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";
 import { SettingKeyboard } from "#system/settings-keyboard";
 import type { SessionSaveData } from "#types/save-data";
+import { getErDifficultyLabel } from "#ui/er-difficulty-label";
 import { addBBCodeTextObject, addTextObject, getTextColor, RAINBOW_TINT } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -993,8 +994,17 @@ export class RunInfoUiHandler extends UiHandler {
       { fontSize: "128px" },
     );
     text.setOrigin(0.5);
+    const difficultyText = addTextObject(
+      globalScene.scaledCanvas.width / 2,
+      globalScene.scaledCanvas.height - 31,
+      `${i18next.t("runHistory:difficulty")}: ${getErDifficultyLabel(this.runInfo.erDifficulty)}`,
+      TextStyle.SUMMARY,
+      { fontSize: "72px" },
+    );
+    difficultyText.setOrigin(0.5);
     this.endCardContainer.add(endCard);
     this.endCardContainer.add(text);
+    this.endCardContainer.add(difficultyText);
   }
 
   /** createHallofFame() - if the run is victorious, this creates a hall of fame image for the player to view

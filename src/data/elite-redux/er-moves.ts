@@ -7333,8 +7333,8 @@ export const ER_MOVES: readonly ErMoveDraft[] = [
     "moveConst": "MOVE_NEEDLE_ARM",
     "name": "Needle Arm",
     "shortName": "Needle Arm",
-    "description": "Attacks with thorny arms. May cause flinching.",
-    "longDescription": "Attacks with thorny arms. Sets creeping thorns. Iron Fist boost.",
+    "description": "Attacks with thorny arms. Sets Creeping Thorns.",
+    "longDescription": "Attacks with thorny arms. Sets Creeping Thorns on the target's side. Fails if Stealth Rock is there. Iron Fist boost.",
     "types": [
       8
     ],

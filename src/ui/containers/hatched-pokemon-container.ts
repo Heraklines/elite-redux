@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import type { EggHatchData } from "#data/egg-hatch-data";
+import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { Gender } from "#data/gender";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { DexAttr } from "#enums/dex-attr";
@@ -104,7 +105,7 @@ export class HatchedPokemonContainer extends Phaser.GameObjects.Container {
     this.checkIconId(female, formIndex, isShiny, variant);
 
     this.shinyIcon.setVisible(displayPokemon.shiny);
-    this.shinyIcon.setTint(getVariantTint(displayPokemon.variant));
+    this.shinyIcon.setTint(isErBlackShiny(displayPokemon) ? 0x0a0a0a : getVariantTint(displayPokemon.variant));
 
     this.eggMoveIcon.setVisible(hatchData.eggMoveUnlocked);
     this.hiddenAbilityIcon.setVisible(displayPokemon.abilityIndex === 2);

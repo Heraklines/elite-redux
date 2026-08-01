@@ -1,7 +1,9 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
+import { getErDifficultyLabel } from "#ui/er-difficulty-label";
 import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
@@ -9,6 +11,7 @@ export class EndCardPhase extends Phase {
   public readonly phaseName = "EndCardPhase";
   public endCard: Phaser.GameObjects.Image;
   public text: Phaser.GameObjects.Text;
+  public difficultyText: Phaser.GameObjects.Text;
   start(): void {
     super.start();
 
@@ -33,6 +36,16 @@ export class EndCardPhase extends Phase {
     );
     this.text.setOrigin(0.5);
     globalScene.field.add(this.text);
+
+    this.difficultyText = addTextObject(
+      globalScene.scaledCanvas.width / 2,
+      globalScene.scaledCanvas.height - 31,
+      `${i18next.t("runHistory:difficulty")}: ${getErDifficultyLabel(getErDifficulty())}`,
+      TextStyle.SUMMARY,
+      { fontSize: "72px" },
+    );
+    this.difficultyText.setOrigin(0.5);
+    globalScene.field.add(this.difficultyText);
 
     globalScene.ui.clearText();
 

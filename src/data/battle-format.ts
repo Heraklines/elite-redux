@@ -261,6 +261,33 @@ export function fieldPositionForSlot(slot: number, capacity: number): FieldPosit
 }
 
 /**
+ * Restore the party-order invariant used by every field lookup: eligible active
+ * battlers occupy the first `capacity` party slots. Save data can violate this
+ * when an active member fainted immediately before a reload (most visibly in a
+ * triple, where party[2] remained fainted while healthy reserves sat behind it).
+ *
+ * The sort is intentionally stable and minimal: an already-valid active seat is
+ * left alone, while each invalid seat swaps with the first eligible reserve.
+ */
+export function compactEligiblePartyIntoActiveSlots<T>(
+  party: T[],
+  capacity: number,
+  isEligible: (member: T) => boolean,
+): void {
+  const activeLimit = Math.min(Math.max(0, capacity), party.length);
+  for (let slot = 0; slot < activeLimit; slot++) {
+    if (isEligible(party[slot])) {
+      continue;
+    }
+    const replacement = party.findIndex((member, index) => index > slot && isEligible(member));
+    if (replacement < 0) {
+      break;
+    }
+    [party[slot], party[replacement]] = [party[replacement], party[slot]];
+  }
+}
+
+/**
  * Per-slot SPRITE pixel offset from a side's centre, by {@linkcode FieldPosition} and the
  * side's capacity. Binary keeps the legacy tight spacing (center 0, wings +/-32). A 3-wide
  * side spreads the wings out and staggers depth. The left lane sits above the right lane,

@@ -1141,6 +1141,7 @@ export function applyVaporBodyAccuracy(user: Pokemon, target: Pokemon, move: Mov
 
 const TRAPPING_TAGS = [
   BattlerTagType.TRAPPED,
+  BattlerTagType.NO_RETREAT,
   BattlerTagType.BIND,
   BattlerTagType.WRAP,
   BattlerTagType.FIRE_SPIN,

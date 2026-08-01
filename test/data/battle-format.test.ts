@@ -13,6 +13,7 @@
 //       diagonal; allied wings are not adjacent to each other.
 
 import {
+  compactEligiblePartyIntoActiveSlots,
   createArrangement,
   DOUBLE_FORMAT,
   fieldSpriteOffset,
@@ -166,5 +167,36 @@ describe("battle-format sprite offsets", () => {
       expect(fieldSpriteOffset(FieldPosition.LEFT, 2, playerSide)).toEqual([-32, -8]);
       expect(fieldSpriteOffset(FieldPosition.RIGHT, 2, playerSide)).toEqual([32, 0]);
     }
+  });
+});
+
+describe("battle-format loaded party seating", () => {
+  it("fills a fainted triple seat from the first healthy reserve", () => {
+    const party = [
+      { id: "lead", hp: 20 },
+      { id: "ally", hp: 20 },
+      { id: "fainted-active", hp: 0 },
+      { id: "fainted-bench", hp: 0 },
+      { id: "reserve-a", hp: 20 },
+      { id: "reserve-b", hp: 20 },
+    ];
+
+    compactEligiblePartyIntoActiveSlots(party, 3, member => member.hp > 0);
+
+    expect(party.slice(0, 3).map(member => member.id)).toEqual(["lead", "ally", "reserve-a"]);
+    expect(party.map(member => member.id)).toEqual([
+      "lead",
+      "ally",
+      "reserve-a",
+      "fainted-bench",
+      "fainted-active",
+      "reserve-b",
+    ]);
+  });
+
+  it("preserves an already-valid active prefix", () => {
+    const party = [1, 2, 3, 0];
+    compactEligiblePartyIntoActiveSlots(party, 3, member => member > 0);
+    expect(party).toEqual([1, 2, 3, 0]);
   });
 });
