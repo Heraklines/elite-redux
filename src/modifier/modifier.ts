@@ -4424,7 +4424,7 @@ export function overrideModifiers(isPlayer = true): void {
     let modifierType: ModifierType | null = modifierFunc();
 
     if (modifierType.is("ModifierTypeGenerator")) {
-      const pregenArgs = "type" in item && item.type !== null ? [item.type] : undefined;
+      const pregenArgs = "type" in item && item.type != null ? [item.type] : undefined;
       modifierType = modifierType.generateType([], pregenArgs);
     }
 
@@ -4466,7 +4466,7 @@ export function overrideHeldItems(pokemon: Pokemon, isPlayer = true): void {
     const qty = item.count || 1;
 
     if (modifierType.is("ModifierTypeGenerator")) {
-      const pregenArgs = "type" in item && item.type !== null ? [item.type] : undefined;
+      const pregenArgs = "type" in item && item.type != null ? [item.type] : undefined;
       modifierType = modifierType.generateType([], pregenArgs);
     }
 

@@ -121,7 +121,7 @@ export class PhaseInterceptor {
       throw new Error(
         `PhaseInterceptor.to("${this.target}") did not reach its target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
-          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+          + `\nOriginal: ${err instanceof Error ? (err.stack ?? err.message) : inspect(err)}`,
       );
     }
 
@@ -177,7 +177,7 @@ export class PhaseInterceptor {
       throw new Error(
         `PhaseInterceptor.toFirst([${targets.join(", ")}]) did not reach a target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
-          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+          + `\nOriginal: ${err instanceof Error ? (err.stack ?? err.message) : inspect(err)}`,
       );
     }
     return currentPhase.phaseName;

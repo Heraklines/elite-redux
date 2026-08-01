@@ -3296,7 +3296,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
   }
 
-  public canApplyAbility(passive = false, passiveSlot = 0, ignoreFaint = false): boolean {
+  public canApplyAbility(
+    passive = false,
+    passiveSlot = 0,
+    ignoreFaint = false,
+    skipFieldAbilitySuppression = false,
+  ): boolean {
     // ER 3-passive: resolve the candidate ability first (before the unlock gates
     // below) so we can special-case form-change-driving innates. We avoid falling
     // back to `this.getAbility()` for an empty passive slot because that would
@@ -3372,7 +3377,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (isAbilityIdSuppressed(this, ability.id)) {
       return false;
     }
-    if (isSuppressedByRequestedFieldAbility(this, ability.id)) {
+    if (!skipFieldAbilitySuppression && isSuppressedByRequestedFieldAbility(this, ability.id)) {
       return false;
     }
     if (this.isTransformed() && ability.hasAttr("NoTransformAbilityAbAttr")) {
@@ -3409,7 +3414,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // holder is still suppressed. Dynamic: lifts the moment the holder stops
     // being enraged (i.e. switches out) or this mon leaves the field.
     if (
-      ability.suppressable
+      !skipFieldAbilitySuppression
+      && ability.suppressable
       && this.isOnField()
       && globalScene
         .getField(true)
@@ -3417,7 +3423,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           p =>
             p !== this
             && p.getTag(BattlerTagType.ER_ENRAGE) != null
-            && p.hasAbilityWithAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+            && p
+              .getAbilitySources()
+              .some(
+                source =>
+                  source.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr")
+                  && p.canApplyAbility(source.passive, source.passiveSlot ?? 0, false, true),
+              ),
         )
     ) {
       return false;

@@ -46,6 +46,9 @@ function validateGhostTeam(team, ids) {
   if (team.difficulty !== undefined && !GHOST_DIFFICULTIES.includes(team.difficulty)) {
     throw new Error(`invalid difficulty in ${team.id}`);
   }
+  if (team.sourcePartitionId !== undefined && !/^training-source-fold-[0-9]+$/.test(team.sourcePartitionId)) {
+    throw new Error(`invalid source partition in ${team.id}`);
+  }
   team.members.forEach(member => validateGhostMember(member, team.id));
 }
 

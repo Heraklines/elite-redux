@@ -14,7 +14,7 @@ on:
         type: string
       tree_run_id:
         required: false
-        default: "30588067756"
+        default: ""
         type: string
     secrets:
       KAGGLE_USERNAME:
@@ -36,7 +36,7 @@ on:
       tree_run_id:
         description: Actions run containing the diagnostic tree-ensemble artifact
         required: true
-        default: "30588067756"
+        default: ""
         type: string
 
 permissions:
@@ -80,7 +80,7 @@ jobs:
           kaggle kernels output "$TRANSFER_KERNEL" --path ai-models/transfer --force
       - uses: actions/download-artifact@v6
         with:
-          name: ai-iterated-leaderboard
+          name: ai-baseline-leaderboard
           path: ai-models/tree
           run-id: ${{ inputs.tree_run_id }}
           github-token: ${{ github.token }}
@@ -126,6 +126,23 @@ jobs:
               raise SystemExit("random-init control unexpectedly performed transfer pretraining")
           if transfer["objective"]["transferPretrainEpochs"] <= 0:
               raise SystemExit("Showdown-transfer arm did not perform transfer pretraining")
+
+          tree_report = json.loads(Path("ai-models/tree/leaderboard.json").read_text(encoding="utf-8"))
+          tree_model = json.loads(
+              Path("ai-models/tree/models/stacked_tree_ensemble.json").read_text(encoding="utf-8")
+          )
+          if tree_report.get("trainingRole") != "diagnostic-imitation":
+              raise SystemExit("tree report is not sealed as diagnostic-only imitation")
+          if (
+              tree_model.get("schemaVersion") != 2
+              or tree_model.get("featureSchemaVersion") != 2
+              or tree_model.get("featureCount") != 4326
+          ):
+              raise SystemExit("tree ensemble does not match runtime feature schema 2 / 4326")
+          if tree_model.get("trainingRole") != "diagnostic-imitation":
+              raise SystemExit("tree ensemble is not sealed as a diagnostic-only controller")
+          if any(member.get("trainingRole") != "diagnostic-imitation" for member in tree_model.get("members", [])):
+              raise SystemExit("tree ensemble contains a member that is not diagnostic-only")
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -233,7 +250,7 @@ jobs:
           if-no-files-found: warn
 
   report:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: always() && github.repository == 'Heraklines/elite-redux'
     name: Difficulty-balanced benchmark report
     needs: benchmark
     runs-on: ubuntu-latest

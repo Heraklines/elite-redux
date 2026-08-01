@@ -14,6 +14,7 @@ from train_candidate_baselines import (
     ordered_group_sizes,
     record_split_group,
     record_source_partition,
+    select_training_decisions,
     select_elite_rollouts,
     split_groups,
     validate_data_dictionary,
@@ -26,6 +27,24 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertFalse(is_policy_target({"policySource": "smart-default-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "human-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "search-relabel-v1", "policyTarget": True}))
+
+    def test_diagnostic_imitation_is_explicit_and_never_creates_policy_targets(self) -> None:
+        excluded = [
+            {"policySource": "smart-default-v1", "policyTarget": False},
+            {"policySource": "engine-hardest-v1", "policyTarget": False},
+        ]
+        with self.assertRaisesRegex(ValueError, "no policy-target decisions"):
+            select_training_decisions(excluded, False)
+        decisions, policy_decisions, diagnostic_only = select_training_decisions(excluded, True)
+        self.assertEqual(decisions, excluded)
+        self.assertEqual(policy_decisions, [])
+        self.assertTrue(diagnostic_only)
+
+        human = {"policySource": "human-v1", "policyTarget": True}
+        decisions, policy_decisions, diagnostic_only = select_training_decisions([*excluded, human], True)
+        self.assertEqual(decisions, [human])
+        self.assertEqual(policy_decisions, [human])
+        self.assertFalse(diagnostic_only)
 
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {

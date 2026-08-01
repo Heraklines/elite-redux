@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       run_training:
-        description: Generate contract-v3 data, train CPU trees, package Kaggle GPU input, and run the tree gauntlet
+        description: Generate contract-v3 diagnostic data and train CPU baseline trees
         required: true
         default: false
         type: boolean
@@ -70,11 +70,15 @@ jobs:
           ER_NEWCOMER_SIGNATURE_CHECK: "1"
         run: >-
           pnpm exec vitest run test/tools/run-scenario.test.ts --no-color
-          -t "combat observation contract|Foul Harvest"
+          -t "combat observation contract|Foul Harvest|generated per-mon held items"
       - name: Verify ghost fields reach the dev-scenario engine adapter
         run: ER_SCENARIO=1 pnpm exec vitest run test/tests/elite-redux/er-scenario-spec.test.ts --no-color
       - name: Guard requested field ability resolution
-        run: pnpm exec vitest run test/data/elite-redux/er-requested-field-effects.test.ts --no-color
+        run: >-
+          pnpm exec vitest run
+          test/data/elite-redux/er-requested-field-effects.test.ts
+          test/data/elite-redux/er-flammable-coat-mental-pollution.test.ts
+          --no-color
       - name: Validate mirrored ghost-team fixtures
         run: node scripts/ai/test-ghost-gauntlet.mjs
       - name: Check changed AI files
@@ -93,6 +97,8 @@ jobs:
           scripts/export-data-dictionary.mjs
           scripts/export-data-dictionary.test.ts
           scripts/run-combat-batch.mjs
+          src/field/pokemon.ts
+          src/modifier/modifier.ts
           src/data/elite-redux/ability-upgrades/requested-field-effects.ts
           src/data/elite-redux/ai/combat-contract.ts
           src/data/elite-redux/ai/combat-data-dictionary.ts
@@ -104,7 +110,9 @@ jobs:
           src/dev-tools/test-suite/scenario-spec.ts
           src/phases/encounter-phase.ts
           test/framework/game-manager.ts
+          test/framework/phase-interceptor.ts
           test/node/combat-contract.test.ts
+          test/data/elite-redux/er-flammable-coat-mental-pollution.test.ts
           test/data/elite-redux/er-requested-field-effects.test.ts
           test/tests/elite-redux/er-scenario-spec.test.ts
           test/tools/run-scenario.test.ts
@@ -144,113 +152,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  ghost-gauntlet:
-    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
-    name: Ghost winner batch ${{ matrix.shard }} (tree controllers, both sides)
-    needs: retrain
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      max-parallel: 6
-      matrix:
-        include:
-          - { shard: 0, start: 0, count: 9 }
-          - { shard: 1, start: 9, count: 9 }
-          - { shard: 2, start: 18, count: 8 }
-          - { shard: 3, start: 26, count: 8 }
-          - { shard: 4, start: 34, count: 8 }
-          - { shard: 5, start: 42, count: 8 }
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: ./.github/actions/setup-deps
-      - uses: actions/download-artifact@v6
-        with:
-          name: ai-iterated-leaderboard
-          path: ai-policy
-      - name: Build strict inverse matchup batch
-        run: >-
-          node scripts/ai/make-ghost-eval-batch.mjs
-          ml/evaluation/ghost-winner-teams.v2.json
-          "${{ matrix.start }}" "${{ matrix.count }}"
-          ai-gauntlet
-          "shard-${{ matrix.shard }}"
-      - name: Play selected tree over both inverse legs
-        run: >-
-          node scripts/run-combat-batch.mjs
-          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
-          --turns 80 --real-rng
-          --ai-model ai-policy/models/selected-model.json
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-selected-tree-v1-results.json"
-      - name: Play stacked tree ensemble over both inverse legs
-        run: >-
-          node scripts/run-combat-batch.mjs
-          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
-          --turns 80 --real-rng
-          --ai-model ai-policy/models/stacked_tree_ensemble.json
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-stacked-tree-v1-results.json"
-      - name: Play winner-trained selected tree over both inverse legs
-        run: >-
-          node scripts/run-combat-batch.mjs
-          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
-          --turns 80 --real-rng
-          --ai-model ai-policy/models/outcome-selected-model.json
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-winner-tree-v1-results.json"
-      - name: Play winner-only stacked tree over both inverse legs
-        run: >-
-          node scripts/run-combat-batch.mjs
-          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
-          --turns 80 --real-rng
-          --ai-model ai-policy/models/winner_only_stacked_tree_ensemble.json
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-winner-stacked-tree-v1-results.json"
-      - name: Play smart-default over both inverse legs
-        run: >-
-          node scripts/run-combat-batch.mjs
-          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
-          --turns 80 --real-rng
-          --ai-policy smart-default
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-smart-default-v1-results.json"
-      - name: Upload every controller and both sides of each matchup
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-ghost-gauntlet-shard-${{ matrix.shard }}
-          path: ai-gauntlet
-          retention-days: 30
-          if-no-files-found: error
-
-  ghost-gauntlet-summary:
-    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
-    name: Side-balanced ghost gauntlet report
-    needs: ghost-gauntlet
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-ghost-gauntlet-shard-*
-          path: ai-gauntlet
-          merge-multiple: true
-      - name: Summarize mirrored results
-        shell: bash
-        run: |
-          mkdir -p ai-report
-          node scripts/ai/summarize-ghost-batch-eval.mjs ai-gauntlet ai-report/ghost-gauntlet.json ai-report/ghost-gauntlet.md
-          cat ai-report/ghost-gauntlet.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload ghost gauntlet report
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-ghost-gauntlet-report
-          path: ai-report
-          retention-days: 30
-          if-no-files-found: error
-
   generate:
     if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: Ghost self-play shard ${{ matrix.shard }}
@@ -261,7 +162,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -272,7 +173,7 @@ jobs:
         shell: bash
         run: >-
           node scripts/ai/make-pilot-batch.mjs
-          "$(( ${{ matrix.shard }} * 24 ))" 24
+          "$(( ${{ matrix.shard }} * 40 ))" 40
           "ai-work/batch-${{ matrix.shard }}.json"
       - name: Generate real-engine decisions
         env:
@@ -366,6 +267,7 @@ jobs:
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
           --models-dir ai-report/models
+          --diagnostic-source-imitation
       - name: Publish run summary
         shell: bash
         run: cat ai-report/leaderboard.md >> "$GITHUB_STEP_SUMMARY"
@@ -374,169 +276,6 @@ jobs:
         with:
           name: ai-baseline-leaderboard
           path: ai-report
-          retention-days: 30
-          if-no-files-found: error
-
-  rollout:
-    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
-    name: Exploratory tree rollout ${{ matrix.shard }}
-    needs: [train, identity]
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      max-parallel: 6
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: ./.github/actions/setup-deps
-      - uses: actions/download-artifact@v6
-        with:
-          name: ai-baseline-leaderboard
-          path: ai-bootstrap
-      - name: Build unseen source-disjoint ghost combat batch
-        shell: bash
-        run: >-
-          node scripts/ai/make-pilot-batch.mjs
-          "$((100000 + ${{ matrix.shard }} * 24))" 24
-          "ai-work/batch-${{ matrix.shard }}.json"
-      - name: Collect deterministic epsilon-tree trajectories
-        env:
-          ER_AI_BUILD_SHA: ${{ github.sha }}
-          ER_AI_DEX_HASH: ${{ needs.identity.outputs.dex_hash }}
-          ER_AI_DICTIONARY_HASH: ${{ needs.identity.outputs.dictionary_hash }}
-        run: >-
-          node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
-          --turns 80 --real-rng
-          --ai-model ai-bootstrap/models/outcome-selected-model.json --ai-epsilon 0.15
-          --json-out "ai-work/result-rollout-${{ matrix.shard }}.json"
-          --ai-data-out "ai-work/decisions-rollout-${{ matrix.shard }}.jsonl"
-      - name: Upload rollout shard
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-rollout-shard-${{ matrix.shard }}
-          path: |
-            ai-work/decisions-rollout-${{ matrix.shard }}.jsonl
-            ai-work/result-rollout-${{ matrix.shard }}.json
-            ai-work/batch-${{ matrix.shard }}.json
-          retention-days: 14
-          if-no-files-found: error
-
-  retrain:
-    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
-    name: Elite-rollout tree iteration
-    needs: rollout
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-baseline-shard-*
-          path: ai-data/bootstrap
-          merge-multiple: true
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-rollout-shard-*
-          path: ai-data/rollout
-          merge-multiple: true
-      - uses: actions/download-artifact@v6
-        with:
-          name: ai-data-dictionary
-          path: ai-dictionary
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: ml/baselines/requirements.txt
-      - name: Install pinned CPU baselines
-        run: python -m pip install --requirement ml/baselines/requirements.txt
-      - name: Run baseline trainer unit tests
-        run: python -m unittest discover -s ml/baselines -p 'test_*.py' -v
-      - name: Retrain on expert data and successful exploratory trajectories
-        run: >-
-          python ml/baselines/train_candidate_baselines.py
-          --data ai-data
-          --dictionary ai-dictionary/er-combat-data-dictionary.json
-          --elite-rollouts
-          --report-json ai-report/leaderboard.json
-          --report-md ai-report/leaderboard.md
-          --models-dir ai-report/models
-      - name: Publish iteration summary
-        shell: bash
-        run: cat ai-report/leaderboard.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload iterated policy
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-iterated-leaderboard
-          path: ai-report
-          retention-days: 30
-          if-no-files-found: error
-
-  package-neural:
-    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
-    name: Package trajectory-transformer Kaggle input
-    needs: rollout
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-baseline-shard-*
-          path: ai-data/bootstrap
-          merge-multiple: true
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-rollout-shard-*
-          path: ai-data/rollout
-          merge-multiple: true
-      - uses: actions/download-artifact@v6
-        with:
-          name: ai-data-dictionary
-          path: ai-dictionary
-      - uses: ./.github/actions/setup-deps
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            ml/policy/requirements.txt
-            ml/baselines/requirements.txt
-      - name: Install pinned trajectory-policy stack
-        run: python -m pip install --requirement ml/policy/requirements.txt
-      - name: Run trajectory and Kaggle bundle tests
-        run: python -m unittest discover -s ml/policy -p 'test_*.py' -v
-      - name: Build checksum-sealed Kaggle GPU bundle
-        run: >-
-          node scripts/ai/prepare-kaggle-candidate-training.mjs
-          ai-data
-          ai-dictionary/er-combat-data-dictionary.json
-          ai-kaggle/er-ai-training-bundle.zip
-          large
-          20260730,20260731,20260732
-      - name: Publish GPU handoff summary
-        shell: bash
-        run: |
-          echo "# ER trajectory-transformer GPU handoff" >> "$GITHUB_STEP_SUMMARY"
-          echo >> "$GITHUB_STEP_SUMMARY"
-          echo "The sealed contract-v3 bundle is ready for private Kaggle T4/A100 training." >> "$GITHUB_STEP_SUMMARY"
-          echo "No neural model was trained on a GitHub CPU runner." >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload Kaggle training bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-kaggle-training-bundle
-          path: ai-kaggle/er-ai-training-bundle.zip
           retention-days: 30
           if-no-files-found: error
 

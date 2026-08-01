@@ -54,6 +54,18 @@ def is_policy_target(record: dict[str, Any]) -> bool:
     return bool(explicit) if explicit is not None else True
 
 
+def select_training_decisions(
+    rollout_decisions: list[dict[str, Any]], diagnostic_source_imitation: bool
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+    policy_decisions = [record for record in rollout_decisions if is_policy_target(record)]
+    if policy_decisions:
+        return policy_decisions, policy_decisions, False
+    if diagnostic_source_imitation:
+        return rollout_decisions, policy_decisions, True
+    excluded = Counter(record_policy_source(record) for record in rollout_decisions)
+    raise ValueError(f"no policy-target decisions remain after source filtering: {dict(excluded)}")
+
+
 def load_optional_lightgbm() -> None:
     global LGBMClassifier, LGBMRanker, _LIGHTGBM_IMPORT_ATTEMPTED
     if _LIGHTGBM_IMPORT_ATTEMPTED:
@@ -832,10 +844,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
     )
-    decisions = [record for record in rollout_decisions if is_policy_target(record)]
-    if not decisions:
-        excluded = Counter(record_policy_source(record) for record in rollout_decisions)
-        raise ValueError(f"no policy-target decisions remain after source filtering: {dict(excluded)}")
+    decisions, policy_decisions, diagnostic_only = select_training_decisions(
+        rollout_decisions,
+        bool(getattr(args, "diagnostic_source_imitation", False)),
+    )
     x, y, decision_ids, episodes, split_group_ids, source_partition_ids, candidate_counts = make_rows(decisions)
     train_partitions, test_partitions = split_groups(source_partition_ids, args.seed)
     train_mask = np.asarray([partition in train_partitions for partition in source_partition_ids])
@@ -960,14 +972,20 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     successful_test_mask = test_mask & successful_rows
     outcome_artifacts: dict[str, dict[str, Any]] = {}
     outcome_fitted_models: dict[str, tuple[Any, bool]] = {}
-    policy_training_mask = train_mask & (outcome_weights > 0)
+    policy_training_mask = (
+        np.zeros_like(train_mask, dtype=bool)
+        if diagnostic_only
+        else train_mask & (outcome_weights > 0)
+    )
     policy_training_partitions = {
         partition
         for partition, selected in zip(source_partition_ids, policy_training_mask)
         if selected
     }
     policy_training_reason: str | None = None
-    if not policy_training_mask.any():
+    if diagnostic_only:
+        policy_training_reason = "diagnostic source imitation cannot produce a trainable policy artifact"
+    elif not policy_training_mask.any():
         policy_training_reason = "no successful policy-training rows are present in the training split"
     elif len(np.unique(y[policy_training_mask])) < 2:
         policy_training_reason = "successful policy-training rows do not contain both selected and rejected candidates"
@@ -1080,6 +1098,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
+    training_role = "diagnostic-imitation" if diagnostic_only else "policy-target"
+    for artifact in artifacts.values():
+        artifact["trainingRole"] = training_role
+
     learned_rows = [
         row for row in leaderboard if row["model"] in artifacts and row["model"] not in outcome_artifacts
     ]
@@ -1122,6 +1144,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "metricScope": "offline imitation of the recorded source policy; not battle win rate",
+        "trainingRole": training_role,
         "selectedBattlePolicy": selected,
         "selectedOutcomeWeightedPolicy": outcome_selected,
         "selectedPolicyFromSuccessfulEpisodes": outcome_selected,
@@ -1148,9 +1171,13 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "meanCandidates": float(np.mean(candidate_counts)),
             "p95Candidates": float(np.percentile(candidate_counts, 95)),
             "inputDecisions": len(all_decisions),
-            "excludedPolicyDecisions": len(rollout_decisions) - len(decisions),
+            "excludedPolicyDecisions": len(rollout_decisions) - len(policy_decisions),
+            "diagnosticSourceDecisions": len(decisions) if diagnostic_only else 0,
             "sourcePolicies": Counter(record_policy_source(record) for record in all_decisions),
-            "policyTargetSources": Counter(record_policy_source(record) for record in decisions),
+            "policyTargetSources": Counter(record_policy_source(record) for record in policy_decisions),
+            "diagnosticSourcePolicies": (
+                Counter(record_policy_source(record) for record in decisions) if diagnostic_only else Counter()
+            ),
             "formats": Counter(record["observation"]["format"] for record in decisions),
             "terminalOutcomes": Counter(record["outcome"] for record in terminals),
             "identity": hashes,
@@ -1169,6 +1196,11 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         "> These are offline imitation metrics against the recorded source policy, not battle win rates.",
         "> A model must still pass a fixed-seed real-engine gauntlet before any gameplay comparison.",
+        (
+            "> Diagnostic-only source imitation: these artifacts are baseline controllers and are forbidden policy teachers."
+            if report["trainingRole"] == "diagnostic-imitation"
+            else "> Policy fitting used only explicitly eligible policy-target records."
+        ),
         "",
         f"Decisions: {report['data']['decisions']} across {report['data']['episodes']} episodes; "
         f"mean candidates: {report['data']['meanCandidates']:.2f}.",
@@ -1235,6 +1267,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.0,
         help="policy sample weight for losing episodes; zero keeps losses value/diagnostic-only",
+    )
+    parser.add_argument(
+        "--diagnostic-source-imitation",
+        action="store_true",
+        help="when no policy targets exist, train baseline-only artifacts from excluded sources without producing policy artifacts",
     )
     return parser.parse_args()
 

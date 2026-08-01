@@ -9,14 +9,27 @@ export const PILOT_SOURCE_PARTITION_COUNT = 5;
 
 function buildPartitionedPilotScenario(episodeIndex, fixture) {
   const inversePairIndex = Math.floor(episodeIndex / 2);
-  const sourcePartitionIndex = inversePairIndex % PILOT_SOURCE_PARTITION_COUNT;
+  const fixturePartitions = [...new Set(fixture.teams.map(team => team.sourcePartitionId).filter(Boolean))].sort();
+  const partitionIds =
+    fixturePartitions.length > 0
+      ? fixturePartitions
+      : Array.from({ length: PILOT_SOURCE_PARTITION_COUNT }, (_, index) => `pilot-source-fold-${index}`);
+  const sourcePartitionIndex = inversePairIndex % partitionIds.length;
+  const sourcePartitionId = partitionIds[sourcePartitionIndex];
   const partitionFixture = {
     ...fixture,
-    teams: fixture.teams.filter((_, index) => index % PILOT_SOURCE_PARTITION_COUNT === sourcePartitionIndex),
+    teams: fixture.teams.filter((team, index) =>
+      fixturePartitions.length > 0
+        ? team.sourcePartitionId === sourcePartitionId
+        : index % PILOT_SOURCE_PARTITION_COUNT === sourcePartitionIndex,
+    ),
   };
-  const partitionEpisodeIndex = Math.floor(inversePairIndex / PILOT_SOURCE_PARTITION_COUNT) * 2 + (episodeIndex % 2);
+  if (partitionFixture.teams.length < 2) {
+    throw new Error(`${sourcePartitionId} has fewer than two training rosters`);
+  }
+  const partitionEpisodeIndex = Math.floor(inversePairIndex / partitionIds.length) * 2 + (episodeIndex % 2);
   return {
-    sourcePartitionId: `pilot-source-fold-${sourcePartitionIndex}`,
+    sourcePartitionId,
     scenario: buildGhostSelfPlayScenario(partitionFixture, partitionEpisodeIndex),
   };
 }

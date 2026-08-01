@@ -25,7 +25,10 @@ function erAbilityId(draftId: number): AbilityId | undefined {
 function hasActiveAbilitySource(holder: Pokemon, abilityId: AbilityId): boolean {
   return holder
     .getAbilitySources()
-    .some(source => source.ability.id === abilityId && holder.canApplyAbility(source.passive, source.passiveSlot ?? 0));
+    .some(
+      source =>
+        source.ability.id === abilityId && holder.canApplyAbility(source.passive, source.passiveSlot ?? 0, false, true),
+    );
 }
 
 function activeFieldHasDraftAbility(draftId: number, predicate?: (holder: Pokemon) => boolean): boolean {

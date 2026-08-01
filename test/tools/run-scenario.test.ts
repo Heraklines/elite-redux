@@ -4207,6 +4207,30 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     ).toBe(true);
   }, 180_000);
 
+  it("generated per-mon held items use their default variant when type is omitted", async () => {
+    const juice = { name: "MYSTERY_ENCOUNTER_SHUCKLE_JUICE" } as const;
+    const spec: RunnerInput = {
+      v: 1,
+      name: "generated held item default variant",
+      run: { level: 100, difficulty: "hell" },
+      party: [{ species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH], heldItems: [juice] }],
+      enemy: {
+        kind: "party",
+        party: [{ species: SpeciesId.CHANSEY, level: 100, moves: [MoveId.SPLASH], heldItems: [juice] }],
+      },
+    };
+
+    const game = await launchScenario(phaserGame, spec, {});
+    const pokemon = [game.scene.getPlayerField()[0], game.scene.getEnemyField()[0]];
+
+    for (const mon of pokemon) {
+      expect(mon.getHeldItems().some(item => item.type.name.toLowerCase().includes("shuckle juice"))).toBe(true);
+      expect(Number.isFinite(mon.hp)).toBe(true);
+      expect(Number.isFinite(mon.getMaxHp())).toBe(true);
+      expect(mon.getStats().every(Number.isFinite)).toBe(true);
+    }
+  }, 180_000);
+
   it("per-mon player held items are applied to their exact party members", async () => {
     const spec: RunnerInput = {
       v: 1,

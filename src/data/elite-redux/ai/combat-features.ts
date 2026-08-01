@@ -696,8 +696,14 @@ export function extractErCombatCandidateFeatures(
     ...destinationFeatures(observation, actor, candidate),
   ];
 
-  if (features.length !== ER_COMBAT_FEATURE_NAMES.length || features.some(value => !Number.isFinite(value))) {
-    throw new Error(`invalid ER combat feature vector (${features.length}/${ER_COMBAT_FEATURE_NAMES.length})`);
+  if (features.length !== ER_COMBAT_FEATURE_NAMES.length) {
+    throw new Error(`invalid ER combat feature vector length (${features.length}/${ER_COMBAT_FEATURE_NAMES.length})`);
+  }
+  const invalidIndex = features.findIndex(value => !Number.isFinite(value));
+  if (invalidIndex >= 0) {
+    throw new Error(
+      `invalid ER combat feature ${ER_COMBAT_FEATURE_NAMES[invalidIndex]} at index ${invalidIndex}: ${String(features[invalidIndex])}`,
+    );
   }
   return features;
 }

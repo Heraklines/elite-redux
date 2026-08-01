@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 const DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
+const TRAINING_SOURCE_PARTITION_COUNT = 5;
 const [
   inputPath,
   outputPath,
@@ -282,6 +283,21 @@ const trainingCandidates = trainingGroups
 
 const evaluationSources = new Set(evaluationGroups.map(group => group.sourceKey));
 const trainingSources = new Set(trainingGroups.map(group => group.sourceKey));
+const trainingPartitions = Array.from({ length: TRAINING_SOURCE_PARTITION_COUNT }, (_, index) => ({
+  id: `training-source-fold-${index}`,
+  rosterCount: 0,
+}));
+const trainingPartitionBySource = new Map();
+for (const group of [...trainingGroups].sort((a, b) => {
+  const countA = DIFFICULTIES.reduce((count, difficulty) => count + a.byDifficulty[difficulty].length, 0);
+  const countB = DIFFICULTIES.reduce((count, difficulty) => count + b.byDifficulty[difficulty].length, 0);
+  return countB - countA || hash(a.sourceKey).localeCompare(hash(b.sourceKey));
+})) {
+  const rosterCount = DIFFICULTIES.reduce((count, difficulty) => count + group.byDifficulty[difficulty].length, 0);
+  const partition = trainingPartitions.toSorted((a, b) => a.rosterCount - b.rosterCount || a.id.localeCompare(b.id))[0];
+  trainingPartitionBySource.set(group.sourceKey, partition.id);
+  partition.rosterCount += rosterCount;
+}
 const sourceIntersection = [...evaluationSources].filter(source => trainingSources.has(source));
 if (sourceIntersection.length > 0) {
   throw new Error(`account leakage across fixtures: ${sourceIntersection.length} sources`);
@@ -333,11 +349,12 @@ if (trainingOutputPath) {
     sourceAccountCount: trainingSources.size,
     source: fixture.source,
     selection:
-      "Every roster comes from a source account excluded from the evaluation fixture. Difficulty is retained as stratification metadata; Elite and Hell may be oversampled by self-play scheduling.",
+      "Every roster comes from a source account excluded from the evaluation fixture. Accounts are assigned to opaque source folds before match scheduling, so one account cannot cross an offline train/evaluation split. Difficulty is retained as stratification metadata; Elite and Hell may be oversampled by self-play scheduling.",
     normalization,
     teams: trainingCandidates.map((candidate, index) => ({
       id: `${candidate.difficulty}-selfplay-${String(index + 1).padStart(4, "0")}`,
       difficulty: candidate.difficulty,
+      sourcePartitionId: trainingPartitionBySource.get(candidate.sourceKey),
       members: candidate.members,
     })),
   };
