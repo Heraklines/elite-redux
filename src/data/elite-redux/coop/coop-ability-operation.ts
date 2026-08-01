@@ -42,7 +42,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export { COOP_ABILITY_ACTION_STRIDE };
 
@@ -246,8 +246,8 @@ function presentationOpId(s: AbilityOpState, pinned: number): string {
   );
 }
 
-function context(wave: number, turn: number) {
-  return coopOperationCommitContext(wave, turn, "INTERACTION");
+function context(wave: number, turn: number, authoritativeState?: CoopAuthoritativeBattleStateV1 | null) {
+  return coopOperationCommitContext(wave, turn, "INTERACTION", authoritativeState);
 }
 
 /**
@@ -349,6 +349,7 @@ function commit(
   binding?: CoopAbilityOperationBinding | null,
   expectedOperationId?: string,
   committed = true,
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
 ): boolean {
   const s = state(binding);
   const owner = coopInteractionOwnerSeat(pinned);
@@ -370,7 +371,7 @@ function commit(
   if (expectedOperationId != null && operation.id !== expectedOperationId) {
     return false;
   }
-  const result = host(binding).submit(operation, context(wave, turn), intent =>
+  const result = host(binding).submit(operation, context(wave, turn, authoritativeState), intent =>
     intent.owner === owner ? { ok: true } : { ok: false, reason: "wrong-owner" },
   );
   if (result.kind === "committed") {
@@ -399,6 +400,7 @@ export function commitAbilityOwnerOutcome(
     wave: number;
     turn?: number;
     committed?: boolean;
+    authoritativeState?: CoopAuthoritativeBattleStateV1 | null;
   },
   binding?: CoopAbilityOperationBinding | null,
 ): boolean {
@@ -407,7 +409,16 @@ export function commitAbilityOwnerOutcome(
   }
   try {
     if (
-      !commit(params.pinned, params.data, params.wave, params.turn ?? 0, binding, undefined, params.committed ?? true)
+      !commit(
+        params.pinned,
+        params.data,
+        params.wave,
+        params.turn ?? 0,
+        binding,
+        undefined,
+        params.committed ?? true,
+        params.authoritativeState,
+      )
     ) {
       coopWarn("ability", "ability owner result could not be retained");
       return false;
@@ -546,6 +557,7 @@ export function commitAbilityWatcherOutcome(
     readonly wave: number;
     readonly turn?: number;
     readonly committed?: boolean;
+    readonly authoritativeState?: CoopAuthoritativeBattleStateV1 | null;
   },
   binding?: CoopAbilityOperationBinding | null,
 ): boolean {
@@ -561,6 +573,7 @@ export function commitAbilityWatcherOutcome(
       binding,
       operationId,
       params.committed ?? true,
+      params.authoritativeState,
     );
   } catch (error) {
     if (isCoopOpRuntimeError(error)) {

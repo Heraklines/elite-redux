@@ -38,7 +38,7 @@ import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 // #840: COOP_ABILITY_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported below.
 import { COOP_ABILITY_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { CoopAuthoritativeBattleStateV1, CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 export { COOP_ABILITY_SEQ_BASE };
 
@@ -123,7 +123,12 @@ export function sendCoopAbilityPickerOutcome(
   relay: CoopInteractionRelay | null,
   shopSeq: number,
   data: number[],
-  context?: { localRole: CoopRole; wave: number; turn?: number },
+  context?: {
+    localRole: CoopRole;
+    wave: number;
+    turn?: number;
+    authoritativeState?: CoopAuthoritativeBattleStateV1 | null;
+  },
   operationBinding?: CoopAbilityOperationBinding | null,
   proposalOperationId?: string,
 ): boolean {

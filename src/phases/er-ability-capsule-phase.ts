@@ -48,6 +48,7 @@ import {
   coopAbilityPickerSeq,
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { captureCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-hooks";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { captureCoopNestedInteractionReturnPlan } from "#data/elite-redux/coop/coop-nested-interaction";
 import type { CoopAbilityPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -302,6 +303,7 @@ export class ErAbilityCapsulePhase extends Phase {
    */
   private commitAndEnd(): void {
     const relayOutcome = !this.coopIsWatcher;
+    const resultState = relayOutcome ? captureCoopOperationAuthorityState(this.coopSourceTurn) : null;
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
     // Co-op (#789, found by the duo exploration probe): a committed capsule ENDS the whole
     // alternating interaction, but the shop deliberately skipped its advance (queuesContinuation)
@@ -314,7 +316,7 @@ export class ErAbilityCapsulePhase extends Phase {
     // Commit only after the authority's exact local result phase ended. This prevents the global ledger
     // from advertising AWAIT_SUCCESSOR while the old picker is still current.
     if (relayOutcome) {
-      this.relayEnd();
+      this.relayEnd(resultState);
     }
   }
 
@@ -326,15 +328,16 @@ export class ErAbilityCapsulePhase extends Phase {
   private cancelAndEnd(): void {
     this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
     const relayOutcome = !this.coopIsWatcher;
+    const resultState = relayOutcome ? captureCoopOperationAuthorityState(this.coopSourceTurn) : null;
     this.end();
     if (relayOutcome) {
-      this.relayEnd();
+      this.relayEnd(resultState);
     }
   }
 
   /** OWNER (#633 B9c): relay the buffered outcome on a DEDICATED derived seq (coopAbilityPickerSeq) the
    *  shop watch loop never awaits - exactly once. No-op in solo (coopSeq < 0) / off the owner. */
-  private relayEnd(): void {
+  private relayEnd(authoritativeState: ReturnType<typeof captureCoopOperationAuthorityState>): void {
     if (this.coopSeq < 0) {
       return;
     }
@@ -363,6 +366,7 @@ export class ErAbilityCapsulePhase extends Phase {
               localRole: controller.role,
               wave: this.coopSourceWave,
               turn: this.coopSourceTurn,
+              authoritativeState,
             },
         this.coopOperationBinding,
         operationId ?? undefined,
@@ -434,6 +438,10 @@ export class ErAbilityCapsulePhase extends Phase {
       // broadcast merging first makes this a no-op; both engines stay lockstep either way).
       advanceCoopInteractionForContinuation(this.coopSeq);
     }
+    const resultState =
+      adoption?.accepted === true && adoption.requiresAuthorityCommit
+        ? captureCoopOperationAuthorityState(this.coopSourceTurn)
+        : null;
     this.end();
     if (adoption?.accepted === true) {
       settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
@@ -450,6 +458,7 @@ export class ErAbilityCapsulePhase extends Phase {
           committed: op !== COOP_ABILITY_OP.CANCEL,
           wave: this.coopSourceWave,
           turn: this.coopSourceTurn,
+          authoritativeState: resultState,
         },
         this.coopOperationBinding,
       )

@@ -44,6 +44,7 @@ import {
   coopAbilityPickerSeq,
   sendCoopAbilityPickerOutcome,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { captureCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-hooks";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { captureCoopNestedInteractionReturnPlan } from "#data/elite-redux/coop/coop-nested-interaction";
 import type { CoopAbilityPresentationPayload } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -288,11 +289,12 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private commitAndEnd(): void {
     this.log("commit -> slot replaced, item consumed");
     const relayOutcome = !this.coopIsWatcher;
+    const resultState = relayOutcome ? captureCoopOperationAuthorityState(this.coopSourceTurn) : null;
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
     advanceCoopInteractionForContinuation(this.coopSeq);
     this.end();
     if (relayOutcome) {
-      this.relayEnd();
+      this.relayEnd(resultState);
     }
   }
 
@@ -302,14 +304,15 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     this.log("cancel/back-out -> item kept, no change applied");
     this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
     const relayOutcome = !this.coopIsWatcher;
+    const resultState = relayOutcome ? captureCoopOperationAuthorityState(this.coopSourceTurn) : null;
     this.end();
     if (relayOutcome) {
-      this.relayEnd();
+      this.relayEnd(resultState);
     }
   }
 
   /** OWNER (#633 B9c): relay the buffered outcome on the shop seq exactly once. No-op in solo. */
-  private relayEnd(): void {
+  private relayEnd(authoritativeState: ReturnType<typeof captureCoopOperationAuthorityState>): void {
     if (this.coopSeq < 0) {
       return;
     }
@@ -340,6 +343,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
               localRole: controller.role,
               wave: this.coopSourceWave,
               turn: this.coopSourceTurn,
+              authoritativeState,
             },
         this.coopOperationBinding,
         operationId ?? undefined,
@@ -403,6 +407,10 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
       advanceCoopInteractionForContinuation(this.coopSeq);
     }
+    const resultState =
+      adoption?.accepted === true && adoption.requiresAuthorityCommit
+        ? captureCoopOperationAuthorityState(this.coopSourceTurn)
+        : null;
     this.end();
     if (adoption?.accepted === true) {
       settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
@@ -419,6 +427,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           committed: op !== COOP_ABILITY_OP.CANCEL,
           wave: this.coopSourceWave,
           turn: this.coopSourceTurn,
+          authoritativeState: resultState,
         },
         this.coopOperationBinding,
       )

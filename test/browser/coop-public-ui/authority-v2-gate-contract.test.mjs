@@ -942,6 +942,33 @@ test("every ability picker retains its construction address after ending into a 
       /wave: globalScene\.currentBattle\?\.waveIndex|turn: globalScene\.currentBattle\?\.turn/u,
       `${workflow} never re-reads an ambient successor battle for Authority V2 material`,
     );
+
+    const ownerCommitStart = source.indexOf("private commitAndEnd(): void");
+    const ownerRelayStart = source.indexOf("private relayEnd(", ownerCommitStart);
+    const ownerCommit = source.slice(ownerCommitStart, ownerRelayStart);
+    assert.match(
+      ownerCommit,
+      /const resultState = relayOutcome \? captureCoopOperationAuthorityState\(this\.coopSourceTurn\) : null;[\s\S]*?this\.end\(\);/u,
+      `${workflow} freezes the complete result image before end() can synchronously enter the next battle`,
+    );
+    assert.match(
+      source.slice(ownerRelayStart, source.indexOf("private async coopApplyRelayedOutcome", ownerRelayStart)),
+      /authoritativeState,/u,
+      `${workflow} forwards the frozen owner image into the durable ability result`,
+    );
+
+    const watcherStart = source.indexOf("private async coopApplyRelayedOutcome", ownerRelayStart);
+    const watcher = source.slice(watcherStart);
+    assert.match(
+      watcher,
+      /const resultState =[\s\S]*?captureCoopOperationAuthorityState\(this\.coopSourceTurn\)[\s\S]*?this\.end\(\);/u,
+      `${workflow} freezes a guest-owned result before the authority watcher advances its continuation`,
+    );
+    assert.match(
+      watcher,
+      /commitAbilityWatcherOutcome\([\s\S]*?authoritativeState: resultState,/u,
+      `${workflow} retains the frozen authority-watcher image instead of a successor-wave snapshot`,
+    );
   }
 });
 
