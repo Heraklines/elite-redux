@@ -65,6 +65,20 @@
       "masters-ex"
     ]
   },
+  "trainer_n_masters_ex_1": {
+    "author": "Kyle Dove",
+    "genders": false,
+    "kind": "other",
+    "label": "EX Trainer N",
+    "license": "cc-by",
+    "sourceUrl": "https://pokengine.org/trainers/01zej7z0/N",
+    "spriteKey": "trainer_n_masters_ex_1",
+    "tags": [
+      "Masters Ex",
+      "N",
+      "Plasma"
+    ]
+  },
   "volo": {
     "author": "Kyle Dove",
     "genders": false,
