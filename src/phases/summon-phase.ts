@@ -321,7 +321,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   }
 
   queuePostSummon(): void {
-    this.getPokemon().turnData.summonedThisTurn = true;
+    const pokemon = this.getPokemon();
+    pokemon.turnData.summonedThisTurn = true;
+    if (pokemon.isEnemy()) {
+      pokemon.waveData.seenInBattle = true;
+    }
   }
 
   end() {

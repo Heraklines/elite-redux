@@ -32,8 +32,10 @@
 // `docs/plans/player-telemetry-schema-v1.md` section 9.
 // =============================================================================
 
+import type { ErCombatDecisionRecord, ErCombatTerminalRecord } from "#data/elite-redux/ai/combat-contract";
+
 /** Bump on an incompatible wire-shape change. Stamped into every session envelope + the R2 object metadata. */
-export const TELEMETRY_SCHEMA_VERSION = 1;
+export const TELEMETRY_SCHEMA_VERSION = 2;
 
 /** Which broad game mode a session was played in (partitions the dataset for training). */
 export type TelemetryMode = "solo" | "coop" | "showdown";
@@ -155,6 +157,19 @@ export interface TelemetryTurnOutcomeEvent extends TelemetryEventBase {
   faints: string[];
 }
 
+/** Full legal-candidate combat contract for one committed human command. */
+export interface TelemetryCombatContractEvent extends TelemetryEventBase {
+  kind: "combat_contract_decision";
+  record: ErCombatDecisionRecord;
+}
+
+/** Run terminal used to assign winner-only policy targets and all-outcome value targets offline. */
+export interface TelemetryRunOutcomeEvent extends TelemetryEventBase {
+  kind: "run_outcome";
+  outcome: "victory" | "player-wiped";
+  record: ErCombatTerminalRecord;
+}
+
 /** An interactive SURFACE opened (a menu / option list): its id + the option labels offered. */
 export interface TelemetrySurfaceOpenEvent extends TelemetryEventBase {
   kind: "surface_open";
@@ -190,6 +205,8 @@ export interface TelemetryInputEvent extends TelemetryEventBase {
 export type TelemetryEvent =
   | TelemetryBattleDecisionEvent
   | TelemetryTurnOutcomeEvent
+  | TelemetryCombatContractEvent
+  | TelemetryRunOutcomeEvent
   | TelemetrySurfaceOpenEvent
   | TelemetrySurfaceChoiceEvent
   | TelemetryInputEvent;
@@ -214,6 +231,8 @@ export interface TelemetrySessionEnvelope {
   gameModeId: number;
   /** Run RNG seed. */
   seed: string;
+  /** Wave where this client began capturing the run (important for resumed saves). */
+  startWave?: number;
   /** ER difficulty ("youngster" | "ace" | "elite" | "hell" | "mystery"). */
   difficulty: string;
   /** Epoch ms at session start. */

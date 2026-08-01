@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
 
-export const DEFAULT_SELF_PLAY_FIXTURE = "ml/training/ghost-self-play-teams.v1.json";
+export const DEFAULT_SELF_PLAY_FIXTURE = "ml/training/ghost-self-play-teams.v2.json";
 
 export function buildPilotScenario(episodeIndex, fixture) {
   const source = fixture ?? readGhostFixture(DEFAULT_SELF_PLAY_FIXTURE);

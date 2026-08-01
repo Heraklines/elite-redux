@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ErCombatCandidateTokenGroups } from "#data/elite-redux/ai/combat-contract";
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
@@ -17,8 +18,15 @@ interface SidecarMessage {
   type?: string;
   id?: number;
   featureCount?: number;
+  historyLength?: number;
   scores?: unknown;
   error?: string;
+}
+
+interface PolicyHistoryStep {
+  candidateFeatures: number[][];
+  candidateTokenGroups: ErCombatCandidateTokenGroups[];
+  chosenIndex: number;
 }
 
 export class AiNeuralPolicyClient {
@@ -34,6 +42,8 @@ export class AiNeuralPolicyClient {
   private readyTimeout: NodeJS.Timeout | null = null;
   private stderr = "";
   private stopping = false;
+  private historyLength = 0;
+  private readonly historyByContext = new Map<string, PolicyHistoryStep[]>();
 
   constructor(modelDir: string, featureCount: number) {
     this.modelDir = modelDir;
@@ -76,7 +86,11 @@ export class AiNeuralPolicyClient {
     return this.readyPromise;
   }
 
-  async score(candidateFeatures: number[][]): Promise<number[]> {
+  async score(
+    contextId: string,
+    candidateFeatures: number[][],
+    candidateTokenGroups: ErCombatCandidateTokenGroups[],
+  ): Promise<number[]> {
     await this.start();
     if (!this.process || this.process.exitCode != null) {
       throw new Error("neural policy sidecar is not running");
@@ -88,8 +102,30 @@ export class AiNeuralPolicyClient {
         rejectScores(new Error(`neural policy request ${id} timed out`));
       }, 30_000);
       this.pending.set(id, { resolve: resolveScores, reject: rejectScores, timeout });
-      this.process?.stdin.write(`${JSON.stringify({ id, candidateFeatures })}\n`);
+      const history = this.historyByContext.get(contextId) ?? [];
+      this.process?.stdin.write(`${JSON.stringify({ id, candidateFeatures, candidateTokenGroups, history })}\n`);
     });
+  }
+
+  commit(
+    contextId: string,
+    candidateFeatures: number[][],
+    candidateTokenGroups: ErCombatCandidateTokenGroups[],
+    chosenIndex: number,
+  ): void {
+    if (!Number.isInteger(chosenIndex) || chosenIndex < 0 || chosenIndex >= candidateFeatures.length) {
+      throw new Error(`neural policy chosen index ${chosenIndex} is outside ${candidateFeatures.length} candidates`);
+    }
+    if (this.historyLength === 0) {
+      return;
+    }
+    const history = this.historyByContext.get(contextId) ?? [];
+    history.push({ candidateFeatures, candidateTokenGroups, chosenIndex });
+    this.historyByContext.set(contextId, history.slice(-this.historyLength));
+  }
+
+  reset(contextId: string): void {
+    this.historyByContext.delete(contextId);
   }
 
   stop(): void {
@@ -102,6 +138,7 @@ export class AiNeuralPolicyClient {
       this.process.kill();
     }
     this.process = null;
+    this.historyByContext.clear();
     this.rejectPending(new Error("neural policy sidecar stopped"));
   }
 
@@ -120,6 +157,11 @@ export class AiNeuralPolicyClient {
         );
         return;
       }
+      if (!Number.isInteger(message.historyLength) || message.historyLength! < 0) {
+        this.failAll(new Error(`neural policy returned invalid history length ${message.historyLength}`));
+        return;
+      }
+      this.historyLength = message.historyLength!;
       this.resolveReady?.();
       this.clearReadyTimeout();
       this.resolveReady = null;

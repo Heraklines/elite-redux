@@ -3,32 +3,29 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+const DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
 const [
   inputPath,
   outputPath,
-  teamCountRaw = "100",
+  teamsPerDifficultyRaw = "50",
   capturedDate = new Date().toISOString().slice(0, 10),
   trainingOutputPath,
 ] = process.argv.slice(2);
 if (!inputPath || !outputPath) {
   console.error(
-    "usage: node scripts/ai/build-ghost-anchor.mjs RAW_D1.json EVAL.json [TEAM_COUNT] [YYYY-MM-DD] [TRAINING.json]",
+    "usage: node scripts/ai/build-ghost-anchor.mjs RAW_D1.json EVAL.json [TEAMS_PER_DIFFICULTY] [YYYY-MM-DD] [TRAINING.json]",
   );
   process.exit(2);
 }
 
-const requestedTeamCount = Number(teamCountRaw);
-if (!Number.isSafeInteger(requestedTeamCount) || requestedTeamCount < 2 || requestedTeamCount % 2 !== 0) {
-  throw new Error("TEAM_COUNT must be an even integer of at least 2");
+const teamsPerDifficulty = Number(teamsPerDifficultyRaw);
+if (!Number.isSafeInteger(teamsPerDifficulty) || teamsPerDifficulty < 2 || teamsPerDifficulty % 2 !== 0) {
+  throw new Error("TEAMS_PER_DIFFICULTY must be an even integer of at least 2");
 }
 
 const hash = value => createHash("sha256").update(value).digest("hex");
 const integer = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Math.floor(Number(value)) : fallback);
 
-// Historical snapshots only retained the registry id and stack count. These ids
-// are generators whose subtype was not serialized, so invoking them now would
-// silently roll a different item. The list is audited against initModifierTypes():
-// every retained id constructs a concrete PokemonHeldItemModifierType directly.
 const NON_RESTORABLE_HELD_ITEM_IDS = new Set([
   "ATTACK_TYPE_BOOSTER",
   "BASE_STAT_BOOSTER",
@@ -109,79 +106,120 @@ function resultRows(raw) {
   return raw.flatMap(batch => (Array.isArray(batch?.results) ? batch.results : []));
 }
 
-const candidates = [];
-const rosterFingerprints = new Set();
-for (const row of resultRows(JSON.parse(readFileSync(inputPath, "utf8")))) {
-  const sourceKey = String(row?.user_id ?? "");
-  if (!sourceKey || typeof row?.player_team !== "string") {
-    continue;
-  }
-  try {
-    const parsed = JSON.parse(row.player_team);
-    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 6) {
-      continue;
-    }
-    const members = parsed.map(normalizeMember);
-    const fingerprint = hash(JSON.stringify(members));
-    if (rosterFingerprints.has(fingerprint)) {
-      continue;
-    }
-    rosterFingerprints.add(fingerprint);
-    candidates.push({ sourceKey, fingerprint, members });
-  } catch {
-    // A malformed historical snapshot is ineligible, but cannot block the anchor.
-  }
+function normalizeDifficulty(value) {
+  const difficulty = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return DIFFICULTIES.includes(difficulty) ? difficulty : null;
 }
 
-const groups = new Map();
-for (const candidate of candidates) {
-  const group = groups.get(candidate.sourceKey) ?? [];
-  group.push(candidate);
-  groups.set(candidate.sourceKey, group);
-}
-const sourceGroups = [...groups.values()]
-  .map(group => group.sort((a, b) => a.fingerprint.localeCompare(b.fingerprint)))
-  .sort((a, b) =>
-    hash(a.map(row => row.fingerprint).join("|")).localeCompare(hash(b.map(row => row.fingerprint).join("|"))),
-  );
-
-function chooseEvaluationGroups(allGroups, teamCount) {
-  const total = allGroups.reduce((sum, group) => sum + group.length, 0);
-  const targetSourceCount = Math.round((allGroups.length * teamCount) / total);
-  const choices = Array.from({ length: total + 1 }, () => new Map());
-  choices[0].set(0, []);
-  for (let groupIndex = 0; groupIndex < allGroups.length; groupIndex++) {
-    const size = allGroups[groupIndex].length;
-    for (let sum = total - size; sum >= 0; sum--) {
-      for (const [sourceCount, existing] of [...choices[sum]]) {
-        const nextSum = sum + size;
-        const nextSourceCount = sourceCount + 1;
-        if (!choices[nextSum].has(nextSourceCount)) {
-          choices[nextSum].set(nextSourceCount, [...existing, groupIndex]);
-        }
+function parseCandidates(raw) {
+  const parsed = [];
+  const invalidByDifficulty = Object.fromEntries(DIFFICULTIES.map(difficulty => [difficulty, 0]));
+  for (const row of resultRows(raw)) {
+    const sourceKey = String(row?.user_id ?? "");
+    const difficulty = normalizeDifficulty(row?.difficulty);
+    if (!sourceKey || difficulty == null || typeof row?.player_team !== "string") {
+      continue;
+    }
+    try {
+      const team = JSON.parse(row.player_team);
+      if (!Array.isArray(team) || team.length === 0 || team.length > 6) {
+        throw new Error("invalid party size");
       }
+      const members = team.map(normalizeMember);
+      const fingerprint = hash(JSON.stringify(members));
+      parsed.push({ sourceKey, difficulty, fingerprint, members });
+    } catch {
+      invalidByDifficulty[difficulty]++;
     }
   }
-  for (let sum = teamCount; sum < choices.length; sum++) {
-    const sourceChoices = [...choices[sum]];
-    if (sourceChoices.length > 0) {
-      sourceChoices.sort(
-        ([countA], [countB]) =>
-          Math.abs(countA - targetSourceCount) - Math.abs(countB - targetSourceCount) || countB - countA,
-      );
-      return new Set(sourceChoices[0][1]);
+
+  // A roster duplicated by several saves/accounts is one matchup input in that tier.
+  // The deterministic source tie-break happens before any account split.
+  parsed.sort(
+    (a, b) =>
+      a.difficulty.localeCompare(b.difficulty)
+      || a.fingerprint.localeCompare(b.fingerprint)
+      || hash(a.sourceKey).localeCompare(hash(b.sourceKey)),
+  );
+  const deduplicated = [];
+  const seen = new Set();
+  for (const candidate of parsed) {
+    const key = `${candidate.difficulty}:${candidate.fingerprint}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicated.push(candidate);
     }
   }
-  throw new Error(`only ${total} distinct valid winning rosters are available; requested ${teamCount}`);
+  return { candidates: deduplicated, invalidByDifficulty };
 }
 
-function selectSourceDiverse(allGroups, teamCount) {
+function groupByAccount(candidates) {
+  const groups = new Map();
+  for (const candidate of candidates) {
+    const group = groups.get(candidate.sourceKey) ?? {
+      sourceKey: candidate.sourceKey,
+      sortKey: hash(candidate.sourceKey),
+      byDifficulty: Object.fromEntries(DIFFICULTIES.map(difficulty => [difficulty, []])),
+    };
+    group.byDifficulty[candidate.difficulty].push(candidate);
+    groups.set(candidate.sourceKey, group);
+  }
+  return [...groups.values()]
+    .map(group => {
+      for (const difficulty of DIFFICULTIES) {
+        group.byDifficulty[difficulty].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+      }
+      return group;
+    })
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+}
+
+function chooseEvaluationAccounts(groups) {
+  const deficits = Object.fromEntries(DIFFICULTIES.map(difficulty => [difficulty, teamsPerDifficulty]));
+  const remaining = new Set(groups);
   const selected = [];
-  for (let pass = 0; selected.length < teamCount; pass++) {
+  while (DIFFICULTIES.some(difficulty => deficits[difficulty] > 0)) {
+    const ranked = [...remaining]
+      .map(group => {
+        const contributions = DIFFICULTIES.map(difficulty =>
+          Math.min(deficits[difficulty], group.byDifficulty[difficulty].length),
+        );
+        const covered = contributions.filter(value => value > 0).length;
+        const rareContribution = contributions[2] * 2 + contributions[3] * 3;
+        const totalContribution = contributions.reduce((sum, value) => sum + value, 0);
+        return { group, covered, rareContribution, totalContribution };
+      })
+      .filter(row => row.totalContribution > 0)
+      .sort(
+        (a, b) =>
+          b.covered - a.covered
+          || b.rareContribution - a.rareContribution
+          || b.totalContribution - a.totalContribution
+          || a.group.sortKey.localeCompare(b.group.sortKey),
+      );
+    const next = ranked[0]?.group;
+    if (!next) {
+      throw new Error(`account-first holdout cannot fill deficits: ${JSON.stringify(deficits)}`);
+    }
+    selected.push(next);
+    remaining.delete(next);
+    for (const difficulty of DIFFICULTIES) {
+      deficits[difficulty] = Math.max(0, deficits[difficulty] - next.byDifficulty[difficulty].length);
+    }
+  }
+  return { evaluationGroups: selected, trainingGroups: groups.filter(group => remaining.has(group)) };
+}
+
+function selectSourceDiverse(groups, difficulty) {
+  const selected = [];
+  for (let pass = 0; selected.length < teamsPerDifficulty; pass++) {
     let added = 0;
-    for (const group of allGroups) {
-      if (group[pass] && selected.length < teamCount) {
-        selected.push(group[pass]);
+    for (const group of groups) {
+      const candidate = group.byDifficulty[difficulty][pass];
+      if (candidate && selected.length < teamsPerDifficulty) {
+        selected.push(candidate);
         added++;
       }
     }
@@ -189,45 +227,83 @@ function selectSourceDiverse(allGroups, teamCount) {
       break;
     }
   }
-  if (selected.length < teamCount) {
-    throw new Error(`only ${selected.length} eligible rosters are available; requested ${teamCount}`);
+  if (selected.length !== teamsPerDifficulty) {
+    throw new Error(`only ${selected.length} held-out ${difficulty} teams are available`);
   }
   return selected;
 }
 
-function pairSourceDistinct(selectedCandidates) {
-  const remaining = [...selectedCandidates].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+function pairSourceDistinct(candidates, difficulty) {
+  const bySource = new Map();
+  for (const candidate of candidates) {
+    const group = bySource.get(candidate.sourceKey) ?? [];
+    group.push(candidate);
+    bySource.set(candidate.sourceKey, group);
+  }
+  for (const group of bySource.values()) {
+    group.sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  }
   const paired = [];
-  while (remaining.length > 0) {
-    const first = remaining.shift();
-    const partnerIndex = remaining.findIndex(candidate => candidate.sourceKey !== first.sourceKey);
-    if (partnerIndex < 0) {
-      throw new Error("could not create source-distinct inverse pairs");
+  while ([...bySource.values()].some(group => group.length > 0)) {
+    const available = [...bySource.entries()]
+      .filter(([, group]) => group.length > 0)
+      .sort(
+        ([sourceA, groupA], [sourceB, groupB]) =>
+          groupB.length - groupA.length || hash(sourceA).localeCompare(hash(sourceB)),
+      );
+    if (available.length < 2) {
+      throw new Error(`could not create source-distinct ${difficulty} inverse pairs`);
     }
-    paired.push(first, remaining.splice(partnerIndex, 1)[0]);
+    paired.push(available[0][1].shift(), available[1][1].shift());
   }
   return paired;
 }
 
-const evaluationGroupIndexes = chooseEvaluationGroups(sourceGroups, requestedTeamCount);
-const evaluationGroups = sourceGroups.filter((_, index) => evaluationGroupIndexes.has(index));
-const trainingGroups = sourceGroups.filter((_, index) => !evaluationGroupIndexes.has(index));
-const selected = selectSourceDiverse(evaluationGroups, requestedTeamCount);
-const paired = pairSourceDistinct(selected);
-const sourceAccountCount = new Set(paired.map(candidate => candidate.sourceKey)).size;
+function difficultyCounts(candidates) {
+  return Object.fromEntries(
+    DIFFICULTIES.map(difficulty => [difficulty, candidates.filter(row => row.difficulty === difficulty).length]),
+  );
+}
+
+const rawInput = readFileSync(inputPath, "utf8").replace(/^\uFEFF/, "");
+const { candidates: allCandidates, invalidByDifficulty } = parseCandidates(JSON.parse(rawInput));
+const sourceGroups = groupByAccount(allCandidates);
+const { evaluationGroups, trainingGroups } = chooseEvaluationAccounts(sourceGroups);
+const evaluationCandidates = DIFFICULTIES.flatMap(difficulty =>
+  pairSourceDistinct(selectSourceDiverse(evaluationGroups, difficulty), difficulty),
+);
+const trainingCandidates = trainingGroups
+  .flatMap(group => DIFFICULTIES.flatMap(difficulty => group.byDifficulty[difficulty]))
+  .sort(
+    (a, b) =>
+      DIFFICULTIES.indexOf(a.difficulty) - DIFFICULTIES.indexOf(b.difficulty)
+      || a.fingerprint.localeCompare(b.fingerprint),
+  );
+
+const evaluationSources = new Set(evaluationGroups.map(group => group.sourceKey));
+const trainingSources = new Set(trainingGroups.map(group => group.sourceKey));
+const sourceIntersection = [...evaluationSources].filter(source => trainingSources.has(source));
+if (sourceIntersection.length > 0) {
+  throw new Error(`account leakage across fixtures: ${sourceIntersection.length} sources`);
+}
+
+const normalization =
+  "Original 1-6 member party size, species, form, ability slot, IVs, nature, gender, shiny tier, passive flag, four saved moves, and exactly reconstructable per-Pokemon held-item stacks are preserved. Historical generic item-generator ids whose subtype was not saved are excluded instead of rerolled. Run-global relics, challenges, and trainer modifiers are excluded.";
 const fixture = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   capturedDate,
-  teamCount: paired.length,
-  sourceAccountCount,
+  teamCount: evaluationCandidates.length,
+  teamsPerDifficulty,
+  difficultyCounts: difficultyCounts(evaluationCandidates),
+  sourceAccountCount: evaluationSources.size,
   source:
-    "Sanitized read-only snapshot of distinct winning Hell ghost runs; no run, account, player, seed, or timestamp identifiers retained.",
+    "Sanitized read-only snapshot of distinct winning ghost rosters across every difficulty; no run, account, player, seed, or timestamp identifiers retained.",
   selection:
-    "Deterministic player-level holdout: every source account represented here is excluded from the self-play fixture. One roster per held-out source is selected before a second; inverse pairs never share a source account.",
-  normalization:
-    "Original 1-6 member party size, species, form, ability slot, IVs, nature, gender, shiny tier, passive flag, first four moves, and exactly reconstructable per-Pokemon held-item stacks are preserved. Historical generic item-generator ids whose subtype was not saved are excluded instead of rerolled. Both sides run at level 200. Run-global relics, challenges, and trainer modifiers are excluded.",
-  teams: paired.map((candidate, index) => ({
-    id: `hell-anchor-${String(index + 1).padStart(3, "0")}`,
+    "Source accounts are partitioned before roster selection. The benchmark holds out exactly the requested number from each difficulty, selects source-diversely, and pairs only different accounts within a difficulty. Every held-out account is excluded from training.",
+  normalization,
+  teams: evaluationCandidates.map((candidate, index) => ({
+    id: `${candidate.difficulty}-anchor-${String(index + 1).padStart(3, "0")}`,
+    difficulty: candidate.difficulty,
     members: candidate.members,
   })),
 };
@@ -235,34 +311,40 @@ const fixture = {
 mkdirSync(dirname(outputPath), { recursive: true });
 writeFileSync(outputPath, `${JSON.stringify(fixture, null, 2)}\n`);
 const result = {
+  validDistinctRosters: difficultyCounts(allCandidates),
+  invalidRosters: invalidByDifficulty,
+  sourceAccounts: sourceGroups.length,
   evaluationTeams: fixture.teamCount,
+  evaluationByDifficulty: fixture.difficultyCounts,
   evaluationSources: fixture.sourceAccountCount,
   inversePairs: fixture.teamCount / 2,
+  sourceAccountIntersection: sourceIntersection.length,
 };
 
 if (trainingOutputPath) {
-  const trainingCandidates = trainingGroups.flat().sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
   if (trainingCandidates.length < 2) {
-    throw new Error("the player-level holdout left fewer than two self-play rosters");
+    throw new Error("the account-level holdout left fewer than two training rosters");
   }
   const trainingFixture = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     capturedDate,
     teamCount: trainingCandidates.length,
-    sourceAccountCount: trainingGroups.length,
-    source:
-      "Sanitized read-only snapshot of distinct winning Hell ghost runs; no run, account, player, seed, or timestamp identifiers retained.",
+    difficultyCounts: difficultyCounts(trainingCandidates),
+    sourceAccountCount: trainingSources.size,
+    source: fixture.source,
     selection:
-      "Every roster comes from a source account excluded from the evaluation fixture. No evaluation player or roster is used for self-play or model fitting.",
-    normalization: fixture.normalization,
+      "Every roster comes from a source account excluded from the evaluation fixture. Difficulty is retained as stratification metadata; Elite and Hell may be oversampled by self-play scheduling.",
+    normalization,
     teams: trainingCandidates.map((candidate, index) => ({
-      id: `hell-selfplay-${String(index + 1).padStart(3, "0")}`,
+      id: `${candidate.difficulty}-selfplay-${String(index + 1).padStart(4, "0")}`,
+      difficulty: candidate.difficulty,
       members: candidate.members,
     })),
   };
   mkdirSync(dirname(trainingOutputPath), { recursive: true });
   writeFileSync(trainingOutputPath, `${JSON.stringify(trainingFixture, null, 2)}\n`);
   result.trainingTeams = trainingFixture.teamCount;
+  result.trainingByDifficulty = trainingFixture.difficultyCounts;
   result.trainingSources = trainingFixture.sourceAccountCount;
 }
 

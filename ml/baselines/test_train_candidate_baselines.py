@@ -10,6 +10,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from train_candidate_baselines import (
     artifact_scores,
     fit_stacked_tree_ensemble,
+    is_policy_target,
     ordered_group_sizes,
     record_split_group,
     record_source_partition,
@@ -20,12 +21,26 @@ from train_candidate_baselines import (
 
 
 class CandidateBaselineContractTest(unittest.TestCase):
+    def test_engine_and_heuristic_rows_are_not_policy_targets(self) -> None:
+        self.assertFalse(is_policy_target({"policySource": "engine-hardest-v1", "policyTarget": False}))
+        self.assertFalse(is_policy_target({"policySource": "smart-default-v1", "policyTarget": True}))
+        self.assertTrue(is_policy_target({"policySource": "human-v1", "policyTarget": True}))
+        self.assertTrue(is_policy_target({"policySource": "search-relabel-v1", "policyTarget": True}))
+
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {
-            "schemaVersion": 2,
+            "schemaVersion": 3,
+            "features": {"schemaVersion": 2, "names": ["f0"]},
             "moves": {"1": {}},
             "abilities": {"2": {}, "3": {}},
             "items": {"LEFTOVERS": {}},
+            "modifiers": {"LEFTOVERS": {}},
+            "speciesForms": {"6:0": {}},
+            "relics": {},
+            "battlerTags": [],
+            "arenaTags": [],
+            "positionalTags": [],
+            "mechanicNamespaces": ["ability-state"],
         }
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "dictionary.json"
@@ -35,18 +50,30 @@ class CandidateBaselineContractTest(unittest.TestCase):
                 "dictionaryHash": digest,
                 "observation": {
                     "selfParty": [{
-                        "ability": 2,
-                        "innates": [3],
+                        "species": 6,
+                        "form": 0,
+                        "abilities": [{"abilityId": 2}, {"abilityId": 3}],
                         "moves": [{"moveId": 1}],
-                        "heldItems": ["LEFTOVERS"],
+                        "heldItems": [{"itemId": "LEFTOVERS"}],
+                        "tags": [],
+                        "mechanics": [{"effectId": "ability-state:foul-harvest"}],
                     }],
                     "opponentActive": [],
+                    "fieldEffects": [],
+                    "positionalEffects": [],
+                    "modifiers": [],
                 },
                 "candidates": [{"kind": "move", "moveId": 1}],
+                "candidateFeatures": [{"values": [0.0]}],
             }
             coverage = validate_data_dictionary(path, [decision])
             self.assertEqual(coverage["referencedMoves"], 1)
-            decision["observation"]["selfParty"][0]["ability"] = 4
+            self.assertEqual(coverage["referencedMechanicNamespaces"], 1)
+            decision["observation"]["selfParty"][0]["mechanics"][0]["effectId"] = "unknown-state:test"
+            with self.assertRaisesRegex(ValueError, "misses recorded runtime ids"):
+                validate_data_dictionary(path, [decision])
+            decision["observation"]["selfParty"][0]["mechanics"][0]["effectId"] = "ability-state:foul-harvest"
+            decision["observation"]["selfParty"][0]["abilities"][0]["abilityId"] = 4
             with self.assertRaisesRegex(ValueError, "misses recorded runtime ids"):
                 validate_data_dictionary(path, [decision])
 
@@ -159,6 +186,71 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertEqual(artifact["schemaVersion"], 2)
         self.assertEqual(scores.shape, (4,))
         self.assertTrue(np.isfinite(scores).all())
+
+    def test_stacked_tree_training_excludes_zero_weight_loss_rows(self) -> None:
+        x = np.asarray([[candidate, group] for group in range(8) for candidate in (0.0, 1.0)], dtype=np.float32)
+        y = np.asarray([0, 1] * 8)
+        decision_ids = [f"decision-{group}" for group in range(8) for _ in range(2)]
+        source_partitions = [f"partition-{group}" for group in range(8) for _ in range(2)]
+        train_mask = np.asarray([group < 6 for group in range(8) for _ in range(2)])
+        test_mask = ~train_mask
+        weights = np.asarray([
+            0.5 if group in (0, 1, 2) else 0.0
+            for group in range(8)
+            for _ in range(2)
+        ])
+        templates = {
+            "first": (HistGradientBoostingClassifier(max_iter=3, max_leaf_nodes=2, min_samples_leaf=1), False),
+            "second": (HistGradientBoostingClassifier(max_iter=4, max_leaf_nodes=3, min_samples_leaf=1), False),
+        }
+        member = {
+            "schemaVersion": 1,
+            "featureSchemaVersion": 1,
+            "featureCount": 2,
+            "modelName": "member",
+            "modelType": "sklearn_hist_gradient_boosting",
+            "aggregation": "sum_raw",
+            "baseScore": 0.0,
+            "trees": [[{"value": 1.0}]],
+        }
+        result = fit_stacked_tree_ensemble(
+            templates,
+            {"first": member, "second": {**member, "modelName": "member-2"}},
+            x,
+            y,
+            decision_ids,
+            source_partitions,
+            train_mask,
+            test_mask,
+            weights,
+            "winner-only-test",
+        )
+        self.assertIsNotNone(result)
+        artifact, scores, _seconds, _names = result
+        self.assertEqual(artifact["modelName"], "winner-only-test")
+        self.assertTrue(np.isfinite(scores).all())
+
+    def test_stacked_tree_training_reports_insufficient_positive_weight_data(self) -> None:
+        x = np.asarray([[0.0], [1.0], [0.0], [1.0]], dtype=np.float32)
+        y = np.asarray([0, 1, 0, 1])
+        result = fit_stacked_tree_ensemble(
+            {
+                "first": (HistGradientBoostingClassifier(max_iter=2, min_samples_leaf=1), False),
+                "second": (HistGradientBoostingClassifier(max_iter=3, min_samples_leaf=1), False),
+            },
+            {
+                "first": {"aggregation": "sum_raw", "baseScore": 0.0, "trees": [[{"value": 0.0}]]},
+                "second": {"aggregation": "sum_raw", "baseScore": 0.0, "trees": [[{"value": 0.0}]]},
+            },
+            x,
+            y,
+            ["a", "a", "b", "b"],
+            ["a", "a", "b", "b"],
+            np.asarray([True, True, False, False]),
+            np.asarray([False, False, True, True]),
+            np.zeros(4),
+        )
+        self.assertIsNone(result)
 
     def test_elite_rollouts_retain_only_successful_exploration(self) -> None:
         decisions = [

@@ -80,6 +80,20 @@ interface FusionRecord {
 }
 const shatteredPsycheLedger = new Map<number, FusionRecord>();
 
+/** Read-only holder/fusion state for combat-policy observations. */
+export function erShatteredPsycheState(pokemon: Pokemon):
+  | {
+      fired: boolean;
+      wave: number;
+      fusion: FusionRecord | null;
+    }
+  | undefined {
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  const fired = shatteredPsycheWaveKey === String(wave) && shatteredPsycheFiredHolders.has(pokemon.id);
+  const fusion = shatteredPsycheWaveKey === String(wave) ? (shatteredPsycheLedger.get(pokemon.id) ?? null) : null;
+  return fired || fusion ? { fired, wave, fusion } : undefined;
+}
+
 /**
  * Split `currentHp` of a fused entity back into the two constituents' shares,
  * PROPORTIONAL to each one's original max HP. Pure + exhaustively rounded so the

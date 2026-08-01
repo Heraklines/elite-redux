@@ -40,6 +40,8 @@ interface ImportMetaEnv {
   readonly VITE_TELEMETRY?: string;
   readonly VITE_SERVER_URL_PLAYER_TELEMETRY?: HTTP_URL;
   readonly VITE_TELEMETRY_SALT?: string;
+  readonly VITE_BUILD_SHA?: string;
+  readonly VITE_AI_DICTIONARY_HASH?: string;
 }
 
 // tell vite to disallow missing env vars

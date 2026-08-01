@@ -105,13 +105,17 @@ import {
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { isInnateSlotSuppressed } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import {
+  captureCommittedCombatDecision,
+  perspectiveTargetRef,
+  sameTargetSet,
+} from "#data/elite-redux/ai/combat-committed-action";
+import {
   ER_COMBAT_CONTRACT_VERSION,
   type ErCombatCandidate,
   type ErCombatDatasetRecord,
   type ErCombatDecisionRecord,
   type ErCombatMoveCandidate,
   type ErCombatTargetRef,
-  validateCombatDecisionRecord,
 } from "#data/elite-redux/ai/combat-contract";
 import {
   type ErCombatEarlierChoice,
@@ -120,8 +124,8 @@ import {
 } from "#data/elite-redux/ai/combat-engine-adapter";
 import {
   ER_COMBAT_FEATURE_NAMES,
-  ER_COMBAT_FEATURE_SCHEMA_VERSION,
   extractErCombatCandidateFeatures,
+  extractErCombatCandidateTokenGroups,
 } from "#data/elite-redux/ai/combat-features";
 import {
   type ErTreeModelArtifact,
@@ -129,8 +133,10 @@ import {
   validateErTreeModel,
 } from "#data/elite-redux/ai/combat-tree-model";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
+import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { AiType } from "#enums/ai-type";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -156,7 +162,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
-import type { EnemyPokemon, Pokemon } from "#field/pokemon";
+import { EnemyPokemon, type Pokemon } from "#field/pokemon";
 import { Move } from "#moves/move";
 import { getMoveTargets } from "#moves/move-utils";
 import type { CommandPhase } from "#phases/command-phase";
@@ -386,13 +392,17 @@ const QUIET = process.env.ER_RUN_QUIET === "1"; // suppress per-turn STATE spam
 const AUTO_FIRST = process.env.ER_RUN_AUTO_FIRST === "1"; // press through unknown menus (option 0 / cancel)
 const JSON_OUT = (process.env.ER_RUN_JSON_OUT ?? "").trim(); // machine-readable result path
 const AI_DATA_OUT = (process.env.ER_RUN_AI_DATA_OUT ?? "").trim();
+const AI_RECORD_ENGINE_BASELINE =
+  process.env.ER_AI_RECORD_ENGINE_BASELINE === "1" || process.env.ER_AI_RECORD_ENGINE_TEACHER === "1";
 const AI_BUILD_SHA = (process.env.ER_AI_BUILD_SHA ?? process.env.GITHUB_SHA ?? "local").trim();
 const AI_DEX_HASH = (process.env.ER_AI_DEX_HASH ?? "unknown").trim();
 const AI_DICTIONARY_HASH = (process.env.ER_AI_DICTIONARY_HASH ?? "unknown").trim();
 let activeAiEpisodeId = (process.env.ER_AI_EPISODE_ID ?? INPUT?.run?.seed ?? "local-episode").trim();
 let activeAiSplitGroupId = activeAiEpisodeId;
 let activeAiSourcePartitionId = activeAiSplitGroupId;
+let enginePlayerSwitchCounter = 0;
 const AI_DATASET_RECORDS: ErCombatDatasetRecord[] = [];
+const AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS = new Set<number>();
 const AI_MODEL_PATH = (process.env.ER_AI_POLICY_MODEL ?? "").trim();
 const AI_NEURAL_MODEL_DIR = (process.env.ER_AI_NEURAL_POLICY_MODEL ?? "").trim();
 const AI_POLICY_MODE = (process.env.ER_AI_POLICY_MODE ?? "first-usable").trim();
@@ -400,7 +410,10 @@ const AI_POLICY_EPSILON = Number(process.env.ER_AI_POLICY_EPSILON ?? "0");
 if (AI_MODEL_PATH && AI_NEURAL_MODEL_DIR) {
   throw new Error("ER_AI_POLICY_MODEL and ER_AI_NEURAL_POLICY_MODEL are mutually exclusive");
 }
-if (!["first-usable", "smart-default"].includes(AI_POLICY_MODE)) {
+if (AI_RECORD_ENGINE_BASELINE && (!COMBAT_BATCH || !AI_DATA_OUT)) {
+  throw new Error("ER_AI_RECORD_ENGINE_BASELINE requires ER_RUN_COMBAT_BATCH and ER_RUN_AI_DATA_OUT");
+}
+if (!["first-usable", "smart-default", "engine-hardest"].includes(AI_POLICY_MODE)) {
   throw new Error(`unsupported ER_AI_POLICY_MODE: ${AI_POLICY_MODE}`);
 }
 if (!Number.isFinite(AI_POLICY_EPSILON) || AI_POLICY_EPSILON < 0 || AI_POLICY_EPSILON > 1) {
@@ -698,10 +711,7 @@ function slotAction(a: TurnAction | undefined, slot: 0 | 1 | 2): SlotAction {
  * Keep this aligned with CommandPhase.clearUnusableMoves/tryExecuteQueuedMove so
  * unattended policies neither queue stale prompts nor record decisions never made.
  */
-function slotCommandIsAutomatic(game: GameManager, mon: Pokemon): boolean {
-  if (game.scene.currentBattle.turnCommands[mon.getBattlerIndex()] != null) {
-    return true;
-  }
+function hasAutomaticQueuedCommand(mon: Pokemon): boolean {
   const moveset = mon.getMoveset();
   const queuedMove = mon.getMoveQueue().find(move => {
     const movesetMove = moveset.find(candidate => candidate.moveId === move.move);
@@ -717,10 +727,14 @@ function slotCommandIsAutomatic(game: GameManager, mon: Pokemon): boolean {
   return !(mon.getTag(BattlerTagType.FRENZY) && mon.hasAbilityWithAttr("SwitchWhileRampagingAbAttr"));
 }
 
+function slotCommandIsAutomatic(game: GameManager, mon: Pokemon): boolean {
+  return game.scene.currentBattle.turnCommands[mon.getBattlerIndex()] != null || hasAutomaticQueuedCommand(mon);
+}
+
 /** The exact automatic move CommandPhase will consume, if it can still require target confirmation. */
 function automaticTurnMove(game: GameManager, mon: Pokemon): TurnMove | null {
   const commandMove = game.scene.currentBattle.turnCommands[mon.getBattlerIndex()]?.move;
-  if (commandMove?.move && commandMove.move !== MoveId.NONE) {
+  if (commandMove?.move) {
     return commandMove;
   }
   const moveset = mon.getMoveset();
@@ -772,9 +786,12 @@ function selectSyntheticStruggle(
     targets: target == null ? getMoveTargets(mon, MoveId.STRUGGLE).targets : [target],
     useMode: MoveUseMode.NORMAL,
   };
-  game.onNextPrompt("CommandPhase", UiMode.COMMAND, () =>
-    game.scene.ui.setMode(UiMode.FIGHT, (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex()),
-  );
+  game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
+    void game.scene.ui.setMode(
+      UiMode.FIGHT,
+      (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex(),
+    );
+  });
   game.onNextPrompt("CommandPhase", UiMode.FIGHT, () =>
     (game.scene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(
       Command.FIGHT,
@@ -881,199 +898,146 @@ function doPlayerActions(
   }
 }
 
-function chosenTargetRef(game: GameManager, battlerIndex: number | undefined): ErCombatTargetRef | null {
-  if (battlerIndex == null) {
-    return null;
-  }
-  const selfSlot = game.scene.getPlayerField().findIndex(mon => mon?.getBattlerIndex() === battlerIndex);
-  if (selfSlot >= 0) {
-    return { side: "self", entityId: game.scene.getPlayerField()[selfSlot].id, activeSlot: selfSlot };
-  }
-  const opponentSlot = game.scene.getEnemyField().findIndex(mon => mon?.getBattlerIndex() === battlerIndex);
-  return opponentSlot < 0
-    ? null
-    : { side: "opponent", entityId: game.scene.getEnemyField()[opponentSlot].id, activeSlot: opponentSlot };
+type CombatCapturePerspective = "player" | "enemy";
+
+interface PolicyCaptureMetadata {
+  policySource: ErCombatDecisionRecord["policySource"];
+  policyTarget: boolean;
 }
 
-function findChosenCombatCandidate(
-  game: GameManager,
-  mon: Pokemon,
-  actorSlot: number,
-  action: SlotAction,
-  forcedMove: MoveId | null,
-  candidates: readonly ErCombatCandidate[],
-): ErCombatCandidate | null {
-  if (action.ball != null || action.run) {
-    return null; // outside the explicitly-scoped combat-command dataset
-  }
-  if (action.switch != null) {
-    return (
-      candidates.find(
-        candidate =>
-          candidate.kind === "switch" && candidate.partyIndex === action.switch && candidate.transfer === "normal",
-      ) ?? null
-    );
-  }
-  const moveId =
-    resolveMove(action.move)
-    ?? forcedMove
-    ?? mon.getMoveset().find(move => move.ppUsed < move.getMovePp())?.moveId
-    ?? MoveId.STRUGGLE;
-  const moveSlot = mon.getMoveset().findIndex(move => move.moveId === moveId && move.ppUsed < move.getMovePp());
-  const chosenTarget = chosenTargetRef(game, action.target);
-  const matches = candidates.filter(
-    (candidate): candidate is ErCombatMoveCandidate =>
-      candidate.kind === "move"
-      && candidate.actorSlot === actorSlot
-      && candidate.moveId === moveId
-      && candidate.moveSlot === moveSlot
-      && candidate.tera === !!action.tera
-      && (candidate.targetMode === "random"
-        || chosenTarget == null
-        || candidate.targets.some(
-          target =>
-            target.side === chosenTarget.side
-            && target.activeSlot === chosenTarget.activeSlot
-            && target.entityId === chosenTarget.entityId,
-        )),
-  );
-  if (matches.length === 1) {
-    return matches[0];
-  }
-  if (chosenTarget == null && matches.length > 1) {
-    const firstLiveOpponentSlot = game.scene
-      .getEnemyField()
-      .findIndex(enemy => enemy?.isActive(true) && !enemy.isFainted());
-    return (
-      matches.find(candidate =>
-        candidate.targets.some(target => target.side === "opponent" && target.activeSlot === firstLiveOpponentSlot),
-      ) ?? null
-    );
-  }
-  return null;
-}
-
-function recordAiTurn(
-  game: GameManager,
-  action: TurnAction | undefined,
-  forcedMove: MoveId | null,
-  sourcePolicy: ErCombatDecisionRecord["sourcePolicy"],
-): void {
-  if (!AI_DATA_OUT) {
-    return;
-  }
-  const scene = game.scene;
-  const wave = scene.currentBattle.waveIndex;
-  const turn = scene.currentBattle.turn;
-  const jointActionId = `${activeAiEpisodeId}:${wave}:${turn}`;
-  const earlier: ErCombatEarlierChoice[] = [];
-  const field = scene.getPlayerField();
-  for (let actorSlot = 0; actorSlot < field.length; actorSlot++) {
-    const mon = field[actorSlot];
-    if (!mon?.isActive(true) || mon.isFainted() || slotCommandIsAutomatic(game, mon)) {
-      continue;
-    }
-    const built = buildAiDecisionForSlot({
-      game,
-      mon,
-      actorSlot,
-      action,
-      forcedMove,
-      sourcePolicy,
-      jointActionId,
-      earlier,
-    });
-    if (built == null) {
-      continue;
-    }
-    AI_DATASET_RECORDS.push(built.record);
-    const chosen = built.chosen;
-    earlier.push({
-      kind: chosen.kind,
-      id: chosen.id,
-      ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
-      ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
-    });
-  }
-}
-
-interface BuildAiDecisionOptions {
+interface AppendCommittedDecisionOptions extends PolicyCaptureMetadata {
   game: GameManager;
-  mon: Pokemon;
+  perspective: CombatCapturePerspective;
   actorSlot: number;
-  action: TurnAction | undefined;
-  forcedMove: MoveId | null;
-  sourcePolicy: ErCombatDecisionRecord["sourcePolicy"];
   jointActionId: string;
   earlier: readonly ErCombatEarlierChoice[];
+  observation: ErCombatDecisionRecord["observation"];
+  candidates: ErCombatCandidate[];
 }
 
-function buildAiDecisionForSlot({
-  game,
-  mon,
-  actorSlot,
-  action,
-  forcedMove,
-  sourcePolicy,
-  jointActionId,
-  earlier,
-}: BuildAiDecisionOptions): { record: ErCombatDecisionRecord; chosen: ErCombatCandidate } | null {
-  const perSlotAction = slotAction(action, actorSlot as 0 | 1 | 2);
-  const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier);
-  const chosen = findChosenCombatCandidate(game, mon, actorSlot, perSlotAction, forcedMove, candidates);
-  if (chosen == null && (perSlotAction.ball != null || perSlotAction.run)) {
+function appendCommittedDecision(options: AppendCommittedDecisionOptions): ErCombatCandidate | null {
+  const { game, perspective, actorSlot, jointActionId, earlier, observation, candidates, ...metadata } = options;
+  const battle = game.scene.currentBattle;
+  const flatSlot = perspective === "enemy" ? battle.arrangement.enemyOffset + actorSlot : actorSlot;
+  const command = battle.turnCommands[flatSlot];
+  if (command == null || command.skip || command.command === Command.BALL || command.command === Command.RUN) {
     return null;
   }
-  if (chosen == null) {
-    const diagnostics = candidates.map(candidate =>
-      candidate.kind === "move"
-        ? {
-            kind: candidate.kind,
-            actorSlot: candidate.actorSlot,
-            moveSlot: candidate.moveSlot,
-            moveId: candidate.moveId,
-            tera: candidate.tera,
-            targets: candidate.targets.map(target => ({ entityId: target.entityId, activeSlot: target.activeSlot })),
-          }
-        : candidate,
-    );
-    throw new Error(
-      `AI dataset label did not map to one legal candidate: episode=${activeAiEpisodeId} `
-        + `decision=${jointActionId}:${actorSlot} action=${JSON.stringify(perSlotAction)} `
-        + `actor=${mon.id} target=${JSON.stringify(chosenTargetRef(game, perSlotAction.target))} `
-        + `candidates=${JSON.stringify(diagnostics)}`,
-    );
-  }
-  const record: ErCombatDecisionRecord = {
-    kind: "combat_decision",
-    schemaVersion: ER_COMBAT_CONTRACT_VERSION,
-    candidateScope: "combat-command",
+  const captured = captureCommittedCombatDecision({
+    scene: game.scene,
+    perspective,
+    actorSlot,
+    jointActionId,
+    earlier,
+    observation,
+    candidates,
+    ...metadata,
     buildSha: AI_BUILD_SHA,
     dexHash: AI_DEX_HASH,
     dictionaryHash: AI_DICTIONARY_HASH,
     episodeId: activeAiEpisodeId,
     splitGroupId: activeAiSplitGroupId,
     sourcePartitionId: activeAiSourcePartitionId,
-    jointActionId,
-    decisionId: `${jointActionId}:${actorSlot}`,
-    sourcePolicy,
-    actorSlot,
-    earlierCandidateIds: earlier.map(choice => choice.id),
-    observation: snapshotErCombatObservation(game.scene),
-    candidates,
-    featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
-    candidateFeatures: [],
-    chosenCandidateId: chosen.id,
-  };
-  record.candidateFeatures = candidates.map(candidate => ({
-    candidateId: candidate.id,
-    values: extractErCombatCandidateFeatures(record.observation, candidate),
-  }));
-  const validationErrors = validateCombatDecisionRecord(record);
-  if (validationErrors.length > 0) {
-    throw new Error(`invalid AI combat decision ${record.decisionId}: ${validationErrors.join("; ")}`);
+  });
+  if (captured == null) {
+    throw new Error(
+      `committed ${perspective} command did not map to one legal candidate: episode=${activeAiEpisodeId} `
+        + `decision=${jointActionId}:${actorSlot} command=${JSON.stringify(command)} `
+        + `candidates=${JSON.stringify(candidates)}`,
+    );
   }
-  return { record, chosen };
+  AI_DATASET_RECORDS.push(captured.record);
+  return captured.chosen;
+}
+
+/** Record only commands accepted by the real player CommandPhase. */
+function recordCommittedPlayerTurn(game: GameManager, metadata: PolicyCaptureMetadata): void {
+  if (!AI_DATA_OUT || AI_RECORD_ENGINE_BASELINE) {
+    return;
+  }
+  const scene = game.scene;
+  const jointActionId = `${activeAiEpisodeId}:${scene.currentBattle.waveIndex}:${scene.currentBattle.turn}`;
+  const earlier: ErCombatEarlierChoice[] = [];
+  for (let actorSlot = 0; actorSlot < scene.getPlayerField().length; actorSlot++) {
+    const actor = scene.getPlayerField()[actorSlot];
+    if (!actor?.isActive(true) || actor.isFainted()) {
+      continue;
+    }
+    const observation = snapshotErCombatObservation(scene);
+    const candidates = enumerateErCombatCandidates(scene, actorSlot, earlier);
+    const chosen = appendCommittedDecision({
+      game,
+      perspective: "player",
+      actorSlot,
+      jointActionId,
+      earlier,
+      observation,
+      candidates,
+      ...metadata,
+    });
+    if (chosen) {
+      earlier.push({
+        kind: chosen.kind,
+        id: chosen.id,
+        ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+        ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+      });
+    }
+  }
+}
+
+/**
+ * Record the hardest engine AI from its own perspective without invoking its chooser twice.
+ * These rows are baseline/value data only and are never policy targets.
+ */
+async function recordEngineBaselineTurn(game: GameManager): Promise<void> {
+  if (!AI_DATA_OUT || !AI_RECORD_ENGINE_BASELINE) {
+    return;
+  }
+  game.scene.getPlayerField().forEach(mon => AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS.add(mon.id));
+  const phaseCount = game.scene.getEnemyField().length;
+  const earlier: ErCombatEarlierChoice[] = [];
+  const wave = game.scene.currentBattle.waveIndex;
+  const turn = game.scene.currentBattle.turn;
+  const jointActionId = `${activeAiEpisodeId}:${wave}:${turn}:enemy`;
+  for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex++) {
+    await game.phaseInterceptor.to("EnemyCommandPhase", false);
+    const phase = game.scene.phaseManager.getCurrentPhase() as { getFieldIndex(): number };
+    const actorSlot = phase.getFieldIndex();
+    const actor = game.scene.getEnemyField()[actorSlot];
+    const automatic = actor == null || !actor.isActive(true) || actor.isFainted() || hasAutomaticQueuedCommand(actor);
+    const observation = automatic
+      ? null
+      : snapshotErCombatObservation(game.scene, {
+          perspective: "enemy",
+          knownOpponentEntityIds: AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS,
+        });
+    const candidates = automatic ? [] : enumerateErCombatCandidates(game.scene, actorSlot, earlier, "enemy");
+
+    await game.phaseInterceptor.to("EnemyCommandPhase");
+    if (automatic) {
+      continue;
+    }
+    const chosen = appendCommittedDecision({
+      game,
+      perspective: "enemy",
+      actorSlot,
+      jointActionId,
+      earlier,
+      observation: observation!,
+      candidates,
+      policySource: "engine-hardest-v1",
+      policyTarget: false,
+    });
+    if (chosen) {
+      earlier.push({
+        kind: chosen.kind,
+        id: chosen.id,
+        ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+        ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+      });
+    }
+  }
 }
 
 /** Whether the turn forces at least one enemy move. */
@@ -1757,24 +1721,24 @@ async function playBattle(
       const scriptedAction = opts.script?.[turn - 1];
       const action =
         scriptedAction
-        ?? (opts.forcedMove == null && (AI_TREE_MODEL || AI_NEURAL_CLIENT || AI_POLICY_MODE === "smart-default")
+        ?? (opts.forcedMove == null
+        && (AI_TREE_MODEL
+          || AI_NEURAL_CLIENT
+          || AI_POLICY_MODE === "smart-default"
+          || AI_POLICY_MODE === "engine-hardest")
           ? await unattendedPolicyAction(game)
           : undefined);
-      recordAiTurn(
-        game,
-        action,
-        opts.forcedMove ?? null,
-        scriptedAction
-          ? "scripted"
-          : (AI_TREE_MODEL || AI_NEURAL_CLIENT) && opts.forcedMove == null
-            ? unattendedSourcePolicy()
-            : AI_POLICY_MODE === "smart-default" && opts.forcedMove == null
-              ? "smart-default-v1"
-              : opts.forcedMove == null
-                ? "first-usable"
-                : "forced-move",
-      );
+      const captureMetadata: PolicyCaptureMetadata = scriptedAction
+        ? { policySource: "scripted", policyTarget: false }
+        : (AI_TREE_MODEL || AI_NEURAL_CLIENT || AI_POLICY_MODE === "engine-hardest") && opts.forcedMove == null
+          ? unattendedPolicyMetadata()
+          : AI_POLICY_MODE === "smart-default" && opts.forcedMove == null
+            ? { policySource: "smart-default-v1", policyTarget: false }
+            : opts.forcedMove == null
+              ? { policySource: "first-usable", policyTarget: false }
+              : { policySource: "forced-move", policyTarget: false };
       doPlayerActions(game, action, opts.forcedMove ?? null, actionLog);
+      recordCommittedPlayerTurn(game, captureMetadata);
       if (action && hasEnemyForce(action)) {
         await forceEnemyActions(game, action, actionLog);
       }
@@ -2718,6 +2682,109 @@ function smartDefaultAction(game: GameManager): TurnAction {
   return action;
 }
 
+/**
+ * Player-side adapter for the shipped hardest trainer AI. It reuses the exact
+ * EnemyPokemon move chooser once, then maps that choice back to a legal public
+ * candidate. The switch comparison mirrors EnemyCommandPhase's threshold rule.
+ */
+function engineHardestAction(game: GameManager): TurnAction {
+  const action: TurnAction = {};
+  const earlier: ErCombatEarlierChoice[] = [];
+  for (let actorSlot = 0; actorSlot < game.scene.getPlayerField().length; actorSlot++) {
+    const actor = game.scene.getPlayerField()[actorSlot];
+    if (!actor?.isActive(true) || actor.isFainted() || slotCommandIsAutomatic(game, actor)) {
+      continue;
+    }
+    const candidates = enumerateErCombatCandidates(game.scene, actorSlot, earlier).filter(
+      candidate => candidate.kind !== "shift",
+    );
+    const proxy = Object.create(actor) as EnemyPokemon;
+    proxy.aiType = AiType.SMART;
+    proxy.hasTrainer = () => true;
+    proxy.getNextTargets = moveId => EnemyPokemon.prototype.getNextTargets.call(proxy, moveId);
+    const switchCandidate = engineHardestSwitchCandidate(game, actor, proxy, candidates);
+    const chosen = switchCandidate ?? engineHardestMoveCandidate(game, proxy, candidates);
+    if (!chosen) {
+      continue;
+    }
+    setCandidateAction(game, action, actorSlot, chosen);
+    earlier.push({
+      kind: chosen.kind,
+      id: chosen.id,
+      ...(chosen.kind === "switch" ? { partyIndex: chosen.partyIndex } : {}),
+      ...(chosen.kind === "move" ? { tera: chosen.tera } : {}),
+    });
+  }
+  return action;
+}
+
+function engineHardestSwitchCandidate(
+  game: GameManager,
+  actor: Pokemon,
+  proxy: EnemyPokemon,
+  candidates: readonly ErCombatCandidate[],
+): ErCombatCandidate | null {
+  if (actor.isTrapped() || actor.getMoveQueue().length > 0) {
+    return null;
+  }
+  const switchCandidates = candidates.filter(candidate => candidate.kind === "switch");
+  const opponents = actor.getOpponents().filter(opponent => opponent.isAllowedInBattle());
+  if (switchCandidates.length === 0 || opponents.length === 0) {
+    return null;
+  }
+  const scorePokemon = (pokemon: Pokemon): number => {
+    let score = 0;
+    for (const opponent of opponents) {
+      score += pokemon.getMatchupScore(opponent, true);
+      if (opponent.species.legendary) {
+        score /= 2;
+      }
+    }
+    return score / opponents.length;
+  };
+  const ranked = switchCandidates
+    .map(candidate => ({ candidate, score: scorePokemon(game.scene.getPlayerParty()[candidate.partyIndex]) }))
+    .sort((a, b) => b.score - a.score || a.candidate.partyIndex - b.candidate.partyIndex);
+  const activeScore = scorePokemon(actor);
+  const profile = getErAiProfile(proxy);
+  let threshold = profile.active ? profile.switchThreshold : 3;
+  if (profile.active) {
+    const threat = erAssessThreat(proxy);
+    if (threat.incomingKO && !threat.outspeeds) {
+      threshold *= ER_DOOMED_SWITCH_THRESHOLD_MULT;
+    }
+  }
+  const switchMultiplier = 1 - (enginePlayerSwitchCounter ? Math.pow(0.1, 1 / enginePlayerSwitchCounter) : 0);
+  if (ranked[0].score * switchMultiplier < activeScore * threshold) {
+    enginePlayerSwitchCounter = Math.max(enginePlayerSwitchCounter - 1, 0);
+    return null;
+  }
+  enginePlayerSwitchCounter++;
+  return ranked[0].candidate;
+}
+
+function engineHardestMoveCandidate(
+  game: GameManager,
+  proxy: EnemyPokemon,
+  candidates: readonly ErCombatCandidate[],
+): ErCombatCandidate | null {
+  const nextMove = EnemyPokemon.prototype.getNextMove.call(proxy);
+  enginePlayerSwitchCounter = Math.max(enginePlayerSwitchCounter - 1, 0);
+  const moveSlot = proxy.getMoveset().findIndex(move => move.moveId === nextMove.move);
+  const targets = nextMove.targets
+    .map(target => perspectiveTargetRef(game, "player", target))
+    .filter((target): target is ErCombatTargetRef => target != null);
+  const matches = candidates.filter(
+    candidate =>
+      candidate.kind === "move"
+      && candidate.moveId === nextMove.move
+      && candidate.moveSlot === moveSlot
+      && !candidate.tera
+      && (candidate.targetMode === "random" || sameTargetSet(candidate.targets, targets)),
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function setCandidateAction(
   game: GameManager,
   action: TurnAction,
@@ -2741,15 +2808,31 @@ function setCandidateAction(
   if (actorSlot === 0) {
     Object.assign(action, chosenAction);
   } else if (actorSlot === 1) {
-    action.move2 = chosenAction.move;
-    action.target2 = chosenAction.target;
-    action.tera2 = chosenAction.tera;
-    action.switch2 = chosenAction.switch;
+    if (chosenAction.move !== undefined) {
+      action.move2 = chosenAction.move;
+    }
+    if (chosenAction.target !== undefined) {
+      action.target2 = chosenAction.target;
+    }
+    if (chosenAction.tera !== undefined) {
+      action.tera2 = chosenAction.tera;
+    }
+    if (chosenAction.switch !== undefined) {
+      action.switch2 = chosenAction.switch;
+    }
   } else {
-    action.move3 = chosenAction.move;
-    action.target3 = chosenAction.target;
-    action.tera3 = chosenAction.tera;
-    action.switch3 = chosenAction.switch;
+    if (chosenAction.move !== undefined) {
+      action.move3 = chosenAction.move;
+    }
+    if (chosenAction.target !== undefined) {
+      action.target3 = chosenAction.target;
+    }
+    if (chosenAction.tera !== undefined) {
+      action.tera3 = chosenAction.tera;
+    }
+    if (chosenAction.switch !== undefined) {
+      action.switch3 = chosenAction.switch;
+    }
   }
 }
 
@@ -2819,7 +2902,8 @@ async function neuralModelAction(game: GameManager, client: AiNeuralPolicyClient
       continue;
     }
     const features = candidates.map(candidate => extractErCombatCandidateFeatures(observation, candidate));
-    const scores = await client.score(features);
+    const tokenGroups = candidates.map(candidate => extractErCombatCandidateTokenGroups(observation, candidate));
+    const scores = await client.score(activeAiEpisodeId, features, tokenGroups);
     if (scores.length !== candidates.length) {
       throw new Error(`neural policy returned ${scores.length} scores for ${candidates.length} candidates`);
     }
@@ -2830,6 +2914,7 @@ async function neuralModelAction(game: GameManager, client: AiNeuralPolicyClient
     const explore = AI_POLICY_EPSILON > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < AI_POLICY_EPSILON;
     const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
     const chosen = (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate;
+    client.commit(activeAiEpisodeId, features, tokenGroups, candidates.indexOf(chosen));
     setCandidateAction(game, action, actorSlot, chosen);
     earlier.push({
       kind: chosen.kind,
@@ -2852,17 +2937,29 @@ async function unattendedPolicyAction(game: GameManager): Promise<TurnAction> {
   if (AI_NEURAL_CLIENT) {
     return await neuralModelAction(game, AI_NEURAL_CLIENT);
   }
+  if (AI_POLICY_MODE === "engine-hardest") {
+    return engineHardestAction(game);
+  }
   return smartDefaultAction(game);
 }
 
-function unattendedSourcePolicy(): ErCombatDecisionRecord["sourcePolicy"] {
+function unattendedPolicyMetadata(): PolicyCaptureMetadata {
   if (AI_TREE_MODEL) {
-    return AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1";
+    return {
+      policySource: AI_POLICY_EPSILON > 0 ? "epsilon-tree-v1" : "tree-model-v1",
+      policyTarget: false,
+    };
   }
   if (AI_NEURAL_CLIENT) {
-    return AI_POLICY_EPSILON > 0 ? "epsilon-neural-v1" : "neural-model-v1";
+    return {
+      policySource: AI_POLICY_EPSILON > 0 ? "epsilon-trajectory-neural-v3" : "trajectory-neural-v3",
+      policyTarget: true,
+    };
   }
-  return "smart-default-v1";
+  if (AI_POLICY_MODE === "engine-hardest") {
+    return { policySource: "engine-hardest-v1", policyTarget: false };
+  }
+  return { policySource: "smart-default-v1", policyTarget: false };
 }
 
 function isTerminalRunPhase(game: GameManager): boolean {
@@ -3013,16 +3110,20 @@ async function playWaveTurns(
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
     const scriptedAction = opts.script?.[turn - 1];
     const action = scriptedAction ?? (opts.forcedMove == null ? await unattendedPolicyAction(game) : undefined);
-    recordAiTurn(
-      game,
-      action,
-      opts.forcedMove ?? null,
-      scriptedAction ? "scripted" : opts.forcedMove == null ? unattendedSourcePolicy() : "forced-move",
-    );
+    const captureMetadata: PolicyCaptureMetadata = scriptedAction
+      ? { policySource: "scripted", policyTarget: false }
+      : opts.forcedMove == null
+        ? unattendedPolicyMetadata()
+        : { policySource: "forced-move", policyTarget: false };
     doPlayerActions(game, action, opts.forcedMove ?? null, st.log);
+    recordCommittedPlayerTurn(game, captureMetadata);
     if (action && hasEnemyForce(action)) {
+      if (AI_RECORD_ENGINE_BASELINE) {
+        throw new Error("engine-hardest baseline capture cannot label a scripted enemy command");
+      }
       await forceEnemyActions(game, action, st.log);
     }
+    await recordEngineBaselineTurn(game);
     let combatBoundary: Awaited<ReturnType<typeof toCombatBatchTurnBoundary>> | null = null;
     try {
       if (COMBAT_BATCH) {
@@ -3390,6 +3491,9 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
   for (const episode of batch.episodes) {
     assertCombatOnlyEpisode(episode);
     activeAiEpisodeId = episode.id;
+    AI_NEURAL_CLIENT?.reset(activeAiEpisodeId);
+    AI_ENGINE_BASELINE_KNOWN_OPPONENT_IDS.clear();
+    enginePlayerSwitchCounter = 0;
     activeAiSplitGroupId = episode.splitGroupId?.trim() || episode.id;
     activeAiSourcePartitionId = episode.sourcePartitionId?.trim() || activeAiSplitGroupId;
     const recordStart = AI_DATASET_RECORDS.length;
@@ -3496,10 +3600,13 @@ const RUN = (!!SPEC || !!COMBAT_BATCH) && process.env.ER_SCENARIO === "1";
 describe.skipIf(!RUN)("headless scenario runner", () => {
   let phaserGame: Phaser.Game;
 
-  beforeAll(async () => {
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
-    await AI_NEURAL_CLIENT?.start();
-  });
+  beforeAll(
+    async () => {
+      phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+      await AI_NEURAL_CLIENT?.start();
+    },
+    AI_NEURAL_CLIENT ? 30_000 : 10_000,
+  );
 
   afterAll(() => AI_NEURAL_CLIENT?.stop());
 
@@ -3702,6 +3809,13 @@ function appendAiEpisodeTerminal(result: {
   finalWave: number;
   wavesCleared: number;
 }): void {
+  const outcome = AI_RECORD_ENGINE_BASELINE
+    ? result.outcome === "victory"
+      ? "player-wiped"
+      : result.outcome === "player-wiped"
+        ? "victory"
+        : result.outcome
+    : result.outcome;
   AI_DATASET_RECORDS.push({
     kind: "episode_terminal",
     schemaVersion: ER_COMBAT_CONTRACT_VERSION,
@@ -3711,10 +3825,10 @@ function appendAiEpisodeTerminal(result: {
     episodeId: activeAiEpisodeId,
     splitGroupId: activeAiSplitGroupId,
     sourcePartitionId: activeAiSourcePartitionId,
-    outcome: result.outcome,
+    outcome,
     startWave: result.startWave,
     finalWave: result.finalWave,
-    wavesCleared: result.wavesCleared,
+    wavesCleared: AI_RECORD_ENGINE_BASELINE ? +(outcome === "victory") : result.wavesCleared,
     truncated: !["victory", "player-wiped"].includes(result.outcome),
   });
 }
@@ -3744,12 +3858,14 @@ function flushAiDataset(): void {
 
 const EASY_ABILITY_ADDITION_CHECK = process.env.ER_ABILITY_EASY_ADDITIONS === "1";
 const NEWCOMER_SIGNATURE_CHECK = process.env.ER_NEWCOMER_SIGNATURE_CHECK === "1";
+const AI_CONTRACT_CHECK = process.env.ER_AI_CONTRACT_CHECK === "1";
 const SELF_CHECK =
   process.env.ER_SCENARIO === "1"
   && !process.env.ER_RUN_SCENARIO
   && !process.env.ER_RUN_COMBAT_BATCH
   && !EASY_ABILITY_ADDITION_CHECK
-  && !NEWCOMER_SIGNATURE_CHECK;
+  && !NEWCOMER_SIGNATURE_CHECK
+  && !AI_CONTRACT_CHECK;
 
 /** Run one inline spec through the full pipeline and return the summary + the game. */
 async function runInline(
@@ -5449,6 +5565,110 @@ describe.skipIf(!EASY_ABILITY_ADDITION_CHECK)("headless scenario runner - easy a
   );
 });
 
+describe.skipIf(!AI_CONTRACT_CHECK)("headless scenario runner - combat observation contract", () => {
+  let phaserGame: Phaser.Game;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  it("records only public foe information and preserves ER decision state", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "combat observation public-information boundary",
+      run: { wave: 146, level: 100, difficulty: "hell", enemyAi: "hardest" },
+      party: [
+        {
+          species: SpeciesId.BLISSEY,
+          ability: AbilityId.FRISK,
+          passiveAbility: AbilityId.HONEY_GATHER,
+          moves: [MoveId.EARTHQUAKE, MoveId.GIGA_DRAIN, MoveId.HYPER_BEAM, MoveId.PROTECT],
+          heldItems: [{ name: "LEFTOVERS", count: 2 }],
+        },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.ROTOM,
+            formIndex: 0,
+            level: 50,
+            ability: AbilityId.LEVITATE,
+            passiveAbility: AbilityId.HONEY_GATHER,
+            moves: [MoveId.SOLAR_BEAM, MoveId.HYPER_BEAM, MoveId.SPLASH],
+            heldItems: [{ name: "LEFTOVERS", count: 2 }],
+          },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+
+    const initial = snapshotErCombatObservation(game.scene);
+    const actor = initial.selfParty[0];
+    const opponent = initial.opponentActive[0];
+    expect(game.scene.getEnemyField()[0].waveData.seenInBattle).toBe(true);
+    expect(initial.opponentKnownParty).toEqual([]);
+    expect(actor.heldItems?.find(item => item.itemId === "LEFTOVERS")?.stackCount).toBe(2);
+    expect(actor.abilities.some(ability => ability.abilityId === AbilityId.FRISK && ability.active)).toBe(true);
+    expect(opponent.hp).toBeNull();
+    expect(opponent.maxHp).toBeNull();
+    expect(opponent.stats).toBeNull();
+    expect(opponent.effectiveStats).toBeNull();
+    expect(opponent.abilities).toEqual([]);
+    expect(opponent.revealState.items).toBe("complete");
+    expect(opponent.heldItems?.find(item => item.itemId === "LEFTOVERS")?.stackCount).toBe(2);
+    expect(initial.modifiers.every(modifier => modifier.side === "self")).toBe(true);
+
+    const earthquake = enumerateErCombatCandidates(game.scene, 0).find(
+      (candidate): candidate is ErCombatMoveCandidate =>
+        candidate.kind === "move" && candidate.moveId === MoveId.EARTHQUAKE && !candidate.tera,
+    );
+    expect(earthquake).toBeDefined();
+    expect({
+      targetTypes: opponent.types,
+      baseTypeMultiplier: earthquake?.baseTypeMultiplier,
+      expectedDamageMax: earthquake?.derived.expectedDamageMax,
+      immunityReason: earthquake?.derived.immunityReason,
+    }).toEqual({
+      targetTypes: [PokemonType.ELECTRIC, PokemonType.GHOST],
+      baseTypeMultiplier: 2,
+      expectedDamageMax: 0,
+      immunityReason: "engine-preview-zero",
+    });
+    const drain = enumerateErCombatCandidates(game.scene, 0).find(
+      (candidate): candidate is ErCombatMoveCandidate =>
+        candidate.kind === "move" && candidate.moveId === MoveId.GIGA_DRAIN && !candidate.tera,
+    );
+    expect(drain?.derived.hasDrain).toBe(true);
+    expect(drain?.derived.drainFraction).toBe(0.5);
+    expect(drain?.derived.expectedDamageMax).toBeGreaterThan(0);
+    expect(extractErCombatCandidateTokenGroups(initial, drain!).actor).toContain(`ability:${AbilityId.FRISK}`);
+
+    const actionLog: string[] = [];
+    const action: TurnAction = {
+      move: "EARTHQUAKE",
+      target: BattlerIndex.ENEMY,
+      enemyMove: "SOLAR_BEAM",
+      enemyTarget: BattlerIndex.PLAYER,
+    };
+    doPlayerActions(game, action, null, actionLog);
+    await forceEnemyActions(game, action, actionLog);
+    await game.toEndOfTurn();
+
+    const afterTurn = snapshotErCombatObservation(game.scene);
+    const revealedOpponent = afterTurn.opponentActive[0];
+    expect(revealedOpponent.abilities.some(ability => ability.abilityId === AbilityId.LEVITATE)).toBe(true);
+    expect(revealedOpponent.revealState.moves).toBe("partial");
+    expect(revealedOpponent.moves.some(move => move.moveId === MoveId.SOLAR_BEAM)).toBe(true);
+    expect(revealedOpponent.mechanics.some(effect => effect.effectId === "move-history:0")).toBe(true);
+    expect(
+      revealedOpponent.mechanics.some(
+        effect => effect.effectId.startsWith("move-queue:") && effect.sourceMoveId === MoveId.SOLAR_BEAM,
+      ),
+    ).toBe(true);
+  }, 180_000);
+});
+
 describe.skipIf(!NEWCOMER_SIGNATURE_CHECK)("headless scenario runner - newcomer signature abilities", () => {
   const NEUTRAL_ABILITY = { ability: AbilityId.HONEY_GATHER, passiveAbility: AbilityId.HONEY_GATHER } as const;
   let phaserGame: Phaser.Game;
@@ -5554,6 +5774,10 @@ describe.skipIf(!NEWCOMER_SIGNATURE_CHECK)("headless scenario runner - newcomer 
     await playTurn(game, { move: "TACKLE", enemyMove: "RECOVER" });
     expect(enemy.getMoveset()[0].ppUsed).toBeGreaterThanOrEqual(2);
     expect(foulHarvestCharges(holder)).toBe(1);
+    const harvestState = snapshotErCombatObservation(game.scene).selfParty[0].mechanics.find(
+      effect => effect.effectId === "ability-state:foul-harvest",
+    );
+    expect(harvestState?.state).toContainEqual({ key: "charges", value: 1 });
     await game.toNextTurn();
     await playTurn(game, { move: "GIGA_DRAIN", enemyMove: "RECOVER" });
     expect(holder.getMoveset()[1].ppUsed).toBe(0);

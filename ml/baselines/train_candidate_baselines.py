@@ -21,17 +21,51 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
-try:
-    from lightgbm import LGBMClassifier, LGBMRanker
-except ModuleNotFoundError:  # The core sklearn ladder remains locally runnable without the optional wheel.
-    LGBMClassifier = None
-    LGBMRanker = None
+LGBMClassifier: Any = None
+LGBMRanker: Any = None
+_LIGHTGBM_IMPORT_ATTEMPTED = False
 
-SCHEMA_VERSION = 2
-FEATURE_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
+FEATURE_SCHEMA_VERSION = 2
+TOKEN_GROUP_NAMES = ("actor", "targets", "destination", "field", "action")
 EPSILON = 1e-9
 ROLLOUT_POLICY = "epsilon-tree-v1"
 SUCCESSFUL_ROLLOUT_OUTCOMES = {"victory", "max-waves"}
+NON_POLICY_TARGET_SOURCES = {
+    "smart-default-v1",
+    "scripted",
+    "forced-move",
+    "first-usable",
+    "tree-model-v1",
+    "epsilon-tree-v1",
+    "engine-hardest-v1",
+}
+
+
+def record_policy_source(record: dict[str, Any]) -> str:
+    return str(record.get("policySource", record.get("sourcePolicy", "unknown")))
+
+
+def is_policy_target(record: dict[str, Any]) -> bool:
+    source = record_policy_source(record)
+    if source in NON_POLICY_TARGET_SOURCES:
+        return False
+    explicit = record.get("policyTarget")
+    return bool(explicit) if explicit is not None else True
+
+
+def load_optional_lightgbm() -> None:
+    global LGBMClassifier, LGBMRanker, _LIGHTGBM_IMPORT_ATTEMPTED
+    if _LIGHTGBM_IMPORT_ATTEMPTED:
+        return
+    _LIGHTGBM_IMPORT_ATTEMPTED = True
+    try:
+        from lightgbm import LGBMClassifier as classifier
+        from lightgbm import LGBMRanker as ranker
+    except ModuleNotFoundError:
+        return
+    LGBMClassifier = classifier
+    LGBMRanker = ranker
 
 
 def jsonl_files(path: Path) -> list[Path]:
@@ -85,9 +119,40 @@ def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> N
         raise ValueError(f"{prefix}: candidate features do not map one-to-one")
     if any(not row.get("values") or not all(math.isfinite(float(value)) for value in row["values"]) for row in feature_rows):
         raise ValueError(f"{prefix}: candidate features must be finite and non-empty")
+    token_rows = record.get("candidateTokenGroups", [])
+    token_ids = [row.get("candidateId") for row in token_rows]
+    if len(token_ids) != len(ids) or len(set(token_ids)) != len(ids) or set(token_ids) != set(ids):
+        raise ValueError(f"{prefix}: candidate token groups do not map one-to-one")
+    for row in token_rows:
+        groups = row.get("groups")
+        if not isinstance(groups, dict) or set(groups) != set(TOKEN_GROUP_NAMES):
+            raise ValueError(f"{prefix}: candidate token groups have an invalid role set")
+        if not groups["action"]:
+            raise ValueError(f"{prefix}: candidate action token group must not be empty")
+        if any(
+            not isinstance(groups[group], list)
+            or any(not isinstance(token, str) or not token for token in groups[group])
+            for group in TOKEN_GROUP_NAMES
+        ):
+            raise ValueError(f"{prefix}: candidate token groups must contain non-empty strings")
     for opponent in record.get("observation", {}).get("opponentActive", []):
-        if opponent.get("heldItems") is not None:
-            raise ValueError(f"{prefix}: opponent held items crossed the Battle Info visibility boundary")
+        if any(opponent.get(field) is not None for field in ("hp", "maxHp", "stats", "effectiveStats")):
+            raise ValueError(f"{prefix}: hidden opponent stats crossed the Battle Info visibility boundary")
+        if any(not item.get("revealed") for item in opponent.get("heldItems") or []):
+            raise ValueError(f"{prefix}: unrevealed opponent item crossed the Battle Info visibility boundary")
+        if any(not ability.get("revealed") for ability in opponent.get("abilities", [])):
+            raise ValueError(f"{prefix}: unrevealed opponent ability crossed the Battle Info visibility boundary")
+    for opponent in record.get("observation", {}).get("opponentKnownParty", []):
+        if any(opponent.get(field) is not None for field in ("hp", "maxHp", "hpRatio", "stats", "effectiveStats")):
+            raise ValueError(f"{prefix}: live hidden opponent bench state crossed the Battle Info visibility boundary")
+        if opponent.get("activeSlot") is not None:
+            raise ValueError(f"{prefix}: known opponent bench entry is still marked active")
+        if any(not item.get("revealed") for item in opponent.get("heldItems") or []):
+            raise ValueError(f"{prefix}: unrevealed opponent bench item crossed the Battle Info visibility boundary")
+        if any(not ability.get("revealed") for ability in opponent.get("abilities", [])):
+            raise ValueError(f"{prefix}: unrevealed opponent bench ability crossed the Battle Info visibility boundary")
+    if any(modifier.get("side") == "opponent" for modifier in record.get("observation", {}).get("modifiers", [])):
+        raise ValueError(f"{prefix}: hidden opponent modifiers crossed the Battle Info visibility boundary")
 
 
 def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, Any]]) -> None:
@@ -130,8 +195,28 @@ def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dic
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     dictionary = json.loads(raw)
-    if dictionary.get("schemaVersion") != 2:
+    if dictionary.get("schemaVersion") != 3:
         raise ValueError(f"unsupported combat data dictionary schema {dictionary.get('schemaVersion')}")
+    features = dictionary.get("features")
+    if (
+        not isinstance(features, dict)
+        or features.get("schemaVersion") != FEATURE_SCHEMA_VERSION
+        or not isinstance(features.get("names"), list)
+        or not features["names"]
+        or any(not isinstance(name, str) or not name for name in features["names"])
+        or len(set(features["names"])) != len(features["names"])
+    ):
+        raise ValueError("combat data dictionary has an invalid feature-name contract")
+    recorded_feature_counts = {
+        len(row["values"])
+        for decision in decisions
+        for row in decision["candidateFeatures"]
+    }
+    if recorded_feature_counts != {len(features["names"])}:
+        raise ValueError(
+            f"feature-name dictionary width mismatch: records={sorted(recorded_feature_counts)}, "
+            f"dictionary={len(features['names'])}"
+        )
     recorded_hashes = {record.get("dictionaryHash") for record in decisions}
     if recorded_hashes != {digest}:
         raise ValueError(f"dictionary hash mismatch: records={sorted(map(str, recorded_hashes))}, file={digest}")
@@ -139,20 +224,48 @@ def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dic
     known_moves = {int(value) for value in dictionary.get("moves", {})}
     known_abilities = {int(value) for value in dictionary.get("abilities", {})}
     known_items = set(dictionary.get("items", {}))
+    known_modifiers = set(dictionary.get("modifiers", {}))
+    known_species_forms = set(dictionary.get("speciesForms", {}))
+    known_battler_tags = set(dictionary.get("battlerTags", []))
+    known_arena_tags = set(dictionary.get("arenaTags", []))
+    known_positional_tags = set(dictionary.get("positionalTags", []))
+    known_relics = set(dictionary.get("relics", {}))
+    known_mechanic_namespaces = set(dictionary.get("mechanicNamespaces", []))
     referenced_moves: set[int] = set()
     referenced_abilities: set[int] = set()
     referenced_items: set[str] = set()
+    referenced_modifiers: set[str] = set()
+    referenced_species_forms: set[str] = set()
+    referenced_battler_tags: set[str] = set()
+    referenced_arena_tags: set[str] = set()
+    referenced_positional_tags: set[str] = set()
+    referenced_relics: set[str] = set()
+    referenced_mechanic_namespaces: set[str] = set()
     for decision in decisions:
         observation = decision["observation"]
-        for pokemon in observation["selfParty"] + observation["opponentActive"]:
-            ability = pokemon.get("ability")
-            if ability is not None:
-                referenced_abilities.add(int(ability))
-            referenced_abilities.update(int(value) for value in pokemon.get("innates", []) if value is not None)
+        for pokemon in observation["selfParty"] + observation["opponentActive"] + observation.get("opponentKnownParty", []):
+            referenced_species_forms.add(f'{int(pokemon["species"])}:{int(pokemon["form"])}')
+            referenced_abilities.update(int(value["abilityId"]) for value in pokemon.get("abilities", []))
             referenced_moves.update(int(move["moveId"]) for move in pokemon.get("moves", []))
             held_items = pokemon.get("heldItems")
             if isinstance(held_items, list):
-                referenced_items.update(str(value) for value in held_items)
+                referenced_items.update(str(value["itemId"]) for value in held_items)
+            referenced_battler_tags.update(str(value["effectId"]) for value in pokemon.get("tags", []))
+            referenced_mechanic_namespaces.update(
+                str(value["effectId"]).split(":", 1)[0]
+                for value in pokemon.get("mechanics", [])
+            )
+        referenced_arena_tags.update(str(value["effectId"]) for value in observation.get("fieldEffects", []))
+        referenced_positional_tags.update(str(value["effectId"]) for value in observation.get("positionalEffects", []))
+        referenced_mechanic_namespaces.update(
+            str(value["effectId"]).split(":", 1)[0]
+            for value in observation.get("mechanics", [])
+        )
+        for modifier in observation.get("modifiers", []):
+            referenced_modifiers.add(str(modifier["modifierId"]))
+            for field in modifier.get("state", []):
+                if field.get("key") == "kind" and isinstance(field.get("value"), str):
+                    referenced_relics.add(field["value"])
         referenced_moves.update(
             int(candidate["moveId"])
             for candidate in decision["candidates"]
@@ -163,17 +276,36 @@ def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dic
         "moves": sorted(referenced_moves - known_moves),
         "abilities": sorted(referenced_abilities - known_abilities),
         "items": sorted(referenced_items - known_items),
+        "modifiers": sorted(referenced_modifiers - known_modifiers),
+        "speciesForms": sorted(referenced_species_forms - known_species_forms),
+        "battlerTags": sorted(referenced_battler_tags - known_battler_tags),
+        "arenaTags": sorted(referenced_arena_tags - known_arena_tags),
+        "positionalTags": sorted(referenced_positional_tags - known_positional_tags),
+        "relics": sorted(referenced_relics - known_relics),
+        "mechanicNamespaces": sorted(referenced_mechanic_namespaces - known_mechanic_namespaces),
     }
     if any(missing.values()):
         raise ValueError(f"combat data dictionary misses recorded runtime ids: {missing}")
     return {
         "sha256": digest,
+        "features": len(features["names"]),
         "moves": len(known_moves),
         "abilities": len(known_abilities),
         "items": len(known_items),
+        "modifiers": len(known_modifiers),
+        "speciesForms": len(known_species_forms),
+        "battlerTags": len(known_battler_tags),
+        "arenaTags": len(known_arena_tags),
+        "positionalTags": len(known_positional_tags),
+        "relics": len(known_relics),
+        "mechanicNamespaces": len(known_mechanic_namespaces),
         "referencedMoves": len(referenced_moves),
         "referencedAbilities": len(referenced_abilities),
         "referencedItems": len(referenced_items),
+        "referencedModifiers": len(referenced_modifiers),
+        "referencedSpeciesForms": len(referenced_species_forms),
+        "referencedRelics": len(referenced_relics),
+        "referencedMechanicNamespaces": len(referenced_mechanic_namespaces),
     }
 
 
@@ -182,7 +314,7 @@ def select_elite_rollouts(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     terminal_by_episode = {record["episodeId"]: record for record in terminals}
     rollout_episodes = {
-        record["episodeId"] for record in decisions if record["sourcePolicy"] == ROLLOUT_POLICY
+        record["episodeId"] for record in decisions if record_policy_source(record) == ROLLOUT_POLICY
     }
     successful = {
         episode
@@ -192,7 +324,7 @@ def select_elite_rollouts(
     selected = [
         record
         for record in decisions
-        if record["sourcePolicy"] != ROLLOUT_POLICY or record["episodeId"] in successful
+        if record_policy_source(record) != ROLLOUT_POLICY or record["episodeId"] in successful
     ]
     if not selected:
         raise ValueError("elite rollout selection removed every decision")
@@ -533,13 +665,17 @@ def fit_stacked_tree_ensemble(
     train_mask: np.ndarray,
     test_mask: np.ndarray,
     weights: np.ndarray,
+    model_name: str = "stacked_tree_ensemble",
 ) -> tuple[dict[str, Any], np.ndarray, float, list[str]] | None:
     member_names = sorted(name for name in fitted_models if name in artifacts)
     if len(member_names) < 2:
         return None
 
-    train_indices = np.flatnonzero(train_mask)
-    train_partitions = np.asarray(source_partition_ids, dtype=object)[train_mask]
+    positive_weight_mask = train_mask & (weights > 0)
+    train_indices = np.flatnonzero(positive_weight_mask)
+    if len(train_indices) == 0 or len(np.unique(y[train_indices])) < 2:
+        return None
+    train_partitions = np.asarray(source_partition_ids, dtype=object)[positive_weight_mask]
     fold_count = min(5, len(set(train_partitions)))
     if fold_count < 2:
         return None
@@ -552,6 +688,8 @@ def fit_stacked_tree_ensemble(
     ):
         source_indices = train_indices[fold_train]
         validation_indices = train_indices[fold_validation]
+        if len(np.unique(y[source_indices])) < 2:
+            return None
         for member_index, name in enumerate(member_names):
             template, ranker = fitted_models[name]
             model = clone(template)
@@ -581,7 +719,7 @@ def fit_stacked_tree_ensemble(
         "schemaVersion": 2,
         "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
         "featureCount": int(x.shape[1]),
-        "modelName": "stacked_tree_ensemble",
+        "modelName": model_name,
         "modelType": "stacked_tree_ensemble",
         "members": [artifacts[name] for name in member_names],
         "memberMeans": scaler.mean_.tolist(),
@@ -597,6 +735,7 @@ def fit_stacked_tree_ensemble(
 
 
 def model_specs(seed: int) -> list[tuple[str, Any, bool, bool]]:
+    load_optional_lightgbm()
     specs = [
         ("logistic", LogisticRegression(max_iter=1000, class_weight=None, random_state=seed), True, False),
         (
@@ -650,16 +789,17 @@ def model_specs(seed: int) -> list[tuple[str, Any, bool, bool]]:
 
 
 def outcome_weighted_model_specs(seed: int) -> list[tuple[str, Any]]:
+    load_optional_lightgbm()
     specs: list[tuple[str, Any]] = [
         (
-            "outcome_weighted_hist_gradient_boosting",
+            "hist_gradient_boosting",
             HistGradientBoostingClassifier(max_iter=250, random_state=seed),
         )
     ]
     if LGBMClassifier is not None:
         specs.append(
             (
-                "outcome_weighted_lightgbm",
+                "lightgbm",
                 LGBMClassifier(
                     n_estimators=300,
                     learning_rate=0.04,
@@ -678,7 +818,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("loss episode weight must be between 0 and 1")
     all_decisions, terminals = load_records(args.data)
     dictionary_coverage = validate_data_dictionary(args.dictionary, all_decisions)
-    decisions, rollout_selection = (
+    rollout_decisions, rollout_selection = (
         select_elite_rollouts(all_decisions, terminals)
         if args.elite_rollouts
         else (
@@ -692,6 +832,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
     )
+    decisions = [record for record in rollout_decisions if is_policy_target(record)]
+    if not decisions:
+        excluded = Counter(record_policy_source(record) for record in rollout_decisions)
+        raise ValueError(f"no policy-target decisions remain after source filtering: {dict(excluded)}")
     x, y, decision_ids, episodes, split_group_ids, source_partition_ids, candidate_counts = make_rows(decisions)
     train_partitions, test_partitions = split_groups(source_partition_ids, args.seed)
     train_mask = np.asarray([partition in train_partitions for partition in source_partition_ids])
@@ -815,13 +959,93 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     successful_test_mask = test_mask & successful_rows
     outcome_artifacts: dict[str, dict[str, Any]] = {}
-    for name, model in outcome_weighted_model_specs(args.seed):
-        started = time.perf_counter()
-        model.fit(x[train_mask], y[train_mask], sample_weight=weights[train_mask] * outcome_weights[train_mask])
-        train_seconds = time.perf_counter() - started
+    outcome_fitted_models: dict[str, tuple[Any, bool]] = {}
+    policy_training_mask = train_mask & (outcome_weights > 0)
+    policy_training_partitions = {
+        partition
+        for partition, selected in zip(source_partition_ids, policy_training_mask)
+        if selected
+    }
+    policy_training_reason: str | None = None
+    if not policy_training_mask.any():
+        policy_training_reason = "no successful policy-training rows are present in the training split"
+    elif len(np.unique(y[policy_training_mask])) < 2:
+        policy_training_reason = "successful policy-training rows do not contain both selected and rejected candidates"
+    else:
+        policy_prefix = "winner_only" if args.loss_episode_weight == 0 else "outcome_weighted"
+        for base_name, model in outcome_weighted_model_specs(args.seed):
+            name = f"{policy_prefix}_{base_name}"
+            started = time.perf_counter()
+            policy_weights = weights[policy_training_mask] * outcome_weights[policy_training_mask]
+            model.fit(x[policy_training_mask], y[policy_training_mask], sample_weight=policy_weights)
+            train_seconds = time.perf_counter() - started
+            infer_started = time.perf_counter()
+            scores = model.predict_proba(x[test_mask])[:, 1]
+            infer_seconds = time.perf_counter() - infer_started
+            metrics = ranking_metrics(
+                scores,
+                y[test_mask],
+                [decision_id for decision_id, selected in zip(decision_ids, test_mask) if selected],
+            )
+            successful_metrics = (
+                ranking_metrics(
+                    model.predict_proba(x[successful_test_mask])[:, 1],
+                    y[successful_test_mask],
+                    [decision_id for decision_id, selected in zip(decision_ids, successful_test_mask) if selected],
+                )
+                if successful_test_mask.any()
+                else None
+            )
+            artifact = export_tree_artifact(name, model, x.shape[1])
+            if artifact is None:
+                raise ValueError(f"{name} cannot be exported to the neutral runtime")
+            neutral_scores = artifact_scores(artifact, x[test_mask])
+            parity_error = float(np.max(np.abs(scores - neutral_scores)))
+            if parity_error > 1e-5:
+                raise ValueError(f"{name} neutral artifact parity error {parity_error}")
+            artifacts[name] = artifact
+            outcome_artifacts[name] = artifact
+            outcome_fitted_models[name] = (model, False)
+            leaderboard.append(
+                {
+                    "model": name,
+                    **metrics,
+                    "successfulEpisodeMetrics": successful_metrics,
+                    "trainingObjective": (
+                        "winner-only behavior cloning; losses excluded from policy fitting"
+                        if args.loss_episode_weight == 0
+                        else f"loss episodes weighted {args.loss_episode_weight}"
+                    ),
+                    "trainSeconds": train_seconds,
+                    "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
+                    "modelBytes": len(pickle.dumps({"model": model, "scaler": None})),
+                    "neutralArtifactMaxError": parity_error,
+                }
+            )
+
+    stack_name = (
+        "winner_only_stacked_tree_ensemble"
+        if args.loss_episode_weight == 0
+        else "outcome_weighted_stacked_tree_ensemble"
+    )
+    outcome_stack = fit_stacked_tree_ensemble(
+        outcome_fitted_models,
+        outcome_artifacts,
+        x,
+        y,
+        decision_ids,
+        source_partition_ids,
+        train_mask,
+        test_mask,
+        weights * outcome_weights,
+        stack_name,
+    )
+    if outcome_stack is not None:
+        artifact, scores, train_seconds, members = outcome_stack
         infer_started = time.perf_counter()
-        scores = model.predict_proba(x[test_mask])[:, 1]
+        neutral_scores = artifact_scores(artifact, x[test_mask])
         infer_seconds = time.perf_counter() - infer_started
+        parity_error = float(np.max(np.abs(scores - neutral_scores)))
         metrics = ranking_metrics(
             scores,
             y[test_mask],
@@ -829,31 +1053,29 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         )
         successful_metrics = (
             ranking_metrics(
-                model.predict_proba(x[successful_test_mask])[:, 1],
+                artifact_scores(artifact, x[successful_test_mask]),
                 y[successful_test_mask],
                 [decision_id for decision_id, selected in zip(decision_ids, successful_test_mask) if selected],
             )
             if successful_test_mask.any()
             else None
         )
-        artifact = export_tree_artifact(name, model, x.shape[1])
-        if artifact is None:
-            raise ValueError(f"{name} cannot be exported to the neutral runtime")
-        neutral_scores = artifact_scores(artifact, x[test_mask])
-        parity_error = float(np.max(np.abs(scores - neutral_scores)))
-        if parity_error > 1e-5:
-            raise ValueError(f"{name} neutral artifact parity error {parity_error}")
-        artifacts[name] = artifact
-        outcome_artifacts[name] = artifact
+        artifacts[stack_name] = artifact
+        outcome_artifacts[stack_name] = artifact
         leaderboard.append(
             {
-                "model": name,
+                "model": stack_name,
                 **metrics,
                 "successfulEpisodeMetrics": successful_metrics,
-                "trainingObjective": f"loss episodes weighted {args.loss_episode_weight}",
+                "members": members,
+                "trainingObjective": (
+                    "winner-only group-fold out-of-fold logistic stacking"
+                    if args.loss_episode_weight == 0
+                    else f"group-fold stacking with loss episodes weighted {args.loss_episode_weight}"
+                ),
                 "trainSeconds": train_seconds,
                 "inferenceMsPerDecision": 1000 * infer_seconds / max(1, metrics["decisions"]),
-                "modelBytes": len(pickle.dumps({"model": model, "scaler": None})),
+                "modelBytes": len(json.dumps(artifact, separators=(",", ":")).encode("utf-8")),
                 "neutralArtifactMaxError": parity_error,
             }
         )
@@ -863,14 +1085,20 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     ]
     selected = sorted(learned_rows, key=lambda row: (-row["top1"], row["candidateNll"], row["model"]))[0]["model"]
     outcome_rows = [row for row in leaderboard if row["model"] in outcome_artifacts]
-    outcome_selected = sorted(
-        outcome_rows,
-        key=lambda row: (
-            -(row["successfulEpisodeMetrics"] or row)["top1"],
-            (row["successfulEpisodeMetrics"] or row)["candidateNll"],
-            row["model"],
-        ),
-    )[0]["model"]
+    outcome_selected = (
+        sorted(
+            outcome_rows,
+            key=lambda row: (
+                -(row["successfulEpisodeMetrics"] or row)["top1"],
+                (row["successfulEpisodeMetrics"] or row)["candidateNll"],
+                row["model"],
+            ),
+        )[0]["model"]
+        if outcome_rows and successful_test_mask.any()
+        else None
+    )
+    if outcome_rows and not successful_test_mask.any():
+        policy_training_reason = "no successful policy-evaluation rows are present in the held-out split"
     if args.models_dir is not None:
         args.models_dir.mkdir(parents=True, exist_ok=True)
         for name, artifact in artifacts.items():
@@ -879,10 +1107,13 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             json.dumps(artifacts[selected], separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
-        (args.models_dir / "outcome-selected-model.json").write_text(
-            json.dumps(outcome_artifacts[outcome_selected], separators=(",", ":")) + "\n",
-            encoding="utf-8",
-        )
+        if outcome_selected is not None:
+            (args.models_dir / "outcome-selected-model.json").write_text(
+                json.dumps(outcome_artifacts[outcome_selected], separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+        elif (args.models_dir / "outcome-selected-model.json").exists():
+            (args.models_dir / "outcome-selected-model.json").unlink()
 
     hashes = {
         key: sorted({record[key] for record in decisions})
@@ -893,7 +1124,15 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "metricScope": "offline imitation of the recorded source policy; not battle win rate",
         "selectedBattlePolicy": selected,
         "selectedOutcomeWeightedPolicy": outcome_selected,
+        "selectedPolicyFromSuccessfulEpisodes": outcome_selected,
         "lossEpisodeWeight": args.loss_episode_weight,
+        "policyTraining": {
+            "available": outcome_selected is not None,
+            "reason": policy_training_reason,
+            "candidateRows": int(policy_training_mask.sum()),
+            "sourcePartitions": sorted(policy_training_partitions),
+            "successfulTestRows": int(successful_test_mask.sum()),
+        },
         "seed": args.seed,
         "data": {
             "decisions": len(decisions),
@@ -908,7 +1147,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "testSplitGroups": sorted({group for group, selected in zip(split_group_ids, test_mask) if selected}),
             "meanCandidates": float(np.mean(candidate_counts)),
             "p95Candidates": float(np.percentile(candidate_counts, 95)),
-            "sourcePolicies": Counter(record["sourcePolicy"] for record in decisions),
+            "inputDecisions": len(all_decisions),
+            "excludedPolicyDecisions": len(rollout_decisions) - len(decisions),
+            "sourcePolicies": Counter(record_policy_source(record) for record in all_decisions),
+            "policyTargetSources": Counter(record_policy_source(record) for record in decisions),
             "formats": Counter(record["observation"]["format"] for record in decisions),
             "terminalOutcomes": Counter(record["outcome"] for record in terminals),
             "identity": hashes,
@@ -951,20 +1193,27 @@ def markdown(report: dict[str, Any]) -> str:
             f"{row.get('inferenceMsPerDecision', 0):.3f} | {row['modelBytes'] / 1024:.1f} |"
         )
     outcome_rows = [row for row in report["leaderboard"] if row.get("successfulEpisodeMetrics")]
-    if outcome_rows:
+    if report["policyTraining"]["available"]:
         lines.extend(
             [
                 "",
-                f"Outcome-weighted selector: `{report['selectedOutcomeWeightedPolicy']}`. "
+                f"Successful-episode policy selector: `{report['selectedPolicyFromSuccessfulEpisodes']}`. "
                 f"Loss-episode decisions carry {report['lossEpisodeWeight']:.2f}x training weight.",
                 "",
-                "| Outcome-weighted model | Successful-episode Top-1 | Successful-episode NLL |",
+                "| Policy model | Successful-episode Top-1 | Successful-episode NLL |",
                 "| --- | ---: | ---: |",
             ]
         )
         for row in outcome_rows:
             metrics = row["successfulEpisodeMetrics"]
             lines.append(f"| {row['model']} | {metrics['top1']:.3f} | {metrics['candidateNll']:.3f} |")
+    else:
+        lines.extend(
+            [
+                "",
+                f"Successful-episode policy unavailable: {report['policyTraining']['reason']}.",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -981,7 +1230,12 @@ def parse_args() -> argparse.Namespace:
         help="retain epsilon-tree decisions only from episodes that reached their requested horizon",
     )
     parser.add_argument("--seed", type=int, default=20260728)
-    parser.add_argument("--loss-episode-weight", type=float, default=0.1)
+    parser.add_argument(
+        "--loss-episode-weight",
+        type=float,
+        default=0.0,
+        help="policy sample weight for losing episodes; zero keeps losses value/diagnostic-only",
+    )
     return parser.parse_args()
 
 

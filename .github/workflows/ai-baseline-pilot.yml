@@ -4,6 +4,12 @@ name: AI Baseline Pilot (Non-Production)
 # endpoint, cloud credential, or write permission.
 on:
   workflow_dispatch:
+    inputs:
+      run_training:
+        description: Generate contract-v3 data, train CPU trees, package Kaggle GPU input, and run the tree gauntlet
+        required: true
+        default: false
+        type: boolean
   push:
     branches:
       - codex/combat-ai-baselines-20260728
@@ -19,6 +25,7 @@ on:
       - "scripts/run-combat-batch.mjs"
       - "scripts/run-scenario.mjs"
       - "src/data/elite-redux/ability-upgrades/requested-field-effects.ts"
+      - "src/data/elite-redux/abilities/**"
       - "src/data/elite-redux/ai/**"
       - "src/dev-tools/registry.ts"
       - "src/dev-tools/test-suite/scenario-spec.ts"
@@ -50,6 +57,14 @@ jobs:
       - uses: ./.github/actions/setup-deps
       - name: Run fast contract tests
         run: pnpm exec vitest run --config test/node/vitest.config.ts test/node/combat-contract.test.ts --no-color
+      - name: Verify visibility and private ER state through real combat
+        env:
+          ER_SCENARIO: "1"
+          ER_AI_CONTRACT_CHECK: "1"
+          ER_NEWCOMER_SIGNATURE_CHECK: "1"
+        run: >-
+          pnpm exec vitest run test/tools/run-scenario.test.ts --no-color
+          -t "combat observation contract|Foul Harvest"
       - name: Verify ghost fields reach the dev-scenario engine adapter
         run: ER_SCENARIO=1 pnpm exec vitest run test/tests/elite-redux/er-scenario-spec.test.ts --no-color
       - name: Guard requested field ability resolution
@@ -77,6 +92,7 @@ jobs:
           src/data/elite-redux/ai/combat-data-dictionary.ts
           src/data/elite-redux/ai/combat-engine-adapter.ts
           src/data/elite-redux/ai/combat-features.ts
+          src/data/elite-redux/ai/combat-private-state.ts
           src/data/elite-redux/ai/combat-tree-model.ts
           src/dev-tools/registry.ts
           src/dev-tools/test-suite/scenario-spec.ts
@@ -123,9 +139,9 @@ jobs:
           if-no-files-found: error
 
   ghost-gauntlet:
-    if: github.repository == 'Heraklines/elite-redux'
-    name: Ghost winner batch ${{ matrix.shard }} (all controllers, both sides)
-    needs: [retrain, neural-ensemble]
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
+    name: Ghost winner batch ${{ matrix.shard }} (tree controllers, both sides)
+    needs: retrain
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -145,23 +161,10 @@ jobs:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            ml/policy/requirements.txt
-            ml/baselines/requirements.txt
-      - name: Install pinned neural-policy runtime
-        run: python -m pip install --requirement ml/policy/requirements.txt
       - uses: actions/download-artifact@v6
         with:
           name: ai-iterated-leaderboard
           path: ai-policy
-      - uses: actions/download-artifact@v6
-        with:
-          name: ai-neural-policy
-          path: ai-neural
       - name: Build strict inverse matchup batch
         run: >-
           node scripts/ai/make-ghost-eval-batch.mjs
@@ -183,20 +186,20 @@ jobs:
           --turns 80 --real-rng
           --ai-model ai-policy/models/stacked_tree_ensemble.json
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-stacked-tree-v1-results.json"
-      - name: Play outcome-weighted tree over both inverse legs
+      - name: Play winner-trained selected tree over both inverse legs
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
           --ai-model ai-policy/models/outcome-selected-model.json
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-outcome-tree-v1-results.json"
-      - name: Play candidate transformer over both inverse legs
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-winner-tree-v1-results.json"
+      - name: Play winner-only stacked tree over both inverse legs
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
-          --ai-neural-model ai-neural
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-candidate-transformer-v1-results.json"
+          --ai-model ai-policy/models/winner_only_stacked_tree_ensemble.json
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-winner-stacked-tree-v1-results.json"
       - name: Play smart-default over both inverse legs
         run: >-
           node scripts/run-combat-batch.mjs
@@ -213,7 +216,7 @@ jobs:
           if-no-files-found: error
 
   ghost-gauntlet-summary:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: Side-balanced ghost gauntlet report
     needs: ghost-gauntlet
     runs-on: ubuntu-latest
@@ -243,7 +246,7 @@ jobs:
           if-no-files-found: error
 
   generate:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: Ghost self-play shard ${{ matrix.shard }}
     needs: [identity, capture-neutrality]
     runs-on: ubuntu-latest
@@ -321,11 +324,11 @@ jobs:
           ai-neutral/without-capture.json ai-neutral/with-capture.json ai-neutral/decisions.jsonl
 
   train:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: CPU baseline leaderboard
     needs: generate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -369,7 +372,7 @@ jobs:
           if-no-files-found: error
 
   rollout:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: Exploratory tree rollout ${{ matrix.shard }}
     needs: [train, identity]
     runs-on: ubuntu-latest
@@ -403,7 +406,7 @@ jobs:
         run: >-
           node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
           --turns 80 --real-rng
-          --ai-model ai-bootstrap/models/selected-model.json --ai-epsilon 0.15
+          --ai-model ai-bootstrap/models/outcome-selected-model.json --ai-epsilon 0.15
           --json-out "ai-work/result-rollout-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/decisions-rollout-${{ matrix.shard }}.jsonl"
       - name: Upload rollout shard
@@ -418,11 +421,11 @@ jobs:
           if-no-files-found: error
 
   retrain:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
     name: Elite-rollout tree iteration
     needs: rollout
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -471,17 +474,12 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  retrain-neural:
-    if: github.repository == 'Heraklines/elite-redux'
-    name: ER candidate-transformer iteration
+  package-neural:
+    if: github.repository == 'Heraklines/elite-redux' && github.event_name == 'workflow_dispatch' && inputs.run_training
+    name: Package trajectory-transformer Kaggle input
     needs: rollout
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        seed: [20260730, 20260731, 20260732]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
@@ -501,6 +499,7 @@ jobs:
         with:
           name: ai-data-dictionary
           path: ai-dictionary
+      - uses: ./.github/actions/setup-deps
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -508,79 +507,29 @@ jobs:
           cache-dependency-path: |
             ml/policy/requirements.txt
             ml/baselines/requirements.txt
-      - name: Install pinned candidate-transformer stack
+      - name: Install pinned trajectory-policy stack
         run: python -m pip install --requirement ml/policy/requirements.txt
-      - name: Run neural policy unit tests
+      - name: Run trajectory and Kaggle bundle tests
         run: python -m unittest discover -s ml/policy -p 'test_*.py' -v
-      - name: Train on expert and successful exploratory combat decisions
+      - name: Build checksum-sealed Kaggle GPU bundle
         run: >-
-          python ml/policy/train_candidate_transformer.py
-          --data ai-data
-          --dictionary ai-dictionary/er-combat-data-dictionary.json
-          --output-dir "ai-neural/seed-${{ matrix.seed }}"
-          --elite-rollouts
-          --device cpu
-          --seed "${{ matrix.seed }}"
-          --epochs 60
-          --patience 8
-      - name: Publish neural validation summary
+          node scripts/ai/prepare-kaggle-candidate-training.mjs
+          ai-data
+          ai-dictionary/er-combat-data-dictionary.json
+          ai-kaggle/er-ai-training-bundle.zip
+          large
+          20260730,20260731,20260732
+      - name: Publish GPU handoff summary
         shell: bash
         run: |
-          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          report = json.load(open("ai-neural/seed-${{ matrix.seed }}/report.json", encoding="utf-8"))
-          metrics = report["validation"]
-          print("# ER candidate transformer")
-          print()
-          print(f"Parameters: {report['parameters']:,}; best epoch: {report['bestEpoch']}; training seconds: {report['trainSeconds']:.1f}")
-          print(f"Held-out Top-1: {metrics['top1']:.3f}; Top-3: {metrics['top3']:.3f}; candidate NLL: {metrics['candidateNll']:.3f}")
-          print()
-          print("These are offline imitation metrics, not battle win rates. The mirrored real-engine gauntlet is authoritative.")
-          print()
-          print("| Epoch | Train loss | Validation NLL | Validation Top-1 |")
-          print("| ---: | ---: | ---: | ---: |")
-          for row in report["history"]:
-              print(f"| {row['epoch']} | {row['train']['loss']:.4f} | {row['validation']['candidateNll']:.4f} | {row['validation']['top1']:.4f} |")
-          PY
-      - name: Upload neural policy bundle
+          echo "# ER trajectory-transformer GPU handoff" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "The sealed contract-v3 bundle is ready for private Kaggle T4/A100 training." >> "$GITHUB_STEP_SUMMARY"
+          echo "No neural model was trained on a GitHub CPU runner." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Kaggle training bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ai-neural-policy-${{ matrix.seed }}
-          path: ai-neural
-          retention-days: 30
-          if-no-files-found: error
-
-  neural-ensemble:
-    if: github.repository == 'Heraklines/elite-redux'
-    name: Assemble neural seed ensemble
-    needs: retrain-neural
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-          submodules: false
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: ai-neural-policy-*
-          path: ai-neural
-          merge-multiple: true
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            ml/policy/requirements.txt
-            ml/baselines/requirements.txt
-      - name: Install pinned candidate-transformer stack
-        run: python -m pip install --requirement ml/policy/requirements.txt
-      - name: Validate and assemble three-seed ensemble
-        run: python ml/policy/build_candidate_ensemble.py --root ai-neural
-      - name: Upload neural ensemble
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-neural-policy
-          path: ai-neural
+          name: ai-kaggle-training-bundle
+          path: ai-kaggle/er-ai-training-bundle.zip
           retention-days: 30
           if-no-files-found: error

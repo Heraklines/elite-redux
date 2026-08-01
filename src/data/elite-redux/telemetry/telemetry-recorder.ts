@@ -64,7 +64,15 @@ export function maybeFlushTelemetry(wave: number): void {
   if (queue == null) {
     return;
   }
-  void queue.maybeFlush(wave);
+  queue.maybeFlush(wave).catch(() => undefined);
+}
+
+/** Force a durable normal flush at a run terminal. Fire-and-forget and gameplay-independent. */
+export function flushTelemetry(wave: number): void {
+  if (queue == null) {
+    return;
+  }
+  queue.flush(wave).catch(() => undefined);
 }
 
 /** Session-end best-effort beacon (pagehide/visibilitychange). No-op unless recording. */

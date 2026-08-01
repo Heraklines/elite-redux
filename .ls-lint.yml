@@ -41,6 +41,9 @@ ignore:
    # Transient agent scratch artifacts (never committed; own naming scheme).
    - scratch_view
    - scratchpad
+   - ai-work
+   - ml/baselines/__pycache__
+   - ml/policy/__pycache__
    # Tier-1 minimal transport bundle output (hashed chunk names).
    - dist-coop-transport-min
    - .devcontainer

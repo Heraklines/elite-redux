@@ -2,11 +2,16 @@
 import assert from "node:assert/strict";
 import { normalizeRunResult } from "./compare-run-results.mjs";
 import { assertInversePair, buildGhostPair, buildGhostSelfPlayScenario, readGhostFixture } from "./ghost-gauntlet.mjs";
-import { buildGhostEvalBatch, EXPECTED_GHOST_EVAL_PAIRS, GHOST_EVAL_CONTROLLERS } from "./make-ghost-eval-batch.mjs";
+import {
+  buildGhostEvalBatch,
+  EXPECTED_GHOST_EVAL_PAIRS,
+  GHOST_EVAL_CONTROLLERS,
+  GHOST_EVAL_FIXED_SEEDS,
+} from "./make-ghost-eval-batch.mjs";
 import { buildPilotBatch } from "./make-pilot-batch.mjs";
 import { buildGhostBatchReport } from "./summarize-ghost-batch-eval.mjs";
 
-const fixturePath = process.argv[2] ?? "ml/evaluation/ghost-winner-teams.v2.json";
+const fixturePath = process.argv[2] ?? "ml/evaluation/ghost-winner-teams.v3.json";
 const fixture = readGhostFixture(fixturePath);
 const seen = new Set();
 for (let pairIndex = 0; pairIndex < fixture.teams.length / 2; pairIndex++) {
@@ -19,20 +24,18 @@ for (let pairIndex = 0; pairIndex < fixture.teams.length / 2; pairIndex++) {
   assert.equal(pair.legA.run.seed, pair.legB.run.seed);
   assert.equal(pair.legA.run.level, pair.legB.run.level);
   assert.equal(pair.legA.run.double, true);
-  assert.deepEqual(pair.manifest.playerControllers, ["selected-tree-v1", "smart-default-v1"]);
+  assert.equal(pair.legA.run.difficulty, "hell");
+  assert.equal(pair.legA.run.enemyAi, "hardest");
 }
 assert.equal(seen.size, fixture.teams.length);
-assert.equal(fixture.teams.length, 100);
-assert.equal(fixture.sourceAccountCount, 28);
+assert.equal(fixture.teams.length, 200);
+assert.deepEqual(fixture.difficultyCounts, { youngster: 50, ace: 50, elite: 50, hell: 50 });
 const evalBatch = buildGhostEvalBatch(fixture, 0, 3);
-assert.equal(evalBatch.manifests.length, 3);
-assert.equal(evalBatch.batch.episodes.length, 6);
+assert.equal(evalBatch.manifests.length, 3 * GHOST_EVAL_FIXED_SEEDS.length);
+assert.equal(evalBatch.batch.episodes.length, 6 * GHOST_EVAL_FIXED_SEEDS.length);
 assert.deepEqual(evalBatch.manifests[0].playerControllers, GHOST_EVAL_CONTROLLERS);
 assert.ok(evalBatch.batch.episodes.every(episode => episode.scenario.eggs === undefined));
-assert.deepEqual(
-  evalBatch.batch.episodes.map(episode => episode.splitGroupId),
-  ["pair-01", "pair-01", "pair-02", "pair-02", "pair-03", "pair-03"],
-);
+assert.ok(evalBatch.batch.episodes.every(episode => episode.splitGroupId.includes("seed-")));
 const fullEval = buildGhostEvalBatch(fixture, 0, EXPECTED_GHOST_EVAL_PAIRS);
 const controllerBatches = GHOST_EVAL_CONTROLLERS.map(controller => ({
   name: `shard-0-${controller}-results.json`,
@@ -54,11 +57,15 @@ const controllerBatches = GHOST_EVAL_CONTROLLERS.map(controller => ({
   },
 }));
 const fullReport = buildGhostBatchReport(fullEval.manifests, controllerBatches);
-assert.equal(fullReport.pairs, EXPECTED_GHOST_EVAL_PAIRS);
-assert.equal(fullReport.legs, EXPECTED_GHOST_EVAL_PAIRS * 2 * GHOST_EVAL_CONTROLLERS.length);
+assert.equal(fullReport.rosterPairs, EXPECTED_GHOST_EVAL_PAIRS);
+assert.equal(
+  fullReport.legs,
+  EXPECTED_GHOST_EVAL_PAIRS * GHOST_EVAL_FIXED_SEEDS.length * 2 * GHOST_EVAL_CONTROLLERS.length,
+);
+assert.equal(fullReport.controllers["smart-default-v1"].byDifficulty.hell.playerWins, 150);
 assert.throws(
   () => buildGhostBatchReport(fullEval.manifests.slice(1), controllerBatches),
-  /expected 50 inverse-pair manifests/,
+  /expected 300 seeded inverse-pair manifests/,
 );
 
 const timingOnlyDifference = structuredClone(controllerBatches[0].batch);
@@ -74,9 +81,9 @@ const weakened = structuredClone(controllerBatches);
 weakened[0].batch.hardestTrainerAi = false;
 assert.throws(() => buildGhostBatchReport(fullEval.manifests, weakened), /invalid hardest-AI combat batch result/);
 
-const trainingFixture = readGhostFixture("ml/training/ghost-self-play-teams.v1.json");
-assert.equal(trainingFixture.teams.length, 163);
-assert.equal(trainingFixture.sourceAccountCount, 45);
+const trainingFixture = readGhostFixture("ml/training/ghost-self-play-teams.v2.json");
+assert.ok(trainingFixture.teams.length > 1500);
+assert.ok(trainingFixture.sourceAccountCount > 300);
 const evaluationRosters = new Set(fixture.teams.map(team => JSON.stringify(team.members)));
 for (const team of trainingFixture.teams) {
   assert.equal(evaluationRosters.has(JSON.stringify(team.members)), false, `${team.id} leaked into evaluation`);
@@ -100,14 +107,15 @@ assert.equal(forward.run.seed, reverse.run.seed);
 assert.deepEqual(forward.party, reverse.enemy.party.map(withoutEnemyLevel));
 assert.deepEqual(reverse.party, forward.enemy.party.map(withoutEnemyLevel));
 assert.ok(
-  forward.party.every(member => member.moves.length === 4),
+  forward.party.every(member => member.moves.length > 0 && member.moves.length <= 4),
   "saved ghost movesets must be retained",
 );
 
 const firstBatchAppearances = new Map(trainingFixture.teams.map(team => [team.id, 0]));
 const sourcePartitionsByTeam = new Map();
-const firstTrainingBatch = buildPilotBatch(0, 576, trainingFixture);
-for (let episode = 0; episode < 576; episode += 2) {
+const coverageEpisodeCount = trainingFixture.teams.length * 2;
+const firstTrainingBatch = buildPilotBatch(0, coverageEpisodeCount, trainingFixture);
+for (let episode = 0; episode < coverageEpisodeCount; episode += 2) {
   const first = firstTrainingBatch.episodes[episode];
   const second = firstTrainingBatch.episodes[episode + 1];
   const firstLeg = first.scenario;
@@ -125,8 +133,8 @@ for (let episode = 0; episode < 576; episode += 2) {
   }
 }
 const appearanceCounts = [...firstBatchAppearances.values()];
-assert.ok(Math.min(...appearanceCounts) >= 3, "the first 576 episodes must cover every training team");
-assert.ok(Math.max(...appearanceCounts) <= 4, "the first 576 episodes must remain roster-balanced");
+assert.equal(Math.min(...appearanceCounts), 2, "one mirrored round must cover every training team twice");
+assert.equal(Math.max(...appearanceCounts), 2, "one mirrored round must remain roster-balanced");
 
 console.log(
   `${fixture.teams.length} held-out ghost teams form ${fixture.teams.length / 2} strict inverse pairs; ${trainingFixture.teams.length} source-disjoint teams feed self-play`,

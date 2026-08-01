@@ -64,7 +64,7 @@ interface LibraryEntry {
 }
 
 /** Per-holder, wave-scoped Library state. */
-interface LibraryState {
+export interface LibraryState {
   wave: number;
   entries: LibraryEntry[];
   /** Foes whose first move has already been recorded (once per foe). */
@@ -119,6 +119,10 @@ export function getRecordedMoves(holder: Pokemon): MoveId[] {
 /** Shared cast PP remaining for the holder this battle. */
 export function getLibraryCastPp(holder: Pokemon): number {
   return getState(holder).castPpRemaining;
+}
+
+export function erLibraryState(holder: Pokemon): Readonly<LibraryState> | undefined {
+  return LIBRARY_STATE.get(holder);
 }
 
 /**

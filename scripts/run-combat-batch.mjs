@@ -7,7 +7,8 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
   console.log(
     "Usage: node scripts/run-combat-batch.mjs @batch.json "
       + "[--turns N] [--json-out FILE] [--ai-data-out FILE] "
-      + "[--ai-model FILE] [--ai-neural-model DIR] [--ai-policy MODE] [--ai-epsilon P] [--real-rng]",
+      + "[--ai-model FILE] [--ai-neural-model DIR] [--ai-policy MODE] [--ai-epsilon P] "
+      + "[--record-engine-baseline] [--real-rng]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -27,6 +28,7 @@ let aiModel;
 let aiNeuralModel;
 let aiPolicy;
 let aiEpsilon;
+let recordEngineBaseline = false;
 let realRng = false;
 for (let index = 1; index < argv.length; index++) {
   const arg = argv[index];
@@ -42,8 +44,8 @@ for (let index = 1; index < argv.length; index++) {
     aiNeuralModel = argv[++index];
   } else if (arg === "--ai-policy") {
     aiPolicy = argv[++index];
-    if (!["first-usable", "smart-default"].includes(aiPolicy)) {
-      console.error("--ai-policy must be first-usable or smart-default");
+    if (!["first-usable", "smart-default", "engine-hardest"].includes(aiPolicy)) {
+      console.error("--ai-policy must be first-usable, smart-default, or engine-hardest");
       process.exit(1);
     }
   } else if (arg === "--ai-epsilon") {
@@ -53,6 +55,8 @@ for (let index = 1; index < argv.length; index++) {
       console.error("--ai-epsilon must be between 0 and 1");
       process.exit(1);
     }
+  } else if (arg === "--record-engine-baseline") {
+    recordEngineBaseline = true;
   } else if (arg === "--real-rng") {
     realRng = true;
   } else {
@@ -90,6 +94,9 @@ if (aiPolicy) {
 }
 if (aiEpsilon) {
   env.ER_AI_POLICY_EPSILON = aiEpsilon;
+}
+if (recordEngineBaseline) {
+  env.ER_AI_RECORD_ENGINE_BASELINE = "1";
 }
 if (realRng) {
   env.ER_RUN_REAL_RNG = "1";

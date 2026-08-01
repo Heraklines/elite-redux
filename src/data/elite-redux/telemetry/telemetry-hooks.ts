@@ -26,6 +26,9 @@ import { clientSessionId, loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
 import { ER_VERSION } from "#app/constants/app-constants";
 import { globalScene } from "#app/global-scene";
+import { captureCommittedCombatDecision } from "#data/elite-redux/ai/combat-committed-action";
+import { ER_COMBAT_CONTRACT_VERSION } from "#data/elite-redux/ai/combat-contract";
+import type { ErCombatEarlierChoice } from "#data/elite-redux/ai/combat-engine-adapter";
 import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -37,6 +40,7 @@ import {
 import {
   beginTelemetrySession,
   endTelemetrySession,
+  flushTelemetry,
   flushTelemetryBeacon,
   getTelemetrySession,
   isTelemetryRecording,
@@ -47,8 +51,10 @@ import type {
   TelemetryActor,
   TelemetryBattleAction,
   TelemetryBattleDecisionEvent,
+  TelemetryCombatContractEvent,
   TelemetryInputEvent,
   TelemetryMode,
+  TelemetryRunOutcomeEvent,
   TelemetrySessionEnvelope,
   TelemetrySurfaceChoiceEvent,
   TelemetrySurfaceOpenEvent,
@@ -80,6 +86,12 @@ let initialized = false;
 let store: TelemetryStore | null = null;
 let base: string | null = null;
 let playerIdHash = "anon";
+const combatDictionaryHash =
+  (import.meta.env as { VITE_AI_DICTIONARY_HASH?: string }).VITE_AI_DICTIONARY_HASH ?? `unsealed-${version}`;
+let combatJointActionId = "";
+let combatEarlierChoices: ErCombatEarlierChoice[] = [];
+const combatCapturedActorSlots = new Set<number>();
+const combatKnownOpponentEntityIds = new Set<number>();
 /** The uiMode of the most recently opened surface, so a choice event can attribute its uiMode. */
 let lastSurfaceMode = -1;
 
@@ -154,6 +166,7 @@ function makeEnvelope(sessionId: string, mode: TelemetryMode, seed: string): Tel
     mode,
     gameModeId: globalScene?.gameMode?.modeId ?? -1,
     seed,
+    startWave: globalScene?.currentBattle?.waveIndex ?? 0,
     difficulty: safeDifficulty(),
     startedAt: Date.now(),
   };
@@ -193,6 +206,10 @@ function ensureSession(): boolean {
   // New run (or first capture): start a fresh session. The previous run's unflushed events stay durable
   // and are shipped by the next boot's recovery pass.
   endTelemetrySession();
+  combatJointActionId = "";
+  combatEarlierChoices = [];
+  combatCapturedActorSlots.clear();
+  combatKnownOpponentEntityIds.clear();
   const env = makeEnvelope(randomString(24), currentMode(), seed);
   const q = new TelemetryQueue(store, env, upload, DEFAULT_TELEMETRY_QUEUE_CONFIG);
   store.saveEnvelope(env).catch(() => {});
@@ -270,6 +287,57 @@ function buildAction(fieldIndex: number, command: Command, cursor: number): Tele
 // Phase taps (called from command-phase.ts + turn-end-phase.ts). Each gates hard + never throws.
 // ---------------------------------------------------------------------------
 
+function recordCombatContractDecision(fieldIndex: number, actor: TelemetryActor): void {
+  const session = getTelemetrySession();
+  if (session == null || actor !== "self" || globalScene.gameMode.isCoop) {
+    return;
+  }
+  const battle = globalScene.currentBattle;
+  const jointActionId = `${session.sessionId}:${battle.waveIndex}:${battle.turn}`;
+  if (jointActionId !== combatJointActionId) {
+    combatJointActionId = jointActionId;
+    combatEarlierChoices = [];
+    combatCapturedActorSlots.clear();
+  }
+  if (combatCapturedActorSlots.has(fieldIndex)) {
+    return;
+  }
+  globalScene.getEnemyField().forEach(mon => combatKnownOpponentEntityIds.add(mon.id));
+  const captured = captureCommittedCombatDecision({
+    scene: globalScene,
+    perspective: "player",
+    actorSlot: fieldIndex,
+    jointActionId,
+    earlier: combatEarlierChoices,
+    policySource: "human-v1",
+    policyTarget: true,
+    knownOpponentEntityIds: combatKnownOpponentEntityIds,
+    buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+    dexHash: combatDictionaryHash,
+    dictionaryHash: combatDictionaryHash,
+    episodeId: session.sessionId,
+    splitGroupId: session.sessionId,
+    sourcePartitionId: playerIdHash,
+  });
+  if (captured == null) {
+    return;
+  }
+  const event: TelemetryCombatContractEvent = {
+    kind: "combat_contract_decision",
+    t: Date.now(),
+    wave: battle.waveIndex,
+    record: captured.record,
+  };
+  recordTelemetryEvent(event);
+  combatCapturedActorSlots.add(fieldIndex);
+  combatEarlierChoices.push({
+    kind: captured.chosen.kind,
+    id: captured.chosen.id,
+    ...(captured.chosen.kind === "switch" ? { partyIndex: captured.chosen.partyIndex } : {}),
+    ...(captured.chosen.kind === "move" ? { tera: captured.chosen.tera } : {}),
+  });
+}
+
 /**
  * Capture one battle decision as a (state, action) training pair. `actor` = "self" for this client's own
  * committed command (solo/co-op), "partner" for an observed co-op partner command. Showdown and tournament
@@ -285,6 +353,7 @@ export function recordTelemetryDecision(
     if (!ensureSession()) {
       return;
     }
+    recordCombatContractDecision(fieldIndex, actor);
     const action = buildAction(fieldIndex, command, cursor);
     if (action == null) {
       return;
@@ -330,6 +399,46 @@ export function recordTelemetryTurnOutcome(): void {
     maybeFlushTelemetry(state.wave);
   } catch {
     /* swallow */
+  }
+}
+
+/** Record the real run terminal so policy training can select wins and value training can retain losses. */
+export function recordTelemetryRunOutcome(victory: boolean): void {
+  try {
+    if (!ensureSession()) {
+      return;
+    }
+    const session = getTelemetrySession();
+    if (session == null) {
+      return;
+    }
+    const finalWave = globalScene.currentBattle?.waveIndex ?? session.startWave ?? 0;
+    const outcome = victory ? "victory" : "player-wiped";
+    const event: TelemetryRunOutcomeEvent = {
+      kind: "run_outcome",
+      t: Date.now(),
+      wave: finalWave,
+      outcome,
+      record: {
+        kind: "episode_terminal",
+        schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+        buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+        dexHash: combatDictionaryHash,
+        dictionaryHash: combatDictionaryHash,
+        episodeId: session.sessionId,
+        splitGroupId: session.sessionId,
+        sourcePartitionId: playerIdHash,
+        outcome,
+        startWave: session.startWave ?? finalWave,
+        finalWave,
+        wavesCleared: Math.max(0, finalWave - (session.startWave ?? finalWave) + (victory ? 1 : 0)),
+        truncated: false,
+      },
+    };
+    recordTelemetryEvent(event);
+    flushTelemetry(finalWave);
+  } catch {
+    /* telemetry must never affect gameplay */
   }
 }
 

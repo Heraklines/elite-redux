@@ -163,3 +163,19 @@ export function erChivalryRedirectActive(incoming: Pokemon): boolean {
   const state = CHIVALRY_REDIRECT.get(incoming);
   return !!state && (globalScene.currentBattle?.turn ?? 0) <= state.expiryTurn;
 }
+
+/** Read-only projection for combat-policy observations. */
+export function erChivalryRedirectState(
+  incoming: Pokemon,
+): { holderEntityId: number; expiryTurn: number; turnsLeft: number } | undefined {
+  const state = CHIVALRY_REDIRECT.get(incoming);
+  const turn = globalScene.currentBattle?.turn ?? 0;
+  if (!state || state.holder.isFainted() || turn > state.expiryTurn) {
+    return;
+  }
+  return {
+    holderEntityId: state.holder.id,
+    expiryTurn: state.expiryTurn,
+    turnsLeft: state.expiryTurn - turn + 1,
+  };
+}

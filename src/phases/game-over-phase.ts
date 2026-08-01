@@ -26,6 +26,7 @@ import {
 } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
+import { recordTelemetryRunOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
 import { Challenges } from "#enums/challenges";
@@ -105,6 +106,10 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
     // Otherwise, continue standard Game Over logic
+
+    // Staging-only player telemetry: this is now a genuine terminal (the ME recovery guard above did not resume it).
+    // Showdown returned before this point, and production builds leave telemetry disabled.
+    recordTelemetryRunOutcome(this.isVictory);
 
     // The ME hook above is allowed to turn a battle loss back into a live encounter. Only a true terminal
     // can prove continuationReady; otherwise the retained battle transaction must remain owned by the

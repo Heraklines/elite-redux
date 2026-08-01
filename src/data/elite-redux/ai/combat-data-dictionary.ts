@@ -3,17 +3,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
+import { allAbilities, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
+import { ER_COMBAT_FEATURE_NAMES, ER_COMBAT_FEATURE_SCHEMA_VERSION } from "#data/elite-redux/ai/combat-features";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { ER_RELIC_CONFIG } from "#data/elite-redux/er-relics";
+import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveTarget } from "#enums/move-target";
 import { PokemonType } from "#enums/pokemon-type";
+import { PositionalTagType } from "#enums/positional-tag-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { getModifierType } from "#utils/modifier-utils";
 import i18next from "i18next";
 
-export const ER_COMBAT_DATA_DICTIONARY_SCHEMA_VERSION = 2 as const;
+export const ER_COMBAT_DATA_DICTIONARY_SCHEMA_VERSION = 3 as const;
 
 interface ErCombatMoveDictionaryEntry {
   readonly id: number;
@@ -60,13 +65,46 @@ interface ErCombatItemDictionaryEntry {
   readonly className: string;
 }
 
+interface ErCombatSpeciesFormDictionaryEntry {
+  readonly id: string;
+  readonly speciesId: number;
+  readonly form: number;
+  readonly name: string;
+  readonly formKey: string;
+  readonly types: readonly number[];
+  readonly baseStats: readonly number[];
+  readonly weight: number;
+  readonly height: number;
+  readonly abilities: readonly number[];
+  readonly innates: readonly number[];
+}
+
+interface ErCombatRelicDictionaryEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly maxStack: number;
+}
+
 export interface ErCombatDataDictionary {
   readonly schemaVersion: typeof ER_COMBAT_DATA_DICTIONARY_SCHEMA_VERSION;
   readonly build: string;
   readonly source: "initialized-game-runtime";
+  readonly features: {
+    readonly schemaVersion: typeof ER_COMBAT_FEATURE_SCHEMA_VERSION;
+    readonly names: typeof ER_COMBAT_FEATURE_NAMES;
+  };
   readonly moves: Readonly<Record<number, ErCombatMoveDictionaryEntry>>;
   readonly abilities: Readonly<Record<number, ErCombatAbilityDictionaryEntry>>;
+  readonly speciesForms: Readonly<Record<string, ErCombatSpeciesFormDictionaryEntry>>;
   readonly items: Readonly<Record<string, ErCombatItemDictionaryEntry>>;
+  /** Canonical modifier-type registry. `items` is retained as the held-item lookup surface. */
+  readonly modifiers: Readonly<Record<string, ErCombatItemDictionaryEntry>>;
+  readonly relics: Readonly<Record<string, ErCombatRelicDictionaryEntry>>;
+  readonly battlerTags: readonly string[];
+  readonly arenaTags: readonly string[];
+  readonly positionalTags: readonly string[];
+  readonly mechanicNamespaces: readonly string[];
 }
 
 function invertNumericMap(source: Readonly<Record<number, number>>): Map<number, number[]> {
@@ -109,8 +147,14 @@ function itemEntry(id: string, factory: ModifierTypeFunc): ErCombatItemDictionar
  * This deliberately runs after `initializeGame()`: draft ER ids are not runtime
  * ids, and hand-authored abilities do not exist in the generated ER tables.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Runtime registries require independent fail-closed coverage checks.
 export function buildErCombatDataDictionary(build: string): ErCombatDataDictionary {
-  if (allMoves.length === 0 || allAbilities.length === 0 || Object.keys(modifierTypes).length === 0) {
+  if (
+    allMoves.length === 0
+    || allAbilities.length === 0
+    || allSpecies.length === 0
+    || Object.keys(modifierTypes).length === 0
+  ) {
     throw new Error("combat data dictionary requires initialized game registries");
   }
 
@@ -118,6 +162,7 @@ export function buildErCombatDataDictionary(build: string): ErCombatDataDictiona
   const abilityDraftIds = invertNumericMap(ER_ID_MAP.abilities);
   const moves: Record<number, ErCombatMoveDictionaryEntry> = {};
   const abilities: Record<number, ErCombatAbilityDictionaryEntry> = {};
+  const speciesForms: Record<string, ErCombatSpeciesFormDictionaryEntry> = {};
   const items: Record<string, ErCombatItemDictionaryEntry> = {};
 
   for (const move of allMoves) {
@@ -166,6 +211,26 @@ export function buildErCombatDataDictionary(build: string): ErCombatDataDictiona
     };
   }
 
+  for (const species of allSpecies) {
+    const forms = species.forms.length > 0 ? species.forms : [species];
+    for (const form of forms) {
+      const id = `${species.speciesId}:${form.formIndex}`;
+      speciesForms[id] = {
+        id,
+        speciesId: species.speciesId,
+        form: form.formIndex,
+        name: species.getName(form.formIndex),
+        formKey: "formKey" in form && typeof form.formKey === "string" ? form.formKey : "",
+        types: [form.type1, ...(form.type2 == null ? [] : [form.type2])],
+        baseStats: [...form.baseStats],
+        weight: form.weight,
+        height: form.height,
+        abilities: [form.ability1, form.ability2, form.abilityHidden].filter(abilityId => abilityId > 0),
+        innates: [...form.getPassiveAbilities()].filter(abilityId => abilityId > 0),
+      };
+    }
+  }
+
   for (const [id, factory] of Object.entries(modifierTypes).sort(([a], [b]) => a.localeCompare(b))) {
     items[id] = itemEntry(id, factory as ModifierTypeFunc);
   }
@@ -174,8 +239,46 @@ export function buildErCombatDataDictionary(build: string): ErCombatDataDictiona
     schemaVersion: ER_COMBAT_DATA_DICTIONARY_SCHEMA_VERSION,
     build,
     source: "initialized-game-runtime",
+    features: {
+      schemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      names: ER_COMBAT_FEATURE_NAMES,
+    },
     moves,
     abilities,
+    speciesForms,
     items,
+    modifiers: items,
+    relics: Object.fromEntries(
+      Object.entries(ER_RELIC_CONFIG)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, config]) => [
+          id,
+          { id, name: config.name, description: config.description, maxStack: config.maxStack },
+        ]),
+    ),
+    battlerTags: Object.values(BattlerTagType).sort(),
+    arenaTags: Object.values(ArenaTagType).sort(),
+    positionalTags: Object.values(PositionalTagType).sort(),
+    mechanicNamespaces: [
+      "ability-suppression",
+      "ability-state",
+      "battle",
+      "deferred",
+      "entry",
+      "entry-fired",
+      "entry-window",
+      "innate-slot-suppression",
+      "item-restore",
+      "move-history",
+      "move-prime",
+      "move-queue",
+      "relation",
+      "relic-state",
+      "summon",
+      "summon-provenance",
+      "turn",
+      "turn-provenance",
+      "wave",
+    ],
   };
 }

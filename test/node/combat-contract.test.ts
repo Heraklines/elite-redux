@@ -15,6 +15,7 @@ import {
   ER_COMBAT_FEATURE_NAMES,
   ER_COMBAT_FEATURE_SCHEMA_VERSION,
   extractErCombatCandidateFeatures,
+  extractErCombatCandidateTokenGroups,
 } from "#data/elite-redux/ai/combat-features";
 import {
   type ErSingleTreeModelArtifact,
@@ -25,6 +26,28 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("ER combat AI contract", () => {
+  const derived = {
+    effectivePriority: 0,
+    actsBeforeTargets: null,
+    expectedDamageMin: null,
+    expectedDamageMax: null,
+    expectedCriticalDamage: null,
+    expectedHits: null,
+    immunityReason: null,
+    hasDrain: false,
+    drainFraction: null,
+    hasRecoil: false,
+    recoilFraction: null,
+    statusChance: null,
+    forcesRecharge: false,
+    createsMoveLock: false,
+  } as const;
+
+  const tokenRow = (candidateId: string) => ({
+    candidateId,
+    groups: { actor: [], targets: [], destination: [], field: [], action: ["action:test"] },
+  });
+
   it("uses semantic target identity rather than target order", () => {
     const base = {
       kind: "move" as const,
@@ -35,6 +58,7 @@ describe("ER combat AI contract", () => {
       targetMode: "resolved" as const,
       baseTypeMultiplier: 2,
       currentStab: true,
+      derived,
     };
     const a = canonicalCombatCandidateId({
       ...base,
@@ -65,6 +89,7 @@ describe("ER combat AI contract", () => {
       targets: [target],
       baseTypeMultiplier: 1,
       currentStab: false,
+      derived,
     };
     const normal = withCanonicalCombatCandidateId(normalInput);
     const tera = withCanonicalCombatCandidateId({ ...normalInput, tera: true });
@@ -101,13 +126,34 @@ describe("ER combat AI contract", () => {
       episodeId: "episode",
       jointActionId: "episode:1:1",
       decisionId: "episode:1:1:0",
-      sourcePolicy: "scripted",
+      policySource: "scripted",
+      policyTarget: false,
       actorSlot: 0,
       earlierCandidateIds: [],
-      observation: {} as ErCombatDecisionRecord["observation"],
+      observation: {
+        version: ER_COMBAT_CONTRACT_VERSION,
+        perspective: "self",
+        wave: 1,
+        turn: 1,
+        biome: 1,
+        battleType: 1,
+        format: 1,
+        weather: null,
+        terrain: null,
+        fieldEffects: [],
+        positionalEffects: [],
+        mechanics: [],
+        modifiers: [],
+        selfParty: [],
+        opponentActive: [],
+        opponentKnownParty: [],
+        opponentRosterSize: 0,
+        playerTerasUsed: 0,
+      },
       candidates: [candidate],
       featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
       candidateFeatures: [{ candidateId: candidate.id, values: [0] }],
+      candidateTokenGroups: [tokenRow(candidate.id)],
       chosenCandidateId: candidate.id,
     } satisfies ErCombatDecisionRecord;
     expect(validateCombatDecisionRecord(record)).toEqual([]);
@@ -116,7 +162,7 @@ describe("ER combat AI contract", () => {
     );
   });
 
-  it("extracts a fixed finite semantic feature vector without species or move ids", () => {
+  it("extracts a fixed finite semantic feature vector with hashed runtime identities", () => {
     const candidate = withCanonicalCombatCandidateId({
       kind: "move",
       actorSlot: 0,
@@ -127,7 +173,9 @@ describe("ER combat AI contract", () => {
       targets: [{ side: "opponent", entityId: 2, activeSlot: 0 }],
       baseTypeMultiplier: 2,
       currentStab: true,
+      derived,
     });
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This compact fixture varies every public/private visibility field by side.
     const mon = (entityId: number, activeSlot: number, types: number[]) => ({
       entityId,
       knowledge: entityId === 1 ? ("self" as const) : ("battle-info" as const),
@@ -135,19 +183,106 @@ describe("ER combat AI contract", () => {
       activeSlot,
       species: entityId === 1 ? 6 : 9,
       form: 0,
+      originalSpecies: entityId === 1 ? 6 : 9,
+      originalForm: 0,
       level: 100,
       types,
-      hp: 100,
-      maxHp: 200,
+      hp: entityId === 1 ? 100 : null,
+      maxHp: entityId === 1 ? 200 : null,
+      hpRatio: 0.5,
       status: null,
       statStages: [0, 0, 0, 0, 0, 0, 0],
-      stats: [200, 150, 140, 160, 140, 130],
-      ability: 1,
-      innates: [2, 3, null],
-      heldItems: entityId === 1 ? ["LEFTOVERS"] : null,
+      stats: entityId === 1 ? [200, 150, 140, 160, 140, 130] : null,
+      effectiveStats: entityId === 1 ? [200, 150, 140, 160, 140, 130] : null,
+      abilities:
+        entityId === 1
+          ? [
+              {
+                abilityId: 1,
+                source: "active" as const,
+                slot: null,
+                active: true,
+                suppressed: false,
+                overridden: false,
+                revealed: true,
+              },
+              {
+                abilityId: 2,
+                source: "innate" as const,
+                slot: 0,
+                active: true,
+                suppressed: false,
+                overridden: false,
+                revealed: true,
+              },
+            ]
+          : [],
+      heldItems:
+        entityId === 1
+          ? [
+              {
+                itemId: "LEFTOVERS",
+                className: "LeftoversModifier",
+                stackCount: 1,
+                virtualStackCount: 0,
+                charges: null,
+                consumed: null,
+                active: true,
+                suppressed: false,
+                revealed: true,
+                state: [],
+              },
+            ]
+          : null,
+      revealState: {
+        abilities: entityId === 1 ? ("complete" as const) : ("unknown" as const),
+        items: entityId === 1 ? ("complete" as const) : ("unknown" as const),
+        moves: entityId === 1 ? ("complete" as const) : ("unknown" as const),
+        revealedAbilityIds: entityId === 1 ? [1, 2] : [],
+        revealedItemIds: entityId === 1 ? ["LEFTOVERS"] : [],
+        revealedMoveIds: entityId === 1 ? [53] : [],
+      },
+      tags: [],
+      mechanics:
+        entityId === 1
+          ? [
+              {
+                effectId: "ability-state:foul-harvest",
+                scope: "mechanic" as const,
+                side: "self" as const,
+                turnsLeft: null,
+                maxDuration: null,
+                sourceMoveId: null,
+                sourceEntityId: null,
+                targetSlot: 0,
+                state: [{ key: "charges", value: 2 }],
+              },
+            ]
+          : [],
+      transformation: {
+        teraType: 9,
+        terastallized: false,
+        teraAvailable: entityId === 1,
+        formChangeAvailable: false,
+        formChanged: false,
+      },
+      boss: { segments: 0, segmentIndex: 0, phase: null },
       moves:
         entityId === 1
-          ? [{ slot: 0, moveId: 53, type: 9, category: 1, power: 90, accuracy: 100, priority: 0, ppUsed: 1, maxPp: 10 }]
+          ? [
+              {
+                slot: 0,
+                moveId: 53,
+                type: 9,
+                category: 1,
+                power: 90,
+                accuracy: 100,
+                priority: 0,
+                ppUsed: 1,
+                maxPp: 10,
+                revealed: true,
+              },
+            ]
           : [],
       fainted: false,
     });
@@ -159,22 +294,41 @@ describe("ER combat AI contract", () => {
       biome: 1,
       battleType: 1,
       format: 1,
-      weather: 0,
-      terrain: 0,
+      weather: null,
+      terrain: null,
+      fieldEffects: [],
+      positionalEffects: [],
+      mechanics: [],
+      modifiers: [],
       selfParty: [mon(1, 0, [9])],
       opponentActive: [mon(2, 0, [11])],
+      opponentKnownParty: [],
       opponentRosterSize: 1,
       playerTerasUsed: 0,
     };
     const vector = extractErCombatCandidateFeatures(observation, candidate);
     expect(vector).toHaveLength(ER_COMBAT_FEATURE_NAMES.length);
     expect(vector.every(Number.isFinite)).toBe(true);
-    expect(ER_COMBAT_FEATURE_NAMES.some(name => name.includes("species") || name.includes("move_id"))).toBe(false);
+    expect(ER_COMBAT_FEATURE_NAMES.some(name => name.includes("species_hash"))).toBe(true);
+    expect(ER_COMBAT_FEATURE_NAMES.some(name => name.includes("move_id_hash"))).toBe(true);
+    const tokens = extractErCombatCandidateTokenGroups(observation, candidate);
+    expect(tokens.actor).toContain("species:6:0");
+    expect(tokens.actor).toContain("effect:mechanic:ability-state:foul-harvest:state:charges:2");
+    expect(tokens.action).toContain("move:53");
+
+    const knownOpponentObservation = {
+      ...observation,
+      opponentKnownParty: [{ ...mon(3, 1, [12]), activeSlot: null, hpRatio: null }],
+      opponentRosterSize: 2,
+    };
+    expect(extractErCombatCandidateTokenGroups(knownOpponentObservation, candidate).field).toContain(
+      "known-opponent:9:0",
+    );
 
     const spreadObservation = {
       ...observation,
       format: 2,
-      opponentActive: [mon(2, 0, [11]), { ...mon(3, 1, [12]), hp: 25 }],
+      opponentActive: [mon(2, 0, [11]), { ...mon(3, 1, [12]), hpRatio: 0.125 }],
       opponentRosterSize: 2,
     };
     const spreadCandidate = withCanonicalCombatCandidateId({
@@ -191,6 +345,116 @@ describe("ER combat AI contract", () => {
     expect(extractErCombatCandidateFeatures(spreadObservation, spreadCandidate)).toEqual(
       extractErCombatCandidateFeatures(spreadObservation, reversedCandidate),
     );
+  });
+
+  it("rejects hidden opponent state while allowing explicitly revealed tokens", () => {
+    const candidate = withCanonicalCombatCandidateId({
+      kind: "switch",
+      actorSlot: 0,
+      partyIndex: 1,
+      transfer: "normal",
+    });
+    const opponent = {
+      entityId: 2,
+      knowledge: "battle-info" as const,
+      partyIndex: null,
+      activeSlot: 0,
+      species: 9,
+      form: 0,
+      originalSpecies: 9,
+      originalForm: 0,
+      level: 50,
+      types: [11],
+      hp: null,
+      maxHp: null,
+      hpRatio: 1,
+      status: null,
+      statStages: [0, 0, 0, 0, 0, 0, 0],
+      stats: null,
+      effectiveStats: null,
+      abilities: [],
+      heldItems: null,
+      revealState: {
+        abilities: "unknown" as const,
+        items: "unknown" as const,
+        moves: "unknown" as const,
+        revealedAbilityIds: [],
+        revealedItemIds: [],
+        revealedMoveIds: [],
+      },
+      tags: [],
+      mechanics: [],
+      transformation: {
+        teraType: null,
+        terastallized: false,
+        teraAvailable: null,
+        formChangeAvailable: null,
+        formChanged: false,
+      },
+      boss: { segments: 0, segmentIndex: 0, phase: null },
+      moves: [],
+      fainted: false,
+    };
+    const record = {
+      kind: "combat_decision",
+      schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+      candidateScope: "combat-command",
+      buildSha: "abc",
+      dexHash: "dex",
+      dictionaryHash: "dict",
+      episodeId: "episode",
+      jointActionId: "episode:1:1",
+      decisionId: "episode:1:1:0",
+      policySource: "scripted",
+      policyTarget: false,
+      actorSlot: 0,
+      earlierCandidateIds: [],
+      observation: {
+        version: ER_COMBAT_CONTRACT_VERSION,
+        perspective: "self",
+        wave: 1,
+        turn: 1,
+        biome: 1,
+        battleType: 1,
+        format: 1,
+        weather: null,
+        terrain: null,
+        fieldEffects: [],
+        positionalEffects: [],
+        mechanics: [],
+        modifiers: [],
+        selfParty: [],
+        opponentActive: [opponent],
+        opponentKnownParty: [],
+        opponentRosterSize: 1,
+        playerTerasUsed: 0,
+      },
+      candidates: [candidate],
+      featureSchemaVersion: ER_COMBAT_FEATURE_SCHEMA_VERSION,
+      candidateFeatures: [{ candidateId: candidate.id, values: [0] }],
+      candidateTokenGroups: [tokenRow(candidate.id)],
+      chosenCandidateId: candidate.id,
+    } satisfies ErCombatDecisionRecord;
+    expect(validateCombatDecisionRecord(record)).toEqual([]);
+    expect(
+      validateCombatDecisionRecord({
+        ...record,
+        observation: {
+          ...record.observation,
+          opponentActive: [{ ...opponent, stats: [1, 2, 3, 4, 5, 6] }],
+        },
+      }),
+    ).toContain("hidden opponent stats crossed the visibility boundary for entity 2");
+    expect(
+      validateCombatDecisionRecord({
+        ...record,
+        observation: {
+          ...record.observation,
+          opponentActive: [],
+          opponentKnownParty: [{ ...opponent, activeSlot: null }],
+        },
+      }),
+    ).toContain("live hidden bench state crossed the visibility boundary for entity 2");
   });
 
   it("scores the neutral JSON tree format used by the headless policy", () => {

@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 
+const GHOST_DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
+
 export function readGhostFixture(path) {
   const fixture = JSON.parse(readFileSync(path, "utf8"));
   validateGhostFixture(fixture);
@@ -7,7 +9,13 @@ export function readGhostFixture(path) {
 }
 
 function validateGhostMember(member, teamId) {
-  if (!Number.isInteger(member.species) || member.species <= 0 || member.moves?.length !== 4) {
+  if (
+    !Number.isInteger(member.species)
+    || member.species <= 0
+    || !Array.isArray(member.moves)
+    || member.moves.length === 0
+    || member.moves.length > 4
+  ) {
     throw new Error(`invalid member in ${teamId}`);
   }
   if (!Array.isArray(member.ivs) || member.ivs.length !== 6 || member.ivs.some(iv => iv < 0 || iv > 31)) {
@@ -35,12 +43,15 @@ function validateGhostTeam(team, ids) {
     throw new Error(`invalid or duplicate ghost team ${String(team?.id)}`);
   }
   ids.add(team.id);
+  if (team.difficulty !== undefined && !GHOST_DIFFICULTIES.includes(team.difficulty)) {
+    throw new Error(`invalid difficulty in ${team.id}`);
+  }
   team.members.forEach(member => validateGhostMember(member, team.id));
 }
 
 export function validateGhostFixture(fixture) {
-  if (fixture?.schemaVersion !== 2 || !Array.isArray(fixture.teams) || fixture.teams.length < 2) {
-    throw new Error("ghost fixture must contain at least two schema-v2 teams");
+  if (![2, 3].includes(fixture?.schemaVersion) || !Array.isArray(fixture.teams) || fixture.teams.length < 2) {
+    throw new Error("ghost fixture must contain at least two schema-v2 or schema-v3 teams");
   }
   const ids = new Set();
   for (const team of fixture.teams) {
@@ -65,7 +76,7 @@ function scenarioMember(member, enemy) {
   };
 }
 
-export function buildGhostPair(fixture, pairIndex) {
+export function buildGhostPair(fixture, pairIndex, fixedSeed = 0) {
   validateGhostFixture(fixture);
   if (fixture.teams.length % 2 !== 0) {
     throw new Error("evaluation fixture team count must be even so every matchup has an inverse leg");
@@ -76,13 +87,16 @@ export function buildGhostPair(fixture, pairIndex) {
   }
   const teamA = fixture.teams[pairIndex * 2];
   const teamB = fixture.teams[pairIndex * 2 + 1];
-  const pairId = `pair-${String(pairIndex + 1).padStart(2, "0")}`;
-  const seed = `er-ai-ghost-v2-${pairId}`;
+  const difficulty = teamA.difficulty ?? "hell";
+  if ((teamB.difficulty ?? "hell") !== difficulty) {
+    throw new Error(`evaluation pair ${pairIndex} crosses difficulties`);
+  }
+  const pairId = `${difficulty}-pair-${String(pairIndex + 1).padStart(3, "0")}-seed-${fixedSeed}`;
+  const seed = `er-ai-ghost-v3-${difficulty}-${pairIndex}-${fixedSeed}`;
   const buildLeg = (leg, player, enemy) => ({
     v: 1,
     name: `Ghost gauntlet ${pairId} leg ${leg.toUpperCase()}: ${player.id} vs ${enemy.id}`,
-    notes:
-      "Sanitized winning Hell rosters with per-Pokemon held items. Strict mirrored leg required; no player identity.",
+    notes: `Sanitized winning ${difficulty} rosters with per-Pokemon held items. Strict mirrored leg required; no player identity.`,
     run: { wave: 199, level: 200, seed, difficulty: "hell", enemyAi: "hardest", double: true },
     party: player.members.map(member => scenarioMember(member, false)),
     enemy: { kind: "party", party: enemy.members.map(member => scenarioMember(member, true)) },
@@ -90,10 +104,12 @@ export function buildGhostPair(fixture, pairIndex) {
   });
   return {
     manifest: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       pairId,
       seed,
-      playerControllers: ["selected-tree-v1", "smart-default-v1"],
+      fixedSeed,
+      difficulty,
+      playerControllers: ["smart-default-v1", "engine-hardest-v1"],
       controllerB: "engine-trainer-ai",
       legs: [
         { leg: "a", playerTeamId: teamA.id, enemyTeamId: teamB.id },
@@ -144,18 +160,21 @@ export function buildGhostSelfPlayScenario(fixture, episodeIndex) {
   const reverse = episodeIndex % 2 === 1;
   const player = fixture.teams[reverse ? secondIndex : firstIndex];
   const enemy = fixture.teams[reverse ? firstIndex : secondIndex];
+  const difficulty = [player.difficulty ?? "hell", enemy.difficulty ?? "hell"].sort(
+    (a, b) => GHOST_DIFFICULTIES.indexOf(b) - GHOST_DIFFICULTIES.indexOf(a),
+  )[0];
   const format = ["single", "double", "triple"][(pairIndex + cycle) % 3];
   const seed = `er-ai-selfplay-v1-${pairIndex}-${cycle}`;
   return {
     v: 1,
     name: `Ghost self-play ${player.id} vs ${enemy.id}`,
     notes:
-      "Combat-only training episode from source-disjoint sanitized winning Hell ghosts. Saved movesets and reconstructable per-Pokemon held items are preserved.",
+      "Combat-only training episode from source-disjoint sanitized winning ghosts. Difficulty metadata, saved movesets, and reconstructable per-Pokemon held items are preserved.",
     run: {
       wave: 199,
       level: 200,
       seed,
-      difficulty: "hell",
+      difficulty,
       enemyAi: "hardest",
       ...(format === "single" ? { double: false } : {}),
       ...(format === "double" ? { double: true } : {}),

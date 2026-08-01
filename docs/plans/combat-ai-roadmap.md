@@ -15,16 +15,60 @@ dataset the rest of this stands on.
 
 ## Featurization principle (the load-bearing decision)
 
-- **Represent moves / mons / abilities by ATTRIBUTES + EFFECT FLAGS, not by IDs.** A move is its
-  type/power/accuracy/priority/category + effect primitives (heal, stat-stage, hazard, status, ...); an
-  ability/innate is its trigger + effect primitives. This is why the telemetry `MoveState`/`MonState`
-  capture attributes (type, power, pp, stat stages, the ER four-ability innate set), not just ids.
+- **Preserve identity AND semantics.** Species/forms, moves, abilities, innates, items, relics, tags, and
+  modifiers keep canonical ids; neural models receive learned identity embeddings while tree baselines
+  receive semantic multi-hot/hash features. Attributes and effect primitives (type, power, accuracy,
+  priority, heal, stat-stage, hazard, status, and so on) supplement identity rather than replacing it.
 - **Why:** Showdown-pretrained priors then TRANSFER to ER's custom content (new species/forms/abilities/
   the ER custom weathers/terrains/statuses), because a novel ability composed of known effect primitives
   is understood zero-shot. New content that is just a recombination needs no retraining.
 - **Optional text feature:** embed the ability/move DESCRIPTION TEXT with a small FROZEN text encoder as an
   extra feature, so semantically similar abilities map close in feature space (the ER 2.65 dex text is the
   authoritative source and is already in-repo).
+
+## Combat contract v3 (required before scaled training)
+
+- The observation is a **public-information POMDP**. It contains complete acting-side state and only
+  battle-revealed opponent abilities, moves, and items. Exact opponent HP totals and stats never cross the
+  visibility boundary; the public HP-bar ratio does. Previously fielded opponents remain in public memory
+  after switching out, but their hidden bench HP and stats do not. Engine damage-preview output is allowed
+  because the game already shows it to the player.
+- Acting-side state includes item identities/stacks/charges/consumption/suppression, all active and innate
+  ability slots with override/suppression state, side/field/position tags, weather/terrain provenance and
+  duration, transformations, boss segments, run modifiers/relics, queued moves, and ER ability counters
+  stored in module-local maps.
+- Neural input uses five permutation-invariant token multisets per candidate: `actor`, `targets`,
+  `destination`, `field`, and `action`. Candidate order remains permutation-equivariant. Tree input keeps
+  dense aggregates plus semantic multi-hot/hash features. Ephemeral runtime entity ids are excluded from
+  the learned vocabulary; source references are projected to stable relative roles such as active slot or
+  known opponent.
+- Candidate rows include player-visible engine-derived damage ranges and immunity results, drain/recoil,
+  effective priority, status chance, recharge, and move-lock consequences. Unknown information stays null;
+  it is not filled from hidden opponent state.
+- Contract schema 3, feature schema 2, dictionary schema 3, transformer artifact schema 4, and the token
+  vocabulary hash are hard compatibility gates. Older decision shards and checkpoints are rejected rather
+  than mixed.
+- Showdown transfer uses a separate schema and explicit domain id. Only semantically shared numeric
+  columns are present; missing ER-only state is masked rather than fabricated as zero. Identity tokens are
+  canonicalized through the ER dictionary when possible, and unmatched names remain Showdown-domain
+  tokens. Transfer rows can pretrain the shared policy body, but held-out ER data alone controls early
+  stopping and model selection.
+- Large data generation and CPU tree training are manual-only in `ai-baseline-pilot.yml`
+  (`run_training=true`). Branch pushes run contract checks but cannot launch the 24-shard generation.
+  The workflow produces a checksum-sealed bundle for private Kaggle GPU training; it never trains the
+  transformer on GitHub CPU runners.
+- Every committed action carries a `policySource` and `policyTarget`. Human actions, promoted checkpoints,
+  and search/advantage relabels may be policy targets. `engine-hardest-v1`, smart-default, forced/scripted
+  actions, and diagnostic trees are value/evaluation data only. The validator and both trainers reject or
+  zero policy loss for forbidden sources; the chooser is never called a second time for recording.
+- Ghost winners are matchup inputs, not demonstrations. The source-account split happens before roster
+  selection. Evaluation holds out 200 teams (50 each from Youngster, Ace, Elite, and Hell), forms 100
+  source-distinct pairs, plays three fixed seeds in both orientations, and reports each tier plus a macro
+  average. All remaining account-disjoint winners feed training matchups, with Elite/Hell oversampling in
+  later checkpoint-league self-play.
+- The first online benchmark compares a random-init/value-only transformer, the matched Showdown-transfer
+  transformer, a diagnostic tree ensemble, smart-default, and hardest engine AI. Each controller plays 600
+  real-engine legs. Offline imitation scores are smoke diagnostics and never promotion evidence.
 
 ## Reference points (external)
 

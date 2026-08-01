@@ -5,13 +5,14 @@ import { pathToFileURL } from "node:url";
 import { assertInversePair, buildGhostPair, readGhostFixture } from "./ghost-gauntlet.mjs";
 
 export const GHOST_EVAL_CONTROLLERS = [
-  "selected-tree-v1",
-  "stacked-tree-v1",
-  "outcome-tree-v1",
-  "candidate-transformer-v1",
+  "random-init-transformer-v4",
+  "showdown-transfer-transformer-v4",
+  "tree-ensemble-v1",
   "smart-default-v1",
+  "engine-hardest-v1",
 ];
-export const EXPECTED_GHOST_EVAL_PAIRS = 50;
+export const GHOST_EVAL_FIXED_SEEDS = [17, 43, 97];
+export const EXPECTED_GHOST_EVAL_PAIRS = 100;
 
 function combatOnlyScenario(scenario) {
   const { eggs: _eggs, ...combatOnly } = scenario;
@@ -29,14 +30,24 @@ export function buildGhostEvalBatch(fixture, pairStart, pairCount) {
   const manifests = [];
   const episodes = [];
   for (let pairIndex = pairStart; pairIndex < pairStart + pairCount; pairIndex++) {
-    const pair = buildGhostPair(fixture, pairIndex);
-    assertInversePair(pair);
-    const manifest = { ...pair.manifest, playerControllers: GHOST_EVAL_CONTROLLERS };
-    manifests.push(manifest);
-    episodes.push(
-      { id: `${manifest.pairId}-leg-a`, splitGroupId: manifest.pairId, scenario: combatOnlyScenario(pair.legA) },
-      { id: `${manifest.pairId}-leg-b`, splitGroupId: manifest.pairId, scenario: combatOnlyScenario(pair.legB) },
-    );
+    for (const fixedSeed of GHOST_EVAL_FIXED_SEEDS) {
+      const pair = buildGhostPair(fixture, pairIndex, fixedSeed);
+      assertInversePair(pair);
+      const manifest = { ...pair.manifest, playerControllers: GHOST_EVAL_CONTROLLERS };
+      manifests.push(manifest);
+      episodes.push(
+        {
+          id: `${manifest.pairId}-leg-a`,
+          splitGroupId: manifest.pairId,
+          scenario: combatOnlyScenario(pair.legA),
+        },
+        {
+          id: `${manifest.pairId}-leg-b`,
+          splitGroupId: manifest.pairId,
+          scenario: combatOnlyScenario(pair.legB),
+        },
+      );
+    }
   }
   return { version: 1, manifests, batch: { version: 1, episodes } };
 }
@@ -55,7 +66,9 @@ function main() {
     writeFileSync(join(outputDir, `${manifest.pairId}-manifest.json`), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   writeFileSync(join(outputDir, `${prefix}-batch.json`), `${JSON.stringify(built.batch, null, 2)}\n`);
-  console.log(`${prefix}: ${built.manifests.length} inverse pairs, ${built.batch.episodes.length} battle legs`);
+  console.log(
+    `${prefix}: ${pairCountRaw} roster pairs x ${GHOST_EVAL_FIXED_SEEDS.length} seeds, ${built.batch.episodes.length} battle legs`,
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

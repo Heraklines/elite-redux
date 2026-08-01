@@ -2,3 +2,4 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.10.0+cpu
 safetensors==0.8.0
+lz4==4.4.5

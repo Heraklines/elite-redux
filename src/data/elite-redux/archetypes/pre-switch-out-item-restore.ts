@@ -104,3 +104,7 @@ export class PreSwitchOutItemRestoreAbAttr extends PreSwitchOutAbAttr {
     }
   }
 }
+
+export function erRetrieverOriginalHeldItems(pokemon: Pokemon): readonly PokemonHeldItemModifier[] {
+  return retrieverOriginalHeldItems.get(pokemon) ?? [];
+}
