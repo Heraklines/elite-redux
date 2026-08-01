@@ -4691,5 +4691,135 @@
     "trainerSprite": "red_masters_ex",
     "victoryDialogue": "...",
     "weight": 5
+  },
+  "TRAINER_70027": {
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "You truly have a kind heart...one that resonates with others.",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": false,
+    "id": 70027,
+    "introDialogue": "My name is N. I will show you that my love for my friends permeates every cell of my body. Behold!",
+    "maxWave": 199,
+    "minWave": 191,
+    "name": "N",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 1,
+          "formIndex": 0,
+          "species": 10481
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SPELL_TAG"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "BITTER_MALICE",
+          "SHEER_COLD",
+          "DESTINY_BOND"
+        ],
+        "species": 10644
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 1,
+          "formIndex": 0,
+          "species": 644
+        },
+        "level": null,
+        "moves": [
+          "BOLT_STRIKE",
+          "TORCH_SONG",
+          "DRAGON_PULSE",
+          "DRAGON_RUSH"
+        ],
+        "species": 643
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 2,
+          "formIndex": 0,
+          "species": 601
+        },
+        "level": null,
+        "moves": [
+          "SKULL_BASH",
+          "SKY_ATTACK",
+          "ELECTRO_SHOT",
+          "SHIFT_GEAR"
+        ],
+        "species": 521
+      },
+      {
+        "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 571
+        },
+        "level": null,
+        "moves": [
+          "LIQUIDATION",
+          "AXE_KICK",
+          "FLIP_TURN",
+          "SUCKER_PUNCH"
+        ],
+        "species": 10479,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "fusion": {
+          "abilitySlot": 1,
+          "formIndex": 0,
+          "species": 291
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "WHIRLING_STRIKES",
+          "FURY_CUTTER",
+          "PROTECT",
+          "SUBSTITUTE"
+        ],
+        "species": 70022
+      },
+      {
+        "abilitySlot": 2,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 139
+        },
+        "level": null,
+        "moves": [
+          "METEOR_BEAM",
+          "PSYCHIC",
+          "HYDRO_PUMP",
+          "SHELL_SMASH"
+        ],
+        "species": 70001
+      }
+    ],
+    "trainerClass": "BREEDER",
+    "victoryDialogue": "Your Pokémon... It was just saying how much it likes you—and how it's happy to be with you.",
+    "weight": 1
   }
 }
