@@ -37,7 +37,11 @@ interface UiSeam {
   getHandler(): { active: boolean; clear(): void; show(args: unknown[]): void };
 }
 
-type UiHarness = UiSeam & Pick<UI, "getMode" | "retirePresentationMode" | "setModeBounded" | "setModeBoundedWhen">;
+type UiHarness = UiSeam &
+  Pick<
+    UI,
+    "getMode" | "retirePresentationMode" | "setModeBounded" | "setModeBoundedWhen" | "setModeWithoutClearBoundedWhen"
+  >;
 
 describe("co-op bounded UI transition seam", () => {
   let previousScene: BattleScene;
@@ -111,6 +115,27 @@ describe("co-op bounded UI transition seam", () => {
     await Promise.resolve();
     expect(ui.getMode(), "the late fade continuation cannot restore the old transition").toBe(UiMode.PARTY);
     expect(clear).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledOnce();
+  });
+
+  it("force-installs a lost nested party overlay without clearing its underlying reward handler", async () => {
+    const fade = deferred();
+    const { ui, clear, show } = makeUi(fade);
+
+    const result = ui.setModeWithoutClearBoundedWhen(UiMode.PARTY, 25, () => true, {
+      marker: "ability-capsule-target",
+    });
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expect(result).resolves.toBe("forced");
+    expect(ui.getMode()).toBe(UiMode.PARTY);
+    expect(clear, "the reward handler stays alive underneath the nested party selector").not.toHaveBeenCalled();
+    expect(show).toHaveBeenCalledOnce();
+
+    fade.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ui.getMode()).toBe(UiMode.PARTY);
     expect(show).toHaveBeenCalledOnce();
   });
 

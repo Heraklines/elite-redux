@@ -32,8 +32,10 @@ import {
   leaveP33Run,
   requestP33Player,
   respondToP33Request,
+  resumeP33RunAfterReload,
 } from "#data/elite-redux/coop/coop-p33-client";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { isCoopAccountId } from "#data/elite-redux/coop/coop-session-binding";
 import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 import { connectCoopP33Pairing, connectCoopWithCode, coopServerBase } from "#data/elite-redux/coop/coop-webrtc-connect";
 
@@ -246,6 +248,71 @@ export interface CoopLobbyOptions {
   netcodeMode?: CoopNetcodeMode | undefined;
   /** Session semantics that must exist before capability negotiation begins. */
   sessionKind?: CoopSessionKind | undefined;
+  /** Tab-scoped reload handoff; injectable so the full-page lifecycle is deterministic in tests. */
+  p33ReloadResumeStore?: CoopP33ReloadResumeStore;
+}
+
+export interface CoopP33ReloadResumeRecordV1 {
+  readonly version: 1;
+  readonly code: string;
+  readonly accountId: string;
+}
+
+export interface CoopP33ReloadResumeStore {
+  load(): CoopP33ReloadResumeRecordV1 | null;
+  save(record: CoopP33ReloadResumeRecordV1): void;
+  clear(): void;
+}
+
+const COOP_P33_RELOAD_RESUME_KEY = "pokerogue:coop:p33-reload-resume:v1";
+
+function parseP33ReloadResumeRecord(value: unknown): CoopP33ReloadResumeRecordV1 | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Partial<CoopP33ReloadResumeRecordV1>;
+  return record.version === 1
+    && typeof record.code === "string"
+    && record.code.length > 0
+    && record.code.length <= 32
+    && /^[A-Za-z0-9_-]+$/u.test(record.code)
+    && isCoopAccountId(record.accountId)
+    ? { version: 1, code: record.code, accountId: record.accountId }
+    : null;
+}
+
+function browserP33ReloadResumeStore(): CoopP33ReloadResumeStore {
+  return {
+    load: () => {
+      try {
+        const raw = globalThis.sessionStorage?.getItem(COOP_P33_RELOAD_RESUME_KEY);
+        if (raw == null) {
+          return null;
+        }
+        const parsed = parseP33ReloadResumeRecord(JSON.parse(raw) as unknown);
+        if (parsed == null) {
+          globalThis.sessionStorage?.removeItem(COOP_P33_RELOAD_RESUME_KEY);
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    },
+    save: record => {
+      try {
+        globalThis.sessionStorage?.setItem(COOP_P33_RELOAD_RESUME_KEY, JSON.stringify(record));
+      } catch {
+        // Storage may be disabled; the server-side grace/rejoin path remains available in-page.
+      }
+    },
+    clear: () => {
+      try {
+        globalThis.sessionStorage?.removeItem(COOP_P33_RELOAD_RESUME_KEY);
+      } catch {
+        // Best-effort cleanup only.
+      }
+    },
+  };
 }
 
 /** Staging selects P33 explicitly; legacy remains isolated until the Worker promotion is complete. */
@@ -290,6 +357,8 @@ export class CoopLobbyController {
   private readonly connectP33Fn: CoopP33ConnectFn;
   private readonly protocol: CoopLobbyProtocol;
   private readonly p33Dependencies: CoopP33ClientDependencies;
+  private readonly p33ReloadResumeStore: CoopP33ReloadResumeStore;
+  private readonly p33ReloadResumeEnabled: boolean;
   private readonly sessionOptions: CoopLobbySessionOptions;
   private p33Credential: CoopP33LobbyCredentialV1 | null = null;
   /** Lobby v2: the presence id of the player currently asking to join ME (dedupe onRequest). */
@@ -307,6 +376,9 @@ export class CoopLobbyController {
     this.protocol = options.protocol ?? coopLobbyProtocolFromEnv();
     const room = coopLobbyRoomFromEnv();
     this.p33Dependencies = options.p33Dependencies ?? (room == null ? {} : { room });
+    this.p33ReloadResumeStore = options.p33ReloadResumeStore ?? browserP33ReloadResumeStore();
+    // Showdown/tournament intentionally keep their current lockstep lifecycle while classic co-op closes V2.
+    this.p33ReloadResumeEnabled = this.protocol === "p33" && options.sessionKind !== "versus";
     this.sessionOptions = {
       ...(options.netcodeMode == null ? {} : { netcodeMode: options.netcodeMode }),
       ...(options.sessionKind == null ? {} : { kind: options.sessionKind }),
@@ -318,16 +390,14 @@ export class CoopLobbyController {
     coopLog("lobby", `start announce name=${this.name} protocol=${this.protocol}`);
     try {
       if (this.protocol === "p33") {
+        if (await this.tryResumeP33AfterReload()) {
+          return;
+        }
         const announced = await announceToP33Lobby(this.p33Dependencies);
         if (this.stopped) {
           return;
         }
-        this.p33Credential = {
-          presenceId: announced.presenceId,
-          pairingToken: announced.pairingToken,
-          identity: announced.identity,
-        };
-        this.id = announced.presenceId;
+        this.adoptP33Credential(announced);
         if (announced.pairing != null) {
           await this.connectP33(announced.pairing);
           return;
@@ -608,6 +678,9 @@ export class CoopLobbyController {
     if (this.connecting || this.p33Credential == null) {
       return;
     }
+    if (this.p33ReloadResumeEnabled) {
+      this.p33ReloadResumeStore.save({ version: 1, code: pairing.code, accountId: pairing.account.accountId });
+    }
     this.connecting = true;
     this.clearTimer();
     this.callbacks.onConnecting();
@@ -633,5 +706,46 @@ export class CoopLobbyController {
       }
       this.callbacks.onError(message(error));
     }
+  }
+
+  /** Resume one exact paired run before attempting to mint a second presence for this account. */
+  private async tryResumeP33AfterReload(): Promise<boolean> {
+    const reloadResume = this.p33ReloadResumeEnabled ? this.p33ReloadResumeStore.load() : null;
+    if (reloadResume == null) {
+      return false;
+    }
+    try {
+      coopLog("lobby", `start reload-rejoin code=${reloadResume.code}`);
+      const resumed = await resumeP33RunAfterReload(reloadResume.code, this.p33Dependencies);
+      if (this.stopped) {
+        return true;
+      }
+      if (resumed.identity.accountId !== reloadResume.accountId) {
+        this.p33ReloadResumeStore.clear();
+        throw new Error("co-op reload rejoin changed the retained account identity");
+      }
+      this.adoptP33Credential(resumed);
+      await this.connectP33(resumed.pairing);
+      return true;
+    } catch (error) {
+      if (!(error instanceof CoopP33HttpError) || ![401, 403, 409].includes(error.status)) {
+        throw error;
+      }
+      coopWarn(
+        "lobby",
+        `reload-rejoin unavailable status=${error.status}; clearing stale tab handoff and announcing normally`,
+      );
+      this.p33ReloadResumeStore.clear();
+      return false;
+    }
+  }
+
+  private adoptP33Credential(credential: CoopP33LobbyCredentialV1): void {
+    this.p33Credential = {
+      presenceId: credential.presenceId,
+      pairingToken: credential.pairingToken,
+      identity: credential.identity,
+    };
+    this.id = credential.presenceId;
   }
 }

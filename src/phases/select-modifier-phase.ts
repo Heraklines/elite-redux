@@ -947,10 +947,36 @@ export class SelectModifierPhase extends BattlePhase {
       coopLog("party", `WATCHER openCheckTeam SHORT-CIRCUIT seq=${this.coopInteractionStart} (stays on watch loop)`);
       return true;
     }
-    globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
+    this.openRewardPartySurface(PartyUiMode.CHECK, -1, () => {
       this.resetModifierSelect(modifierSelectCallback);
     });
     return true;
+  }
+
+  /**
+   * Open a reward-owned PARTY child without retiring the shop handler underneath it. In co-op the
+   * ordinary Phaser fade is not a correctness boundary: a throttled/lost delayed callback previously
+   * left MODIFIER_SELECT visible with its one-shot action latch already consumed. Bound the transition
+   * to this exact phase so every party-target reward either becomes actionable or fails the shared
+   * session explicitly instead of parking forever.
+   */
+  private openRewardPartySurface(...args: any[]): void {
+    const ui = this.coopOwningScene.ui;
+    if (!this.coopOwningScene.gameMode.isCoop) {
+      void ui.setModeWithoutClear(UiMode.PARTY, ...args);
+      return;
+    }
+    const stillOwnsSurface = (): boolean =>
+      this.coopOwningScene.currentBattle != null && this.coopOwningScene.phaseManager.getCurrentPhase() === this;
+    const transition = ui.setModeWithoutClearBoundedWhen(UiMode.PARTY, 2_000, stillOwnsSurface, ...args);
+    void transition.then(result => {
+      this.coopResumeOnOwningRuntime(() => {
+        coopLog("reward", `nested PARTY transition ${result} phaseCurrent=${stillOwnsSurface()}`);
+        if (result === "superseded" && stillOwnsSurface()) {
+          failCoopSharedSession("A reward-owned party selector could not install its exact UI control surface");
+        }
+      });
+    });
   }
 
   /**
@@ -969,8 +995,7 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Transfer modifiers among party pokemon
   private openModifierTransferScreen(modifierSelectCallback: ModifierSelectCallback) {
-    globalScene.ui.setModeWithoutClear(
-      UiMode.PARTY,
+    this.openRewardPartySurface(
       PartyUiMode.MODIFIER_TRANSFER,
       -1,
       (fromSlotIndex: number, itemIndex: number, itemQuantity: number, toSlotIndex: number) => {
@@ -1371,8 +1396,7 @@ export class SelectModifierPhase extends BattlePhase {
       }
       return;
     }
-    globalScene.ui.setModeWithoutClear(
-      UiMode.PARTY,
+    this.openRewardPartySurface(
       PartyUiMode.SPLICE,
       -1,
       (fromSlotIndex: number, spliceSlotIndex: number) => {
@@ -1446,8 +1470,7 @@ export class SelectModifierPhase extends BattlePhase {
       }
       return;
     }
-    globalScene.ui.setModeWithoutClear(
-      UiMode.PARTY,
+    this.openRewardPartySurface(
       partyUiMode,
       -1,
       (slotIndex: number, option: PartyOption) => {

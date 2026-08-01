@@ -14822,7 +14822,9 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "player's alternation turn, have the OWNER use the Ability Capsule and pick an ability; EXPECT\n"
       + "BOTH clients show the SAME ability/innate on that mon, the shop continues for both with NO hang,\n"
       + "and an owner CANCEL re-offers the capsule on both sides. VERIFY no [coop-desync] / no stall.\n"
-      + "(Regression unit test: test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts.)",
+      + "A throttled/lost PARTY fade must also force-open the target selector within two seconds; the old\n"
+      + "MODIFIER_SELECT action latch must never remain visibly frozen after the capsule was accepted.\n"
+      + "(Regressions: coop-ability-picker-relay.test.ts and coop-ui-bounded-transition.test.ts.)",
     setup: () => {
       resetDevOverrides();
       setOverrides({

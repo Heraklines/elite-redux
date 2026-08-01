@@ -6619,3 +6619,24 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Focused run `30666465115` is a second CI-metadata-only red: because the formatter correction was pushed as the next train commit, its exact push base is `4699d8242`, not the earlier `b70c3271f`. Advance the manifest one commit at a time as required by the guard; keep the active fresh-browser run `30666465060` untouched before pushing again.
 - Journey run `30666465060` stopped in its pre-browser navigation source contract because the formatter legitimately split the new assignment across lines while two source-regex assertions still required a literal space. Make those contracts whitespace-tolerant, and declare the exact preceding remote tip `0ed6a18a0` for the next focused push.
 - Exact `657f29306` focused run `30666717716` is green (planner, static, all source/node-pure contracts, affected shard). The push journey `30666717704` found one additional stale assertion in the animations-on test that still named `mysteryProgressBudget`; update it to the renamed `registeredSurfaceProgressBudget`. This is a test-contract red before browser build, not a product or harness runtime failure.
+
+## 2026-08-01 - Live Ability Capsule freeze and page-reload presence collision
+
+- Staging log `2026-08-01T20-47-03-692Z` stayed on `SelectModifierPhase` / `MODIFIER_SELECT` after the
+  owner accepted an Ability Capsule. UI-mirror ordinals remained monotonic, no authoritative reward
+  operation was emitted, and no JavaScript exception occurred. The action latch had been consumed while
+  the nested PARTY fade never installed its handler: a production UI-transition liveness defect, not the
+  prior reward-mirror ordering bug.
+- Every reward-owned PARTY child (capsules, TMs, held-item transfer, fusion, PP/move items, Check Team)
+  now uses a bounded without-clear transition. A lost Phaser callback force-installs the target in two
+  seconds without clearing the underlying reward handler; phase/generation fencing prevents a late fade
+  from overwriting a successor. A focused failure-first regression covers this exact lost-fade shape.
+- Reload logs from both accounts showed the server correctly rejecting a second presence while their
+  paired run remained live. Classic co-op now stores only `{run code, account id}` in tab-scoped
+  `sessionStorage`, mints a fresh identity ticket on re-entry, and invokes the Worker's existing atomic
+  membership-authorized rejoin before announcing. No bearer is persisted. Ended/wrong-account handoffs
+  fail closed, clear, and fall back to normal announce; Showdown/tournament remain on their unchanged
+  lockstep lifecycle.
+- The retained-reward browser proof now accepts the production `skippedObsolete=0` diagnostic field; the
+  previous exact-SHA red was a stale evidence regex, not a product failure. All executable qualification
+  remains remote per `AGENTS.md`; the focused and two-browser reload/capsule journeys are pending dispatch.

@@ -502,9 +502,9 @@ export async function endP33Run(
 }
 
 /** Mint one fresh ticket, then retry the exact rejoin body so a lost response cannot double-increment. */
-export async function rejoinP33Run(
+async function rejoinP33RunInternal(
   code: string,
-  currentCredential: CoopP33LobbyCredentialV1,
+  currentCredential: CoopP33LobbyCredentialV1 | null,
   overrides: CoopP33ClientDependencies = {},
 ): Promise<CoopP33AnnounceResult & { pairing: CoopP33PairingV1 }> {
   const ticket = await acquireTicket(overrides);
@@ -513,15 +513,37 @@ export async function rejoinP33Run(
     throw new CoopP33HttpError("could not create a valid co-op rejoin nonce", 0, "/coop/v3/rejoin");
   }
   const body = JSON.stringify({ code, ticket: ticket.ticket, clientNonce });
-  const response = await exactRetryRequest(
-    "/coop/v3/rejoin",
-    { method: "POST", headers: bearerHeaders(currentCredential.pairingToken, true), body },
-    overrides,
-    120,
-  );
+  // A live transport rejoin authenticates with its current bearer as defense in depth. A full page
+  // reload deliberately has no bearer to retain: the Worker authorizes the fresh account ticket
+  // against immutable run membership before atomically replacing that account's old presence.
+  const headers =
+    currentCredential == null
+      ? new Headers({ "Content-Type": "application/json" })
+      : bearerHeaders(currentCredential.pairingToken, true);
+  const response = await exactRetryRequest("/coop/v3/rejoin", { method: "POST", headers, body }, overrides, 120);
   const credential = validateCredentialBody(response, ticket.identity);
   if (credential.pairing == null || credential.pairing.code !== code) {
     throw new CoopP33HttpError("co-op P33 rejoin returned the wrong run", 502, "/coop/v3/rejoin");
   }
   return { ...credential, pairing: credential.pairing };
+}
+
+/** Rebind an already-running browser session while its current signaling credential is still available. */
+export function rejoinP33Run(
+  code: string,
+  currentCredential: CoopP33LobbyCredentialV1,
+  overrides: CoopP33ClientDependencies = {},
+): Promise<CoopP33AnnounceResult & { pairing: CoopP33PairingV1 }> {
+  return rejoinP33RunInternal(code, currentCredential, overrides);
+}
+
+/**
+ * Rebind after a full page reload. No signaling bearer is persisted across the reload; the fresh
+ * account ticket and the Worker's immutable pair-membership row are the complete authorization.
+ */
+export function resumeP33RunAfterReload(
+  code: string,
+  overrides: CoopP33ClientDependencies = {},
+): Promise<CoopP33AnnounceResult & { pairing: CoopP33PairingV1 }> {
+  return rejoinP33RunInternal(code, null, overrides);
 }

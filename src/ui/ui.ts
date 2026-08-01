@@ -1097,6 +1097,30 @@ export class UI extends Phaser.GameObjects.Container {
     isCurrent: (() => boolean) | undefined,
     ...args: any[]
   ): Promise<"completed" | "forced" | "superseded"> {
+    return this.setModeBoundedInternal(mode, true, timeoutMs, isCurrent, args);
+  }
+
+  /**
+   * Bounded form of {@linkcode setModeWithoutClear}. Nested reward/party overlays must preserve the
+   * underlying shop handler, but they still need the same lost-fade deadline and generation fence as
+   * every other authoritative co-op surface.
+   */
+  setModeWithoutClearBoundedWhen(
+    mode: UiMode,
+    timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+    ...args: any[]
+  ): Promise<"completed" | "forced" | "superseded"> {
+    return this.setModeBoundedInternal(mode, false, timeoutMs, isCurrent, args);
+  }
+
+  private setModeBoundedInternal(
+    mode: UiMode,
+    clear: boolean,
+    timeoutMs: number,
+    isCurrent: (() => boolean) | undefined,
+    args: any[],
+  ): Promise<"completed" | "forced" | "superseded"> {
     // A projector may construct and start an exact successor before PhaseManager publishes it as the
     // current phase. setModeInternal deliberately performs no mutation when that caller fence is false,
     // but its resolved void promise cannot distinguish that refusal from a completed transition. Preserve
@@ -1105,7 +1129,7 @@ export class UI extends Phaser.GameObjects.Container {
     if (isCurrent?.() === false) {
       return Promise.resolve("superseded");
     }
-    const transition = this.setModeInternal(mode, true, false, false, args, isCurrent);
+    const transition = this.setModeInternal(mode, clear, false, false, args, isCurrent);
     const generation = this.modeTransitionGeneration;
     return new Promise(resolve => {
       let settled = false;
@@ -1130,7 +1154,9 @@ export class UI extends Phaser.GameObjects.Container {
           ++this.modeTransitionGeneration;
           try {
             this.normalizeTransitionOverlay();
-            this.getHandler().clear();
+            if (clear) {
+              this.getHandler().clear();
+            }
             this.mode = mode;
             const touchControls = typeof document === "undefined" ? null : document.getElementById("touchControls");
             if (touchControls) {

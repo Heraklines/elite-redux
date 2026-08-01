@@ -4,7 +4,7 @@
  */
 
 import { clearNegotiatedCoopCapabilities } from "#data/elite-redux/coop/coop-capabilities";
-import { CoopLobbyController } from "#data/elite-redux/coop/coop-lobby";
+import { CoopLobbyController, type CoopP33ReloadResumeStore } from "#data/elite-redux/coop/coop-lobby";
 import {
   announceToP33Lobby,
   type CoopP33ClientDependencies,
@@ -20,6 +20,7 @@ import {
   rejoinP33Run,
   requestP33Player,
   respondToP33Request,
+  resumeP33RunAfterReload,
 } from "#data/elite-redux/coop/coop-p33-client";
 import { createFreshCoopP33Context, createFreshCoopSeatMap } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -238,6 +239,33 @@ describe("authenticated P33 browser client", () => {
 
     const stale = baseDependencies(async () => response({ error: "invalid pairing credential" }, 401));
     await expect(fetchP33Lobby(credential, stale)).rejects.toBeInstanceOf(CoopP33HttpError);
+  });
+
+  it("rejoins after a full page reload with a fresh ticket and no persisted signaling bearer", async () => {
+    const calls: { body: string; authorization: string | null }[] = [];
+    const fetcher: typeof fetch = async (_input, init) => {
+      calls.push({
+        body: String(init?.body),
+        authorization: new Headers(init?.headers).get("Authorization"),
+      });
+      return response({
+        presenceId: "p33_reload_rejoined",
+        pairingToken: "C".repeat(43),
+        identity,
+        pairing: pairing({ connectionGeneration: 1 }),
+      });
+    };
+
+    const resumed = await resumeP33RunAfterReload("PAIR33", baseDependencies(fetcher));
+
+    expect(resumed).toMatchObject({
+      presenceId: "p33_reload_rejoined",
+      identity,
+      pairing: { code: "PAIR33", connectionGeneration: 1 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].authorization).toBeNull();
+    expect(JSON.parse(calls[0].body)).toEqual({ code: "PAIR33", ticket: "signed-ticket", clientNonce: nonce });
   });
 
   it("keeps stable seats and authority invariant under reversed invitations", async () => {
@@ -583,6 +611,77 @@ describe("authenticated P33 browser client", () => {
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain("/coop/v3/lobby/announce");
     expect(urls.some(url => /\/coop\/lobby(?!\/announce)/u.test(url))).toBe(false);
+  });
+
+  it("uses the tab-scoped run handoff before announce and reconnects the paired account after reload", async () => {
+    const urls: string[] = [];
+    const store: CoopP33ReloadResumeStore = {
+      load: vi.fn(() => ({ version: 1, code: "PAIR33", accountId: identity.accountId })),
+      save: vi.fn(),
+      clear: vi.fn(),
+    };
+    const dependencies = baseDependencies(async input => {
+      urls.push(String(input));
+      return response({
+        presenceId: "p33_reload_rejoined",
+        pairingToken: "C".repeat(43),
+        identity,
+        pairing: pairing({ connectionGeneration: 1 }),
+      });
+    });
+    const connectP33 = vi.fn().mockResolvedValue({});
+    const onConnected = vi.fn();
+    const onError = vi.fn();
+    const controller = new CoopLobbyController(
+      identity.displayName,
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected, onError },
+      { protocol: "p33", p33Dependencies: dependencies, p33ReloadResumeStore: store, connectP33 },
+    );
+
+    await controller.start();
+
+    expect(urls).toEqual(["https://coop.example.test/coop/v3/rejoin"]);
+    expect(connectP33).toHaveBeenCalledWith(
+      expect.objectContaining({ presenceId: "p33_reload_rejoined", pairingToken: "C".repeat(43) }),
+      expect.objectContaining({ code: "PAIR33", connectionGeneration: 1 }),
+      { p33Dependencies: dependencies },
+    );
+    expect(store.save).toHaveBeenCalledWith({ version: 1, code: "PAIR33", accountId: identity.accountId });
+    expect(store.clear).not.toHaveBeenCalled();
+    expect(onConnected).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("clears an ended tab handoff and falls back to a normal authenticated announce", async () => {
+    const urls: string[] = [];
+    const store: CoopP33ReloadResumeStore = {
+      load: vi.fn(() => ({ version: 1, code: "ENDED33", accountId: identity.accountId })),
+      save: vi.fn(),
+      clear: vi.fn(),
+    };
+    const dependencies = baseDependencies(async input => {
+      const url = String(input);
+      urls.push(url);
+      return url.endsWith("/coop/v3/rejoin")
+        ? response({ error: "run unavailable" }, 409)
+        : response({ presenceId: credential.presenceId, pairingToken: token, identity, pairing: null });
+    });
+    const onError = vi.fn();
+    const controller = new CoopLobbyController(
+      identity.displayName,
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected: vi.fn(), onError },
+      { protocol: "p33", p33Dependencies: dependencies, p33ReloadResumeStore: store },
+    );
+
+    await controller.start();
+
+    expect(urls).toEqual([
+      "https://coop.example.test/coop/v3/rejoin",
+      "https://coop.example.test/coop/v3/lobby/announce",
+    ]);
+    expect(store.clear).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
+    controller.cancel();
   });
 
   it("carries Showdown lockstep axes through the authenticated P33 connector seam", async () => {
