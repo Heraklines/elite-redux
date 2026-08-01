@@ -3413,6 +3413,11 @@ test("a chained biome picker preserves its exact interaction coordinate through 
     /phase\.coopV2BiomeInteractionPin\?\.\(\)[\s\S]*?phasePin >= 0 \? phasePin : coopBiomeInteractionStartValue\(\)/u,
     "the two-engine soak asserts the actual projected phase coordinate before its legacy leaf fallback",
   );
+  assert.match(
+    soakDriver,
+    /hostPinBeforeMap >= 0 && hostPinBeforeMap !== hostCounter[\s\S]*guestPinBeforeMap >= 0 && guestPinBeforeMap !== guestCounter[\s\S]*hostEffectivePin = hostPinBeforeMap >= 0 \? hostPinBeforeMap : hostCounter[\s\S]*guestEffectivePin = guestPinBeforeMap >= 0 \? guestPinBeforeMap : guestCounter[\s\S]*hostEffectivePin !== guestEffectivePin/u,
+    "the soak compares effective map addresses while permitting the authority's valid pre-bind lifecycle state",
+  );
   const readyStart = selectBiomePhase.indexOf("private publishCoopBiomeSurfaceWhenActionable(");
   const readyEnd = selectBiomePhase.indexOf("\n  private ", readyStart + 1);
   assert.notEqual(readyStart, -1, "SelectBiome exposes one bounded public-control proof");

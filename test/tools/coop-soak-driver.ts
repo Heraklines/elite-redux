@@ -2663,14 +2663,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           hostBiomeProjected = true;
           const hostPinBeforeMap = readBiomeInteractionPin(rig.hostCtx);
           const guestPinBeforeMap = readBiomeInteractionPin(rig.guestCtx);
-          if (hostPinBeforeMap !== guestPinBeforeMap) {
-            fail(
-              "desync",
-              transitionSourceWave,
-              `World Map pin diverged host=${hostPinBeforeMap} guest=${guestPinBeforeMap}`,
-            );
-          }
-          const pinnedBeforeMap = hostPinBeforeMap;
           const hostCounter = withClientSync(rig.hostCtx, () => rig.hostRuntime.controller.interactionCounter());
           const guestCounter = withClientSync(rig.guestCtx, () => rig.guestRuntime.controller.interactionCounter());
           if (hostCounter !== guestCounter) {
@@ -2680,7 +2672,37 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
               `World Map opened with divergent counters host=${hostCounter} guest=${guestCounter}`,
             );
           }
-          const interactionPinned = pinnedBeforeMap >= 0 ? pinnedBeforeMap : hostCounter;
+          // The authority's natural SelectBiomePhase owns the current interaction counter but does not bind
+          // coopAdvancePinned until continueCoopBiomePickFlow() opens the public map. The replica is already a
+          // projected V2 successor and therefore carries that same coordinate on the phase. Compare their
+          // effective addresses, while still rejecting any explicit phase/module pin that disagrees with its
+          // local counter. Comparing the raw lifecycle states made a healthy wave-150 pair (-1 vs 178) look
+          // desynced even though both counters, source wave, phase, and eventual operation address agreed.
+          if (hostPinBeforeMap >= 0 && hostPinBeforeMap !== hostCounter) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              `World Map host pin disagreed with its counter pin=${hostPinBeforeMap} counter=${hostCounter}`,
+            );
+          }
+          if (guestPinBeforeMap >= 0 && guestPinBeforeMap !== guestCounter) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              `World Map guest pin disagreed with its counter pin=${guestPinBeforeMap} counter=${guestCounter}`,
+            );
+          }
+          const hostEffectivePin = hostPinBeforeMap >= 0 ? hostPinBeforeMap : hostCounter;
+          const guestEffectivePin = guestPinBeforeMap >= 0 ? guestPinBeforeMap : guestCounter;
+          if (hostEffectivePin !== guestEffectivePin) {
+            fail(
+              "desync",
+              transitionSourceWave,
+              `World Map effective pin diverged host=${hostEffectivePin} guest=${guestEffectivePin}`,
+            );
+          }
+          const pinnedBeforeMap = hostPinBeforeMap;
+          const interactionPinned = hostEffectivePin;
           const hostOwns = withClientSync(rig.hostCtx, () =>
             rig.hostRuntime.controller.isLocalOwnerAtCounter(interactionPinned),
           );
