@@ -216,9 +216,7 @@ describe.skipIf(!RUN)(
           SpeciesId.SNORLAX,
         );
         expect(
-          rig.guestScene
-            .getPlayerField()
-            .filter(mon => mon?.coopOwner === "host" && !mon.isFainted()),
+          rig.guestScene.getPlayerField().filter(mon => mon?.coopOwner === "host" && !mon.isFainted()),
           "the guest sees no active host-owned mon (converged with the host)",
         ).toEqual([]);
       });
