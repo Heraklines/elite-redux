@@ -2021,10 +2021,7 @@ test("recorded turn work suppresses fallback even when the initial TurnStart mar
   const from = { authority: 0, renderer: 0 };
 
   assert.deepEqual(clientsAwaitingTurnProgress(rig, from), []);
-  assert.deepEqual(
-    await driveBattleFallback(rig, ["Space", "ArrowRight", "Space", "Space"], from, "fallback"),
-    [],
-  );
+  assert.deepEqual(await driveBattleFallback(rig, ["Space", "ArrowRight", "Space", "Space"], from, "fallback"), []);
   assert.deepEqual(authority.presses, []);
   assert.deepEqual(renderer.presses, []);
 });
