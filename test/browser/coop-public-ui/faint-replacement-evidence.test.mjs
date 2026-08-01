@@ -42,7 +42,7 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   );
   assert.match(
     harness,
-    /halfWipeFixture = false[\s\S]*?halfWipeFixture[\s\S]*?ZUBAT_SPECIES_ID[\s\S]*?DONDOZO_SPECIES_ID/u,
+    /halfWipeFixture = false[\s\S]*?halfWipeFixture[\s\S]*?ZUBAT_SPECIES_ID[\s\S]*?PSYDUCK_SPECIES_ID/u,
     "the driver confirms the exact visible teams before spending battle input",
   );
   assert.match(
