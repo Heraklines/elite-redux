@@ -3672,12 +3672,9 @@ export async function driveGuestReplayTurn(
   const rendererCtx = peerCtx == null ? undefined : peerContextByScene.get(peerCtx.scene);
   const inRenderer = async <T>(fn: () => T | Promise<T>): Promise<T> =>
     rendererCtx == null ? await fn() : await withClient(rendererCtx, fn);
-  const inRendererSync = <T>(fn: () => T): T =>
-    rendererCtx == null ? fn() : withClientSync(rendererCtx, fn);
+  const inRendererSync = <T>(fn: () => T): T => (rendererCtx == null ? fn() : withClientSync(rendererCtx, fn));
 
-  await inRenderer(() =>
-    maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false),
-  );
+  await inRenderer(() => maybeSealHostRetainedWaveBoundary(guestScene, options.sealRetainedWaveBoundary !== false));
   // Production-transition journeys arrive here through the guest's real TurnStartPhase, which has already
   // queued and selected CoopReplayTurnPhase. Reuse that CURRENT object so its end() advances the same phase
   // tree (Victory/reward/NewBattle tails cannot be stranded behind an unrelated constructor phase). A
@@ -3717,14 +3714,14 @@ export async function driveGuestReplayTurn(
       }
     }
   });
-  if (!replayStarted) {
+  if (replayStarted) {
+    await inRenderer(() => drainLoopback());
+  } else {
     manuallyStartedDuoPhases.add(replay);
     await inRenderer(async () => {
       replay.start();
       await drainLoopback();
     });
-  } else {
-    await inRenderer(() => drainLoopback());
   }
   // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
   // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
