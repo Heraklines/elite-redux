@@ -219,6 +219,10 @@ const starterHandler = await readFile(
   new URL("../../../src/ui/handlers/starter-select-ui-handler.ts", import.meta.url),
   "utf8",
 );
+const selectStarterPhase = await readFile(
+  new URL("../../../src/phases/select-starter-phase.ts", import.meta.url),
+  "utf8",
+);
 const webRtcTransport = await readFile(
   new URL("../../../src/data/elite-redux/coop/coop-webrtc-transport.ts", import.meta.url),
   "utf8",
