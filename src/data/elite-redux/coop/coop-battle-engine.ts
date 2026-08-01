@@ -5057,6 +5057,31 @@ export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined,
     if (authoritativeGuest && localField.some(s => s.heldItems !== undefined)) {
       globalScene.updateModifiers(true);
       globalScene.updateModifiers(false);
+      // updateModifiers is not presentation-only: it recalculates stat-bearing held-item effects and can
+      // overwrite the explicit max-HP authority that applyFullMon installed above. That exact ordering left
+      // a wave-44 renderer at 79 max HP after accepting the host's 76, so TURN_COMMIT never converged and
+      // the subsequent WAVE_ADVANCE/reward entries remained behind a permanent revision gap. Reassert the
+      // immutable HP material after the final modifier refresh, matching the ordinary authoritative-state
+      // projector's final-stat boundary.
+      for (const snap of localField) {
+        const mon = byIndex.get(snap.bi);
+        if (mon == null) {
+          continue;
+        }
+        if (typeof snap.maxHp === "number" && snap.maxHp > 0 && mon.getMaxHp() !== Math.trunc(snap.maxHp)) {
+          coopWarn(
+            "resync",
+            `post-modifier maxhp force bi=${snap.bi} host=${Math.trunc(snap.maxHp)} guest=${mon.getMaxHp()}`,
+          );
+          mon.setStat(Stat.HP, Math.trunc(snap.maxHp));
+        }
+        const wantHp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
+        if (mon.hp !== wantHp) {
+          coopWarn("heal", `post-modifier hp force bi=${snap.bi} host=${wantHp} guest=${mon.hp}`);
+          mon.hp = wantHp;
+        }
+        void mon.updateInfo();
+      }
     }
   } catch (error) {
     // The caller drains this structured failure and requests/awaits a complete retry. Swallowing it here

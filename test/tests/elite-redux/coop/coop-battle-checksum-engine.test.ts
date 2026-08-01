@@ -32,6 +32,7 @@ import { DisabledTag, EncoreTag, ErBleedTag, ErFearTag, ErFrostbiteTag, Substitu
 import { modifierTypes } from "#data/data-lists";
 import {
   applyCoopAuthoritativeBattleState,
+  applyCoopFieldSnapshot,
   applyCoopFullSnapshot,
   captureCoopAuthoritativeBattleState,
   captureCoopCheckpoint,
@@ -54,6 +55,7 @@ import { MoveResult } from "#enums/move-result";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import type { PersistentModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonData } from "#system/pokemon-data";
@@ -495,6 +497,33 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     // hp now clamps to the FORCED max (not the lower natural one), so the host's hp value applied.
     expect(guestMon.hp, "hp clamps correctly to the forced (host) max").toBe(forcedMaxHp);
     expect(sawMaxHpWarn, "a loud [coop-maxhp] warn surfaces the upstream stat divergence").toBe(true);
+  });
+
+  it("keeps full-field maxHp authority after the held-item modifier refresh", async () => {
+    const field = await startCoopDouble();
+    const guestMon = field[COOP_GUEST_FIELD_INDEX];
+    const naturalMaxHp = guestMon.getMaxHp();
+    const snapshot = captureCoopFullSnapshot();
+    expect(snapshot).not.toBeNull();
+    const forcedMaxHp = naturalMaxHp + 30;
+    const fullField = snapshot!.field.map(mon =>
+      mon.bi === guestMon.getBattlerIndex() ? { ...mon, maxHp: forcedMaxHp, hp: forcedMaxHp } : mon,
+    );
+
+    // Model the production failure: updateModifiers is invoked after applyFullMon and recomputes the local
+    // HP stat, erasing the signed host ceiling. The field projector must make the immutable HP material the
+    // final write, not let a nominal render-bar refresh silently win authority.
+    const updateModifiers = vi.spyOn(globalScene, "updateModifiers").mockImplementation(() => {
+      guestMon.setStat(Stat.HP, naturalMaxHp);
+    });
+    try {
+      applyCoopFieldSnapshot(fullField, true);
+    } finally {
+      updateModifiers.mockRestore();
+    }
+
+    expect(guestMon.getMaxHp(), "modifier refresh cannot overwrite the authoritative maxHp").toBe(forcedMaxHp);
+    expect(guestMon.hp, "current HP is re-clamped against the final authoritative ceiling").toBe(forcedMaxHp);
   });
 
   // GAP 4 (#633): the snapshot carries the player party order but did not rewrite it; a bench-order
