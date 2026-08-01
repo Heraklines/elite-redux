@@ -58,6 +58,10 @@ function main() {
     console.error(`invalid smoke dataset: ${decisions.length} decisions, ${terminals.length} terminals`);
     process.exit(1);
   }
+  if (decisions.some(row => row.policySource !== "smart-default-v1" || row.policyTarget !== false)) {
+    console.error("capture smoke contains an invalid policy source or policy target");
+    process.exit(1);
+  }
   if (decisions.some(row => row.observation.opponentActive.some(mon => mon.heldItems !== null))) {
     console.error("opponent held-item leakage detected");
     process.exit(1);

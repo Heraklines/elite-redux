@@ -954,11 +954,32 @@ function appendCommittedDecision(options: AppendCommittedDecisionOptions): ErCom
   return captured.chosen;
 }
 
+function preparePlayerDecisionObservations(game: GameManager): Map<number, ErCombatDecisionRecord["observation"]> {
+  if (!AI_DATA_OUT || AI_RECORD_ENGINE_BASELINE) {
+    return new Map();
+  }
+  return new Map(
+    game.scene
+      .getPlayerField()
+      .map((actor, actorSlot) =>
+        actor?.isActive(true) && !actor.isFainted() && !slotCommandIsAutomatic(game, actor)
+          ? ([actorSlot, snapshotErCombatObservation(game.scene)] as const)
+          : null,
+      )
+      .filter((entry): entry is readonly [number, ErCombatDecisionRecord["observation"]] => entry != null),
+  );
+}
+
 /** Record only commands accepted by the real player CommandPhase. */
-function recordCommittedPlayerTurn(game: GameManager, metadata: PolicyCaptureMetadata): void {
+async function recordCommittedPlayerTurn(
+  game: GameManager,
+  metadata: PolicyCaptureMetadata,
+  observations: ReadonlyMap<number, ErCombatDecisionRecord["observation"]>,
+): Promise<void> {
   if (!AI_DATA_OUT || AI_RECORD_ENGINE_BASELINE) {
     return;
   }
+  await game.phaseInterceptor.to("EnemyCommandPhase", false);
   const scene = game.scene;
   const jointActionId = `${activeAiEpisodeId}:${scene.currentBattle.waveIndex}:${scene.currentBattle.turn}`;
   const earlier: ErCombatEarlierChoice[] = [];
@@ -967,7 +988,7 @@ function recordCommittedPlayerTurn(game: GameManager, metadata: PolicyCaptureMet
     if (!actor?.isActive(true) || actor.isFainted()) {
       continue;
     }
-    const observation = snapshotErCombatObservation(scene);
+    const observation = observations.get(actorSlot) ?? snapshotErCombatObservation(scene);
     const candidates = enumerateErCombatCandidates(scene, actorSlot, earlier);
     const chosen = appendCommittedDecision({
       game,
@@ -1722,6 +1743,7 @@ async function playBattle(
     for (let turn = 1; turn <= opts.maxTurns; turn++) {
       turnsPlayed++;
       console.log(`\n=== WAVE ${wave} TURN ${turn} (wave ${game.scene.currentBattle?.waveIndex}) ===`);
+      const playerDecisionObservations = preparePlayerDecisionObservations(game);
       const scriptedAction = opts.script?.[turn - 1];
       const action =
         scriptedAction
@@ -1742,7 +1764,7 @@ async function playBattle(
               ? { policySource: "first-usable", policyTarget: false }
               : { policySource: "forced-move", policyTarget: false };
       doPlayerActions(game, action, opts.forcedMove ?? null, actionLog);
-      recordCommittedPlayerTurn(game, captureMetadata);
+      await recordCommittedPlayerTurn(game, captureMetadata, playerDecisionObservations);
       if (action && hasEnemyForce(action)) {
         await forceEnemyActions(game, action, actionLog);
       }
@@ -3112,6 +3134,7 @@ async function playWaveTurns(
     }
     // Scripted action for this turn; else force the requested move; else pick the best
     // damaging move per slot (so type immunities don't wall an otherwise-winnable wave).
+    const playerDecisionObservations = preparePlayerDecisionObservations(game);
     const scriptedAction = opts.script?.[turn - 1];
     const action = scriptedAction ?? (opts.forcedMove == null ? await unattendedPolicyAction(game) : undefined);
     const captureMetadata: PolicyCaptureMetadata = scriptedAction
@@ -3120,7 +3143,7 @@ async function playWaveTurns(
         ? unattendedPolicyMetadata()
         : { policySource: "forced-move", policyTarget: false };
     doPlayerActions(game, action, opts.forcedMove ?? null, st.log);
-    recordCommittedPlayerTurn(game, captureMetadata);
+    await recordCommittedPlayerTurn(game, captureMetadata, playerDecisionObservations);
     if (action && hasEnemyForce(action)) {
       if (AI_RECORD_ENGINE_BASELINE) {
         throw new Error("engine-hardest baseline capture cannot label a scripted enemy command");

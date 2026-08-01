@@ -182,7 +182,7 @@ jobs:
           ER_AI_DICTIONARY_HASH: ${{ needs.identity.outputs.dictionary_hash }}
         run: >-
           node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
-          --turns 80 --real-rng
+          --turns 80 --real-rng --ai-policy smart-default
           --json-out "ai-work/result-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/decisions-${{ matrix.shard }}.jsonl"
       - name: Upload immutable shard
@@ -213,7 +213,7 @@ jobs:
       - name: Run without capture
         run: >-
           node scripts/run-combat-batch.mjs @ai-neutral/batch.json
-          --turns 20 --real-rng
+          --turns 20 --real-rng --ai-policy smart-default
           --json-out ai-neutral/without-capture.json
       - name: Run with capture
         env:
@@ -222,7 +222,7 @@ jobs:
           ER_AI_DICTIONARY_HASH: capture-neutrality-smoke
         run: >-
           node scripts/run-combat-batch.mjs @ai-neutral/batch.json
-          --turns 20 --real-rng
+          --turns 20 --real-rng --ai-policy smart-default
           --json-out ai-neutral/with-capture.json
           --ai-data-out ai-neutral/decisions.jsonl
       - name: Assert capture neutrality and visibility boundary
