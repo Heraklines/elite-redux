@@ -7,8 +7,10 @@ import {
   coopSessionGeneration,
   failCoopSharedSession,
   getCoopController,
+  isAuthoritativeBattleSession,
   retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
+import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
@@ -520,6 +522,16 @@ export class NewBattlePhase extends BattlePhase {
     globalScene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
 
     const sourceWave = globalScene.currentBattle?.waveIndex ?? -1;
+    const controller = getCoopController();
+    if (sourceWave >= 0 && isAuthoritativeBattleSession() && controller?.role === "host") {
+      // `newBattle()` advances currentBattle before it narrates expiring arena tags. If the prior battle
+      // ended through a replacement-only tail, its recorder can still be open at the old turn. Recording
+      // that narration there makes the live emitter combine the NEW wave with the OLD turn; the renderer
+      // correctly rejects the cross-address packet and silently misses lines such as Sticky Web expiring.
+      // Open the destination entry prefix first. InitEncounter/Summon/TurnStart use this same scope and
+      // preserve it, so every transition cue is ordered ahead of the destination command frontier.
+      beginCoopRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
+    }
     globalScene.newBattle();
 
     if (!this.routeCommittedHostBiomeEncounter(sourceWave)) {

@@ -776,7 +776,6 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
       && observation.seatsWithInput?.length === 1
       && !observation.seatsWithInput.includes(client.publicSeat)
       && observation.ready?.handlerActive === true
-      && observation.ready?.awaitingActionInput === false
       && observation.ready?.inputBlocked !== true;
     const partnerWaiting =
       observation.surfaceId === "battle:message"
@@ -3930,7 +3929,6 @@ export function hasProvisionalCommandWatcherSurface(clients, cursors) {
       && observation.seatsWithInput?.length === 1
       && !observation.seatsWithInput.includes(client.publicSeat)
       && observation.ready?.handlerActive === true
-      && observation.ready?.awaitingActionInput === false
       && observation.ready?.inputBlocked !== true;
     return event?.index === latest?.index && (replayWait || partnerCommandWait);
   });

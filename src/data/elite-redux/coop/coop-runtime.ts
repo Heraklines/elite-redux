@@ -408,6 +408,7 @@ import {
   COOP_MAX_REACHABLE_COUNTER,
   COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
+  COOP_QUIZ_CHOICE_KINDS,
   COOP_ME_SUB_CHOICE_KINDS,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
@@ -416,6 +417,7 @@ import {
   COOP_REWARD_CHOICE_KINDS,
   COOP_STORMGLASS_CHOICE_KINDS,
   COOP_STORMGLASS_SEQ,
+  coopQuizAnswerSeq,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import {
   coopFieldIndexOf,
@@ -5671,6 +5673,7 @@ export interface CoopV2AuthorityProposalWaitSpec {
 export function coopV2AuthorityProposalWaitSpec(
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" }>,
   plan: CoopV2InteractionProjectionPlan,
+  requestedRelaySequence?: number,
 ): CoopV2AuthorityProposalWaitSpec | null {
   const parsed = parseCoopOperationId(control.operationId);
   switch (plan.kind) {
@@ -5716,9 +5719,27 @@ export function coopV2AuthorityProposalWaitSpec(
       if (control.surfaceClass === "op:catchFull" && control.operationKind === "CATCH_FULL") {
         return { relaySequence: COOP_ME_PUMP_SEQ_BASE + plan.pinned, acceptedKinds: COOP_ME_SUB_CHOICE_KINDS };
       }
+      if (control.surfaceClass === "op:me" && control.operationKind === "QUIZ_ANSWER") {
+        // A quiz presentation owns one closed family of per-question proposal addresses. Projection asks
+        // without a concrete sequence and receives the first address as its canonical proof that this is a
+        // remote-input control. The real relay wait supplies its current question sequence; accept it only
+        // when that sequence is one of the immutable streamed questions. This keeps later questions exact
+        // without widening the 8.5M family to unrelated counters or indices.
+        const questionCount = plan.presentation.subPrompt?.kind === "quiz"
+          ? Math.min(plan.presentation.subPrompt.questions.length, 16)
+          : 0;
+        if (questionCount === 0) {
+          return null;
+        }
+        const questionSequences = Array.from({ length: questionCount }, (_, index) =>
+          coopQuizAnswerSeq(plan.pinned, index),
+        );
+        const relaySequence = requestedRelaySequence ?? questionSequences[0];
+        return questionSequences.includes(relaySequence)
+          ? { relaySequence, acceptedKinds: COOP_QUIZ_CHOICE_KINDS }
+          : null;
+      }
       if (control.surfaceClass !== "op:me" || control.operationKind !== "ME_PRESENT") {
-        // The quiz sub-prompt arms an op:me / QUIZ_ANSWER control and drives its own session on the distinct
-        // quiz seq, so it never awaits on this pump seq.
         return null;
       }
       // The armed ME presentation decides which relayed pick kind the authority legitimately awaits on the ME
@@ -5786,7 +5807,7 @@ function resolveCoopV2AuthorityProposalControlId(
   }
   const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
   const plan = sourceEntry == null ? null : projectionPlanOfCoopV2InteractionEntry(sourceEntry);
-  const expected = plan == null ? null : coopV2AuthorityProposalWaitSpec(control, plan);
+  const expected = plan == null ? null : coopV2AuthorityProposalWaitSpec(control, plan, wait.relaySequence);
   return expected != null
     && wait.relaySequence === expected.relaySequence
     && sameOrderedStrings(wait.acceptedKinds, expected.acceptedKinds)

@@ -363,6 +363,47 @@ test("between-wave completion accepts an exact partner-command wait after one ha
   assert.equal(allClientsAtCurrentCommandFrontier([waiting, owner], { waiting: 0, owner: 0 }), true);
 });
 
+test("a partner-command watcher remains remote-owned when the generic message handler awaits input", () => {
+  const waiting = fakeClient("waiting");
+  waiting.publicSeat = 0;
+  waiting.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "MESSAGE",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      // The UI handler can report an armed MESSAGE callback even though the typed seat list proves that
+      // only the partner may act. Run 30687253590 reached this exact healthy wave-5 frontier.
+      ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: null },
+    },
+  });
+  const owner = fakeClient("owner");
+  owner.publicSeat = 1;
+  owner.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:command",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "COMMAND",
+      localSeat: 1,
+      seatsWithInput: [1],
+      ready: { handlerActive: true },
+    },
+  });
+
+  const clients = [waiting, owner];
+  const cursors = { waiting: 0, owner: 0 };
+  assert.equal(hasProvisionalCommandWatcherSurface(clients, cursors), true);
+  assert.equal(allClientsAtCurrentCommandFrontier(clients, cursors), true);
+});
+
 test("a one-sided next-wave command does not preempt its partner's current learn-move continuation", () => {
   const host = fakeClient("host");
   host.publicSeat = 0;

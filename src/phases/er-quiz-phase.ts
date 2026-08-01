@@ -391,7 +391,7 @@ export class ErQuizPhase extends Phase {
    * remotely (a duplicate resolution is dropped).
    */
   private armRemoteAnswer(): void {
-    const remote = coopQuizAwaitRemoteAnswer(this.index);
+    const remote = coopQuizAwaitRemoteAnswer(this.index, this.coopV2ControlOperationId);
     if (remote) {
       const forIndex = this.index;
       void remote.then(c => {

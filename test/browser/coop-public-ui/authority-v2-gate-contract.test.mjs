@@ -31,6 +31,7 @@ const battleStream = readFileSync(new URL("src/data/elite-redux/coop/coop-battle
 const turnRecorder = readFileSync(new URL("src/data/elite-redux/coop/coop-turn-recorder.ts", root), "utf8");
 const turnCutover = readFileSync(new URL("src/data/elite-redux/coop/authority-v2/cutover-turn.ts", root), "utf8");
 const meOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-me-operation.ts", root), "utf8");
+const quizMirror = readFileSync(new URL("src/data/elite-redux/coop/coop-quiz-mirror.ts", root), "utf8");
 const meTerminalValidator = readFileSync(
   new URL("src/data/elite-redux/coop/coop-me-terminal-validator.ts", root),
   "utf8",
@@ -2724,6 +2725,21 @@ test("every relay-driven remote interaction derives one exact authority proposal
     "nested Mystery reward waits cannot attest the wrong surface at a reused sequence",
   );
   assert.match(
+    spec,
+    /control\.operationKind === "QUIZ_ANSWER"[\s\S]*?questions\.length[\s\S]*?coopQuizAnswerSeq\(plan\.pinned, index\)[\s\S]*?questionSequences\.includes\(relaySequence\)/u,
+    "a streamed quiz authorizes only the immutable session's per-question 8.5M proposal addresses",
+  );
+  assert.match(
+    erQuizPhase,
+    /coopQuizAwaitRemoteAnswer\(this\.index, this\.coopV2ControlOperationId\)/u,
+    "the live quiz phase carries its immutable presentation address into every remote-answer wait",
+  );
+  assert.match(
+    quizMirror,
+    /control\.operationId === expectedControlOperationId[\s\S]*?control\.operationKind === "QUIZ_ANSWER"[\s\S]*?v2ControlLedger\.isMaterialApplied\(control\)[\s\S]*?awaitInteractionChoice\([\s\S]*?authorityControlOperationId/u,
+    "the authority defers quiz ingress until the global ledger proves the exact typed successor",
+  );
+  assert.match(
     interactionRelay,
     /awaitInteractionOutcomeProposal\([\s\S]*?resolveV2AuthorityProposalControlId\([\s\S]*?projectV2AuthorityProposalWait\(authorityWait\)/u,
     "complete Bargain outcomes use the same address-exact control proof as small choice proposals",
@@ -3422,6 +3438,26 @@ test("a chained biome picker preserves its exact interaction coordinate through 
     soakDriver,
     /guestCurrent\?\.phaseName === "CoopReplayTurnPhase"[\s\S]*startCurrentDuoPhaseOnce\(rig\.guestScene, guestCurrent\)[\s\S]*headless scheduler started replacement-installed retained replay/u,
     "the headless soak starts a production-installed retained replay exactly once before reciprocal command rendezvous",
+  );
+  assert.match(
+    soakDriver,
+    /guestCommandRequired && guestCommand != null[\s\S]*projectedReplay\?\.phaseName !== "CoopReplayTurnPhase"[\s\S]*post-replacement guest command[\s\S]*markRealGuestCommandBoundary\(rig\.guestScene, wave, turn\)[\s\S]*pumpDuoDestinations\(rig, 2\)/u,
+    "the headless soak crosses a replacement command's retained presentation before judging the reciprocal rendezvous",
+  );
+  assert.match(
+    soakDriver,
+    /const replay = withClient\(rig\.guestCtx,[\s\S]*settleDuoPromise\(rig, replay,[\s\S]*describeAwaitedInteractions\(\)[\s\S]*wait\.expectedKinds\[0\] === "switch"[\s\S]*picker\.pick\(picker\.slot, 0\)/u,
+    "the one-process soak lets the authority install its real replacement waiter before the guest's public pick",
+  );
+  assert.match(
+    newBattlePhase,
+    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]*?beginCoopRecording\(1, `\$\{controller\.sessionEpoch\}:\$\{sourceWave \+ 1\}`\);[\s\S]*?globalScene\.newBattle\(\);/u,
+    "the authority opens the destination presentation scope before newBattle narrates transition cleanup",
+  );
+  assert.match(
+    campaignDriver,
+    /const partnerCommandWatcher =[\s\S]*?!observation\.seatsWithInput\.includes\(client\.publicSeat\)[\s\S]*?handlerActive === true[\s\S]*?inputBlocked !== true;/u,
+    "the browser oracle keys partner-command ownership from seatsWithInput, not a generic MESSAGE callback flag",
   );
   assert.match(
     soakDriver,

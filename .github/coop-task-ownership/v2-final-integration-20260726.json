@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "2353c289a9e2dd474c4387d9a0536ddb3486ab0e",
+  "baseSha": "fc194a9f050d9ba7f6927ff82a11e0fd5104ca21",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -145,6 +145,7 @@
     "src/phases/coop-wave-progression-replay-phase.ts",
     "src/phases/egg-hatch-phase.ts",
     "src/phases/encounter-phase.ts",
+    "src/phases/er-quiz-phase.ts",
     "src/phases/er-ability-capsule-phase.ts",
     "src/phases/er-crossroads-phase.ts",
     "src/phases/er-custom-trainer-install.ts",

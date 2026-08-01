@@ -76,6 +76,18 @@ export { COOP_ME_QUIZ_SEQ_BASE, coopQuizAnswerSeq };
 const COOP_QUIZ_WAIT_MS = 1_200_000;
 
 /**
+ * Connected synchronization ceiling for the authority's locally-authored quiz presentation to enter the
+ * global V2 log and install its typed QUIZ_ANSWER successor. This time is not charged to the remote human's
+ * answer window. A missing successor fails closed instead of manufacturing an ambient relay wait.
+ */
+const COOP_QUIZ_CONTROL_WAIT_MS = 300_000;
+const COOP_QUIZ_CONTROL_POLL_MS = 25;
+
+function delayQuizControlPoll(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, COOP_QUIZ_CONTROL_POLL_MS));
+}
+
+/**
  * #818: base seq for the owner->follower per-QUESTION answer relay. Deliberately its OWN band
  * (8_500_000), disjoint from the 8_000_000 ME pump / present channel and below the 9_000_000
  * terminal seq family, so a quiz answer can never FIFO-collide with the session stream, the
@@ -161,7 +173,10 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
  * the drive / null side (the caller then takes local input as usual). The caller owns the double-fire
  * guard - a stale resolution must never answer a later question.
  */
-export function coopQuizAwaitRemoteAnswer(index: number): Promise<number> | null {
+export function coopQuizAwaitRemoteAnswer(
+  index: number,
+  expectedControlOperationId: string | null = null,
+): Promise<number> | null {
   if (coopQuizSide() !== "follow") {
     return null;
   }
@@ -176,13 +191,62 @@ export function coopQuizAwaitRemoteAnswer(index: number): Promise<number> | null
   const controller = getCoopController();
   const generation = coopSessionGeneration();
   coopLog("me", `quiz FOLLOW arm remote-answer wait index=${index} seq=${seq} counter=${counter} (#818)`);
-  return relay.awaitInteractionChoice(seq, COOP_QUIZ_WAIT_MS, COOP_QUIZ_CHOICE_KINDS).then(a => {
+  const boundaryStillLive = (): boolean =>
+    globalScene === scene
+    && getCoopRuntime() === runtime
+    && getCoopController() === controller
+    && coopSessionGeneration() === generation
+    && coopMeInteractionStartValue() === counter;
+  const awaitAddressedAnswer = async (): Promise<Awaited<ReturnType<typeof relay.awaitInteractionChoice>>> => {
+    let authorityControlOperationId: string | undefined;
+    const v2AuthorityFollower =
+      isCoopV2InteractionCutoverActive(runtime?.durability ?? null)
+      && controller?.authorityRole === "authority"
+      && controller.localSeatId === controller.authoritySeatId;
+    if (v2AuthorityFollower) {
+      if (expectedControlOperationId == null || expectedControlOperationId.length === 0) {
+        failCoopSharedSession(`Quiz answer ${index} has no immutable V2 presentation address`);
+        return new Promise<never>(() => undefined);
+      }
+      const deadline = Date.now() + COOP_QUIZ_CONTROL_WAIT_MS;
+      while (boundaryStillLive() && Date.now() < deadline) {
+        const control = runtime?.v2ControlLedger.latestControl;
+        if (
+          control?.kind === "SHARED_INTERACTION"
+          && control.operationId === expectedControlOperationId
+          && control.surfaceClass === "op:me"
+          && control.operationKind === "QUIZ_ANSWER"
+          && control.ownerSeatId !== controller.localSeatId
+          && runtime?.v2ControlLedger.isMaterialApplied(control)
+        ) {
+          authorityControlOperationId = control.operationId;
+          break;
+        }
+        await delayQuizControlPoll();
+      }
+      if (!boundaryStillLive()) {
+        return null;
+      }
+      if (authorityControlOperationId == null) {
+        failCoopSharedSession(`Quiz answer ${index} control unavailable after bounded wait`);
+        return new Promise<never>(() => undefined);
+      }
+      coopLog(
+        "me",
+        `quiz FOLLOW exact V2 control ready index=${index} seq=${seq} operation=${authorityControlOperationId}`,
+      );
+    }
+    return relay.awaitInteractionChoice(
+      seq,
+      COOP_QUIZ_WAIT_MS,
+      COOP_QUIZ_CHOICE_KINDS,
+      undefined,
+      authorityControlOperationId,
+    );
+  };
+  return awaitAddressedAnswer().then(a => {
     if (
-      globalScene !== scene
-      || getCoopRuntime() !== runtime
-      || getCoopController() !== controller
-      || coopSessionGeneration() !== generation
-      || coopMeInteractionStartValue() !== counter
+      !boundaryStillLive()
     ) {
       return new Promise<number>(() => undefined);
     }

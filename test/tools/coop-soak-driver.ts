@@ -1148,17 +1148,22 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
  * CoopGuestFaintSwitchPhase opens its PARTY picker (a guest-owned mon fainted), pick the first legal
  * guest-owned bench slot - which fires the GENUINE relay send + seq keying (the host summons the guest's
  * pick). MUST be called inside withClient(guestCtx). The stub is one-shot per PARTY open and restored in a
- * finally so it never leaks into the next turn's rendering.
+ * finally so it never leaks into the next turn's rendering. The one-process rig must alternate both
+ * destination contexts until the authority's real `switch` waiter exists before invoking the public picker:
+ * an immediate callback while only the guest context is installed outruns a host browser that production
+ * runs independently and strands a perfectly valid proposal in the harness-only early inbox.
  */
 async function driveGuestReplayTurnWithFaint(rig: DuoRig, turn: number): Promise<void> {
   const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
   const realSetMode = ui.setMode.bind(ui);
+  let pendingPicker: { slot: number; pick: (slotIndex: number, option: number) => void } | null = null;
   ui.setMode = (...args: unknown[]): unknown => {
     if (args[0] === UiMode.PARTY) {
-      ui.setMode = realSetMode; // one-shot: restore before invoking the picker callback
       const slot = firstLegalBenchSlot(rig.guestScene, "guest");
       if (slot >= 0) {
-        (args[3] as (slotIndex: number, option: number) => void)(slot, 0);
+        pendingPicker = { slot, pick: args[3] as (slotIndex: number, option: number) => void };
+      } else {
+        ui.setMode = realSetMode;
       }
       return;
     }
@@ -1168,7 +1173,26 @@ async function driveGuestReplayTurnWithFaint(rig: DuoRig, turn: number): Promise
     return realSetMode(...args);
   };
   try {
-    await driveGuestReplayTurn(rig.guestScene, turn);
+    const replay = withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+    await settleDuoPromise(rig, replay, `guest replay turn ${turn} with faint replacement`, {
+      afterPump: async () => {
+        if (pendingPicker == null) {
+          return;
+        }
+        const authorityWaitReady = withClientSync(rig.hostCtx, () =>
+          rig.hostRuntime.interactionRelay
+            .describeAwaitedInteractions()
+            .some(wait => wait.expectedKinds.length === 1 && wait.expectedKinds[0] === "switch"),
+        );
+        if (!authorityWaitReady) {
+          return;
+        }
+        const picker = pendingPicker;
+        pendingPicker = null;
+        ui.setMode = realSetMode;
+        await withClient(rig.guestCtx, () => picker.pick(picker.slot, 0));
+      },
+    });
   } finally {
     ui.setMode = realSetMode;
   }
@@ -2936,6 +2960,44 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         await drainLoopback();
       });
       await pumpDuoDestinations(rig, 2);
+      // A replacement-created CommandPhase can be the first concrete consumer of a CONTROL_COMMIT whose
+      // retained switch/ability prefix has not rendered yet. Production replaces that still-inert command
+      // with a fresh CoopReplayTurnPhase, starts it through PhaseManager, then reconstructs CommandPhase
+      // after the presentation receipt. The one-process PhaseInterceptor sees the replacement but suppresses
+      // its automatic start; checking the authority's public command immediately therefore makes the host
+      // exhaust cmd:N:1 even though every ordered entry and replacement checkpoint was delivered. Cross this
+      // exact production lifecycle edge before judging either browser. The bounded loop permits one retained
+      // prefix plus one defensive re-projection while still failing loudly on a genuinely recursive surface.
+      if (guestCommandRequired && guestCommand != null) {
+        for (let projectionPass = 0; projectionPass < 2; projectionPass++) {
+          const projectedReplay = withClientSync(rig.guestCtx, () =>
+            rig.guestScene.phaseManager.getCurrentPhase(),
+          );
+          if (projectedReplay?.phaseName !== "CoopReplayTurnPhase") {
+            break;
+          }
+          actionScript.push(
+            `wave ${transitionSourceWave}: headless scheduler crossed retained pre-command presentation `
+              + `after replacement pass=${projectionPass + 1}`,
+          );
+          guestCommand = await withClient(rig.guestCtx, () =>
+            driveClientPhaseQueueTo(rig.guestScene, `post-replacement guest command ${wave}:${turn}`, {
+              matches: phase =>
+                phase.phaseName === "CommandPhase"
+                && (phase as unknown as { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX
+                && rig.guestScene.currentBattle.waveIndex === wave
+                && rig.guestScene.currentBattle.turn === turn,
+            }),
+          );
+          await withClient(rig.guestCtx, async () => {
+            markRealGuestCommandBoundary(rig.guestScene, wave, turn);
+            guestCommand!.start();
+            await drainLoopback();
+          });
+          await withClient(rig.hostCtx, () => drainLoopback());
+          await pumpDuoDestinations(rig, 2);
+        }
+      }
       if (!restartAlreadyOpenHost && hostCommand != null) {
         const hostCommandSurface = await waitForPublicModeOrPhaseExit(
           rig.hostCtx,
@@ -3122,7 +3184,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
         armHostFaintAutoPick();
       });
-      await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
+      await driveGuestReplayTurnWithFaint(rig, turn);
       if (profile === "god") {
         restoreGodProfileBench(rig.hostScene);
         withClientSync(rig.guestCtx, () => restoreGodProfileBench(rig.guestScene));
@@ -4691,7 +4753,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // POST-HOC so the crossing to the throw's CommandPhase drives it instead of stranding at the PARTY UI.
       armHostFaintAutoPick();
     });
-    await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn1));
+    await driveGuestReplayTurnWithFaint(rig, turn1);
 
     if (rig.hostScene.getEnemyField().filter(e => !e.isFainted()).length !== 1) {
       // The survivor was not isolated (an ally proc / weather KO'd it, or the first foe survived) - degrade.
@@ -4731,7 +4793,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // Drive that production replay edge just like every normal turn before asking either renderer to enter the
     // retained reward boundary. Skipping it leaves CommandPhase current with TurnStart/CoopFinalize queued, so
     // the host's shop arrival cannot be answered even though the authoritative capture transaction arrived.
-    await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn1 + 1));
+    await driveGuestReplayTurnWithFaint(rig, turn1 + 1);
     const captured = rig.hostScene.getPlayerParty().length === hostPartyBefore + 1;
     actionScript.push(`wave ${wave}: CATCH throw sp=${rootId} captured=${captured}`);
     // eslint-disable-next-line no-console

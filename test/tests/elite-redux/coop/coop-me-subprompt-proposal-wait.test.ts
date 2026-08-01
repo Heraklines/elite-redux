@@ -16,8 +16,8 @@
 // ("refused unaddressed remote proposal wait ... expected=[meSub]") -> the shared-session terminal above.
 // The fix branches on the armed control + presentation `subPrompt`: a party/secondary presentation (op:me
 // ME_PRESENT) and the catch-full replace picker (op:catchFull CATCH_FULL) resolve to `meSub`, the top-level
-// option list stays `me`, and `quiz` (op:me QUIZ_ANSWER; it streams its own session on a distinct quiz seq)
-// resolves NO pump-seq wait.
+// option list stays `me`, and `quiz` (op:me QUIZ_ANSWER) resolves only the streamed session's
+// per-question 8.5M addresses rather than the generic pump sequence.
 //
 // This is a PURE, deterministic regression over the exact resolver the browser hit (engine-free: it
 // projects immutable entry material, no GameManager / no two-engine boot).
@@ -38,6 +38,8 @@ import {
   COOP_ME_PICK_CHOICE_KINDS,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_SUB_CHOICE_KINDS,
+  COOP_QUIZ_CHOICE_KINDS,
+  coopQuizAnswerSeq,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopAuthoritativeBattleStateV1, CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
@@ -171,10 +173,23 @@ describe("Authority-V2 ME sub-prompt proposal-wait spec (campaign 29912693840 pa
     expect(coopV2AuthorityProposalWaitSpec(control, plan)?.acceptedKinds).toEqual(COOP_ME_PICK_CHOICE_KINDS);
   });
 
-  it("a quiz sub-prompt does NOT resolve a pump-seq proposal wait (it streams its own quiz seq)", () => {
-    const { control, plan } = meControlAndPlan(withSubPrompt({ kind: "quiz", questions: [], stopOnWrong: false }));
-    // The quiz sub-prompt arms an op:me / QUIZ_ANSWER control; the guest owner drives the session on the
-    // distinct quiz seq, so the pump-seq resolver resolves NO wait for it (it is never a meSub sub-pick).
-    expect(coopV2AuthorityProposalWaitSpec(control, plan)).toBeNull();
+  it("a quiz sub-prompt resolves only its immutable per-question quiz-answer addresses", () => {
+    const questions = [
+      { kind: "species", answerId: 1, options: [1, 2], prompt: "one" },
+      { kind: "species", answerId: 3, options: [3, 4], prompt: "two" },
+    ];
+    const { control, plan } = meControlAndPlan(withSubPrompt({ kind: "quiz", questions, stopOnWrong: false }));
+    const first = coopQuizAnswerSeq(ME_PINNED, 0);
+    const second = coopQuizAnswerSeq(ME_PINNED, 1);
+    expect(coopV2AuthorityProposalWaitSpec(control, plan)).toEqual({
+      relaySequence: first,
+      acceptedKinds: COOP_QUIZ_CHOICE_KINDS,
+    });
+    expect(coopV2AuthorityProposalWaitSpec(control, plan, second)).toEqual({
+      relaySequence: second,
+      acceptedKinds: COOP_QUIZ_CHOICE_KINDS,
+    });
+    expect(coopV2AuthorityProposalWaitSpec(control, plan, coopQuizAnswerSeq(ME_PINNED, 2))).toBeNull();
+    expect(coopV2AuthorityProposalWaitSpec(control, plan, COOP_ME_PUMP_SEQ_BASE + ME_PINNED)).toBeNull();
   });
 });
