@@ -6640,3 +6640,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The retained-reward browser proof now accepts the production `skippedObsolete=0` diagnostic field; the
   previous exact-SHA red was a stale evidence regex, not a product failure. All executable qualification
   remains remote per `AGENTS.md`; the focused and two-browser reload/capsule journeys are pending dispatch.
+- Aggregate run `30719578822` exposed one deliberate harness coupling: the TM-case duo driver intercepted
+  only the retired unbounded `setModeWithoutClear` method, so it declared that PARTY never opened when the
+  product invoked the new bounded seam. The helper now intercepts both signatures and calls the nested
+  target callback at the new argument position. This is a harness-wiring correction; the run's other
+  multiwave tests and the exact product UI transition contract passed.
