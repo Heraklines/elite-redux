@@ -3446,6 +3446,11 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   );
   assert.match(
     soakDriver,
+    /pendingPicker == null[\s\S]*withClient\(rig\.hostCtx,[\s\S]*hostPhase\?\.phaseName === "SwitchPhase"[\s\S]*startCurrentDuoPhaseOnce\(rig\.hostScene, hostPhase\)[\s\S]*drainLoopback\(\)[\s\S]*const authorityWaitReady/u,
+    "the intercepted soak starts the authority replacement phase exactly once before waiting for its relay waiter",
+  );
+  assert.match(
+    soakDriver,
     /const replay = withClient\(rig\.guestCtx,[\s\S]*settleDuoPromise\(rig, replay,[\s\S]*describeAwaitedInteractions\(\)[\s\S]*wait\.expectedKinds\[0\] === "switch"[\s\S]*picker\.pick\(picker\.slot, 0\)/u,
     "the one-process soak lets the authority install its real replacement waiter before the guest's public pick",
   );

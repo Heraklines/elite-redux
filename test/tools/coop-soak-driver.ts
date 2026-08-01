@@ -1179,6 +1179,17 @@ async function driveGuestReplayTurnWithFaint(rig: DuoRig, turn: number): Promise
         if (pendingPicker == null) {
           return;
         }
+        // PhaseInterceptor deliberately leaves asynchronously-installed phases current-but-unstarted.
+        // Production's PhaseManager starts this authority-side SwitchPhase immediately; reproduce that
+        // scheduling edge before waiting for the real relay waiter, otherwise the synthetic guest picker
+        // and the authority can wait on each other forever even though the V2 replacement is correct.
+        await withClient(rig.hostCtx, async () => {
+          const hostPhase = rig.hostScene.phaseManager.getCurrentPhase();
+          if (hostPhase?.phaseName === "SwitchPhase") {
+            startCurrentDuoPhaseOnce(rig.hostScene, hostPhase);
+            await drainLoopback();
+          }
+        });
         const authorityWaitReady = withClientSync(rig.hostCtx, () =>
           rig.hostRuntime.interactionRelay
             .describeAwaitedInteractions()
