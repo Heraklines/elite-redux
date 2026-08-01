@@ -1110,7 +1110,10 @@ test("a passive command watcher starts at the current tail instead of resurrecti
   );
 
   assert.deepEqual(order, ["authority"]);
-  assert.deepEqual(result.commandPartition.owners.map(owner => owner.label), ["authority"]);
+  assert.deepEqual(
+    result.commandPartition.owners.map(owner => owner.label),
+    ["authority"],
+  );
   assert.deepEqual(result.commandPartition.omitted, [{ label: "watcher", seat: 1 }]);
 });
 
