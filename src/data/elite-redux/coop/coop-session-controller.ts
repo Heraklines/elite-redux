@@ -857,6 +857,7 @@ export class CoopSessionController {
         account: { ...this.p33Context.account },
         transportRole: this.p33Context.transportRole,
         authorityClaim: this.authorityRole,
+        connectionGeneration: this.p33Context.connectionGeneration,
         capabilities: [...(this.localCapabilities ?? [])],
         ...(binding == null
           ? {}
@@ -2474,6 +2475,8 @@ export class CoopSessionController {
       Array.isArray(msg.capabilities)
       && msg.capabilities.length <= 128
       && msg.capabilities.every(capability => typeof capability === "string" && capability.length <= 128);
+    const peerGenerationValid =
+      Number.isSafeInteger(msg.connectionGeneration) && msg.connectionGeneration >= context.peerConnectionGeneration;
     const existing = msg.existingBinding;
     const existingBindingValid =
       existing == null
@@ -2496,6 +2499,7 @@ export class CoopSessionController {
       || msg.authorityClaim !== expectedAuthorityClaim
       || !identityMatches
       || !capabilitiesValid
+      || !peerGenerationValid
       || !existingBindingValid
     ) {
       this.p33BindingRejected = true;
@@ -2520,6 +2524,16 @@ export class CoopSessionController {
         this.emit();
         return;
       }
+    }
+    // Both peers must call the Worker-authenticated rejoin endpoint before a replacement WebRTC channel
+    // can open. The first caller's rejoin response can still contain the other seat's previous generation;
+    // the P33 hello received on the newly-opened channel is the first exact proof of the peer's advanced
+    // generation. Complete the retained context here before binding-ready rebuilds/rebinds Authority V2.
+    // A regression is rejected above, and the immutable account/role/pairing axes have already matched.
+    if (msg.connectionGeneration > context.peerConnectionGeneration) {
+      const previous = context.peerConnectionGeneration;
+      context.peerConnectionGeneration = msg.connectionGeneration;
+      coopLog("launch", `P33 peer generation advanced ${previous}->${msg.connectionGeneration} on authenticated hello`);
     }
     this.p33PeerHelloAccepted = true;
     this._partnerConnected = true;

@@ -75,6 +75,7 @@ async function bindAuthority(context = authenticatedContext()) {
     account: context.peerAccount,
     transportRole: "offerer",
     authorityClaim: "replica",
+    connectionGeneration: context.peerConnectionGeneration,
     capabilities: [],
   });
   await Promise.resolve();
@@ -225,6 +226,7 @@ describe("P33 authenticated terminal binding adapter", () => {
       account: rejoined.peerAccount,
       transportRole: "offerer",
       authorityClaim: "replica",
+      connectionGeneration: rejoined.peerConnectionGeneration,
       capabilities: [],
       existingBinding: {
         sessionId: fixture.binding.sessionId,

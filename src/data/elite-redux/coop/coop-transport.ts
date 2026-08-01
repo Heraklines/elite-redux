@@ -164,7 +164,11 @@ export type CoopRole = "host" | "guest";
 // er-coop-61 distinguishes the field-local form flash from the full player evolution-style form cutscene
 // and carries its immutable preimage. Older renderers only snap the target sprite and would acknowledge
 // presentation before the narration/sound/tint/scale/tween subtree actually completed.
-export const COOP_PROTOCOL_VERSION = "er-coop-61";
+// er-coop-62 binds the sender's Worker-authenticated connection generation into every P33 hello. A browser
+// that rejoins first can legitimately receive a provisional peer generation from the Worker; the peer's
+// hello on the replacement data channel is the exact later edge that completes that generation pair. Older
+// clients leave the retained Authority V2 peer lease stale and eventually reject every valid receipt.
+export const COOP_PROTOCOL_VERSION = "er-coop-62";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that
@@ -1492,6 +1496,8 @@ export type CoopMessage =
       account: CoopAccountIdentityV1;
       transportRole: CoopTransportRole;
       authorityClaim: CoopAuthorityRole;
+      /** Sender-local Worker-authenticated generation for this replacement data channel. */
+      connectionGeneration: number;
       capabilities: string[];
       existingBinding?: {
         sessionId: string;

@@ -6661,3 +6661,30 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Focused run `30720160001` stopped in the ownership planner before setup because the integration manifest
   omitted the two existing test paths changed by this correction. This is CI metadata only; both exact paths
   are now declared and the train base advances to the rejected commit for a clean remote qualification.
+## 2026-08-01 — reward PARTY summary transition closure
+
+- Latest submitted staging logs still identify the pre-fix `8ccf994dd` bundle. Their reload errors contain
+  no `reload-rejoin` attempt and therefore predate the qualified `c63c63468` handoff/rejoin fix now live on
+  staging.
+- The Ability Capsule freeze report exposed a narrower surviving production seam: the reward picker now
+  opens PARTY through the bounded no-clear transition, but PARTY's own Summary action still used the old
+  unbounded no-clear fade. `PartyUiHandler.processSummaryOption` now preserves solo behavior and uses the
+  phase-fenced bounded no-clear transition in co-op, so a lost fade force-installs Summary without retiring
+  the underlying reward selector.
+- Next proof: exact-build two-browser Ability Capsule journey must inspect Summary, return to the same
+  addressed PARTY target, apply the capsule, finish its registered ability picker, and reach the ordered
+  successor. A separate same-tab reload journey must prove `/coop/v3/rejoin` and forbid a second announce.
+
+## 2026-08-01 — exact wave-13 generation rejection mechanism
+
+- The newest `c63c63468` staging logs are not a checksum divergence. At wave 13 the replica emits genuine
+  `controlInstalled` receipts with connection generation 2, while the authority rejects the entire retained
+  log as `connection-generation-mismatch`; the unreleased tail then ends at command-control installation.
+- Root cause: the first browser to call the Worker rejoin endpoint can receive `{local: 2, peer: 1}` before
+  the partner rejoins. The replacement channel later carries the partner at generation 2, but the P33
+  controller never completed that peer axis, so Authority V2 froze generation 1 into every lease.
+- Protocol 62 now carries sender-local generation on the authenticated P33 hello. After the immutable
+  account/pairing/role axes pass, that replacement-channel hello monotonically completes the peer generation
+  before the binding-ready callback rebinds or constructs Authority V2. Regressions still fail closed.
+- The P33 controller tests now reproduce the asymmetric provisional view (`local=1, peer=0`) and require
+  the partner's generation-1 hello to appear in the accepted membership snapshot.

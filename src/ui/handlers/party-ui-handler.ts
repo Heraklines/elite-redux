@@ -482,7 +482,28 @@ export class PartyUiHandler extends MessageUiHandler {
   private processSummaryOption(pokemon: Pokemon): boolean {
     const ui = this.getUi();
     ui.playSelect();
-    ui.setModeWithoutClear(UiMode.SUMMARY, pokemon).then(() => this.clearOptions());
+    if (!globalScene.gameMode.isCoop) {
+      ui.setModeWithoutClear(UiMode.SUMMARY, pokemon).then(() => this.clearOptions());
+      return true;
+    }
+
+    // A reward-owned PARTY selector is itself installed through a bounded transition. Its nested
+    // Summary open must obey the same rule: under a throttled renderer the ordinary fade callback can
+    // be lost, leaving the PARTY action latch consumed while SUMMARY never becomes actionable. Fence the
+    // open to the exact phase and still-active PARTY handler, preserve that handler underneath the local
+    // inspection overlay, and let the shared UI transition seam force-install after the bounded deadline.
+    const owningPhase = globalScene.phaseManager.getCurrentPhase();
+    const stillOwnsPartySurface = (): boolean =>
+      globalScene.phaseManager.getCurrentPhase() === owningPhase && ui.getMode() === UiMode.PARTY && this.active;
+    ui.setModeWithoutClearBoundedWhen(UiMode.SUMMARY, 2_000, stillOwnsPartySurface, pokemon).then(result => {
+      coopLog(
+        "party",
+        `nested SUMMARY transition ${result} phaseCurrent=${globalScene.phaseManager.getCurrentPhase() === owningPhase}`,
+      );
+      if (result !== "superseded") {
+        this.clearOptions();
+      }
+    });
     return true;
   }
 

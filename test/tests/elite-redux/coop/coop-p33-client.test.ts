@@ -340,6 +340,7 @@ describe("authenticated P33 browser client", () => {
       account: { accountId: authority.accountId },
       transportRole: "answerer",
       authorityClaim: "authority",
+      connectionGeneration: 0,
     });
     expect(JSON.stringify(hello)).not.toContain(token);
 
@@ -350,6 +351,7 @@ describe("authenticated P33 browser client", () => {
       account: replica,
       transportRole: "offerer",
       authorityClaim: "replica",
+      connectionGeneration: 0,
       capabilities: [],
     });
     await Promise.resolve();
@@ -433,6 +435,7 @@ describe("authenticated P33 browser client", () => {
       account: replica,
       transportRole: "offerer",
       authorityClaim: "replica",
+      connectionGeneration: 1,
       capabilities: [],
       existingBinding: {
         sessionId: beforeRejoin.binding!.sessionId,
@@ -457,6 +460,9 @@ describe("authenticated P33 browser client", () => {
       connectionGeneration: 1,
       sessionEpoch: beforeRejoin.epoch,
     });
+    expect(controller.p33MembershipSnapshot()?.members).toEqual(
+      expect.arrayContaining([expect.objectContaining({ seatId: 1, connectionGeneration: 1 })]),
+    );
     controller.dispose();
     local.close();
     remote.close();
