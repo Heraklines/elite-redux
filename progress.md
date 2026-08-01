@@ -6707,3 +6707,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   forbids a fallback lobby announce, requires two successful `/coop/v3/rejoin` calls and generation-2 bindings,
   observes the authenticated hello complete the provisional peer-generation axis, resumes wave 2, and completes
   another battle while rejecting every `connection-generation-mismatch` receipt.
+
+## 2026-08-02 - protocol-62 focused-gate test migration
+
+- Exact-SHA focused run `30722179433` completed every selected shard except source contracts and lane A.
+  Both reds were stale tests that hard-coded `er-coop-61`; lane A's artifact identified the sole failure at
+  `coop-session-controller.test.ts:77`, while the production controller/rejoin coverage around it passed.
+- The assertions now track `er-coop-62`, and the source contract additionally requires the authenticated
+  `connectionGeneration` hello field. This changes no product code and does not invalidate the already-running
+  exact-SHA Ability Capsule or same-tab rejoin browser proofs.

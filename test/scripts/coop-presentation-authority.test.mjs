@@ -888,14 +888,15 @@ test("V2 replacement animation drains before its checkpoint can install", () => 
   assert.match(harness, /"CoopFinalizeEntryPresentationPhase"/u);
 });
 
-test("protocol 61 binds every structured presentation cue and retained Mystery market to exact mechanics", () => {
+test("protocol 62 binds every structured presentation cue and authenticated rejoin generation to exact mechanics", () => {
   const adapter = read("src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts");
   const transport = read("src/data/elite-redux/coop/coop-transport.ts");
   const validator = read("src/data/elite-redux/coop/coop-battle-event-validator.ts");
   const move = read("src/phases/move-phase.ts");
   assert.match(adapter, /live authority carrier has invalid replacement presentation/u);
   assert.match(adapter, /"presentation"/u);
-  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-61"/u);
+  assert.match(transport, /COOP_PROTOCOL_VERSION\s*=\s*"er-coop-62"/u);
+  assert.match(transport, /connectionGeneration: number/u);
   assert.match(transport, /k: "formChange";[\s\S]+preFormIndex: number;[\s\S]+presentation: "field" \| "evolution";/u);
   assert.match(
     validator,
