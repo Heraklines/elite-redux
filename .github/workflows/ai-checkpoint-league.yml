@@ -3,6 +3,11 @@ name: AI Checkpoint League Generation (Non-Production)
 # Artifact-only research lane. It has read-only permissions, no deployment job,
 # no environment, and no game or production endpoint.
 on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-checkpoint-league.yml"
   workflow_dispatch:
     inputs:
       base_kernel:
@@ -50,7 +55,7 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-          BASE_KERNEL: ${{ inputs.base_kernel }}
+          BASE_KERNEL: ${{ inputs.base_kernel || 'michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -158,9 +163,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          start=$(( ${{ matrix.shard }} * ${{ inputs.episodes_per_shard }} ))
+          start=$(( ${{ matrix.shard }} * ${{ inputs.episodes_per_shard || 80 }} ))
           node scripts/ai/make-pilot-batch.mjs \
-            "$start" "${{ inputs.episodes_per_shard }}" \
+            "$start" "${{ inputs.episodes_per_shard || 80 }}" \
             "ai-work/batch-${{ matrix.shard }}.json" \
             ml/training/ghost-self-play-teams.v2.json
       - name: Run true two-seat checkpoint self-play
@@ -172,17 +177,17 @@ jobs:
           node scripts/run-combat-batch.mjs "@ai-work/batch-${{ matrix.shard }}.json"
           --turns 80 --real-rng
           --ai-neural-model "$BASE_MODEL"
-          --ai-epsilon "${{ inputs.epsilon }}"
+          --ai-epsilon "${{ inputs.epsilon || '0.08' }}"
           --ai-source checkpoint-neural-v4 --ai-policy-target 1
           --opponent-ai-neural-model "$BASE_MODEL"
-          --opponent-ai-epsilon "${{ inputs.epsilon }}"
+          --opponent-ai-epsilon "${{ inputs.epsilon || '0.08' }}"
           --opponent-ai-source checkpoint-neural-v4 --opponent-ai-policy-target 1
           --test-timeout-ms 14400000
           --json-out "ai-work/result-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/decisions-${{ matrix.shard }}.jsonl"
       - name: Assert dual-seat policy and combat-only boundaries
         env:
-          EXPECTED_EPISODES: ${{ inputs.episodes_per_shard }}
+          EXPECTED_EPISODES: ${{ inputs.episodes_per_shard || 80 }}
           SHARD: ${{ matrix.shard }}
         run: node scripts/ai/validate-checkpoint-selfplay.mjs "ai-work/decisions-${{ matrix.shard }}.jsonl" "ai-work/result-${{ matrix.shard }}.json" "$EXPECTED_EPISODES" checkpoint-neural-v4
       - uses: actions/upload-artifact@v4
