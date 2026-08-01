@@ -331,7 +331,12 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     browserEntry,
-    /semantic == null && NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES\.has\(phase\)[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set\(\["SelectModifierPhase:EVOLUTION_SCENE"\]\)/u,
+    "the observer suppresses only the sampled reward-phase/evolution-UI teardown pair",
+  );
+  assert.match(
+    browserEntry,
+    /semantic == null &&[\s\S]*NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES\.has\(phase\)[\s\S]*NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS\.has\(`\$\{phase\}:\$\{uiMode\}`\)[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
     "a stale evolution handler closes observation state instead of emitting a fatal unclassified surface",
   );
   assert.match(journeys, /"evolution-sync": evolutionSync/u);

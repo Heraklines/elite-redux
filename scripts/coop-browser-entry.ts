@@ -561,6 +561,9 @@ const COOP_REVIVAL_PHASES = new Set(["RevivalBlessingPhase", "CoopGuestRevivalPh
 // They are engine progress, not human-input surfaces: publishing the stale handler as `unclassified`
 // makes a successful public journey fail merely because the read-only observer sampled the handoff.
 const NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES = new Set(["EndEvolutionPhase"]);
+// SelectModifierPhase owns the reward UI, but the engine assigns it before EVOLUTION_SCENE has
+// finished closing. That exact phase/UI pair is a teardown sample, not an actionable reward surface.
+const NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set(["SelectModifierPhase:EVOLUTION_SCENE"]);
 
 /**
  * Resolve surfaces whose owner is part of the immutable operation, rather than the alternating
@@ -1578,7 +1581,11 @@ function observeSemanticSurface(): void {
             ownerModel: "interaction" as const,
           }
         : classifiedSemantic;
-    if (semantic == null && NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES.has(phase)) {
+    if (
+      semantic == null &&
+      (NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES.has(phase) ||
+        NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS.has(`${phase}:${uiMode}`))
+    ) {
       // Close the prior canonical observation so the next genuinely actionable surface is emitted even
       // when it happens to be byte-identical. Do not mirror or drive the stale transition handler.
       lastSemanticObservation = "";

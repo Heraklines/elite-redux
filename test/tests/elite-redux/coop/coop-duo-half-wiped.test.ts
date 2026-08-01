@@ -218,6 +218,12 @@ describe.skipIf(!RUN)(
 
       // ZERO forced resyncs across the wiped-half faint crossing (a resync is a player-facing divergence).
       expect(resyncProbe.count(), "the wiped-half faint close forced NO resync").toBe(0);
+      expect(
+        [...logs.host, ...logs.guest, ...logs.errors].filter(line =>
+          /command-open predecessor is .*expected AWAIT_SUCCESSOR|could not install command control/iu.test(line),
+        ),
+        "the typed null replacement retired the predecessor before command opened",
+      ).toEqual([]);
 
       logs.flush();
     }, 240_000);
