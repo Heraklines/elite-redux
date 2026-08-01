@@ -4146,17 +4146,18 @@ export function assertNavigationCoverage(coverage, marketCoverage, battleKinds, 
   if (biomeIds.size < 2) {
     throw new Error(`[campaign-navigation] no second biome reached: ${JSON.stringify([...biomeIds])}`);
   }
-  const chained = coverage.waveSurfaces.some(({ surfaces }) => {
+  const chained = coverage.waveSurfaces.some(({ wave, surfaces }) => {
     const names = surfaces.map(surface => surface.surface);
-    const reward = names.indexOf("reward");
     const market = names.indexOf("biome-shop");
     const crossroads = names.indexOf("crossroads");
     const worldMap = names.indexOf("biome-pick");
-    return reward >= 0 && market > reward && crossroads > market && worldMap > crossroads;
+    const choseLeave = coverage.crossroads.some(event => event.wave === wave && event.targetId === "leave");
+    const completedWorldMap = coverage.worldMaps.some(event => event.wave === wave);
+    return market >= 0 && crossroads > market && worldMap > crossroads && choseLeave && completedWorldMap;
   });
   if (!chained) {
     throw new Error(
-      "[campaign-navigation] no ordered reward -> market -> Crossroads Leave -> World Map chain completed",
+      "[campaign-navigation] no ordered market -> Crossroads Leave -> World Map chain completed",
     );
   }
   if (targetWaves >= 20) {

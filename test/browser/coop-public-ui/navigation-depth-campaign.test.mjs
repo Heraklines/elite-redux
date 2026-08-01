@@ -87,7 +87,6 @@ function completeCoverage() {
       {
         wave: 10,
         surfaces: [
-          { surface: "reward" },
           { surface: "biome-shop" },
           { surface: "crossroads" },
           { surface: "biome-pick" },
@@ -118,6 +117,23 @@ test("30-wave navigation acceptance closes markets, both routes, map, second bio
   assert.deepEqual(proof.requiredMarketWaves, [10, 20, 30]);
   assert.deepEqual(new Set(proof.marketOwners), new Set([0, 1]));
   assert.equal(proof.chained, true);
+});
+
+test("navigation acceptance treats the milestone biome shop as the reward boundary", () => {
+  const coverage = completeCoverage();
+  assert.deepEqual(coverage.waveSurfaces[0].surfaces.map(surface => surface.surface), [
+    "biome-shop",
+    "crossroads",
+    "biome-pick",
+  ]);
+  assert.doesNotThrow(() =>
+    assertNavigationCoverage(
+      coverage,
+      completeMarkets(),
+      [{ wave: 20, battleType: "TRAINER", trainerBoss: true }],
+      30,
+    ),
+  );
 });
 
 test("navigation acceptance fails loudly when a nominal driver never crosses a required surface", () => {
