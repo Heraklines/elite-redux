@@ -4072,7 +4072,7 @@ test("the browser observer republishes an unchanged menu after a non-semantic mo
   const classification = browserEntry.slice(classify, selection);
   assert.match(
     classification,
-    /if \(semantic == null\) \{[\s\S]*if \(runtime == null \|\| membership\?\.state !== "active"\) \{[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
+    /if \(semantic == null\) \{[\s\S]*observedMembershipAxes\(runtime\)[\s\S]*if \(runtime == null \|\| membership == null\) \{[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
     "a local Settings/modal gap must invalidate deduplication so the reopened title menu is fresh",
   );
 });
