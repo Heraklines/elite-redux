@@ -3415,7 +3415,11 @@ async function driveCustomOpponentPolicyTurn(game: GameManager): Promise<void> {
     return;
   }
   game.scene.getPlayerField().forEach(mon => AI_CUSTOM_OPPONENT_KNOWN_PLAYER_IDS.add(mon.id));
-  const phaseCount = game.scene.getEnemyField().length;
+  // TurnInitPhase queues one EnemyCommandPhase per currently active enemy, not
+  // per occupied field slot. Fainted slots can remain in getEnemyField() until
+  // replacement/end-of-battle processing, so counting them waits for a phase
+  // that does not exist and runs into the next player CommandPhase.
+  const phaseCount = game.scene.getEnemyField().filter(mon => mon.isActive()).length;
   const earlier: ErCombatEarlierChoice[] = [];
   const { waveIndex: wave, turn } = game.scene.currentBattle;
   const jointActionId = `${activeAiEpisodeId}:${wave}:${turn}:enemy`;
