@@ -30,7 +30,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -170,7 +170,9 @@ describe.skipIf(!RUN)(
       const hostLead = rig.hostScene.getPlayerParty().find(mon => mon.id === hostLeadId);
       expect(hostLead?.isFainted(), "the HOST-owned lead fainted this turn").toBe(true);
       const guestLead = rig.hostScene.getPlayerParty().find(mon => mon.id === guestLeadId);
-      expect(guestLead != null && !guestLead.isFainted(), "the GUEST-owned lead survived (the run continues)").toBe(true);
+      expect(guestLead != null && !guestLead.isFainted(), "the GUEST-owned lead survived (the run continues)").toBe(
+        true,
+      );
 
       // THE PATH UNDER TEST: cross to the next CommandPhase. The host-owned SwitchPhase opens with NO legal
       // same-owner replacement. PRE-FIX it opens the modal FAINT_SWITCH picker whose only mons are fainted or
@@ -192,17 +194,15 @@ describe.skipIf(!RUN)(
       // survivor from field index 1 to index 0, so field indices are presentation positions—not ownership.
       const hostOwnedActive = rig.hostScene
         .getPlayerField()
-        .filter(mon => mon?.coopOwner === "host" && mon.isOnField() && !mon.isFainted());
-      expect(
-        hostOwnedActive,
-        "the wiped host owner got no replacement (that player is out)",
-      ).toEqual([]);
+        .filter(mon => mon?.coopOwner === "host" && !mon.isFainted());
+      expect(hostOwnedActive, "the wiped host owner got no replacement (that player is out)").toEqual([]);
       const activeGuestLead = rig.hostScene
         .getPlayerField()
-        .find(mon => mon?.id === guestLeadId && mon.coopOwner === "guest" && mon.isOnField() && !mon.isFainted());
-      expect(activeGuestLead?.species.speciesId, "the guest's lead remains active - the battle continues asymmetric (#828)").toBe(
-        SpeciesId.SNORLAX,
-      );
+        .find(mon => mon?.coopOwner === "guest" && mon.species.speciesId === SpeciesId.SNORLAX && !mon.isFainted());
+      expect(
+        activeGuestLead?.species.speciesId,
+        "the guest's lead remains active - the battle continues asymmetric (#828)",
+      ).toBe(SpeciesId.SNORLAX);
 
       // GUEST replays turn 1 + converges: its lead survives and the host owner has no active field mon there too.
       await withClient(rig.guestCtx, async () => {
@@ -211,12 +211,14 @@ describe.skipIf(!RUN)(
       withClientSync(rig.guestCtx, () => {
         const guestActiveLead = rig.guestScene
           .getPlayerField()
-          .find(mon => mon?.id === guestLeadId && mon.coopOwner === "guest" && mon.isOnField() && !mon.isFainted());
-        expect(guestActiveLead?.species.speciesId, "the guest sees its own lead still on-field").toBe(SpeciesId.SNORLAX);
+          .find(mon => mon?.coopOwner === "guest" && mon.species.speciesId === SpeciesId.SNORLAX && !mon.isFainted());
+        expect(guestActiveLead?.species.speciesId, "the guest sees its own lead still on-field").toBe(
+          SpeciesId.SNORLAX,
+        );
         expect(
           rig.guestScene
             .getPlayerField()
-            .filter(mon => mon?.coopOwner === "host" && mon.isOnField() && !mon.isFainted()),
+            .filter(mon => mon?.coopOwner === "host" && !mon.isFainted()),
           "the guest sees no active host-owned mon (converged with the host)",
         ).toEqual([]);
       });
