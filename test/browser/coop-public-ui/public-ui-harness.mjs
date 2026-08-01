@@ -69,7 +69,8 @@ const RENDEZVOUS_RECOVERY_RETRY_POINT =
 const TATSUGIRI_SPECIES_ID = 978;
 const DONDOZO_SPECIES_ID = 977;
 const MAGIKARP_SPECIES_ID = 129;
-const CROBAT_SPECIES_ID = 169;
+const ZUBAT_SPECIES_ID = 41;
+const INNER_FOCUS_ABILITY_ID = 39;
 const BULBASAUR_SPECIES_ID = 1;
 const SEEL_SPECIES_ID = 86;
 const CATERPIE_SPECIES_ID = 10;
@@ -3618,14 +3619,14 @@ export class DuoPublicUiRig {
             ? [client.label === this.config.commanderOwnerSeat ? TATSUGIRI_SPECIES_ID : DONDOZO_SPECIES_ID]
             : halfWipeFixture
               ? client.label === this.config.faintOwnerSeat
-                ? [CROBAT_SPECIES_ID]
+                ? [ZUBAT_SPECIES_ID]
                 : [DONDOZO_SPECIES_ID]
               : faintFixture
                 ? client.label === this.config.faintOwnerSeat
                   ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                   : [BULBASAUR_SPECIES_ID]
                 : gameOverFixture
-                  ? [CROBAT_SPECIES_ID]
+                  ? [ZUBAT_SPECIES_ID]
                   : campaignSurvivalFixture
                     ? [SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID]
                     : navigationFixture
@@ -4060,6 +4061,28 @@ export class DuoPublicUiRig {
   async driveWaveToGameOver() {
     if (!this.host || !this.guest) {
       throw new Error("driveWaveToGameOver requires a fully bound host and guest");
+    }
+    for (const client of Object.values(this.clients)) {
+      const commandSurface = [...client.evidence.events]
+        .reverse()
+        .find(event => event.kind === "browser-surface2" && event.observation?.operationClass === "command");
+      const active = commandSurface?.observation?.partySlots?.filter(slot => slot.active === true) ?? [];
+      if (
+        active.length !== 2
+        || active.some(
+          slot =>
+            slot.speciesId !== ZUBAT_SPECIES_ID
+            || slot.abilityId !== INNER_FOCUS_ABILITY_ID
+            || slot.abilityActive !== true
+            || slot.abilitySuppressed === true,
+        )
+      ) {
+        throw new Error(`${client.label}: GameOver fixture ability mismatch ${JSON.stringify(active)}`);
+      }
+      client.evidence.record("game-over-ability-proof", {
+        surfaceIndex: commandSurface.index,
+        active,
+      });
     }
     const commandCursors = Object.fromEntries(
       Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),

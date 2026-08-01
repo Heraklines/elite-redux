@@ -32,7 +32,7 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   assert.match(config, /"half-wipe"/u);
   assert.match(
     registry,
-    /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.CROBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
+    /fixture !== "half-wipe-owner"[\s\S]*?fixture !== "half-wipe-partner"[\s\S]*?SpeciesId\.ZUBAT[\s\S]*?MoveId\.MEMENTO[\s\S]*?SpeciesId\.DONDOZO[\s\S]*?MoveId\.TACKLE/u,
     "the gated visible starter material forces one replica wipe without ending the double battle",
   );
   assert.match(registry, /nature: fixture === "half-wipe-owner" \? Nature\.JOLLY : Nature\.HARDY/u);
@@ -42,7 +42,7 @@ test("the two-browser half-wipe journey proves replica passive presentation befo
   );
   assert.match(
     harness,
-    /halfWipeFixture = false[\s\S]*?halfWipeFixture[\s\S]*?CROBAT_SPECIES_ID[\s\S]*?DONDOZO_SPECIES_ID/u,
+    /halfWipeFixture = false[\s\S]*?halfWipeFixture[\s\S]*?ZUBAT_SPECIES_ID[\s\S]*?DONDOZO_SPECIES_ID/u,
     "the driver confirms the exact visible teams before spending battle input",
   );
   assert.match(

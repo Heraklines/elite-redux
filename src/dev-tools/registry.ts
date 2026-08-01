@@ -443,9 +443,9 @@ export function getCoopBrowserCommanderFixtureStarters(): Starter[] | null {
  *
  * The configured owner visibly submits a Magikarp lead with Healing Wish plus two legal reserves.
  * Healing Wish makes the first real public command self-faint without depending on a random wave-1
- * enemy, while the other seat receives a one-mon attacking team. The exact build flag and per-page
- * The half-wipe variant instead gives the configured replica a lone fast Memento Crobat and its
- * partner a durable one-target attacker. The Crobat self-faints before ordinary wave-1 enemies, but
+ * enemy, while the other seat receives a one-mon attacking team.
+ * The half-wipe variant instead gives the configured replica a lone Inner Focus Memento Zubat and
+ * its partner a durable one-target attacker. The Zubat self-faints before ordinary wave-1 enemies, but
  * Dondozo cannot erase both opposing battlers with one Tackle, so the same battle must continue with
  * exactly one command owner. The exact build flag and per-page URL value keep every variant
  * unreachable in normal local, staging, and production bundles.
@@ -476,7 +476,7 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
       : fixture === "faint-partner"
         ? [{ speciesId: SpeciesId.BULBASAUR, moveset: [MoveId.WATER_SPOUT] }]
         : fixture === "half-wipe-owner"
-          ? [{ speciesId: SpeciesId.CROBAT, moveset: [MoveId.MEMENTO] }]
+          ? [{ speciesId: SpeciesId.ZUBAT, moveset: [MoveId.MEMENTO] }]
           : [{ speciesId: SpeciesId.DONDOZO, moveset: [MoveId.TACKLE] }];
   return specs.map(({ speciesId, moveset }) => ({
     speciesId,
@@ -495,9 +495,10 @@ export function getCoopBrowserFaintFixtureStarters(): Starter[] | null {
 /**
  * Materialize a deterministic public party wipe in the normal co-op starter UI.
  *
- * Both players visibly submit one fast, Inner Focus Crobat whose only move is Memento. Inner Focus
- * makes a random Fake Out/flinch incapable of cancelling the scripted self-faint, while Crobat's
- * speed and a Jolly nature put the move ahead of ordinary wave-1 enemies. The two real command
+ * Both players visibly submit one Inner Focus Zubat whose only move is Memento. Unlike Crobat's
+ * Elite Redux ability table, Zubat's explicit primary slot still resolves to Inner Focus, making a
+ * random Fake Out/flinch incapable of cancelling the scripted self-faint. Its level advantage and
+ * Jolly nature put the move ahead of ordinary wave-1 enemies. The two real command
  * surfaces therefore collect ordinary player choices, then the production battle and faint call
  * chains end the run without depending on a random enemy roll. As with every public-browser fixture,
  * both the exact bundle identity and exact per-page query must agree.
@@ -511,13 +512,13 @@ export function getCoopBrowserGameOverFixtureStarters(): Starter[] | null {
   }
   return [
     {
-      speciesId: SpeciesId.CROBAT,
+      speciesId: SpeciesId.ZUBAT,
       shiny: false,
       variant: 0,
       formIndex: 0,
       abilityIndex: 0,
       passive: false,
-      // Crobat's primary ability is Inner Focus; keep the slot explicit so fixture determinism
+      // Zubat's Elite Redux primary ability is Inner Focus; keep the slot explicit so fixture determinism
       // cannot silently change if a future caller starts supplying a different default.
       nature: Nature.JOLLY,
       moveset: [MoveId.MEMENTO] as StarterMoveset,

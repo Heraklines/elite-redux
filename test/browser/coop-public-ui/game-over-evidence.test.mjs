@@ -33,13 +33,18 @@ test("GameOver journey uses visible starters, real command input, and exact reta
   );
   assert.match(
     registry,
-    /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.CROBAT[\s\S]*abilityIndex: 0[\s\S]*Nature\.JOLLY[\s\S]*MoveId\.MEMENTO/u,
-    "the public terminal fixture uses Crobat's primary Inner Focus slot plus maximum practical wave-1 speed",
+    /getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*SpeciesId\.ZUBAT[\s\S]*abilityIndex: 0[\s\S]*Nature\.JOLLY[\s\S]*MoveId\.MEMENTO/u,
+    "the public terminal fixture uses Zubat's Elite Redux Inner Focus slot",
   );
   assert.match(
     harness,
-    /const CROBAT_SPECIES_ID = 169;[\s\S]*gameOverFixture[\s\S]*\? \[CROBAT_SPECIES_ID\]/u,
-    "the public driver must attest the same Crobat party that the fixture materializes",
+    /const ZUBAT_SPECIES_ID = 41;[\s\S]*gameOverFixture[\s\S]*\? \[ZUBAT_SPECIES_ID\]/u,
+    "the public driver must attest the same Zubat party that the fixture materializes",
+  );
+  assert.match(
+    harness,
+    /INNER_FOCUS_ABILITY_ID = 39[\s\S]*game-over-ability-proof[\s\S]*abilityId !== INNER_FOCUS_ABILITY_ID[\s\S]*abilityActive !== true/u,
+    "the browser proves the active fixture ability before submitting either Memento",
   );
   assert.match(
     transport,
