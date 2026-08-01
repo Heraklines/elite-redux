@@ -203,6 +203,20 @@ function resolveRedirectedAsset(pathname, redirects) {
   return null;
 }
 
+function exactAssetUpstreamCandidates(asset) {
+  const primary = new URL(asset.href);
+  const repoPrefix = `/gh/Heraklines/er-assets@${asset.assetSha}/`;
+  if (primary.hostname !== "cdn.jsdelivr.net" || !primary.pathname.startsWith(repoPrefix)) {
+    throw new Error("validated production asset lost its exact-SHA jsDelivr binding");
+  }
+  const repoPath = primary.pathname.slice(repoPrefix.length);
+  return Object.freeze([
+    primary.href,
+    `https://fastly.jsdelivr.net${primary.pathname}`,
+    `https://raw.githubusercontent.com/Heraklines/er-assets/${asset.assetSha}/${repoPath}`,
+  ]);
+}
+
 function positiveInteger(value, name) {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive safe integer`);
@@ -261,6 +275,8 @@ export function createSharedProductionAssetProxy({
     cacheHits: 0,
     inFlightHits: 0,
     upstreamFetches: 0,
+    fallbackFetches: 0,
+    fallbackSuccesses: 0,
     evictions: 0,
     failures: 0,
   };
@@ -319,44 +335,63 @@ export function createSharedProductionAssetProxy({
     );
     timeout.unref?.();
     try {
-      stats.upstreamFetches++;
-      const upstream = await fetchImpl(asset.href, {
-        method: "GET",
-        redirect: "error",
-        signal: controller.signal,
-        headers: { Accept: "*/*" },
-      });
-      if (upstream.status !== 200 || upstream.body == null) {
-        throw new Error(`exact-SHA asset fetch returned HTTP ${upstream.status}`);
-      }
-      const declaredLength = upstream.headers.get("content-length");
-      if (declaredLength != null) {
-        const value = Number(declaredLength);
-        if (!Number.isSafeInteger(value) || value < 0 || value > maxEntryBytes) {
-          throw new Error(`exact-SHA asset Content-Length is outside the ${maxEntryBytes}-byte bound`);
+      let lastError = null;
+      const candidates = exactAssetUpstreamCandidates(asset);
+      for (const [candidateIndex, candidate] of candidates.entries()) {
+        try {
+          stats.upstreamFetches++;
+          if (candidateIndex > 0) {
+            stats.fallbackFetches++;
+          }
+          const upstream = await fetchImpl(candidate, {
+            method: "GET",
+            redirect: "error",
+            signal: controller.signal,
+            headers: { Accept: "*/*" },
+          });
+          if (upstream.status !== 200 || upstream.body == null) {
+            throw new Error(`exact-SHA asset fetch returned HTTP ${upstream.status}`);
+          }
+          const declaredLength = upstream.headers.get("content-length");
+          if (declaredLength != null) {
+            const value = Number(declaredLength);
+            if (!Number.isSafeInteger(value) || value < 0 || value > maxEntryBytes) {
+              throw new Error(`exact-SHA asset Content-Length is outside the ${maxEntryBytes}-byte bound`);
+            }
+          }
+          const chunks = [];
+          let bytes = 0;
+          for await (const value of upstream.body) {
+            const chunk = Buffer.from(value);
+            bytes += chunk.length;
+            if (bytes > maxEntryBytes) {
+              throw new Error(`exact-SHA asset body exceeded the ${maxEntryBytes}-byte bound`);
+            }
+            chunks.push(chunk);
+          }
+          const entry = Object.freeze({
+            body: Buffer.concat(chunks, bytes),
+            contentType:
+              upstream.headers.get("content-type")
+              || CONTENT_TYPES[extname(new URL(candidate).pathname)]
+              || "application/octet-stream",
+            etag: upstream.headers.get("etag"),
+            lastModified: upstream.headers.get("last-modified"),
+          });
+          retain(asset.href, entry);
+          if (candidateIndex > 0) {
+            stats.fallbackSuccesses++;
+          }
+          return entry;
+        } catch (error) {
+          if (controller.signal.aborted) {
+            throw error;
+          }
+          lastError = error;
         }
       }
-      const chunks = [];
-      let bytes = 0;
-      for await (const value of upstream.body) {
-        const chunk = Buffer.from(value);
-        bytes += chunk.length;
-        if (bytes > maxEntryBytes) {
-          throw new Error(`exact-SHA asset body exceeded the ${maxEntryBytes}-byte bound`);
-        }
-        chunks.push(chunk);
-      }
-      const entry = Object.freeze({
-        body: Buffer.concat(chunks, bytes),
-        contentType:
-          upstream.headers.get("content-type")
-          || CONTENT_TYPES[extname(new URL(asset.href).pathname)]
-          || "application/octet-stream",
-        etag: upstream.headers.get("etag"),
-        lastModified: upstream.headers.get("last-modified"),
-      });
-      retain(asset.href, entry);
-      return entry;
+      const detail = lastError instanceof Error ? lastError.message : String(lastError);
+      throw new Error(`all exact-SHA asset sources failed: ${detail}`, { cause: lastError });
     } finally {
       clearTimeout(timeout);
       controllers.delete(controller);

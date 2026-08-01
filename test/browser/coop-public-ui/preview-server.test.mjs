@@ -204,6 +204,39 @@ test("two simultaneous browser requests share one exact-SHA upstream fetch and i
   }
 });
 
+test("asset proxy falls back only across immutable URLs derived from the validated SHA", async () => {
+  const attempted = [];
+  const proxy = createSharedProductionAssetProxy({
+    redirects: redirects(),
+    fetchImpl: async url => {
+      attempted.push(String(url));
+      if (new URL(url).hostname !== "raw.githubusercontent.com") {
+        return new Response("unavailable", { status: 503 });
+      }
+      return new Response("raw-exact-asset", { status: 200, headers: { "Content-Type": "image/png" } });
+    },
+    maxBytes: 1_024,
+    maxEntryBytes: 512,
+    maxEntries: 8,
+    maxConcurrent: 1,
+  });
+  try {
+    const entry = await proxy.get("/images/pokemon/test.png");
+    assert.equal(entry.body.toString(), "raw-exact-asset");
+    assert.deepEqual(attempted, [
+      `https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${ASSET_SHA}/images/pokemon/test.png`,
+      `https://fastly.jsdelivr.net/gh/Heraklines/er-assets@${ASSET_SHA}/images/pokemon/test.png`,
+      `https://raw.githubusercontent.com/Heraklines/er-assets/${ASSET_SHA}/images/pokemon/test.png`,
+    ]);
+    assert.equal(proxy.snapshot().upstreamFetches, 3);
+    assert.equal(proxy.snapshot().fallbackFetches, 2);
+    assert.equal(proxy.snapshot().fallbackSuccesses, 1);
+    assert.equal(proxy.snapshot().failures, 0);
+  } finally {
+    proxy.close();
+  }
+});
+
 test("proxy cache is byte-bounded and evicts least-recently-used exact-SHA assets", async () => {
   let upstreamFetches = 0;
   const proxy = createSharedProductionAssetProxy({
@@ -284,7 +317,9 @@ test("asset proxy fails closed and never fetches a URL outside the validated red
     assert.equal(failedAsset.status, 502);
     assert.equal(failedAsset.headers.get("location"), null, "proxy failure never falls back to a redirect");
     assert.equal(failedAsset.headers.get("cache-control"), "no-store");
-    assert.equal(upstreamFetches, 1);
+    assert.equal(upstreamFetches, 3);
+    assert.equal(proxy.snapshot().fallbackFetches, 2);
+    assert.equal(proxy.snapshot().fallbackSuccesses, 0);
     assert.equal(proxy.snapshot().failures, 1);
   } finally {
     await preview.close();
