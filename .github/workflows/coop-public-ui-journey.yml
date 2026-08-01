@@ -401,9 +401,10 @@ jobs:
           COOP_UI_PROXY_PRODUCTION_ASSETS: "1"
           COOP_UI_EXPECTED_API_ORIGIN: ${{ env.COOP_UI_API_ORIGIN }}
           COOP_UI_EXPECTED_SIGNAL_ORIGIN: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          # run-campaign.mjs consumes the same base config but owns its own campaign policy;
-          # `probe` keeps the base journey validator satisfied for the dedicated market route.
-          COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
+          # Keep the selected campaign identity intact. The public rig uses it to attach the exact,
+          # build-gated navigation fixture URL token; reducing market-wide-lens to `probe` silently
+          # launched ordinary level-5 starters in exact-SHA run 30698494882.
+          COOP_UI_JOURNEY: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
           COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}

@@ -160,9 +160,7 @@ test("journey push defaults to fresh-wave2 while manual milestone runs retain fr
     "the job label identifies fresh-wave2 on push and fresh-resume on a default dispatch",
   );
   assert.ok(
-    primary.includes(
-      "COOP_UI_JOURNEY: ${{ inputs.journey == 'market-wide-lens' && 'probe' || " + selectedJourneyExpression + " }}",
-    ),
+    primary.includes("COOP_UI_JOURNEY: ${{ " + selectedJourneyExpression + " }}"),
     "the driver receives the same selected journey advertised by concurrency and the job label",
   );
   assert.doesNotMatch(

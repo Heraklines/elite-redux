@@ -193,6 +193,16 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
     /\(inputs\.journey == 'navigation-depth-30' \|\| inputs\.journey == 'market-wide-lens'\) && 'navigation-depth-30'/u,
   );
   assert.match(
+    workflow,
+    /COOP_UI_JOURNEY: \$\{\{ inputs\.journey \|\| \(github\.event_name == 'push' && 'fresh-wave2'\) \|\| 'fresh-resume' \}\}/u,
+    "the campaign identity must reach the public rig so its exact URL-gated fixture can activate",
+  );
+  assert.doesNotMatch(
+    workflow,
+    /inputs\.journey == 'market-wide-lens' && 'probe'/u,
+    "the market route must never be disguised as probe and silently lose its survival fixture",
+  );
+  assert.match(
     harness,
     /this\.config\.journey === "navigation-depth-30" \|\| this\.config\.journey === "market-wide-lens"[\s\S]*entryUrl\.searchParams\.set\("coopfixture", "navigation-depth-30"\)/u,
   );
