@@ -180,8 +180,10 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
     /const fixturePauseEvolutions = shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*this\.initBattle\(merged, true, owners, undefined, fixtureStartingLevels, fixturePauseEvolutions\)/u,
   );
   assert.equal(
-    (starterPhase.match(/if \(fixtureStartingMoney != null\) \{\s*globalScene\.money = fixtureStartingMoney;\s*\}/gu) ?? [])
-      .length,
+    (
+      starterPhase.match(/if \(fixtureStartingMoney != null\) \{\s*globalScene\.money = fixtureStartingMoney;\s*\}/gu)
+      ?? []
+    ).length,
     2,
     "both the legacy fallback and authoritative host set the fixture purse before initial battle construction",
   );
