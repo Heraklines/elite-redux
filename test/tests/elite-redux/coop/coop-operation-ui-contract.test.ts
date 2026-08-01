@@ -6,6 +6,7 @@
 import {
   COOP_OPERATION_SURFACES,
   COOP_OPERATION_UI_CONTRACTS,
+  coopV2InteractionUiProofContract,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
 import { COOP_UI_AUTHORITATIVE_COMMIT_MODES } from "#data/elite-redux/coop/coop-ui-registry";
 import { UiMode } from "#enums/ui-mode";
@@ -41,5 +42,13 @@ describe("co-op authoritative operation public-UI contracts", () => {
         ).toBe(true);
       }
     }
+  });
+
+  it("keeps nested reward Summary input inside the exact reward control proof", () => {
+    expect(COOP_OPERATION_UI_CONTRACTS["op:reward"].uiModes).toContain(UiMode.SUMMARY);
+    for (const kind of ["REWARD", "REWARD_PRESENT", "SHOP_BUY", "SHOP_PRESENT"] as const) {
+      expect(coopV2InteractionUiProofContract("op:reward", kind)?.uiModes, kind).toContain(UiMode.SUMMARY);
+    }
+    expect(coopV2InteractionUiProofContract("op:learnMove", "REWARD")).toBeNull();
   });
 });

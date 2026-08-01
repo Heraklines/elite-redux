@@ -1814,7 +1814,7 @@ export class PublicUiClient {
           // SelectChallengePhase with a valid host binding. Only an actual TitlePhase return is
           // terminal; post-lobby setup or a stable binding proves the request was superseded by a
           // successful pairing.
-          const binding = sink.findBinding(requestCursor);
+          const binding = sink.findPairingRole(requestCursor);
           if (binding) {
             return { kind: "paired", event: binding };
           }
@@ -2539,7 +2539,7 @@ export class DuoPublicUiRig {
         } else {
           assertNoDriverApiFailure(client.evidence, "co-op lobby");
         }
-        const binding = client.evidence.findBinding(roleCursors[client.label]);
+        const binding = client.evidence.findPairingRole(roleCursors[client.label]);
         if (binding) {
           client.publicRole = binding.observation.role;
           client.publicSeat = binding.observation.seat;
@@ -5200,11 +5200,9 @@ export class DuoPublicUiRig {
     const roleCursors = Object.fromEntries(clients.map(client => [client.label, client.evidence.cursor()]));
     await Promise.all(clients.map(client => client.enterCoopLobby({ expectedLifecycle: "reload-rejoin" })));
     this.pairRoleCursors = roleCursors;
-    await this.completePairingBinding();
     await this.assertPairingFunctionalFingerprintMatch(roleCursors);
 
-    const bindings = clients.map(client => client.evidence.findLastBinding(roleCursors[client.label]));
-    for (const [index, client] of clients.entries()) {
+    for (const client of clients) {
       const rejoin = client.evidence.findResponse("/coop/v3/rejoin", {
         from: roleCursors[client.label],
         status: 200,
@@ -5220,6 +5218,24 @@ export class DuoPublicUiRig {
       if (announce != null) {
         throw new Error(`${client.label}: same-tab reload incorrectly minted a second lobby presence`);
       }
+    }
+    const peerAdvance = clients
+      .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
+      .find(event => /P33 peer generation advanced \d+->\d+ on authenticated hello/u.test(event.text ?? ""));
+    if (peerAdvance == null) {
+      throw new Error("same-tab rejoin never completed the provisional peer-generation axis from authenticated hello");
+    }
+    // A full-page reload creates a fresh controller. It must first drive the normal public Resume transaction
+    // before either seat can accept a new immutable gameplay binding. Waiting for that binding here deadlocks
+    // ahead of the very human decision that creates it; resumeRun() owns that ordering boundary.
+    return roleCursors;
+  }
+
+  /** Prove the post-Resume binding is the Worker's rotated same-tab generation on both seats. */
+  assertSameTabRejoinGeneration(roleCursors) {
+    const clients = Object.values(this.clients);
+    const bindings = clients.map(client => client.evidence.findLastBinding(roleCursors[client.label]));
+    for (const [index, client] of clients.entries()) {
       if ((bindings[index]?.observation.connectionGeneration ?? 0) < 2) {
         throw new Error(
           `${client.label}: same-tab rejoin retained generation ${bindings[index]?.observation.connectionGeneration ?? "none"}`,
@@ -5230,7 +5246,7 @@ export class DuoPublicUiRig {
       .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
       .find(event => /P33 peer generation advanced \d+->\d+ on authenticated hello/u.test(event.text ?? ""));
     if (peerAdvance == null) {
-      throw new Error("same-tab rejoin never completed the provisional peer-generation axis from authenticated hello");
+      throw new Error("same-tab rejoin lost its authenticated peer-generation proof before gameplay binding");
     }
     for (const client of clients) {
       client.evidence.record("same-tab-rejoin-generation-proof", {
@@ -5239,7 +5255,6 @@ export class DuoPublicUiRig {
         peerAdvanceEvidenceIndex: peerAdvance.index,
       });
     }
-    return roleCursors;
   }
 
   async coldReplaceContextsAndLogin() {

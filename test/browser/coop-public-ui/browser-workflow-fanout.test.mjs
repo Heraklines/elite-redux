@@ -171,10 +171,11 @@ test("journey push defaults to fresh-wave2 while manual milestone runs retain fr
 });
 
 test("same-tab rejoin journey preserves browser storage and proves a post-rejoin battle", async () => {
-  const [workflow, config, evidence, harness, journeys] = await Promise.all([
+  const [workflow, config, evidence, browserEntry, harness, journeys] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
   ]);
@@ -192,8 +193,18 @@ test("same-tab rejoin journey preserves browser storage and proves a post-rejoin
   assert.match(harness, /findResponse\("\/coop\/v3\/rejoin"[\s\S]*status: 200[\s\S]*method: "POST"/u);
   assert.match(harness, /P33 peer generation advanced \\d\+->\\d\+ on authenticated hello/u);
   assert.match(
+    browserEntry,
+    /hasAuthenticatedPairing[\s\S]*p33FrameContext\(\)[\s\S]*p33MembershipSnapshot\(\)/u,
+    "the public binding oracle must use the accepted P33 axes, not provisional V1 generation zero",
+  );
+  assert.match(
+    evidence,
+    /findBinding\([\s\S]*gameplayBindingReady === true[\s\S]*findPairingRole\(/u,
+    "pairing role discovery must remain observable without promoting it to a gameplay binding",
+  );
+  assert.match(
     journeys,
-    /async function sameTabRejoin\(rig\)[\s\S]*sameTabReloadAndRejoin\(\)[\s\S]*resumeRun\(\{ expectedWave: 2 \}\)[\s\S]*driveWaveToReward\(\)[\s\S]*connection-generation-mismatch/u,
+    /async function sameTabRejoin\(rig\)[\s\S]*sameTabReloadAndRejoin\(\)[\s\S]*resumeRun\(\{ expectedWave: 2 \}\)[\s\S]*assertSameTabRejoinGeneration\([\s\S]*driveWaveToReward\(\)[\s\S]*connection-generation-mismatch/u,
     "the oracle must drive real post-rejoin mechanics and reject the player's stale-generation symptom",
   );
 });

@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "359dd9a159539961d390cae19bafc4daa5558167",
+  "baseSha": "282d2c3b9f40a268ef1c5980aee60a5c9c732909",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -328,6 +328,7 @@
     "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts",
     "test/tests/elite-redux/coop/coop-operation-durability-remediation.test.ts",
     "test/tests/elite-redux/coop/coop-operation-precommit-intent-loss.test.ts",
+    "test/tests/elite-redux/coop/coop-operation-ui-contract.test.ts",
     "test/tests/elite-redux/coop/coop-p33-client.test.ts",
     "test/tests/elite-redux/coop/coop-p33-terminal-binding.test.ts",
     "test/tests/elite-redux/coop/coop-replacement-carrier-transaction.test.ts",

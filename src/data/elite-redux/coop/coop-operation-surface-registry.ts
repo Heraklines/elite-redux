@@ -140,19 +140,22 @@ const COOP_V2_INTERACTION_UI_PROOFS = {
     phaseNames: ["RevivalBlessingPhase", "CoopGuestRevivalPhase", "CoopReplayMePhase"],
   },
   REWARD: {
-    uiModes: [UiMode.MODIFIER_SELECT, UiMode.CONFIRM, UiMode.PARTY],
+    // PARTY's Summary action is a presentation-only child of this exact reward lease. It must remain
+    // address/owner/phase-bound here: treating every SUMMARY as globally local would bypass the shared
+    // LearnMove control, while omitting it freezes the rightful reward owner after the overlay opens.
+    uiModes: [UiMode.MODIFIER_SELECT, UiMode.CONFIRM, UiMode.PARTY, UiMode.SUMMARY],
     phaseNames: ["SelectModifierPhase"],
   },
   REWARD_PRESENT: {
-    uiModes: [UiMode.MODIFIER_SELECT, UiMode.CONFIRM, UiMode.PARTY],
+    uiModes: [UiMode.MODIFIER_SELECT, UiMode.CONFIRM, UiMode.PARTY, UiMode.SUMMARY],
     phaseNames: ["SelectModifierPhase"],
   },
   SHOP_PRESENT: {
-    uiModes: [UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY, UiMode.MESSAGE],
+    uiModes: [UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY, UiMode.SUMMARY, UiMode.MESSAGE],
     phaseNames: ["BiomeShopPhase", "ExoticShopPhase", "BlackMarketShopPhase", "ImportBazaarShopPhase"],
   },
   SHOP_BUY: {
-    uiModes: [UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY, UiMode.MESSAGE],
+    uiModes: [UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY, UiMode.SUMMARY, UiMode.MESSAGE],
     phaseNames: ["BiomeShopPhase", "ExoticShopPhase", "BlackMarketShopPhase", "ImportBazaarShopPhase"],
   },
   STORMGLASS_PRESENT: {
@@ -266,7 +269,7 @@ export const COOP_OPERATION_UI_CONTRACTS = {
     phaseNames: ["RevivalBlessingPhase", "CoopGuestRevivalPhase", "CoopReplayMePhase"],
   },
   "op:reward": {
-    uiModes: [UiMode.MODIFIER_SELECT, UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY],
+    uiModes: [UiMode.MODIFIER_SELECT, UiMode.BIOME_SHOP, UiMode.CONFIRM, UiMode.PARTY, UiMode.SUMMARY],
     phaseNames: [
       "SelectModifierPhase",
       "BiomeShopPhase",

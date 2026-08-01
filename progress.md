@@ -6716,3 +6716,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The assertions now track `er-coop-62`, and the source contract additionally requires the authenticated
   `connectionGeneration` hello field. This changes no product code and does not invalidate the already-running
   exact-SHA Ability Capsule or same-tab rejoin browser proofs.
+
+## 2026-08-02 - Ability Capsule Summary authority proof
+
+- Exact-SHA journey `30722189191` reproduced the player's freeze through real keyboard input. The bounded
+  PARTY -> Summary transition completed and `SUMMARY` became the active handler, but the read-only observer
+  reported `inputBlocked=true` indefinitely while transport and both engines stayed healthy.
+- The live claim was `op:reward` / `REWARD_PRESENT`. Its V2 proof admitted MODIFIER_SELECT, CONFIRM, and PARTY,
+  but not PARTY's nested informational SUMMARY child, so the global physical-input gate rejected every key.
+- Reward and shop proof contracts now admit SUMMARY only under their existing exact owner, address, and phase
+  lease. LearnMove Summary remains a separate `op:learnMove` proof; no global Summary bypass was added.
+- The two-browser Ability Capsule journey remains the production-path regression. Default headless soaks keep
+  the new Summary -> reward edge explicitly classified rather than pretending they drive that nested screen.
+
+## 2026-08-02 - Same-tab reload ordering and authenticated observer axes
+
+- Exact-SHA journey `30722191260` reached `/coop/v3/rejoin` with HTTP 200 on both seats, opened generation-2
+  WebRTC, and completed the authenticated hello/fingerprint exchange. It then waited in the title launch UI:
+  host "Checking for a co-op save", guest "Waiting for host". This was a harness ordering defect, not a failed
+  carrier rejoin: the journey demanded a gameplay binding before driving the ordinary Resume transaction that
+  creates and acknowledges that binding on a newly constructed page runtime.
+- The browser binding observer also mislabeled the runtime's provisional V1 active/generation-zero membership
+  as an authenticated stable-seat binding. P33 observations now fail closed until `p33FrameContext()` and the
+  authenticated membership snapshot are both actionable, then expose the Worker's real local generation.
+- The journey now proves the rejoin HTTP/hello boundary first, drives Resume through ordinary public keys, and
+  only then asserts generation >= 2 on both accepted gameplay bindings before completing a post-reload battle.

@@ -407,16 +407,57 @@ let lastProbedAddress = "";
 let lastProbeAt = 0;
 let lastObserverError = "";
 
+/**
+ * Project the membership axes that can actually authenticate mechanical traffic. The legacy V1 membership
+ * controller starts active/generation-zero as soon as a runtime is constructed, before a P33 seat has accepted
+ * the immutable session binding. Treating that provisional object as a "stable-seat binding" made the browser
+ * oracle report a false host binding during reload and hid the Worker's generation-2 channel. P33 observations
+ * therefore fail closed until the same exact frame context used by Authority V2 is actionable.
+ */
+function observedMembershipAxes(runtime: NonNullable<ReturnType<typeof getCoopRuntime>>): {
+  readonly revision: number;
+  readonly connectionGeneration: number;
+  readonly state: "active";
+} | null {
+  if (runtime.controller.hasAuthenticatedPairing) {
+    const frame = runtime.controller.p33FrameContext();
+    const membership = runtime.controller.p33MembershipSnapshot();
+    if (frame == null || membership?.state !== "active") {
+      return null;
+    }
+    return {
+      revision: frame.membershipRevision,
+      connectionGeneration: frame.connectionGeneration,
+      state: "active",
+    };
+  }
+  const membership = runtime.membership.snapshot();
+  return membership.state === "active"
+    ? {
+        revision: membership.revision,
+        connectionGeneration: membership.connectionGeneration,
+        state: "active",
+      }
+    : null;
+}
+
 function observeBoundSession(): void {
   try {
     const runtime = getCoopRuntime();
     if (runtime == null || runtime.controller.sessionEpoch <= 0) {
       return;
     }
-    const membership = runtime.membership.snapshot();
-    if (membership.state !== "active") {
+    const authenticatedMembership = observedMembershipAxes(runtime);
+    const provisionalMembership = runtime.membership.snapshot();
+    if (authenticatedMembership == null && provisionalMembership.state !== "active") {
       return;
     }
+    const membership = authenticatedMembership ?? {
+      revision: provisionalMembership.revision,
+      connectionGeneration:
+        runtime.localTransport.connectionGeneration?.() ?? provisionalMembership.connectionGeneration,
+      state: "active" as const,
+    };
     const observation = {
       version: 1,
       role: runtime.controller.role,
@@ -425,6 +466,7 @@ function observeBoundSession(): void {
       membershipRevision: membership.revision,
       connectionGeneration: membership.connectionGeneration,
       membershipState: membership.state,
+      gameplayBindingReady: authenticatedMembership != null || !runtime.controller.hasAuthenticatedPairing,
     } as const;
     const canonical = JSON.stringify(observation);
     if (canonical === lastObservedBinding) {
@@ -457,7 +499,10 @@ function observeContinuationSurface(): void {
     if (surface == null) {
       return;
     }
-    const membership = runtime.membership.snapshot();
+    const membership = observedMembershipAxes(runtime);
+    if (membership == null) {
+      return;
+    }
     const addressKey = [
       surface,
       runtime.controller.role,
@@ -1206,7 +1251,7 @@ interface MarketHeldModifierProjection {
 function observeBiomeMarket(): void {
   try {
     const runtime = getCoopRuntime();
-    const membership = runtime?.membership.snapshot();
+    const membership = runtime == null ? null : observedMembershipAxes(runtime);
     const battle = globalScene?.currentBattle;
     const currentPhase = globalScene?.phaseManager?.getCurrentPhase();
     const ui = globalScene?.ui;
@@ -1328,7 +1373,7 @@ function observeBiomeMarket(): void {
 function observeCommanderBoundary(): void {
   try {
     const runtime = getCoopRuntime();
-    const membership = runtime?.membership.snapshot();
+    const membership = runtime == null ? null : observedMembershipAxes(runtime);
     const battle = globalScene?.currentBattle;
     const phase = globalScene?.phaseManager?.getCurrentPhase()?.phaseName;
     if (runtime == null || membership?.state !== "active" || battle == null || phase == null) {
@@ -1472,8 +1517,8 @@ function observeSemanticSurface(): void {
       currentPhase as unknown as { isAwaitingAuthority?: () => boolean }
     ).isAwaitingAuthority?.();
     if (rendererWaitReady === true && runtime != null && battle != null) {
-      const membership = runtime.membership.snapshot();
-      if (membership.state !== "active" || runtime.controller.sessionEpoch <= 0) {
+      const membership = observedMembershipAxes(runtime);
+      if (membership == null || runtime.controller.sessionEpoch <= 0) {
         return;
       }
       const { digest: stateDigest } = semanticMechanicalDigest(
@@ -1595,8 +1640,8 @@ function observeSemanticSurface(): void {
       return;
     }
     if (semantic == null) {
-      const membership = runtime?.membership.snapshot();
-      if (runtime == null || membership?.state !== "active") {
+      const membership = runtime == null ? null : observedMembershipAxes(runtime);
+      if (runtime == null || membership == null) {
         // A local modal such as Settings can temporarily replace a semantic menu without changing
         // either its phase object or its eventual payload. Retaining the old canonical observation
         // across that gap makes the reopened menu look like a duplicate, so a public driver can see
@@ -1655,8 +1700,13 @@ function observeSemanticSurface(): void {
     let connectionGeneration: number | null = null;
     let seatsWithInput: number[] = [0];
     if (runtime != null) {
-      const membership = runtime.membership.snapshot();
-      if (membership.state !== "active" && !preBindingGuestLaunchMessage) {
+      // The guest's actionable pre-binding resume prompt is intentionally observable at epoch zero. Every
+      // other P33 surface must use the accepted frame axes above; otherwise a provisional generation-zero
+      // runtime can masquerade as authenticated gameplay.
+      const membership = preBindingGuestLaunchMessage
+        ? runtime.membership.snapshot()
+        : observedMembershipAxes(runtime);
+      if (membership == null || (membership.state !== "active" && !preBindingGuestLaunchMessage)) {
         return;
       }
       coop = true;

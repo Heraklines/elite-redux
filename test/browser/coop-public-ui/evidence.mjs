@@ -651,6 +651,7 @@ function bindingView(text) {
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
     || value.membershipState !== "active"
+    || typeof value.gameplayBindingReady !== "boolean"
   ) {
     throw new Error("built browser emitted an invalid session-binding observation");
   }
@@ -1342,14 +1343,21 @@ export class EvidenceSink {
   }
 
   findBinding(from = 0) {
-    return this.events.slice(from).find(event => event.kind === "browser-binding");
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-binding" && event.observation.gameplayBindingReady === true);
   }
 
   findLastBinding(from = 0) {
     return this.events
       .slice(from)
       .toReversed()
-      .find(event => event.kind === "browser-binding");
+      .find(event => event.kind === "browser-binding" && event.observation.gameplayBindingReady === true);
+  }
+
+  /** Worker-authenticated role/seat visibility before the gameplay binding transaction is committed. */
+  findPairingRole(from = 0) {
+    return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
   findResponse(pathname, { from = 0, status = null, method = null, slot = null, mode = null } = {}) {

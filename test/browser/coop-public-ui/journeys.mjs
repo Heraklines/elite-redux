@@ -461,6 +461,7 @@ async function sameTabRejoin(rig) {
   await freshThroughWave2(rig);
   const rejoinCursors = await rig.sameTabReloadAndRejoin();
   await rig.resumeRun({ expectedWave: 2 });
+  rig.assertSameTabRejoinGeneration(rejoinCursors);
   await rig.driveWaveToReward();
   rig.assertNoFatalRecoverySince(rejoinCursors, "same-tab rejoin through one complete post-reload battle");
   for (const client of Object.values(rig.clients)) {
