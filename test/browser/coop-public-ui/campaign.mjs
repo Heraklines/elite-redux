@@ -4156,9 +4156,7 @@ export function assertNavigationCoverage(coverage, marketCoverage, battleKinds, 
     return market >= 0 && crossroads > market && worldMap > crossroads && choseLeave && completedWorldMap;
   });
   if (!chained) {
-    throw new Error(
-      "[campaign-navigation] no ordered market -> Crossroads Leave -> World Map chain completed",
-    );
+    throw new Error("[campaign-navigation] no ordered market -> Crossroads Leave -> World Map chain completed");
   }
   if (targetWaves >= 20) {
     const wave20 = battleKinds.find(kind => kind.wave === 20);
