@@ -218,6 +218,16 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
     /this\.config\.journey === "navigation-depth-30" \|\| this\.config\.journey === "market-wide-lens"[\s\S]*entryUrl\.searchParams\.set\("coopfixture", "navigation-depth-30"\)/u,
   );
   assert.match(workflow, /COOP_UI_CHROME_TRACE: \$\{\{ inputs\.chrome_trace && '1' \|\| '0' \}\}/u);
+  assert.match(
+    workflow,
+    /== 'market-wide-lens' && 100/u,
+    "the wave-20 market journey retains enough hosted-runner time for its measured human-equivalent pace",
+  );
+  assert.match(
+    workflow,
+    /inputs\.journey == 'market-wide-lens' && '5100000'/u,
+    "the market lifecycle deadline cannot expire at synchronized wave 13 before opposite-owner coverage",
+  );
   assert.match(workflow, /node test\/browser\/coop-public-ui\/run-campaign\.mjs/u);
   assert.match(workflow, /node test\/browser\/coop-public-ui\/check-campaign-boundary\.mjs/u);
   assert.match(workflow, /node --test test\/browser\/coop-public-ui\/market-gold-standard\.test\.mjs/u);

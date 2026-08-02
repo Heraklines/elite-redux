@@ -342,7 +342,7 @@ jobs:
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
     # remain healthy for roughly 48 minutes on the constrained ~3-fps runner; a 35-minute outer job ceiling
     # previously cancelled it mid-ShowAbilityPhase while both peers were connected and assertion-clean.
-    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'same-tab-rejoin') && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
+    timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 100 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'same-tab-rejoin') && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
       matrix:
@@ -432,7 +432,10 @@ jobs:
           # fixture or cross-job aggregation can counterfeit the owner alternation.
           COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || '20' }}
           COOP_UI_CAMPAIGN_MODE: ${{ inputs.journey == 'navigation-depth-30' && 'nightly' || 'gating' }}
-          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || '2700000' }}
+          # The measured default 2-vCPU runner reached synchronized wave 13 at the old 45-minute
+          # market deadline. Give the continuous wave-20 proof its measured 85-minute lifecycle;
+          # this remains immutable and leaves 15 minutes for bounded diagnosis/artifact upload.
+          COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || inputs.journey == 'market-wide-lens' && '5100000' || '2700000' }}
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
           COOP_UI_REWARD_MODE: ${{ inputs.journey == 'ability-capsule' && 'pick-first' || 'leave' }}
           COOP_UI_RAISE_SPEED: "1"
