@@ -309,9 +309,11 @@ ENJOY facing and feed it back into design:
 
 - Keep production on legacy schema v1 until the contract-v3 rollout gate in
   `docs/plans/combat-ai-human-telemetry-rollout.md` passes and the maintainer explicitly approves it.
-- Evaluate the account-split legacy human tree on the frozen 100-pair mirrored ghost benchmark. Treat
-  offline Top-1 as diagnostic only.
+- The account-split legacy human tree completed the frozen 100-pair mirrored benchmark at 24.5%
+  (147/600, 95% CI 21.2%-28.1%) with zero illegal actions, timeouts, or draws. That is the strongest
+  aggregate baseline so far, ahead of hardest AI at 19.8%, but it remains research-only.
 - After contract-v3 accumulates terminal-labelled human data, train policy primarily from human wins and
   value from every completed outcome. Hardest AI remains evaluation/sparring only.
-- Resume checkpoint-league self-play only after a human-initialized policy improves actual mirrored
-  battle win rate. Do not scale the current transformer recipe.
+- Use contract-v3 terminal-labelled human data to produce the self-play initializer. The legacy tree has
+  cleared the mirrored-improvement prerequisite, but lacks safe switch labels and outcome supervision.
+  Do not scale the current transformer recipe or serve any experimental model in production.

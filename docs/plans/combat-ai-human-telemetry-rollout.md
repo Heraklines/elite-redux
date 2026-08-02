@@ -1,19 +1,20 @@
 # Combat AI human telemetry baseline and contract-v3 rollout
 
-Date: 2026-08-01. Status: implementation and non-production evaluation in progress. Production deployment
-is not approved by this document.
+Date: 2026-08-01. Status: legacy baseline evaluated; contract-v3 production rollout awaiting explicit
+approval. Production deployment is not approved by this document.
 
 ## Verified production snapshot
 
-A GET-only R2 import completed while the bucket was still growing:
+A GET-only R2 import completed while the bucket was still growing. The benchmark training snapshot from
+Actions run `30761540906` contained:
 
 - Source: production bucket `er-telemetry`.
-- 112,292 events in 3,284 immutable batches (10,317,945 compressed bytes).
-- 63,393 human battle decisions and 48,899 turn-outcome snapshots.
-- 1,229 sessions from 832 pseudonymous source partitions.
+- 137,371 events in 4,111 immutable batches.
+- 77,784 human battle decisions and 59,587 turn-outcome snapshots.
+- 1,550 sessions from 1,061 pseudonymous source partitions.
 - Every batch is solo and schema v1. There are zero contract-v3 decisions and zero terminal records.
-- Session modes are 1,052 Classic, 2 Endless, and 175 Challenge. Difficulty coverage is 667 Youngster,
-  240 Ace, 115 Elite, and 207 Hell. Co-op, Showdown, and tournament sessions are absent.
+- Session modes are 1,335 Classic, 3 Endless, and 212 Challenge. Difficulty coverage is 801 Youngster,
+  308 Ace, 168 Elite, and 273 Hell. Co-op, Showdown, and tournament sessions are absent.
 
 This supersedes the earlier lower bound observed during inspection (94,083 events, 53,147 decisions,
 40,936 outcomes, 1,098 sessions, and 735 sources). Counts are snapshots, not a fixed corpus size.
@@ -31,22 +32,23 @@ This supersedes the earlier lower bound observed during inspection (94,083 event
 
 ## First human baselines
 
-The first snapshot contains 58,216 move choices, 2,961 switches, 2,187 ball throws, and 29 run attempts.
-Legacy v1 captured active battlers but not the bench or the complete legal-candidate set. Therefore:
+The benchmark snapshot contains 71,468 usable move choices. It excludes 3,601 switches, 2,550 ball
+throws, 30 run attempts, and 135 move records that cannot be matched safely. Legacy v1 captured active
+battlers but not the bench or the complete legal-candidate set. Therefore:
 
 - The behavior-cloning forest ranks moves only. It does not fabricate switch destinations or target-set
   labels. Its neutral artifact declares `candidateScope=move-only` and uses runtime feature schema 2.
-- 58,105 move decisions materialized: 43,351 train, 9,118 validation, and 5,636 untouched test decisions.
-- The selected random forest scored 51.0% validation Top-1 and 48.7% test Top-1. These are human
+- 71,468 move decisions materialized: 52,308 train, 11,769 validation, and 7,391 untouched test decisions.
+- The selected random forest scored 53.6% validation Top-1 and 48.5% test Top-1. These are human
   move-imitation diagnostics, not battle win rates.
-- The transition baseline joined 32,915 turn outcomes to a preceding human decision state. On the test
-  split, player/enemy any-faint ROC-AUC is 0.829/0.927. It predicts immediate turn outcomes only and has
+- The transition baseline joined 39,992 turn outcomes to a preceding human decision state. On the test
+  split, player/enemy any-faint ROC-AUC is 0.827/0.929. It predicts immediate turn outcomes only and has
   no terminal-value target.
 
 The manual `ai-human-legacy-baseline.yml` workflow imports and trains on one runner, uploads no raw player
 telemetry, then uses at most four runners for the frozen benchmark.
 
-## Required online benchmark
+## Completed online benchmark
 
 The human tree plays the frozen `ghost-winner-teams.v3.json` benchmark: 100 source-account-held-out roster
 pairs, 50 teams per difficulty, three fixed seeds, and both team orientations. Compare its report with the
@@ -54,9 +56,21 @@ already frozen results for smart-default, the selected tree, and hardest AI. Rep
 Wilson 95% intervals, draws, timeouts, illegal actions, unresolved battles, per-difficulty rates, and the
 macro-average. No offline metric can promote a policy.
 
-Current frozen reference rates are hardest AI 19.8%, selected tree 14.2%, smart-default 12.2%, and the
-transformer checkpoint 3.8%. Hardest AI is evaluation and sparring only; its actions are never policy
-targets.
+The complete 600-leg result from Actions runs `30761540906` and `30765780509` is:
+
+| Controller | Wins | Losses | Win rate (95% Wilson CI) | Illegal | Timeouts | Draws |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Human legacy tree | 147 | 453 | 24.5% (21.2%-28.1%) | 0 | 0 | 0 |
+| Hardest AI | 119 | 481 | 19.8% (16.8%-23.2%) | 0 | 0 | 0 |
+| Selected tree | 85 | 515 | 14.2% (11.6%-17.2%) | 0 | 0 | 0 |
+| Smart-default | 73 | 527 | 12.2% (9.8%-15.0%) | 0 | 0 | 0 |
+| Transformer checkpoint | 23 | 577 | 3.8% (2.6%-5.7%) | 0 | 0 | 0 |
+
+The human tree's per-difficulty rates are 24.7% Youngster, 18.7% Ace, 28.0% Elite, and 26.7% Hell.
+It is the strongest tested aggregate baseline, improving 4.7 percentage points over hardest AI and 10.3
+points over the prior selected tree. The individual aggregate confidence intervals overlap, and hardest AI
+remains 2.0 points ahead on Hell, so this result qualifies the human tree as the next research initializer,
+not as a production policy. Hardest AI is evaluation and sparring only; its actions are never policy targets.
 
 ## Contract-v3 production gate
 
@@ -83,7 +97,8 @@ Do not serve an experimental policy in production.
 1. Accumulate terminal-labelled contract-v3 human sessions.
 2. Train policy primarily from completed human wins; retain all completed outcomes for value learning.
 3. Add engine-search or advantage-relabelled actions when available.
-4. Initialize checkpoint-league self-play from the strongest human policy only after it improves the
-   mirrored benchmark.
+4. Initialize checkpoint-league self-play from a terminal-labelled human policy. The legacy human tree has
+   cleared the mirrored-improvement prerequisite, but its missing switch labels and unknown outcomes make it
+   a baseline rather than the final initializer.
 5. Promote checkpoints only on held-out mirrored battle improvement and consistent performance against
    hardest AI. Never use hardest-AI actions as policy supervision.
