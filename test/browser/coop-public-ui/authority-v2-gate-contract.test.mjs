@@ -58,6 +58,12 @@ const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), 
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const learnMovePhase = readFileSync(new URL("src/phases/learn-move-phase.ts", root), "utf8");
+const abilityPickerModalPhases = [
+  "er-ability-capsule-phase.ts",
+  "er-greater-ability-capsule-phase.ts",
+  "er-greater-ability-randomizer-phase.ts",
+  "er-dex-nav-phase.ts",
+].map(file => [file, readFileSync(new URL(`src/phases/${file}`, root), "utf8")]);
 const encounterPhase = readFileSync(new URL("src/phases/encounter-phase.ts", root), "utf8");
 const fieldPresentation = readFileSync(new URL("src/data/elite-redux/coop/coop-field-presentation.ts", root), "utf8");
 const battleScene = readFileSync(new URL("src/battle-scene.ts", root), "utf8");
@@ -422,8 +428,8 @@ test("public co-op launch waits for an actionable save decision and chooses sema
   );
   assert.match(
     browserEntry,
-    /phase === "TitlePhase"[\s\S]*?&& uiMode === "MESSAGE"[\s\S]*?&& !preBindingGuestLaunchMessage[\s\S]*?&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
-    "the semantic observer suppresses unbound title narration except the real pre-binding guest launch handler",
+    /phase === "TitlePhase"[\s\S]*?&& uiMode === "MESSAGE"[\s\S]*?&& !preBindingLaunchSurface[\s\S]*?&& \(runtime == null \|\| runtime\.controller\.sessionEpoch <= 0\)/u,
+    "the semantic observer suppresses unbound title narration except an authenticated P33 launch handler",
   );
   assert.match(
     publicUiHarness,
@@ -459,13 +465,13 @@ test("public co-op launch waits for an actionable save decision and chooses sema
 
   assert.match(
     browserEntry,
-    /const preBindingGuestLaunchMessage =[\s\S]*?phase === "TitlePhase"[\s\S]*?uiMode === "MESSAGE"[\s\S]*?runtime\.controller\.role === "guest"[\s\S]*?runtime\.controller\.sessionEpoch === 0/u,
-    "the read-only oracle identifies the legitimate guest launch prompt before P33 binds its positive epoch",
+    /const preBindingLaunchSurface =[\s\S]*?phase === "TitlePhase"[\s\S]*?uiMode === "MESSAGE" \|\| uiMode === "CONFIRM"[\s\S]*?hasAuthenticatedPairing[\s\S]*?p33FrameContext\(\) == null/u,
+    "the read-only oracle identifies the launch message and its real confirmation before P33 accepts a gameplay binding",
   );
   assert.match(
     browserEntry,
-    /membership\.state !== "active" && !preBindingGuestLaunchMessage/u,
-    "only the exact pre-binding guest launch prompt bypasses active-membership surface suppression",
+    /membership\.state !== "active" && !preBindingLaunchSurface/u,
+    "only the exact pre-binding P33 launch surfaces bypass accepted-membership surface suppression",
   );
 });
 
@@ -1397,6 +1403,25 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
     "the old renderer standby is replaced by the exact ordered predecessor before the modal starts",
   );
   assert.doesNotMatch(modal, /clearAllPhases/u, "the parked V2 predecessor remains the modal's return target");
+  const committedModalClose = phaseManager.indexOf("public shiftCoopAuthoritativeModalThroughAuthorityCommit(");
+  assert.ok(committedModalClose > modalStart, "PhaseManager exposes the committed-modal close seam");
+  const committedModal = phaseManager.slice(committedModalClose, modalEnd);
+  assert.match(committedModal, /this\.standbyPhase == null/u, "only a real projected modal can use the close seam");
+  assert.ok(
+    committedModal.indexOf("predecessor.retire()") < committedModal.indexOf("commitAfterClose()"),
+    "the consumed predecessor is retired before immutable result retention",
+  );
+  assert.ok(
+    committedModal.indexOf("commitAfterClose()") < committedModal.indexOf("this.startCurrentPhase()"),
+    "the queued successor cannot start before immutable result retention",
+  );
+  for (const [file, source] of abilityPickerModalPhases) {
+    assert.match(
+      source,
+      /isCoopAbilityPresentationAuthorityActive\(this\.coopOperationBinding\)[\s\S]*?shiftCoopAuthoritativeModalThroughAuthorityCommit\(this, settleResult\)/u,
+      `${file} consumes its projected reward predecessor only after an accepted committed V2 result`,
+    );
+  }
 });
 
 test("Mystery publishes the real actionability edge after its click-through guard expires", () => {
@@ -4072,7 +4097,7 @@ test("the browser observer republishes an unchanged menu after a non-semantic mo
   const classification = browserEntry.slice(classify, selection);
   assert.match(
     classification,
-    /if \(semantic == null\) \{[\s\S]*if \(runtime == null \|\| membership\?\.state !== "active"\) \{[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
+    /if \(semantic == null\) \{[\s\S]*observedMembershipAxes\(runtime\)[\s\S]*if \(runtime == null \|\| membership == null\) \{[\s\S]*lastSemanticObservation = "";[\s\S]*return;/u,
     "a local Settings/modal gap must invalidate deduplication so the reopened title menu is fresh",
   );
 });

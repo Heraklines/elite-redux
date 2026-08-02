@@ -81,6 +81,7 @@ const SPINDA_SPECIES_ID = 327;
 const MEWTWO_SPECIES_ID = 150;
 const ZACIAN_SPECIES_ID = 888;
 const ZAMAZENTA_SPECIES_ID = 889;
+const GARCHOMP_SPECIES_ID = 445;
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -1119,6 +1120,8 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", "game-over");
     } else if (this.config.journey === "registered-interactions") {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
+    } else if (this.config.journey === "ability-capsule") {
+      entryUrl.searchParams.set("coopfixture", "ability-capsule");
     } else if (this.config.journey === "navigation-depth-30" || this.config.journey === "market-wide-lens") {
       entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
     } else if (this.config.journey === "evolution-sync") {
@@ -1140,6 +1143,26 @@ export class PublicUiClient {
   async reopen() {
     await this.prepareReopen();
     await this.open();
+  }
+
+  /** Reload the same real tab, preserving its production sessionStorage handoff. */
+  async reloadInPlace() {
+    if (this.page == null) {
+      throw new Error(`${this.label}: cannot reload a missing page`);
+    }
+    this.evidence.record("same-tab-reload", { reason: "exercise production P33 reload handoff" });
+    this.pageGeneration += 1;
+    this.pageCursor = this.evidence.cursor();
+    this.evidence.networkState.account = null;
+    this.evidence.networkState.lobby = null;
+    this.evidence.networkState.coopRunStatus = null;
+    this.evidence.networkState.apiFailure = null;
+    this.publicRole = null;
+    this.publicSeat = null;
+    this.lobbySurfaceCursor = this.pageCursor;
+    await this.page.reload({ waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });
+    await this.page.waitForSelector("#app canvas", { timeout: this.config.bootTimeoutMs });
+    return this.pageCursor;
   }
 
   /** Close the old page without starting the replacement renderer yet. */
@@ -1627,7 +1650,7 @@ export class PublicUiClient {
     return this.evidence.checkpoint(this.page, this.context, `page-${this.pageGeneration}-${name}`, opts);
   }
 
-  async enterCoopLobby() {
+  async enterCoopLobby({ expectedLifecycle = "announce" } = {}) {
     await this.evidence.waitFor(TITLE_PHASE, {
       from: this.pageCursor,
       timeoutMs: this.config.timeoutMs,
@@ -1657,12 +1680,15 @@ export class PublicUiClient {
       timeoutMs: this.config.timeoutMs,
       fromCursor: modeCursor,
     });
-    await this.evidence.waitFor(/start announce name=/u, {
+    const lifecyclePattern =
+      expectedLifecycle === "reload-rejoin" ? /start reload-rejoin code=/u : /start announce name=/u;
+    await this.evidence.waitFor(lifecyclePattern, {
       from: announceCursor,
       timeoutMs: this.config.timeoutMs,
-      description: "public co-op lobby announce",
+      description:
+        expectedLifecycle === "reload-rejoin" ? "public same-tab co-op reload rejoin" : "public co-op lobby announce",
     });
-    await this.checkpoint("lobby-announced");
+    await this.checkpoint(expectedLifecycle === "reload-rejoin" ? "lobby-rejoined" : "lobby-announced");
   }
 
   async enterShowdownLobby() {
@@ -1788,7 +1814,7 @@ export class PublicUiClient {
           // SelectChallengePhase with a valid host binding. Only an actual TitlePhase return is
           // terminal; post-lobby setup or a stable binding proves the request was superseded by a
           // successful pairing.
-          const binding = sink.findBinding(requestCursor);
+          const binding = sink.findPairingRole(requestCursor);
           if (binding) {
             return { kind: "paired", event: binding };
           }
@@ -2513,7 +2539,7 @@ export class DuoPublicUiRig {
         } else {
           assertNoDriverApiFailure(client.evidence, "co-op lobby");
         }
-        const binding = client.evidence.findBinding(roleCursors[client.label]);
+        const binding = client.evidence.findPairingRole(roleCursors[client.label]);
         if (binding) {
           client.publicRole = binding.observation.role;
           client.publicSeat = binding.observation.seat;
@@ -3546,6 +3572,7 @@ export class DuoPublicUiRig {
     navigationFixture = false,
     evolutionFixture = false,
     registeredInteractionsFixture = false,
+    abilityCapsuleFixture = false,
   } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -3642,7 +3669,9 @@ export class DuoPublicUiRig {
                           ? client.label === "host-seat"
                             ? [MAGIKARP_SPECIES_ID, SEEL_SPECIES_ID]
                             : [BULBASAUR_SPECIES_ID]
-                          : null;
+                          : abilityCapsuleFixture
+                            ? [GARCHOMP_SPECIES_ID]
+                            : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {
@@ -5143,6 +5172,125 @@ export class DuoPublicUiRig {
       await delay(releaseRemainderMs);
     }
     await this.pair(requesterSeat);
+  }
+
+  /**
+   * Reload both current tabs without replacing their browser contexts, then use the real
+   * sessionStorage-backed `/coop/v3/rejoin` route. No lobby request is allowed on this path.
+   */
+  async sameTabReloadAndRejoin() {
+    const clients = Object.values(this.clients);
+    const preReloadRoles = new Map(
+      clients.map(client => [client.label, { role: client.publicRole, seat: client.publicSeat }]),
+    );
+    const preReloadHost = clients.find(client => preReloadRoles.get(client.label)?.role === "host");
+    const preReloadGuest = clients.find(client => preReloadRoles.get(client.label)?.role === "guest");
+    if (
+      preReloadHost == null
+      || preReloadGuest == null
+      || preReloadRoles.get(preReloadHost.label)?.seat !== 0
+      || preReloadRoles.get(preReloadGuest.label)?.seat !== 1
+    ) {
+      throw new Error(`same-tab rejoin had no exact pre-reload role map: ${JSON.stringify([...preReloadRoles])}`);
+    }
+    const handoffKey = "pokerogue:coop:p33-reload-resume:v1";
+    const before = await Promise.all(
+      clients.map(client => client.checkpoint("same-tab-rejoin-before", { full: true })),
+    );
+    for (const [index, dom] of before.entries()) {
+      const handoffs = dom?.sessionStorage?.filter(item => item.key === handoffKey) ?? [];
+      if (handoffs.length !== 1 || handoffs[0].length <= 0 || !/^[0-9a-f]{64}$/u.test(handoffs[0].sha256)) {
+        throw new Error(`${clients[index].label}: exact P33 reload handoff was not present before browser reload`);
+      }
+    }
+
+    // Keep both real device renderers independent while avoiding simultaneous cold Phaser boot on
+    // the four-core runner. The first seat remains inside the Worker's hot-rejoin grace throughout.
+    for (const client of clients) {
+      await client.reloadInPlace();
+    }
+    await this.loginBoth();
+    const roleCursors = Object.fromEntries(clients.map(client => [client.label, client.evidence.cursor()]));
+    await Promise.all(clients.map(client => client.enterCoopLobby({ expectedLifecycle: "reload-rejoin" })));
+    this.pairRoleCursors = roleCursors;
+    await this.assertPairingFunctionalFingerprintMatch(roleCursors);
+
+    // reloadInPlace intentionally clears client.publicRole/publicSeat with the dead page. Before Resume,
+    // production exposes only the host's provisional P33 pairing role; the guest's gameplay binding is
+    // created by the public resume decision below. Reattach the already-proven same-context account map,
+    // but require the new host observation to agree exactly so a role flip cannot be hidden by the harness.
+    const rejoinedHostRole = await preReloadHost.evidence.waitForCondition(
+      sink => {
+        const event = sink.findPairingRole(roleCursors[preReloadHost.label]);
+        return event?.observation.role === "host" && event.observation.seat === 0 ? event : null;
+      },
+      { timeoutMs: this.config.timeoutMs, description: "same-tab provisional host role after rejoin" },
+    );
+    for (const client of clients) {
+      const prior = preReloadRoles.get(client.label);
+      client.publicRole = prior.role;
+      client.publicSeat = prior.seat;
+      client.evidence.record("same-tab-rejoin-role-restored", {
+        role: prior.role,
+        seat: prior.seat,
+        provisionalHostEventIndex: rejoinedHostRole.index,
+        source: "exact-pre-reload-context",
+      });
+    }
+
+    for (const client of clients) {
+      const rejoin = client.evidence.findResponse("/coop/v3/rejoin", {
+        from: roleCursors[client.label],
+        status: 200,
+        method: "POST",
+      });
+      if (rejoin == null) {
+        throw new Error(`${client.label}: same-tab route did not complete /coop/v3/rejoin`);
+      }
+      const announce = client.evidence.findResponse("/coop/v3/lobby/announce", {
+        from: roleCursors[client.label],
+        method: "POST",
+      });
+      if (announce != null) {
+        throw new Error(`${client.label}: same-tab reload incorrectly minted a second lobby presence`);
+      }
+    }
+    const peerAdvance = clients
+      .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
+      .find(event => /P33 peer generation advanced \d+->\d+ on authenticated hello/u.test(event.text ?? ""));
+    if (peerAdvance == null) {
+      throw new Error("same-tab rejoin never completed the provisional peer-generation axis from authenticated hello");
+    }
+    // A full-page reload creates a fresh controller. It must first drive the normal public Resume transaction
+    // before either seat can accept a new immutable gameplay binding. Waiting for that binding here deadlocks
+    // ahead of the very human decision that creates it; resumeRun() owns that ordering boundary.
+    return roleCursors;
+  }
+
+  /** Prove the post-Resume binding is the Worker's rotated same-tab generation on both seats. */
+  assertSameTabRejoinGeneration(roleCursors) {
+    const clients = Object.values(this.clients);
+    const bindings = clients.map(client => client.evidence.findLastBinding(roleCursors[client.label]));
+    for (const [index, client] of clients.entries()) {
+      if ((bindings[index]?.observation.connectionGeneration ?? 0) < 2) {
+        throw new Error(
+          `${client.label}: same-tab rejoin retained generation ${bindings[index]?.observation.connectionGeneration ?? "none"}`,
+        );
+      }
+    }
+    const peerAdvance = clients
+      .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
+      .find(event => /P33 peer generation advanced \d+->\d+ on authenticated hello/u.test(event.text ?? ""));
+    if (peerAdvance == null) {
+      throw new Error("same-tab rejoin lost its authenticated peer-generation proof before gameplay binding");
+    }
+    for (const client of clients) {
+      client.evidence.record("same-tab-rejoin-generation-proof", {
+        connectionGeneration: client.evidence.findLastBinding(roleCursors[client.label])?.observation
+          .connectionGeneration,
+        peerAdvanceEvidenceIndex: peerAdvance.index,
+      });
+    }
   }
 
   async coldReplaceContextsAndLogin() {

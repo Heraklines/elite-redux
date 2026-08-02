@@ -26,6 +26,7 @@ import {
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
   resolveSurfaceOwner,
+  rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
   selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
@@ -661,6 +662,41 @@ test("reward navigation treats the visible reward carousel as one horizontal axi
     chooseNavigationKey(observation, "BERRY", ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"], 0),
     "ArrowLeft",
     "three rewards must reach the wrap-around third card instead of oscillating between cards zero and one",
+  );
+});
+
+test("reward cursor projection requires the watcher's exact addressed visual selection", () => {
+  const authority = {
+    surfaceId: "reward-shop",
+    address: { epoch: 12, wave: 1, turn: 3 },
+    stateDigest: "cursor-on-capsule",
+    localSeat: 0,
+    ownerSeat: 0,
+    seatsWithInput: [0],
+    selectedOptionId: "ER_ABILITY_CAPSULE",
+    optionIds: ["POKEBALL", "ER_ABILITY_CAPSULE"],
+    ready: { handlerActive: true, inputBlocked: false },
+  };
+  const watcher = {
+    ...authority,
+    localSeat: 1,
+    ready: { handlerActive: true, inputBlocked: false },
+  };
+  assert.equal(rewardCursorProjectionMatches(authority, watcher), true);
+  assert.equal(
+    rewardCursorProjectionMatches(authority, { ...watcher, selectedOptionId: "POKEBALL" }),
+    false,
+    "the initial watcher card cannot satisfy proof after the owner moved to the capsule",
+  );
+  assert.equal(
+    rewardCursorProjectionMatches(authority, { ...watcher, address: { ...watcher.address, wave: 2 } }),
+    false,
+    "a matching card at another reward address is stale evidence",
+  );
+  assert.equal(
+    rewardCursorProjectionMatches(authority, { ...watcher, seatsWithInput: [1] }),
+    false,
+    "a second actionable cursor is not a cosmetic watcher projection",
   );
 });
 
@@ -1438,6 +1474,8 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.doesNotMatch(campaign, /\^cursor:\(\\d\+\)\$/u);
   assert.match(campaign, /selected\.startsWith\("party-option:"\)/u);
   assert.match(campaign, /campaign-reward-target-action/u);
+  assert.match(campaign, /async function selectRewardOptionWithMirroredCursor\(/u);
+  assert.match(campaign, /campaign-reward-cursor-mirror/u);
   assert.match(campaign, /campaign-reward-target-dismiss-rejection/u);
   assert.match(campaign, /campaign-reward-target-exhausted/u);
   assert.match(awaitable, /public isAwaitingActionInput\(\): boolean/u);

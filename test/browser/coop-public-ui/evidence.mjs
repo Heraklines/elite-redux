@@ -651,6 +651,7 @@ function bindingView(text) {
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
     || value.membershipState !== "active"
+    || typeof value.gameplayBindingReady !== "boolean"
   ) {
     throw new Error("built browser emitted an invalid session-binding observation");
   }
@@ -1342,14 +1343,21 @@ export class EvidenceSink {
   }
 
   findBinding(from = 0) {
-    return this.events.slice(from).find(event => event.kind === "browser-binding");
+    return this.events
+      .slice(from)
+      .find(event => event.kind === "browser-binding" && event.observation.gameplayBindingReady === true);
   }
 
   findLastBinding(from = 0) {
     return this.events
       .slice(from)
       .toReversed()
-      .find(event => event.kind === "browser-binding");
+      .find(event => event.kind === "browser-binding" && event.observation.gameplayBindingReady === true);
+  }
+
+  /** Worker-authenticated role/seat visibility before the gameplay binding transaction is committed. */
+  findPairingRole(from = 0) {
+    return this.events.slice(from).find(event => event.kind === "browser-binding");
   }
 
   findResponse(pathname, { from = 0, status = null, method = null, slot = null, mode = null } = {}) {
@@ -1970,6 +1978,17 @@ export class EvidenceSink {
             return { key, length: value.length, sha256 };
           }),
       );
+      const sessionStorageMetadata = await Promise.all(
+        Object.keys(sessionStorage)
+          .sort()
+          .map(async key => {
+            const value = sessionStorage.getItem(key) ?? "";
+            const sha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+              .map(byte => byte.toString(16).padStart(2, "0"))
+              .join("");
+            return { key, length: value.length, sha256 };
+          }),
+      );
       return {
         title: document.title,
         url: location.href,
@@ -1987,6 +2006,7 @@ export class EvidenceSink {
           visible: input.getClientRects().length > 0,
         })),
         storage,
+        sessionStorage: sessionStorageMetadata,
       };
     });
     if (dom.canvases.length === 0 || dom.canvases.some(canvas => canvas.width <= 0 || canvas.height <= 0)) {

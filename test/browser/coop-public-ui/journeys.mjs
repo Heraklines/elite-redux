@@ -457,6 +457,28 @@ async function freshResume(rig) {
   await rig.resumeRun({ expectedWave: 2 });
 }
 
+async function sameTabRejoin(rig) {
+  await freshThroughWave2(rig);
+  const rejoinCursors = await rig.sameTabReloadAndRejoin();
+  await rig.resumeRun({ expectedWave: 2 });
+  rig.assertSameTabRejoinGeneration(rejoinCursors);
+  await rig.driveWaveToReward();
+  rig.assertNoFatalRecoverySince(rejoinCursors, "same-tab rejoin through one complete post-reload battle");
+  for (const client of Object.values(rig.clients)) {
+    const mismatch = client.evidence.events
+      .slice(rejoinCursors[client.label])
+      .find(event => /connection-generation-mismatch/u.test(event.text ?? ""));
+    if (mismatch != null) {
+      throw new Error(`${client.label}: post-rejoin Authority V2 receipt used a stale generation: ${mismatch.text}`);
+    }
+    client.evidence.record("same-tab-rejoin-post-battle-proof", {
+      resumedWave: 2,
+      rewardWave: rig.activeBattleWave,
+      mismatch: false,
+    });
+  }
+}
+
 async function reverseResume(rig) {
   await freshThroughWave2(rig);
   await rig.coldReopenAndPair(oppositeSeat(rig.config.requesterSeat));
@@ -702,6 +724,7 @@ const journeys = {
   probe,
   "fresh-wave2": freshWave2,
   "fresh-resume": freshResume,
+  "same-tab-rejoin": sameTabRejoin,
   "reverse-resume": reverseResume,
   "faint-replacement": faintReplacement,
   "half-wipe": halfWipe,

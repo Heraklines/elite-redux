@@ -22,6 +22,8 @@
 // `choice` sentinel stays distinct from the reward-shop LEAVE/REROLL sentinels (so the shop's
 // watch loop can never misread an ability outcome as a reward pick).
 
+import { Phase } from "#app/phase";
+import { PhaseManager } from "#app/phase-manager";
 import {
   adoptAbilityWatcherOutcome,
   captureCoopAbilityOperationBinding,
@@ -80,6 +82,21 @@ const OUTCOMES: { name: string; data: number[] }[] = [
   { name: "Greater Randomizer: slot 0 <- abilityId 261", data: [COOP_ABILITY_OP.GRAND, 0, 261] },
 ];
 
+class RecordingMessagePhase extends Phase {
+  public readonly phaseName = "MessagePhase";
+  public starts = 0;
+  public wasRetired = false;
+
+  public override start(): void {
+    this.starts++;
+  }
+
+  public override retire(): void {
+    super.retire();
+    this.wasRetired = true;
+  }
+}
+
 describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", () => {
   afterEach(() => {
     resetCoopAbilityOutcomeRetryMs();
@@ -106,6 +123,36 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     for (const code of Object.values(COOP_ABILITY_OP)) {
       expect(COOP_ACT_CODES).not.toContain(code);
     }
+  });
+
+  it("a committed V2 ability modal retires its parked reward shell before starting the queued successor", () => {
+    const phaseManager = new PhaseManager();
+    const rewardShell = new RecordingMessagePhase();
+    const abilityModal = new RecordingMessagePhase();
+    const orderedSuccessor = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = rewardShell;
+    phaseManager.pushPhase(orderedSuccessor);
+
+    expect(phaseManager.replaceWithCoopAuthoritativeModal(rewardShell, abilityModal)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(abilityModal);
+    expect(phaseManager.getStandbyPhase()).toBe(rewardShell);
+
+    let currentDuringCommit: Phase | null = null;
+    expect(
+      phaseManager.shiftCoopAuthoritativeModalThroughAuthorityCommit(abilityModal, () => {
+        currentDuringCommit = phaseManager.getCurrentPhase();
+        return true;
+      }),
+    ).toBe(true);
+
+    expect(rewardShell.wasRetired, "the consumed SelectModifier predecessor cannot be restored").toBe(true);
+    expect(abilityModal.wasRetired, "a late picker callback cannot shift the scheduler twice").toBe(true);
+    expect(phaseManager.getStandbyPhase()).toBeNull();
+    expect(currentDuringCommit, "the immutable result is retained after close but before successor start").toBe(
+      orderedSuccessor,
+    );
+    expect(phaseManager.getCurrentPhase()).toBe(orderedSuccessor);
+    expect(orderedSuccessor.starts).toBe(1);
   });
 
   it("rides a DEDICATED seq the shop loop never reads (channel isolation - the BLOCKING fix)", async () => {

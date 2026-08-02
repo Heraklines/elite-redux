@@ -187,6 +187,9 @@ export const REVIEWED_UNDRIVABLE_UI_OPERATIONS = [
   [UiMode.MODIFIER_SELECT, "op:reward"],
   [UiMode.BIOME_SHOP, "op:reward"],
   [UiMode.PARTY, "op:reward"],
+  // The default headless soak does not enter PARTY -> Summary. The exact-build Ability Capsule browser
+  // journey below does, but dedicated coverage must not falsely promote a default-soak guarantee.
+  [UiMode.SUMMARY, "op:reward"],
   [UiMode.OPTION_SELECT, "op:stormglass"],
 ] as const satisfies readonly (readonly [UiMode, CoopOperationSurfaceClass])[];
 
@@ -205,6 +208,19 @@ export interface CoopDedicatedScenarioCoverage {
  * the ordinary soak still auto-resolves its map boundary and therefore honestly keeps its omissions below.
  */
 export const COOP_DEDICATED_SCENARIO_COVERAGE: ReadonlyMap<string, CoopDedicatedScenarioCoverage> = new Map([
+  [
+    "ABILITY_CAPSULE_REWARD_SUMMARY",
+    {
+      testFile: "test/browser/coop-public-ui/campaign.mjs",
+      surfaces: new Set([modeKey(UiMode.SUMMARY), uiOperationKey(UiMode.SUMMARY, "op:reward")]),
+      residual:
+        "The exact-build ability-capsule journey moves the top-level reward cursor and proves the watcher's exact "
+        + "addressed card, then drives PARTY -> Summary -> Back -> the same addressed PARTY target -> ability "
+        + "choice in two real browsers. The default headless soak intentionally does not browse these "
+        + "presentation-only surfaces.",
+      evidence: "documentation-only",
+    },
+  ],
   [
     "T2_WAVE10_BIOME_TRANSITION",
     {

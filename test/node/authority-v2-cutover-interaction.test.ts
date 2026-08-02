@@ -226,7 +226,7 @@ describe("Authority V2 interaction cutover", () => {
       "op:ability",
       "SHARED_INTERACTION",
     ],
-    ["ABILITY_PICK", { data: [0, 1] }, "INTERACTION", "op:ability", "AWAIT_SUCCESSOR"],
+    ["ABILITY_PICK", { data: [0, 1], allowNextWaveStart: true }, "INTERACTION", "op:ability", "AWAIT_SUCCESSOR"],
     ["BARGAIN", { outcome: RESYNC }, "INTERACTION", "op:bargain", "AWAIT_SUCCESSOR"],
     ["STORMGLASS", { weatherIndex: 0, weather: 1 }, "INTERACTION", "op:stormglass", "AWAIT_SUCCESSOR"],
   ] as const)("states a non-null typed successor for %s", (kind, payload, logicalPhase, surfaceClass, expectedKind) => {
@@ -240,6 +240,37 @@ describe("Authority V2 interaction cutover", () => {
     });
     expect(built?.nextControl).toEqual(successor);
     expect(built?.nextControl).not.toBeNull();
+  });
+
+  it("states the Ability result's exact wave-boundary permission in its immutable payload", () => {
+    const consumedReward = envelope("ABILITY_PICK", { data: [11], allowNextWaveStart: true });
+    expect(successorOfCoopV2InteractionEnvelope("op:ability", consumedReward)).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowNextWaveStart: true,
+    });
+
+    const nestedReturn = envelope("ABILITY_PICK", {
+      data: [10],
+      allowNextWaveStart: false,
+      nextInteraction: { kind: "reward", wave: 1, turn: 1 },
+    });
+    expect(successorOfCoopV2InteractionEnvelope("op:ability", nestedReturn)).toMatchObject({
+      kind: "AWAIT_SUCCESSOR",
+      allowNextWaveStart: false,
+      allowedInteractionAddresses: [{ surfaceClass: "op:reward", operationKind: "REWARD_PRESENT", wave: 1, turn: 1 }],
+    });
+
+    expect(successorOfCoopV2InteractionEnvelope("op:ability", envelope("ABILITY_PICK", { data: [11] }))).toBeNull();
+    expect(
+      successorOfCoopV2InteractionEnvelope(
+        "op:ability",
+        envelope("ABILITY_PICK", {
+          data: [11],
+          allowNextWaveStart: true,
+          nextInteraction: { kind: "reward", wave: 1, turn: 1 },
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("authorizes only the exact same-turn command or Mystery frontier after Stormglass settles", () => {
@@ -493,7 +524,10 @@ describe("Authority V2 interaction cutover", () => {
 
   it("distinguishes executable result terminals from no-input ordered waits", () => {
     expect(
-      requiresCoopV2InteractionTerminalProof("op:ability", envelope("ABILITY_PICK", { data: [0, 1] }, "INTERACTION")),
+      requiresCoopV2InteractionTerminalProof(
+        "op:ability",
+        envelope("ABILITY_PICK", { data: [0, 1], allowNextWaveStart: true }, "INTERACTION"),
+      ),
     ).toBe(true);
     expect(
       requiresCoopV2InteractionTerminalProof(
@@ -829,7 +863,11 @@ describe("Authority V2 interaction cutover", () => {
     ],
     [
       "ABILITY_PICK",
-      { data: [11], nextInteraction: { kind: "mystery-terminal", wave: 1, turn: 0 } },
+      {
+        data: [11],
+        allowNextWaveStart: false,
+        nextInteraction: { kind: "mystery-terminal", wave: 1, turn: 0 },
+      },
       "op:ability",
       "op:me",
       "ME_TERMINAL",
@@ -837,7 +875,7 @@ describe("Authority V2 interaction cutover", () => {
     ],
     [
       "ABILITY_PICK",
-      { data: [10], nextInteraction: { kind: "reward", wave: 1, turn: 1 } },
+      { data: [10], allowNextWaveStart: false, nextInteraction: { kind: "reward", wave: 1, turn: 1 } },
       "op:ability",
       "op:reward",
       "REWARD_PRESENT",
@@ -1008,7 +1046,7 @@ describe("Authority V2 interaction cutover", () => {
     const state = createCoopRuntimeOpState("guest");
     setActiveCoopRuntimeOpState(state);
     const guest = new CoopOperationGuest({ epoch: 1, initialRevision: 99 });
-    const committed = envelope("ABILITY_PICK", { data: [1] });
+    const committed = envelope("ABILITY_PICK", { data: [1], allowNextWaveStart: true });
     const sink = vi.fn(() => true);
     registerCoopOperationLiveSink("op:ability", sink);
 

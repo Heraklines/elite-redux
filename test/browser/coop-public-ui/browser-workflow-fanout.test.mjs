@@ -170,6 +170,50 @@ test("journey push defaults to fresh-wave2 while manual milestone runs retain fr
   );
 });
 
+test("same-tab rejoin journey preserves browser storage and proves a post-rejoin battle", async () => {
+  const [workflow, config, evidence, browserEntry, harness, journeys] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/evidence.mjs"), "utf8"),
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/journeys.mjs"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- same-tab-rejoin/u);
+  assert.match(config, /"same-tab-rejoin"/u);
+  assert.match(evidence, /Object\.keys\(sessionStorage\)[\s\S]*sessionStorage: sessionStorageMetadata/u);
+  assert.match(
+    harness,
+    /async reloadInPlace\(\)[\s\S]*page\.reload\([\s\S]*async sameTabReloadAndRejoin\(\)/u,
+    "the route must reload the existing tab rather than replace its context",
+  );
+  assert.match(harness, /pokerogue:coop:p33-reload-resume:v1/u);
+  assert.match(harness, /expectedLifecycle: "reload-rejoin"/u);
+  assert.match(
+    harness,
+    /const preReloadRoles = new Map[\s\S]*same-tab provisional host role after rejoin[\s\S]*same-tab-rejoin-role-restored/u,
+    "reload must restore the exact proven role map before the human Resume decision creates the guest binding",
+  );
+  assert.match(harness, /findResponse\("\/coop\/v3\/rejoin"[\s\S]*status: 200[\s\S]*method: "POST"/u);
+  assert.match(harness, /P33 peer generation advanced \\d\+->\\d\+ on authenticated hello/u);
+  assert.match(
+    browserEntry,
+    /hasAuthenticatedPairing[\s\S]*p33FrameContext\(\)[\s\S]*p33MembershipSnapshot\(\)/u,
+    "the public binding oracle must use the accepted P33 axes, not provisional V1 generation zero",
+  );
+  assert.match(
+    evidence,
+    /findBinding\([\s\S]*gameplayBindingReady === true[\s\S]*findPairingRole\(/u,
+    "pairing role discovery must remain observable without promoting it to a gameplay binding",
+  );
+  assert.match(
+    journeys,
+    /async function sameTabRejoin\(rig\)[\s\S]*sameTabReloadAndRejoin\(\)[\s\S]*resumeRun\(\{ expectedWave: 2 \}\)[\s\S]*assertSameTabRejoinGeneration\([\s\S]*driveWaveToReward\(\)[\s\S]*connection-generation-mismatch/u,
+    "the oracle must drive real post-rejoin mechanics and reject the player's stale-generation symptom",
+  );
+});
+
 test("exact GameOver gate runs the retained guest-renderer phase-queue regression", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const build = jobBlock(workflow, "browser-build");
@@ -236,6 +280,53 @@ test("journey starter fixtures require both the exact build and exact per-page U
     /const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters\(\)[\s\S]*getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*\?\? coopBrowserNavigationStarters[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{[\s\S]*allowUncaught: true,[\s\S]*allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters/u,
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
   );
+});
+
+test("Ability Capsule journey forces and proves the nested reward Summary route in two real browsers", async () => {
+  const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- ability-capsule/u, "manual dispatch exposes the focused journey");
+  assert.match(workflow, /inputs\.journey == 'ability-capsule' && 'ability-capsule'/u);
+  assert.match(workflow, /COOP_UI_REQUIRE_ABILITY_CAPSULE:.*ability-capsule/u);
+  assert.match(workflow, /COOP_UI_REWARD_INSPECT_SUMMARY:.*ability-capsule/u);
+  assert.match(config, /"ability-capsule"/u, "the public driver accepts only the named journey");
+  assert.match(
+    registry,
+    /isCoopBrowserAbilityCapsuleFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "ability-capsule"/u,
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserAbilityCapsuleFixtureActive\(\)[\s\S]*get\("coopfixture"\) === "ability-capsule"/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserAbilityCapsuleFixtureStarters\(\)[\s\S]*SpeciesId\.GARCHOMP[\s\S]*MoveId\.WATER_SPOUT/u,
+  );
+  assert.match(starterHandler, /getCoopBrowserAbilityCapsuleFixtureStarters\(\)/u);
+  assert.match(harness, /this\.config\.journey === "ability-capsule"[\s\S]*set\("coopfixture", "ability-capsule"\)/u);
+  assert.match(harness, /abilityCapsuleFixture[\s\S]*GARCHOMP_SPECIES_ID/u);
+  assert.match(
+    selectModifier,
+    /isCoopBrowserAbilityCapsuleFixtureActive\(\)[\s\S]*coopRewardWave\(\) === 1[\s\S]*modifierTypes\.ER_ABILITY_CAPSULE/u,
+    "the option authority removes random reward-pool coverage",
+  );
+  assert.match(policy, /COOP_UI_REQUIRE_ABILITY_CAPSULE/u);
+  assert.match(policy, /COOP_UI_REWARD_INSPECT_SUMMARY/u);
+  assert.match(campaign, /targetId: "party-option:summary"/u);
+  assert.match(campaign, /findLastSemanticSurface\(summaryCursor, "summary"\)/u);
+  assert.match(campaign, /campaign-reward-summary-inspection/u);
+  assert.match(campaign, /campaign-ability-capsule-coverage/u);
+  assert.match(campaign, /cursorMirrors\.some\(event => event\.navigationSteps < 1\)/u);
+  assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {

@@ -339,6 +339,8 @@ export interface CoopAbilityPickPayload {
   readonly data: number[];
   /** Exact interaction resumed after this concrete committed/cancelled outcome. */
   readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
+  /** True only when this committed reward consumes its parent and may enter wave N+1. */
+  readonly allowNextWaveStart: boolean;
 }
 
 /** Whole ability-picker workflow presentation; random choices are literal host-authored ids. */

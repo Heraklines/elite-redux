@@ -4202,8 +4202,12 @@ export async function driveHostTeachMoveRewardOwner(
     throw new Error(`teach-move reward owner found no compatible reward at interaction ${pinned}`);
   }
 
-  const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+  const ui = globalScene.ui as unknown as {
+    setModeWithoutClear: (...args: unknown[]) => unknown;
+    setModeWithoutClearBoundedWhen: (...args: unknown[]) => Promise<"completed" | "forced" | "superseded">;
+  };
   const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+  const realSetModeWithoutClearBoundedWhen = ui.setModeWithoutClearBoundedWhen.bind(ui);
   let partySurfaceOpened = false;
   ui.setModeWithoutClear = (...args: unknown[]): unknown => {
     if (args[0] === UiMode.PARTY) {
@@ -4214,6 +4218,17 @@ export async function driveHostTeachMoveRewardOwner(
     }
     return realSetModeWithoutClear(...args);
   };
+  ui.setModeWithoutClearBoundedWhen = (...args: unknown[]) => {
+    if (args[0] === UiMode.PARTY) {
+      partySurfaceOpened = true;
+      ui.setModeWithoutClear = realSetModeWithoutClear;
+      ui.setModeWithoutClearBoundedWhen = realSetModeWithoutClearBoundedWhen;
+      // [mode, timeout, phaseFence, partyMode, initialSlot, targetCallback, ...filters]
+      (args[5] as (slotIndex: number, option: number) => void)(pick.slot, pick.moveIndex);
+      return Promise.resolve("completed");
+    }
+    return realSetModeWithoutClearBoundedWhen(...args);
+  };
   try {
     hostPhase.selectRewardModifierOption(rewardIndex, () => false);
     for (let i = 0; i < 8; i++) {
@@ -4221,6 +4236,7 @@ export async function driveHostTeachMoveRewardOwner(
     }
   } finally {
     ui.setModeWithoutClear = realSetModeWithoutClear;
+    ui.setModeWithoutClearBoundedWhen = realSetModeWithoutClearBoundedWhen;
   }
   if (!partySurfaceOpened) {
     throw new Error(`teach-move reward owner never opened PARTY at interaction ${pinned}`);

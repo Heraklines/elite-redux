@@ -539,7 +539,13 @@ export interface SoakResult {
    * ME wave: the wave, the forced type, and which authoritative path fired (host-owned / guest-owned /
    * battle-handoff). Empty when {@linkcode SoakOptions.meWaves} is unset (MEs off, today's default).
    */
-  mysteryEncounters: { wave: number; type: string; path: "host-owned" | "guest-owned" | "battle-handoff" }[];
+  mysteryEncounters: {
+    wave: number;
+    type: string;
+    path: "host-owned" | "guest-owned" | "battle-handoff";
+    /** Exact authoritative interaction counter whose parity selected the owner for this encounter. */
+    interactionStart: number;
+  }[];
   /**
    * COMPLETENESS BACKSTOP (#849): every co-op interactive surface the run OBSERVED, per dimension (modes /
    * relay kinds / seq bands / battle-flow situations). The EXPECTED set is derived from the registries, so
@@ -4601,7 +4607,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       );
     }
     assertLockstep(wave, "me-end");
-    mysteryEncounters.push({ wave, type: MysteryEncounterType[type], path: mePath });
+    mysteryEncounters.push({ wave, type: MysteryEncounterType[type], path: mePath, interactionStart: counterBefore });
     actionScript.push(
       `wave ${wave}: ME ${MysteryEncounterType[type]} option=${option} driven (${mePath}, counter ${counterBefore}->${hostAfter})`,
     );

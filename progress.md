@@ -6640,3 +6640,151 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The retained-reward browser proof now accepts the production `skippedObsolete=0` diagnostic field; the
   previous exact-SHA red was a stale evidence regex, not a product failure. All executable qualification
   remains remote per `AGENTS.md`; the focused and two-browser reload/capsule journeys are pending dispatch.
+- Aggregate run `30719578822` exposed one deliberate harness coupling: the TM-case duo driver intercepted
+  only the retired unbounded `setModeWithoutClear` method, so it declared that PARTY never opened when the
+  product invoked the new bounded seam. The helper now intercepts both signatures and calls the nested
+  target callback at the new argument position. This is a harness-wiring correction; the run's other
+  multiwave tests and the exact product UI transition contract passed.
+
+## 2026-08-01 - Aggregate B11/C3 reds classified as stale test contracts
+
+- Aggregate B11 used a second one-off TM market driver that also intercepted only the retired
+  `setModeWithoutClear` seam. The production phase therefore correctly requested the new bounded PARTY
+  surface, but the synthetic test never answered it and falsely reported that no pinned market continuation
+  was queued. The test now observes both signatures and resolves the exact same public party callback.
+- Aggregate C3 drove all 17 requested waves, exactly one Mystery Encounter, and two complete post-Mystery
+  waves with zero digest findings or checksum assertions. Its only failure hard-coded wave 15 as host-owned.
+  Authority ownership is selected by accumulated interaction-counter parity, not wave number; optional
+  reward and biome-market continuations can legitimately alter that counter. Soak evidence now records the
+  exact `interactionStart`, and the continuation assertion verifies the observed path against its parity.
+  The separate focused cases still require one host-owned and one guest-owned Mystery path explicitly.
+- Focused run `30720160001` stopped in the ownership planner before setup because the integration manifest
+  omitted the two existing test paths changed by this correction. This is CI metadata only; both exact paths
+  are now declared and the train base advances to the rejected commit for a clean remote qualification.
+## 2026-08-01 — reward PARTY summary transition closure
+
+- Latest submitted staging logs still identify the pre-fix `8ccf994dd` bundle. Their reload errors contain
+  no `reload-rejoin` attempt and therefore predate the qualified `c63c63468` handoff/rejoin fix now live on
+  staging.
+- The Ability Capsule freeze report exposed a narrower surviving production seam: the reward picker now
+  opens PARTY through the bounded no-clear transition, but PARTY's own Summary action still used the old
+  unbounded no-clear fade. `PartyUiHandler.processSummaryOption` now preserves solo behavior and uses the
+  phase-fenced bounded no-clear transition in co-op, so a lost fade force-installs Summary without retiring
+  the underlying reward selector.
+- Next proof: exact-build two-browser Ability Capsule journey must inspect Summary, return to the same
+  addressed PARTY target, apply the capsule, finish its registered ability picker, and reach the ordered
+  successor. A separate same-tab reload journey must prove `/coop/v3/rejoin` and forbid a second announce.
+
+## 2026-08-01 — exact wave-13 generation rejection mechanism
+
+- The newest `c63c63468` staging logs are not a checksum divergence. At wave 13 the replica emits genuine
+  `controlInstalled` receipts with connection generation 2, while the authority rejects the entire retained
+  log as `connection-generation-mismatch`; the unreleased tail then ends at command-control installation.
+- Root cause: the first browser to call the Worker rejoin endpoint can receive `{local: 2, peer: 1}` before
+  the partner rejoins. The replacement channel later carries the partner at generation 2, but the P33
+  controller never completed that peer axis, so Authority V2 froze generation 1 into every lease.
+- Protocol 62 now carries sender-local generation on the authenticated P33 hello. After the immutable
+  account/pairing/role axes pass, that replacement-channel hello monotonically completes the peer generation
+  before the binding-ready callback rebinds or constructs Authority V2. Regressions still fail closed.
+- The P33 controller tests now reproduce the asymmetric provisional view (`local=1, peer=0`) and require
+  the partner's generation-1 hello to appear in the accepted membership snapshot.
+
+## 2026-08-01 — player-log closure: nested reward Summary and hot-rejoin generation
+
+- Player evidence showed two separate blind spots: Ability Capsule could consume the PARTY action latch before
+  SUMMARY became actionable, and same-tab reload/rejoin retained a provisional peer generation from the first
+  `/coop/v3/rejoin` response. The latter rejected every genuine generation-2 replica receipt and eventually
+  failed command-control installation at wave 13.
+- Production fixes now use the bounded nested UI transition and carry the authenticated sender generation in
+  P33 hello so the peer axis advances monotonically before Authority V2 leases are rebound.
+- Added an exact-build `ability-capsule` two-browser campaign: both players visibly confirm Garchomp, wave 1
+  deterministically offers Ability Capsule, the reward owner opens `PARTY -> SUMMARY`, backs out to the exact
+  same addressed PARTY selector, applies the capsule, completes the real ability choice, and reaches wave 2.
+- The pre-existing `fresh-resume` journey was not representative of browser reload: it destroys sessionStorage,
+  waits the cold-rejoin grace, and creates a new lobby. A same-tab `/coop/v3/rejoin` journey remains the next
+  closure item after the focused Ability Capsule proof.
+- Added that missing `same-tab-rejoin` journey: it hashes and attests the tab handoff, reloads both existing tabs,
+  forbids a fallback lobby announce, requires two successful `/coop/v3/rejoin` calls and generation-2 bindings,
+  observes the authenticated hello complete the provisional peer-generation axis, resumes wave 2, and completes
+  another battle while rejecting every `connection-generation-mismatch` receipt.
+
+## 2026-08-02 - protocol-62 focused-gate test migration
+
+- Exact-SHA focused run `30722179433` completed every selected shard except source contracts and lane A.
+  Both reds were stale tests that hard-coded `er-coop-61`; lane A's artifact identified the sole failure at
+  `coop-session-controller.test.ts:77`, while the production controller/rejoin coverage around it passed.
+- The assertions now track `er-coop-62`, and the source contract additionally requires the authenticated
+  `connectionGeneration` hello field. This changes no product code and does not invalidate the already-running
+  exact-SHA Ability Capsule or same-tab rejoin browser proofs.
+
+## 2026-08-02 - Ability Capsule Summary authority proof
+
+- Exact-SHA journey `30722189191` reproduced the player's freeze through real keyboard input. The bounded
+  PARTY -> Summary transition completed and `SUMMARY` became the active handler, but the read-only observer
+  reported `inputBlocked=true` indefinitely while transport and both engines stayed healthy.
+- The live claim was `op:reward` / `REWARD_PRESENT`. Its V2 proof admitted MODIFIER_SELECT, CONFIRM, and PARTY,
+  but not PARTY's nested informational SUMMARY child, so the global physical-input gate rejected every key.
+- Reward and shop proof contracts now admit SUMMARY only under their existing exact owner, address, and phase
+  lease. LearnMove Summary remains a separate `op:learnMove` proof; no global Summary bypass was added.
+- The two-browser Ability Capsule journey remains the production-path regression. Default headless soaks keep
+  the new Summary -> reward edge explicitly classified rather than pretending they drive that nested screen.
+
+## 2026-08-02 - Same-tab reload ordering and authenticated observer axes
+
+- Exact-SHA journey `30722191260` reached `/coop/v3/rejoin` with HTTP 200 on both seats, opened generation-2
+  WebRTC, and completed the authenticated hello/fingerprint exchange. It then waited in the title launch UI:
+  host "Checking for a co-op save", guest "Waiting for host". This was a harness ordering defect, not a failed
+  carrier rejoin: the journey demanded a gameplay binding before driving the ordinary Resume transaction that
+  creates and acknowledges that binding on a newly constructed page runtime.
+- The browser binding observer also mislabeled the runtime's provisional V1 active/generation-zero membership
+  as an authenticated stable-seat binding. P33 observations now fail closed until `p33FrameContext()` and the
+  authenticated membership snapshot are both actionable, then expose the Worker's real local generation.
+- The journey now proves the rejoin HTTP/hello boundary first, drives Resume through ordinary public keys, and
+  only then asserts generation >= 2 on both accepted gameplay bindings before completing a post-reload battle.
+- Pairing and launch are deliberately distinct proofs: provisional P33 role/seat discovery can keep the
+  self-healing lobby moving, and the exact Title/MESSAGE save decision remains keyboard-actionable on either
+  role before a gameplay binding exists. All battle/interaction observers still require the accepted P33 frame
+  axes, and `findBinding()` filters out provisional pairing-role observations.
+
+## 2026-08-02 - Ability result successor and reward-cursor oracle
+
+- Exact-SHA Ability Capsule run `30723962028` proved the nested Summary fix and completed the capsule choice,
+  then exposed a real product failure at the next command frontier. Revision 7 installed `ABILITY_PICK` with an
+  `AWAIT_SUCCESSOR` carrying `nextWave:0`; when the host reached wave 2 turn 1, Authority V2 correctly rejected
+  its `CONTROL_COMMIT` as unauthorized and terminated both clients.
+- `ABILITY_PICK` now carries a mandatory immutable `allowNextWaveStart` result bit. Consuming an ordinary reward
+  states `true`; cancel and explicit reward/Mystery return edges state `false`. The closed registry, materializer,
+  and successor adapter reject missing or contradictory payloads, so no local phase guesses this exit.
+- The player-reported reward cursor gap was also absent from the browser oracle: the previous Ability fixture
+  offered only one card, and paired convergence was checked only before navigation. The fixture now presents
+  Poke Balls plus Ability Capsule; the driver moves through real public keys and requires the watcher to expose
+  the same selection, option list, address, digest, and sole owner before it may submit the capsule.
+- The next Ability run must qualify both the new cursor proof and the corrected wave-2 successor on one sealed
+  build. Same-tab rejoin run `30723963985` is classified separately below.
+
+## 2026-08-02 - Same-tab rejoin harness role restoration
+
+- Exact-SHA run `30723963985` proved both browsers through wave 2, reloaded the existing tabs, completed the
+  real `/coop/v3/rejoin` path and authenticated fingerprint exchange, then failed inside the driver with
+  `resumeRun requires a paired public host`. This is a harness-context red: `reloadInPlace()` correctly clears
+  page-owned public roles, but the journey never restored its already-proven account/role map before Resume.
+- The harness now snapshots the exact host/seat-0 and guest/seat-1 clients before reload, requires the new
+  provisional P33 host observation to match that mapping, and restores only those same-context identities.
+  It still does not promote the provisional event to a gameplay binding; the ordinary public Resume decision
+  must create and acknowledge generation-2 bindings before the journey accepts them.
+
+## 2026-08-02 - committed Ability modal consumes its projected reward shell
+
+- Exact-SHA Ability journey `30725240535` passed the paired reward cursor, PARTY/Summary return, Ability
+  selection, and immutable `ABILITY_PICK` application. It then reproduced the player's real softlock: the
+  replica accepted revision 7 but stayed on wave 1 in `ErAbilityCapsulePhase`/`SelectModifierPhase`, while the
+  authority reached wave 2 and retained command revision 8 until the control-install watchdog terminated it.
+- Authority V2 projects nested Ability surfaces as modals. Their old reward phase is parked in
+  `PhaseManager.standbyPhase`; `tryRemovePhase("SelectModifierPhase")` can only remove queued phases, and normal
+  `end()` restores the parked predecessor without starting it. The replica therefore resurrected the consumed
+  reward shell instead of reaching its signed next-wave wait.
+- `PhaseManager.shiftCoopAuthoritativeModalThroughAuthorityCommit` now closes this exact scheduler edge:
+  committed Ability results retire both the result modal and its parked predecessor, select the already-queued
+  successor, record/retain the address-exact terminal result, and only then start that successor. Cancellation
+  still restores the reward shell. All four registered Ability workflows use the same seam, and focused
+  coverage proves the predecessor cannot be resurrected or shifted again.
