@@ -248,6 +248,15 @@ test("ability owner/watcher proof rejects a second input seat or divergent mecha
 test("ability party driver targets the phase-owned mon and a stable ability slot", () => {
   assert.equal(
     chooseAbilityInteractionOption({
+      phase: "ErAbilityCapsulePhase",
+      selectedOptionId: "slot:0",
+      optionIds: ["slot:0", "slot:1", "slot:2"],
+    }),
+    "slot:0",
+    "top-level capsule choices must be retained as exact public-driver evidence",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityCapsulePhase",
       interactionTargetPartySlot: 2,
       optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],

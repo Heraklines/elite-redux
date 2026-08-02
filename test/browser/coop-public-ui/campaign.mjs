@@ -2891,6 +2891,9 @@ export function chooseAbilityInteractionOption(observation) {
       ? `party-slot:${observation.interactionTargetPartySlot}`
       : null;
   }
+  if (typeof observation.selectedOptionId === "string" && options.includes(observation.selectedOptionId)) {
+    return observation.selectedOptionId;
+  }
   const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
   return (
     abilitySlots.map(slot => `party-option:ability-slot-${slot}`).find(optionId => options.includes(optionId)) ?? null
@@ -2899,7 +2902,22 @@ export function chooseAbilityInteractionOption(observation) {
 
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
   if (driver.abilitySurfaceKind !== "party") {
+    const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation);
     await owner.sequence(driver.keys, `campaign-${driver.name}`);
+    if (driver.abilitySurfaceKind === "option" || driver.abilitySurfaceKind === "choice") {
+      if (targetId == null) {
+        throw new Error(
+          `[campaign-ability] ${driver.abilityPhase} exposed no stable ${driver.abilitySurfaceKind} choice: `
+            + `${JSON.stringify(boundary.ownerEvent.observation)}`,
+        );
+      }
+      owner.evidence.record("campaign-ability-choice", {
+        phase: driver.abilityPhase,
+        surfaceId: driver.v2SurfaceId,
+        targetId,
+        address: boundary.authority.address,
+      });
+    }
     return;
   }
   let surface = boundary.ownerEvent;
@@ -4964,6 +4982,14 @@ export async function runCampaign(rig) {
       const capsuleChoices = events.filter(
         event => event.kind === "campaign-ability-choice" && event.phase === "ErAbilityCapsulePhase",
       );
+      const ownerOutcomes = events.filter(
+        event => event.kind === "console" && /capsule OWNER relay OUTCOME .* op=CAP_CYCLE data=\[11\]/u.test(event.text ?? ""),
+      );
+      const watcherOutcomes = events.filter(
+        event =>
+          event.kind === "console"
+          && /capsule WATCHER apply OUTCOME .* op=CAP_CYCLE data=\[11\] timedOut=false/u.test(event.text ?? ""),
+      );
       const cursorMirrors = events.filter(
         event => event.kind === "campaign-reward-cursor-mirror" && event.selectedOptionId === "ER_ABILITY_CAPSULE",
       );
@@ -4971,6 +4997,8 @@ export async function runCampaign(rig) {
         summaryInspections.length !== 1
         || capsuleTargets.length !== 1
         || capsuleChoices.length !== 1
+        || ownerOutcomes.length !== 1
+        || watcherOutcomes.length !== 1
         || cursorMirrors.length !== clients.length
         || cursorMirrors.some(event => event.navigationSteps < 1)
       ) {
@@ -4981,6 +5009,8 @@ export async function runCampaign(rig) {
               summaryInspections: summaryInspections.length,
               capsuleTargets: capsuleTargets.length,
               capsuleChoices: capsuleChoices.length,
+              ownerOutcomes: ownerOutcomes.length,
+              watcherOutcomes: watcherOutcomes.length,
               cursorMirrors: cursorMirrors.map(event => ({
                 navigationSteps: event.navigationSteps,
                 selectedOptionId: event.selectedOptionId,
@@ -4993,6 +5023,8 @@ export async function runCampaign(rig) {
         summary: summaryInspections[0],
         target: capsuleTargets[0],
         choice: capsuleChoices[0],
+        ownerOutcome: ownerOutcomes[0],
+        watcherOutcome: watcherOutcomes[0],
       };
       for (const client of clients) {
         client.evidence.record("campaign-ability-capsule-coverage", proof);
