@@ -398,6 +398,11 @@ test("party-mutating reward matrix drives every non-held target mutation family 
     assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
     assert.match(registry, new RegExp(`COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS[\\s\\S]*${rewardId}`, "u"));
     assert.match(selectModifier, new RegExp(`COOP_BROWSER_PARTY_REWARD_TYPES[\\s\\S]*${rewardId}`, "u"));
+    assert.match(
+      selectModifier,
+      new RegExp(`${rewardId}: \\(\\) =>`, "u"),
+      `${rewardId} must resolve after initModifierTypes instead of capturing the empty registry at module load`,
+    );
   }
   assert.match(config, /"party-mutating-rewards"/u);
   assert.match(

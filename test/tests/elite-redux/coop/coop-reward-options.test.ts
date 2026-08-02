@@ -62,10 +62,10 @@ describe("co-op reward-option host-streaming (#633 Fix #2) - registry round-trip
     expect(forcedLure.tier).toBe(serialized[0].tier);
   });
 
-  it.each([
-    ["TM_COMMON", new TmModifierType(MoveId.PROTECT), MoveId.PROTECT],
-    ["MINT", new PokemonNatureChangeModifierType(Nature.ADAMANT), Nature.ADAMANT],
-  ] as const)("pins the concrete generated %s variant without a watcher RNG roll", (id, ownerType, variant) => {
+  it("pins the concrete generated MINT variant without a watcher RNG roll", () => {
+    const id = "MINT";
+    const ownerType = new PokemonNatureChangeModifierType(Nature.ADAMANT);
+    const variant = Nature.ADAMANT;
     ownerType.id = id;
     ownerType.setTier(ModifierTier.COMMON);
     const serialized = serializeRewardOptions([new ModifierTypeOption(ownerType, 0, 0)]);
@@ -88,6 +88,24 @@ describe.skipIf(!RUN)("co-op reward-option host-streaming (#633 Fix #2) - live r
 
   beforeEach(() => {
     game = new GameManager(phaserGame);
+  });
+
+  it("pins the concrete generated TM variant without a watcher RNG roll", async () => {
+    // TmModifierType resolves its icon from allMoves in the constructor. Construct it only after the
+    // normal game bootstrap has populated that registry; doing this in the top-level `it.each` table
+    // made the suite fail during collection before any test could run.
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    const ownerType = new TmModifierType(MoveId.PROTECT);
+    ownerType.id = "TM_COMMON";
+    ownerType.setTier(ModifierTier.COMMON);
+
+    const serialized = serializeRewardOptions([new ModifierTypeOption(ownerType, 0, 0)]);
+    expect(serialized[0].pregenArgs).toEqual([MoveId.PROTECT]);
+
+    const rebuilt = reconstructRewardOptions(serialized, []);
+    expect(rebuilt).not.toBeNull();
+    expect(rebuilt![0].type.id).toBe("TM_COMMON");
+    expect((rebuilt![0].type as unknown as { getPregenArgs(): unknown[] }).getPregenArgs()).toEqual([MoveId.PROTECT]);
   });
 
   it("serialize -> reconstruct round-trips a rolled option list verbatim", async () => {
