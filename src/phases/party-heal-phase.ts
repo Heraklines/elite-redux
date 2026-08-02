@@ -41,16 +41,23 @@ export class PartyHealPhase extends BattlePhase {
         }
         pokemon.updateInfo(true);
       }
+      const finish = () => {
+        if (this.resumeBgm && bgmPlaying) {
+          globalScene.playBgm();
+        }
+        globalScene.ui.fadeIn(500).then(() => this.end());
+      };
       const healSong = globalScene.playSoundWithoutBgm("heal");
-      if (healSong) {
-        globalScene.time.delayedCall(fixedInt(healSong.totalDuration * 1000), () => {
-          healSong.destroy();
-          if (this.resumeBgm && bgmPlaying) {
-            globalScene.playBgm();
-          }
-          globalScene.ui.fadeIn(500).then(() => this.end());
-        });
+      if (!healSong) {
+        // Browsers can legitimately refuse or fail to construct a sound (muted/headless/autoplay policy).
+        // The old branch left the screen black and retained PartyHealPhase forever in that case.
+        finish();
+        return;
       }
+      globalScene.time.delayedCall(fixedInt(healSong.totalDuration * 1000), () => {
+        healSong.destroy();
+        finish();
+      });
     });
     globalScene.arena.playerTerasUsed = 0;
   }

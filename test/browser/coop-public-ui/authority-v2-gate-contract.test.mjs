@@ -138,6 +138,7 @@ const bargainOperation = readFileSync(new URL("src/data/elite-redux/coop/coop-ba
 const theBargainPhase = readFileSync(new URL("src/phases/the-bargain-phase.ts", root), "utf8");
 const rendererGate = readFileSync(new URL("src/data/elite-redux/coop/coop-renderer-gate.ts", root), "utf8");
 const switchBiomePhase = readFileSync(new URL("src/phases/switch-biome-phase.ts", root), "utf8");
+const partyHealPhase = readFileSync(new URL("src/phases/party-heal-phase.ts", root), "utf8");
 const newBattlePhase = readFileSync(new URL("src/phases/new-battle-phase.ts", root), "utf8");
 const stormglassPhase = readFileSync(new URL("src/phases/er-stormglass-picker-phase.ts", root), "utf8");
 const abilityPickerPhases = {
@@ -3693,6 +3694,27 @@ test("superseded control addresses can reopen without weakening live-address con
   assert.ok(
     register.indexOf("if (duplicate)") < register.indexOf("if (!prior.superseded"),
     "identical redelivery stays idempotent before a newer lease generation is considered",
+  );
+});
+
+test("party healing cannot retain a black transition when audio is unavailable", () => {
+  const healSong = partyHealPhase.indexOf('const healSong = globalScene.playSoundWithoutBgm("heal");');
+  const missingAudio = partyHealPhase.indexOf("if (!healSong)", healSong);
+  const fallbackFinish = partyHealPhase.indexOf("finish();", missingAudio);
+  const fallbackReturn = partyHealPhase.indexOf("return;", fallbackFinish);
+  const timedAudio = partyHealPhase.indexOf("globalScene.time.delayedCall", fallbackReturn);
+  assert.ok(healSong >= 0, "PartyHealPhase attempts its ordinary heal presentation");
+  assert.ok(
+    missingAudio > healSong
+      && fallbackFinish > missingAudio
+      && fallbackReturn > fallbackFinish
+      && timedAudio > fallbackReturn,
+    "a refused heal sound finishes the fade/phase before the audio-timed branch",
+  );
+  assert.match(
+    partyHealPhase,
+    /const finish = \(\) => \{[\s\S]*?globalScene\.ui\.fadeIn\(500\)\.then\(\(\) => this\.end\(\)\);/u,
+    "both audio branches share the same phase-ending continuation",
   );
 });
 
