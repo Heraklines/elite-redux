@@ -3789,7 +3789,38 @@ async function finishRewardFusion(rig, owner, boundary, primarySlot, fromCursor)
     { timeoutMs: rig.config.timeoutMs, description: "DNA Splicers secondary party selector" },
   );
   slotEvent = await moveRewardPartyCursor(rig, owner, slotEvent, secondarySlot);
-  const optionEvent = await openRewardPartyApply(rig, owner, boundary, secondarySlot);
+  const secondaryCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-reward-fusion-select-secondary");
+  const secondaryResolution = await owner.evidence.waitForCondition(
+    sink => {
+      const optionEvent = sink.findLastSemanticSurface(secondaryCursor, "party:reward-target");
+      if (
+        optionEvent != null
+        && JSON.stringify(optionEvent.observation.address) === JSON.stringify(boundary.authority.address)
+        && optionEvent.observation.optionIds?.includes("party-option:splice")
+        && isActionableSemanticObservation(optionEvent.observation)
+      ) {
+        return { kind: "splice-action", event: optionEvent };
+      }
+      const outcome = classifyRewardTargetApplyOutcome(sink.events, secondaryCursor, boundary.authority.address);
+      return outcome?.status === "accepted" ? { kind: "immediate", outcome } : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: "DNA Splicers secondary target action or immediate fusion commit",
+    },
+  );
+  if (secondaryResolution.kind === "immediate") {
+    owner.evidence.record("campaign-reward-fusion-secondary", {
+      address: boundary.authority.address,
+      ownerSeat: owner.publicSeat,
+      primarySlot,
+      secondarySlot,
+      resolution: "immediate",
+    });
+    return secondaryResolution.outcome;
+  }
+  const optionEvent = secondaryResolution.event;
   if (!optionEvent.observation.optionIds?.includes("party-option:splice")) {
     throw new Error(
       `[campaign-reward-fusion] slot ${secondarySlot} exposed no splice action: `
@@ -3801,6 +3832,7 @@ async function finishRewardFusion(rig, owner, boundary, primarySlot, fromCursor)
     ownerSeat: owner.publicSeat,
     primarySlot,
     secondarySlot,
+    resolution: "splice-action",
   });
   const spliceCursor = owner.evidence.cursor();
   await selectOptionById(owner, {

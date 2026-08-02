@@ -500,6 +500,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /observation\.phase === "ErGreaterAbilityCapsulePhase" && options\.includes\("slot:1"\)/u);
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
+  assert.match(campaign, /DNA Splicers secondary target action or immediate fusion commit/u);
+  assert.match(campaign, /resolution: "immediate"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
   assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
