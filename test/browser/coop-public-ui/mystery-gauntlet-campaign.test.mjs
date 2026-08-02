@@ -267,6 +267,7 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityCapsulePhase",
+      selectedOptionId: "party-option:ability-slot-0",
       optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:ability-slot-2"],
     }),
     "party-option:ability-slot-1",
@@ -275,6 +276,7 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityRandomizerPhase",
+      selectedOptionId: "party-option:ability-slot-1",
       optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1"],
     }),
     "party-option:ability-slot-0",

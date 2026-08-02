@@ -2938,13 +2938,16 @@ export function chooseAbilityInteractionOption(observation) {
       ? `party-slot:${observation.interactionTargetPartySlot}`
       : null;
   }
-  if (typeof observation.selectedOptionId === "string" && options.includes(observation.selectedOptionId)) {
-    return observation.selectedOptionId;
-  }
   const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
-  return (
-    abilitySlots.map(slot => `party-option:ability-slot-${slot}`).find(optionId => options.includes(optionId)) ?? null
-  );
+  const abilitySlot = abilitySlots
+    .map(slot => `party-option:ability-slot-${slot}`)
+    .find(optionId => options.includes(optionId));
+  if (abilitySlot != null) {
+    return abilitySlot;
+  }
+  return typeof observation.selectedOptionId === "string" && options.includes(observation.selectedOptionId)
+    ? observation.selectedOptionId
+    : null;
 }
 
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
@@ -5463,7 +5466,10 @@ export async function runCampaign(rig) {
           );
         }
         const targetAction = targetActions[0];
-        if (targetAction.partySlot !== policy.rewardTargetSlot || targetAction.beforePartySlot?.coopOwner !== "guest") {
+        if (
+          targetAction.partySlot !== targetAction.beforePartySlot?.slot
+          || targetAction.beforePartySlot?.coopOwner !== "guest"
+        ) {
           throw new Error(
             `[campaign-party-reward] ${configuredId} did not target the guest-owned combined party slot: `
               + JSON.stringify(targetAction),

@@ -1778,13 +1778,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
       }
       const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters();
+      const coopBrowserPartyRewardStarters = getCoopBrowserPartyRewardFixtureStarters();
       const coopBrowserStarters =
         getCoopBrowserCommanderFixtureStarters()
         ?? getCoopBrowserFaintFixtureStarters()
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
         ?? getCoopBrowserAbilityCapsuleFixtureStarters()
-        ?? getCoopBrowserPartyRewardFixtureStarters()
+        ?? coopBrowserPartyRewardStarters
         ?? coopBrowserNavigationStarters
         ?? getCoopBrowserEvolutionFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();
@@ -1794,7 +1795,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // registry requires both the exact dedicated build flag and this client's exact URL fixture.
         this.seedTeamFromStarters(coopBrowserStarters, {
           allowUncaught: true,
-          allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters,
+          allowOverValueLimit:
+            coopBrowserStarters === coopBrowserNavigationStarters
+            || coopBrowserStarters === coopBrowserPartyRewardStarters,
         });
       }
 

@@ -1200,6 +1200,28 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       };
     }
   }
+  if (uiMode === "ER_BARGAIN") {
+    const bargainHandler = handler as unknown as {
+      picker?: { options?: unknown[] } | null;
+    };
+    const pickerOptions = bargainHandler.picker?.options;
+    if (Array.isArray(pickerOptions) && pickerOptions.length > 0) {
+      // The Curiosity/Greater Ability Randomizer picker renders localized labels, so publish
+      // stable ordinals for its actual ability rows. Deliberately omit the trailing Cancel row:
+      // landing there must remain a visible driver failure instead of being mistaken for a choice.
+      const optionIds = pickerOptions.map((_option, index) => `er-bargain-picker:option:${index}`);
+      return {
+        selectedOptionId:
+          selectedIndex != null && selectedIndex >= 0 && selectedIndex < optionIds.length
+            ? optionIds[selectedIndex]
+            : selectedIndex == null
+              ? null
+              : "er-bargain-picker:cancel",
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
   if (uiMode === "PARTY") {
     const partyHandler = handler as unknown as {
       optionsMode?: boolean;

@@ -82,6 +82,16 @@ const MEWTWO_SPECIES_ID = 150;
 const ZACIAN_SPECIES_ID = 888;
 const ZAMAZENTA_SPECIES_ID = 889;
 const GARCHOMP_SPECIES_ID = 445;
+const PARTY_REWARD_SUBJECT_SPECIES_IDS = Object.freeze({
+  EVOLUTION_ITEM: 120,
+  RARE_EVOLUTION_ITEM: 891,
+  FORM_CHANGE_ITEM: 492,
+  RARE_FORM_CHANGE_ITEM: 487,
+});
+
+function expectedPartyRewardFixtureSpecies(rewardId) {
+  return [PARTY_REWARD_SUBJECT_SPECIES_IDS[rewardId] ?? GARCHOMP_SPECIES_ID, CATERPIE_SPECIES_ID];
+}
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -3715,7 +3725,7 @@ export class DuoPublicUiRig {
                           : abilityCapsuleFixture
                             ? [GARCHOMP_SPECIES_ID]
                             : partyRewardFixture
-                              ? [GARCHOMP_SPECIES_ID]
+                              ? expectedPartyRewardFixtureSpecies(this.config.partyRewardId)
                               : null;
           const result =
             expectedSeededSpecies == null

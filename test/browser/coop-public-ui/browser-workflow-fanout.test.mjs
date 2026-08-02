@@ -434,9 +434,15 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
+    starterHandler,
+    /coopBrowserStarters === coopBrowserPartyRewardStarters/u,
+    "the exact test fixture must retain its declared reserve despite the ordinary starter point budget",
+  );
+  assert.match(
     harness,
     /this\.config\.journey === "party-mutating-rewards"[\s\S]*set\("coopfixture", "party-mutating-rewards"\)[\s\S]*set\("partyreward", this\.config\.partyRewardId\)/u,
   );
+  assert.match(harness, /expectedPartyRewardFixtureSpecies\(this\.config\.partyRewardId\)/u);
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
   assert.match(policy, /nestedDirectRewardIds/u);
@@ -447,6 +453,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
+  assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
   assert.match(campaign, /event\.observation\?\.address\?\.wave >= 2/u);
   assert.match(browserEntry, /maxMoveCount: pokemon\.getMaxMoveCount\(\)/u);
@@ -455,6 +462,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(browserEntry, /innateAbilityIds: safeInnateIds\(pokemon\)/u);
   assert.match(browserEntry, /moves: pokemon\.getMoveset\(\)\.map/u);
   assert.match(browserEntry, /modifierStacks: observedPokemonModifierStacks\(pokemon\.id\)/u);
+  assert.match(browserEntry, /uiMode === "ER_BARGAIN"[\s\S]*er-bargain-picker:option:/u);
   assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
   assert.match(campaign, /dexChoices\.length !== 2/u);
 });
