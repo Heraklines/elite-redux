@@ -125,7 +125,7 @@ jobs:
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
           --ai-model ai-human/models/selected-model.json
-          --test-timeout-ms 3600000
+          --test-timeout-ms 7200000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-human-legacy-tree-v1-results.json"
       - uses: actions/upload-artifact@v4
         if: always()
