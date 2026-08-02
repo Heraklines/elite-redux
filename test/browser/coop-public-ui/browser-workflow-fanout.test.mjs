@@ -589,7 +589,16 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(browserEntry, /uiMode === "ER_BARGAIN"[\s\S]*er-bargain-picker:option:/u);
   assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
   assert.match(campaign, /dexChoices\.length !== 2/u);
-  assert.match(campaign, /driver\.abilityPhase === "ErDexNavPhase"[\s\S]*priorChoiceIds/u);
+  assert.match(
+    campaign,
+    /const priorChoiceIds = new Set\([\s\S]*event\.kind === "campaign-ability-choice"[\s\S]*event\.phase === driver\.abilityPhase[\s\S]*chooseAbilityInteractionOption\(surface\.observation, priorChoiceIds\)/u,
+    "every repeated nested ability picker must exclude choices already submitted in that exact phase",
+  );
+  assert.match(
+    campaign,
+    /party-option:ability-slot-\$\{slot\}[\s\S]*!excludedOptionIds\.has\(optionId\)/u,
+    "Greater Capsule cannot reuse its first innate while selecting the required second slot",
+  );
   assert.match(
     browserEntry,
     /phase === "FormChangePhase" \|\| phase === "CoopFormChangeCutsceneReplayPhase"[\s\S]*surfaceId: "battle:form-change"/u,
