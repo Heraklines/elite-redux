@@ -223,6 +223,15 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
   assert.match(workflow, /node --test test\/browser\/coop-public-ui\/market-gold-standard\.test\.mjs/u);
 });
 
+test("between-wave deadline performs a final address-exact command proof", async () => {
+  const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
+  assert.match(
+    campaign,
+    /const consumeSharedCommandFrontier = async \(\) =>[\s\S]*allClientsAtCurrentCommandFrontier\(clients, commandCursors\)[\s\S]*assertSharedCommandFrontier\(commandCursors,[\s\S]*while \(Date\.now\(\) <[\s\S]*const deadlineCommandFrontier = await consumeSharedCommandFrontier\(\)[\s\S]*if \(deadlineCommandFrontier != null\)[\s\S]*return deadlineCommandFrontier/u,
+    "a frontier materialized by the final asynchronous readiness pass must be consumed without extending the deadline",
+  );
+});
+
 test("private DataChannel fault injection stays out of the human-equivalent lane", async () => {
   const readme = await readFile(resolve(root, "test/browser/coop-public-ui/README.md"), "utf8");
   const marketJourney = await readFile(resolve(root, "test/browser/coop-public-ui/market-journey.mjs"), "utf8");

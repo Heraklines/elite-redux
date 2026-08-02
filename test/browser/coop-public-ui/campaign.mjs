@@ -4529,6 +4529,35 @@ async function advanceToNextWaveCommand(
       surfaceCount: stats.surfaces.length,
       ...detail,
     });
+  const consumeSharedCommandFrontier = async () => {
+    if (!allClientsAtCurrentCommandFrontier(clients, commandCursors)) {
+      return null;
+    }
+    const boundary = await rig.assertSharedCommandFrontier(commandCursors, `wave-${waveOrdinal}-advance`, {
+      allowAddressRepeat: true,
+    });
+    rig.activeBattleWave = boundary.wave;
+    await finalizePendingMysteryEvent(rig, stats, {
+      kind: "command",
+      wave: boundary.wave,
+      address: { epoch: boundary.epoch, wave: boundary.wave, turn: boundary.turn },
+      stateDigest: boundary.stateDigest,
+    });
+    if (stats.market != null) {
+      stats.market.continuation = {
+        status: "command",
+        epoch: boundary.epoch,
+        wave: boundary.wave,
+        turn: boundary.turn,
+        stateDigest: boundary.stateDigest,
+      };
+    }
+    await reportBetweenWaveProgress("between-wave command frontier reached", {
+      destinationWave: boundary.wave,
+      destinationTurn: boundary.turn,
+    });
+    return { status: "continue", boundary };
+  };
 
   while (Date.now() < (betweenWaveBudget?.observe() ?? registeredSurfaceProgressBudget?.deadline() ?? fixedDeadline)) {
     if (
@@ -4542,31 +4571,9 @@ async function advanceToNextWaveCommand(
       return { status: "terminal" };
     }
 
-    if (allClientsAtCurrentCommandFrontier(clients, commandCursors)) {
-      const boundary = await rig.assertSharedCommandFrontier(commandCursors, `wave-${waveOrdinal}-advance`, {
-        allowAddressRepeat: true,
-      });
-      rig.activeBattleWave = boundary.wave;
-      await finalizePendingMysteryEvent(rig, stats, {
-        kind: "command",
-        wave: boundary.wave,
-        address: { epoch: boundary.epoch, wave: boundary.wave, turn: boundary.turn },
-        stateDigest: boundary.stateDigest,
-      });
-      if (stats.market != null) {
-        stats.market.continuation = {
-          status: "command",
-          epoch: boundary.epoch,
-          wave: boundary.wave,
-          turn: boundary.turn,
-          stateDigest: boundary.stateDigest,
-        };
-      }
-      await reportBetweenWaveProgress("between-wave command frontier reached", {
-        destinationWave: boundary.wave,
-        destinationTurn: boundary.turn,
-      });
-      return { status: "continue", boundary };
+    const commandFrontier = await consumeSharedCommandFrontier();
+    if (commandFrontier != null) {
+      return commandFrontier;
     }
 
     // Loud-fail (strict) unless the explicit shakedown/auto-first ordering opt-in is set: the same
@@ -4681,6 +4688,16 @@ async function advanceToNextWaveCommand(
       }
     }
     await delay(150);
+  }
+
+  // Every loop iteration performs asynchronous public-surface work before returning to its deadline
+  // guard. A command frontier can therefore become current during the final readiness delay, exactly
+  // as market run 30732573521 did 260ms after the last provisional-progress observation. Re-read the
+  // append-only evidence once at the immutable deadline; this grants no extra waiting budget and only
+  // accepts the same address-exact shared proof used inside the loop.
+  const deadlineCommandFrontier = await consumeSharedCommandFrontier();
+  if (deadlineCommandFrontier != null) {
+    return deadlineCommandFrontier;
   }
 
   const parked = latestStartPhase(clients);
