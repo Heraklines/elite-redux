@@ -6873,8 +6873,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `AWAIT_SUCCESSOR -> ABILITY_PRESENT`, but the guest reward projector's concrete modifier switch omitted
   `ErDexNavModifierType`. It therefore returned `continuation=false`, advanced into ordinary `NewBattlePhase`,
   and began a 120-second wave-2 enemy wait while the host still owned the two-pick Dex Nav surface. Dex Nav is
-  now retained by the same projection path as every other ability workflow, so the V2 presentation overrides
-  a live reward continuation instead of racing a stale next-wave renderer.
+  now retained before the ordinary Pokemon-target guard (its payload intentionally carries slot `-1`) by the
+  same projection path as every other ability workflow, so the V2 presentation overrides a live reward
+  continuation instead of racing a stale next-wave renderer.
 - The ordinary form-change item applied successfully and opened the real `FormChangePhase`, but the CI observer
   emitted `unclassified` for its actionable `EVOLUTION_SCENE` handler. The driver consequently supplied no
   player-equivalent Space and timed out while the replica was already parked at the ordered next-wave wait.

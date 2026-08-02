@@ -446,8 +446,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     selectModifier,
-    /else if \(modifierType instanceof ErDexNavModifierType\)[\s\S]*v2ProjectsAbilitySurface[\s\S]*unshiftNew\("ErDexNavPhase", 0, seq, watcher\)/u,
-    "the reward replica must retain Dex Nav as a nested continuation until its V2 picker is projected",
+    /v2ProjectsAbilitySurface[\s\S]*if \(modifierType instanceof ErDexNavModifierType\)[\s\S]*unshiftNew\("ErDexNavPhase", 0, seq, watcher\)[\s\S]*unshiftPhase\(this\.copy\(\)\)[\s\S]*return true;[\s\S]*const target = globalScene\.getPlayerParty\(\)\[slotIndex\]/u,
+    "the targetless Dex Nav reward must retain its nested continuation before the ordinary Pokemon target guard",
   );
   assert.match(
     registry,

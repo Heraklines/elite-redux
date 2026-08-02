@@ -1260,13 +1260,24 @@ export class SelectModifierPhase extends BattlePhase {
     cost: number,
     offerKey: string,
   ): boolean {
+    const v2ProjectsAbilitySurface =
+      getCoopController()?.role === "guest"
+      && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+    // Dex Nav has no Pokemon target and its relayed reward payload therefore carries slot=-1. It must be
+    // classified before the ordinary target guard; otherwise the replica returns `continuation=false`,
+    // advances into NewBattlePhase, and races the still-open authoritative two-pick surface.
+    if (modifierType instanceof ErDexNavModifierType) {
+      if (!v2ProjectsAbilitySurface) {
+        const { seq, watcher } = this.coopAbilityContext();
+        globalScene.phaseManager.unshiftNew("ErDexNavPhase", 0, seq, watcher);
+      }
+      globalScene.phaseManager.unshiftPhase(this.copy());
+      return true;
+    }
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
       return false;
     }
-    const v2ProjectsAbilitySurface =
-      getCoopController()?.role === "guest"
-      && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
 
     let queued = true;
     if (modifierType instanceof TmModifierType) {
@@ -1317,11 +1328,6 @@ export class SelectModifierPhase extends BattlePhase {
           watcher,
           this.getGreaterAbilityRandomizerChoiceCache(offerKey),
         );
-      }
-    } else if (modifierType instanceof ErDexNavModifierType) {
-      if (!v2ProjectsAbilitySurface) {
-        const { seq, watcher } = this.coopAbilityContext();
-        globalScene.phaseManager.unshiftNew("ErDexNavPhase", 0, seq, watcher);
       }
     } else {
       queued = false;
