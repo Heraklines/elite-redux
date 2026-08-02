@@ -4706,6 +4706,10 @@ export async function runCampaign(rig) {
     commandFrontiers: [],
     waveSurfaces: [],
   };
+  const useDepthPartyFixture =
+    rig.config.journey === "campaign"
+    && policy.renderProfile === "animations-skipped-depth"
+    && !rig.config.expectReclaim;
   progress.startHeartbeat(() => campaignLiveSnapshot(rig, clients, policy.targetWaves));
   await progress.note("campaign start", {
     targetWaves: policy.targetWaves,
@@ -4728,10 +4732,6 @@ export async function runCampaign(rig) {
     await configureRenderProfile(rig, policy, progress);
     await rig.pair(rig.config.requesterSeat);
     await progress.note("public lobby pairing complete");
-    const useDepthPartyFixture =
-      rig.config.journey === "campaign"
-      && policy.renderProfile === "animations-skipped-depth"
-      && !rig.config.expectReclaim;
     await rig.startFreshRun({
       campaignSurvivalFixture: policy.mysteryGauntlet.required || useDepthPartyFixture,
       // The market-only 20-wave profile uses the same exact level-100 seeded party as the
