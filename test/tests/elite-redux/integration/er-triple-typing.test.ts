@@ -48,7 +48,9 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
   it("Dead Bark (944) adds Ghost to Snorlax → 3 types (Normal/Ghost), Tackle 0 damage", async () => {
     // Already proven in er-damage-sanity.test.ts. Re-verify the type array.
     const pkrgDeadBark = await erId(944);
-    if (pkrgDeadBark === undefined) return;
+    if (pkrgDeadBark === undefined) {
+      return;
+    }
     game.override
       .battleStyle("single")
       .ability(AbilityId.NO_GUARD)
@@ -75,7 +77,9 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
   it("Adding a type the Pokemon already has is a no-op (no duplicate)", async () => {
     // If a Fire-type Pokemon has an ability that adds Fire, no change.
     const pkrgDeadBark = await erId(944); // adds GHOST
-    if (pkrgDeadBark === undefined) return;
+    if (pkrgDeadBark === undefined) {
+      return;
+    }
     game.override
       .battleStyle("single")
       .ability(AbilityId.NO_GUARD)
@@ -89,7 +93,7 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
     // Gengar should still be Ghost + Poison, no duplicate Ghost.
     const ghostCount = types.filter(t => t === PokemonType.GHOST).length;
     expect(ghostCount).toBe(1);
-    expect(types.length).toBeLessThanOrEqual(3); // never more than 3 types
+    expect(types).toEqual(expect.arrayContaining([PokemonType.GHOST, PokemonType.POISON]));
   });
 
   it("Triple-type effectiveness multiplies correctly (Earthquake vs Normal/Ghost = 0)", async () => {
@@ -102,7 +106,9 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
     //   - vs Ghost: 0×
     //   - combined: 0× (immune)
     const pkrgDeadBark = await erId(944);
-    if (pkrgDeadBark === undefined) return;
+    if (pkrgDeadBark === undefined) {
+      return;
+    }
     game.override
       .battleStyle("single")
       .ability(AbilityId.NO_GUARD)
@@ -122,12 +128,15 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
     expect(hpBefore - enemy.hp).toBeGreaterThan(0);
   });
 
-  it("Adding a type to a 2-type Pokemon yields exactly 3 types", async () => {
-    // Charizard is Fire/Flying. If an add-type ability adds Dragon, we want 3 types.
+  it("Adding a type preserves every existing native type", async () => {
+    // Charizard is at least Fire/Flying. Type-granting abilities must append
+    // without discarding any native extra type already present.
     // Find Lightning Born (847) which adds Electric — use a Pokemon that's
     // not Electric already so we get a clean 3rd type.
     const pkrgId = await erId(847);
-    if (pkrgId === undefined) return;
+    if (pkrgId === undefined) {
+      return;
+    }
     game.override
       .battleStyle("single")
       .ability(pkrgId)
@@ -138,13 +147,39 @@ describe.skipIf(!RUN_SCENARIOS)("ER triple-typing", () => {
     await game.classicMode.startBattle(SpeciesId.CHARIZARD);
     const player = game.field.getPlayerPokemon();
     const types = player.getTypes();
-    // Charizard (Fire/Flying) + Electric = exactly 3 types
+    // Charizard retains Fire/Flying and gains Electric; native extra types are
+    // allowed to make the final list longer than three.
     if (types.includes(PokemonType.ELECTRIC)) {
-      // Wire fired — verify cap.
-      expect(types.length).toBe(3);
+      expect(types.length).toBeGreaterThanOrEqual(3);
       expect(types).toContain(PokemonType.FIRE);
       expect(types).toContain(PokemonType.FLYING);
       expect(types).toContain(PokemonType.ELECTRIC);
     }
+  });
+
+  it("Dodrio keeps its native Ground immunity after Bruiser adds Fighting", async () => {
+    game.override
+      .battleStyle("single")
+      .ability(AbilityId.NO_GUARD)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.DODRIO)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.THUNDERBOLT)
+      .startingWave(146) // past the #419 BST cap and not the wave-145 rival battle
+      .startingLevel(100)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+    const enemy = game.field.getEnemyPokemon();
+    expect(enemy.getTypes()).toEqual(
+      expect.arrayContaining([PokemonType.NORMAL, PokemonType.FLYING, PokemonType.GROUND, PokemonType.FIGHTING]),
+    );
+    const hpBefore = enemy.hp;
+
+    game.move.use(MoveId.THUNDERBOLT);
+    await game.toEndOfTurn();
+
+    expect(enemy.hp, "Ground must still make Dodrio immune to Electric").toBe(hpBefore);
   });
 });

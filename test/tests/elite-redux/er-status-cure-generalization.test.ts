@@ -99,4 +99,25 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     // (live players previously could not remove it at all).
     expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
   });
+
+  it("Take Heart clears ER Fear as a full-status cure", async () => {
+    game.override
+      .battleStyle("single")
+      .ability(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.TAKE_HEART])
+      .startingLevel(50)
+      .enemyLevel(5);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+    const mon = game.field.getPlayerPokemon();
+    mon.addTag(BattlerTagType.ER_FEAR, 5, MoveId.NONE, mon.id);
+
+    game.move.select(MoveId.TAKE_HEART);
+    await game.toNextTurn();
+
+    expect(mon.getTag(BattlerTagType.ER_FEAR)).toBeUndefined();
+  });
 });

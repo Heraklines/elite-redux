@@ -35,7 +35,7 @@ export class FieldStatShareAbAttr extends PostStatStageChangeAbAttr {
   }
 
   override apply(params: PostStatStageChangeAbAttrParams): void {
-    const { pokemon, stats, stages, simulated } = params;
+    const { pokemon, stats, stages, selfTarget, simulated } = params;
     if (simulated) {
       return;
     }
@@ -44,13 +44,7 @@ export class FieldStatShareAbAttr extends PostStatStageChangeAbAttr {
     const others = globalScene.getField().filter(p => p && p !== pokemon && !p.isFainted());
     for (const other of others) {
       (other as unknown as Record<symbol, number>)[SHARED_TURN_FLAG] = turn;
-      globalScene.phaseManager.unshiftNew(
-        "StatStageChangePhase",
-        other.getBattlerIndex(),
-        true,
-        stats,
-        stages,
-      );
+      globalScene.phaseManager.unshiftNew("StatStageChangePhase", other.getBattlerIndex(), selfTarget, stats, stages);
     }
   }
 }

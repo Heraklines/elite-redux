@@ -228,5 +228,32 @@ describe("EntryEffectAbAttr archetype (C1)", () => {
         PokemonType.FAIRY,
       ]);
     });
+
+    it("preserves native third and later types when appending another type", () => {
+      const pokemon = makeStubPokemon({
+        initialTypes: [PokemonType.NORMAL, PokemonType.FLYING, PokemonType.GROUND],
+      });
+      const attr = new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.FIGHTING });
+      attr.apply(makeParams(pokemon, false));
+      expect((pokemon.summonData as { types: PokemonType[] }).types).toEqual([
+        PokemonType.NORMAL,
+        PokemonType.FLYING,
+        PokemonType.GROUND,
+        PokemonType.FIGHTING,
+      ]);
+    });
+
+    it("can retain every legal Pokemon type without a slot cap", () => {
+      const everyTypeExceptStellar = Array.from({ length: PokemonType.STELLAR }, (_, type) => type as PokemonType);
+      const pokemon = makeStubPokemon({ initialTypes: everyTypeExceptStellar });
+      const attr = new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.STELLAR });
+
+      attr.apply(makeParams(pokemon, false));
+
+      expect((pokemon.summonData as { types: PokemonType[] }).types).toEqual([
+        ...everyTypeExceptStellar,
+        PokemonType.STELLAR,
+      ]);
+    });
   });
 });

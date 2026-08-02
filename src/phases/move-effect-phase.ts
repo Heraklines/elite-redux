@@ -1055,7 +1055,14 @@ export class MoveEffectPhase extends PokemonPhase {
     this.triggerMoveEffects(MoveEffectTrigger.POST_APPLY, user, target, firstTarget, false);
     this.applyHeldItemFlinchCheck(user, target, dealsDamage);
     this.applyOnGetHitAbEffects(user, target, dmgTuple);
-    applyAbAttrs("PostAttackAbAttr", { pokemon: user, opponent: target, move: this.move, hitResult, damage });
+    applyAbAttrs("PostAttackAbAttr", {
+      pokemon: user,
+      opponent: target,
+      move: this.move,
+      hitResult,
+      damage,
+      useMode: this.useMode,
+    });
     applyCenterOfAttentionPenalty(user, target, this.move, damage);
 
     // ER Batch 3 same-turn "linked/aligned pair" effects (Rendezvous heal,
@@ -1126,6 +1133,7 @@ export class MoveEffectPhase extends PokemonPhase {
       move,
       hitResult,
       damage,
+      useMode: this.useMode,
     };
     applyAbAttrs("PostDefendAbAttr", params);
 
