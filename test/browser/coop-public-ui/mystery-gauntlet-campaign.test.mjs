@@ -487,6 +487,16 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   assert.match(workflow, /VITE_DEV_TOOLS: 1/u);
   assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE: campaign-survival/u);
   assert.match(
+    workflow,
+    /Drive two isolated built clients through the \$\{\{ matrix\.profile \}\} campaign[\s\S]*COOP_UI_JOURNEY: campaign/u,
+    "the campaign process must not silently inherit the generic probe journey identity",
+  );
+  assert.match(
+    await readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    /const allowedJourneys = new Set\(\[[\s\S]*"campaign"/u,
+    "the explicit campaign runtime identity must be accepted by shared browser config",
+  );
+  assert.match(
     registry,
     /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*fixture === "campaign-survival" \|\| fixture === "campaign-party"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
   );

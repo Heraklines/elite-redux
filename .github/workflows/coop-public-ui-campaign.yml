@@ -443,6 +443,10 @@ jobs:
 
       - name: Drive two isolated built clients through the ${{ matrix.profile }} campaign
         env:
+          # `run-campaign.mjs` shares the public-UI config with the shorter journeys. Keep its
+          # runtime identity explicit: without this, config silently defaults to `probe`, making
+          # campaign-only fixture/proof branches unreachable while summary.json still says campaign.
+          COOP_UI_JOURNEY: campaign
           COOP_UI_BASE_URL: http://127.0.0.1:4175/?coopdebug=1
           COOP_UI_BROWSER_DIST: dist-coop-public-ui
           COOP_UI_ASSET_DIR: .coop-no-local-asset-fallback

@@ -70,6 +70,7 @@ function optionalIdentifier(name, maxLength) {
 }
 
 const allowedJourneys = new Set([
+  "campaign",
   "probe",
   "fresh-wave2",
   "fresh-resume",
