@@ -35,6 +35,21 @@ on:
         required: false
         default: ""
         type: string
+      training_output_run_id:
+        description: Completed run whose packaged training artifact should be published to private Kaggle
+        required: false
+        default: ""
+        type: string
+      kaggle_dataset_slug:
+        description: Private Kaggle dataset slug for a packaged checkpoint resume
+        required: false
+        default: michaelferjani/er-ai-checkpoint-league-resume-20260802
+        type: string
+      kaggle_kernel_slug:
+        description: Private Kaggle GPU kernel slug for checkpoint resume training
+        required: false
+        default: michaelferjani/er-ai-checkpoint-league-resume-gpu-20260802
+        type: string
 
 permissions:
   actions: read
@@ -46,7 +61,7 @@ concurrency:
 
 jobs:
   model:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && inputs.training_output_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Seal starting checkpoint
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -121,7 +136,7 @@ jobs:
           if-no-files-found: error
 
   identity:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && inputs.training_output_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Seal current combat identity
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -153,7 +168,7 @@ jobs:
           if-no-files-found: error
 
   self-play:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && inputs.training_output_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Checkpoint self-play shard ${{ matrix.shard }}
     needs: [model, identity]
     runs-on: ubuntu-latest
@@ -276,7 +291,7 @@ jobs:
           if-no-files-found: warn
 
   train-and-package:
-    if: always() && github.repository == 'Heraklines/elite-redux' && (inputs.reuse_run_id != '' || (needs.self-play.result == 'success' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))))
+    if: always() && github.repository == 'Heraklines/elite-redux' && inputs.training_output_run_id == '' && (inputs.reuse_run_id != '' || (needs.self-play.result == 'success' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))))
     name: Winner-only tree and resumed-transformer bundle
     needs: self-play
     runs-on: ubuntu-latest
@@ -368,3 +383,103 @@ jobs:
           path: ai-report
           retention-days: 30
           if-no-files-found: error
+
+  publish-private-gpu:
+    if: always() && github.repository == 'Heraklines/elite-redux' && inputs.training_output_run_id != ''
+    name: Publish private Kaggle resume and start GPU
+    needs: train-and-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-checkpoint-league-training-output
+          path: ai-report
+          run-id: ${{ inputs.training_output_run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==1.8.4
+      - name: Build private Kaggle dataset and kernel manifests
+        env:
+          DATASET_SLUG: ${{ inputs.kaggle_dataset_slug }}
+          KERNEL_SLUG: ${{ inputs.kaggle_kernel_slug }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ai-report/er-ai-training-bundle.zip
+          mkdir -p ai-kaggle-dataset ai-kaggle-kernel
+          cp ai-report/er-ai-training-bundle.zip ai-kaggle-dataset/
+          cp ml/policy/kaggle_train_entrypoint.py ai-kaggle-kernel/
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          dataset_slug = os.environ["DATASET_SLUG"]
+          kernel_slug = os.environ["KERNEL_SLUG"]
+          Path("ai-kaggle-dataset/dataset-metadata.json").write_text(
+              json.dumps(
+                  {
+                      "title": "ER AI Checkpoint League Resume 20260802",
+                      "id": dataset_slug,
+                      "licenses": [{"name": "other"}],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          Path("ai-kaggle-kernel/kernel-metadata.json").write_text(
+              json.dumps(
+                  {
+                      "id": kernel_slug,
+                      "title": "ER AI Checkpoint League Resume GPU 20260802",
+                      "code_file": "kaggle_train_entrypoint.py",
+                      "language": "python",
+                      "kernel_type": "script",
+                      "is_private": "true",
+                      "enable_gpu": "true",
+                      "enable_tpu": "false",
+                      "enable_internet": "true",
+                      "dataset_sources": [dataset_slug],
+                      "competition_sources": [],
+                      "kernel_sources": [],
+                      "model_sources": [],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Publish private dataset and launch private GPU kernel
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          DATASET_SLUG: ${{ inputs.kaggle_dataset_slug }}
+          KERNEL_SLUG: ${{ inputs.kaggle_kernel_slug }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          if kaggle datasets status "$DATASET_SLUG" >/dev/null 2>&1; then
+            kaggle datasets version --path ai-kaggle-dataset --message "checkpoint league run ${{ inputs.training_output_run_id }}"
+          else
+            kaggle datasets create --path ai-kaggle-dataset --private
+          fi
+          kaggle kernels push --path ai-kaggle-kernel
+          {
+            echo "### Private GPU checkpoint resume"
+            echo "- Dataset: \`$DATASET_SLUG\`"
+            echo "- Kernel: \`$KERNEL_SLUG\`"
+            echo "- Source Actions run: \`${{ inputs.training_output_run_id }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
