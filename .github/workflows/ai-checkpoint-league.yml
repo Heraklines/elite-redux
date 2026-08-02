@@ -474,7 +474,7 @@ jobs:
           if kaggle datasets status "$DATASET_SLUG" >/dev/null 2>&1; then
             kaggle datasets version --path ai-kaggle-dataset --message "checkpoint league run ${{ inputs.training_output_run_id }}"
           else
-            kaggle datasets create --path ai-kaggle-dataset --private
+            kaggle datasets create --path ai-kaggle-dataset
           fi
           kaggle kernels push --path ai-kaggle-kernel
           {
