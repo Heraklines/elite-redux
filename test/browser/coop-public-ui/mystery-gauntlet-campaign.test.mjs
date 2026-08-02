@@ -834,6 +834,65 @@ test("campaign move driving semantically selects Fight instead of assuming the r
   assert.match(navigation, /client\.evidence\.record\("campaign-voluntary-switch"/u);
 });
 
+test("campaign move driving resumes a Fight submenu opened before round admission", async () => {
+  const presses = [];
+  const records = [];
+  const fightEvent = {
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:fight",
+      operationClass: "command",
+      ownerModel: "local",
+      phase: "CommandPhase",
+      uiMode: "FIGHT",
+      address: { epoch: 91, wave: 1, turn: 5 },
+      localSeat: 0,
+      seatsWithInput: [0],
+      selectedOptionId: "move:94:slot:3",
+      optionIds: ["move:94:slot:3"],
+      moveSlots: [
+        { index: 3, optionId: "move:94:slot:3", moveId: 94, category: "SPECIAL", power: 90, usable: true },
+      ],
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  const events = [fightEvent];
+  const evidence = {
+    cursor: () => events.length,
+    findLastSemanticSurface(from = 0, surfaceId = null) {
+      return events
+        .filter(
+          event =>
+            event.index >= from
+            && event.kind === "browser-surface2"
+            && (surfaceId == null || event.observation.surfaceId === surfaceId),
+        )
+        .at(-1);
+    },
+    record(kind, detail) {
+      records.push({ kind, ...detail });
+    },
+  };
+  const client = {
+    label: "host-seat",
+    publicSeat: 0,
+    evidence,
+    async press(key, purpose) {
+      presses.push({ key, purpose });
+    },
+  };
+
+  const move = await driveBestCampaignMove(client, "resume-fight", {
+    timeoutMs: 1_000,
+    commandEvent: fightEvent,
+  });
+
+  assert.equal(move.moveId, 94);
+  assert.deepEqual(presses, [{ key: "Space", purpose: "nav-submit-command:fight->move:94:slot:3" }]);
+  assert.equal(records.at(-1).kind, "campaign-battle-move");
+});
+
 test("a rejected voluntary switch stays on the same owner and falls back to a relayed attack", async () => {
   const address = { epoch: 91, wave: 2, turn: 3 };
   const partySlots = [

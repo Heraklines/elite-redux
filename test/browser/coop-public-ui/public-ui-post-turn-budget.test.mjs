@@ -82,6 +82,24 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
   };
 }
 
+function ownedFight(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+  return {
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      ownerModel: "local",
+      surfaceId: "command:fight",
+      phase: "CommandPhase",
+      uiMode: "FIGHT",
+      address,
+      stateDigest: `digest-${address.epoch}-${address.wave}-${address.turn}`,
+      localSeat,
+      seatsWithInput: [localSeat],
+      ready: { handlerActive: true },
+    },
+  };
+}
+
 function replacementPicker(ownerSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
   return {
     kind: "browser-surface2",
@@ -723,6 +741,52 @@ test("sequential command driver submits the first owner before waiting for the p
     second: secondEvidence.events.at(-1).index,
   });
   assert.equal(result.expectedCommandAddress, "73:1:2");
+});
+
+test("sequential command driver resumes an owner already advanced into Fight", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 1, turn: 5 };
+  const firstEvidence = new FakeEvidence("first");
+  const secondEvidence = new FakeEvidence("second");
+  firstEvidence.push(ownedFight(0, address));
+  secondEvidence.push(ownedCommand(1, address));
+  const first = {
+    label: "first",
+    publicSeat: 0,
+    evidence: firstEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      throw new Error("the campaign callback owns this resumed command");
+    },
+  };
+  const second = {
+    label: "second",
+    publicSeat: 1,
+    evidence: secondEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      throw new Error("the campaign callback owns this root command");
+    },
+  };
+  const rig = {
+    clients: { first, second },
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async () => order.push("presentation-proof"),
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { first: 0, second: 0 },
+    ["Space"],
+    "turn-5",
+    {
+      driveCommand: async client => order.push(client.label),
+    },
+  );
+
+  assert.deepEqual(order, ["first", "presentation-proof", "second"]);
+  assert.equal(result.commandEvents.first.observation.surfaceId, "command:fight");
+  assert.equal(result.expectedCommandAddress, "73:1:5");
 });
 
 test("sequential command presentation proof retains receipts before an intervening replacement", async () => {

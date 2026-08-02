@@ -572,41 +572,49 @@ export async function driveBestCampaignMove(
   purpose,
   { timeoutMs = 15_000, cycleIndex = 0, commandEvent = null, preferredMoveId = null } = {},
 ) {
+  const resumedFight = commandEvent?.observation?.surfaceId === "command:fight" ? commandEvent : null;
   let command =
     commandEvent?.observation?.surfaceId === "command:command"
       ? commandEvent
       : client.evidence.findLastSemanticSurface(0, "command:command");
-  if (command == null) {
-    throw new Error(`${client.label}: ${purpose} exposed no command:command semantic surface`);
+  if (resumedFight != null && !sameSemanticAddress(command?.observation.address, resumedFight.observation.address)) {
+    command = null;
   }
-  const switchTarget = chooseVoluntarySwitchTarget(command.observation);
-  if (switchTarget != null) {
+  if (command == null && resumedFight == null) {
+    throw new Error(`${client.label}: ${purpose} exposed neither command:command nor command:fight semantic surface`);
+  }
+  const switchTarget = resumedFight == null ? chooseVoluntarySwitchTarget(command.observation) : null;
+  if (switchTarget != null && command != null) {
     const switchResult = await driveCampaignVoluntarySwitch(client, command, switchTarget, purpose, timeoutMs);
     if (switchResult.submitted) {
       return;
     }
     command = switchResult.commandEvent;
   }
-  const fightCursor = client.evidence.cursor();
-  // CommandUiHandler remembers its cursor. A cancelled/superseded target flow can therefore reopen
-  // COMMAND on Ball, Pokemon, or Run. Pressing Space blindly here opened that remembered option and
-  // made the driver wait forever for FIGHT (depth run 30357074506). Navigate the same visible grid a
-  // human uses and prove Fight is selected before submitting.
-  await selectOptionById(client, {
-    surfaceId: "command:command",
-    targetId: "command:fight",
-    navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
-    submitKey: "Space",
-    fromCursor: command.index,
-    timeoutMs,
-  });
-  const fight = await waitForActionableSemanticSurface(client, "command:fight", {
-    fromCursor: fightCursor,
-    timeoutMs,
-  });
+  let fight = resumedFight;
+  let fightCursor = resumedFight?.index ?? client.evidence.cursor();
+  if (fight == null) {
+    // CommandUiHandler remembers its cursor. A cancelled/superseded target flow can therefore reopen
+    // COMMAND on Ball, Pokemon, or Run. Pressing Space blindly here opened that remembered option and
+    // made the driver wait forever for FIGHT (depth run 30357074506). Navigate the same visible grid a
+    // human uses and prove Fight is selected before submitting.
+    await selectOptionById(client, {
+      surfaceId: "command:command",
+      targetId: "command:fight",
+      navKeys: ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"],
+      submitKey: "Space",
+      fromCursor: command.index,
+      timeoutMs,
+    });
+    fight = await waitForActionableSemanticSurface(client, "command:fight", {
+      fromCursor: fightCursor,
+      timeoutMs,
+    });
+    fightCursor = fight.index;
+  }
   const move = chooseBestCampaignMove(fight.observation, cycleIndex, preferredMoveId);
   if (move == null) {
-    if (await driveNoUsableMoveSwitch(client, command, fight, purpose, timeoutMs)) {
+    if (await driveNoUsableMoveSwitch(client, command ?? fight, fight, purpose, timeoutMs)) {
       return;
     }
     const observedMoves = Array.isArray(fight.observation.moveSlots) ? fight.observation.moveSlots : [];

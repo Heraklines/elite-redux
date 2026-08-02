@@ -336,27 +336,33 @@ function findOwnedCommandOrTerminal(client, from) {
   if (terminal != null) {
     return terminal;
   }
-  const semantic = client.evidence.findLastSemanticSurface(from, "command:command");
   const latestSemantic = client.evidence.findLastSemanticSurface(from);
-  const observation = semantic?.observation;
+  const observation = latestSemantic?.observation;
+  const ownedCommandSurface =
+    (observation?.surfaceId === "command:command"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "COMMAND")
+    || (observation?.surfaceId === "command:fight"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "FIGHT");
   const semanticOwner =
     observation != null
     && (observation.coop === false
       ? observation.ownerModel === "local" && observation.localSeat == null && observation.seatsWithInput?.includes(0)
       : observation.localSeat === client.publicSeat && observation.seatsWithInput?.includes(client.publicSeat));
   const ownedSemantic =
-    semantic?.index === latestSemantic?.index
-    && observation?.surfaceId === "command:command"
+    ownedCommandSurface
     && observation?.ready?.handlerActive === true
-    && observation.phase === "CommandPhase"
-    && observation.uiMode === "COMMAND"
     && semanticOwner
-      ? semantic
+      ? latestSemantic
       : null;
   // Semantic surfaces are an append-only observation log, but only the latest one represents the
   // UI a human can currently control. Never resurrect an old CommandPhase after EnemyCommandPhase,
   // narration, a picker, or turn replay has replaced it (Showdown run 30030175748 otherwise spent
   // switch-navigation keys in MoveEffectPhase after the 60s clock had already closed the menu).
+  // The current surface can legitimately be command:fight: the post-turn prompt driver may consume
+  // the CommandPhase narration and leave the real player one submenu deeper before the next round
+  // begins. That is still actionable command ownership, not a missing owner.
   if (latestSemantic != null) {
     return ownedSemantic;
   }
