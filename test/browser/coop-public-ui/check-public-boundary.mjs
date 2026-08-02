@@ -373,7 +373,11 @@ if (
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
-  || !browserEntry.includes('uiMode === "PARTY" || semantic.operationClass === "command"')
+  || // Mutation continuations are validated after the picker closes and wave-2 command opens, while
+  // evolution/fusion can also reorder the roster. Keep the stable party projection on every
+  // addressed gameplay surface instead of limiting it to PARTY/COMMAND with a UI-mode allowlist.
+  !browserEntry.includes("const partySlots =")
+  || !browserEntry.includes("? globalScene.getPlayerParty().map((pokemon, slot) => {")
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
   || !campaign.includes("export function rewardPartyTargetCandidates(")
   || !campaign.includes('observation?.surfaceId === "reward-shop"')
