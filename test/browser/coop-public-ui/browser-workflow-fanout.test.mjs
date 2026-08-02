@@ -469,6 +469,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     registry,
     /getCoopBrowserPartyRewardFixtureStarters\(\)[\s\S]*SpeciesId\.GARCHOMP[\s\S]*MoveId\.WATER_SPOUT[\s\S]*MoveId\.TACKLE[\s\S]*MoveId\.SPLASH[\s\S]*MoveId\.PROTECT/u,
   );
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*getCoopBrowserPartyRewardFixtureId\(\) === "RARE_EVOLUTION_ITEM"[\s\S]*\? 70/u,
+    "the rare evolution fixture must meet every configured Scroll of Darkness level floor",
+  );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
     starterHandler,
@@ -522,6 +527,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(browserEntry, /uiMode === "ER_BARGAIN"[\s\S]*er-bargain-picker:option:/u);
   assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
   assert.match(campaign, /dexChoices\.length !== 2/u);
+  assert.match(campaign, /driver\.abilityPhase === "ErDexNavPhase"[\s\S]*priorChoiceIds/u);
   assert.match(browserEntry, /phase === "FormChangePhase"[\s\S]*surfaceId: "battle:form-change"/u);
   assert.match(campaign, /"battle:form-change", \{ phases: new Set\(\["FormChangePhase"\]\)/u);
 });

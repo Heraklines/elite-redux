@@ -291,6 +291,18 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
     "party-option:ability-slot-0",
     "the randomizer accepts any slot and deterministically uses the active slot first",
   );
+  assert.equal(
+    chooseAbilityInteractionOption(
+      {
+        phase: "ErDexNavPhase",
+        selectedOptionId: "slot:0",
+        optionIds: ["slot:0", "slot:1", "slot:2"],
+      },
+      new Set(["slot:0"]),
+    ),
+    "slot:1",
+    "Dex Nav must choose a different visible ability on its second pass",
+  );
 });
 
 test("Revival and Stormglass have stable-owner public drivers instead of generic local surfaces", async () => {

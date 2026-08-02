@@ -2977,7 +2977,7 @@ async function checkpointAsymmetricRegisteredSurface(rig, driver, cursors, owner
 }
 
 /** Choose the stable party or ability option that advances the current registered ability workflow. */
-export function chooseAbilityInteractionOption(observation) {
+export function chooseAbilityInteractionOption(observation, excludedOptionIds = new Set()) {
   const options = observation?.optionIds;
   if (!Array.isArray(options) || options.length === 0) {
     return null;
@@ -2986,6 +2986,9 @@ export function chooseAbilityInteractionOption(observation) {
     return Number.isSafeInteger(observation.interactionTargetPartySlot)
       ? `party-slot:${observation.interactionTargetPartySlot}`
       : null;
+  }
+  if (observation.phase === "ErDexNavPhase") {
+    return options.find(optionId => /^slot:\d+$/u.test(optionId) && !excludedOptionIds.has(optionId)) ?? null;
   }
   if (observation.phase === "ErGreaterAbilityCapsulePhase" && options.includes("slot:1")) {
     // Exercise the run-material branch. The permanent branch intentionally changes only the owner's
@@ -3006,7 +3009,15 @@ export function chooseAbilityInteractionOption(observation) {
 
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
   if (driver.abilitySurfaceKind !== "party") {
-    const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation);
+    const priorChoiceIds =
+      driver.abilityPhase === "ErDexNavPhase"
+        ? new Set(
+            owner.evidence.events
+              .filter(event => event.kind === "campaign-ability-choice" && event.phase === driver.abilityPhase)
+              .map(event => event.targetId),
+          )
+        : new Set();
+    const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation, priorChoiceIds);
     if (driver.abilitySurfaceKind === "option" || driver.abilitySurfaceKind === "choice") {
       if (targetId == null) {
         throw new Error(

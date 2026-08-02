@@ -434,15 +434,17 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
   }));
 }
 
-/** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
+/** Initial-save-only construction level for exact interaction, navigation, and evolution browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
   return isCoopBrowserEvolutionFixtureActive()
     ? 6
-    : isCoopBrowserRegisteredInteractionFixtureActive()
-        || isCoopBrowserCampaignSurvivalFixtureActive()
-        || isCoopBrowserNavigationFixtureActive()
-      ? 100
-      : null;
+    : getCoopBrowserPartyRewardFixtureId() === "RARE_EVOLUTION_ITEM"
+      ? 70
+      : isCoopBrowserRegisteredInteractionFixtureActive()
+          || isCoopBrowserCampaignSurvivalFixtureActive()
+          || isCoopBrowserNavigationFixtureActive()
+        ? 100
+        : null;
 }
 
 /** Initial-save-only purse for the four-hour navigation lane's repeated real biome-market purchases. */
