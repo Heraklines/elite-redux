@@ -488,16 +488,16 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   assert.match(workflow, /VITE_COOP_BROWSER_FIXTURE: campaign-survival/u);
   assert.match(
     registry,
-    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*get\("coopfixture"\) === "campaign-survival"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
+    /isCoopBrowserCampaignFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "campaign-survival"[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*fixture === "campaign-survival" \|\| fixture === "campaign-party"[\s\S]*getCoopBrowserCampaignFixtureStarters\(\)[\s\S]*SpeciesId\.SEEL[\s\S]*SpeciesId\.CASTFORM[\s\S]*SpeciesId\.SPINDA/u,
   );
   assert.match(
     registry,
-    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*isCoopBrowserCampaignSurvivalFixtureActive\(\)[\s\S]*\? 100[\s\S]*: null/u,
     "the interaction-only Mystery journey cannot randomly wipe before its wave-10 authority boundary",
   );
   assert.match(
     registry,
-    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignSurvivalFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
     "survival and navigation fixtures pause incidental evolutions without weakening the dedicated proof lane",
   );
   for (const species of ["SEEL", "CASTFORM", "SPINDA"]) {
@@ -523,6 +523,21 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   );
   assert.match(harness, /campaignSurvivalFixture[\s\S]*SEEL_SPECIES_ID, CASTFORM_SPECIES_ID, SPINDA_SPECIES_ID/u);
   assert.match(campaign, /assertMysteryFixtureParty\(rig, 1\)[\s\S]*mystery fixture level-100 parties proven/u);
+  assert.match(
+    harness,
+    /journey === "campaign"[\s\S]*renderProfile === "animations-skipped-depth"[\s\S]*!this\.config\.expectReclaim[\s\S]*set\("coopfixture", "campaign-party"\)/u,
+    "the normal-level depth roster must be exact-build, exact-profile, and clean-account gated",
+  );
+  assert.match(
+    campaign,
+    /const useDepthPartyFixture =[\s\S]*rig\.config\.journey === "campaign"[\s\S]*!rig\.config\.expectReclaim[\s\S]*campaignSurvivalFixture: policy\.mysteryGauntlet\.required \|\| useDepthPartyFixture[\s\S]*assertDepthFixtureParty\(rig, 1\)[\s\S]*depth fixture normal-level six-mon party proven/u,
+    "the short depth lane must visibly confirm and then attest its six normal-level starters",
+  );
+  assert.match(
+    campaign,
+    /assertDepthFixtureParty[\s\S]*party\.length !== 6[\s\S]*slot\.level >= 100[\s\S]*slot\.pauseEvolutions === true/u,
+    "the depth fixture must reject level-100 or evolution-paused material",
+  );
   assert.match(
     campaign,
     /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required \|\| policy\.registeredInteractions\.required\)/u,

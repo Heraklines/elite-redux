@@ -1151,6 +1151,15 @@ export class PublicUiClient {
       entryUrl.searchParams.set("enableShowdown", "1");
     } else if (this.config.renderProfile === "mystery-gauntlet" && this.config.difficultyId === "mystery") {
       entryUrl.searchParams.set("coopfixture", "campaign-survival");
+    } else if (
+      this.config.journey === "campaign"
+      && this.config.renderProfile === "animations-skipped-depth"
+      && !this.config.expectReclaim
+    ) {
+      // The short normal-level depth lane needs a deterministic six-mon party, not a level or
+      // invulnerability cheat. Its separate URL token reuses the point-legal visible roster while
+      // deliberately retaining normal levels, EXP, evolutions, damage, and replacement behavior.
+      entryUrl.searchParams.set("coopfixture", "campaign-party");
     }
     this.evidence.record("navigate", { url: entryUrl.origin });
     await this.page.goto(entryUrl, { waitUntil: "domcontentloaded", timeout: this.config.bootTimeoutMs });

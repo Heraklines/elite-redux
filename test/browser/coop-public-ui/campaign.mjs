@@ -4291,6 +4291,46 @@ export function assertMysteryFixtureParty(rig, wave = 1) {
   return assertLongitudinalFixtureParty(rig, wave, "mystery", "campaign-mystery-level100-party", [86, 327, 351]);
 }
 
+/** Prove the short depth lane received six point-legal starters without disabling normal progression. */
+export function assertDepthFixtureParty(rig, wave = 1) {
+  const expectedSpecies = [86, 327, 351];
+  const projections = Object.values(rig.clients).map(client => {
+    const party = latestCommandObservation(client, wave)?.partySlots;
+    if (!Array.isArray(party) || party.length !== 6) {
+      throw new Error(`[campaign-depth] ${client.label} did not observe the six-mon initial shared party`);
+    }
+    for (const owner of ["host", "guest"]) {
+      const owned = party.filter(slot => slot.coopOwner === owner);
+      const species = owned.map(slot => slot.speciesId).toSorted((left, right) => left - right);
+      if (
+        owned.length !== 3
+        || owned.some(slot => !Number.isSafeInteger(slot.level) || slot.level < 1 || slot.level >= 100)
+        || owned.some(slot => slot.pauseEvolutions === true)
+        || JSON.stringify(species) !== JSON.stringify(expectedSpecies)
+      ) {
+        throw new Error(
+          `[campaign-depth] ${client.label} ${owner} fixture mismatch: ${JSON.stringify(owned.map(slot => ({ speciesId: slot.speciesId, level: slot.level, pauseEvolutions: slot.pauseEvolutions })))}`,
+        );
+      }
+    }
+    return party.map(slot => ({
+      slot: slot.slot,
+      speciesId: slot.speciesId,
+      coopOwner: slot.coopOwner,
+      level: slot.level,
+      pauseEvolutions: slot.pauseEvolutions,
+    }));
+  });
+  if (JSON.stringify(projections[0]) !== JSON.stringify(projections[1])) {
+    throw new Error(`[campaign-depth] initial normal-level party projection diverged: ${JSON.stringify(projections)}`);
+  }
+  const proof = { wave, party: projections[0] };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-depth-normal-level-party", proof);
+  }
+  return proof;
+}
+
 /** Capture the raw arena/presentation view at a paired command frontier; the mechanical digest remains primary. */
 export function recordNavigationCommandFrontier(rig, coverage, wave) {
   if (coverage.commandFrontiers.some(frontier => frontier.wave === wave)) {
@@ -4688,8 +4728,12 @@ export async function runCampaign(rig) {
     await configureRenderProfile(rig, policy, progress);
     await rig.pair(rig.config.requesterSeat);
     await progress.note("public lobby pairing complete");
+    const useDepthPartyFixture =
+      rig.config.journey === "campaign"
+      && policy.renderProfile === "animations-skipped-depth"
+      && !rig.config.expectReclaim;
     await rig.startFreshRun({
-      campaignSurvivalFixture: policy.mysteryGauntlet.required,
+      campaignSurvivalFixture: policy.mysteryGauntlet.required || useDepthPartyFixture,
       // The market-only 20-wave profile uses the same exact level-100 seeded party as the
       // navigation-depth profile. Keeping the selected journey identity reaches the URL gate, but
       // setup must also choose the seeded-team confirmer instead of trying to add default starters.
@@ -4744,6 +4788,9 @@ export async function runCampaign(rig) {
   } else if (policy.mysteryGauntlet.required) {
     assertMysteryFixtureParty(rig, 1);
     await progress.note("mystery fixture level-100 parties proven");
+  } else if (useDepthPartyFixture) {
+    assertDepthFixtureParty(rig, 1);
+    await progress.note("depth fixture normal-level six-mon party proven");
   }
 
   let wavesCleared = 0;

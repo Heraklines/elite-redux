@@ -118,12 +118,22 @@ export function isCoopBrowserCampaignFixtureBuild(): boolean {
   return env?.VITE_COOP_BROWSER_FIXTURE === "campaign-survival";
 }
 
-/** Require both the dedicated campaign bundle and its exact Mystery-profile URL token. */
+/** Require the dedicated campaign bundle and one exact, public-driver-owned campaign token. */
 export function isCoopBrowserCampaignFixtureActive(): boolean {
   if (!isCoopBrowserCampaignFixtureBuild() || typeof location === "undefined") {
     return false;
   }
-  return new URLSearchParams(location.search).get("coopfixture") === "campaign-survival";
+  const fixture = new URLSearchParams(location.search).get("coopfixture");
+  return fixture === "campaign-survival" || fixture === "campaign-party";
+}
+
+/** Only the interaction-only Mystery fixture is promoted to level 100 and evolution-paused. */
+export function isCoopBrowserCampaignSurvivalFixtureActive(): boolean {
+  return (
+    isCoopBrowserCampaignFixtureBuild()
+    && typeof location !== "undefined"
+    && new URLSearchParams(location.search).get("coopfixture") === "campaign-survival"
+  );
 }
 
 /** Whether this exact bundle was built for the continuous 30-wave navigation journey. */
@@ -366,7 +376,7 @@ export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null 
   return isCoopBrowserEvolutionFixtureActive()
     ? 6
     : isCoopBrowserRegisteredInteractionFixtureActive()
-        || isCoopBrowserCampaignFixtureActive()
+        || isCoopBrowserCampaignSurvivalFixtureActive()
         || isCoopBrowserNavigationFixtureActive()
       ? 100
       : null;
@@ -381,7 +391,7 @@ export function getCoopBrowserNavigationFixtureStartingMoney(): number | null {
 export function shouldPauseCoopBrowserLongitudinalFixtureEvolutions(): boolean {
   return (
     isCoopBrowserRegisteredInteractionFixtureActive()
-    || isCoopBrowserCampaignFixtureActive()
+    || isCoopBrowserCampaignSurvivalFixtureActive()
     || isCoopBrowserNavigationFixtureActive()
   );
 }
