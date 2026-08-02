@@ -4,8 +4,8 @@ import { SceneBase } from "#app/scene-base";
 import { isMobile } from "#app/touch-controls";
 import { getErBiomeBackgroundTextureKeys } from "#data/elite-redux/er-biome-backgrounds";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
-import { isIOSDevice } from "#data/elite-redux/er-ios";
 import { getEliteReduxCustomIconLoads } from "#data/elite-redux/er-ios-icon-preload";
+import { shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
 import { getBiomeHasProps } from "#field/arena";
@@ -23,8 +23,8 @@ export class LoadingScene extends SceneBase {
   readonly LOAD_EVENTS = Phaser.Loader.Events;
 
   /**
-   * #ios-stability: on iOS the game-data init runs yielding (see preload). create() awaits
-   * this before starting the battle scene so all data is registered first. Null on desktop
+   * #mobile-stability: on constrained mobile browsers the game-data init runs yielding
+   * (see preload). create() awaits this before starting the battle scene so all data is registered first. Null on desktop
    * (init already ran synchronously in preload).
    */
   private erInitPromise: Promise<void> | null = null;
@@ -513,11 +513,11 @@ export class LoadingScene extends SceneBase {
       .loadBgm("heal", "bw/heal.mp3");
 
     // #ios-stability (P1): the 5 heavy non-title BGM tracks (~146 MB of decoded PCM,
-    // the #1 suspected WKWebView jetsam trigger) are NOT preloaded/decoded at boot on iOS.
+    // a major mobile memory-pressure trigger) are NOT preloaded/decoded at boot on iOS or Android.
     // Each is loaded on demand at first play - playBgm / playSoundWithoutBgm look its `bw/`
-    // filename up in ER_IOS_DEFERRED_BGM_FILES so the on-demand fetch resolves seamlessly.
+    // filename up in ER_MOBILE_DEFERRED_BGM_FILES so the on-demand fetch resolves seamlessly.
     // Desktop keeps the eager path (identical set + load order).
-    if (isIOSDevice()) {
+    if (shouldUseMobileBootMitigations()) {
       markBootMilestone("ios-bgm-deferred");
     } else {
       this.loadBgm("victory_trainer", "bw/victory_trainer.mp3")
@@ -531,10 +531,10 @@ export class LoadingScene extends SceneBase {
     this.loadLoadingScreen();
 
     // #ios-stability (P4): the long, synchronous game-data init blocks the main thread
-    // during boot - on a slow iOS device that can trip the kill-the-tab watchdog. On iOS
+    // during boot - on a slow mobile device that can trip the kill-the-tab watchdog. On mobile
     // run it yielding between phases and await it in create() before the battle scene starts
     // (init order/semantics are identical). Desktop keeps the single synchronous pass.
-    if (isIOSDevice()) {
+    if (shouldUseMobileBootMitigations()) {
       this.erInitPromise = initializeGameYielding();
     } else {
       initializeGame();
@@ -712,7 +712,7 @@ export class LoadingScene extends SceneBase {
 
   async create() {
     this.events.once(Phaser.Scenes.Events.DESTROY, () => this.handleDestroy());
-    // #ios-stability: ensure the yielding iOS init has fully completed before the battle
+    // #mobile-stability: ensure the yielding mobile init has fully completed before the battle
     // scene (and its title phase) run, so every species/move/ability is registered. No-op
     // on desktop, where init already ran synchronously in preload.
     if (this.erInitPromise) {
@@ -805,10 +805,10 @@ export class LoadingScene extends SceneBase {
       }
     }
     // #ios-stability (P3): the ~1,850 ER-custom icon requests are pulled OUT of the
-    // blocking iOS boot preload and streamed at the title instead (title-phase.ts ->
+    // blocking mobile boot preload and streamed at the title instead (title-phase.ts ->
     // loadEliteReduxCustomIconsInBackground), so the fetch fan can't stall the WKWebView
     // connection pool during the pre-title crash window. Desktop keeps the eager preload.
-    if (isIOSDevice()) {
+    if (shouldUseMobileBootMitigations()) {
       markBootMilestone("ios-icons-deferred");
     } else {
       this.loadEliteReduxCustomIcons();
@@ -822,7 +822,7 @@ export class LoadingScene extends SceneBase {
    * in lazily. Each ER custom has its own per-slug atlas
    * (`er_icon__{slug}`) — pokerogue's vanilla bundled `pokemon_icons_N`
    * has no frames for id >= 10000. The load list is the single source of
-   * truth shared with the iOS background streamer (er-ios-icon-preload.ts).
+   * truth shared with the mobile background streamer (legacy filename: er-ios-icon-preload.ts).
    */
   private loadEliteReduxCustomIcons(): void {
     for (const load of getEliteReduxCustomIconLoads()) {

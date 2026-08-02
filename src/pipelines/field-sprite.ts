@@ -21,10 +21,43 @@ export class FieldSpritePipeline extends Phaser.Renderer.WebGL.Pipelines.MultiPi
   }
 
   onPreRender(): void {
-    this.set1f("time", 0)
+    super.onPreRender();
+
+    const arena = globalScene.arena;
+    const noTint = globalScene.dayNightTint === false;
+    const time = noTint
+      ? 0.1
+      : globalScene.currentBattle?.waveIndex
+        ? ((globalScene.currentBattle.waveIndex + globalScene.waveCycleOffset) % 40) / 40
+        : getCurrentTime();
+
+    // These uniforms are field-global. Uploading and rebuilding their arrays in
+    // onBind repeated the same work for every rendered battler; that cost scaled
+    // directly from singles to doubles/triples. Set them once per pipeline frame.
+    this.set1f("time", time)
       .setBoolean("ignoreTimeTint", false)
-      .set1f("terrainColorRatio", 0)
-      .set3fv("terrainColor", [0, 0, 0]);
+      .setBoolean("isOutside", arena?.isOutside() ?? true)
+      .set3fv(
+        "overrideTint",
+        (noTint || !arena ? ([0, 0, 0] as RGBArray) : overrideTint()).map(color => color / 255),
+      )
+      .set3fv(
+        "dayTint",
+        (arena?.getDayTint() ?? [0, 0, 0]).map(color => color / 255),
+      )
+      .set3fv(
+        "duskTint",
+        (arena?.getDuskTint() ?? [0, 0, 0]).map(color => color / 255),
+      )
+      .set3fv(
+        "nightTint",
+        (arena?.getNightTint() ?? [0, 0, 0]).map(color => color / 255),
+      )
+      .set3fv(
+        "terrainColor",
+        (arena ? getTerrainColor(arena.terrainType) : [0, 0, 0]).map(color => color / 255),
+      )
+      .set1f("terrainColorRatio", 0);
   }
 
   onBind(gameObject: Phaser.GameObjects.GameObject): void {
@@ -36,41 +69,7 @@ export class FieldSpritePipeline extends Phaser.Renderer.WebGL.Pipelines.MultiPi
     const ignoreTimeTint = !!data["ignoreTimeTint"];
     const terrainColorRatio = (data["terrainColorRatio"] as number) ?? 0;
 
-    // ER: when the player turns the day/night tint off, pin the visual time to
-    // daytime (~0.1) AND clear the time-of-day override, so dusk/night (and any
-    // dev TIME_OF_DAY_OVERRIDE) never darken the screen. Only the SHADER tint is
-    // affected - the real time of day (encounters, abilities) is untouched.
-    const noTint = globalScene.dayNightTint === false;
-    const time = noTint
-      ? 0.1
-      : globalScene.currentBattle?.waveIndex
-        ? ((globalScene.currentBattle.waveIndex + globalScene.waveCycleOffset) % 40) / 40 // ((new Date().getSeconds() * 1000 + new Date().getMilliseconds()) % 10000) / 10000
-        : getCurrentTime();
-
-    this.set1f("time", time)
-      .setBoolean("ignoreTimeTint", ignoreTimeTint)
-      .setBoolean("isOutside", globalScene.arena.isOutside())
-      .set3fv(
-        "overrideTint",
-        (noTint ? ([0, 0, 0] as RGBArray) : overrideTint()).map(c => c / 255),
-      )
-      .set3fv(
-        "dayTint",
-        globalScene.arena.getDayTint().map(c => c / 255),
-      )
-      .set3fv(
-        "duskTint",
-        globalScene.arena.getDuskTint().map(c => c / 255),
-      )
-      .set3fv(
-        "nightTint",
-        globalScene.arena.getNightTint().map(c => c / 255),
-      )
-      .set3fv(
-        "terrainColor",
-        getTerrainColor(globalScene.arena.terrainType).map(c => c / 255),
-      )
-      .set1f("terrainColorRatio", terrainColorRatio);
+    this.setBoolean("ignoreTimeTint", ignoreTimeTint).set1f("terrainColorRatio", terrainColorRatio);
   }
 
   onBatch(gameObject: Phaser.GameObjects.GameObject): void {

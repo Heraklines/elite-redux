@@ -33,8 +33,8 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
-import { isIOSDevice } from "#data/elite-redux/er-ios";
 import { loadEliteReduxCustomIconsInBackground } from "#data/elite-redux/er-ios-icon-preload";
+import { shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
 import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
 import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
@@ -187,11 +187,11 @@ export class TitlePhase extends Phase {
     // ABSENCE (in a persisted trail read back after a reload) means the previous session crashed on boot.
     markBootMilestone("title-shown");
 
-    // #ios-stability (P3): the ER-custom icon atlases were pulled off the iOS boot preload
+    // #mobile-stability (P3): the ER-custom icon atlases were pulled off the mobile boot preload
     // (loading-scene.ts) to spare the pre-title crash window ~1,850 CDN requests. Now that the
     // title is up, stream them in paced background batches. Idempotent per session; no-op on
     // desktop (icons were preloaded at boot).
-    if (isIOSDevice()) {
+    if (shouldUseMobileBootMitigations()) {
       loadEliteReduxCustomIconsInBackground(globalScene);
     }
 
