@@ -2,13 +2,13 @@ import type { Ability } from "#abilities/ability";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import {
   getCoopBrowserAbilityCapsuleFixtureStarters,
-  getCoopBrowserPartyRewardFixtureStarters,
   getCoopBrowserCampaignFixtureStarters,
   getCoopBrowserCommanderFixtureStarters,
   getCoopBrowserEvolutionFixtureStarters,
   getCoopBrowserFaintFixtureStarters,
   getCoopBrowserGameOverFixtureStarters,
   getCoopBrowserNavigationFixtureStarters,
+  getCoopBrowserPartyRewardFixtureStarters,
   getCoopBrowserRegisteredInteractionFixtureStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
