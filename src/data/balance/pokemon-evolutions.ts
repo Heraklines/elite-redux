@@ -1502,23 +1502,17 @@ export const pokemonEvolutions: PokemonEvolutions = {
   // ER 2.65: Eevee evolves at level 23 and the player CHOOSES the eeveelution
   // (the dex makes every branch a plain level-up; no friendship/time/stone gates).
   // All branches share a level so EvolutionPhase prompts a pick, like Tyrogue.
+  // Partner Eevee is deliberately excluded: its Omniform move transformations are
+  // battle-scoped form changes, and the partner form must never permanently evolve.
   [SpeciesId.EEVEE]: [
     new SpeciesFormEvolution(SpeciesId.SYLVEON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.SYLVEON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.ESPEON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.ESPEON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.UMBREON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.UMBREON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.VAPOREON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.VAPOREON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.JOLTEON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.JOLTEON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.FLAREON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.FLAREON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.LEAFEON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.LEAFEON, "partner", "", 23, null, null, [24, 28, 28]),
     new SpeciesFormEvolution(SpeciesId.GLACEON, "", "", 23, null, null, [24, 28, 28]),
-    new SpeciesFormEvolution(SpeciesId.GLACEON, "partner", "", 23, null, null, [24, 28, 28])
   ],
   [SpeciesId.TOGETIC]: [
     new SpeciesEvolution(SpeciesId.TOGEKISS, 1, EvolutionItem.SHINY_STONE, null, [40, 45, 50])

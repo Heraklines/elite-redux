@@ -36,6 +36,8 @@ export type TelemetryUpload = (batch: TelemetryBatch, useBeacon: boolean) => Pro
 
 /** Tunable flush thresholds. Defaults target the ~4-6 requests/player-hour budget. */
 export interface TelemetryQueueConfig {
+  /** Debounce durable local writes so short sessions survive before an upload boundary. */
+  persistDebounceMs: number;
   /** Flush after this many waves since the last flush. */
   flushWaveInterval: number;
   /** Flush after this long since the last flush (ms). */
@@ -51,6 +53,7 @@ export interface TelemetryQueueConfig {
 }
 
 export const DEFAULT_TELEMETRY_QUEUE_CONFIG: TelemetryQueueConfig = {
+  persistDebounceMs: 1000,
   flushWaveInterval: 10,
   flushIntervalMs: 15 * 60 * 1000,
   sizeThresholdBytes: 256 * 1024,
@@ -78,7 +81,10 @@ export class TelemetryQueue {
   private pendingBytes = 0;
   private lastFlushAt: number;
   private lastFlushWave = 0;
-  private flushing = false;
+  private flushPromise: Promise<void> | null = null;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Serializes IndexedDB appends so overlapping debounce/flush calls cannot race the pending buffer. */
+  private persistChain: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly store: TelemetryStore,
@@ -110,22 +116,34 @@ export class TelemetryQueue {
       const dropped = this.beaconTail.shift();
       this.beaconTailBytes -= dropped?.bytes ?? 0;
     }
+    this.schedulePersist();
   }
 
   /** Persist the debounce buffer to the durable store + enforce the local-retention cap. */
-  async persist(): Promise<void> {
-    if (this.pending.length === 0) {
-      return;
+  persist(): Promise<void> {
+    if (this.persistTimer != null) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
     }
-    const batch = this.pending;
-    this.pending = [];
-    try {
-      await this.store.append(batch);
-      await this.store.evictOldestBytes(this.config.maxLocalBytes);
-    } catch {
-      // Store write failed (blocked IDB / quota). Re-buffer so nothing is lost mid-session.
-      this.pending.unshift(...batch);
-    }
+
+    const persistPending = async () => {
+      if (this.pending.length === 0) {
+        return;
+      }
+      const batch = this.pending;
+      this.pending = [];
+      try {
+        await this.store.append(batch);
+        await this.store.evictOldestBytes(this.config.maxLocalBytes);
+      } catch {
+        // Store write failed (blocked IDB / quota). Re-buffer so nothing is lost mid-session.
+        this.pending.unshift(...batch);
+      }
+    };
+
+    const result = this.persistChain.then(persistPending, persistPending);
+    this.persistChain = result.catch(() => {});
+    return result;
   }
 
   /** Whether any flush trigger is met for `currentWave`. */
@@ -148,11 +166,30 @@ export class TelemetryQueue {
    * Normal flush: persist pending, upload one oldest batch of THIS session via `fetch`, and remove it from
    * the store + the beacon tail on success. Reentrancy-guarded. Never throws.
    */
-  async flush(currentWave: number = this.lastFlushWave): Promise<void> {
-    if (this.flushing) {
-      return;
+  flush(currentWave: number = this.lastFlushWave): Promise<void> {
+    if (this.flushPromise != null) {
+      return this.flushPromise;
     }
-    this.flushing = true;
+
+    const active = this.flushInternal(currentWave);
+    this.flushPromise = active;
+    return active.finally(() => {
+      if (this.flushPromise === active) {
+        this.flushPromise = null;
+      }
+    });
+  }
+
+  /**
+   * Terminal drain. Waiting for the first flush and then starting a fresh one closes the race where a
+   * decision was captured after an already-running flush had snapshotted its batch.
+   */
+  async finalize(): Promise<void> {
+    await this.flush();
+    await this.flush();
+  }
+
+  private async flushInternal(currentWave: number): Promise<void> {
     try {
       await this.persist();
       const records = await this.store.readSession(this.envelope.sessionId, this.config.batchReadLimit);
@@ -175,8 +212,6 @@ export class TelemetryQueue {
       this.lastFlushWave = currentWave;
     } catch {
       // swallow - a failed flush keeps events durable for the next attempt / next-session recovery
-    } finally {
-      this.flushing = false;
     }
   }
 
@@ -243,5 +278,15 @@ export class TelemetryQueue {
     if (this.beaconTailBytes < 0) {
       this.beaconTailBytes = 0;
     }
+  }
+
+  private schedulePersist(): void {
+    if (this.persistTimer != null) {
+      return;
+    }
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      void this.persist();
+    }, this.config.persistDebounceMs);
   }
 }

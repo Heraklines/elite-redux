@@ -72,6 +72,7 @@ import {
   type TournamentDeepLink,
 } from "#data/elite-redux/showdown/tournament-notifications";
 import { isTournamentPairingCurrent, opponentOf } from "#data/elite-redux/showdown/tournament-types";
+import { endTelemetrySession } from "#data/elite-redux/telemetry/telemetry-recorder";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -177,6 +178,10 @@ export class TitlePhase extends Phase {
 
   async start(): Promise<void> {
     super.start();
+
+    // The title is the universal terminal boundary for completed/abandoned runs. This is idempotent and
+    // ensures a short solo run is flushed even when it never crossed a periodic telemetry threshold.
+    endTelemetrySession();
 
     // #ios-stability: we reached the title — boot completed cleanly. This is the milestone whose
     // ABSENCE (in a persisted trail read back after a reload) means the previous session crashed on boot.

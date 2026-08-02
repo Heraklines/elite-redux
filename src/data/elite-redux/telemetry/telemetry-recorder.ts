@@ -47,8 +47,14 @@ export function beginTelemetrySession(envelope: TelemetrySessionEnvelope, q: Tel
  * unflushed events stay on disk and are uploaded by the next session's recovery pass.
  */
 export function endTelemetrySession(): void {
+  const endingQueue = queue;
   session = null;
   queue = null;
+  // A run can end before the 10-wave/time/size upload thresholds (especially Showdown/tournaments).
+  // Finalize the captured queue after closing the hot-path gate so its durable tail is uploaded now.
+  if (endingQueue != null) {
+    void endingQueue.finalize();
+  }
 }
 
 /** Enqueue one already-built event. No-op unless recording. Cheap (buffer append in the queue). */

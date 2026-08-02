@@ -1567,6 +1567,7 @@ function isAutopilotMode(phaseName: string, mode: UiMode): boolean {
     case UiMode.BIOME_SHOP:
     case UiMode.ER_MAP:
     case UiMode.MYSTERY_ENCOUNTER:
+    case UiMode.LEARN_MOVE_BATCH:
       return true;
     case UiMode.MODIFIER_SELECT:
       return phaseName === "SelectModifierPhase";
@@ -1609,6 +1610,7 @@ function isInteractiveMenuMode(mode: UiMode): boolean {
     case UiMode.POKEDEX_PAGE:
     case UiMode.EGG_HATCH_SUMMARY:
     case UiMode.EGG_HATCH_SCENE:
+    case UiMode.LEARN_MOVE_BATCH:
     case UiMode.SAVE_SLOT:
       return true;
     default:
@@ -1773,6 +1775,35 @@ function driveLearnMoveSummary(game: GameManager, st: RunState): void {
   st.log.push(st.policy.learnMove ? `learn-move: forget slot ${slot}` : "learn-move: declined");
 }
 
+/** Drive the ER level-up batch panel through its real public input path. */
+function driveLearnMoveBatch(game: GameManager, st: RunState): void {
+  const ui = game.scene.ui;
+  if (st.policy.learnMove) {
+    // Pick the first offered move, then choose the requested replacement slot if
+    // the current moveset is full. A free slot commits on the first ACTION.
+    ui.processInput(Button.ACTION);
+    if (ui.getMode() === UiMode.LEARN_MOVE_BATCH) {
+      for (let slot = 0; slot < st.policy.learnMove.slot; slot++) {
+        ui.processInput(Button.DOWN);
+      }
+      ui.processInput(Button.ACTION);
+    }
+    st.log.push(`learn-move-batch: learn first offer in slot ${st.policy.learnMove.slot}`);
+    return;
+  }
+
+  // Default policy is decline: CANCEL opens the panel's internal confirmation,
+  // RIGHT selects Yes, ACTION closes it. The sub-state deliberately keeps the
+  // same UiMode, so this must be completed in one dispatch instead of waiting for
+  // another signature-guarded autopilot tick.
+  ui.processInput(Button.CANCEL);
+  if (ui.getMode() === UiMode.LEARN_MOVE_BATCH) {
+    ui.processInput(Button.RIGHT);
+    ui.processInput(Button.ACTION);
+  }
+  st.log.push("learn-move-batch: declined");
+}
+
 function driveParty(game: GameManager, st: RunState, phaseName: string): void {
   const handler = game.scene.ui.getHandler() as PartyUiHandler;
   if (phaseName === "SwitchPhase") {
@@ -1881,6 +1912,9 @@ function dispatchMenu(game: GameManager, st: RunState, phaseName: string, mode: 
       return true;
     case UiMode.MYSTERY_ENCOUNTER:
       driveMysteryEncounter(game, st);
+      return true;
+    case UiMode.LEARN_MOVE_BATCH:
+      driveLearnMoveBatch(game, st);
       return true;
     case UiMode.MESSAGE:
       game.scene.ui.processInput(Button.ACTION); // advance ME intro/outro dialogue

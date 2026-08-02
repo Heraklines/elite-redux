@@ -1850,6 +1850,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Partner: no level evolution",
+    description:
+      "Partner Eevee changes into its Partner Eeveelutions only through Omniform while\n"
+      + "using typed moves. It must never receive the permanent level-23 Eeveelution picker.\n"
+      + "DO: win the opening battle, take the guaranteed Rare Candy, and use it on Partner\n"
+      + "Eevee to cross level 23.\n"
+      + "EXPECT: no evolution choice opens and the party member remains Partner Eevee. In\n"
+      + "battle, typed moves still adapt it normally and a Normal move still returns it to base.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 22,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EEVEE, {
+          formIndex: formIndexByKey(SpeciesId.EEVEE, "partner"),
+          moveset: [MoveId.WATER_GUN, MoveId.EMBER, MoveId.TACKLE, MoveId.SPLASH],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.RARE_CANDY],
+  },
+  {
     label: "Partner: Eeveelution innate unlocks",
     description:
       "Partner Eevee's three candy-unlock bits belong to the WHOLE Omniform family, even\n"

@@ -55,6 +55,7 @@ import {
   type EvolutionConditionData,
   pokemonEvolutions,
   SpeciesEvolution,
+  SpeciesFormEvolution,
 } from "#balance/pokemon-evolutions";
 import { Gender } from "#data/gender";
 import { speciesStarterCosts } from "#balance/starters";
@@ -782,13 +783,18 @@ function addEvolutionEdge(
   targetId: number,
   level: number,
   condition: EvolutionConditionData | EvolutionConditionData[] | null = null,
+  preFormKey: string | null = null,
 ): boolean {
-  const table = pokemonEvolutions as Record<number, SpeciesEvolution[]>;
+  const table = pokemonEvolutions as Record<number, SpeciesFormEvolution[]>;
   const list = (table[from] ??= []);
   if (list.some(e => (e.speciesId as number) === targetId)) {
     return false; // idempotent
   }
-  list.push(new SpeciesEvolution(targetId as SpeciesId, level, null, condition));
+  list.push(
+    preFormKey == null
+      ? new SpeciesEvolution(targetId as SpeciesId, level, null, condition)
+      : new SpeciesFormEvolution(targetId as SpeciesId, preFormKey, null, level, null, condition),
+  );
   return true;
 }
 
@@ -859,7 +865,19 @@ export function injectErNewcomerSpecies(): InjectErNewcomerSpeciesResult {
     } else {
       result.speciesAlreadyPresent++;
     }
-    if (addEvolutionEdge(def.evolvesFrom, def.speciesId, def.evolveLevel, def.evolutionCondition ?? null)) {
+    // Partner Eevee shares SpeciesId.EEVEE with ordinary Eevee. New Eeveelution
+    // edges must therefore be gated to the empty/base form key; Omniform owns the
+    // partner form's battle-scoped transformations and it never level-evolves.
+    const preFormKey = def.evolvesFrom === SpeciesId.EEVEE ? "" : null;
+    if (
+      addEvolutionEdge(
+        def.evolvesFrom,
+        def.speciesId,
+        def.evolveLevel,
+        def.evolutionCondition ?? null,
+        preFormKey,
+      )
+    ) {
       result.evolutionEdges++;
     }
   }
