@@ -58,7 +58,7 @@ const commandPhase = readFileSync(new URL("src/phases/command-phase.ts", root), 
 const turnInitPhase = readFileSync(new URL("src/phases/turn-init-phase.ts", root), "utf8");
 const battleEndPhase = readFileSync(new URL("src/phases/battle-end-phase.ts", root), "utf8");
 const learnMovePhase = readFileSync(new URL("src/phases/learn-move-phase.ts", root), "utf8");
-const abilityPickerPhases = [
+const abilityPickerModalPhases = [
   "er-ability-capsule-phase.ts",
   "er-greater-ability-capsule-phase.ts",
   "er-greater-ability-randomizer-phase.ts",
@@ -1415,7 +1415,7 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
     committedModal.indexOf("commitAfterClose()") < committedModal.indexOf("this.startCurrentPhase()"),
     "the queued successor cannot start before immutable result retention",
   );
-  for (const [file, source] of abilityPickerPhases) {
+  for (const [file, source] of abilityPickerModalPhases) {
     assert.match(
       source,
       /isCoopAbilityPresentationAuthorityActive\(this\.coopOperationBinding\)[\s\S]*?shiftCoopAuthoritativeModalThroughAuthorityCommit\(this, settleResult\)/u,
