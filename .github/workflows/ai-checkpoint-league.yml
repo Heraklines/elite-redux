@@ -476,6 +476,13 @@ jobs:
           else
             kaggle datasets create --path ai-kaggle-dataset
           fi
+          dataset_status=""
+          for _ in $(seq 1 30); do
+            dataset_status=$(kaggle datasets status "$DATASET_SLUG" 2>/dev/null || true)
+            [[ "$dataset_status" == "ready" ]] && break
+            sleep 10
+          done
+          test "$dataset_status" = "ready"
           kaggle kernels push --path ai-kaggle-kernel
           {
             echo "### Private GPU checkpoint resume"
