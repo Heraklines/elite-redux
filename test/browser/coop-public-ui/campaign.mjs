@@ -1597,10 +1597,7 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
                 // and cycles it like a human responding to an immunity; otherwise one immune foe
                 // can consume the longitudinal journey before it reaches the target interactions.
                 commandEvent,
-                cycleIndex:
-                  policy.navigation.required || policy.market.requiredPurchases > 0
-                    ? turn - 1
-                    : 0,
+                cycleIndex: policy.navigation.required || policy.market.requiredPurchases > 0 ? turn - 1 : 0,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },
