@@ -26,6 +26,7 @@ import {
   captureCoopOperationAuthorityState,
   reapplyCoopOperationAuthorityState,
 } from "#data/elite-redux/coop/coop-authority-state-hooks";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
@@ -795,6 +796,8 @@ export interface CoopRewardSurfaceResultState {
   readonly remainingStock?: readonly number[];
   /** Exact nested interaction synchronously queued by this result, when one exists. */
   readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
+  /** Exact ordered visual mutation produced by the committed reward, when one exists. */
+  readonly presentation?: NonNullable<CoopRewardActionPayload["result"]>["presentation"];
   /**
    * Exact phase-local surface that remains executable after this result. Required for non-terminal
    * retained actions and deliberately absent for terminal results.
@@ -1067,12 +1070,19 @@ function buildCompleteRewardResultPayload(
 ): CoopRewardActionPayload | null {
   const action = payload as CoopRewardActionPayload;
   const nextInteraction = surfaceResult?.nextInteraction;
+  const presentation = surfaceResult?.presentation;
   if (
     nextInteraction !== undefined
     && (!isCoopInteractionSuccessorRef(nextInteraction)
       || nextInteraction.wave !== prepared.wave
       || nextInteraction.turn !== prepared.turn
       || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability"))
+    || (presentation !== undefined
+      && (!isStrictCoopBattleEvent(presentation)
+        || presentation.k !== "formChange"
+        || presentation.actor.side !== "player"
+        || presentation.presentation !== "evolution"
+        || presentation.animate !== true))
   ) {
     return null;
   }
@@ -1087,6 +1097,7 @@ function buildCompleteRewardResultPayload(
     result: {
       lockModifierTiers,
       ...(nextInteraction === undefined ? {} : { nextInteraction: structuredClone(nextInteraction) }),
+      ...(presentation === undefined ? {} : { presentation: structuredClone(presentation) }),
       ...(continuation == null
         ? {}
         : {

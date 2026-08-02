@@ -2974,6 +2974,8 @@ export class RememberMoveModifier extends ConsumablePokemonModifier {
 
 export class EvolutionItemModifier extends ConsumablePokemonModifier {
   public declare type: EvolutionItemModifierType;
+  /** Exact V2 successor permit supplied by the reward surface that constructed this consumable. */
+  public coopAllowNextWaveStart = false;
   /**
    * Applies {@linkcode EvolutionItemModifier}
    * @param playerPokemon The {@linkcode PlayerPokemon} that should evolve via item
@@ -2996,7 +2998,15 @@ export class EvolutionItemModifier extends ConsumablePokemonModifier {
     }
 
     if (matchingEvolution) {
-      globalScene.phaseManager.unshiftNew("EvolutionPhase", playerPokemon, matchingEvolution, playerPokemon.level - 1);
+      globalScene.phaseManager.unshiftNew(
+        "EvolutionPhase",
+        playerPokemon,
+        matchingEvolution,
+        playerPokemon.level - 1,
+        true,
+        [],
+        this.coopAllowNextWaveStart,
+      );
       return true;
     }
 

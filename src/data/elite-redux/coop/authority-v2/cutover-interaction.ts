@@ -36,6 +36,7 @@ import type {
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthorityV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import type { CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import { isCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import {
@@ -177,6 +178,12 @@ function rewardPayload(value: unknown): boolean {
     && terminalMatchesAction
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
+    && (value.result.presentation === undefined
+      || (isStrictCoopBattleEvent(value.result.presentation)
+        && value.result.presentation.k === "formChange"
+        && value.result.presentation.actor.side === "player"
+        && value.result.presentation.presentation === "evolution"
+        && value.result.presentation.animate === true))
     && (value.result.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.result.nextInteraction))
     && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))
   );

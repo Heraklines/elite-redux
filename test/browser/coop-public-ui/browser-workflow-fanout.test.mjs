@@ -361,6 +361,13 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     campaign,
     browserEntry,
     greaterAbilityCapsulePhase,
+    operationEnvelope,
+    rewardOperation,
+    coopRuntime,
+    battleScene,
+    modifier,
+    evolutionPhase,
+    learnMovePhase,
   ] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
@@ -373,6 +380,13 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
     readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
     readFile(resolve(root, "src/phases/er-greater-ability-capsule-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-operation-envelope.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-reward-operation.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-runtime.ts"), "utf8"),
+    readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
+    readFile(resolve(root, "src/modifier/modifier.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/evolution-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/learn-move-phase.ts"), "utf8"),
   ]);
 
   assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
@@ -527,6 +541,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     /this\.config\.journey === "party-mutating-rewards"[\s\S]*set\("coopfixture", "party-mutating-rewards"\)[\s\S]*set\("partyreward", this\.config\.partyRewardId\)/u,
   );
   assert.match(harness, /expectedPartyRewardFixtureSpecies\(this\.config\.partyRewardId\)/u);
+  assert.match(
+    harness,
+    /MILCERY_SPECIES_ID = 868[\s\S]*EVOLUTION_ITEM: MILCERY_SPECIES_ID/u,
+    "the browser roster oracle must follow the production Milcery evolution fixture",
+  );
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
   assert.match(policy, /nestedDirectRewardIds/u);
@@ -570,6 +589,26 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     /presentationCursors: Object\.fromEntries\([\s\S]*client\.evidence\.cursor\(\)[\s\S]*assertPartyRewardPresentationParity\([\s\S]*targetAction\.presentationCursors/u,
     "unrelated earlier battle presentation cannot satisfy the item-specific oracle",
   );
+  assert.match(
+    selectModifier,
+    /modifier instanceof EvolutionItemModifier[\s\S]*coopAllowNextWaveStart = globalScene\.gameMode\.isCoop && cost === -1/u,
+    "only a terminal free evolution reward may inherit the wave-crossing successor permit",
+  );
+  assert.match(
+    modifier,
+    /EvolutionItemModifier[\s\S]*coopAllowNextWaveStart = false[\s\S]*"EvolutionPhase"[\s\S]*this\.coopAllowNextWaveStart/u,
+    "the evolution modifier must carry its exact parent-boundary permit into the queued evolution",
+  );
+  assert.match(
+    evolutionPhase,
+    /this\.coopAllowNextWaveStart[\s\S]*"LearnMovePhase"[\s\S]*LearnMoveType\.LEARN_MOVE[\s\S]*this\.coopAllowNextWaveStart/u,
+    "an evolve-move picker must inherit the terminal reward's successor permit",
+  );
+  assert.match(
+    learnMovePhase,
+    /nextInteraction == null[\s\S]*this\.coopParentAllowsNextWaveStart/u,
+    "the retained learn-move result must authorize wave N+1 when its item-evolution parent did",
+  );
   assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
   assert.match(campaign, /function latestPartyMaterialObservation\(client, minWave\)/u);
@@ -606,6 +645,31 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(
     campaign,
     /"battle:form-change"[\s\S]*new Set\(\["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"\]\)/u,
+  );
+  assert.match(
+    operationEnvelope,
+    /readonly presentation\?: Extract<CoopBattleEvent, \{ readonly k: "formChange" \}>/u,
+    "the immutable reward result must carry its exact form-change presentation event",
+  );
+  assert.match(
+    battleScene,
+    /resolvePokemonFormChange\([\s\S]*return matchingFormChange \?\? null;[\s\S]*triggerPokemonFormChange\([\s\S]*this\.resolvePokemonFormChange/u,
+    "presentation capture and ordinary mechanics must share the exact engine form-edge resolver",
+  );
+  assert.match(
+    selectModifier,
+    /coopPendingAuthorityPresentation[\s\S]*resolvePokemonFormChange\(formTarget, SpeciesFormChangeItemTrigger\)[\s\S]*presentation: "evolution"[\s\S]*commitRewardAuthoritativeResult\([\s\S]*presentation: this\.coopPendingAuthorityPresentation/u,
+    "the authority must bind the queued form edge to the same reward result that produced it",
+  );
+  assert.match(
+    rewardOperation,
+    /isStrictCoopBattleEvent\(presentation\)[\s\S]*presentation\.k !== "formChange"[\s\S]*presentation: structuredClone\(presentation\)/u,
+    "malformed or non-form presentation material cannot enter a reward commit",
+  );
+  assert.match(
+    coopRuntime,
+    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*return false;/u,
+    "the replica must withhold material completion until its mechanics-free replay reaches a bounded terminal",
   );
 });
 

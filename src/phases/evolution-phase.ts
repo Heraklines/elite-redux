@@ -10,6 +10,7 @@ import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-t
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
+import { LearnMoveType } from "#enums/learn-move-type";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonData } from "#system/pokemon-data";
@@ -48,6 +49,8 @@ export class EvolutionPhase extends Phase {
    * Empty/single-element means there is no choice and {@linkcode evolution} is used directly.
    */
   private readonly evolutionChoices: SpeciesFormEvolution[];
+  /** True only for an evolution queued by a terminal reward whose successor may enter wave N+1. */
+  private readonly coopAllowNextWaveStart: boolean;
   private fusionSpeciesEvolved: boolean; // Whether the evolution is of the fused species
   private evolutionBgm: AnySound | null;
   private evolutionHandler: EvolutionSceneUiHandler;
@@ -73,6 +76,7 @@ export class EvolutionPhase extends Phase {
    * @param canCancel - Whether the evolution can be cancelled by the player
    * @param evolutionChoices - When the line offers more than one valid evolution, the candidates to
    *  let the player pick between. Defaults to just `evolution` (no choice).
+   * @param coopAllowNextWaveStart - Inherit a terminal reward's wave-crossing permit through evolve-move prompts.
    */
   constructor(
     pokemon: PlayerPokemon,
@@ -80,6 +84,7 @@ export class EvolutionPhase extends Phase {
     lastLevel: number,
     canCancel = true,
     evolutionChoices: SpeciesFormEvolution[] = [],
+    coopAllowNextWaveStart = false,
   ) {
     super();
 
@@ -89,6 +94,7 @@ export class EvolutionPhase extends Phase {
     this.fusionSpeciesEvolved = evolution instanceof FusionSpeciesFormEvolution;
     this.canCancel = canCancel;
     this.evolutionChoices = evolutionChoices;
+    this.coopAllowNextWaveStart = coopAllowNextWaveStart;
     this.coopPreEvolutionSpeciesId = pokemon.species.speciesId;
     this.coopPreEvolutionFormIndex = pokemon.formIndex;
     this.coopPreEvolutionSpriteKey = pokemon.getSpriteKey(true);
@@ -532,7 +538,14 @@ export class EvolutionPhase extends Phase {
       .getLevelMoves(this.lastLevel + 1, true, false, false, learnSituation)
       .filter(lm => lm[0] === EVOLVE_MOVE);
     for (const lm of levelMoves) {
-      globalScene.phaseManager.unshiftNew("LearnMovePhase", globalScene.getPlayerParty().indexOf(this.pokemon), lm[1]);
+      globalScene.phaseManager.unshiftNew(
+        "LearnMovePhase",
+        globalScene.getPlayerParty().indexOf(this.pokemon),
+        lm[1],
+        LearnMoveType.LEARN_MOVE,
+        -1,
+        this.coopAllowNextWaveStart,
+      );
     }
     globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
 

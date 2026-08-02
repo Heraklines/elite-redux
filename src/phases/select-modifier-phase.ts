@@ -18,6 +18,7 @@ import {
 import type {
   CoopInteractionSuccessorRef,
   CoopNestedInteractionReturnPlan,
+  CoopRewardActionPayload,
   CoopRewardPresentationPayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
@@ -88,6 +89,7 @@ import type { PlayerPokemon } from "#field/pokemon";
 import type { Modifier } from "#modifiers/modifier";
 import {
   ErGreaterAbilityRandomizerModifier,
+  EvolutionItemModifier,
   ExtraModifierModifier,
   HealShopCostModifier,
   PokemonFormChangeItemModifier,
@@ -335,6 +337,10 @@ export class SelectModifierPhase extends BattlePhase {
   protected coopPendingAuthorityOperationId: string | null = null;
   /** Exact nested picker opened by the pending result; cleared at every new intent and successful commit. */
   private coopPendingAuthorityNextInteraction: CoopInteractionSuccessorRef | undefined;
+  /** Exact mechanics-free replay material queued by the pending authoritative reward result. */
+  private coopPendingAuthorityPresentation:
+    | NonNullable<NonNullable<CoopRewardActionPayload["result"]>["presentation"]>
+    | undefined;
   /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
@@ -1347,8 +1353,36 @@ export class SelectModifierPhase extends BattlePhase {
    * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
    */
   protected applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
+    if (modifier instanceof EvolutionItemModifier) {
+      // A free reward consumes its parent and is allowed to enter wave N+1. Paid market applications retain
+      // the current shop, so they must not inherit that broader successor edge through an evolve-move picker.
+      modifier.coopAllowNextWaveStart = globalScene.gameMode.isCoop && cost === -1;
+    }
+    const formTarget =
+      modifier instanceof PokemonFormChangeItemModifier
+        ? globalScene.getPlayerParty().find(pokemon => pokemon.id === modifier.pokemonId)
+        : undefined;
+    const preFormIndex = formTarget?.formIndex;
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
     this.coopPendingAuthorityNextInteraction = result ? this.coopModifierFollowUp(modifier) : undefined;
+    this.coopPendingAuthorityPresentation = undefined;
+    if (result && formTarget != null && preFormIndex != null) {
+      const formChange = globalScene.resolvePokemonFormChange(formTarget, SpeciesFormChangeItemTrigger);
+      const targetFormIndex =
+        formChange == null ? -1 : formTarget.species.forms.findIndex(form => form.formKey === formChange.formKey);
+      if (targetFormIndex >= 0 && targetFormIndex !== preFormIndex) {
+        this.coopPendingAuthorityPresentation = {
+          k: "formChange",
+          bi: formTarget.getBattlerIndex(),
+          actor: { side: "player", pokemonId: formTarget.id },
+          speciesId: formTarget.species.speciesId,
+          preFormIndex,
+          formIndex: targetFormIndex,
+          presentation: "evolution",
+          animate: true,
+        };
+      }
+    }
     // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
     // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
     // wave-15 divergence was exactly one host-only berry hidden behind shifted sorted modifier arrays.
@@ -1966,6 +2000,7 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     this.coopPendingAuthorityNextInteraction = undefined;
+    this.coopPendingAuthorityPresentation = undefined;
     // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
     // relay source. Log the exact preparation (seq + label + choice + payload) so a retained result or
     // compatibility carrier can be matched against it in the captured log. Hot-ish (per reward action) -
@@ -2162,6 +2197,7 @@ export class SelectModifierPhase extends BattlePhase {
     }
     const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding, {
       nextInteraction: this.coopPendingAuthorityNextInteraction,
+      presentation: this.coopPendingAuthorityPresentation,
       continuation: {
         surface: "reward",
         pinned: this.coopInteractionStart,
@@ -2180,6 +2216,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopPendingAuthorityOperationId = null;
     }
     this.coopPendingAuthorityNextInteraction = undefined;
+    this.coopPendingAuthorityPresentation = undefined;
     return true;
   }
 

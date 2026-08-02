@@ -85,6 +85,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private messageMode: UiMode;
   private readonly learnMoveType: LearnMoveType;
   private readonly cost: number;
+  /**
+   * Exact parent-boundary permit inherited from an item evolution.
+   *
+   * A reward result is allowed to cross into wave N+1, but an evolve-move picker becomes the newer
+   * mechanical predecessor before that command opens. The picker must carry the same permit forward when
+   * it has no typed nested return; otherwise the correctly ordered wave-N+1 CONTROL_COMMIT is rejected.
+   */
+  private readonly coopParentAllowsNextWaveStart: boolean;
   /** Stable selectors for every authoritative picker callback / await tail owned by this phase. */
   private coopOperationBinding: CoopLearnMoveOperationBinding | null = null;
   private coopRelay: CoopInteractionRelay | null = null;
@@ -181,11 +189,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     moveId: MoveId,
     learnMoveType: LearnMoveType = LearnMoveType.LEARN_MOVE,
     cost = -1,
+    coopParentAllowsNextWaveStart = false,
   ) {
     super(partyMemberIndex);
     this.moveId = moveId;
     this.learnMoveType = learnMoveType;
     this.cost = cost;
+    this.coopParentAllowsNextWaveStart = coopParentAllowsNextWaveStart;
   }
 
   start() {
@@ -393,7 +403,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         ? this.coopNestedReturnPlan?.onCommit
         : this.coopNestedReturnPlan?.onCancel;
     const allowNextWaveStart =
-      forgetSlot >= 0 && forgetSlot < maxMoveCount && this.coopNestedReturnPlan != null && nextInteraction == null;
+      nextInteraction == null
+      && (this.coopParentAllowsNextWaveStart
+        || (forgetSlot >= 0 && forgetSlot < maxMoveCount && this.coopNestedReturnPlan != null));
     const pending = this.coopPendingV2Decision;
     if (pending != null) {
       return (

@@ -24,6 +24,7 @@
 
 import type {
   CoopAuthoritativeBattleStateV1,
+  CoopBattleEvent,
   CoopInteractionOutcome,
   CoopRewardSurfaceIdentity,
   CoopSerializedRewardOption,
@@ -235,6 +236,12 @@ export interface CoopRewardActionPayload {
   /** Complete reward-surface state after this action; proposals omit it, committed results require it. */
   readonly result?: {
     readonly lockModifierTiers: boolean;
+    /**
+     * Exact authority-resolved visual mutation queued by this reward. The interaction commit carries the
+     * event itself so the replica never guesses a form edge from its local modifier catalog, and material
+     * completion remains ordered behind the mechanics-free replay.
+     */
+    readonly presentation?: Extract<CoopBattleEvent, { readonly k: "formChange" }> | undefined;
     /** Exact nested picker opened by this result, when one exists. */
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
     /**

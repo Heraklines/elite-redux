@@ -184,7 +184,10 @@ import {
   resetCoopStateTicks,
   // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates battle-engine callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
+import {
+  isStrictCoopBattleEvent,
+  isStrictCoopEntryPresentation,
+} from "#data/elite-redux/coop/coop-battle-event-validator";
 import {
   CoopBattleStreamer,
   type CoopEntryPresentationPrefix,
@@ -307,6 +310,11 @@ import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-
 import { isCompleteCoopMeResyncOutcome } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
 import { CoopMutationLedger, setActiveCoopMutationLedger } from "#data/elite-redux/coop/coop-mutation-ledger";
+import {
+  type CoopPresentationOutcomeToken,
+  coopPresentationOutcome,
+  createCoopPresentationOutcomeToken,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
 import type {
   CoopAbilityPickPayload,
   CoopAbilityPresentationPayload,
@@ -4426,6 +4434,8 @@ export interface CoopRuntime {
   readonly v2InteractionStateApplied: Set<string>;
   /** Result phases that consumed their exact operation and reached the real local terminal. */
   readonly v2SettledInteractionOperations: Set<string>;
+  /** Reward-owned presentation replays whose terminal outcome gates the exact interaction material receipt. */
+  readonly v2RewardPresentationOutcomes: Map<string, CoopPresentationOutcomeToken>;
   /** Address-exact interaction claims shared by ordinary delivery, authority-local control, and recovery. */
   readonly v2ControlLedger: CoopV2ControlLedger;
   /** Successor that may release a recovered ordered-wait phase only after its immutable material applies. */
@@ -11085,6 +11095,7 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   }
   if (op.kind === "REWARD") {
     const payload = op.payload as CoopRewardActionPayload;
+    const presentation = payload.result?.presentation;
     const expectedSurfaceBand = payload.rewardSurface == null ? 0 : payload.rewardSurface.ordinal + 1;
     if (
       typeof payload?.label !== "string"
@@ -11099,8 +11110,41 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       || (payload.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(payload.rewardSurface))
       || Math.floor(ordinal / COOP_REWARD_SURFACE_ACTION_STRIDE) !== expectedSurfaceBand
       || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
+      || (presentation !== undefined
+        && (!isStrictCoopBattleEvent(presentation)
+          || presentation.k !== "formChange"
+          || presentation.actor.side !== "player"
+          || presentation.presentation !== "evolution"
+          || presentation.animate !== true))
     ) {
       return false;
+    }
+    if (presentation != null) {
+      const pending = runtime.v2RewardPresentationOutcomes.get(op.id);
+      if (pending != null) {
+        const outcome = coopPresentationOutcome(pending);
+        if (outcome == null) {
+          return false;
+        }
+        if (outcome.kind === "failed") {
+          // Presentation must never become an indefinite mechanical wait. The replay owns a bounded watchdog;
+          // retain the failure as visible evidence, then allow the already-applied authoritative state to proceed.
+          coopWarn(
+            "v2-interaction",
+            `reward presentation failed op=${op.id} reason=${outcome.reason}; releasing ordered material boundary`,
+          );
+        }
+        return true;
+      }
+      const target = globalScene
+        .getPlayerParty()
+        .find(pokemon => pokemon.id === presentation.actor.pokemonId && pokemon.species.speciesId === presentation.speciesId);
+      if (
+        target == null
+        || (target.formIndex !== presentation.preFormIndex && target.formIndex !== presentation.formIndex)
+      ) {
+        return false;
+      }
     }
     runtime.interactionRelay.materializeCommittedInteractionChoice(
       pinned,
@@ -11121,6 +11165,17 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       );
     }
     armCoopRewardJournalMaterialization(op.id, pinned);
+    if (presentation != null) {
+      const outcomeToken = createCoopPresentationOutcomeToken();
+      runtime.v2RewardPresentationOutcomes.set(op.id, outcomeToken);
+      globalScene.phaseManager.unshiftNew("CoopFormChangeReplayPhase", structuredClone(presentation), outcomeToken);
+      coopLog(
+        "v2-interaction",
+        `reward presentation queued op=${op.id} pokemon=${presentation.actor.pokemonId} `
+          + `form=${presentation.preFormIndex}->${presentation.formIndex}`,
+      );
+      return false;
+    }
     return true;
   }
   if (op.kind === "SHOP_BUY") {
@@ -13383,6 +13438,7 @@ export function assembleCoopRuntime(
       runtime.v2InstalledInteractionTargets.clear();
       runtime.v2InteractionStateApplied.clear();
       runtime.v2SettledInteractionOperations.clear();
+      runtime.v2RewardPresentationOutcomes.clear();
       runtime.v2ControlLedger.clear();
       runtime.v2RecoveryWaitSuccessorOperationId = null;
       runtime.v2RecoveryPreparedControlId = null;
@@ -13711,6 +13767,7 @@ export function assembleCoopRuntime(
     v2InstalledInteractionTargets: new Set<string>(),
     v2InteractionStateApplied: new Set<string>(),
     v2SettledInteractionOperations: new Set<string>(),
+    v2RewardPresentationOutcomes: new Map<string, CoopPresentationOutcomeToken>(),
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
     v2RecoveryPreparedControlId: null,

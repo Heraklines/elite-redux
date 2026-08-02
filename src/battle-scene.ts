@@ -4505,12 +4505,11 @@ export class BattleScene extends SceneBase {
     return null;
   }
 
-  triggerPokemonFormChange(
+  /** Resolve the exact form edge the engine would queue for this trigger without mutating or scheduling it. */
+  resolvePokemonFormChange(
     pokemon: Pokemon,
     formChangeTriggerType: Constructor<SpeciesFormChangeTrigger>,
-    delayed = false,
-    modal = false,
-  ): boolean {
+  ): SpeciesFormChange | null {
     if (Object.hasOwn(pokemonFormChanges, pokemon.species.speciesId)) {
       // in case this is NECROZMA, determine which forms this
       const matchingFormChangeOpts = pokemonFormChanges[pokemon.species.speciesId].filter(
@@ -4535,22 +4534,33 @@ export class BattleScene extends SceneBase {
       } else {
         matchingFormChange = matchingFormChangeOpts[0];
       }
-      if (matchingFormChange) {
-        let phase: Phase;
-        if (pokemon.isPlayer() && !matchingFormChange.quiet) {
-          phase = this.phaseManager.create("FormChangePhase", pokemon, matchingFormChange, modal);
-        } else {
-          phase = this.phaseManager.create("QuietFormChangePhase", pokemon, matchingFormChange);
-        }
-        if (pokemon.isPlayer() && !matchingFormChange.quiet && modal) {
-          this.phaseManager.overridePhase(phase);
-        } else if (delayed) {
-          this.phaseManager.pushPhase(phase);
-        } else {
-          this.phaseManager.unshiftPhase(phase);
-        }
-        return true;
+      return matchingFormChange ?? null;
+    }
+    return null;
+  }
+
+  triggerPokemonFormChange(
+    pokemon: Pokemon,
+    formChangeTriggerType: Constructor<SpeciesFormChangeTrigger>,
+    delayed = false,
+    modal = false,
+  ): boolean {
+    const matchingFormChange = this.resolvePokemonFormChange(pokemon, formChangeTriggerType);
+    if (matchingFormChange) {
+      let phase: Phase;
+      if (pokemon.isPlayer() && !matchingFormChange.quiet) {
+        phase = this.phaseManager.create("FormChangePhase", pokemon, matchingFormChange, modal);
+      } else {
+        phase = this.phaseManager.create("QuietFormChangePhase", pokemon, matchingFormChange);
       }
+      if (pokemon.isPlayer() && !matchingFormChange.quiet && modal) {
+        this.phaseManager.overridePhase(phase);
+      } else if (delayed) {
+        this.phaseManager.pushPhase(phase);
+      } else {
+        this.phaseManager.unshiftPhase(phase);
+      }
+      return true;
     }
 
     return false;
