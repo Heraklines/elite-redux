@@ -3534,17 +3534,6 @@ function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abi
   if (rewardId === "DNA_SPLICERS" && after.fusionSpeciesId == null) {
     throw new Error(`[campaign-party-reward] DNA Splicers did not install a fusion species: ${JSON.stringify(after)}`);
   }
-  if (rewardId === "BASE_STAT_BOOSTER") {
-    const quantity = slot =>
-      slot.modifierStacks
-        ?.filter(modifier => modifier.typeId === "BASE_STAT_BOOSTER")
-        .reduce((sum, modifier) => sum + (modifier.quantity ?? 0), 0) ?? 0;
-    if (quantity(after) <= quantity(before)) {
-      throw new Error(
-        `[campaign-party-reward] vitamin did not add its permanent stat modifier: ${JSON.stringify({ before, after })}`,
-      );
-    }
-  }
 }
 
 /**

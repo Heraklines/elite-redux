@@ -158,7 +158,6 @@ const allowedPartyRewardIds = new Set([
   "FORM_CHANGE_ITEM",
   "RARE_FORM_CHANGE_ITEM",
   "DNA_SPLICERS",
-  "BASE_STAT_BOOSTER",
   "ER_DEX_NAV",
 ]);
 const partyRewardLearnMoveIds = new Set([

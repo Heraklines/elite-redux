@@ -83,7 +83,6 @@ import type { ModifierTier } from "#enums/modifier-tier";
 import { Nature } from "#enums/nature";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
-import { Stat } from "#enums/stat";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { Modifier } from "#modifiers/modifier";
@@ -97,8 +96,8 @@ import {
 } from "#modifiers/modifier";
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
-  BaseStatBoosterModifierType,
   ErAbilityCapsuleModifierType,
+  ErDexNavModifierType,
   ErGreaterAbilityCapsuleModifierType,
   ErGreaterAbilityRandomizerModifierType,
   ErLearnersShroomModifierType,
@@ -174,8 +173,6 @@ const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTyp
   RARE_FORM_CHANGE_ITEM: () => () =>
     new FormChangeItemModifierType(FormChangeItem.GRISEOUS_CORE).withIdFromFunc(modifierTypes.RARE_FORM_CHANGE_ITEM),
   DNA_SPLICERS: () => modifierTypes.DNA_SPLICERS,
-  BASE_STAT_BOOSTER: () => () =>
-    new BaseStatBoosterModifierType(Stat.ATK).withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER),
   ER_DEX_NAV: () => modifierTypes.ER_DEX_NAV,
 };
 
@@ -1212,6 +1209,7 @@ export class SelectModifierPhase extends BattlePhase {
       || modifierType instanceof ErAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+      || modifierType instanceof ErDexNavModifierType
     );
   }
 
@@ -1228,6 +1226,7 @@ export class SelectModifierPhase extends BattlePhase {
       modifierType instanceof ErAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+      || modifierType instanceof ErDexNavModifierType
     ) {
       return { kind: "ability", wave, turn };
     }

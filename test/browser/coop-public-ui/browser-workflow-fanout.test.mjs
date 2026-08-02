@@ -365,7 +365,6 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "RARE_EVOLUTION_ITEM",
     "FORM_CHANGE_ITEM",
     "RARE_FORM_CHANGE_ITEM",
-    "BASE_STAT_BOOSTER",
   ]);
   for (const rewardId of [
     "TM_CASE",
@@ -403,7 +402,6 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "FORM_CHANGE_ITEM",
     "RARE_FORM_CHANGE_ITEM",
     "DNA_SPLICERS",
-    "BASE_STAT_BOOSTER",
     "ER_DEX_NAV",
   ]) {
     assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
@@ -423,6 +421,16 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     }
   }
   assert.match(config, /"party-mutating-rewards"/u);
+  assert.match(
+    selectModifier,
+    /modifierQueuesContinuation[\s\S]*modifierType instanceof ErDexNavModifierType/u,
+    "Dex Nav must retain the reward continuation until its nested result commits",
+  );
+  assert.match(
+    selectModifier,
+    /coopModifierFollowUp[\s\S]*modifierType instanceof ErDexNavModifierType[\s\S]*return \{ kind: "ability", wave, turn \}/u,
+    "Dex Nav's reward result must authorize its typed ability successor before wave progression",
+  );
   assert.match(
     registry,
     /isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"/u,
