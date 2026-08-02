@@ -20,8 +20,8 @@
 // author state or advance its ordinal.
 // =============================================================================
 
-import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopOperationAuthorityState,
   captureCoopOperationAuthorityState,

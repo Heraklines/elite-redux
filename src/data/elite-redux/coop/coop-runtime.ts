@@ -11105,9 +11105,7 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       && presentation.presentation === "evolution"
       && presentation.animate === true;
     const validEvolutionPresentation =
-      presentation !== undefined
-      && isValidWaveProgressionPresentation(presentation)
-      && presentation.k === "evolution";
+      presentation !== undefined && isValidWaveProgressionPresentation(presentation) && presentation.k === "evolution";
     const expectedSurfaceBand = payload.rewardSurface == null ? 0 : payload.rewardSurface.ordinal + 1;
     if (
       typeof payload?.label !== "string"
