@@ -385,7 +385,6 @@ jobs:
             "er-telemetry-staging/dictionaries/${{ env.AI_DICTIONARY_HASH }}.json"
             --file "${{ runner.temp }}/er-combat-data-dictionary.json"
             --content-type application/json
-            --remote
 
       - name: Deploy co-op signaling API (staging)
         if: inputs.deploy_coop
