@@ -387,6 +387,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     /render_profile:[\s\S]*default: animations-skipped-depth[\s\S]*animations-on-surface[\s\S]*COOP_UI_RENDER_PROFILE: \$\{\{ inputs\.render_profile \|\| 'animations-skipped-depth' \}\}/u,
     "a focused item journey must be dispatchable with animations enabled without changing its public input path",
   );
+  assert.match(
+    workflow,
+    /group: coop-public-ui-\$\{\{ github\.ref \}\}-\$\{\{ inputs\.journey[\s\S]*\$\{\{ inputs\.render_profile \|\| 'animations-skipped-depth' \}\}/u,
+    "animations-on presentation qualification must not queue behind the independent fast mechanical profile",
+  );
   const exactVariantRewardIds = new Set([
     "MINT",
     "TERA_SHARD",

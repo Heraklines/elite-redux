@@ -115,7 +115,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
+  # Presentation-fidelity qualification is independent from the fast mechanical lane. Keep each profile
+  # serialized with itself, but do not make an animations-on proof wait behind an animations-skipped run.
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}-${{ inputs.render_profile || 'animations-skipped-depth' }}
   cancel-in-progress: false
 
 env:
