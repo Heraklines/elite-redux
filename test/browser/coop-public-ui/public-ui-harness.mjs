@@ -363,6 +363,18 @@ function findOwnedCommandOrTerminal(client, from) {
   return client.evidence.find(LOCAL_COMMAND, from) ?? null;
 }
 
+/**
+ * Anchor a new command round at the newest public command admission, regardless of whether
+ * that path emitted the legacy console marker. Same-tab resume publishes the semantic V2
+ * command surface without repeating `CommandPhase -> LOCAL UI`; falling back to zero there
+ * resurrects the pre-reload reward as a false structural successor and submits no input.
+ */
+export function latestCommandAdmissionCursor(client) {
+  const semanticIndex = client.evidence.findLastSemanticSurface(0, "command:command")?.index ?? 0;
+  const legacyIndex = client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0;
+  return Math.max(semanticIndex, legacyIndex);
+}
+
 function findAddressedCommandCollectionClosed(client, from, expectedAddress) {
   return client.evidence.events.slice(from).find(event => {
     const observation = event.kind === "browser-surface2" ? event.observation : null;
@@ -3851,7 +3863,7 @@ export class DuoPublicUiRig {
       Object.values(this.clients).map(client => [client.label, client.evidence.cursor()]),
     );
     let commandCursors = Object.fromEntries(
-      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+      Object.values(this.clients).map(client => [client.label, latestCommandAdmissionCursor(client)]),
     );
     let pendingCommandProof = null;
     for (let turn = 1; turn <= this.config.maxTurns; turn++) {
@@ -4000,7 +4012,7 @@ export class DuoPublicUiRig {
     });
 
     const firstCommandCursors = Object.fromEntries(
-      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+      Object.values(this.clients).map(client => [client.label, latestCommandAdmissionCursor(client)]),
     );
     const firstRound = await this.driveSequentialCommandRound(
       firstCommandCursors,
@@ -4150,7 +4162,7 @@ export class DuoPublicUiRig {
       });
     }
     const commandCursors = Object.fromEntries(
-      Object.values(this.clients).map(client => [client.label, client.evidence.findLast(LOCAL_COMMAND)?.index ?? 0]),
+      Object.values(this.clients).map(client => [client.label, latestCommandAdmissionCursor(client)]),
     );
     const { outcomeCursors, expectedCommandAddress } = await this.driveSequentialCommandRound(
       commandCursors,

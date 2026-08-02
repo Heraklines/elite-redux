@@ -8,8 +8,21 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { coopCasUpdateRequestView } from "./evidence.mjs";
+import { latestCommandAdmissionCursor } from "./public-ui-harness.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
+
+test("post-resume rounds anchor at the semantic command when the legacy marker is absent", () => {
+  const makeClient = ({ semanticIndex, legacyIndex }) => ({
+    evidence: {
+      findLastSemanticSurface: () => (semanticIndex == null ? undefined : { index: semanticIndex }),
+      findLast: () => (legacyIndex == null ? undefined : { index: legacyIndex }),
+    },
+  });
+  assert.equal(latestCommandAdmissionCursor(makeClient({ semanticIndex: 42, legacyIndex: null })), 42);
+  assert.equal(latestCommandAdmissionCursor(makeClient({ semanticIndex: 42, legacyIndex: 40 })), 42);
+  assert.equal(latestCommandAdmissionCursor(makeClient({ semanticIndex: 42, legacyIndex: 44 })), 44);
+});
 
 test("captures only valid co-op CAS slot and mode commitments", () => {
   assert.deepEqual(
