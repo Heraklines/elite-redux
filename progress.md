@@ -6837,3 +6837,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   matrix without exceeding the 32-runner co-op ceiling. Tera shards, fusion, evolution/form items, restoratives,
   and status/revive preconditions need dedicated deterministic fixtures before claiming complete consumable
   coverage; the first matrix covers every already-driveable nested picker and the exact live failure family.
+
+## 2026-08-02 - full-moveset TM browser driver correction
+
+- Live matrix `30750278739` exposed `TM_GREAT` as a harness-path red, not a completed product mutation: the
+  Summary picker defaults to its fifth "new move/cancel" row, while the driver mistook Summary's page cursor
+  (`cursor:3`) for a real move row and confirmed cancellation. The resulting return to the reward screen made
+  its cursor oracle time out before any TM result was committed.
+- The CI-only semantic observer now publishes the real learn-move row identity (`move:<id>:slot:<n>` versus
+  `learn-move:cancel`). The public driver must visibly navigate to an existing move row before confirming, and
+  records that exact selection. This prevents every full-moveset TM/Shroom case from earning a false green by
+  clicking the cancel row.
+- No local co-op or browser tests were run. Keep matrix `30750278739` alive for independent item evidence; run
+  the corrected exact-SHA matrix remotely after its remaining jobs are classified.

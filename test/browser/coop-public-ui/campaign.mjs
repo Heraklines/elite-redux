@@ -2691,6 +2691,32 @@ async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
   if (picker.observation.uiMode !== "SUMMARY") {
     throw new Error(`[campaign-learn-move] ${owner.label} never opened the full-moveset Summary picker`);
   }
+  const replacementMoveId = picker.observation.optionIds?.find(optionId => /^move:\d+:slot:\d+$/u.test(optionId));
+  if (replacementMoveId == null) {
+    throw new Error(
+      `[campaign-learn-move] ${owner.label} exposed no existing move row in the full-moveset Summary picker: `
+        + JSON.stringify(picker.observation),
+    );
+  }
+  const replacementSelection = await selectOptionById(owner, {
+    surfaceId: "learn-move:confirm",
+    targetId: replacementMoveId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submit: false,
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: picker.index,
+  });
+  picker = owner.evidence.events[replacementSelection.surfaceEventIndex];
+  if (
+    picker?.observation?.uiMode !== "SUMMARY"
+    || picker.observation.selectedOptionId !== replacementMoveId
+    || picker.observation.selectedOptionId === "learn-move:cancel"
+  ) {
+    throw new Error(
+      `[campaign-learn-move] ${owner.label} did not select an existing move before confirming replacement: `
+        + JSON.stringify(picker?.observation ?? null),
+    );
+  }
   const confirmationCursor = owner.evidence.cursor();
   await owner.press("Space", "campaign-learn-move-forget-selected");
   const finalConfirmation = await owner.evidence.waitForCondition(
@@ -2712,6 +2738,7 @@ async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
     ownerSeat: owner.publicSeat,
     rewardId,
     selectedOptionId: picker.observation.selectedOptionId,
+    navigationSteps: replacementSelection.steps,
     confirmationEventIndex: finalConfirmation.index,
   });
 }

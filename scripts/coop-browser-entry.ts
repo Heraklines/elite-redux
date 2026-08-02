@@ -60,6 +60,7 @@ const [
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
+const { SummaryUiMode } = await import("../src/ui/handlers/summary-ui-handler");
 
 // The exact browser uses the same callbacks and 5s no-progress fence as production, but hosted SwiftShader
 // advances one asset frame per ~333ms instead of a real player's ~16ms. A valid long move such as Explosion
@@ -1157,6 +1158,33 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       const optionIds = moveSlots.map(slot => slot.optionId);
       return {
         selectedOptionId: selectedIndex == null ? null : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
+  if (uiMode === "SUMMARY") {
+    const summaryHandler = handler as unknown as {
+      summaryUiMode?: unknown;
+      moveCursor?: unknown;
+      pokemon?: Pokemon;
+    };
+    if (
+      summaryHandler.summaryUiMode === SummaryUiMode.LEARN_MOVE
+      && Number.isSafeInteger(summaryHandler.moveCursor)
+      && summaryHandler.pokemon != null
+    ) {
+      const moveCursor = summaryHandler.moveCursor as number;
+      const moves = summaryHandler.pokemon.getMoveset();
+      const optionIds = [...moves.map((move, index) => `move:${move.moveId}:slot:${index}`), "learn-move:cancel"];
+      const selectedOptionId =
+        moveCursor >= 0 && moveCursor < moves.length
+          ? optionIds[moveCursor]
+          : moveCursor === summaryHandler.pokemon.getMaxMoveCount()
+            ? "learn-move:cancel"
+            : `learn-move:cursor:${moveCursor}`;
+      return {
+        selectedOptionId,
         optionIds,
         optionCount: optionIds.length,
       };

@@ -469,6 +469,10 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(policy, /nestedDirectRewardIds/u);
   assert.match(workflow, /party-mutating-rewards" \]\]; then[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u);
   assert.match(campaign, /driveLearnMoveAccept/u);
+  assert.match(browserEntry, /summaryHandler\.summaryUiMode === SummaryUiMode\.LEARN_MOVE/u);
+  assert.match(browserEntry, /"learn-move:cancel"/u);
+  assert.match(campaign, /replacementMoveId[\s\S]*?selectOptionById\(owner,[\s\S]*?surfaceId: "learn-move:confirm"/u);
+  assert.match(campaign, /selectedOptionId === "learn-move:cancel"/u);
   assert.match(campaign, /actionable learn-move final replacement confirmation/u);
   assert.match(campaign, /campaign-learn-move-confirm-replacement/u);
   assert.match(campaign, /finishRewardFusion/u);
