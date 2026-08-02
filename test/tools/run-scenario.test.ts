@@ -195,6 +195,8 @@ interface TurnAction {
   tera?: boolean;
   /** Voluntary switch this turn: the 0-indexed party slot to send in (real Command path). */
   switch?: number;
+  /** Internal policy adapter detail: use the held Baton transfer instead of a normal switch. */
+  switchTransfer?: "normal" | "baton";
   /** Throw a poke ball this turn (PokeballType number or enum name). */
   ball?: number | string;
   /** Flee attempt this turn. */
@@ -204,6 +206,7 @@ interface TurnAction {
   target2?: number;
   tera2?: boolean;
   switch2?: number;
+  switch2Transfer?: "normal" | "baton";
   ball2?: number | string;
   run2?: boolean;
   /** Triple: the 3rd player mon's action. */
@@ -211,6 +214,7 @@ interface TurnAction {
   target3?: number;
   tera3?: boolean;
   switch3?: number;
+  switch3Transfer?: "normal" | "baton";
   ball3?: number | string;
   run3?: boolean;
   /** Force the enemy slot(s) to use this move (+ target) this turn (2/3 = player targets). */
@@ -773,6 +777,7 @@ interface SlotAction {
   target?: number | undefined;
   tera?: boolean | undefined;
   switch?: number | undefined;
+  switchTransfer?: "normal" | "baton" | undefined;
   ball?: number | string | undefined;
   run?: boolean | undefined;
 }
@@ -783,12 +788,36 @@ function slotAction(a: TurnAction | undefined, slot: 0 | 1 | 2): SlotAction {
     return {};
   }
   if (slot === 0) {
-    return { move: a.move, target: a.target, tera: a.tera, switch: a.switch, ball: a.ball, run: a.run };
+    return {
+      move: a.move,
+      target: a.target,
+      tera: a.tera,
+      switch: a.switch,
+      switchTransfer: a.switchTransfer,
+      ball: a.ball,
+      run: a.run,
+    };
   }
   if (slot === 1) {
-    return { move: a.move2, target: a.target2, tera: a.tera2, switch: a.switch2, ball: a.ball2, run: a.run2 };
+    return {
+      move: a.move2,
+      target: a.target2,
+      tera: a.tera2,
+      switch: a.switch2,
+      switchTransfer: a.switch2Transfer,
+      ball: a.ball2,
+      run: a.run2,
+    };
   }
-  return { move: a.move3, target: a.target3, tera: a.tera3, switch: a.switch3, ball: a.ball3, run: a.run3 };
+  return {
+    move: a.move3,
+    target: a.target3,
+    tera: a.tera3,
+    switch: a.switch3,
+    switchTransfer: a.switch3Transfer,
+    ball: a.ball3,
+    run: a.run3,
+  };
 }
 
 /**
@@ -875,7 +904,7 @@ function selectSyntheticStruggle(
   const battle = game.scene.currentBattle;
   const turn = battle.turn;
   const commandCommitted = () =>
-    game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[idx] != null;
+    game.scene.currentBattle !== battle || battle.turn !== turn || battle.turnCommands[idx] != null;
   const matchesActor = () =>
     game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
     && (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === idx;
@@ -918,11 +947,17 @@ function selectSyntheticStruggle(
 }
 
 /** Route a voluntary switch through the exact actor's public COMMAND and PARTY prompts. */
-function selectVoluntarySwitch(game: GameManager, partyIndex: number, idx: BattlerIndex, log: string[]): void {
+function selectVoluntarySwitch(
+  game: GameManager,
+  partyIndex: number,
+  transfer: "normal" | "baton",
+  idx: BattlerIndex,
+  log: string[],
+): void {
   const battle = game.scene.currentBattle;
   const turn = battle.turn;
   const commandCommitted = () =>
-    game.scene.currentBattle !== battle || battle.turn > turn + 1 || battle.turnCommands[idx] != null;
+    game.scene.currentBattle !== battle || battle.turn !== turn || battle.turnCommands[idx] != null;
   const matchesActor = () =>
     game.scene.phaseManager.getCurrentPhase().phaseName === "CommandPhase"
     && (game.scene.phaseManager.getCurrentPhase() as CommandPhase).getFieldIndex() === idx;
@@ -945,7 +980,7 @@ function selectVoluntarySwitch(game: GameManager, partyIndex: number, idx: Battl
   game.onNextPrompt(
     "CommandPhase",
     UiMode.PARTY,
-    () => drivePartySelection(game, partyIndex),
+    () => drivePartySelection(game, partyIndex, [transfer === "baton" ? PartyOption.PASS_BATON : PartyOption.SEND_OUT]),
     commandCommitted,
     false,
     {
@@ -954,7 +989,7 @@ function selectVoluntarySwitch(game: GameManager, partyIndex: number, idx: Battl
       matchFn: matchesActor,
     },
   );
-  log.push(`slot${idx}: switch -> party[${partyIndex}]`);
+  log.push(`slot${idx}: ${transfer === "baton" ? "baton " : ""}switch -> party[${partyIndex}]`);
 }
 
 /**
@@ -980,7 +1015,7 @@ function applyAction(
     return;
   }
   if (action.switch != null) {
-    selectVoluntarySwitch(game, action.switch, idx, log);
+    selectVoluntarySwitch(game, action.switch, action.switchTransfer ?? "normal", idx, log);
     return;
   }
   if (action.ball != null) {
@@ -2711,6 +2746,14 @@ function autopilotTick(game: GameManager, st: RunState): void {
     return;
   }
 
+  // Voluntary switches already have an actor-scoped PromptHandler callback that
+  // selects the policy's exact reserve. Letting the generic menu autopilot drive
+  // the same PARTY surface can replace that choice with the first legal bench
+  // slot, strand the original prompt, or select one reserve for two doubles seats.
+  if (COMBAT_BATCH && mode === UiMode.PARTY && game.promptHandler.hasMatchingPrompt()) {
+    return;
+  }
+
   if (isAutopilotMode(phaseName, mode, handler)) {
     const partyCallback =
       mode === UiMode.PARTY ? ((handler as unknown as { selectCallback?: unknown }).selectCallback ?? null) : null;
@@ -3069,7 +3112,7 @@ function setCandidateAction(
     candidate.kind === "move"
       ? { move: candidate.moveId, tera: candidate.tera, target }
       : candidate.kind === "switch"
-        ? { switch: candidate.partyIndex }
+        ? { switch: candidate.partyIndex, switchTransfer: candidate.transfer }
         : {};
   if (actorSlot === 0) {
     Object.assign(action, chosenAction);
@@ -3085,6 +3128,9 @@ function setCandidateAction(
     }
     if (chosenAction.switch !== undefined) {
       action.switch2 = chosenAction.switch;
+      if (chosenAction.switchTransfer !== undefined) {
+        action.switch2Transfer = chosenAction.switchTransfer;
+      }
     }
   } else {
     if (chosenAction.move !== undefined) {
@@ -3098,6 +3144,9 @@ function setCandidateAction(
     }
     if (chosenAction.switch !== undefined) {
       action.switch3 = chosenAction.switch;
+      if (chosenAction.switchTransfer !== undefined) {
+        action.switch3Transfer = chosenAction.switchTransfer;
+      }
     }
   }
 }
@@ -4637,6 +4686,49 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     expect(game.scene.getPlayerField()[0].species.speciesId, "PIKACHU should be active after the switch").toBe(
       SpeciesId.PIKACHU,
     );
+  }, 180_000);
+
+  it("the policy adapter preserves a trapped holder's legal Baton transfer", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "policy Baton transfer",
+      run: { level: 100, difficulty: "hell", enemyAi: "hardest" },
+      party: [
+        { species: SpeciesId.SNORLAX, moves: [MoveId.SPLASH], heldItems: [{ name: "BATON" }] },
+        { species: SpeciesId.PIKACHU, moves: [MoveId.THUNDERBOLT] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.DUGTRIO,
+            level: 100,
+            moves: [MoveId.SPLASH],
+            ability: AbilityId.ARENA_TRAP,
+          },
+        ],
+      },
+    };
+    normalizeSpec(spec);
+    const game = await launchScenario(phaserGame, spec, {});
+    const actor = game.scene.getPlayerField()[0];
+    expect(actor.isTrapped([], true), "Arena Trap should forbid a normal switch").toBe(true);
+    const candidates = enumerateErCombatCandidates(game.scene, 0);
+    expect(candidates.some(candidate => candidate.kind === "switch" && candidate.transfer === "normal")).toBe(false);
+    const baton = candidates.find(
+      candidate => candidate.kind === "switch" && candidate.partyIndex === 1 && candidate.transfer === "baton",
+    );
+    expect(baton, "the held Baton should expose a trap-bypassing transfer candidate").toBeDefined();
+
+    const action: TurnAction = {};
+    setCandidateAction(game, action, 0, baton!);
+    doPlayerActions(game, action, null, []);
+    await game.phaseInterceptor.to("EnemyCommandPhase", false);
+    expect(game.scene.currentBattle.turnCommands[0]).toMatchObject({
+      command: Command.POKEMON,
+      cursor: 1,
+      args: [true],
+    });
   }, 180_000);
 
   it("Revival Blessing selects the REVIVE party option through the public UI", async () => {
