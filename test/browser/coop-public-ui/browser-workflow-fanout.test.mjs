@@ -797,8 +797,8 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     browserEntry,
-    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set\(\["SelectModifierPhase:EVOLUTION_SCENE"\]\)/u,
-    "the observer suppresses only the sampled reward-phase/evolution-UI teardown pair",
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set\(\[[\s\S]*"SelectModifierPhase:EVOLUTION_SCENE"[\s\S]*"LearnMovePhase:EVOLUTION_SCENE"[\s\S]*\]\)/u,
+    "the observer suppresses sampled reward and learn-move phase handoffs while evolution UI still owns the screen",
   );
   assert.match(
     browserEntry,
