@@ -185,8 +185,8 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(starterHandler, /!options\.allowOverValueLimit && !this\.tryUpdateValue\(cost, true\)/u);
   assert.match(
     starterPhase,
-    /const navigationFixtureActive = isCoopBrowserNavigationFixtureActive\(\)[\s\S]*cost:\s*navigationFixtureActive\s*\?\s*0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u,
-    "the exact navigation fixture must survive the real co-op roster budget after visible starter confirmation",
+    /const navigationFixtureActive = isCoopBrowserNavigationFixtureActive\(\)[\s\S]*const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId\(\) != null[\s\S]*cost:\s*navigationFixtureActive \|\| partyRewardFixtureActive\s*\?\s*0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u,
+    "the exact navigation fixture must retain its roster-budget exemption when another exact fixture shares the envelope boundary",
   );
   assert.match(
     starterHandler,
