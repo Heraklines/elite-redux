@@ -220,8 +220,8 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
   assert.match(
     campaign,
-    /cycleIndex: policy\.navigation\.required \? turn - 1 : 0/u,
-    "the navigation-only driver must cycle the observer-proven coverage set across a real multi-turn battle",
+    /cycleIndex: policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0 \? turn - 1 : 0/u,
+    "the navigation and market drivers must cycle the observer-proven coverage set across a real multi-turn battle",
   );
   assert.match(
     campaign,
