@@ -14,12 +14,24 @@ export const GHOST_EVAL_CONTROLLERS = [
 export const GHOST_EVAL_FIXED_SEEDS = [17, 43, 97];
 export const EXPECTED_GHOST_EVAL_PAIRS = 100;
 
+function validateControllers(controllers) {
+  if (
+    !Array.isArray(controllers)
+    || controllers.length === 0
+    || controllers.some(controller => typeof controller !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(controller))
+    || new Set(controllers).size !== controllers.length
+  ) {
+    throw new Error("controllers must be a non-empty list of unique kebab-case identifiers");
+  }
+  return [...controllers];
+}
+
 function combatOnlyScenario(scenario) {
   const { eggs: _eggs, ...combatOnly } = scenario;
   return combatOnly;
 }
 
-export function buildGhostEvalBatch(fixture, pairStart, pairCount) {
+export function buildGhostEvalBatch(fixture, pairStart, pairCount, controllers = GHOST_EVAL_CONTROLLERS) {
   const availablePairs = fixture.teams.length / 2;
   if (!Number.isInteger(pairStart) || !Number.isInteger(pairCount) || pairStart < 0 || pairCount < 1) {
     throw new Error("pair start must be non-negative and pair count must be positive");
@@ -27,13 +39,14 @@ export function buildGhostEvalBatch(fixture, pairStart, pairCount) {
   if (pairStart + pairCount > availablePairs) {
     throw new Error(`pair range ${pairStart}..${pairStart + pairCount - 1} exceeds ${availablePairs} pairs`);
   }
+  const playerControllers = validateControllers(controllers);
   const manifests = [];
   const episodes = [];
   for (let pairIndex = pairStart; pairIndex < pairStart + pairCount; pairIndex++) {
     for (const fixedSeed of GHOST_EVAL_FIXED_SEEDS) {
       const pair = buildGhostPair(fixture, pairIndex, fixedSeed);
       assertInversePair(pair);
-      const manifest = { ...pair.manifest, playerControllers: GHOST_EVAL_CONTROLLERS };
+      const manifest = { ...pair.manifest, playerControllers };
       manifests.push(manifest);
       episodes.push(
         {
@@ -53,14 +66,20 @@ export function buildGhostEvalBatch(fixture, pairStart, pairCount) {
 }
 
 function main() {
-  const [fixturePath, pairStartRaw, pairCountRaw, outputDir, prefix] = process.argv.slice(2);
+  const [fixturePath, pairStartRaw, pairCountRaw, outputDir, prefix, controllersRaw] = process.argv.slice(2);
   if (!fixturePath || pairStartRaw === undefined || pairCountRaw === undefined || !outputDir || !prefix) {
     console.error(
       "usage: node scripts/ai/make-ghost-eval-batch.mjs FIXTURE.json PAIR_START PAIR_COUNT OUTPUT_DIR PREFIX",
     );
     process.exit(2);
   }
-  const built = buildGhostEvalBatch(readGhostFixture(fixturePath), Number(pairStartRaw), Number(pairCountRaw));
+  const controllers = controllersRaw ? controllersRaw.split(",") : GHOST_EVAL_CONTROLLERS;
+  const built = buildGhostEvalBatch(
+    readGhostFixture(fixturePath),
+    Number(pairStartRaw),
+    Number(pairCountRaw),
+    controllers,
+  );
   mkdirSync(outputDir, { recursive: true });
   for (const manifest of built.manifests) {
     writeFileSync(join(outputDir, `${manifest.pairId}-manifest.json`), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { EXPECTED_GHOST_EVAL_PAIRS, GHOST_EVAL_CONTROLLERS, GHOST_EVAL_FIXED_SEEDS } from "./make-ghost-eval-batch.mjs";
+import { EXPECTED_GHOST_EVAL_PAIRS, GHOST_EVAL_FIXED_SEEDS } from "./make-ghost-eval-batch.mjs";
 
 const DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
 
@@ -53,8 +53,21 @@ function collectExpectedEpisodeIds(manifests) {
   return new Set(pairIds.flatMap(pairId => [`${pairId}-leg-a`, `${pairId}-leg-b`]));
 }
 
-function indexControllerResults(controllerBatches, expectedEpisodeIds) {
-  const byController = new Map(GHOST_EVAL_CONTROLLERS.map(controller => [controller, new Map()]));
+function manifestControllers(manifests) {
+  const controllers = manifests[0]?.playerControllers;
+  if (
+    !Array.isArray(controllers)
+    || controllers.length === 0
+    || new Set(controllers).size !== controllers.length
+    || manifests.some(manifest => JSON.stringify(manifest.playerControllers) !== JSON.stringify(controllers))
+  ) {
+    throw new Error("seeded inverse-pair manifests have an invalid or inconsistent controller inventory");
+  }
+  return controllers;
+}
+
+function indexControllerResults(controllerBatches, expectedEpisodeIds, controllers) {
+  const byController = new Map(controllers.map(controller => [controller, new Map()]));
   for (const { name, controller, batch } of controllerBatches) {
     if (!byController.has(controller)) {
       throw new Error(`unrecognized controller result file: ${name}`);
@@ -98,10 +111,10 @@ function classifyResult(result) {
   return "unresolved";
 }
 
-function collectLegs(manifests, byController) {
+function collectLegs(manifests, byController, controllers) {
   const legs = [];
   for (const manifest of manifests) {
-    for (const controller of GHOST_EVAL_CONTROLLERS) {
+    for (const controller of controllers) {
       for (const leg of manifest.legs) {
         const result = byController.get(controller).get(`${manifest.pairId}-leg-${leg.leg}`);
         legs.push({
@@ -165,9 +178,9 @@ function summarizeLegs(legs) {
   };
 }
 
-function summarizeControllers(legs) {
+function summarizeControllers(legs, controllers) {
   const controllerReports = {};
-  for (const controller of GHOST_EVAL_CONTROLLERS) {
+  for (const controller of controllers) {
     const controllerLegs = legs.filter(leg => leg.controller === controller);
     const byDifficulty = Object.fromEntries(
       DIFFICULTIES.map(difficulty => [
@@ -192,17 +205,17 @@ function summarizeControllers(legs) {
 
 export function buildGhostBatchReport(manifests, controllerBatches) {
   const expectedEpisodeIds = collectExpectedEpisodeIds(manifests);
-  const byController = indexControllerResults(controllerBatches, expectedEpisodeIds);
-  const legs = collectLegs(manifests, byController);
+  const controllers = manifestControllers(manifests);
+  const byController = indexControllerResults(controllerBatches, expectedEpisodeIds, controllers);
+  const legs = collectLegs(manifests, byController, controllers);
   return {
-    evaluator:
-      "Random-init transformer, Showdown-transfer transformer, tree ensemble, smart-default, and hardest engine baseline versus hardest engine trainer AI",
+    evaluator: `${controllers.join(", ")} versus hardest engine trainer AI`,
     warning: "Offline imitation scores are not win rates; these rates come only from real-engine battles.",
     rosterPairs: EXPECTED_GHOST_EVAL_PAIRS,
     fixedSeeds: GHOST_EVAL_FIXED_SEEDS,
     seededMatchups: manifests.length,
     legs: legs.length,
-    controllers: summarizeControllers(legs),
+    controllers: summarizeControllers(legs, controllers),
     results: legs,
   };
 }

@@ -16,6 +16,14 @@ on:
         required: false
         default: ""
         type: string
+      tree_artifact_name:
+        required: false
+        default: ai-baseline-leaderboard
+        type: string
+      candidate_kernel:
+        required: false
+        default: ""
+        type: string
     secrets:
       KAGGLE_USERNAME:
         required: true
@@ -34,8 +42,18 @@ on:
         default: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
         type: string
       tree_run_id:
-        description: Actions run containing the diagnostic tree-ensemble artifact
+        description: Actions run containing the requested tree-policy artifact
         required: true
+        default: ""
+        type: string
+      tree_artifact_name:
+        description: Artifact containing leaderboard.json and tree model files
+        required: true
+        default: ai-baseline-leaderboard
+        type: string
+      candidate_kernel:
+        description: Optional private checkpoint-trained transformer; switches to checkpoint benchmark mode
+        required: false
         default: ""
         type: string
 
@@ -65,6 +83,7 @@ jobs:
       - name: Install Kaggle client
         run: python -m pip install kaggle==1.8.4
       - name: Download private matched transformer outputs
+        if: inputs.candidate_kernel == ''
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
@@ -78,71 +97,110 @@ jobs:
           mkdir -p ai-models/control ai-models/transfer
           kaggle kernels output "$CONTROL_KERNEL" --path ai-models/control --force
           kaggle kernels output "$TRANSFER_KERNEL" --path ai-models/transfer --force
+      - name: Download private checkpoint transformer output
+        if: inputs.candidate_kernel != ''
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          CANDIDATE_KERNEL: ${{ inputs.candidate_kernel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          mkdir -p ai-models/candidate
+          kaggle kernels output "$CANDIDATE_KERNEL" --path ai-models/candidate --force
       - uses: actions/download-artifact@v6
         with:
-          name: ai-baseline-leaderboard
+          name: ${{ inputs.tree_artifact_name }}
           path: ai-models/tree
           run-id: ${{ inputs.tree_run_id }}
           github-token: ${{ github.token }}
       - name: Validate exact model inventory and policy firewall
+        env:
+          CANDIDATE_MODE: ${{ inputs.candidate_kernel != '' }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
-          test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
+          if [[ "$CANDIDATE_MODE" == "true" ]]; then
+            test "$(find ai-models/candidate -name model.safetensors -type f | wc -l)" -eq 1
+          else
+            test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
+            test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
+          fi
           test -f ai-models/tree/models/stacked_tree_ensemble.json
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          reports = {}
-          for arm in ("control", "transfer"):
-              paths = list(Path("ai-models", arm).rglob("report.json"))
+          candidate_mode = os.environ["CANDIDATE_MODE"] == "true"
+          if candidate_mode:
+              paths = list(Path("ai-models/candidate").rglob("report.json"))
               if len(paths) != 1:
-                  raise SystemExit(f"expected one {arm} report, found {paths}")
-              report = json.loads(paths[0].read_text(encoding="utf-8"))
-              if report["checkpointSelection"]["metric"] != "valueBrier":
-                  raise SystemExit(f"{arm} did not use value-only ER checkpoint selection")
-              reports[arm] = report
-          control = reports["control"]
-          transfer = reports["transfer"]
-          if control["architecture"] != transfer["architecture"] or control["seed"] != transfer["seed"]:
-              raise SystemExit("matched transformer arms differ in architecture or seed")
-          if control["tokenVocabularySha256"] != transfer["tokenVocabularySha256"]:
-              raise SystemExit("matched transformer arms differ in token vocabulary")
-          if control["data"]["erJsonlSha256"] != transfer["data"]["erJsonlSha256"]:
-              raise SystemExit("matched transformer arms differ in ER data")
-          if control["data"]["identity"] != transfer["data"]["identity"]:
-              raise SystemExit("matched transformer arms differ in runtime identity")
-          if control["data"]["transferDecisions"] != 0 or transfer["data"]["transferDecisions"] <= 0:
-              raise SystemExit("matched transfer assignment is invalid")
-          if control["data"]["policyTargetDecisions"] != 0:
-              raise SystemExit("control ER data contains forbidden policy targets")
-          if transfer["data"]["policyTargetDecisions"] != transfer["data"]["transferDecisions"]:
-              raise SystemExit("transfer arm policy targets are not confined to transfer decisions")
-          if control["data"]["excludedPolicyDecisions"] != transfer["data"]["excludedPolicyDecisions"]:
-              raise SystemExit("matched arms disagree on excluded ER policy decisions")
-          if control["objective"]["transferPretrainEpochs"] != 0:
-              raise SystemExit("random-init control unexpectedly performed transfer pretraining")
-          if transfer["objective"]["transferPretrainEpochs"] <= 0:
-              raise SystemExit("Showdown-transfer arm did not perform transfer pretraining")
+                  raise SystemExit(f"expected one checkpoint candidate report, found {paths}")
+              candidate = json.loads(paths[0].read_text(encoding="utf-8"))
+              data = candidate["data"]
+              sources = data["sourcePolicies"]
+              allowed_sources = {"checkpoint-tree-v1", "checkpoint-neural-v4", "engine-hardest-v1"}
+              if set(sources) - allowed_sources:
+                  raise SystemExit(f"checkpoint candidate contains an unexpected policy source: {sources}")
+              if data["excludedPolicyDecisions"] != sources.get("engine-hardest-v1", 0):
+                  raise SystemExit("hardest-engine actions were not excluded exactly from policy training")
+              if data["policyTargetDecisions"] <= 0 or candidate["checkpointSelection"]["metric"] != "candidateNll":
+                  raise SystemExit("checkpoint candidate was not selected on held-out policy targets")
+              if data["transferDecisions"] != 0 or candidate["objective"]["transferPretrainEpochs"] != 0:
+                  raise SystemExit("checkpoint resume unexpectedly repeated Showdown transfer training")
+              if candidate.get("tokenVocabularySource") != "fixed" or not candidate.get("initializedFrom"):
+                  raise SystemExit("checkpoint candidate did not strictly resume the sealed transformer")
+              if not str(candidate.get("device", "")).startswith("cuda"):
+                  raise SystemExit("checkpoint candidate was not trained on CUDA")
+          else:
+              reports = {}
+              for arm in ("control", "transfer"):
+                  paths = list(Path("ai-models", arm).rglob("report.json"))
+                  if len(paths) != 1:
+                      raise SystemExit(f"expected one {arm} report, found {paths}")
+                  report = json.loads(paths[0].read_text(encoding="utf-8"))
+                  if report["checkpointSelection"]["metric"] != "valueBrier":
+                      raise SystemExit(f"{arm} did not use value-only ER checkpoint selection")
+                  reports[arm] = report
+              control = reports["control"]
+              transfer = reports["transfer"]
+              if control["architecture"] != transfer["architecture"] or control["seed"] != transfer["seed"]:
+                  raise SystemExit("matched transformer arms differ in architecture or seed")
+              if control["tokenVocabularySha256"] != transfer["tokenVocabularySha256"]:
+                  raise SystemExit("matched transformer arms differ in token vocabulary")
+              if control["data"]["erJsonlSha256"] != transfer["data"]["erJsonlSha256"]:
+                  raise SystemExit("matched transformer arms differ in ER data")
+              if control["data"]["identity"] != transfer["data"]["identity"]:
+                  raise SystemExit("matched transformer arms differ in runtime identity")
+              if control["data"]["transferDecisions"] != 0 or transfer["data"]["transferDecisions"] <= 0:
+                  raise SystemExit("matched transfer assignment is invalid")
+              if control["data"]["policyTargetDecisions"] != 0:
+                  raise SystemExit("control ER data contains forbidden policy targets")
+              if transfer["data"]["policyTargetDecisions"] != transfer["data"]["transferDecisions"]:
+                  raise SystemExit("transfer arm policy targets are not confined to transfer decisions")
+              if control["data"]["excludedPolicyDecisions"] != transfer["data"]["excludedPolicyDecisions"]:
+                  raise SystemExit("matched arms disagree on excluded ER policy decisions")
+              if control["objective"]["transferPretrainEpochs"] != 0:
+                  raise SystemExit("random-init control unexpectedly performed transfer pretraining")
+              if transfer["objective"]["transferPretrainEpochs"] <= 0:
+                  raise SystemExit("Showdown-transfer arm did not perform transfer pretraining")
 
           tree_report = json.loads(Path("ai-models/tree/leaderboard.json").read_text(encoding="utf-8"))
-          tree_model = json.loads(
-              Path("ai-models/tree/models/stacked_tree_ensemble.json").read_text(encoding="utf-8")
-          )
-          if tree_report.get("trainingRole") != "diagnostic-imitation":
-              raise SystemExit("tree report is not sealed as diagnostic-only imitation")
-          if (
-              tree_model.get("schemaVersion") != 2
-              or tree_model.get("featureSchemaVersion") != 2
-              or tree_model.get("featureCount") != 4326
-          ):
-              raise SystemExit("tree ensemble does not match runtime feature schema 2 / 4326")
-          if tree_model.get("trainingRole") != "diagnostic-imitation":
-              raise SystemExit("tree ensemble is not sealed as a diagnostic-only controller")
-          if any(member.get("trainingRole") != "diagnostic-imitation" for member in tree_model.get("members", [])):
-              raise SystemExit("tree ensemble contains a member that is not diagnostic-only")
+          expected_role = "policy-target" if candidate_mode else "diagnostic-imitation"
+          if tree_report.get("trainingRole") != expected_role:
+              raise SystemExit(f"tree report has the wrong training role: {tree_report.get('trainingRole')}")
+          tree_names = ["stacked_tree_ensemble.json"] + (["selected-model.json"] if candidate_mode else [])
+          for tree_name in tree_names:
+              tree_model = json.loads(Path("ai-models/tree/models", tree_name).read_text(encoding="utf-8"))
+              if tree_model.get("featureSchemaVersion") != 2 or tree_model.get("featureCount") != 4326:
+                  raise SystemExit(f"{tree_name} does not match runtime feature schema 2 / 4326")
+              if tree_model.get("trainingRole") != expected_role:
+                  raise SystemExit(f"{tree_name} has the wrong training role")
+              if any(member.get("trainingRole") != expected_role for member in tree_model.get("members", [])):
+                  raise SystemExit(f"{tree_name} contains a member with the wrong training role")
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -188,23 +246,35 @@ jobs:
           name: ai-mirrored-benchmark-models
           path: ai-models
       - name: Resolve sealed model directories
+        env:
+          CANDIDATE_MODE: ${{ inputs.candidate_kernel != '' }}
         shell: bash
         run: |
           set -euo pipefail
-          control_weights=$(find ai-models/control -name model.safetensors -type f)
-          transfer_weights=$(find ai-models/transfer -name model.safetensors -type f)
-          test "$(printf '%s\n' "$control_weights" | wc -l)" -eq 1
-          test "$(printf '%s\n' "$transfer_weights" | wc -l)" -eq 1
-          echo "CONTROL_MODEL=$(dirname "$control_weights")" >> "$GITHUB_ENV"
-          echo "TRANSFER_MODEL=$(dirname "$transfer_weights")" >> "$GITHUB_ENV"
+          if [[ "$CANDIDATE_MODE" == "true" ]]; then
+            candidate_weights=$(find ai-models/candidate -name model.safetensors -type f)
+            test "$(printf '%s\n' "$candidate_weights" | wc -l)" -eq 1
+            echo "CANDIDATE_MODEL=$(dirname "$candidate_weights")" >> "$GITHUB_ENV"
+          else
+            control_weights=$(find ai-models/control -name model.safetensors -type f)
+            transfer_weights=$(find ai-models/transfer -name model.safetensors -type f)
+            test "$(printf '%s\n' "$control_weights" | wc -l)" -eq 1
+            test "$(printf '%s\n' "$transfer_weights" | wc -l)" -eq 1
+            echo "CONTROL_MODEL=$(dirname "$control_weights")" >> "$GITHUB_ENV"
+            echo "TRANSFER_MODEL=$(dirname "$transfer_weights")" >> "$GITHUB_ENV"
+          fi
       - name: Build difficulty-balanced mirrored batch
+        env:
+          CONTROLLERS: ${{ inputs.candidate_kernel != '' && 'checkpoint-transformer-v4,selected-tree-v1,stacked-tree-v1,smart-default-v1,engine-hardest-v1' || '' }}
         run: >-
           node scripts/ai/make-ghost-eval-batch.mjs
           ml/evaluation/ghost-winner-teams.v3.json
           "${{ matrix.start }}" "${{ matrix.count }}"
           ai-gauntlet
           "shard-${{ matrix.shard }}"
+          "$CONTROLLERS"
       - name: Play random-init transformer
+        if: inputs.candidate_kernel == ''
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -213,6 +283,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-random-init-transformer-v4-results.json"
       - name: Play Showdown-transfer transformer
+        if: inputs.candidate_kernel == ''
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -221,6 +292,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-showdown-transfer-transformer-v4-results.json"
       - name: Play diagnostic tree ensemble
+        if: inputs.candidate_kernel == ''
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -228,6 +300,33 @@ jobs:
           --ai-model ai-models/tree/models/stacked_tree_ensemble.json
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-tree-ensemble-v1-results.json"
+      - name: Play checkpoint transformer
+        if: inputs.candidate_kernel != ''
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-neural-model "$CANDIDATE_MODEL"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-checkpoint-transformer-v4-results.json"
+      - name: Play selected winner-only tree
+        if: inputs.candidate_kernel != ''
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ai-models/tree/models/selected-model.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-selected-tree-v1-results.json"
+      - name: Play stacked winner-only tree
+        if: inputs.candidate_kernel != ''
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ai-models/tree/models/stacked_tree_ensemble.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-stacked-tree-v1-results.json"
       - name: Play smart-default baseline
         run: >-
           node scripts/run-combat-batch.mjs

@@ -34,6 +34,16 @@ const evalBatch = buildGhostEvalBatch(fixture, 0, 3);
 assert.equal(evalBatch.manifests.length, 3 * GHOST_EVAL_FIXED_SEEDS.length);
 assert.equal(evalBatch.batch.episodes.length, 6 * GHOST_EVAL_FIXED_SEEDS.length);
 assert.deepEqual(evalBatch.manifests[0].playerControllers, GHOST_EVAL_CONTROLLERS);
+const checkpointControllers = [
+  "checkpoint-transformer-v4",
+  "selected-tree-v1",
+  "stacked-tree-v1",
+  "smart-default-v1",
+  "engine-hardest-v1",
+];
+const checkpointEval = buildGhostEvalBatch(fixture, 0, 1, checkpointControllers);
+assert.deepEqual(checkpointEval.manifests[0].playerControllers, checkpointControllers);
+assert.throws(() => buildGhostEvalBatch(fixture, 0, 1, ["duplicate", "duplicate"]), /unique kebab-case/);
 assert.ok(evalBatch.batch.episodes.every(episode => episode.scenario.eggs === undefined));
 assert.ok(evalBatch.batch.episodes.every(episode => episode.splitGroupId.includes("seed-")));
 const fullEval = buildGhostEvalBatch(fixture, 0, EXPECTED_GHOST_EVAL_PAIRS);
@@ -63,6 +73,24 @@ assert.equal(
   EXPECTED_GHOST_EVAL_PAIRS * GHOST_EVAL_FIXED_SEEDS.length * 2 * GHOST_EVAL_CONTROLLERS.length,
 );
 assert.equal(fullReport.controllers["smart-default-v1"].byDifficulty.hell.playerWins, 150);
+const checkpointManifests = fullEval.manifests.map(manifest => ({
+  ...manifest,
+  playerControllers: checkpointControllers,
+}));
+const checkpointControllerBatches = checkpointControllers.map(controller => ({
+  name: `shard-0-${controller}-results.json`,
+  controller,
+  batch: controllerBatches[0].batch,
+}));
+const checkpointReport = buildGhostBatchReport(checkpointManifests, checkpointControllerBatches);
+assert.deepEqual(Object.keys(checkpointReport.controllers), checkpointControllers);
+assert.equal(checkpointReport.controllers["checkpoint-transformer-v4"].playerWins, 600);
+const inconsistentControllers = structuredClone(checkpointManifests);
+inconsistentControllers[0].playerControllers = ["wrong-controller"];
+assert.throws(
+  () => buildGhostBatchReport(inconsistentControllers, checkpointControllerBatches),
+  /invalid or inconsistent controller inventory/,
+);
 assert.throws(
   () => buildGhostBatchReport(fullEval.manifests.slice(1), controllerBatches),
   /expected 300 seeded inverse-pair manifests/,
