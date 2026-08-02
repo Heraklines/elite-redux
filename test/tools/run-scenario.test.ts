@@ -495,6 +495,7 @@ const POLICY_SOURCES: ReadonlySet<string> = new Set<ErCombatPolicySource>([
   "first-usable",
   "tree-model-v1",
   "epsilon-tree-v1",
+  "diagnostic-tree-v1",
   "checkpoint-tree-v1",
   "engine-hardest-v1",
   "neural-model-v2",

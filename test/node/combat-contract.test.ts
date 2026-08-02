@@ -7,6 +7,7 @@ import {
   canonicalCombatCandidateId,
   committedTurnTargetIndices,
   ER_COMBAT_CONTRACT_VERSION,
+  ER_NON_POLICY_TARGET_SOURCES,
   type ErCombatDecisionRecord,
   type ErCombatMoveCandidate,
   validateCombatDecisionRecord,
@@ -47,6 +48,10 @@ describe("ER combat AI contract", () => {
   const tokenRow = (candidateId: string) => ({
     candidateId,
     groups: { actor: [], targets: [], destination: [], field: [], action: ["action:test"] },
+  });
+
+  it("keeps diagnostic tree actions outside policy training", () => {
+    expect(ER_NON_POLICY_TARGET_SOURCES.has("diagnostic-tree-v1")).toBe(true);
   });
 
   it("reads resolved interactive targets before move-default targets", () => {
