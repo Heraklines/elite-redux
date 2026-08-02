@@ -2691,13 +2691,29 @@ async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
   if (picker.observation.uiMode !== "SUMMARY") {
     throw new Error(`[campaign-learn-move] ${owner.label} never opened the full-moveset Summary picker`);
   }
+  const confirmationCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-learn-move-forget-selected");
+  const finalConfirmation = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(confirmationCursor, "learn-move:confirm");
+      return candidate != null
+        && candidate.observation.uiMode === "CONFIRM"
+        && candidate.observation.selectedOptionId === "yes"
+        && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+        && isActionableSemanticObservation(candidate.observation)
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "actionable learn-move final replacement confirmation" },
+  );
+  await owner.press("Space", `campaign-learn-move-confirm-replacement:${finalConfirmation.index}`);
   owner.evidence.record("campaign-learn-move-accepted", {
     address: boundary.authority.address,
     ownerSeat: owner.publicSeat,
     rewardId,
     selectedOptionId: picker.observation.selectedOptionId,
+    confirmationEventIndex: finalConfirmation.index,
   });
-  await owner.press("Space", "campaign-learn-move-forget-selected");
 }
 
 /**

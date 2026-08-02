@@ -442,6 +442,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(policy, /nestedDirectRewardIds/u);
   assert.match(workflow, /party-mutating-rewards" \]\]; then[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u);
   assert.match(campaign, /driveLearnMoveAccept/u);
+  assert.match(campaign, /actionable learn-move final replacement confirmation/u);
+  assert.match(campaign, /campaign-learn-move-confirm-replacement/u);
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
