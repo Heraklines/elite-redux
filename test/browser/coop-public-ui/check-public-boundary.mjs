@@ -376,6 +376,7 @@ if (
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
+  || !browserEntry.includes("modifierStacks: observedPokemonModifierStacks(pokemon.id)")
   || !browserEntry.includes("const partySlots =")
   || !browserEntry.includes("? globalScene.getPlayerParty().map((pokemon, slot) => {")
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")

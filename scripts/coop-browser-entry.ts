@@ -243,6 +243,36 @@ function safeInnateIds(pokemon: Pokemon): number[] {
   }
 }
 
+/** Stable read-only projection of persistent modifiers attached to one party member. */
+function observedPokemonModifierStacks(pokemonId: number) {
+  return globalScene.modifiers
+    .flatMap(modifier => {
+      const projected = modifier as unknown as {
+        type?: { id?: string };
+        pokemonId?: number;
+        stackCount?: number;
+        getStackCount?: () => number;
+      };
+      if (projected.pokemonId !== pokemonId || typeof projected.type?.id !== "string") {
+        return [];
+      }
+      const stack = typeof projected.getStackCount === "function" ? projected.getStackCount() : projected.stackCount;
+      return [
+        {
+          typeId: projected.type.id,
+          className: modifier.constructor.name,
+          quantity: Number.isSafeInteger(stack) ? Math.max(0, stack ?? 0) : 0,
+        },
+      ];
+    })
+    .toSorted(
+      (left, right) =>
+        left.typeId.localeCompare(right.typeId)
+        || left.className.localeCompare(right.className)
+        || left.quantity - right.quantity,
+    );
+}
+
 function observedPokemon(pokemon: Pokemon, slot: number) {
   return {
     slot,
@@ -276,6 +306,7 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
               pokemon.status.effect === StatusEffect.SLEEP ? (pokemon.status.sleepTurnsRemaining ?? null) : null,
           },
     fainted: pokemon.isFainted(),
+    modifierStacks: observedPokemonModifierStacks(pokemon.id),
     statStages: [...pokemon.summonData.statStages],
     moves: pokemon.moveset.map(move => ({
       move: move.moveId,
@@ -1577,6 +1608,7 @@ function observeSemanticSurface(): void {
         teraType: pokemon.teraType,
         maxMoveCount: pokemon.getMaxMoveCount(),
         bonusMoveSlots: pokemon.customPokemonData.bonusMoveSlots,
+        modifierStacks: observedPokemonModifierStacks(pokemon.id),
         moves: pokemon.getMoveset().map(move => ({
           moveId: move.moveId,
           ppUsed: move.ppUsed,
@@ -1870,6 +1902,7 @@ function observeSemanticSurface(): void {
               teraType: pokemon.teraType,
               maxMoveCount: pokemon.getMaxMoveCount(),
               bonusMoveSlots: pokemon.customPokemonData.bonusMoveSlots,
+              modifierStacks: observedPokemonModifierStacks(pokemon.id),
               moves: pokemon.getMoveset().map(move => ({
                 moveId: move.moveId,
                 ppUsed: move.ppUsed,

@@ -353,7 +353,7 @@ jobs:
       max-parallel: 28
       matrix:
         commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
-        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS"]' || '["NONE"]') }}
+        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS","BASE_STAT_BOOSTER","ER_DEX_NAV"]' || '["NONE"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -437,7 +437,9 @@ jobs:
           # Each visit must buy Wide Lens once, return to the same grid, leave normally and prove
           # the following public command surface. This is one real run, so no save/runtime
           # fixture or cross-job aggregation can counterfeit the owner alternation.
-          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || '20' }}
+          # Party-reward shards prove their complete continuation after wave 1 by reaching the
+          # synchronized wave-2 command. Playing another nineteen battles adds no item-path coverage.
+          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || inputs.journey == 'party-mutating-rewards' && '1' || '20' }}
           COOP_UI_CAMPAIGN_MODE: ${{ inputs.journey == 'navigation-depth-30' && 'nightly' || 'gating' }}
           # The measured default 2-vCPU runner reached synchronized wave 13 at the old 45-minute
           # market deadline. Give the continuous wave-20 proof its measured 85-minute lifecycle;

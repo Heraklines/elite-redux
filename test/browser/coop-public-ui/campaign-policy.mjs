@@ -158,6 +158,8 @@ const allowedPartyRewardIds = new Set([
   "FORM_CHANGE_ITEM",
   "RARE_FORM_CHANGE_ITEM",
   "DNA_SPLICERS",
+  "BASE_STAT_BOOSTER",
+  "ER_DEX_NAV",
 ]);
 const partyRewardLearnMoveIds = new Set([
   "TM_CASE",
@@ -168,6 +170,7 @@ const partyRewardLearnMoveIds = new Set([
   "TM_ULTRA",
 ]);
 const directPartyRewardIds = new Set(["RARER_CANDY", "SACRED_ASH"]);
+const nestedDirectRewardIds = new Set(["ER_DEX_NAV"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -245,7 +248,9 @@ export function loadCampaignPolicy() {
       required: partyRewardId != null,
       rewardId: partyRewardId,
       acceptLearnMove: partyRewardId != null && partyRewardLearnMoveIds.has(partyRewardId),
-      direct: partyRewardId != null && directPartyRewardIds.has(partyRewardId),
+      direct:
+        partyRewardId != null && (directPartyRewardIds.has(partyRewardId) || nestedDirectRewardIds.has(partyRewardId)),
+      nestedDirect: partyRewardId != null && nestedDirectRewardIds.has(partyRewardId),
     },
     navigation: {
       required: navigationRequired,

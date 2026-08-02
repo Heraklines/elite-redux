@@ -343,7 +343,7 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
 });
 
-test("party-mutating reward matrix drives every non-held target mutation family into wave two", async () => {
+test("party-mutating reward matrix drives every non-held mutation and nested item workflow into wave two", async () => {
   const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign, browserEntry] =
     await Promise.all([
       readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
@@ -394,6 +394,8 @@ test("party-mutating reward matrix drives every non-held target mutation family 
     "FORM_CHANGE_ITEM",
     "RARE_FORM_CHANGE_ITEM",
     "DNA_SPLICERS",
+    "BASE_STAT_BOOSTER",
+    "ER_DEX_NAV",
   ]) {
     assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
     assert.match(registry, new RegExp(`COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS[\\s\\S]*${rewardId}`, "u"));
@@ -421,6 +423,8 @@ test("party-mutating reward matrix drives every non-held target mutation family 
   );
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
+  assert.match(policy, /nestedDirectRewardIds/u);
+  assert.match(workflow, /inputs\.journey == 'party-mutating-rewards' && '1'/u);
   assert.match(campaign, /driveLearnMoveAccept/u);
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
@@ -432,6 +436,9 @@ test("party-mutating reward matrix drives every non-held target mutation family 
   assert.match(browserEntry, /statusEffect: pokemon\.status\?\.effect \?\? null/u);
   assert.match(browserEntry, /innateAbilityIds: safeInnateIds\(pokemon\)/u);
   assert.match(browserEntry, /moves: pokemon\.getMoveset\(\)\.map/u);
+  assert.match(browserEntry, /modifierStacks: observedPokemonModifierStacks\(pokemon\.id\)/u);
+  assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
+  assert.match(campaign, /dexChoices\.length !== 2/u);
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {

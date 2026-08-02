@@ -3425,6 +3425,7 @@ function partyRewardMutationProjection(slot) {
         teraType: slot.teraType,
         maxMoveCount: slot.maxMoveCount,
         bonusMoveSlots: slot.bonusMoveSlots,
+        modifierStacks: slot.modifierStacks,
         moves: slot.moves,
       };
 }
@@ -3513,6 +3514,17 @@ function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abi
   }
   if (rewardId === "DNA_SPLICERS" && after.fusionSpeciesId == null) {
     throw new Error(`[campaign-party-reward] DNA Splicers did not install a fusion species: ${JSON.stringify(after)}`);
+  }
+  if (rewardId === "BASE_STAT_BOOSTER") {
+    const quantity = slot =>
+      slot.modifierStacks
+        ?.filter(modifier => modifier.typeId === "BASE_STAT_BOOSTER")
+        .reduce((sum, modifier) => sum + (modifier.quantity ?? 0), 0) ?? 0;
+    if (quantity(after) <= quantity(before)) {
+      throw new Error(
+        `[campaign-party-reward] vitamin did not add its permanent stat modifier: ${JSON.stringify({ before, after })}`,
+      );
+    }
   }
 }
 
@@ -5384,6 +5396,32 @@ export async function runCampaign(rig) {
             throw new Error(
               "[campaign-party-reward] Sacred Ash did not revive both prepared reserves: "
                 + JSON.stringify({ beforeSlots, after: finalParties[0] }),
+            );
+          }
+        }
+        if (configuredId === "ER_DEX_NAV") {
+          const dexChoices = abilityChoices.filter(event => event.phase === "ErDexNavPhase");
+          const ownerOutcomes = allEvents.filter(
+            event => event.kind === "console" && /dexNav OWNER relay OUTCOME .* op=DEX_NAV/u.test(event.text ?? ""),
+          );
+          const watcherOutcomes = allEvents.filter(
+            event =>
+              event.kind === "console"
+              && /dexNav WATCHER apply OUTCOME .* op=DEX_NAV .* timedOut=false/u.test(event.text ?? ""),
+          );
+          if (
+            dexChoices.length !== 2
+            || new Set(dexChoices.map(event => event.targetId)).size !== 2
+            || ownerOutcomes.length !== 1
+            || watcherOutcomes.length !== 1
+          ) {
+            throw new Error(
+              "[campaign-party-reward] Dex Nav did not complete its two-choice owner/watcher workflow: "
+                + JSON.stringify({
+                  dexChoices,
+                  ownerOutcomes: ownerOutcomes.length,
+                  watcherOutcomes: watcherOutcomes.length,
+                }),
             );
           }
         }
