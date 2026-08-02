@@ -382,6 +382,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     /party_reward_id: \$\{\{ fromJSON\(inputs\.journey == 'party-mutating-rewards' && inputs\.party_reward_ids != '' && inputs\.party_reward_ids/u,
     "a demonstrated red subset must be rerunnable without spending 36 browsers again",
   );
+  assert.match(
+    workflow,
+    /render_profile:[\s\S]*default: animations-skipped-depth[\s\S]*animations-on-surface[\s\S]*COOP_UI_RENDER_PROFILE: \$\{\{ inputs\.render_profile \|\| 'animations-skipped-depth' \}\}/u,
+    "a focused item journey must be dispatchable with animations enabled without changing its public input path",
+  );
   const exactVariantRewardIds = new Set([
     "MINT",
     "TERA_SHARD",

@@ -102,6 +102,14 @@ on:
         required: false
         type: string
         default: ""
+      render_profile:
+        description: Presentation fidelity for manually dispatched journeys
+        required: true
+        type: choice
+        default: animations-skipped-depth
+        options:
+          - animations-skipped-depth
+          - animations-on-surface
 
 permissions:
   contents: read
@@ -448,7 +456,7 @@ jobs:
           # market deadline. Give the continuous wave-20 proof its measured 85-minute lifecycle;
           # this remains immutable and leaves 15 minutes for bounded diagnosis/artifact upload.
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || inputs.journey == 'market-wide-lens' && '5100000' || '2700000' }}
-          COOP_UI_RENDER_PROFILE: animations-skipped-depth
+          COOP_UI_RENDER_PROFILE: ${{ inputs.render_profile || 'animations-skipped-depth' }}
           COOP_UI_REWARD_MODE: ${{ (inputs.journey == 'ability-capsule' || inputs.journey == 'party-mutating-rewards') && 'pick-first' || 'leave' }}
           COOP_UI_PARTY_REWARD_ID: ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || '' }}
           COOP_UI_REWARD_PARTY_SLOT: ${{ inputs.journey == 'party-mutating-rewards' && contains(fromJSON('["POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL"]'), matrix.party_reward_id) && '3' || inputs.journey == 'party-mutating-rewards' && '1' || '0' }}
