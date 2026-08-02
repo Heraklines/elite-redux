@@ -1204,9 +1204,7 @@ export function createAnimationProgressBudget(
       const retainedEvolutionProgress =
         /\[coop:progression\] GUEST retained evolution heartbeat\b[\s\S]*\bstage=/u.test(text);
       const retainedWaveProgress =
-        phase === "CoopWaveProgressionReplayPhase"
-        || /\bWAVE_ADVANCE\b/u.test(text)
-        || retainedEvolutionProgress;
+        phase === "CoopWaveProgressionReplayPhase" || /\bWAVE_ADVANCE\b/u.test(text) || retainedEvolutionProgress;
       const progress =
         phase
         ?? (retainedWaveProgress ? "wave-successor" : null)
