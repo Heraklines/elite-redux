@@ -678,7 +678,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     coopRuntime,
-    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*settleCoopPresentationOutcome[\s\S]*return false;/u,
+    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*settleCoopPresentationOutcome[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*return false;/u,
     "the replica must withhold material completion until its mechanics-free replay reaches a bounded terminal",
   );
 });
