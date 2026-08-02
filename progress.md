@@ -6850,3 +6850,35 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   clicking the cancel row.
 - No local co-op or browser tests were run. Keep matrix `30750278739` alive for independent item evidence; run
   the corrected exact-SHA matrix remotely after its remaining jobs are classified.
+
+## 2026-08-02 - party-fixture and post-reward oracle corrections
+
+- Matrix `30750278739` proved the restorative/revival fixture rendered two visible starters per seat but then
+  rejected each seat's Caterpie from its mirrored roster envelope: Garchomp cost four plus Caterpie cost two
+  exceeded the ordinary five-point budget. The shared party therefore had only three members, `party[3]` was
+  absent, and the deterministic damaged/status/fainted reserve precondition never existed. The exact build- and
+  URL-gated party-reward fixture now makes only that envelope metadata free, matching the already-authorized
+  visible fixture while leaving production roster validation unchanged.
+- A successfully applied Ability Capsule reached wave 2 on both browsers, but Mystery difficulty opened the
+  wave-2 Mystery Encounter before any CommandPhase. The final oracle incorrectly required a wave-2 command and
+  reported the completed mutation as unfinished. Party material proof now accepts the newest classified,
+  exact-address semantic frontier, prefers Command when available, and requires both clients to expose the same
+  Authority V2 address and byte-equivalent mutation projection.
+- No local co-op or browser tests were run; these harness corrections will be qualified in the next exact-SHA
+  remote item matrix after the still-active diagnostic matrix finishes.
+
+## 2026-08-02 - Dex Nav retained projection and form-change UI coverage
+
+- The Dex Nav artifact proved a production continuation omission. Its reward commit correctly declared
+  `AWAIT_SUCCESSOR -> ABILITY_PRESENT`, but the guest reward projector's concrete modifier switch omitted
+  `ErDexNavModifierType`. It therefore returned `continuation=false`, advanced into ordinary `NewBattlePhase`,
+  and began a 120-second wave-2 enemy wait while the host still owned the two-pick Dex Nav surface. Dex Nav is
+  now retained by the same projection path as every other ability workflow, so the V2 presentation overrides
+  a live reward continuation instead of racing a stale next-wave renderer.
+- The ordinary form-change item applied successfully and opened the real `FormChangePhase`, but the CI observer
+  emitted `unclassified` for its actionable `EVOLUTION_SCENE` handler. The driver consequently supplied no
+  player-equivalent Space and timed out while the replica was already parked at the ordered next-wave wait.
+  Form change now has an explicit semantic battle-presentation surface and uses the same readiness/address/
+  phase-instance fences as evolution prompts.
+- These changes were derived from the live two-browser artifacts, not inferred from the matrix conclusion.
+  Verification remains remote-only after the diagnostic matrix completes.

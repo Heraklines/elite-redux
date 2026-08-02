@@ -445,6 +445,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "Dex Nav's reward result must authorize its typed ability successor before wave progression",
   );
   assert.match(
+    selectModifier,
+    /else if \(modifierType instanceof ErDexNavModifierType\)[\s\S]*v2ProjectsAbilitySurface[\s\S]*unshiftNew\("ErDexNavPhase", 0, seq, watcher\)/u,
+    "the reward replica must retain Dex Nav as a nested continuation until its V2 picker is projected",
+  );
+  assert.match(
     registry,
     /isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"/u,
   );
@@ -458,6 +463,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     starterHandler,
     /coopBrowserStarters === coopBrowserPartyRewardStarters/u,
     "the exact test fixture must retain its declared reserve despite the ordinary starter point budget",
+  );
+  assert.match(
+    selectStarter,
+    /const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId\(\) != null;[\s\S]*navigationFixtureActive \|\| partyRewardFixtureActive[\s\S]*\? 0/u,
+    "the exact party-mutation fixture must also retain its reserve in the mirrored roster envelope",
   );
   assert.match(
     harness,
@@ -480,7 +490,14 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
   assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
-  assert.match(campaign, /event\.observation\?\.address\?\.wave >= 2/u);
+  assert.match(campaign, /function latestPartyMaterialObservation\(client, minWave\)/u);
+  assert.match(campaign, /observation\.surfaceId !== "unclassified"/u);
+  assert.match(campaign, /assertPairedPartyMaterialFrontier\(configuredId, finalObservations\)/u);
+  assert.doesNotMatch(
+    campaign,
+    /never reached a wave-2 command with the target visible/u,
+    "a wave-2 Mystery surface is a valid post-mutation material frontier before CommandPhase",
+  );
   assert.match(browserEntry, /maxMoveCount: pokemon\.getMaxMoveCount\(\)/u);
   assert.match(browserEntry, /fusionSpeciesId: pokemon\.fusionSpecies\?\.speciesId \?\? null/u);
   assert.match(browserEntry, /statusEffect: pokemon\.status\?\.effect \?\? null/u);
@@ -490,6 +507,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(browserEntry, /uiMode === "ER_BARGAIN"[\s\S]*er-bargain-picker:option:/u);
   assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
   assert.match(campaign, /dexChoices\.length !== 2/u);
+  assert.match(browserEntry, /phase === "FormChangePhase"[\s\S]*surfaceId: "battle:form-change"/u);
+  assert.match(campaign, /"battle:form-change", \{ phases: new Set\(\["FormChangePhase"\]\)/u);
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {

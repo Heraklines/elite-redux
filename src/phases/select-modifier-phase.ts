@@ -1318,6 +1318,11 @@ export class SelectModifierPhase extends BattlePhase {
           this.getGreaterAbilityRandomizerChoiceCache(offerKey),
         );
       }
+    } else if (modifierType instanceof ErDexNavModifierType) {
+      if (!v2ProjectsAbilitySurface) {
+        const { seq, watcher } = this.coopAbilityContext();
+        globalScene.phaseManager.unshiftNew("ErDexNavPhase", 0, seq, watcher);
+      }
     } else {
       queued = false;
     }

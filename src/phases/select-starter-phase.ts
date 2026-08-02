@@ -255,6 +255,7 @@ export class SelectStarterPhase extends Phase {
       // both clients' merged launch parties are byte-identical (a prerequisite for
       // the shared-seed lockstep).
       const navigationFixtureActive = isCoopBrowserNavigationFixtureActive();
+      const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId() != null;
       controller.setLocalRoster(
         starters.map<CoopRosterEntry>(s => ({
           speciesId: s.speciesId,
@@ -262,9 +263,15 @@ export class SelectStarterPhase extends Phase {
           // level-100 starters so its continuous 30-wave proof tests geography and interactions,
           // not fresh-account survivability. The visible starter handler already admits that exact
           // fixture; mirror it through the otherwise production-strict five-point roster by making
-          // only its launch-envelope budget metadata free. The complete serialized starter remains
-          // authoritative, so both browsers still construct the identical requested party.
-          cost: navigationFixtureActive ? 0 : globalScene.gameData.getSpeciesStarterValue(s.speciesId),
+          // only its launch-envelope budget metadata free. Party-mutation fixtures need the same
+          // exact exemption: their fourth reserve carries deterministic damage/status/faint setup,
+          // and silently rejecting that visible over-budget pick would leave healing/revival items
+          // with no legal target. The complete serialized starter remains authoritative, so both
+          // browsers still construct the identical requested party.
+          cost:
+            navigationFixtureActive || partyRewardFixtureActive
+              ? 0
+              : globalScene.gameData.getSpeciesStarterValue(s.speciesId),
           starter: serializeCoopStarter(s),
         })),
       );

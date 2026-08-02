@@ -61,6 +61,7 @@ const BATTLE_PROMPT_PHASES = new Map([
     "battle:evolution",
     { phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
   ],
+  ["battle:form-change", { phases: new Set(["FormChangePhase"]), uiMode: "EVOLUTION_SCENE" }],
 ]);
 const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "MysteryEncounterPhase",
@@ -895,8 +896,8 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   const isSuccessorSettlementMessage =
     observation.surfaceId === "battle:message" && NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase);
   const isSuccessorEvolution =
-    observation.surfaceId === "battle:evolution"
-    && BATTLE_PROMPT_PHASES.get("battle:evolution")?.phases?.has(observation.phase) === true;
+    (observation.surfaceId === "battle:evolution" || observation.surfaceId === "battle:form-change")
+    && BATTLE_PROMPT_PHASES.get(observation.surfaceId)?.phases?.has(observation.phase) === true;
   if (
     !hasLiveBattleAddress
     || expectedParts.length !== 3
@@ -1035,7 +1036,7 @@ export function createBattlePromptAdvancer(
       const { surfaceId, phase, phaseInstance } = readyEvent.observation;
       consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
       const statName =
-        surfaceId === "battle:evolution"
+        surfaceId === "battle:evolution" || surfaceId === "battle:form-change"
           ? "postBattleEvolutionPrompts"
           : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
             ? "postBattleExpPrompts"
@@ -4547,6 +4548,46 @@ function latestCommandObservation(client, wave) {
   return observation?.operationClass === "command" && observation.address?.wave === wave ? observation : null;
 }
 
+/**
+ * Return the newest exact-address semantic projection that carries party material at/after `minWave`.
+ * Prefer a command projection within that newest wave when one exists, but do not require one: on
+ * Mystery difficulty the next authoritative surface can legitimately be the wave-N Mystery Encounter
+ * before CommandPhase opens. Requiring CommandPhase made a completed reward mutation look unfinished.
+ */
+function latestPartyMaterialObservation(client, minWave) {
+  const candidates = client.evidence.events.filter(event => {
+    const observation = event.kind === "browser-surface2" ? event.observation : null;
+    return (
+      Number.isSafeInteger(observation?.address?.epoch)
+      && Number.isSafeInteger(observation.address.wave)
+      && observation.address.wave >= minWave
+      && Number.isSafeInteger(observation.address.turn)
+      && observation.surfaceId !== "unclassified"
+      && Array.isArray(observation.partySlots)
+    );
+  });
+  const newestWave = candidates.reduce(
+    (wave, event) => Math.max(wave, event.observation.address.wave),
+    Number.NEGATIVE_INFINITY,
+  );
+  const newestWaveCandidates = candidates.filter(event => event.observation.address.wave === newestWave);
+  const command = newestWaveCandidates.findLast(event => event.observation.operationClass === "command");
+  return (command ?? newestWaveCandidates.at(-1))?.observation ?? null;
+}
+
+function assertPairedPartyMaterialFrontier(configuredId, observations) {
+  if (observations.some(observation => observation == null)) {
+    throw new Error(`[campaign-party-reward] ${configuredId} never exposed both wave-2 party projections`);
+  }
+  const addresses = observations.map(observation => observation.address);
+  if (JSON.stringify(addresses[0]) !== JSON.stringify(addresses[1])) {
+    throw new Error(
+      `[campaign-party-reward] ${configuredId} party material came from different authority addresses: `
+        + JSON.stringify(addresses),
+    );
+  }
+}
+
 /** Prove an exact initial-save fixture produced three level-100, evolution-paused mons per real seat. */
 function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind, expectedSpecies) {
   const observations = Object.values(rig.clients).map(client => ({
@@ -5384,19 +5425,9 @@ export async function runCampaign(rig) {
               + JSON.stringify(directActions),
           );
         }
-        const finalParties = clients.map(client => {
-          const command = client.evidence.events.findLast(
-            event =>
-              event.kind === "browser-surface2"
-              && event.observation?.operationClass === "command"
-              && event.observation?.address?.wave >= 2
-              && Array.isArray(event.observation.partySlots),
-          );
-          return command?.observation.partySlots ?? null;
-        });
-        if (finalParties.some(party => party == null)) {
-          throw new Error(`[campaign-party-reward] ${configuredId} never exposed both wave-2 parties`);
-        }
+        const finalObservations = clients.map(client => latestPartyMaterialObservation(client, 2));
+        assertPairedPartyMaterialFrontier(configuredId, finalObservations);
+        const finalParties = finalObservations.map(observation => observation.partySlots);
         const finalProjections = finalParties.map(party =>
           party.map(partyRewardMutationProjection).sort((left, right) => left.pokemonId - right.pokemonId),
         );
@@ -5458,6 +5489,7 @@ export async function runCampaign(rig) {
         const proof = {
           rewardId: configuredId,
           directAction: directActions[0],
+          finalAddress: finalObservations[0].address,
           finalParty: finalParties[0],
         };
         for (const client of clients) {
@@ -5490,19 +5522,14 @@ export async function runCampaign(rig) {
         if (!Number.isSafeInteger(targetPokemonId)) {
           throw new Error(`[campaign-party-reward] ${configuredId} target exposed no stable Pokemon id`);
         }
-        const finalSlots = clients.map(client => {
-          const command = client.evidence.events.findLast(
-            event =>
-              event.kind === "browser-surface2"
-              && event.observation?.operationClass === "command"
-              && event.observation?.address?.wave >= 2
-              && Array.isArray(event.observation.partySlots),
-          );
-          return command?.observation.partySlots.find(slot => slot.pokemonId === targetPokemonId) ?? null;
-        });
+        const finalObservations = clients.map(client => latestPartyMaterialObservation(client, 2));
+        assertPairedPartyMaterialFrontier(configuredId, finalObservations);
+        const finalSlots = finalObservations.map(
+          observation => observation.partySlots.find(slot => slot.pokemonId === targetPokemonId) ?? null,
+        );
         if (finalSlots.some(slot => slot == null)) {
           throw new Error(
-            `[campaign-party-reward] ${configuredId} never reached a wave-2 command with the target visible on both clients`,
+            `[campaign-party-reward] ${configuredId} never exposed the target on both wave-2 party projections`,
           );
         }
         const finalProjections = finalSlots.map(partyRewardMutationProjection);
@@ -5523,6 +5550,7 @@ export async function runCampaign(rig) {
           targetAction,
           learnAccept: learnAccepts[0] ?? null,
           abilityChoice: abilityChoices[0] ?? null,
+          finalAddress: finalObservations[0].address,
           finalTarget: finalSlots[0],
         };
         for (const client of clients) {

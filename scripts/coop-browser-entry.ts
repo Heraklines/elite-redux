@@ -885,6 +885,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       // Evolution is rendered twice from one authoritative result: EvolutionPhase owns the real
       // mutation and CoopWaveProgressionReplayPhase owns the mechanics-free retained presentation.
       // Both use EvolutionSceneUiHandler and both deliberately arm their own local completion prompt.
+      if (phase === "FormChangePhase") {
+        return { surfaceId: "battle:form-change", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return phase === "EvolutionPhase" || phase === "CoopWaveProgressionReplayPhase"
         ? { surfaceId: "battle:evolution", operationClass: "battle-progress", ownerModel: "local" }
         : null;
