@@ -360,6 +360,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     policy,
     campaign,
     browserEntry,
+    greaterAbilityCapsulePhase,
   ] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
@@ -371,9 +372,16 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
     readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-greater-ability-capsule-phase.ts"), "utf8"),
   ]);
 
   assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
+  assert.match(workflow, /party_reward_ids:[\s\S]*Optional closed JSON subset/u);
+  assert.match(
+    workflow,
+    /party_reward_id: \$\{\{ fromJSON\(inputs\.journey == 'party-mutating-rewards' && inputs\.party_reward_ids != '' && inputs\.party_reward_ids/u,
+    "a demonstrated red subset must be rerunnable without spending 36 browsers again",
+  );
   const exactVariantRewardIds = new Set([
     "MINT",
     "TERA_SHARD",
@@ -479,6 +487,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     /partyRewardFixture === "EVOLUTION_ITEM"[\s\S]*\? 30/u,
     "the ordinary evolution fixture must meet every configured Water Stone level floor",
   );
+  assert.match(
+    selectModifier,
+    /\[coop-browser:evolution-item-legality\][\s\S]*validatesModifierItem[\s\S]*validatesOwnItem/u,
+    "an evolution fixture rejection must identify the exact modifier enum and evolution-edge verdict",
+  );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
     starterHandler,
@@ -508,6 +521,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /transitioned\.observation\.phase !== "LearnMovePhase"/u);
   assert.match(campaign, /campaign-learn-move-confirm-replacement/u);
   assert.match(campaign, /observation\.phase === "ErGreaterAbilityCapsulePhase" && options\.includes\("slot:1"\)/u);
+  assert.match(
+    greaterAbilityCapsulePhase,
+    /private coopSurfaceGeneration = 0;[\s\S]*public coopV2SurfaceGeneration\(\): number[\s\S]*this\.coopSurfaceGeneration \+= 1;/u,
+    "the two-slot Greater Capsule workflow must expose distinct nested Party appearances",
+  );
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
   assert.match(campaign, /DNA Splicers secondary target action or immediate fusion commit/u);

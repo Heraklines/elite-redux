@@ -24,7 +24,6 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
   notifyCoopV2InteractionSurfaceReady,
-  runWhenCoopRuntimeActive,
   setCoopLearnMovePickerOpener,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -317,41 +316,21 @@ export class CoopReplayLearnMovePhase extends Phase {
     this.settled = true;
     coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact projected picker`);
     const scene = globalScene;
-    void scene.ui
-      .setModeBoundedWhen(
-        UiMode.MESSAGE,
-        2_000,
-        () =>
-          getCoopRuntime() === runtime
-          && globalScene === scene
-          && scene.phaseManager.getCurrentPhase() === this
-          && isCoopLearnMoveAuthorityV2Active(this.operationBinding)
-          && this.coopV2ControlOperationId != null
-          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
-      )
-      .then(result => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact projected phase`);
-            return;
-          }
-          getCoopUiMirror()?.endSession();
-          clearCoopLearnMoveForwardInFlight(this.partySlot);
-          super.end();
-          if (scene.phaseManager.getCurrentPhase() === this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
-            return;
-          }
-          if (!settleCoopV2InteractionOperation(operationId, runtime)) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
-          }
-        });
-      })
-      .catch(() => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          failCoopSharedSession(`Committed learn-move result ${operationId} could not close its projected picker`);
-        });
-      });
+    // Complete the exact projected terminal in the immutable commit's runtime call stack. An async mode
+    // transition can outlive the projector activation that owns it, leaving materialDeferred parked even
+    // though the authoritative result already applied. The phase/address guards above make this targeted
+    // synchronous retirement safe against stale or superseded commits.
+    scene.ui.retirePresentationMode(UiMode.SUMMARY, UiMode.MESSAGE);
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partySlot);
+    super.end();
+    if (scene.phaseManager.getCurrentPhase() === this) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
+      return true;
+    }
+    if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
+    }
     return true;
   }
 

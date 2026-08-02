@@ -926,45 +926,26 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     const continuation = this.prepareCoopV2LearnMoveContinuation(forgetSlot, maxMoveCount);
     coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact queued picker`);
     const scene = globalScene;
-    void scene.ui
-      .setModeBoundedWhen(
-        this.messageMode,
-        2_000,
-        () =>
-          getCoopRuntime() === runtime
-          && globalScene === scene
-          && scene.phaseManager.getCurrentPhase() === this
-          && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)
-          && this.coopV2ControlOperationId != null
-          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
-      )
-      .then(result => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact queued phase`);
-            return;
-          }
-          getCoopUiMirror()?.endSession();
-          clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
-          super.end();
-          if (scene.phaseManager.getCurrentPhase() === this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} did not close its queued phase`);
-            return;
-          }
-          if (!settleCoopV2InteractionOperation(operationId, runtime)) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its queued terminal`);
-            return;
-          }
-          if (continuation.removed) {
-            runtime.controller.advanceInteractionFromAuthoritativeCommit(continuation.interactionCounter);
-          }
-        });
-      })
-      .catch(() => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          failCoopSharedSession(`Committed learn-move result ${operationId} could not close its queued picker`);
-        });
-      });
+    // The immutable result is being applied in this phase's exact runtime/scene call stack. Waiting for a
+    // fade promise here creates a second, ambient-runtime continuation after the replica projector has
+    // returned `materialDeferred`; under real two-browser delivery that tail can remain queued forever
+    // while the authority enters the next wave. Retire only the still-current SUMMARY presentation and
+    // complete the scheduler edge synchronously, just like destructive form-change presentation release.
+    scene.ui.retirePresentationMode(UiMode.SUMMARY, this.messageMode);
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+    super.end();
+    if (scene.phaseManager.getCurrentPhase() === this) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} did not close its queued phase`);
+      return true;
+    }
+    if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its queued terminal`);
+      return true;
+    }
+    if (continuation.removed) {
+      runtime.controller.advanceInteractionFromAuthoritativeCommit(continuation.interactionCounter);
+    }
     return true;
   }
 

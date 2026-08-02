@@ -171,8 +171,8 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(queueOwned, /this\.coopSubmittedV2ForgetSlot !== forgetSlot/u);
   assert.match(queueOwned, /!this\.coopAwaitingHostOwnedPresentation/u);
   assert.match(queueOwned, /const scene = globalScene/u);
-  assert.match(queueOwned, /runWhenCoopRuntimeActive\(runtime/u);
-  assert.match(queueOwned, /globalScene !== scene/u);
+  assert.match(queueOwned, /retirePresentationMode\(UiMode\.SUMMARY, this\.messageMode\)/u);
+  assert.doesNotMatch(queueOwned, /setModeBoundedWhen|runWhenCoopRuntimeActive/u);
   const queueEnd = queueOwned.indexOf("super.end()");
   const queueClosed = queueOwned.indexOf("scene.phaseManager.getCurrentPhase() === this", queueEnd);
   const queueProof = queueOwned.indexOf("settleCoopV2InteractionOperation(", queueClosed);
@@ -188,8 +188,8 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(projected, /this\.ownerIsGuest && this\.submittedV2MoveIndex !== forgetSlot/u);
   assert.match(projected, /!this\.ownerIsGuest && this\.submittedV2MoveIndex != null/u);
   assert.match(projected, /const scene = globalScene/u);
-  assert.match(projected, /runWhenCoopRuntimeActive\(runtime/u);
-  assert.match(projected, /globalScene !== scene/u);
+  assert.match(projected, /retirePresentationMode\(UiMode\.SUMMARY, UiMode\.MESSAGE\)/u);
+  assert.doesNotMatch(projected, /setModeBoundedWhen|runWhenCoopRuntimeActive/u);
   const projectedEnd = projected.indexOf("super.end()");
   const projectedClosed = projected.indexOf("scene.phaseManager.getCurrentPhase() === this", projectedEnd);
   const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedClosed);

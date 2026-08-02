@@ -97,6 +97,11 @@ on:
         required: true
         type: string
         default: "[]"
+      party_reward_ids:
+        description: Optional closed JSON subset for a focused party-mutating-rewards rerun
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -158,7 +163,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -353,7 +358,7 @@ jobs:
       max-parallel: 28
       matrix:
         commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
-        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS","ER_DEX_NAV"]' || '["NONE"]') }}
+        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && inputs.party_reward_ids != '' && inputs.party_reward_ids || inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS","ER_DEX_NAV"]' || '["NONE"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6

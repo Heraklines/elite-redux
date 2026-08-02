@@ -5,7 +5,7 @@ import {
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
-import { EvolutionItem } from "#data/balance/pokemon-evolutions";
+import { EvolutionItem, pokemonEvolutions } from "#data/balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
@@ -1556,6 +1556,37 @@ export class SelectModifierPhase extends BattlePhase {
     offerKey: string,
   ): void {
     const pokemonModifierType = modifierType as PokemonModifierType;
+    const partyRewardFixtureId = getCoopBrowserPartyRewardFixtureId();
+    if (
+      modifierType instanceof EvolutionItemModifierType
+      && (partyRewardFixtureId === "EVOLUTION_ITEM" || partyRewardFixtureId === "RARE_EVOLUTION_ITEM")
+    ) {
+      // Exact-build browser evidence for a fixture that must exercise the real production filter. Keep
+      // the diagnostic next to that filter so an invalid subject, item enum, form, or evolution edge is
+      // distinguishable from a co-op relay failure without granting the harness any game-state access.
+      console.info(
+        `[coop-browser:evolution-item-legality] ${JSON.stringify({
+          rewardId: partyRewardFixtureId,
+          modifierItem: modifierType.evolutionItem,
+          modifierItemName: EvolutionItem[modifierType.evolutionItem],
+          party: globalScene.getPlayerParty().map(pokemon => ({
+            speciesId: pokemon.species.speciesId,
+            level: pokemon.level,
+            formKey: pokemon.getFormKey(),
+            filterResult: pokemonModifierType.selectFilter?.(pokemon) ?? null,
+            edges: (pokemonEvolutions[pokemon.species.speciesId] ?? []).map(evolution => ({
+              speciesId: evolution.speciesId,
+              level: evolution.level,
+              item: evolution.evoItem,
+              itemName: EvolutionItem[evolution.evoItem],
+              preFormKey: evolution.preFormKey,
+              validatesModifierItem: evolution.validate(pokemon, false, modifierType.evolutionItem),
+              validatesOwnItem: evolution.validate(pokemon, false, evolution.evoItem),
+            })),
+          })),
+        })}`,
+      );
+    }
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
     const isAbilityModifier = modifierType instanceof PokemonAbilityModifierType;
     const isTmModifier = modifierType instanceof TmModifierType;
