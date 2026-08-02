@@ -3001,7 +3001,7 @@ export function chooseAbilityInteractionOption(observation, excludedOptionIds = 
   const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
   const abilitySlot = abilitySlots
     .map(slot => `party-option:ability-slot-${slot}`)
-    .find(optionId => options.includes(optionId));
+    .find(optionId => options.includes(optionId) && !excludedOptionIds.has(optionId));
   if (abilitySlot != null) {
     return abilitySlot;
   }
@@ -3011,15 +3011,12 @@ export function chooseAbilityInteractionOption(observation, excludedOptionIds = 
 }
 
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
+  const priorChoiceIds = new Set(
+    owner.evidence.events
+      .filter(event => event.kind === "campaign-ability-choice" && event.phase === driver.abilityPhase)
+      .map(event => event.targetId),
+  );
   if (driver.abilitySurfaceKind !== "party") {
-    const priorChoiceIds =
-      driver.abilityPhase === "ErDexNavPhase"
-        ? new Set(
-            owner.evidence.events
-              .filter(event => event.kind === "campaign-ability-choice" && event.phase === driver.abilityPhase)
-              .map(event => event.targetId),
-          )
-        : new Set();
     const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation, priorChoiceIds);
     if (driver.abilitySurfaceKind === "option" || driver.abilitySurfaceKind === "choice") {
       if (targetId == null) {
@@ -3048,7 +3045,7 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
     return;
   }
   let surface = boundary.ownerEvent;
-  let targetId = chooseAbilityInteractionOption(surface.observation);
+  let targetId = chooseAbilityInteractionOption(surface.observation, priorChoiceIds);
   if (targetId == null) {
     throw new Error(
       `[campaign-ability] ${driver.abilityPhase} exposed no driveable party choice: `
@@ -3076,7 +3073,7 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
       },
       { timeoutMs: rig.config.timeoutMs, description: `${driver.abilityPhase} ability-slot submenu` },
     );
-    targetId = chooseAbilityInteractionOption(surface.observation);
+    targetId = chooseAbilityInteractionOption(surface.observation, priorChoiceIds);
     if (targetId == null || !targetId.startsWith("party-option:ability-slot-")) {
       throw new Error(
         `[campaign-ability] ${driver.abilityPhase} opened no stable ability-slot option: `

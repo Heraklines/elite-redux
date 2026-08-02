@@ -294,6 +294,18 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption(
       {
+        phase: "ErGreaterAbilityCapsulePhase",
+        selectedOptionId: "party-option:ability-slot-1",
+        optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:ability-slot-2"],
+      },
+      new Set(["slot:1", "party-option:ability-slot-1"]),
+    ),
+    "party-option:ability-slot-2",
+    "the Greater Capsule run branch must choose a distinct second locked innate",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption(
+      {
         phase: "ErDexNavPhase",
         selectedOptionId: "slot:0",
         optionIds: ["slot:0", "slot:1", "slot:2"],

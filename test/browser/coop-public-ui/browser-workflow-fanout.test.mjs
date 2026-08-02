@@ -490,17 +490,26 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(
     registry,
     /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*partyRewardFixture === "RARE_EVOLUTION_ITEM"[\s\S]*\? 70/u,
-    "the rare evolution fixture must meet every configured Scroll of Darkness level floor",
+    "the rare evolution fixture retains a high-level legal Kubfu while exercising Scroll of Waters",
   );
   assert.match(
     registry,
     /partyRewardFixture === "EVOLUTION_ITEM"[\s\S]*\? 30/u,
-    "the ordinary evolution fixture must meet every configured Water Stone level floor",
+    "the ordinary evolution fixture retains a legal Milcery above Strawberry Sweet's level floor",
   );
   assert.match(
     selectModifier,
     /\[coop-browser:evolution-item-legality\][\s\S]*remainingRuntimeItemEdges[\s\S]*validatesModifierItem[\s\S]*validatesOwnItem/u,
     "an evolution fixture rejection must identify the exact modifier, all post-ER item edges, and target verdict",
+  );
+  assert.match(
+    selectModifier,
+    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.STRAWBERRY_SWEET[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
+    "the exact fixtures must use item edges that remain reachable after the ER evolution rewrite",
+  );
+  assert.match(
+    registry,
+    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.MILCERY[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
   );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(

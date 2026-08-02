@@ -165,9 +165,9 @@ const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTyp
   FULL_HEAL: () => modifierTypes.FULL_HEAL,
   SACRED_ASH: () => modifierTypes.SACRED_ASH,
   EVOLUTION_ITEM: () => () =>
-    new EvolutionItemModifierType(EvolutionItem.WATER_STONE).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
+    new EvolutionItemModifierType(EvolutionItem.STRAWBERRY_SWEET).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
   RARE_EVOLUTION_ITEM: () => () =>
-    new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_DARKNESS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
+    new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_WATERS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
   FORM_CHANGE_ITEM: () => () =>
     new FormChangeItemModifierType(FormChangeItem.GRACIDEA).withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM),
   RARE_FORM_CHANGE_ITEM: () => () =>
