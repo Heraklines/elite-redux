@@ -125,6 +125,7 @@ try {
     },
     baseOrigin: new URL(config.baseUrl).origin,
     requesterSeat: config.requesterSeat,
+    expectReclaim: config.expectReclaim,
     replacementCount: rig?.replacementCount ?? 0,
     finalWave: rig?.activeBattleWave ?? null,
     marketCoverage: rig?.marketCoverage ?? null,

@@ -492,6 +492,11 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
     "the campaign process must not silently inherit the generic probe journey identity",
   );
   assert.match(
+    workflow,
+    /COOP_UI_EXPECT_RECLAIM: \$\{\{ matrix\.dirty_accounts == '1' && '1' \|\| '0' \}\}/u,
+    "the seeded dirty-account lane must activate its reclaim proof and suppress the clean depth fixture",
+  );
+  assert.match(
     await readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     /const allowedJourneys = new Set\(\[[\s\S]*"campaign"/u,
     "the explicit campaign runtime identity must be accepted by shared browser config",

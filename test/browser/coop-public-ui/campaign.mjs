@@ -4740,6 +4740,7 @@ export async function runCampaign(rig) {
     registeredInteractions: policy.registeredInteractions,
     abilityCapsule: policy.abilityCapsule,
     navigation: policy.navigation,
+    expectReclaim: rig.config.expectReclaim,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
   });
 
