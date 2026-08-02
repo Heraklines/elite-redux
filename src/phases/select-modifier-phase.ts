@@ -1569,6 +1569,19 @@ export class SelectModifierPhase extends BattlePhase {
           rewardId: partyRewardFixtureId,
           modifierItem: modifierType.evolutionItem,
           modifierItemName: EvolutionItem[modifierType.evolutionItem],
+          remainingRuntimeItemEdges: Object.entries(pokemonEvolutions).flatMap(([sourceSpeciesId, evolutions]) =>
+            evolutions
+              .filter(evolution => evolution.evoItem !== EvolutionItem.NONE)
+              .map(evolution => ({
+                sourceSpeciesId: Number(sourceSpeciesId),
+                targetSpeciesId: evolution.speciesId,
+                item: evolution.evoItem,
+                itemName: EvolutionItem[evolution.evoItem],
+                level: evolution.level,
+                preFormKey: evolution.preFormKey,
+                evoFormKey: evolution.evoFormKey,
+              })),
+          ),
           party: globalScene.getPlayerParty().map(pokemon => ({
             speciesId: pokemon.species.speciesId,
             level: pokemon.level,

@@ -146,6 +146,11 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         "ability",
         `greaterCapsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
       );
+      // The watcher owns one passive MESSAGE appearance for this presentation. It never calls
+      // openChoice(), so allocate that generation explicitly before publishing readiness. A zero
+      // generation is not a valid surface identity and made the real-browser oracle reject an
+      // otherwise correctly parked watcher as input-inert/ambiguous.
+      this.coopSurfaceGeneration += 1;
       // The inherited reward handler is not this ABILITY_PRESENT control. Install the registered passive
       // watcher surface before asking the projector for controlInstalled; otherwise the remote owner window
       // waits forever for a proof this replica can never legally produce.

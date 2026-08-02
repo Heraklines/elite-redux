@@ -489,8 +489,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     selectModifier,
-    /\[coop-browser:evolution-item-legality\][\s\S]*validatesModifierItem[\s\S]*validatesOwnItem/u,
-    "an evolution fixture rejection must identify the exact modifier enum and evolution-edge verdict",
+    /\[coop-browser:evolution-item-legality\][\s\S]*remainingRuntimeItemEdges[\s\S]*validatesModifierItem[\s\S]*validatesOwnItem/u,
+    "an evolution fixture rejection must identify the exact modifier, all post-ER item edges, and target verdict",
   );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
@@ -523,8 +523,13 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /observation\.phase === "ErGreaterAbilityCapsulePhase" && options\.includes\("slot:1"\)/u);
   assert.match(
     greaterAbilityCapsulePhase,
-    /private coopSurfaceGeneration = 0;[\s\S]*public coopV2SurfaceGeneration\(\): number[\s\S]*this\.coopSurfaceGeneration \+= 1;/u,
-    "the two-slot Greater Capsule workflow must expose distinct nested Party appearances",
+    /if \(this\.coopIsWatcher\)[\s\S]*this\.coopSurfaceGeneration \+= 1;[\s\S]*notifyCoopV2InteractionSurfaceReady/u,
+    "the passive Greater Capsule watcher must allocate a valid surface generation before publishing readiness",
+  );
+  assert.match(
+    greaterAbilityCapsulePhase,
+    /private coopSurfaceGeneration = 0;[\s\S]*public coopV2SurfaceGeneration\(\): number[\s\S]*private openChoice[\s\S]*this\.coopSurfaceGeneration \+= 1;/u,
+    "the Greater Capsule owner workflow must expose distinct nested picker appearances",
   );
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
