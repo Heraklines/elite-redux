@@ -26,8 +26,8 @@ import {
   captureCoopOperationAuthorityState,
   reapplyCoopOperationAuthorityState,
 } from "#data/elite-redux/coop/coop-authority-state-hooks";
-import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -1072,11 +1072,11 @@ function buildCompleteRewardResultPayload(
   const nextInteraction = surfaceResult?.nextInteraction;
   const presentation = surfaceResult?.presentation;
   if (
-    nextInteraction !== undefined
-    && (!isCoopInteractionSuccessorRef(nextInteraction)
-      || nextInteraction.wave !== prepared.wave
-      || nextInteraction.turn !== prepared.turn
-      || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability"))
+    (nextInteraction !== undefined
+      && (!isCoopInteractionSuccessorRef(nextInteraction)
+        || nextInteraction.wave !== prepared.wave
+        || nextInteraction.turn !== prepared.turn
+        || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability")))
     || (presentation !== undefined
       && (!isStrictCoopBattleEvent(presentation)
         || presentation.k !== "formChange"

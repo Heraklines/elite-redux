@@ -310,11 +310,6 @@ import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-
 import { isCompleteCoopMeResyncOutcome } from "#data/elite-redux/coop/coop-me-terminal-validator";
 import { CoopMembershipController } from "#data/elite-redux/coop/coop-membership";
 import { CoopMutationLedger, setActiveCoopMutationLedger } from "#data/elite-redux/coop/coop-mutation-ledger";
-import {
-  type CoopPresentationOutcomeToken,
-  coopPresentationOutcome,
-  createCoopPresentationOutcomeToken,
-} from "#data/elite-redux/coop/coop-presentation-outcome";
 import type {
   CoopAbilityPickPayload,
   CoopAbilityPresentationPayload,
@@ -378,6 +373,11 @@ import {
   coopV2InteractionSourceSurface,
   coopV2InteractionUiProofContract,
 } from "#data/elite-redux/coop/coop-operation-surface-registry";
+import {
+  type CoopPresentationOutcomeToken,
+  coopPresentationOutcome,
+  createCoopPresentationOutcomeToken,
+} from "#data/elite-redux/coop/coop-presentation-outcome";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   isCoopRevivalOperationEnabled,
@@ -11138,7 +11138,10 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       }
       const target = globalScene
         .getPlayerParty()
-        .find(pokemon => pokemon.id === presentation.actor.pokemonId && pokemon.species.speciesId === presentation.speciesId);
+        .find(
+          pokemon =>
+            pokemon.id === presentation.actor.pokemonId && pokemon.species.speciesId === presentation.speciesId,
+        );
       if (
         target == null
         || (target.formIndex !== presentation.preFormIndex && target.formIndex !== presentation.formIndex)
