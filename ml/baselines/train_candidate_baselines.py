@@ -110,6 +110,69 @@ def load_records(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]
     return decisions, terminals
 
 
+def load_winner_policy_records(
+    path: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Load only victorious policy targets without retaining the full JSON corpus."""
+    files = jsonl_files(path)
+    terminals: list[dict[str, Any]] = []
+    input_decisions = 0
+    for file in files:
+        with file.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                if record.get("schemaVersion") != SCHEMA_VERSION:
+                    raise ValueError(f"{file}:{line_number}: unsupported schema version")
+                if record.get("kind") == "combat_decision":
+                    input_decisions += 1
+                elif record.get("kind") == "episode_terminal":
+                    terminals.append(record)
+                else:
+                    raise ValueError(f"{file}:{line_number}: unknown record kind")
+
+    terminal_by_episode = {record["episodeId"]: record for record in terminals}
+    if len(terminal_by_episode) != len(terminals):
+        raise ValueError("dataset contains duplicate episode terminals")
+    winning_episodes = {
+        episode
+        for episode, terminal in terminal_by_episode.items()
+        if terminal.get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
+    }
+    decisions: list[dict[str, Any]] = []
+    policy_target_decisions = 0
+    for file in files:
+        with file.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                if record.get("kind") != "combat_decision":
+                    continue
+                if not is_policy_target(record):
+                    continue
+                policy_target_decisions += 1
+                if record.get("episodeId") not in winning_episodes:
+                    continue
+                validate_decision(record, file, line_number)
+                decisions.append(record)
+
+    if not decisions:
+        raise ValueError("winner-only policy selection removed every combat decision")
+    selected_episodes = {record["episodeId"] for record in decisions}
+    selected_terminals = [record for record in terminals if record["episodeId"] in selected_episodes]
+    validate_dataset(decisions, selected_terminals)
+    return decisions, selected_terminals, {
+        "inputDecisions": input_decisions,
+        "policyTargetDecisions": policy_target_decisions,
+        "retainedDecisions": len(decisions),
+        "inputEpisodes": len(terminals),
+        "winningEpisodes": len(winning_episodes),
+        "retainedEpisodes": len(selected_episodes),
+    }
+
+
 def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> None:
     candidates = record.get("candidates", [])
     ids = [candidate.get("id") for candidate in candidates]
@@ -828,7 +891,13 @@ def outcome_weighted_model_specs(seed: int) -> list[tuple[str, Any]]:
 def train(args: argparse.Namespace) -> dict[str, Any]:
     if not 0.0 <= args.loss_episode_weight <= 1.0:
         raise ValueError("loss episode weight must be between 0 and 1")
-    all_decisions, terminals = load_records(args.data)
+    if args.winner_only_policy and args.loss_episode_weight != 0:
+        raise ValueError("winner-only policy training requires --loss-episode-weight 0")
+    winner_only_selection: dict[str, int] | None = None
+    if args.winner_only_policy:
+        all_decisions, terminals, winner_only_selection = load_winner_policy_records(args.data)
+    else:
+        all_decisions, terminals = load_records(args.data)
     dictionary_coverage = validate_data_dictionary(args.dictionary, all_decisions)
     rollout_decisions, rollout_selection = (
         select_elite_rollouts(all_decisions, terminals)
@@ -983,7 +1052,17 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         if selected
     }
     policy_training_reason: str | None = None
-    if diagnostic_only:
+    if args.winner_only_policy:
+        outcome_artifacts = dict(artifacts)
+        for row in leaderboard:
+            if row["model"] not in outcome_artifacts:
+                continue
+            row["successfulEpisodeMetrics"] = {
+                key: row[key]
+                for key in ("decisions", "top1", "top3", "mrr", "candidateNll")
+            }
+            row["trainingObjective"] = "winner-only behavior cloning; losses excluded before materialization"
+    elif diagnostic_only:
         policy_training_reason = "diagnostic source imitation cannot produce a trainable policy artifact"
     elif not policy_training_mask.any():
         policy_training_reason = "no successful policy-training rows are present in the training split"
@@ -1105,7 +1184,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     learned_rows = [
         row for row in leaderboard if row["model"] in artifacts and row["model"] not in outcome_artifacts
     ]
-    selected = sorted(learned_rows, key=lambda row: (-row["top1"], row["candidateNll"], row["model"]))[0]["model"]
+    selected = (
+        sorted(learned_rows, key=lambda row: (-row["top1"], row["candidateNll"], row["model"]))[0]["model"]
+        if learned_rows
+        else None
+    )
     outcome_rows = [row for row in leaderboard if row["model"] in outcome_artifacts]
     outcome_selected = (
         sorted(
@@ -1121,6 +1204,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     )
     if outcome_rows and not successful_test_mask.any():
         policy_training_reason = "no successful policy-evaluation rows are present in the held-out split"
+    if selected is None:
+        selected = outcome_selected
+    if selected is None:
+        raise ValueError("training did not produce a selectable tree policy")
     if args.models_dir is not None:
         args.models_dir.mkdir(parents=True, exist_ok=True)
         for name, artifact in artifacts.items():
@@ -1180,6 +1267,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "formats": Counter(record["observation"]["format"] for record in decisions),
             "terminalOutcomes": Counter(record["outcome"] for record in terminals),
+            "winnerOnlySelection": winner_only_selection,
             "identity": hashes,
             "dictionaryCoverage": dictionary_coverage,
         },
@@ -1267,6 +1355,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.0,
         help="policy sample weight for losing episodes; zero keeps losses value/diagnostic-only",
+    )
+    parser.add_argument(
+        "--winner-only-policy",
+        action="store_true",
+        help="stream-select victorious policy targets before fitting and train each tree family only once",
     )
     parser.add_argument(
         "--diagnostic-source-imitation",

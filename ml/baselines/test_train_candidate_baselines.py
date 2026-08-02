@@ -11,6 +11,7 @@ from train_candidate_baselines import (
     artifact_scores,
     fit_stacked_tree_ensemble,
     is_policy_target,
+    load_winner_policy_records,
     ordered_group_sizes,
     record_split_group,
     record_source_partition,
@@ -45,6 +46,70 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertEqual(decisions, [human])
         self.assertEqual(policy_decisions, [human])
         self.assertFalse(diagnostic_only)
+
+    def test_winner_only_loader_streams_only_victorious_policy_targets(self) -> None:
+        def decision(episode: str, source: str, target: bool) -> dict:
+            candidate_id = f"move:{episode}"
+            return {
+                "schemaVersion": 3,
+                "featureSchemaVersion": 2,
+                "kind": "combat_decision",
+                "candidateScope": "combat-command",
+                "episodeId": episode,
+                "decisionId": f"decision:{episode}",
+                "buildSha": "build",
+                "dexHash": "dex",
+                "dictionaryHash": "dictionary",
+                "policySource": source,
+                "policyTarget": target,
+                "candidates": [{"id": candidate_id}],
+                "chosenCandidateId": candidate_id,
+                "candidateFeatures": [{"candidateId": candidate_id, "values": [0.0]}],
+                "candidateTokenGroups": [{
+                    "candidateId": candidate_id,
+                    "groups": {
+                        "actor": [],
+                        "targets": [],
+                        "destination": [],
+                        "field": [],
+                        "action": [candidate_id],
+                    },
+                }],
+                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+            }
+
+        rows = [
+            decision("winner", "checkpoint-neural-v4", True),
+            decision("loser", "checkpoint-neural-v4", True),
+            decision("engine", "engine-hardest-v1", False),
+            decision("heuristic", "smart-default-v1", True),
+        ]
+        outcomes = {
+            "winner": "victory",
+            "loser": "player-wiped",
+            "engine": "victory",
+            "heuristic": "victory",
+        }
+        rows.extend({
+            "schemaVersion": 3,
+            "kind": "episode_terminal",
+            "episodeId": episode,
+            "outcome": outcome,
+            "buildSha": "build",
+            "dexHash": "dex",
+            "dictionaryHash": "dictionary",
+        } for episode, outcome in outcomes.items())
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "decisions.jsonl"
+            path.write_text("".join(f"{json.dumps(row)}\n" for row in rows), encoding="utf-8")
+            selected, terminals, report = load_winner_policy_records(path)
+
+        self.assertEqual([row["episodeId"] for row in selected], ["winner"])
+        self.assertEqual([row["episodeId"] for row in terminals], ["winner"])
+        self.assertEqual(report["inputDecisions"], 4)
+        self.assertEqual(report["policyTargetDecisions"], 2)
+        self.assertEqual(report["retainedDecisions"], 1)
 
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {

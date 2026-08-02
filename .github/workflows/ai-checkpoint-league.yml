@@ -302,11 +302,17 @@ jobs:
       - name: Install pinned CPU tree dependencies
         run: python -m pip install --requirement ml/baselines/requirements.txt
       - name: Train winner-only tree policy
+        env:
+          OMP_NUM_THREADS: "2"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
         run: >-
           python ml/baselines/train_candidate_baselines.py
           --data ai-data
           --dictionary ai-dictionary/er-combat-data-dictionary.json
           --loss-episode-weight 0
+          --winner-only-policy
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
           --models-dir ai-report/models
