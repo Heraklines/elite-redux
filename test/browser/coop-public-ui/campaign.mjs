@@ -5370,7 +5370,7 @@ export async function runCampaign(rig) {
           configuredId === "RARER_CANDY"
           && !beforeSlots.every(slot => (afterById.get(slot.pokemonId)?.level ?? slot.level) > slot.level)
         ) {
-          throw new Error(`[campaign-party-reward] Rarer Candy did not level the whole party`);
+          throw new Error("[campaign-party-reward] Rarer Candy did not level the whole party");
         }
         if (configuredId === "SACRED_ASH") {
           const faintedBefore = beforeSlots.filter(slot => slot.fainted === true);
@@ -5382,7 +5382,7 @@ export async function runCampaign(rig) {
             })
           ) {
             throw new Error(
-              `[campaign-party-reward] Sacred Ash did not revive both prepared reserves: `
+              "[campaign-party-reward] Sacred Ash did not revive both prepared reserves: "
                 + JSON.stringify({ beforeSlots, after: finalParties[0] }),
             );
           }
