@@ -191,8 +191,8 @@ function ensureSession(): boolean {
   if (cur != null && cur.seed === seed) {
     return true; // same run
   }
-  // New run (or first capture): start a fresh session. The previous run's unflushed events stay durable
-  // and are shipped by the next boot's recovery pass.
+  // New run (or first capture): start a fresh session. The previous run is finalized immediately; its
+  // durable local copy remains available to the next boot's recovery pass if that upload fails.
   endTelemetrySession();
   const env = makeEnvelope(randomString(24), currentMode(), seed);
   const q = new TelemetryQueue(store, env, upload, DEFAULT_TELEMETRY_QUEUE_CONFIG);

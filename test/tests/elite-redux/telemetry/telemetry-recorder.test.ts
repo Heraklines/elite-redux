@@ -14,6 +14,11 @@ import {
   TelemetryQueue,
   type TelemetryUpload,
 } from "#data/elite-redux/telemetry/telemetry-queue";
+import {
+  beginTelemetrySession,
+  endTelemetrySession,
+  recordTelemetryEvent,
+} from "#data/elite-redux/telemetry/telemetry-recorder";
 import type {
   TelemetryBatch,
   TelemetryEvent,
@@ -26,7 +31,7 @@ import {
   resolvePlayerTelemetryBase,
   resolvePlayerTelemetryMode,
 } from "#data/elite-redux/telemetry/telemetry-transport";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Fakes.
@@ -195,6 +200,65 @@ describe("telemetry queue", () => {
       uploads.push(batch);
       return Promise.resolve(uploadOk);
     });
+  });
+
+  afterEach(() => {
+    endTelemetrySession();
+    vi.useRealTimers();
+  });
+
+  it("debounces every captured event into the durable local store", async () => {
+    vi.useFakeTimers();
+    const q = new TelemetryQueue(store, envelope(), upload, DEFAULT_TELEMETRY_QUEUE_CONFIG, () => 5000);
+    q.enqueue(decisionEvent(1));
+    expect(await store.totalBytes()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_TELEMETRY_QUEUE_CONFIG.persistDebounceMs);
+
+    expect(await store.totalBytes()).toBeGreaterThan(0);
+    expect(uploads).toHaveLength(0);
+  });
+
+  it("flushes a short session when recording ends", async () => {
+    const shortMatch = envelope("short-showdown", "showdown");
+    const q = new TelemetryQueue(store, shortMatch, upload);
+    beginTelemetrySession(shortMatch, q);
+    recordTelemetryEvent(decisionEvent(1));
+
+    endTelemetrySession();
+
+    await vi.waitFor(() => expect(uploads).toHaveLength(1));
+    expect(uploads[0].envelope.mode).toBe("showdown");
+    expect(uploads[0].events).toEqual([decisionEvent(1)]);
+    expect(await store.totalBytes()).toBe(0);
+  });
+
+  it("drains decisions captured behind an in-flight upload when the session ends", async () => {
+    let releaseFirstUpload: ((ok: boolean) => void) | undefined;
+    upload = vi.fn((batch: TelemetryBatch) => {
+      uploads.push(batch);
+      if (uploads.length === 1) {
+        return new Promise<boolean>(resolve => {
+          releaseFirstUpload = resolve;
+        });
+      }
+      return Promise.resolve(true);
+    });
+    const shortMatch = envelope("racing-showdown", "showdown");
+    const q = new TelemetryQueue(store, shortMatch, upload);
+    beginTelemetrySession(shortMatch, q);
+    q.enqueue(decisionEvent(1));
+    const periodicFlush = q.flush(1);
+    await vi.waitFor(() => expect(uploads).toHaveLength(1));
+
+    recordTelemetryEvent(decisionEvent(2));
+    endTelemetrySession();
+    releaseFirstUpload?.(true);
+    await periodicFlush;
+
+    await vi.waitFor(() => expect(uploads).toHaveLength(2));
+    expect(uploads[1].events).toEqual([decisionEvent(2)]);
+    expect(await store.totalBytes()).toBe(0);
   });
 
   it("does NOT flush before any trigger is met, but persists events durably", async () => {

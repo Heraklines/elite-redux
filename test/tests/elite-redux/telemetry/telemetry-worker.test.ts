@@ -127,6 +127,21 @@ describe("telemetry ingest route (worker)", () => {
     expect(put.options?.httpMetadata?.contentEncoding).toBe("gzip");
   });
 
+  it.each(["solo", "showdown", "tournament"])("persists %s battles in their own R2 partition", async mode => {
+    const { bucket, puts } = makeBucket();
+    const now = Date.UTC(2026, 6, 14, 10, 30, 0);
+    const res = await handleTelemetryIngest(
+      ingestRequest({ mode, sessionId: `sess-${mode}`, seq: "1" }, "gz-bytes"),
+      AUTH,
+      { TELEMETRY: bucket },
+      CORS,
+      now,
+    );
+
+    expect(res.status).toBe(200);
+    expect(puts[0].key).toBe(`2026-07-14/${mode}/sess-${mode}/1.jsonl.gz`);
+  });
+
   it("enforces a per-user rate limit (429 once the window budget is spent)", async () => {
     const { bucket } = makeBucket();
     const now = Date.now();
