@@ -731,6 +731,26 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     /prepareCoopV2InteractionStateMaterialConsumer\(entry\)[\s\S]*?const stateApplied =/u,
     "cross-wave interaction DATA cannot apply before its exact destination Battle shell exists",
   );
+  const bargainInteractionPrepare = theBargainPhase.slice(
+    theBargainPhase.indexOf("public canPrepareForCoopV2InteractionMaterial"),
+    theBargainPhase.indexOf("public installCoopV2TerminalSuccessor"),
+  );
+  assert.match(
+    bargainInteractionPrepare,
+    /successor\.operationId === this\.coopV2ControlOperationId[\s\S]*?control\.surfaceClass === "op:bargain"[\s\S]*?control\.operationKind === "BARGAIN_PRESENT"/u,
+    "only this exact signed Bargain presentation can prepare its missing destination shell",
+  );
+  assert.match(
+    bargainInteractionPrepare,
+    /material\.wave === this\.coopSourceWave \+ 1[\s\S]*?material\.turn === 1/u,
+    "a projected Bargain may prepare only the immediately adjacent first-turn Battle identity",
+  );
+  assert.match(bargainInteractionPrepare, /globalScene\.newCoopV2ProjectedBattle\(\)/u);
+  assert.doesNotMatch(
+    bargainInteractionPrepare,
+    /globalScene\.newBattle\(\)/u,
+    "Bargain shell preparation cannot derive an unsigned encounter tail",
+  );
   const release = newBattlePhase.slice(
     newBattlePhase.indexOf("public releaseForCoopV2Control"),
     newBattlePhase.indexOf("start()"),

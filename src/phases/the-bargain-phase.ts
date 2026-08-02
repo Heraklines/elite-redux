@@ -20,7 +20,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
-import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopAuthorityEntryKind, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
@@ -85,6 +85,18 @@ import i18next from "i18next";
 
 const ns = "mysteryEncounters/theBargain";
 
+interface CoopV2BargainPresentationClaim {
+  readonly sessionEpoch: number;
+  readonly kind: CoopAuthorityEntryKind;
+  readonly operationId: string;
+  readonly nextControl: CoopNextControl;
+  readonly interactionStateMaterial?: {
+    readonly wave: number;
+    readonly turn: number;
+    readonly stateTick: number;
+  };
+}
+
 export class TheBargainPhase extends Phase {
   public readonly phaseName = "TheBargainPhase";
   /** Exact V2 presentation address owned by this phase generation. */
@@ -110,6 +122,8 @@ export class TheBargainPhase extends Phase {
   /** Immutable battle coordinate retained before Bargain's UI, proposal, or watcher awaits can resume. */
   private readonly coopSourceWave = globalScene.currentBattle?.waveIndex ?? 0;
   private readonly coopSourceTurn = globalScene.currentBattle?.turn ?? 0;
+  /** Whether this exact projected Bargain created the adjacent destination Battle identity. */
+  private coopV2DestinationBattleCreated = false;
   /** Signed terminal wait installed from the immutable Bargain result before this phase may leave. */
   private coopV2NextWaveAwait: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> | null = null;
   private coopV2NextWaveAwaitQueued = false;
@@ -130,6 +144,92 @@ export class TheBargainPhase extends Phase {
     this.coopBargainStart = pinned;
     this.coopV2ControlOperationId = operationId;
     return true;
+  }
+
+  /**
+   * Prove that this exact projected Bargain is the first signed interaction in wave N+1.
+   *
+   * The ordinary authority reaches a gauntlet Bargain after constructing wave N+1. A renderer can instead
+   * receive the presentation while its preceding reward phase still owns wave N and replace that phase with
+   * this one. In that schedule the immutable entry must construct the destination shell before its complete
+   * state can apply; accepting an ambient or non-adjacent interaction would reintroduce local progression.
+   */
+  public canPrepareForCoopV2InteractionMaterial(successor: CoopV2BargainPresentationClaim): boolean {
+    const runtime = this.coopOwningRuntime ?? getCoopRuntime();
+    const control = successor.nextControl;
+    const material = successor.interactionStateMaterial;
+    const currentBattle = globalScene.currentBattle;
+    return (
+      runtime != null
+      && isCoopV2InteractionCutoverActive(runtime.durability)
+      && runtime.controller.role === "guest"
+      && runtime.controller.authorityRole === "replica"
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && successor.sessionEpoch === runtime.controller.sessionEpoch
+      && successor.kind === "INTERACTION_COMMIT"
+      && successor.operationId === this.coopV2ControlOperationId
+      && control.kind === "SHARED_INTERACTION"
+      && control.surfaceClass === "op:bargain"
+      && control.operationKind === "BARGAIN_PRESENT"
+      && control.operationId === successor.operationId
+      && material != null
+      && material.wave === control.wave
+      && material.turn === control.turn
+      && material.stateTick > 0
+      && material.wave === this.coopSourceWave + 1
+      && material.turn === 1
+      && currentBattle != null
+      && ((currentBattle.waveIndex === this.coopSourceWave && currentBattle.turn === this.coopSourceTurn)
+        || (currentBattle.waveIndex === material.wave && currentBattle.turn === material.turn))
+    );
+  }
+
+  /** Build only the adjacent Battle identity; the signed interaction entry applies every mechanical field. */
+  public prepareForCoopV2InteractionMaterial(successor: CoopV2BargainPresentationClaim): boolean {
+    if (!this.canPrepareForCoopV2InteractionMaterial(successor)) {
+      return false;
+    }
+    const material = successor.interactionStateMaterial;
+    const currentBattle = globalScene.currentBattle;
+    if (material == null || currentBattle == null) {
+      return false;
+    }
+    if (currentBattle.waveIndex === material.wave) {
+      const alreadyPrepared = currentBattle.turn === material.turn;
+      this.coopV2DestinationBattleCreated ||= alreadyPrepared;
+      return alreadyPrepared;
+    }
+    if (
+      this.coopV2DestinationBattleCreated
+      || currentBattle.waveIndex !== this.coopSourceWave
+      || material.wave !== currentBattle.waveIndex + 1
+    ) {
+      return false;
+    }
+    try {
+      const destinationBattle = globalScene.newCoopV2ProjectedBattle();
+      if (
+        globalScene.currentBattle !== destinationBattle
+        || destinationBattle.waveIndex !== material.wave
+        || destinationBattle.turn !== material.turn
+      ) {
+        throw new Error(
+          `Bargain destination Battle address mismatch expected=${material.wave}:${material.turn} `
+            + `actual=${destinationBattle.waveIndex}:${destinationBattle.turn}`,
+        );
+      }
+      this.coopV2DestinationBattleCreated = true;
+      coopLog(
+        "v2-interaction",
+        `TheBargainPhase prepared signed destination shell wave=${this.coopSourceWave}->${destinationBattle.waveIndex} `
+          + `op=${successor.operationId}`,
+      );
+      return true;
+    } catch (error) {
+      coopWarn("v2-interaction", "TheBargainPhase could not prepare its signed destination Battle shell", error);
+      failCoopSharedSession(`The shared Bargain could not create battle wave ${material.wave}.`);
+      return false;
+    }
   }
 
   /** Bind the result's signed N+1 bridge before its complete state can retire. */

@@ -351,11 +351,7 @@ function findOwnedCommandOrTerminal(client, from) {
       ? observation.ownerModel === "local" && observation.localSeat == null && observation.seatsWithInput?.includes(0)
       : observation.localSeat === client.publicSeat && observation.seatsWithInput?.includes(client.publicSeat));
   const ownedSemantic =
-    ownedCommandSurface
-    && observation?.ready?.handlerActive === true
-    && semanticOwner
-      ? latestSemantic
-      : null;
+    ownedCommandSurface && observation?.ready?.handlerActive === true && semanticOwner ? latestSemantic : null;
   // Semantic surfaces are an append-only observation log, but only the latest one represents the
   // UI a human can currently control. Never resurrect an old CommandPhase after EnemyCommandPhase,
   // narration, a picker, or turn replay has replaced it (Showdown run 30030175748 otherwise spent
