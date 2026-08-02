@@ -4127,6 +4127,16 @@ test("the animations-on campaign extends a live between-wave renderer without we
     /const betweenWaveBudget = true/u,
     "the animation budget remains scoped to the animations-on profile",
   );
+  assert.match(
+    campaignDriver,
+    /retainedEvolutionProgress[\s\S]*GUEST retained evolution heartbeat[\s\S]*stage=[\s\S]*retainedWaveProgress/u,
+    "finite retained-evolution stages must refresh the animations-on budget inside its immutable ceiling",
+  );
+  assert.match(
+    browserEntry,
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS[\s\S]*SelectModifierPhase:EVOLUTION_SCENE[\s\S]*LearnMovePhase:EVOLUTION_SCENE/u,
+    "the learn-move phase must not advertise input while the preceding evolution scene is still visible",
+  );
 });
 
 test("the Mystery and navigation journeys use progress-proven rolling surface windows under an immutable ceiling", () => {

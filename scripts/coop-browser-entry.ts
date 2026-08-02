@@ -674,8 +674,13 @@ const COOP_REVIVAL_PHASES = new Set(["RevivalBlessingPhase", "CoopGuestRevivalPh
 // makes a successful public journey fail merely because the read-only observer sampled the handoff.
 const NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES = new Set(["EndEvolutionPhase"]);
 // SelectModifierPhase owns the reward UI, but the engine assigns it before EVOLUTION_SCENE has
-// finished closing. That exact phase/UI pair is a teardown sample, not an actionable reward surface.
-const NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set(["SelectModifierPhase:EVOLUTION_SCENE"]);
+// finished closing. A reward evolution can likewise queue LearnMovePhase while the preceding evolution
+// cutscene is still the visible handler. These exact phase/UI pairs are teardown samples, not actionable
+// reward/learn-move surfaces; the observer must wait for the real MODIFIER_SELECT/SUMMARY handler.
+const NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set([
+  "SelectModifierPhase:EVOLUTION_SCENE",
+  "LearnMovePhase:EVOLUTION_SCENE",
+]);
 
 /**
  * Resolve surfaces whose owner is part of the immutable operation, rather than the alternating

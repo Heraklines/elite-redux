@@ -1196,7 +1196,17 @@ export function createAnimationProgressBudget(
     for (const event of events) {
       const text = event.text ?? "";
       const phase = OUTCOME_PROGRESS_PHASE.exec(text)?.[1] ?? null;
-      const retainedWaveProgress = phase === "CoopWaveProgressionReplayPhase" || /\bWAVE_ADVANCE\b/u.test(text);
+      // A retained evolution is one finite presentation event, but on the two-Chromium SwiftShader runner
+      // its staged tween can outlive the one-time replay-phase allowance. Every heartbeat names a distinct,
+      // monotonically advancing stage from that closed cutscene (assets -> cycle -> reveal -> completion),
+      // so it is causal progress rather than a keepalive. It may refresh only inside the existing immutable
+      // animations-on hard ceiling.
+      const retainedEvolutionProgress =
+        /\[coop:progression\] GUEST retained evolution heartbeat\b[\s\S]*\bstage=/u.test(text);
+      const retainedWaveProgress =
+        phase === "CoopWaveProgressionReplayPhase"
+        || /\bWAVE_ADVANCE\b/u.test(text)
+        || retainedEvolutionProgress;
       const progress =
         phase
         ?? (retainedWaveProgress ? "wave-successor" : null)

@@ -509,7 +509,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(
     registry,
     /partyRewardFixture === "EVOLUTION_ITEM"[\s\S]*\? 30/u,
-    "the ordinary evolution fixture retains a deterministic legal Kubfu",
+    "the ordinary evolution fixture retains a deterministic legal Partner Pikachu",
   );
   assert.match(
     selectModifier,
@@ -518,12 +518,17 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     selectModifier,
-    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_DARKNESS[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
+    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.THUNDER_STONE[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
     "the exact fixtures must use item edges that remain reachable after the ER evolution rewrite",
   );
   assert.match(
     registry,
-    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
+    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.PIKACHU[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
+  );
+  assert.match(
+    registry,
+    /const subjectFormIndex = rewardId === "EVOLUTION_ITEM" \? 1 : 0;[\s\S]*makeStarter\(subjectSpecies, subjectFormIndex\)/u,
+    "the ordinary fixture must retain Partner Pikachu form 1 rather than base Pikachu's rewritten level edge",
   );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
@@ -543,8 +548,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(harness, /expectedPartyRewardFixtureSpecies\(this\.config\.partyRewardId\)/u);
   assert.match(
     harness,
-    /KUBFU_SPECIES_ID = 891[\s\S]*EVOLUTION_ITEM: KUBFU_SPECIES_ID/u,
-    "the browser roster oracle must follow the production Kubfu evolution fixture",
+    /PIKACHU_SPECIES_ID = 25[\s\S]*EVOLUTION_ITEM: PIKACHU_SPECIES_ID[\s\S]*RARE_EVOLUTION_ITEM: KUBFU_SPECIES_ID/u,
+    "the browser roster oracle must distinguish the Partner Pikachu and rare Kubfu evolution fixtures",
   );
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);

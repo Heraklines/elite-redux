@@ -542,7 +542,7 @@ export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
   }
   const subjectSpecies =
     rewardId === "EVOLUTION_ITEM"
-      ? SpeciesId.KUBFU
+      ? SpeciesId.PIKACHU
       : rewardId === "RARE_EVOLUTION_ITEM"
         ? SpeciesId.KUBFU
         : rewardId === "FORM_CHANGE_ITEM"
@@ -550,12 +550,16 @@ export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
           : rewardId === "RARE_FORM_CHANGE_ITEM"
             ? SpeciesId.GIRATINA
             : SpeciesId.GARCHOMP;
+  // Elite Redux rewrites base Pikachu's stone edges to level evolutions, while Partner Pikachu retains
+  // its legitimate Thunder Stone edge. Preserve that exact form so the ordinary item lane exercises the
+  // real production selectFilter instead of relying on an evolution path the ER merge removed.
+  const subjectFormIndex = rewardId === "EVOLUTION_ITEM" ? 1 : 0;
   const reserveSpecies = SpeciesId.CATERPIE;
-  const makeStarter = (speciesId: SpeciesId): Starter => ({
+  const makeStarter = (speciesId: SpeciesId, formIndex = 0): Starter => ({
     speciesId,
     shiny: false,
     variant: 0,
-    formIndex: 0,
+    formIndex,
     abilityIndex: 0,
     passive: false,
     nature: Nature.HARDY,
@@ -563,7 +567,7 @@ export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
     pokerus: false,
     ivs: new Array(6).fill(31),
   });
-  return [makeStarter(subjectSpecies), makeStarter(reserveSpecies)];
+  return [makeStarter(subjectSpecies, subjectFormIndex), makeStarter(reserveSpecies)];
 }
 
 /**
