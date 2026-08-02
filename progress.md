@@ -6788,3 +6788,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   successor, record/retain the address-exact terminal result, and only then start that successor. Cancellation
   still restores the reward shell. All four registered Ability workflows use the same seam, and focused
   coverage proves the predecessor cannot be resurrected or shifted again.
+
+## 2026-08-02 - retired reward wait lease and per-seat rejoin generation proof
+
+- Exact-SHA Ability journey `30726790868` proved the capsule result and signed wave-2 successor both applied,
+  but the consumed reward continuation retained an old `interactionChoice seq=0` wait after its modal replaced
+  it. The stall watchdog later mistook that obsolete wait for a mutual softlock while ordinary wave-2
+  presentation was still progressing. `SelectModifierPhase.retire()` now aborts every phase-owned reward/action
+  wait through one non-sticky lease; relay coverage proves the same sequence remains replayable afterward.
+- Exact-SHA fresh-wave2 journey `30726784457` is green and provides the timing control: the same wave-2
+  presentation normally needs about 32 seconds on the hosted renderer, while the stale Ability wait fired the
+  watchdog at that boundary. The production fix is committed as `0a81120c9`; its focused push red
+  `30727905904` is CI metadata only because the train manifest still named the previous base. Exact Ability
+  proof `30727965146` is running.
+- Exact same-tab run `30726792139` did not expose a game softlock. Both real browsers visibly reached the same
+  wave-2 command screen with digest `c760f589548029d1`, zero relay waits, and generations host-local 1 / guest-
+  local 2. The harness incorrectly required those per-seat generations to be one equal scalar. Browser evidence
+  now emits the complete canonical generation vector, every parser checks its local element, and shared-
+  frontier proofs require both clients to report the same vector. This preserves strict authentication while
+  admitting the Worker's legitimate sequential hot-rejoin counters and generalizes naturally beyond two seats.

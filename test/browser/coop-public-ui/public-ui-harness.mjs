@@ -735,7 +735,7 @@ function comparableSurfaceObservation(observation) {
     surface: observation.surface,
     epoch: observation.epoch,
     membershipRevision: observation.membershipRevision,
-    connectionGeneration: observation.connectionGeneration,
+    connectionGenerations: observation.connectionGenerations,
     wave: observation.wave,
     turn: observation.turn,
     phase: observation.phase,
@@ -815,6 +815,9 @@ function commandFrontierProjection(client, event) {
     || !Number.isSafeInteger(address?.turn)
     || !Number.isSafeInteger(observation.membershipRevision)
     || !Number.isSafeInteger(observation.connectionGeneration)
+    || !Array.isArray(observation.connectionGenerations)
+    || observation.connectionGenerations.length < 2
+    || observation.connectionGenerations[observation.localSeat] !== observation.connectionGeneration
     || typeof observation.stateDigest !== "string"
     || observation.stateDigest.length === 0
     || (observation.ready?.handlerActive !== true && !rendererWatcher)
@@ -877,7 +880,7 @@ export function findSharedCommandFrontierMatch(
       return (
         candidate.address === hostProjection.address
         && peer.membershipRevision === observation.membershipRevision
-        && peer.connectionGeneration === observation.connectionGeneration
+        && JSON.stringify(peer.connectionGenerations) === JSON.stringify(observation.connectionGenerations)
         && peer.stateDigest === observation.stateDigest
       );
     });
@@ -892,7 +895,7 @@ export function findSharedCommandFrontierMatch(
         surface: "command",
         epoch: observation.address.epoch,
         membershipRevision: observation.membershipRevision,
-        connectionGeneration: observation.connectionGeneration,
+        connectionGenerations: observation.connectionGenerations,
         wave: observation.address.wave,
         turn: observation.address.turn,
         phase: "CommandPhase",
@@ -960,7 +963,7 @@ function comparableCommanderObservation(observation) {
     commanderOwnerRole: observation.commanderOwnerRole,
     epoch: observation.epoch,
     membershipRevision: observation.membershipRevision,
-    connectionGeneration: observation.connectionGeneration,
+    connectionGenerations: observation.connectionGenerations,
     wave: observation.wave,
     turn: observation.turn,
     point: observation.point,
@@ -2643,7 +2646,10 @@ export class DuoPublicUiRig {
         && JSON.stringify(roles) === JSON.stringify(["guest", "host"])
         && JSON.stringify(seats) === "[0,1]"
         && epochs.every(epoch => Number.isSafeInteger(epoch) && epoch > 0)
-        && new Set(epochs).size === 1;
+        && new Set(epochs).size === 1
+        && new Set(
+          bindings.map(binding => JSON.stringify(binding.event?.observation.connectionGenerations ?? null)),
+        ).size === 1;
       if (complete) {
         break;
       }
@@ -2660,6 +2666,14 @@ export class DuoPublicUiRig {
     if (epochs.some(epoch => !Number.isSafeInteger(epoch) || epoch <= 0) || new Set(epochs).size !== 1) {
       throw new Error(`Latest stable-seat bindings did not converge on one gameplay epoch: ${JSON.stringify(epochs)}`);
     }
+    const connectionGenerationVectors = bindings.map(
+      binding => binding.event.observation.connectionGenerations,
+    );
+    if (new Set(connectionGenerationVectors.map(vector => JSON.stringify(vector))).size !== 1) {
+      throw new Error(
+        `Latest stable-seat bindings did not converge on one per-seat generation vector: ${JSON.stringify(connectionGenerationVectors)}`,
+      );
+    }
     for (const binding of bindings) {
       binding.client.evidence.record("paired-binding-address-proof", {
         epoch: binding.event.observation.epoch,
@@ -2667,6 +2681,7 @@ export class DuoPublicUiRig {
         seat: binding.event.observation.seat,
         membershipRevision: binding.event.observation.membershipRevision,
         connectionGeneration: binding.event.observation.connectionGeneration,
+        connectionGenerations: binding.event.observation.connectionGenerations,
         peerEpoch: bindings.find(candidate => candidate !== binding)?.event.observation.epoch ?? null,
         sourceEventIndex: binding.event.index,
       });
@@ -5272,11 +5287,20 @@ export class DuoPublicUiRig {
     const clients = Object.values(this.clients);
     const bindings = clients.map(client => client.evidence.findLastBinding(roleCursors[client.label]));
     for (const [index, client] of clients.entries()) {
-      if ((bindings[index]?.observation.connectionGeneration ?? 0) < 2) {
+      const observation = bindings[index]?.observation;
+      if (
+        observation == null
+        || observation.connectionGeneration < 1
+        || observation.connectionGenerations.some(generation => generation < 1)
+      ) {
         throw new Error(
-          `${client.label}: same-tab rejoin retained generation ${bindings[index]?.observation.connectionGeneration ?? "none"}`,
+          `${client.label}: same-tab rejoin retained stale per-seat generations ${JSON.stringify(observation?.connectionGenerations ?? null)}`,
         );
       }
+    }
+    const vectors = bindings.map(binding => binding.observation.connectionGenerations);
+    if (new Set(vectors.map(vector => JSON.stringify(vector))).size !== 1) {
+      throw new Error(`same-tab rejoin bindings disagreed on per-seat generations: ${JSON.stringify(vectors)}`);
     }
     const peerAdvance = clients
       .flatMap(client => client.evidence.events.slice(roleCursors[client.label]))
@@ -5288,6 +5312,8 @@ export class DuoPublicUiRig {
       client.evidence.record("same-tab-rejoin-generation-proof", {
         connectionGeneration: client.evidence.findLastBinding(roleCursors[client.label])?.observation
           .connectionGeneration,
+        connectionGenerations: client.evidence.findLastBinding(roleCursors[client.label])?.observation
+          .connectionGenerations,
         peerAdvanceEvidenceIndex: peerAdvance.index,
       });
     }

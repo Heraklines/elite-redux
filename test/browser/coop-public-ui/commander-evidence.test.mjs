@@ -16,6 +16,7 @@ test("Commander observer parser binds the owner, command address, species, and m
     epoch: 73,
     membershipRevision: 4,
     connectionGeneration: 2,
+    connectionGenerations: [2, 3],
     observationPhase: "CoopReplayTurnPhase",
     wave: 1,
     turn: 3,

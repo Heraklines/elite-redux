@@ -1312,7 +1312,7 @@ export function findSharedSuccessorWavePresentation(rig, from) {
       observation.address?.wave,
       observation.address?.turn,
       observation.membershipRevision,
-      observation.connectionGeneration,
+      observation.connectionGenerations,
       observation.mysteryEncounterType ?? null,
       observation.stateDigest,
     ]);

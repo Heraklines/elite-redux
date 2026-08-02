@@ -80,6 +80,8 @@ interface CoopBrowserSurfaceObservationV1 {
   readonly epoch: number;
   readonly membershipRevision: number;
   readonly connectionGeneration: number;
+  /** Canonical per-seat generations, ordered by immutable seat id. */
+  readonly connectionGenerations: readonly number[];
   readonly wave: number;
   readonly turn: number;
   readonly phase: string;
@@ -417,6 +419,7 @@ let lastObserverError = "";
 function observedMembershipAxes(runtime: NonNullable<ReturnType<typeof getCoopRuntime>>): {
   readonly revision: number;
   readonly connectionGeneration: number;
+  readonly connectionGenerations: readonly number[];
   readonly state: "active";
 } | null {
   if (runtime.controller.hasAuthenticatedPairing) {
@@ -425,9 +428,23 @@ function observedMembershipAxes(runtime: NonNullable<ReturnType<typeof getCoopRu
     if (frame == null || membership?.state !== "active") {
       return null;
     }
+    const members = [...membership.members].sort((left, right) => left.seatId - right.seatId);
+    if (
+      members.length < 2
+      || members.some(
+        (member, seatId) =>
+          member.seatId !== seatId
+          || !Number.isSafeInteger(member.connectionGeneration)
+          || member.connectionGeneration < 0,
+      )
+      || members[frame.fromSeatId]?.connectionGeneration !== frame.connectionGeneration
+    ) {
+      return null;
+    }
     return {
       revision: frame.membershipRevision,
       connectionGeneration: frame.connectionGeneration,
+      connectionGenerations: members.map(member => member.connectionGeneration),
       state: "active",
     };
   }
@@ -436,6 +453,7 @@ function observedMembershipAxes(runtime: NonNullable<ReturnType<typeof getCoopRu
     ? {
         revision: membership.revision,
         connectionGeneration: membership.connectionGeneration,
+        connectionGenerations: [membership.connectionGeneration, membership.connectionGeneration],
         state: "active",
       }
     : null;
@@ -456,6 +474,10 @@ function observeBoundSession(): void {
       revision: provisionalMembership.revision,
       connectionGeneration:
         runtime.localTransport.connectionGeneration?.() ?? provisionalMembership.connectionGeneration,
+      connectionGenerations: [
+        runtime.localTransport.connectionGeneration?.() ?? provisionalMembership.connectionGeneration,
+        runtime.localTransport.connectionGeneration?.() ?? provisionalMembership.connectionGeneration,
+      ],
       state: "active" as const,
     };
     const observation = {
@@ -465,6 +487,7 @@ function observeBoundSession(): void {
       epoch: runtime.controller.sessionEpoch,
       membershipRevision: membership.revision,
       connectionGeneration: membership.connectionGeneration,
+      connectionGenerations: membership.connectionGenerations,
       membershipState: membership.state,
       gameplayBindingReady: authenticatedMembership != null || !runtime.controller.hasAuthenticatedPairing,
     } as const;
@@ -549,6 +572,7 @@ function observeContinuationSurface(): void {
       epoch: runtime.controller.sessionEpoch,
       membershipRevision: membership.revision,
       connectionGeneration: membership.connectionGeneration,
+      connectionGenerations: membership.connectionGenerations,
       wave: battle.waveIndex,
       turn: battle.turn,
       phase,
@@ -1406,6 +1430,7 @@ function observeCommanderBoundary(): void {
       epoch: runtime.controller.sessionEpoch,
       membershipRevision: membership.revision,
       connectionGeneration: membership.connectionGeneration,
+      connectionGenerations: membership.connectionGenerations,
       observationPhase: phase,
       wave: battle.waveIndex,
       turn: battle.turn,
@@ -1555,6 +1580,7 @@ function observeSemanticSurface(): void {
         },
         membershipRevision: membership.revision,
         connectionGeneration: membership.connectionGeneration,
+        connectionGenerations: membership.connectionGenerations,
         localSeat: runtime.controller.seat,
         localRole: runtime.controller.role,
         ownerSeat: null,
@@ -1668,6 +1694,7 @@ function observeSemanticSurface(): void {
         address: { epoch: runtime.controller.sessionEpoch, wave, turn },
         membershipRevision: membership.revision,
         connectionGeneration: membership.connectionGeneration,
+        connectionGenerations: membership.connectionGenerations,
         localSeat: runtime.controller.seat,
         localRole: runtime.controller.role,
         ownerSeat: null,
@@ -1700,6 +1727,7 @@ function observeSemanticSurface(): void {
     let epoch = 0;
     let membershipRevision: number | null = null;
     let connectionGeneration: number | null = null;
+    let connectionGenerations: readonly number[] | null = null;
     let seatsWithInput: number[] = [0];
     if (runtime != null) {
       // The exact launch prompt above is intentionally observable before the binding transaction. Every other
@@ -1714,6 +1742,10 @@ function observeSemanticSurface(): void {
       epoch = runtime.controller.sessionEpoch;
       membershipRevision = membership.revision;
       connectionGeneration = membership.connectionGeneration;
+      connectionGenerations =
+        "connectionGenerations" in membership
+          ? membership.connectionGenerations
+          : [membership.connectionGeneration, membership.connectionGeneration];
       const partnerSeat = localSeat === 0 ? 1 : 0;
       let isLocalOwner: boolean | null = null;
       try {
@@ -1976,6 +2008,7 @@ function observeSemanticSurface(): void {
       address: { epoch, wave, turn },
       membershipRevision,
       connectionGeneration,
+      connectionGenerations,
       localSeat,
       localRole,
       ownerSeat,

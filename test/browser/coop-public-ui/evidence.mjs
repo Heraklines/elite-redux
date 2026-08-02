@@ -77,6 +77,21 @@ const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
+
+/**
+ * Connection generations are per seat, not one room-global scalar. Sequential hot rejoin therefore
+ * legitimately yields different local generations on the two browsers. Require the complete canonical
+ * vector and prove that its local element agrees with the frame stamped by this browser.
+ */
+function validConnectionGenerations(generations, localSeat, localGeneration) {
+  return (
+    Array.isArray(generations)
+    && generations.length >= 2
+    && generations.every(generation => Number.isSafeInteger(generation) && generation >= 0)
+    && Number.isSafeInteger(localSeat)
+    && generations[localSeat] === localGeneration
+  );
+}
 const PRESENTATION_EVENT_KINDS = new Set([
   "appearance",
   "message",
@@ -605,6 +620,7 @@ function continuationSurfaceView(text) {
     || value.membershipRevision <= 0
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
+    || !validConnectionGenerations(value.connectionGenerations, value.seat, value.connectionGeneration)
     || !Number.isSafeInteger(value.wave)
     || value.wave <= 0
     || !Number.isSafeInteger(value.turn)
@@ -624,7 +640,7 @@ function continuationSurfaceView(text) {
   ) {
     throw new Error("built browser emitted an invalid continuation observation");
   }
-  return Object.freeze({ ...value });
+  return Object.freeze({ ...value, connectionGenerations: Object.freeze([...value.connectionGenerations]) });
 }
 
 function bindingView(text) {
@@ -650,12 +666,13 @@ function bindingView(text) {
     || value.membershipRevision <= 0
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
+    || !validConnectionGenerations(value.connectionGenerations, value.seat, value.connectionGeneration)
     || value.membershipState !== "active"
     || typeof value.gameplayBindingReady !== "boolean"
   ) {
     throw new Error("built browser emitted an invalid session-binding observation");
   }
-  return Object.freeze({ ...value });
+  return Object.freeze({ ...value, connectionGenerations: Object.freeze([...value.connectionGenerations]) });
 }
 
 function renderProfileView(text) {
@@ -805,6 +822,7 @@ export function commanderObservationView(text) {
     || value.membershipRevision <= 0
     || !Number.isSafeInteger(value.connectionGeneration)
     || value.connectionGeneration < 0
+    || !validConnectionGenerations(value.connectionGenerations, value.localSeat, value.connectionGeneration)
     || !["CommandPhase", "TurnStartPhase", "CoopReplayTurnPhase"].includes(value.observationPhase)
     || !Number.isSafeInteger(value.wave)
     || value.wave <= 0
@@ -830,7 +848,7 @@ export function commanderObservationView(text) {
   ) {
     throw new Error("built browser emitted an invalid Commander observation");
   }
-  return Object.freeze({ ...value });
+  return Object.freeze({ ...value, connectionGenerations: Object.freeze([...value.connectionGenerations]) });
 }
 
 const INPUT_ECHO_PREFIX = "[coop-browser:input-echo] ";
@@ -1064,6 +1082,8 @@ export function semanticSurfaceView(text) {
     || new Set(value.seatsWithInput).size !== value.seatsWithInput.length
     || !nullableRevision(value.membershipRevision)
     || !nullableRevision(value.connectionGeneration)
+    || (value.connectionGenerations !== null
+      && !validConnectionGenerations(value.connectionGenerations, value.localSeat, value.connectionGeneration))
     || (value.localRole !== null && value.localRole !== "host" && value.localRole !== "guest")
     || !validSemanticReadiness(value.ready)
     || typeof value.phase !== "string"
@@ -1081,7 +1101,8 @@ export function semanticSurfaceView(text) {
       && (value.localSeat === null
         || value.localRole === null
         || value.membershipRevision === null
-        || value.connectionGeneration === null))
+        || value.connectionGeneration === null
+        || value.connectionGenerations === null))
   ) {
     throw new Error("built browser emitted an invalid semantic surface observation");
   }
@@ -1090,6 +1111,9 @@ export function semanticSurfaceView(text) {
     address: Object.freeze({ ...value.address }),
     seatsWithInput: Object.freeze([...value.seatsWithInput]),
     ready: Object.freeze({ ...value.ready }),
+    ...(Array.isArray(value.connectionGenerations)
+      ? { connectionGenerations: Object.freeze([...value.connectionGenerations]) }
+      : {}),
     ...(Array.isArray(value.optionIds) ? { optionIds: Object.freeze([...value.optionIds]) } : {}),
     ...(Array.isArray(value.teamSpeciesIds) ? { teamSpeciesIds: Object.freeze([...value.teamSpeciesIds]) } : {}),
   });
