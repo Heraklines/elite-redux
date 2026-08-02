@@ -479,6 +479,15 @@ export class CoopSharedTerminalSupervisor {
     }
     const candidate = message.commit;
     this.trace({ stage: "received", terminalId: candidate.terminalId });
+    // Send Logs previously showed only `raw rx ... sharedTerminal bytes=N` on the receiving client, which
+    // erased the peer's actual fail-closed cause whenever only that player submitted a report. The commit
+    // is authenticated and shape-validated above, including the bounded/control-character-free reason, so
+    // retain its exact diagnostic identity before terminal teardown clears the runtime and returns to Title.
+    coopWarn(
+      "runtime",
+      `shared session terminal received id=${candidate.terminalId} boundary=${candidate.boundary} `
+        + `code=${candidate.reasonCode} wave=${candidate.wave} turn=${candidate.turn}: ${candidate.reason}`,
+    );
     if (this.finalized) {
       if (this.active?.commit.terminalId === candidate.terminalId && this.active.source === "remote") {
         this.sendAck(this.active, true);

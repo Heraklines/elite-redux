@@ -371,7 +371,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
           && integer(payload.moveId)
           && integer(payload.forgetSlot)
           && integer(payload.maxMoveCount)
-          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction)),
+          && typeof payload.allowNextWaveStart === "boolean"
+          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction))
+          && !(payload.allowNextWaveStart && payload.nextInteraction !== undefined),
       ),
   },
   LEARN_MOVE_BATCH: {
@@ -920,7 +922,7 @@ export function successorOfCoopV2InteractionEnvelope(
       if (payload?.type !== "prompt") {
         return wait(
           ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
-          false,
+          operation.kind === "LEARN_MOVE" && payload?.allowNextWaveStart === true,
           isCoopInteractionSuccessorRef(payload?.nextInteraction)
             ? [interactionAddressOf(payload.nextInteraction)]
             : undefined,

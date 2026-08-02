@@ -113,6 +113,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     readonly wave: number;
     readonly turn: number;
     readonly interactionCounter: number;
+    readonly allowNextWaveStart: boolean;
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
   } | null = null;
   /** Guest-owner proposal retained until the matching immutable result closes this exact phase. */
@@ -391,6 +392,11 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       forgetSlot >= 0 && forgetSlot < maxMoveCount
         ? this.coopNestedReturnPlan?.onCommit
         : this.coopNestedReturnPlan?.onCancel;
+    const allowNextWaveStart =
+      forgetSlot >= 0
+      && forgetSlot < maxMoveCount
+      && this.coopNestedReturnPlan != null
+      && nextInteraction == null;
     const pending = this.coopPendingV2Decision;
     if (pending != null) {
       return (
@@ -398,6 +404,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         && pending.ownerRole === ownerRole
         && pending.forgetSlot === forgetSlot
         && pending.maxMoveCount === maxMoveCount
+        && pending.allowNextWaveStart === allowNextWaveStart
         && JSON.stringify(pending.nextInteraction ?? null) === JSON.stringify(nextInteraction ?? null)
       );
     }
@@ -409,6 +416,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       wave: this.coopSourceWave,
       turn: this.coopSourceTurn,
       interactionCounter: this.coopInteractionCounter?.() ?? -1,
+      allowNextWaveStart,
       ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
     };
     return true;
@@ -489,6 +497,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
               moveId: this.moveId,
               forgetSlot: pending.forgetSlot,
               maxMoveCount: pending.maxMoveCount,
+              allowNextWaveStart: pending.allowNextWaveStart,
               ...(pending.nextInteraction == null ? {} : { nextInteraction: structuredClone(pending.nextInteraction) }),
             },
             ownerRole: pending.ownerRole,
@@ -583,6 +592,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
             moveId: this.moveId,
             forgetSlot: moveIndex,
             maxMoveCount: this.getPokemon().getMaxMoveCount(),
+            allowNextWaveStart: false,
           },
           ownerRole: "host",
           localRole: "host",
@@ -1038,7 +1048,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     } else if (
       !commitCoopLearnMoveDecision(
         {
-          payload: { type: "decision", partySlot: slot, moveId: this.moveId, forgetSlot, maxMoveCount },
+          payload: {
+            type: "decision",
+            partySlot: slot,
+            moveId: this.moveId,
+            forgetSlot,
+            maxMoveCount,
+            allowNextWaveStart: false,
+          },
           ownerRole: "guest",
           localRole: "host",
           wave,
@@ -1098,6 +1115,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         moveId: this.moveId,
         forgetSlot: moveIndex,
         maxMoveCount: pokemon.getMaxMoveCount(),
+        allowNextWaveStart: false,
       };
       const decisionOperationId =
         this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);

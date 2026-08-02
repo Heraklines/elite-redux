@@ -408,6 +408,8 @@ export type CoopLearnMovePayload =
       readonly maxMoveCount: number;
       /** Exact interaction resumed after this concrete accept/decline result. */
       readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
+      /** True only when this accepted nested reward consumes its parent and may enter wave N+1. */
+      readonly allowNextWaveStart: boolean;
     };
 
 export type CoopLearnMoveBatchPayload =

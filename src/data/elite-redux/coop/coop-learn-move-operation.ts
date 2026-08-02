@@ -452,7 +452,9 @@ function valid(value: unknown, kind: CoopOperationKind): value is LearnPayload {
       && (m.type === "prompt"
         ? m.returnPlan === undefined || isCoopNestedInteractionReturnPlan(m.returnPlan)
         : m.type === "decision"
-          && (m.nextInteraction === undefined || isCoopInteractionSuccessorRef(m.nextInteraction)))
+          && typeof m.allowNextWaveStart === "boolean"
+          && (m.nextInteraction === undefined || isCoopInteractionSuccessorRef(m.nextInteraction))
+          && !(m.allowNextWaveStart && m.nextInteraction !== undefined))
     );
   }
   const b = p as CoopLearnMoveBatchPayload;

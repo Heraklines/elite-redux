@@ -97,7 +97,14 @@ export function openCoopLearnMovePickerInline(
     relay.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
     armCoopLearnMoveIntentResend(
       {
-        payload: { type: "decision", partySlot, moveId, forgetSlot: moveIndex, maxMoveCount },
+        payload: {
+          type: "decision",
+          partySlot,
+          moveId,
+          forgetSlot: moveIndex,
+          maxMoveCount,
+          allowNextWaveStart: false,
+        },
         wave: globalScene.currentBattle?.waveIndex ?? 0,
         turn: globalScene.currentBattle?.turn ?? 0,
         resend: () => relay.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex),
@@ -391,6 +398,7 @@ export class CoopReplayLearnMovePhase extends Phase {
           moveId: this.moveId,
           forgetSlot: moveIndex,
           maxMoveCount: this.maxMoveCount,
+          allowNextWaveStart: false,
         },
         wave: globalScene.currentBattle?.waveIndex ?? 0,
         turn: globalScene.currentBattle?.turn ?? 0,
