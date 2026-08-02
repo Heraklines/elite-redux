@@ -2647,9 +2647,8 @@ export class DuoPublicUiRig {
         && JSON.stringify(seats) === "[0,1]"
         && epochs.every(epoch => Number.isSafeInteger(epoch) && epoch > 0)
         && new Set(epochs).size === 1
-        && new Set(
-          bindings.map(binding => JSON.stringify(binding.event?.observation.connectionGenerations ?? null)),
-        ).size === 1;
+        && new Set(bindings.map(binding => JSON.stringify(binding.event?.observation.connectionGenerations ?? null)))
+          .size === 1;
       if (complete) {
         break;
       }
@@ -2666,9 +2665,7 @@ export class DuoPublicUiRig {
     if (epochs.some(epoch => !Number.isSafeInteger(epoch) || epoch <= 0) || new Set(epochs).size !== 1) {
       throw new Error(`Latest stable-seat bindings did not converge on one gameplay epoch: ${JSON.stringify(epochs)}`);
     }
-    const connectionGenerationVectors = bindings.map(
-      binding => binding.event.observation.connectionGenerations,
-    );
+    const connectionGenerationVectors = bindings.map(binding => binding.event.observation.connectionGenerations);
     if (new Set(connectionGenerationVectors.map(vector => JSON.stringify(vector))).size !== 1) {
       throw new Error(
         `Latest stable-seat bindings did not converge on one per-seat generation vector: ${JSON.stringify(connectionGenerationVectors)}`,
