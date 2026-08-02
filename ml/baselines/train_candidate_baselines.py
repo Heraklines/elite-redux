@@ -39,6 +39,7 @@ NON_POLICY_TARGET_SOURCES = {
     "forced-move",
     "first-usable",
     "tree-model-v1",
+    "diagnostic-tree-v1",
     "epsilon-tree-v1",
     "engine-hardest-v1",
 }

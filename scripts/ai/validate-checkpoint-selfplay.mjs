@@ -9,6 +9,7 @@ const [
   expectedEnemySource = expectedPlayerSource,
 ] = process.argv.slice(2);
 const expectedEpisodes = Number.parseInt(expectedEpisodesArg ?? "", 10);
+const nonPolicyTargetSources = new Set(["diagnostic-tree-v1", "engine-hardest-v1"]);
 if (!decisionsPath || !resultPath || !Number.isInteger(expectedEpisodes) || expectedEpisodes < 1) {
   console.error(
     "usage: node scripts/ai/validate-checkpoint-selfplay.mjs DECISIONS.jsonl RESULT.json EXPECTED_EPISODES [PLAYER_SOURCE] [ENEMY_SOURCE]",
@@ -54,7 +55,7 @@ for (const decision of decisions) {
   }
   decisionsBySeat[seat]++;
   const expectedSource = seat === "player" ? expectedPlayerSource : expectedEnemySource;
-  const expectedTarget = expectedSource !== "engine-hardest-v1";
+  const expectedTarget = !nonPolicyTargetSources.has(expectedSource);
   if (decision.policySource !== expectedSource || decision.policyTarget !== expectedTarget) {
     throw new Error(`decision crossed the checkpoint policy firewall: ${decision.decisionId}`);
   }

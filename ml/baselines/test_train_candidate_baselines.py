@@ -26,6 +26,7 @@ from train_candidate_baselines import (
 class CandidateBaselineContractTest(unittest.TestCase):
     def test_engine_and_heuristic_rows_are_not_policy_targets(self) -> None:
         self.assertFalse(is_policy_target({"policySource": "engine-hardest-v1", "policyTarget": False}))
+        self.assertFalse(is_policy_target({"policySource": "diagnostic-tree-v1", "policyTarget": True}))
         self.assertFalse(is_policy_target({"policySource": "smart-default-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "human-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "search-relabel-v1", "policyTarget": True}))

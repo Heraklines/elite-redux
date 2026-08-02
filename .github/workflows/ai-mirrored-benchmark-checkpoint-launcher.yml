@@ -9,7 +9,6 @@ on:
       - codex/combat-ai-baselines-20260728
     paths:
       - ".github/workflows/ai-mirrored-benchmark-checkpoint-launcher.yml"
-      - ".github/workflows/ai-mirrored-benchmark.yml"
 
 permissions:
   actions: read

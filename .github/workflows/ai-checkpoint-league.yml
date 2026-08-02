@@ -92,9 +92,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          weights=$(find ai-model -name model.safetensors -type f)
-          test "$(printf '%s\n' "$weights" | wc -l)" -eq 1
-          model_dir=$(dirname "$weights")
+          report=$(find ai-model -name report.json -type f)
+          test "$(printf '%s\n' "$report" | wc -l)" -eq 1
+          model_dir=$(dirname "$report")
+          test -f "$model_dir/model.safetensors"
           python - "$model_dir" <<'PY'
           import json
           import sys
@@ -126,6 +127,13 @@ jobs:
           const model = require("./ai-model/tree/models/stacked_tree_ensemble.json");
           if (model.schemaVersion !== 2 || model.featureSchemaVersion !== 2 || model.featureCount !== 4326) {
             throw new Error("tree controller does not match feature schema 2 / 4326");
+          }
+          const allowedRoles = new Set(["diagnostic-imitation", "policy-target"]);
+          if (!allowedRoles.has(model.trainingRole)) {
+            throw new Error(`tree controller has an unsupported training role: ${model.trainingRole}`);
+          }
+          if (!Array.isArray(model.members) || model.members.some(member => member.trainingRole !== model.trainingRole)) {
+            throw new Error("tree controller members do not preserve the ensemble training role");
           }
           JS
       - uses: actions/upload-artifact@v4
@@ -172,7 +180,7 @@ jobs:
     name: Checkpoint self-play shard ${{ matrix.shard }}
     needs: [model, identity]
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -199,11 +207,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          weights=$(find ai-model -name model.safetensors -type f)
-          test "$(printf '%s\n' "$weights" | wc -l)" -eq 1
-          echo "BASE_MODEL=$(dirname "$weights")" >> "$GITHUB_ENV"
+          report=$(find ai-model -name report.json -type f)
+          test "$(printf '%s\n' "$report" | wc -l)" -eq 1
+          model_dir=$(dirname "$report")
+          test -f "$model_dir/model.safetensors"
+          echo "BASE_MODEL=$model_dir" >> "$GITHUB_ENV"
           test -f ai-model/tree/models/stacked_tree_ensemble.json
           echo "TREE_MODEL=ai-model/tree/models/stacked_tree_ensemble.json" >> "$GITHUB_ENV"
+          node - <<'JS' >> "$GITHUB_ENV"
+          const model = require("./ai-model/tree/models/stacked_tree_ensemble.json");
+          if (model.trainingRole === "policy-target") {
+            console.log("TREE_SOURCE=checkpoint-tree-v1");
+            console.log("TREE_POLICY_TARGET=1");
+          } else if (model.trainingRole === "diagnostic-imitation") {
+            console.log("TREE_SOURCE=diagnostic-tree-v1");
+            console.log("TREE_POLICY_TARGET=0");
+          } else {
+            throw new Error(`unsupported tree training role: ${model.trainingRole}`);
+          }
+          JS
       - name: Build source-account-disjoint mixed league batches
         shell: bash
         run: |
@@ -238,12 +260,12 @@ jobs:
           --ai-source checkpoint-neural-v4 --ai-policy-target 1
           --opponent-ai-model "$TREE_MODEL"
           --opponent-ai-epsilon "${{ inputs.epsilon || '0.08' }}"
-          --opponent-ai-source checkpoint-tree-v1 --opponent-ai-policy-target 1
+          --opponent-ai-source "$TREE_SOURCE" --opponent-ai-policy-target "$TREE_POLICY_TARGET"
           --test-timeout-ms 14400000
           --json-out "ai-work/mixed-result-${{ matrix.shard }}.json"
           --ai-data-out "ai-work/mixed-decisions-${{ matrix.shard }}.jsonl"
       - name: Assert neural-vs-tree policy boundaries
-        run: node scripts/ai/validate-checkpoint-selfplay.mjs "ai-work/mixed-decisions-${{ matrix.shard }}.jsonl" "ai-work/mixed-result-${{ matrix.shard }}.json" "$MIXED_EPISODES" checkpoint-neural-v4 checkpoint-tree-v1
+        run: node scripts/ai/validate-checkpoint-selfplay.mjs "ai-work/mixed-decisions-${{ matrix.shard }}.jsonl" "ai-work/mixed-result-${{ matrix.shard }}.json" "$MIXED_EPISODES" checkpoint-neural-v4 "$TREE_SOURCE"
       - name: Run neural checkpoint self-play
         env:
           ER_AI_BUILD_SHA: ${{ github.sha }}
@@ -295,7 +317,7 @@ jobs:
     name: Winner-only tree and resumed-transformer bundle
     needs: self-play
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v6
         with:
@@ -348,7 +370,7 @@ jobs:
           --dictionary ai-dictionary/er-combat-data-dictionary.json
           --loss-episode-weight 0
           --winner-only-policy
-          --max-policy-decisions 4000
+          --max-policy-decisions 6000
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
           --models-dir ai-report/models
@@ -366,9 +388,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          weights=$(find ai-model -name model.safetensors -type f)
-          test "$(printf '%s\n' "$weights" | wc -l)" -eq 1
-          model_dir=$(dirname "$weights")
+          report=$(find ai-model -name report.json -type f)
+          test "$(printf '%s\n' "$report" | wc -l)" -eq 1
+          model_dir=$(dirname "$report")
+          test -f "$model_dir/model.safetensors"
           node scripts/ai/prepare-kaggle-candidate-training.mjs \
             ai-data \
             ai-dictionary/er-combat-data-dictionary.json \

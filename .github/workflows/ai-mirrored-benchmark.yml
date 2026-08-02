@@ -144,11 +144,17 @@ jobs:
               candidate = json.loads(paths[0].read_text(encoding="utf-8"))
               data = candidate["data"]
               sources = data["sourcePolicies"]
-              allowed_sources = {"checkpoint-tree-v1", "checkpoint-neural-v4", "engine-hardest-v1"}
+              allowed_sources = {
+                  "checkpoint-tree-v1",
+                  "checkpoint-neural-v4",
+                  "diagnostic-tree-v1",
+                  "engine-hardest-v1",
+              }
               if set(sources) - allowed_sources:
                   raise SystemExit(f"checkpoint candidate contains an unexpected policy source: {sources}")
-              if data["excludedPolicyDecisions"] != sources.get("engine-hardest-v1", 0):
-                  raise SystemExit("hardest-engine actions were not excluded exactly from policy training")
+              expected_excluded = sources.get("engine-hardest-v1", 0) + sources.get("diagnostic-tree-v1", 0)
+              if data["excludedPolicyDecisions"] != expected_excluded:
+                  raise SystemExit("value-only sparring actions were not excluded exactly from policy training")
               if data["policyTargetDecisions"] <= 0 or candidate["checkpointSelection"]["metric"] != "candidateNll":
                   raise SystemExit("checkpoint candidate was not selected on held-out policy targets")
               if data["transferDecisions"] != 0 or candidate["objective"]["transferPretrainEpochs"] != 0:
