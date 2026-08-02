@@ -36,6 +36,7 @@ import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-it
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
+import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 import { removeQueuedPostVictoryCombatPhases } from "#phases/post-victory-queue-cleanup";
@@ -190,6 +191,9 @@ export class BattleEndPhase extends BattlePhase {
       (phase: BattleEndPhase) => phase.isVictory,
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
+    if (this.isVictory) {
+      recordTelemetryBattleTerminal("victory");
+    }
 
     const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
     // A runtime always owns a wave-ledger binding, including during an ME battle. Only an actual staged

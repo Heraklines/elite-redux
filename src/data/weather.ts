@@ -55,11 +55,22 @@ export class Weather {
   public weatherType: WeatherType;
   public turnsLeft: number;
   public maxDuration: number;
+  /** Public provenance for battle-state consumers; null means biome/override/legacy source. */
+  public sourceEntityId: number | null;
+  public sourcePlayer: boolean | null;
 
-  constructor(weatherType: WeatherType, turnsLeft = 0, maxDuration: number = turnsLeft) {
+  constructor(
+    weatherType: WeatherType,
+    turnsLeft = 0,
+    maxDuration: number = turnsLeft,
+    sourceEntityId: number | null = null,
+    sourcePlayer: boolean | null = null,
+  ) {
     this.weatherType = weatherType;
     this.turnsLeft = this.isImmutable() ? 0 : turnsLeft;
     this.maxDuration = this.isImmutable() ? 0 : maxDuration;
+    this.sourceEntityId = sourceEntityId;
+    this.sourcePlayer = sourcePlayer;
   }
 
   /**

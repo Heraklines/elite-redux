@@ -4862,6 +4862,13 @@ export class FriskAbAttr extends PostSummonAbAttr {
         .getHeldItems()
         .map(m => m.type?.name)
         .filter((n): n is string => !!n);
+      opponent.revealHeldItems(
+        opponent
+          .getHeldItems()
+          .map(item => item.type?.id)
+          .filter((id): id is string => !!id),
+        true,
+      );
       if (itemNames.length === 0) {
         continue;
       }

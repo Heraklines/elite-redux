@@ -203,3 +203,21 @@ export function erWorldInPiecesAttached(pokemon: Pokemon): PokemonType[] | undef
   const types = pokemon.getTypes();
   return types.length > 0 ? [...types] : undefined;
 }
+
+export function erWorldInPiecesState(pokemon: Pokemon):
+  | {
+      original: readonly PokemonType[];
+      removed: readonly PokemonType[];
+      removedThisTurn: string | null;
+    }
+  | undefined {
+  const state = WORLD_IN_PIECES_STATE.get(pokemon);
+  if (!state) {
+    return;
+  }
+  return {
+    original: [...(state.original ?? pokemon.getTypes())],
+    removed: [...state.removed].sort((a, b) => a - b),
+    removedThisTurn: WORLD_IN_PIECES_REMOVED_THIS_TURN.get(pokemon) ?? null,
+  };
+}

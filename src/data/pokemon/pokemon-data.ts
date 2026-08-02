@@ -553,6 +553,8 @@ export interface LostHeldItemRecord {
  * Resets on new wave/battle start (but not on switch).
  */
 export class PokemonWaveData {
+  /** Whether this Pokemon has appeared on the field and is therefore public to the opposing player. */
+  public seenInBattle = false;
   /** Whether the pokemon has endured due to a {@linkcode BattlerTagType.ENDURE_TOKEN} */
   public endured = false;
   /**
@@ -563,6 +565,14 @@ export class PokemonWaveData {
   /** Whether the pokemon's ability has been revealed or not */
   // TODO: this doesn't account for passives
   public abilityRevealed = false;
+  /** Publicly revealed active/innate ability source keys (`active:-1:id`, `innate:slot:id`). */
+  public revealedAbilityKeys: Set<string> = new Set<string>();
+  /** Held-item modifier type ids explicitly revealed to the opposing player. */
+  public revealedHeldItemIds: Set<string> = new Set<string>();
+  /** True after an effect such as Frisk disclosed the complete current held-item set. */
+  public heldItemKnowledgeComplete = false;
+  /** Move ids this Pokemon has publicly attempted during the current battle. */
+  public revealedMoveIds: Set<MoveId> = new Set<MoveId>();
   /**
    * Keys of "once per battle" on-entry effects that have already fired this
    * wave for this Pokémon. Used by ER's once-per-battle entry effects (e.g.

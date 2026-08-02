@@ -88,3 +88,7 @@ export function erTryQuickeningGrace(user: Pokemon | undefined, move: Move): boo
   }
   return false;
 }
+
+export function erQuickeningGraceUsedTurn(pokemon: Pokemon): string | undefined {
+  return QUICKENING_GRACE_USED.get(pokemon);
+}

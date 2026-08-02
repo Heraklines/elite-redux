@@ -5,16 +5,16 @@
  */
 
 // =============================================================================
-// TELEMETRY HOOKS (#player-telemetry). The engine-coupled layer: it reads globalScene + the coop runtime,
-// builds events, and hands them to the (engine-free) recorder/queue. This is the ONLY telemetry module
+// TELEMETRY HOOKS (#player-telemetry). The engine-coupled layer builds the solo human-policy contract
+// and hands it to the engine-free recorder/queue. This is the ONLY telemetry module
 // that touches the game; everything it calls (recorder / queue / store / state / transport) is testable
 // without it.
 //
 // GATING: capture is enabled only when the build-time flag `VITE_TELEMETRY` is set. When it is unset,
 // `initTelemetry` returns immediately, no listeners are installed, no
-// store is opened, and every phase tap is a hard no-op (the observer emits in ui.ts / command-phase.ts /
-// turn-end-phase.ts have no listener), so the build is behavior-identical + free. Designed so a future
-// Production and staging use separate R2 bindings.
+// store is opened, and every phase tap is a hard no-op. Schema v2 captures only committed solo combat
+// commands and their resolved successors; it never subscribes to UI/raw-input events and fails closed in
+// co-op, Showdown, and tournament modes. Production and staging use separate R2 bindings.
 //
 // SESSIONS: a telemetry session == one RUN. It begins LAZILY on the first in-run capture (keyed by the
 // run seed) and switches when the seed changes (a new run), so no extra run-start/run-end tap is needed.
@@ -26,8 +26,24 @@ import { clientSessionId, loggedInUser } from "#app/account";
 import { SESSION_ID_COOKIE_NAME } from "#app/constants";
 import { ER_VERSION } from "#app/constants/app-constants";
 import { globalScene } from "#app/global-scene";
-import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import { captureCommittedCombatDecision, perspectiveTargetRef } from "#data/elite-redux/ai/combat-committed-action";
+import {
+  ER_COMBAT_CONTRACT_VERSION,
+  type ErCombatAuxiliaryAction,
+  type ErCombatBattleTerminal,
+  type ErCombatCandidate,
+  type ErCombatMonObservation,
+  type ErCombatObservation,
+  type ErCombatPreviousActionObservation,
+  type ErCombatRewardComponents,
+} from "#data/elite-redux/ai/combat-contract";
+import {
+  type ErCombatEarlierChoice,
+  enumerateErCombatCandidates,
+  snapshotErCombatJointActions,
+  snapshotErCombatObservation,
+} from "#data/elite-redux/ai/combat-engine-adapter";
+import { isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { isTournamentMatch } from "#data/elite-redux/showdown/tournament-match-context";
 import {
@@ -38,25 +54,23 @@ import {
 import {
   beginTelemetrySession,
   endTelemetrySession,
+  flushTelemetry,
   flushTelemetryBeacon,
   getTelemetrySession,
-  isTelemetryRecording,
   maybeFlushTelemetry,
   recordTelemetryEvent,
 } from "#data/elite-redux/telemetry/telemetry-recorder";
 import type {
   TelemetryActor,
-  TelemetryBattleAction,
-  TelemetryBattleDecisionEvent,
-  TelemetryInputEvent,
+  TelemetryBattleTerminalEvent,
+  TelemetryCombatAuxiliaryDecisionEvent,
+  TelemetryCombatContractEvent,
+  TelemetryCombatTransitionEvent,
   TelemetryMode,
+  TelemetryRunOutcomeEvent,
   TelemetrySessionEnvelope,
-  TelemetrySurfaceChoiceEvent,
-  TelemetrySurfaceOpenEvent,
-  TelemetryTurnOutcomeEvent,
 } from "#data/elite-redux/telemetry/telemetry-schema";
 import { TELEMETRY_SCHEMA_VERSION } from "#data/elite-redux/telemetry/telemetry-schema";
-import { snapshotBattleState, type TelemetryMonSource } from "#data/elite-redux/telemetry/telemetry-state";
 import {
   MemoryTelemetryStore,
   openIdbTelemetryStore,
@@ -66,9 +80,9 @@ import {
   resolvePlayerTelemetryBase,
   resolvePlayerTelemetryMode,
   sendTelemetryBatch,
+  shouldCaptureHumanCombatTelemetry,
 } from "#data/elite-redux/telemetry/telemetry-transport";
 import { Command } from "#enums/command";
-import { UiMode } from "#enums/ui-mode";
 import { version } from "#package.json";
 import { randomString } from "#utils/common";
 import { getCookie } from "#utils/cookies";
@@ -81,8 +95,21 @@ let initialized = false;
 let store: TelemetryStore | null = null;
 let base: string | null = null;
 let playerIdHash = "anon";
-/** The uiMode of the most recently opened surface, so a choice event can attribute its uiMode. */
-let lastSurfaceMode = -1;
+const combatDictionaryHash =
+  (import.meta.env as { VITE_AI_DICTIONARY_HASH?: string }).VITE_AI_DICTIONARY_HASH ?? `unsealed-${version}`;
+let combatJointActionId = "";
+let combatEarlierChoices: ErCombatEarlierChoice[] = [];
+let combatPendingObservation: ErCombatObservation | null = null;
+let combatPendingDecisionIds: string[] = [];
+const combatCapturedActorSlots = new Set<number>();
+const combatKnownOpponentEntityIds = new Set<number>();
+const combatRecordedBattleTerminals = new Set<string>();
+const combatRecordedActionIds = new Set<string>();
+const combatActionHistory: ErCombatPreviousActionObservation[] = [];
+const combatPreparedDecisions = new Map<
+  number,
+  { jointActionId: string; observation: ErCombatObservation; candidates: ErCombatCandidate[] }
+>();
 
 /** Enabled only when the build-time flag is set. A non-empty, non-"off" value. */
 export function isTelemetryEnabled(): boolean {
@@ -151,6 +178,7 @@ function currentMode(): TelemetryMode {
 function makeEnvelope(sessionId: string, mode: TelemetryMode, seed: string): TelemetrySessionEnvelope {
   const env: TelemetrySessionEnvelope = {
     schemaVersion: TELEMETRY_SCHEMA_VERSION,
+    combatContractVersion: ER_COMBAT_CONTRACT_VERSION,
     sessionId,
     playerIdHash,
     build: version,
@@ -158,6 +186,7 @@ function makeEnvelope(sessionId: string, mode: TelemetryMode, seed: string): Tel
     mode,
     gameModeId: globalScene?.gameMode?.modeId ?? -1,
     seed,
+    startWave: globalScene?.currentBattle?.waveIndex ?? 0,
     difficulty: safeDifficulty(),
     startedAt: Date.now(),
   };
@@ -183,6 +212,11 @@ function ensureSession(): boolean {
   if (store == null || base == null) {
     return false; // telemetry not enabled / not initialized
   }
+  const mode = currentMode();
+  if (!shouldCaptureHumanCombatTelemetry(mode)) {
+    endTelemetrySession();
+    return false;
+  }
   const seed = globalScene?.seed ?? "";
   if (seed === "" || globalScene?.currentBattle == null) {
     return false; // no active run yet
@@ -194,76 +228,68 @@ function ensureSession(): boolean {
   // New run (or first capture): start a fresh session. The previous run is finalized immediately; its
   // durable local copy remains available to the next boot's recovery pass if that upload fails.
   endTelemetrySession();
-  const env = makeEnvelope(randomString(24), currentMode(), seed);
+  combatJointActionId = "";
+  combatEarlierChoices = [];
+  combatPendingObservation = null;
+  combatPendingDecisionIds = [];
+  combatCapturedActorSlots.clear();
+  combatKnownOpponentEntityIds.clear();
+  combatRecordedBattleTerminals.clear();
+  combatRecordedActionIds.clear();
+  combatActionHistory.length = 0;
+  combatPreparedDecisions.clear();
+  const env = makeEnvelope(randomString(24), mode, seed);
   const q = new TelemetryQueue(store, env, upload, DEFAULT_TELEMETRY_QUEUE_CONFIG);
   store.saveEnvelope(env).catch(() => {});
   beginTelemetrySession(env, q);
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Field-state snapshot helpers.
-// ---------------------------------------------------------------------------
+function currentJointActionId(sessionId: string): string {
+  const battle = globalScene.currentBattle;
+  return `${sessionId}:${battle.waveIndex}:${battle.battleSeed}:${battle.turn}`;
+}
 
-/** Resolve the co-op actor (self/partner) that owns a player-side mon, or undefined outside co-op. */
-function makeOwnerResolver(): ((mon: TelemetryMonSource) => TelemetryActor | undefined) | undefined {
-  let me: CoopRole | undefined;
-  try {
-    me = getCoopController()?.role;
-  } catch {
-    me = undefined;
-  }
-  if (me == null) {
+function enterCombatJointAction(jointActionId: string): void {
+  if (jointActionId === combatJointActionId) {
     return;
   }
-  return (mon: TelemetryMonSource) => {
-    const owner = (mon as { coopOwner?: CoopRole }).coopOwner;
-    if (owner == null) {
+  combatJointActionId = jointActionId;
+  combatEarlierChoices = [];
+  combatPendingObservation = null;
+  combatPendingDecisionIds = [];
+  combatCapturedActorSlots.clear();
+  combatPreparedDecisions.clear();
+}
+
+/**
+ * Build the expensive immutable command snapshot before the input surface opens. The actual event is still
+ * emitted only after handleCommand accepts a genuine human action, but damage previews never block that commit.
+ */
+export function prepareTelemetryDecision(fieldIndex: number): void {
+  try {
+    if (!ensureSession()) {
       return;
     }
-    return owner === me ? "self" : "partner";
-  };
-}
-
-function snapshotState() {
-  const arena = globalScene.arena;
-  return snapshotBattleState(
-    globalScene.getPlayerField() as unknown as TelemetryMonSource[],
-    globalScene.getEnemyField() as unknown as TelemetryMonSource[],
-    {
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      biome: arena?.biomeId ?? -1,
-      turn: globalScene.currentBattle?.turn ?? 0,
-      weather: arena?.weather?.weatherType ?? null,
-      terrain: arena?.terrain?.terrainType ?? null,
-    },
-    makeOwnerResolver(),
-  );
-}
-
-/** Map a committed CommandPhase decision to the ACTION half of the (state, action) pair. */
-function buildAction(fieldIndex: number, command: Command, cursor: number): TelemetryBattleAction | null {
-  switch (command) {
-    case Command.FIGHT:
-    case Command.TERA: {
-      const committed = globalScene.currentBattle?.turnCommands?.[fieldIndex];
-      const moveId =
-        committed?.move?.move ?? globalScene.getPlayerField()[fieldIndex]?.getMoveset()?.[cursor]?.moveId ?? -1;
-      const target = committed?.move?.targets?.[0];
-      const action: TelemetryBattleAction = { kind: "move", moveIndex: cursor, moveId };
-      if (target != null) {
-        action.target = target;
-      }
-      return action;
+    const session = getTelemetrySession();
+    if (session == null || currentMode() !== "solo") {
+      return;
     }
-    case Command.POKEMON:
-      return { kind: "switch", partyIndex: cursor };
-    case Command.BALL:
-      return { kind: "ball", ballIndex: cursor };
-    case Command.RUN:
-      return { kind: "run" };
-    default:
-      return null; // SHIFT / other non-decisions are not (state, action) training pairs
+    const jointActionId = currentJointActionId(session.sessionId);
+    enterCombatJointAction(jointActionId);
+    if (combatPreparedDecisions.get(fieldIndex)?.jointActionId === jointActionId) {
+      return;
+    }
+    globalScene.getEnemyField().forEach(mon => combatKnownOpponentEntityIds.add(mon.id));
+    const observation = snapshotErCombatObservation(globalScene, {
+      perspective: "player",
+      knownOpponentEntityIds: combatKnownOpponentEntityIds,
+      previousActions: combatActionHistory,
+    });
+    const candidates = enumerateErCombatCandidates(globalScene, fieldIndex, combatEarlierChoices, "player");
+    combatPreparedDecisions.set(fieldIndex, { jointActionId, observation, candidates });
+  } catch {
+    /* telemetry preparation must never affect the command UI */
   }
 }
 
@@ -271,9 +297,172 @@ function buildAction(fieldIndex: number, command: Command, cursor: number): Tele
 // Phase taps (called from command-phase.ts + turn-end-phase.ts). Each gates hard + never throws.
 // ---------------------------------------------------------------------------
 
+function recordCombatContractDecision(
+  fieldIndex: number,
+  command: Command,
+  cursor: number,
+  actor: TelemetryActor,
+): void {
+  const session = getTelemetrySession();
+  if (session == null || actor !== "self" || currentMode() !== "solo") {
+    return;
+  }
+  const battle = globalScene.currentBattle;
+  const jointActionId = currentJointActionId(session.sessionId);
+  enterCombatJointAction(jointActionId);
+  if (combatCapturedActorSlots.has(fieldIndex)) {
+    return;
+  }
+  globalScene.getEnemyField().forEach(mon => combatKnownOpponentEntityIds.add(mon.id));
+  const prepared = combatPreparedDecisions.get(fieldIndex);
+  const captured = captureCommittedCombatDecision({
+    scene: globalScene,
+    perspective: "player",
+    actorSlot: fieldIndex,
+    jointActionId,
+    earlier: combatEarlierChoices,
+    policySource: "human-v1",
+    policyTarget: true,
+    knownOpponentEntityIds: combatKnownOpponentEntityIds,
+    buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+    dexHash: combatDictionaryHash,
+    dictionaryHash: combatDictionaryHash,
+    episodeId: session.sessionId,
+    splitGroupId: session.sessionId,
+    sourcePartitionId: playerIdHash,
+    ...(prepared?.jointActionId === jointActionId
+      ? { observation: prepared.observation, candidates: prepared.candidates }
+      : {}),
+  });
+  if (captured == null) {
+    if (command !== Command.BALL && command !== Command.RUN) {
+      return;
+    }
+    const observation =
+      prepared?.jointActionId === jointActionId
+        ? prepared.observation
+        : snapshotErCombatObservation(globalScene, {
+            perspective: "player",
+            knownOpponentEntityIds: combatKnownOpponentEntityIds,
+            previousActions: combatActionHistory,
+          });
+    const committed = battle.turnCommands[fieldIndex];
+    const action: ErCombatAuxiliaryAction =
+      command === Command.RUN
+        ? { kind: "run" }
+        : {
+            kind: "ball",
+            ballIndex: cursor,
+            targets: (committed?.targets ?? [])
+              .map(target => perspectiveTargetRef(globalScene, "player", target))
+              .filter(target => target != null),
+          };
+    const decisionId = `${jointActionId}:${fieldIndex}`;
+    const event: TelemetryCombatAuxiliaryDecisionEvent = {
+      kind: "combat_auxiliary_decision",
+      t: Date.now(),
+      wave: battle.waveIndex,
+      record: {
+        kind: "combat_auxiliary_decision",
+        schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+        candidateScope: "non-policy-battle-command",
+        buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+        dexHash: combatDictionaryHash,
+        dictionaryHash: combatDictionaryHash,
+        episodeId: session.sessionId,
+        sourcePartitionId: playerIdHash,
+        jointActionId,
+        decisionId,
+        actorSlot: fieldIndex,
+        policyTarget: false,
+        observation,
+        action,
+      },
+    };
+    recordTelemetryEvent(event);
+    combatPendingObservation ??= observation;
+    combatPendingDecisionIds.push(decisionId);
+    combatCapturedActorSlots.add(fieldIndex);
+    combatPreparedDecisions.delete(fieldIndex);
+    return;
+  }
+  const event: TelemetryCombatContractEvent = {
+    kind: "combat_contract_decision",
+    t: Date.now(),
+    wave: battle.waveIndex,
+    record: captured.record,
+  };
+  recordTelemetryEvent(event);
+  combatPendingObservation ??= captured.record.observation;
+  combatPendingDecisionIds.push(captured.record.decisionId);
+  combatCapturedActorSlots.add(fieldIndex);
+  combatPreparedDecisions.delete(fieldIndex);
+  combatEarlierChoices.push({
+    kind: captured.chosen.kind,
+    id: captured.chosen.id,
+    ...(captured.chosen.kind === "switch" ? { partyIndex: captured.chosen.partyIndex } : {}),
+    ...(captured.chosen.kind === "move" ? { tera: captured.chosen.tera } : {}),
+  });
+}
+
+function observationMons(observation: ErCombatObservation, side: "self" | "opponent"): ErCombatMonObservation[] {
+  return side === "self" ? observation.selfParty : [...observation.opponentActive, ...observation.opponentKnownParty];
+}
+
+function transitionRewards(before: ErCombatObservation, after: ErCombatObservation): ErCombatRewardComponents {
+  const beforeSelf = new Map(observationMons(before, "self").map(mon => [mon.entityId, mon]));
+  const afterSelf = new Map(observationMons(after, "self").map(mon => [mon.entityId, mon]));
+  const beforeOpponent = new Map(observationMons(before, "opponent").map(mon => [mon.entityId, mon]));
+  const afterOpponent = new Map(observationMons(after, "opponent").map(mon => [mon.entityId, mon]));
+  let damageDealtRatio = 0;
+  let damageTaken = 0;
+  let healingDealtRatio = 0;
+  let healingReceived = 0;
+  let statusChanges = 0;
+  let selfFaints = 0;
+  let opponentFaints = 0;
+  let shieldSegmentsBroken = 0;
+
+  for (const [entityId, prior] of beforeSelf) {
+    const next = afterSelf.get(entityId);
+    if (next == null) {
+      continue;
+    }
+    if (prior.hp != null && next.hp != null) {
+      damageTaken += Math.max(0, prior.hp - next.hp);
+      healingReceived += Math.max(0, next.hp - prior.hp);
+    }
+    statusChanges += Number(prior.status !== next.status);
+    selfFaints += Number(!prior.fainted && next.fainted);
+  }
+  for (const [entityId, prior] of beforeOpponent) {
+    const next = afterOpponent.get(entityId);
+    if (next == null) {
+      continue;
+    }
+    if (prior.hpRatio != null && next.hpRatio != null) {
+      damageDealtRatio += Math.max(0, prior.hpRatio - next.hpRatio);
+      healingDealtRatio += Math.max(0, next.hpRatio - prior.hpRatio);
+    }
+    statusChanges += Number(prior.status !== next.status);
+    opponentFaints += Number(!prior.fainted && next.fainted);
+    shieldSegmentsBroken += Math.max(0, prior.boss.segmentIndex - next.boss.segmentIndex);
+  }
+  return {
+    damageDealtRatio,
+    damageTaken,
+    healingDealtRatio,
+    healingReceived,
+    statusChanges,
+    selfFaints,
+    opponentFaints,
+    shieldSegmentsBroken,
+    terminal: 0,
+  };
+}
+
 /**
- * Capture one battle decision as a (state, action) training pair. `actor` = "self" for this client's own
- * committed command, "partner" for an observed co-op partner command. No-op unless recording.
+ * Capture one genuinely committed solo human combat command. Partner/automatic/non-combat commands fail closed.
  */
 export function recordTelemetryDecision(
   fieldIndex: number,
@@ -285,137 +474,227 @@ export function recordTelemetryDecision(
     if (!ensureSession()) {
       return;
     }
-    const action = buildAction(fieldIndex, command, cursor);
-    if (action == null) {
-      return;
-    }
-    const event: TelemetryBattleDecisionEvent = {
-      kind: "battle_decision",
-      t: Date.now(),
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      actor,
-      slotFieldIndex: fieldIndex,
-      state: snapshotState(),
-      action,
-    };
-    recordTelemetryEvent(event);
+    recordCombatContractDecision(fieldIndex, command, cursor, actor);
   } catch {
     /* telemetry must never affect gameplay */
   }
 }
 
+function structuredJointActions(phase: "committed" | "resolved"): ErCombatPreviousActionObservation[] {
+  const session = getTelemetrySession();
+  if (session == null) {
+    return [];
+  }
+  const jointActionId = currentJointActionId(session.sessionId);
+  return snapshotErCombatJointActions(globalScene, jointActionId, phase, combatActionHistory);
+}
+
+function appendStructuredJointActions(phase: "committed" | "resolved"): void {
+  for (const action of structuredJointActions(phase)) {
+    if (combatRecordedActionIds.has(action.actionId)) {
+      continue;
+    }
+    combatRecordedActionIds.add(action.actionId);
+    combatActionHistory.push(action);
+  }
+  if (combatActionHistory.length > 32) {
+    combatActionHistory.splice(0, combatActionHistory.length - 32);
+  }
+}
+
+/** Called once all player/enemy commands exist, before switches or moves mutate the field. */
+export function recordTelemetryJointActionsCommitted(): void {
+  try {
+    if (!ensureSession() || currentMode() !== "solo") {
+      return;
+    }
+    appendStructuredJointActions("committed");
+  } catch {
+    /* telemetry must never affect turn start */
+  }
+}
+
 /**
- * Capture the resolved field OUTCOME at turn end (both sides' state + which slots fainted), so state
- * transitions are learnable. Also drives the boundary flush check. No-op unless recording.
+ * Capture the resolved successor and reward components for the preceding committed joint action.
  */
+function recordPendingTransition(battleTerminal: ErCombatBattleTerminal | null): string | null {
+  const session = getTelemetrySession();
+  if (session == null || combatPendingObservation == null || combatPendingDecisionIds.length === 0) {
+    return null;
+  }
+  const resolvedObservation = snapshotErCombatObservation(globalScene, {
+    perspective: "player",
+    knownOpponentEntityIds: combatKnownOpponentEntityIds,
+    previousActions: combatActionHistory,
+  });
+  const transitionId = `${combatJointActionId}:resolved`;
+  const rewards = transitionRewards(combatPendingObservation, resolvedObservation);
+  rewards.terminal =
+    battleTerminal === "victory" || battleTerminal === "capture" || battleTerminal === "flee"
+      ? 1
+      : battleTerminal === "defeat"
+        ? -1
+        : 0;
+  const event: TelemetryCombatTransitionEvent = {
+    kind: "combat_contract_transition",
+    t: Date.now(),
+    wave: globalScene.currentBattle.waveIndex,
+    record: {
+      kind: "combat_transition",
+      schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+      buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+      dexHash: combatDictionaryHash,
+      dictionaryHash: combatDictionaryHash,
+      episodeId: session.sessionId,
+      jointActionId: combatJointActionId,
+      transitionId,
+      decisionIds: [...combatPendingDecisionIds],
+      resolvedObservation,
+      rewards,
+      battleTerminal,
+    },
+  };
+  recordTelemetryEvent(event);
+  combatPendingObservation = null;
+  combatPendingDecisionIds = [];
+  return transitionId;
+}
+
 export function recordTelemetryTurnOutcome(): void {
   try {
     if (!ensureSession()) {
       return;
     }
-    const state = snapshotState();
-    const faints = [
-      ...state.player.map((m, i) => (m.fainted ? `p${i}` : null)),
-      ...state.enemy.map((m, i) => (m.fainted ? `e${i}` : null)),
-    ].filter((s): s is string => s != null);
-    const event: TelemetryTurnOutcomeEvent = {
-      kind: "turn_outcome",
-      t: Date.now(),
-      wave: state.wave,
-      turn: state.turn,
-      state,
-      faints,
-    };
-    recordTelemetryEvent(event);
-    maybeFlushTelemetry(state.wave);
+    appendStructuredJointActions("resolved");
+    recordPendingTransition(null);
+    maybeFlushTelemetry(globalScene.currentBattle.waveIndex);
   } catch {
     /* swallow */
   }
 }
 
-// ---------------------------------------------------------------------------
-// UI surface / input observers (subscribed to the ui.ts / option-select emits).
-// ---------------------------------------------------------------------------
-
-function recordSurfaceOpen(mode: number, args: unknown[]): void {
+/** Record one exact-once solo battle terminal; capture/flee are retained without becoming policy labels. */
+export function recordTelemetryBattleTerminal(outcome: ErCombatBattleTerminal): void {
   try {
     if (!ensureSession()) {
       return;
     }
-    lastSurfaceMode = mode;
-    const config = args?.[0] as { options?: { label?: unknown }[] } | undefined;
-    const options = Array.isArray(config?.options) ? config.options.map(o => String(o?.label ?? "")).slice(0, 32) : [];
-    const event: TelemetrySurfaceOpenEvent = {
-      kind: "surface_open",
+    const session = getTelemetrySession();
+    if (session == null) {
+      return;
+    }
+    const wave = globalScene.currentBattle.waveIndex;
+    const battleId = `${session.sessionId}:${wave}:${globalScene.currentBattle.battleSeed}`;
+    if (combatRecordedBattleTerminals.has(battleId)) {
+      return;
+    }
+    appendStructuredJointActions("resolved");
+    const transitionId = recordPendingTransition(outcome);
+    const event: TelemetryBattleTerminalEvent = {
+      kind: "battle_terminal",
       t: Date.now(),
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      uiMode: mode,
-      uiModeName: UiMode[mode] ?? String(mode),
-      options,
-      actor: surfaceActor(),
+      wave,
+      outcome,
+      record: {
+        kind: "battle_terminal",
+        schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+        buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+        dexHash: combatDictionaryHash,
+        dictionaryHash: combatDictionaryHash,
+        episodeId: session.sessionId,
+        battleId,
+        terminalId: `${battleId}:terminal`,
+        wave,
+        turn: globalScene.currentBattle.turn,
+        outcome,
+        jointActionId: combatJointActionId || null,
+        transitionId,
+      },
     };
     recordTelemetryEvent(event);
+    combatRecordedBattleTerminals.add(battleId);
+    maybeFlushTelemetry(wave);
   } catch {
-    /* swallow */
+    /* telemetry must never affect gameplay */
   }
 }
 
-function recordSurfaceChoice(chosenIndex: number, chosenLabel: string): void {
+/** Record a genuine solo run terminal; retries and Mystery Encounter recoveries call this only after resumption is ruled out. */
+export function recordTelemetryRunOutcome(victory: boolean): void {
   try {
+    recordTelemetryBattleTerminal(victory ? "victory" : "defeat");
     if (!ensureSession()) {
       return;
     }
-    const event: TelemetrySurfaceChoiceEvent = {
-      kind: "surface_choice",
-      t: Date.now(),
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      uiMode: lastSurfaceMode,
-      uiModeName: UiMode[lastSurfaceMode] ?? String(lastSurfaceMode),
-      chosenIndex,
-      chosenLabel: String(chosenLabel ?? "").slice(0, 64),
-      actor: surfaceActor(),
-    };
-    recordTelemetryEvent(event);
-  } catch {
-    /* swallow */
-  }
-}
-
-function recordInput(code: number, mode: number): void {
-  try {
-    if (!ensureSession() || !isTelemetryRecording()) {
+    const session = getTelemetrySession();
+    if (session == null) {
       return;
     }
-    const event: TelemetryInputEvent = {
-      kind: "input",
+    const finalWave = globalScene.currentBattle?.waveIndex ?? session.startWave ?? 0;
+    const outcome = victory ? "victory" : "player-wiped";
+    const event: TelemetryRunOutcomeEvent = {
+      kind: "run_outcome",
       t: Date.now(),
-      wave: globalScene.currentBattle?.waveIndex ?? 0,
-      code,
-      uiMode: mode,
+      wave: finalWave,
+      outcome,
+      record: {
+        kind: "run_terminal",
+        schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+        buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+        dexHash: combatDictionaryHash,
+        dictionaryHash: combatDictionaryHash,
+        episodeId: session.sessionId,
+        splitGroupId: session.sessionId,
+        sourcePartitionId: playerIdHash,
+        outcome,
+        startWave: session.startWave ?? finalWave,
+        finalWave,
+        wavesCleared: Math.max(0, finalWave - (session.startWave ?? finalWave) + (victory ? 1 : 0)),
+        truncated: false,
+      },
     };
     recordTelemetryEvent(event);
+    flushTelemetry(finalWave);
+    endTelemetrySession();
   } catch {
-    /* swallow */
+    /* telemetry must never affect gameplay */
   }
 }
 
-/**
- * In co-op, whose surface is this? The mirror drives the surface for whichever seat OWNS the interaction;
- * we tag by comparing the interaction owner-seat to our own role. Outside co-op it is always "self".
- */
-function surfaceActor(): TelemetryActor {
+/** Explicit title-return abandonment only; pagehide/reload never call this and remain incomplete sessions. */
+export function recordTelemetryRunAbandonment(): void {
   try {
-    const controller = getCoopController();
-    if (controller == null) {
-      return "self";
+    const session = getTelemetrySession();
+    if (session == null || currentMode() !== "solo") {
+      return;
     }
-    const me = controller.role;
-    const ownerSeat = (controller as { interactionCounter?: () => number }).interactionCounter?.() ?? 0;
-    // Even interaction counter -> host owns, odd -> guest owns (CoopInteractionTurn.ownerOf parity).
-    const ownerRole: CoopRole = ownerSeat % 2 === 0 ? "host" : "guest";
-    return ownerRole === me ? "self" : "partner";
+    recordTelemetryBattleTerminal("abort");
+    const finalWave = globalScene.currentBattle?.waveIndex ?? session.startWave ?? 0;
+    const event: TelemetryRunOutcomeEvent = {
+      kind: "run_outcome",
+      t: Date.now(),
+      wave: finalWave,
+      outcome: "abandonment",
+      record: {
+        kind: "run_terminal",
+        schemaVersion: ER_COMBAT_CONTRACT_VERSION,
+        buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA ?? version,
+        dexHash: combatDictionaryHash,
+        dictionaryHash: combatDictionaryHash,
+        episodeId: session.sessionId,
+        splitGroupId: session.sessionId,
+        sourcePartitionId: playerIdHash,
+        outcome: "abandonment",
+        startWave: session.startWave ?? finalWave,
+        finalWave,
+        wavesCleared: Math.max(0, finalWave - (session.startWave ?? finalWave)),
+        truncated: false,
+      },
+    };
+    recordTelemetryEvent(event);
+    endTelemetrySession();
   } catch {
-    return "self";
+    /* telemetry must never affect gameplay */
   }
 }
 
@@ -424,8 +703,8 @@ function surfaceActor(): TelemetryActor {
 // ---------------------------------------------------------------------------
 
 /**
- * Initialize the telemetry pipeline: open the durable store, install the pagehide/visibilitychange beacon
- * + the UI surface/input observers, and run the boot RECOVERY of any previous session's unflushed events.
+ * Initialize the telemetry pipeline: open the durable store, install the pagehide/visibilitychange beacon,
+ * and run boot recovery. Schema v2 deliberately installs no UI or raw-input observers.
  * A hard no-op unless the build-time flag is set AND an ingest endpoint is configured. Never throws.
  */
 export async function initTelemetry(): Promise<void> {
@@ -445,7 +724,6 @@ export async function initTelemetry(): Promise<void> {
     store = (await openIdbTelemetryStore()) ?? new MemoryTelemetryStore();
 
     installLifecycleBeacon();
-    installUiObservers();
     await runBootRecovery();
   } catch {
     /* telemetry init must never break the game */
@@ -472,16 +750,6 @@ function installLifecycleBeacon(): void {
   if (typeof window !== "undefined") {
     window.addEventListener("pagehide", beacon);
   }
-}
-
-function installUiObservers(): void {
-  const ui = globalScene?.ui;
-  if (ui == null) {
-    return;
-  }
-  ui.on("er-telemetry-surface", (mode: number, args: unknown[]) => recordSurfaceOpen(mode, args));
-  ui.on("er-telemetry-choice", (index: number, label: string) => recordSurfaceChoice(index, label));
-  ui.on("er-telemetry-input", (code: number, mode: number) => recordInput(code, mode));
 }
 
 async function runBootRecovery(): Promise<void> {

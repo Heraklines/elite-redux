@@ -10,8 +10,14 @@ import type { NonFunctionProperties } from "#types/type-helpers";
 
 export interface SerializedArenaData {
   biome: BiomeId;
-  weather: NonFunctionProperties<Weather> | null;
-  terrain: NonFunctionProperties<Terrain> | null;
+  weather:
+    | (Omit<NonFunctionProperties<Weather>, "sourceEntityId" | "sourcePlayer"> &
+        Partial<Pick<NonFunctionProperties<Weather>, "sourceEntityId" | "sourcePlayer">>)
+    | null;
+  terrain:
+    | (Omit<NonFunctionProperties<Terrain>, "sourceEntityId" | "sourcePlayer"> &
+        Partial<Pick<NonFunctionProperties<Terrain>, "sourceEntityId" | "sourcePlayer">>)
+    | null;
   tags?: ArenaTagData[];
   positionalTags: SerializedPositionalTag[];
   playerTerasUsed?: number;
@@ -54,10 +60,22 @@ export class ArenaData {
 
     this.biome = source.biome;
     this.weather = source.weather
-      ? new Weather(source.weather.weatherType, source.weather.turnsLeft, source.weather.maxDuration)
+      ? new Weather(
+          source.weather.weatherType,
+          source.weather.turnsLeft,
+          source.weather.maxDuration,
+          source.weather.sourceEntityId ?? null,
+          source.weather.sourcePlayer ?? null,
+        )
       : null;
     this.terrain = source.terrain
-      ? new Terrain(source.terrain.terrainType, source.terrain.turnsLeft, source.terrain.maxDuration)
+      ? new Terrain(
+          source.terrain.terrainType,
+          source.terrain.turnsLeft,
+          source.terrain.maxDuration,
+          source.terrain.sourceEntityId ?? null,
+          source.terrain.sourcePlayer ?? null,
+        )
       : null;
     this.positionalTags = source.positionalTags ?? [];
   }

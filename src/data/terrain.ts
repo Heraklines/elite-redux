@@ -33,11 +33,22 @@ export class Terrain {
   public terrainType: TerrainType;
   public turnsLeft: number;
   public maxDuration: number;
+  /** Public provenance for battle-state consumers; null means biome/override/legacy source. */
+  public sourceEntityId: number | null;
+  public sourcePlayer: boolean | null;
 
-  constructor(terrainType: TerrainType, turnsLeft = 0, maxDuration: number = turnsLeft) {
+  constructor(
+    terrainType: TerrainType,
+    turnsLeft = 0,
+    maxDuration: number = turnsLeft,
+    sourceEntityId: number | null = null,
+    sourcePlayer: boolean | null = null,
+  ) {
     this.terrainType = terrainType;
     this.turnsLeft = turnsLeft;
     this.maxDuration = maxDuration;
+    this.sourceEntityId = sourceEntityId;
+    this.sourcePlayer = sourcePlayer;
   }
 
   /**

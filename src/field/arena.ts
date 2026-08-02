@@ -480,7 +480,9 @@ export class Arena {
       weatherDuration.value = turnsOverride;
     }
 
-    this.weather = weather ? new Weather(weather, weatherDuration.value, weatherDuration.value) : null;
+    this.weather = weather
+      ? new Weather(weather, weatherDuration.value, weatherDuration.value, user?.id ?? null, user?.isPlayer() ?? null)
+      : null;
 
     if (
       [WeatherType.HAIL, WeatherType.SNOW].includes(oldWeatherType)
@@ -652,7 +654,9 @@ export class Arena {
       globalScene.applyModifier(FieldEffectModifier, user.isPlayer(), user, terrainDuration);
     }
 
-    this.terrain = terrain ? new Terrain(terrain, terrainDuration.value, terrainDuration.value) : null;
+    this.terrain = terrain
+      ? new Terrain(terrain, terrainDuration.value, terrainDuration.value, user?.id ?? null, user?.isPlayer() ?? null)
+      : null;
 
     this.eventTarget.dispatchEvent(
       new TerrainChangedEvent(oldTerrainType, this.terrain?.terrainType!, this.terrain?.turnsLeft!),

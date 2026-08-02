@@ -140,3 +140,13 @@ export function erApplyPendingRevives(isPlayer: boolean): void {
     );
   }
 }
+
+export function erDeferredReviveState(pokemon: Pokemon): {
+  pendingHpFraction: number | null;
+  usedThisBattle: boolean;
+} {
+  return {
+    pendingHpFraction: PENDING_REVIVE.get(pokemon) ?? null,
+    usedThisBattle: USED_THIS_BATTLE.get(pokemon) === true,
+  };
+}

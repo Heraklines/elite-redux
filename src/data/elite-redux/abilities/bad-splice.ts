@@ -172,3 +172,12 @@ export function erBadSpliceOnLeaveField(holder: Pokemon): void {
   }
   SPLICE_LEDGER.delete(holder);
 }
+
+export function erBadSpliceLedger(holder: Pokemon): ReadonlyArray<{
+  foeEntityId: number;
+  types: readonly PokemonType[];
+}> {
+  return [...(SPLICE_LEDGER.get(holder)?.entries() ?? [])]
+    .map(([foe, types]) => ({ foeEntityId: foe.id, types: [...types].sort((a, b) => a - b) }))
+    .sort((a, b) => a.foeEntityId - b.foeEntityId);
+}

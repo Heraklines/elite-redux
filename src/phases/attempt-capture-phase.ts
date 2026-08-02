@@ -19,6 +19,7 @@ import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
+import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { Gender } from "#data/gender";
 import {
   doPokeballBounceAnim,
@@ -354,6 +355,7 @@ export class AttemptCapturePhase extends PokemonPhase {
       null,
       () => {
         const end = () => {
+          recordTelemetryBattleTerminal("capture");
           // Co-op (#633, authoritative wave-advance handshake): the host caught the wild enemy,
           // which clears the wave. Signal the guest renderer so it runs the same post-battle tail
           // (it removes the captured enemy without a FaintPhase, so it never queues that tail
