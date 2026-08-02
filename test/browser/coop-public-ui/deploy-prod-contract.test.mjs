@@ -20,26 +20,31 @@ test("production verifies one save-worker and browser contract before publishing
 
   const sealSource = requiredOffset("- name: Seal exact promotion source");
   const build = requiredOffset("- name: Build standalone bundle");
+  const telemetryPrereqs = requiredOffset("- name: Verify production telemetry prerequisites");
   const verify = requiredOffset("- name: Verify assembled dist");
   const contract = requiredOffset("- name: Verify production promotion contract");
   const worker = requiredOffset("- name: Deploy cloud-save API (production)");
+  const telemetryWorker = requiredOffset("- name: Deploy tournament telemetry API (production)");
   const pages = requiredOffset("- name: Deploy to Cloudflare Pages (PRODUCTION)");
 
   assert.ok(sealSource < build, "the checked-out source must be sealed before the browser build");
+  assert.ok(telemetryPrereqs < build, "telemetry resources must be proven before the browser build");
   assert.ok(build < verify, "the browser bundle must build before verification");
   assert.ok(verify < contract, "the assembled bundle must verify before the production contract");
   assert.ok(contract < worker, "all local verification must finish before production mutates");
-  assert.ok(worker < pages, "the production save contract must be live before the browser is published");
+  assert.ok(worker < telemetryWorker, "the save identity contract must be live before telemetry is published");
+  assert.ok(telemetryWorker < pages, "both production APIs must be live before the browser is published");
 });
 
-test("production keeps Showdown telemetry while excluding player capture, co-op, and developer bindings", () => {
+test("production enables partitioned player, Showdown, and tournament telemetry without co-op or developer bindings", () => {
   assert.match(workflow, /echo "VITE_SERVER_URL=https:\/\/er-save-api\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry\.heraklines\.workers\.dev"/u);
+  assert.match(workflow, /echo "VITE_TELEMETRY=prod"/u);
+  assert.match(workflow, /echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"/u);
   assert.match(workflow, /command: deploy --config workers\/er-save-api\/wrangler\.toml/u);
-  assert.doesNotMatch(workflow, /echo "VITE_TELEMETRY=/u);
+  assert.match(workflow, /command: deploy --config workers\/er-telemetry\/wrangler\.toml/u);
   assert.doesNotMatch(workflow, /VITE_SERVER_URL_PLAYER_TELEMETRY/u);
   assert.doesNotMatch(workflow, /echo "VITE_DEV_TOOLS=/u);
-  assert.doesNotMatch(workflow, /VITE_ENABLE_SHOWDOWN_TOURNAMENTS/u);
   assert.doesNotMatch(workflow, /VITE_COOP_SERVER_URL/u);
   assert.doesNotMatch(workflow, /workers\/er-coop-api/u);
   assert.doesNotMatch(workflow, /wrangler\.staging\.toml/u);

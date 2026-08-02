@@ -8,7 +8,7 @@
 // PLAYER TELEMETRY SCHEMA v1 (#player-telemetry). PURE TYPES + version constant, zero runtime.
 //
 // The telemetry pipeline captures every player DECISION as a semantic event stream, in ALL modes
-// (solo / co-op / showdown), for one purpose: TRAINING A COMBAT AI on how real players play. So the
+// (solo / co-op / showdown / tournament), for one purpose: TRAINING A COMBAT AI on how real players play. So the
 // schema is built as (STATE, ACTION) pairs from day one: a `TelemetryBattleDecision` carries BOTH the
 // full both-sides field STATE and the ACTION the player took, so each battle decision is reconstructable
 // as a supervised training example WITHOUT joining any external data.
@@ -36,7 +36,7 @@
 export const TELEMETRY_SCHEMA_VERSION = 1;
 
 /** Which broad game mode a session was played in (partitions the dataset for training). */
-export type TelemetryMode = "solo" | "coop" | "showdown";
+export type TelemetryMode = "solo" | "coop" | "showdown" | "tournament";
 
 /** In co-op, whether a captured surface / decision belongs to THIS client or the OBSERVED partner. */
 export type TelemetryActor = "self" | "partner";

@@ -115,6 +115,6 @@ try {
   // production builds and on clean checkouts (gitignored local modules absent).
   void (await import("#app/dev-tools/registry")).loadDevTools();
   // Player-telemetry ML pipeline (#player-telemetry). Hard no-op unless the build-time flag
-  // VITE_TELEMETRY is set (staging build) AND an ingest endpoint is configured.
+  // VITE_TELEMETRY is set for the deployed environment AND an ingest endpoint is configured.
   void (await import("#data/elite-redux/telemetry/telemetry-hooks")).initTelemetry();
 }

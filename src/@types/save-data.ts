@@ -71,6 +71,12 @@ export interface SystemSaveData {
    * {@linkcode GameData.grantFreeLegendaryEggsOnce}.
    */
   freeLegendaryEggsGranted?: boolean;
+  /**
+   * One-time Discord 1k gift. The stored root species id is both the idempotency
+   * marker and the record of which tier-2 shiny was granted. Absent on older
+   * saves, which makes them eligible exactly once.
+   */
+  discord1kT2ShinySpeciesId?: number;
   /** ER Shiny Lab: global achievement/challenge availability bitset. */
   erShinyLabAvailableEffects?: number[];
   /** ER Ghost Trainer Editor: the player's authored ghost presentation profile

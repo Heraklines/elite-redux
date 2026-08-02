@@ -17,7 +17,11 @@
 // affect gameplay.
 // =============================================================================
 
-import type { TelemetryBatch, TelemetrySessionEnvelope } from "#data/elite-redux/telemetry/telemetry-schema";
+import type {
+  TelemetryBatch,
+  TelemetryMode,
+  TelemetrySessionEnvelope,
+} from "#data/elite-redux/telemetry/telemetry-schema";
 import { compressToBase64 } from "lz-string";
 
 /** Compressed batch ready to POST. `body` is a `BlobPart`/`BodyInit` (ArrayBuffer for gzip, string for lz). */
@@ -32,12 +36,19 @@ export interface PlayerTelemetryEnv {
   VITE_SERVER_URL?: string;
 }
 
-/** Player-run capture deliberately excludes Showdown and tournament versus sessions. */
-export function isPlayerTelemetryBattleEligible(isVersus: boolean): boolean {
-  return !isVersus;
+/** Partition every player-decision session without merging tournament data into ordinary Showdown. */
+export function resolvePlayerTelemetryMode(options: {
+  isShowdown: boolean;
+  isTournament: boolean;
+  isCoop: boolean;
+}): TelemetryMode {
+  if (options.isShowdown) {
+    return options.isTournament ? "tournament" : "showdown";
+  }
+  return options.isCoop ? "coop" : "solo";
 }
 
-/** Resolve the player-decision ingest host. Showdown telemetry uses a different Worker and env key. */
+/** Resolve the player-decision ingest host. The separate match-summary telemetry keeps its own Worker. */
 export function resolvePlayerTelemetryBase(env: PlayerTelemetryEnv): string | null {
   const url = env.VITE_SERVER_URL_PLAYER_TELEMETRY ?? env.VITE_SERVER_URL ?? "";
   return url ? url.replace(/\/$/, "") : null;

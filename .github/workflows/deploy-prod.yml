@@ -47,30 +47,102 @@ jobs:
             echo "VITE_BYPASS_LOGIN=0"
             echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
+            echo "VITE_TELEMETRY=prod"
+            echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
           } > .env.standalone.local
 
       # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects
       # pin is never stale (mirrors deploy-staging.yml). Without this, prod kept the
       # committed - and stale - pin, so brand-new atlas frames (e.g. the TM Case
       # icon) 404'd / fell back to the wrong sprite while staging looked fine.
-      # Best-effort: an API failure keeps the committed pin and never blocks a deploy.
+      # Fail closed if the immutable asset revision cannot be resolved.
       - name: Resolve er-assets HEAD for the jsDelivr pin
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
-          if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
-            echo "er-assets pin for this deploy: $SHA"
-          else
-            echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+          SHA=""
+          for attempt in 1 2 3; do
+            SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha 2>/dev/null || true)
+            echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' && break
+            SHA=""
+            sleep 3
+          done
+          if [ -z "$SHA" ]; then
+            SHA=$(git ls-remote https://github.com/Heraklines/er-assets.git refs/heads/main | awk 'NR == 1 { print $1 }')
           fi
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Could not resolve immutable er-assets/main SHA" >&2; exit 1; }
+          echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "er-assets pin for this deploy: $SHA"
           # Asset CDN host: blank = jsDelivr (normal). 'raw' = serve er-assets from
           # raw.githubusercontent.com (jsDelivr-outage stopgap). Redeploy blank to revert.
           if [ "${{ github.event.inputs.asset_host }}" = "raw" ]; then
             echo "ER_ASSETS_HOST=raw" >> "$GITHUB_ENV"
             echo "asset host OVERRIDE: raw.githubusercontent.com (jsDelivr bypass)"
           fi
+
+      - name: Verify the exact er-assets sprite pin
+        run: |
+          if [ "${ER_ASSETS_HOST:-}" = "raw" ]; then
+            BASE="https://raw.githubusercontent.com/Heraklines/er-assets/${ER_ASSETS_SHA}"
+          else
+            BASE="https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${ER_ASSETS_SHA}"
+          fi
+          FILES="
+            images/items.png
+            images/items.json
+            images/types.png
+            images/types.json
+            images/statuses.png
+            images/statuses.json
+            images/pokemon/elite-redux/infernape_redux/front.png
+            images/pokemon/elite-redux/infernape_redux/back.png
+            images/pokemon/elite-redux/infernape_redux/icon.png
+            images/pokemon/elite-redux/infernape_redux/shiny.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back.png
+            images/pokemon/elite-redux/infernape_redux/shiny-2.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back-2.png
+            images/pokemon/elite-redux/infernape_redux/shiny-3.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back-3.png
+            images/pokemon/elite-redux/luxray_redux/front.png
+            images/pokemon/elite-redux/luxray_redux/back.png
+            images/pokemon/elite-redux/luxray_redux/icon.png
+            images/pokemon/elite-redux/luxray_redux/shiny.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back.png
+            images/pokemon/elite-redux/luxray_redux/shiny-2.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back-2.png
+            images/pokemon/elite-redux/luxray_redux/shiny-3.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back-3.png
+          "
+          for f in $FILES; do
+            ok=0
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$BASE/$f" || echo 000)
+              if [ "$code" = "200" ]; then ok=1; echo "asset OK $f"; break; fi
+              sleep 5
+            done
+            [ "$ok" = "1" ] || { echo "Asset unavailable at exact pin: $f" >&2; exit 1; }
+          done
+
+      - name: Verify production telemetry prerequisites
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets/er-telemetry" \
+            > "$RUNNER_TEMP/prod-telemetry-r2.json"
+          jq -e '.success == true and .result.name == "er-telemetry"' "$RUNNER_TEMP/prod-telemetry-r2.json" > /dev/null
+
+          npx wrangler secret list --config workers/er-save-api/wrangler.toml --format json \
+            > "$RUNNER_TEMP/prod-save-secrets.json"
+          jq -e '[.[].name] | index("SESSION_SECRET") != null and index("SHOWDOWN_GRANT_SECRET") != null' \
+            "$RUNNER_TEMP/prod-save-secrets.json" > /dev/null
+
+          npx wrangler secret list --config workers/er-telemetry/wrangler.toml --format json \
+            > "$RUNNER_TEMP/prod-tel-secrets.json"
+          jq -e '[.[].name] | index("SHOWDOWN_GRANT_SECRET") != null' \
+            "$RUNNER_TEMP/prod-tel-secrets.json" > /dev/null
 
       - name: Build standalone bundle
         run: |
@@ -92,7 +164,14 @@ jobs:
             test -f "dist/$f" || { echo "MISSING dist/$f"; exit 1; }
           done
           echo "=== er-assets pins in dist/_redirects ==="
-          grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
+          if [ "${ER_ASSETS_HOST:-}" = "raw" ]; then
+            grep -q "raw.githubusercontent.com/Heraklines/er-assets/${ER_ASSETS_SHA}/" dist/_redirects
+            ! grep -q 'cdn.jsdelivr.net/gh/Heraklines/er-assets@' dist/_redirects
+          else
+            PINS=$(grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u)
+            echo "$PINS"
+            test "$PINS" = "er-assets@${ER_ASSETS_SHA}"
+          fi
 
       - name: Verify production promotion contract
         run: node --test test/browser/coop-public-ui/deploy-prod-contract.test.mjs
@@ -105,6 +184,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-save-api/wrangler.toml
+
+      - name: Deploy tournament telemetry API (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-telemetry/wrangler.toml
 
       - name: Deploy to Cloudflare Pages (PRODUCTION)
         uses: cloudflare/wrangler-action@v3

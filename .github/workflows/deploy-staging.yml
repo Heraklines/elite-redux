@@ -77,6 +77,11 @@ on:
         required: false
         default: true
         type: boolean
+      deploy_coop:
+        description: Deploy and verify the co-op Worker during this promotion
+        required: false
+        default: true
+        type: boolean
       author:
         description: Staff attribution for the catalog entry
         required: false
@@ -218,8 +223,7 @@ jobs:
             # Showdown/tournament state: isolated staging worker + staging D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry-staging.heraklines.workers.dev"
-            # Player decision telemetry is staging-only. Production does not set this flag and the
-            # production save Worker has no telemetry R2 binding.
+            # Player decision telemetry uses an environment-isolated R2 bucket.
             echo "VITE_TELEMETRY=staging"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
@@ -232,35 +236,59 @@ jobs:
       # _redirects pin can never be stale. The pin used to be bumped by hand;
       # a forgotten bump = players kept old art/audio (or 404'd brand-new
       # assets) for days - the single biggest source of "stale cache" reports.
-      # Best-effort: on API failure the committed pin is used (never blocks a
-      # deploy, worst case is the old manual-bump behavior).
       - name: Resolve er-assets HEAD for the jsDelivr pin
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
-          if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
-            echo "er-assets pin for this deploy: $SHA"
-          else
-            echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+          SHA=""
+          for attempt in 1 2 3; do
+            SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha 2>/dev/null || true)
+            echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' && break
+            SHA=""
+            sleep 3
+          done
+          if [ -z "$SHA" ]; then
+            SHA=$(git ls-remote https://github.com/Heraklines/er-assets.git refs/heads/main | awk 'NR == 1 { print $1 }')
           fi
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Could not resolve immutable er-assets/main SHA" >&2; exit 1; }
+          echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "er-assets pin for this deploy: $SHA"
 
       # jsDelivr caches per-SHA, so a fresh pin is COLD on the CDN edge and the first
       # player fetches after a deploy can transiently fail; the game loader has no
       # retry for the UI atlases, so one failed fetch means a whole session of
       # __MISSING icons (the 2026-07-06 staging report: items/types/species icons all
       # placeholder). Warm + VERIFY the critical UI atlases at the new pin before the
-      # build; if the pin will not serve after retries, fall back to the committed
-      # (last-good) pin so a deploy can never ship a cold/broken asset base.
+      # build, and fail closed if that immutable revision cannot be served.
       - name: Warm + verify the er-assets pin on jsDelivr
         run: |
-          if [ -z "${ER_ASSETS_SHA:-}" ]; then
-            echo "no freshly-resolved pin (committed pin in use) - skipping warm."
-            exit 0
-          fi
           BASE="https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${ER_ASSETS_SHA}"
-          FILES="images/items.png images/items.json images/types.png images/types.json images/statuses.png images/statuses.json"
+          FILES="
+            images/items.png
+            images/items.json
+            images/types.png
+            images/types.json
+            images/statuses.png
+            images/statuses.json
+            images/pokemon/elite-redux/infernape_redux/front.png
+            images/pokemon/elite-redux/infernape_redux/back.png
+            images/pokemon/elite-redux/infernape_redux/icon.png
+            images/pokemon/elite-redux/infernape_redux/shiny.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back.png
+            images/pokemon/elite-redux/infernape_redux/shiny-2.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back-2.png
+            images/pokemon/elite-redux/infernape_redux/shiny-3.png
+            images/pokemon/elite-redux/infernape_redux/shiny-back-3.png
+            images/pokemon/elite-redux/luxray_redux/front.png
+            images/pokemon/elite-redux/luxray_redux/back.png
+            images/pokemon/elite-redux/luxray_redux/icon.png
+            images/pokemon/elite-redux/luxray_redux/shiny.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back.png
+            images/pokemon/elite-redux/luxray_redux/shiny-2.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back-2.png
+            images/pokemon/elite-redux/luxray_redux/shiny-3.png
+            images/pokemon/elite-redux/luxray_redux/shiny-back-3.png
+          "
           FAILED=0
           for f in $FILES; do
             ok=0
@@ -276,8 +304,8 @@ jobs:
             fi
           done
           if [ "$FAILED" = "1" ]; then
-            echo "::warning::er-assets pin ${ER_ASSETS_SHA} did not fully serve on jsDelivr - falling back to the committed (last-good) pin."
-            echo "ER_ASSETS_SHA=" >> "$GITHUB_ENV"
+            echo "er-assets pin ${ER_ASSETS_SHA} did not fully serve on jsDelivr" >&2
+            exit 1
           else
             echo "er-assets pin warmed + verified on jsDelivr."
           fi
@@ -303,12 +331,15 @@ jobs:
             test -f "dist/$f" || { echo "MISSING dist/$f"; exit 1; }
           done
           echo "=== er-assets pins in dist/_redirects ==="
-          grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
+          PINS=$(grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u)
+          echo "$PINS"
+          test "$PINS" = "er-assets@${ER_ASSETS_SHA}"
 
       - name: Verify staging promotion contract
         run: node --test test/browser/coop-public-ui/deploy-staging-contract.test.mjs
 
       - name: Resolve isolated co-op D1 and seal staging Worker config
+        if: inputs.deploy_coop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -340,6 +371,7 @@ jobs:
           command: deploy --config workers/er-telemetry/wrangler.staging.toml
 
       - name: Deploy co-op signaling API (staging)
+        if: inputs.deploy_coop
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -347,6 +379,7 @@ jobs:
           command: deploy --config workers/er-coop-api/wrangler.generated.staging.toml
 
       - name: Verify staging P33 signaling contract
+        if: inputs.deploy_coop
         run: |
           for attempt in $(seq 1 24); do
             if curl --fail --silent --show-error \

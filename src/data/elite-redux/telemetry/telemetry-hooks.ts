@@ -10,11 +10,11 @@
 // that touches the game; everything it calls (recorder / queue / store / state / transport) is testable
 // without it.
 //
-// GATING: capture is enabled only when the build-time flag `VITE_TELEMETRY` is set (staging build). When
-// it is unset (production / local), `initTelemetry` returns immediately, no listeners are installed, no
+// GATING: capture is enabled only when the build-time flag `VITE_TELEMETRY` is set. When it is unset,
+// `initTelemetry` returns immediately, no listeners are installed, no
 // store is opened, and every phase tap is a hard no-op (the observer emits in ui.ts / command-phase.ts /
 // turn-end-phase.ts have no listener), so the build is behavior-identical + free. Designed so a future
-// PROD enablement is a one-line flag flip (set VITE_TELEMETRY=prod + bind the R2 bucket).
+// Production and staging use separate R2 bindings.
 //
 // SESSIONS: a telemetry session == one RUN. It begins LAZILY on the first in-run capture (keyed by the
 // run seed) and switches when the seed changes (a new run), so no extra run-start/run-end tap is needed.
@@ -29,6 +29,7 @@ import { globalScene } from "#app/global-scene";
 import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { isTournamentMatch } from "#data/elite-redux/showdown/tournament-match-context";
 import {
   DEFAULT_TELEMETRY_QUEUE_CONFIG,
   TelemetryQueue,
@@ -62,8 +63,8 @@ import {
   type TelemetryStore,
 } from "#data/elite-redux/telemetry/telemetry-store";
 import {
-  isPlayerTelemetryBattleEligible,
   resolvePlayerTelemetryBase,
+  resolvePlayerTelemetryMode,
   sendTelemetryBatch,
 } from "#data/elite-redux/telemetry/telemetry-transport";
 import { Command } from "#enums/command";
@@ -83,7 +84,7 @@ let playerIdHash = "anon";
 /** The uiMode of the most recently opened surface, so a choice event can attribute its uiMode. */
 let lastSurfaceMode = -1;
 
-/** Enabled only when the build-time flag is set (staging on / prod+local off). A non-empty, non-"off" value. */
+/** Enabled only when the build-time flag is set. A non-empty, non-"off" value. */
 export function isTelemetryEnabled(): boolean {
   const v = (import.meta.env as { VITE_TELEMETRY?: string }).VITE_TELEMETRY;
   return typeof v === "string" && v !== "" && v !== "0" && v !== "off";
@@ -134,14 +135,17 @@ async function computePlayerIdHash(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 function currentMode(): TelemetryMode {
+  let isCoop = false;
   try {
-    if (globalScene?.gameMode?.isCoop) {
-      return "coop";
-    }
+    isCoop = globalScene?.gameMode?.isCoop === true;
   } catch {
-    /* fall through to solo */
+    isCoop = false;
   }
-  return "solo";
+  return resolvePlayerTelemetryMode({
+    isShowdown: isVersusSession(),
+    isTournament: isTournamentMatch(),
+    isCoop,
+  });
 }
 
 function makeEnvelope(sessionId: string, mode: TelemetryMode, seed: string): TelemetrySessionEnvelope {
@@ -178,9 +182,6 @@ function safeDifficulty(): string {
 function ensureSession(): boolean {
   if (store == null || base == null) {
     return false; // telemetry not enabled / not initialized
-  }
-  if (!isPlayerTelemetryBattleEligible(isVersusSession())) {
-    return false; // Showdown and tournament battles retain their independent telemetry path.
   }
   const seed = globalScene?.seed ?? "";
   if (seed === "" || globalScene?.currentBattle == null) {
@@ -272,8 +273,7 @@ function buildAction(fieldIndex: number, command: Command, cursor: number): Tele
 
 /**
  * Capture one battle decision as a (state, action) training pair. `actor` = "self" for this client's own
- * committed command (solo/co-op), "partner" for an observed co-op partner command. Showdown and tournament
- * versus sessions are excluded. No-op unless recording.
+ * committed command, "partner" for an observed co-op partner command. No-op unless recording.
  */
 export function recordTelemetryDecision(
   fieldIndex: number,

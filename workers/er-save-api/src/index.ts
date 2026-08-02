@@ -80,10 +80,9 @@ import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
 interface Env {
   DB: D1Database;
   /**
-   * OPTIONAL R2 bucket for the player-telemetry ML pipeline (#player-telemetry). Bound only on the
-   * staging worker (bucket `er-telemetry-staging`); absent elsewhere, so `POST /telemetry/ingest` fails
-   * soft (503) until the maintainer enables R2 + binds it. The client drops on any non-2xx, so an unbound
-   * binding never affects gameplay.
+   * Environment-isolated R2 bucket for the player-telemetry ML pipeline (#player-telemetry).
+   * Staging and production bind different buckets. The optional type preserves fail-soft behavior
+   * (503) for local/misconfigured Workers; the client drops any non-2xx without affecting gameplay.
    */
   TELEMETRY?: TelemetryR2Bucket;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */

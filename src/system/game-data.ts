@@ -132,6 +132,7 @@ import { EggData } from "#system/egg-data";
 import { GameStats } from "#system/game-stats";
 import { defaultDirectorState, type LLMDirectorState, mergeDirectorState } from "#system/llm-director/director-state";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
+import { notificationManager } from "#system/notifications/notification-manager";
 import { PokemonData } from "#system/pokemon-data";
 import { RibbonData } from "#system/ribbons/ribbon-data";
 import { resetSettings, SettingKeys, setSetting } from "#system/settings";
@@ -561,6 +562,9 @@ export class GameData {
    */
   public freeLegendaryEggsGranted = false;
 
+  /** Root species awarded by the one-time Discord 1k tier-2 shiny gift. */
+  public discord1kT2ShinySpeciesId: SpeciesId | null = null;
+
   /** Settings controlling silent auto-restock of the egg queue between waves. */
   public autoEggRestock: AutoEggRestockSettings = defaultAutoEggRestockSettings();
 
@@ -648,6 +652,7 @@ export class GameData {
       showdownAppliedSettlements: this.showdownAppliedSettlements.slice(0),
       showdownTeamPresets: this.showdownTeamPresets.map(p => ({ ...p, mons: p.mons.map(m => ({ ...m })) })),
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
+      ...(this.discord1kT2ShinySpeciesId == null ? {} : { discord1kT2ShinySpeciesId: this.discord1kT2ShinySpeciesId }),
       erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
       ghostProfile: this.ghostProfile,
       spentAchvPoints: this.spentAchvPoints,
@@ -673,6 +678,54 @@ export class GameData {
     }
     this.freeLegendaryEggsGranted = true;
     console.log("[er-gift] granted 2 free Legendary eggs (one-time)");
+  }
+
+  /**
+   * Discord 1k thank-you gift: grant one random tier-2 shiny the account does
+   * not already own. The awarded species id is persisted in the system/cloud
+   * save, so subsequent loads and devices are permanent no-ops.
+   */
+  public grantDiscord1kT2ShinyOnce(): SpeciesId | null {
+    if (this.discord1kT2ShinySpeciesId != null) {
+      return this.discord1kT2ShinySpeciesId;
+    }
+
+    const tier2 = DexAttr.SHINY | DexAttr.VARIANT_2;
+    const roots = new Set<SpeciesId>();
+    for (const rawId of Object.keys(speciesStarterCosts)) {
+      roots.add(this.getRootStarterSpeciesId(Number.parseInt(rawId) as SpeciesId));
+    }
+    const candidates = [...roots].filter(speciesId => {
+      const caughtAttr = this.dexData[speciesId]?.caughtAttr ?? 0n;
+      return (caughtAttr & tier2) !== tier2;
+    });
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const speciesId = candidates[Math.floor(Math.random() * candidates.length)];
+    const dexEntry = this.dexData[speciesId];
+    if (!dexEntry) {
+      return null;
+    }
+    dexEntry.caughtAttr |= DexAttr.SHINY | DexAttr.VARIANT_2 | DexAttr.MALE | DexAttr.DEFAULT_FORM;
+    this.discord1kT2ShinySpeciesId = speciesId;
+
+    const speciesName = getPokemonSpecies(speciesId).name;
+    notificationManager.push({
+      id: "reward:discord-1k-t2-shiny",
+      type: "reward",
+      timestamp: Date.now(),
+      read: false,
+      data: {
+        title: "Discord reached 1k!",
+        body:
+          "Discord reached 1k, thanks for playing this silly game. Enjoy your free stuff\n\n"
+          + `You received a tier-2 shiny ${speciesName}!`,
+        payload: { species: speciesId, shiny: true, variant: 1, miniIcon: true },
+      },
+    });
+    return speciesId;
   }
 
   // --- Showdown TEAM PRESETS (account-save CRUD) --------------------------------------------
@@ -817,6 +870,7 @@ export class GameData {
     // runs initParsedSystem on its first session (no save to parse yet), so the
     // grant rides the first save instead. Idempotent (flag-guarded).
     this.grantFreeLegendaryEggsOnce();
+    this.grantDiscord1kT2ShinyOnce();
     const data = this.getSystemSaveData();
 
     const maxIntAttrValue = 0x80000000;
@@ -1334,6 +1388,9 @@ export class GameData {
     // The actual grant runs below, after eggPity/unlockPity are restored (egg
     // species rolls read unlockPity).
     this.freeLegendaryEggsGranted = systemData.freeLegendaryEggsGranted ?? false;
+    this.discord1kT2ShinySpeciesId = Number.isInteger(systemData.discord1kT2ShinySpeciesId)
+      ? (systemData.discord1kT2ShinySpeciesId as SpeciesId)
+      : null;
 
     this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
     this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
@@ -1370,6 +1427,10 @@ export class GameData {
     // species' dex entries onto their RDX counterparts (gen slot reverts to
     // vanilla; shiny/candies land on the RDX entry). Additive + idempotent.
     migrateErReduxDexHijack(this);
+
+    // Existing accounts receive the Discord 1k gift only after their full dex
+    // has loaded and migrations have consolidated ownership to line roots.
+    this.grantDiscord1kT2ShinyOnce();
 
     // This instance now reflects real persisted data - saves may overwrite local.
     this.systemDataLoaded = true;
@@ -1420,7 +1481,19 @@ export class GameData {
         localStorage.setItem(lsItemKey, "");
       }
 
+      const shouldPersistDiscordGift = !Number.isInteger(systemData.discord1kT2ShinySpeciesId);
       this.initParsedSystem(systemData);
+      if (shouldPersistDiscordGift && this.discord1kT2ShinySpeciesId != null) {
+        try {
+          // Persist immediately: without this, closing the game before the next
+          // ordinary autosave could re-roll the supposedly one-time reward.
+          await this.saveSystem(true);
+        } catch (err) {
+          // The grant is already in memory and the notification is local; a later
+          // autosave retries persistence. Never turn a thank-you gift into a login blocker.
+          console.error("[er-gift] could not immediately persist the Discord 1k reward:", err);
+        }
+      }
       return true;
     } catch (err) {
       console.error(err);

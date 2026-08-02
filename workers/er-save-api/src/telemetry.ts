@@ -4,7 +4,7 @@
  */
 
 // =============================================================================
-// PLAYER TELEMETRY INGEST (#player-telemetry). Staging-gated ML capture sink.
+// PLAYER TELEMETRY INGEST (#player-telemetry). Environment-isolated ML capture sink.
 //
 // The client records every player decision as a semantic (state, action) event
 // stream (see src/data/elite-redux/telemetry/*), batches + compresses it, and

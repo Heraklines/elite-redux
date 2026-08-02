@@ -23,8 +23,8 @@ import { TELEMETRY_SCHEMA_VERSION } from "#data/elite-redux/telemetry/telemetry-
 import { snapshotBattleState, snapshotMon, type TelemetryMonSource } from "#data/elite-redux/telemetry/telemetry-state";
 import { MemoryTelemetryStore } from "#data/elite-redux/telemetry/telemetry-store";
 import {
-  isPlayerTelemetryBattleEligible,
   resolvePlayerTelemetryBase,
+  resolvePlayerTelemetryMode,
 } from "#data/elite-redux/telemetry/telemetry-transport";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,7 +50,10 @@ function fakeMon(overrides: Partial<Record<string, unknown>> = {}): TelemetryMon
   return { ...base, ...overrides } as unknown as TelemetryMonSource;
 }
 
-function envelope(sessionId = "sess-1", mode: "solo" | "coop" | "showdown" = "solo"): TelemetrySessionEnvelope {
+function envelope(
+  sessionId = "sess-1",
+  mode: "solo" | "coop" | "showdown" | "tournament" = "solo",
+): TelemetrySessionEnvelope {
   return {
     schemaVersion: TELEMETRY_SCHEMA_VERSION,
     sessionId,
@@ -66,9 +69,11 @@ function envelope(sessionId = "sess-1", mode: "solo" | "coop" | "showdown" = "so
 }
 
 describe("player telemetry endpoint", () => {
-  it("excludes Showdown and tournament versus battles", () => {
-    expect(isPlayerTelemetryBattleEligible(true)).toBe(false);
-    expect(isPlayerTelemetryBattleEligible(false)).toBe(true);
+  it("partitions solo, co-op, Showdown, and tournament decisions", () => {
+    expect(resolvePlayerTelemetryMode({ isShowdown: false, isTournament: false, isCoop: false })).toBe("solo");
+    expect(resolvePlayerTelemetryMode({ isShowdown: false, isTournament: false, isCoop: true })).toBe("coop");
+    expect(resolvePlayerTelemetryMode({ isShowdown: true, isTournament: false, isCoop: false })).toBe("showdown");
+    expect(resolvePlayerTelemetryMode({ isShowdown: true, isTournament: true, isCoop: false })).toBe("tournament");
   });
 
   it("uses the save API and ignores the Showdown telemetry Worker", () => {

@@ -408,7 +408,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       // Server-pushed reward (e.g. a black-shiny grant): ONE large mon icon
       // centred under the title, then the wrapped body text below it.
       const payload = (n.data as { payload?: unknown }).payload as
-        | { species?: number; shiny?: boolean; variant?: number }
+        | { species?: number; shiny?: boolean; variant?: number; miniIcon?: boolean }
         | undefined;
       this.renderRewardIcon(payload, 0, y + 16, panel);
       y += 36;
@@ -480,7 +480,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
 
   /** Render ONE large mon icon (a server-pushed reward) centred at (xCentre, yCentre). */
   private renderRewardIcon(
-    payload: { species?: number; shiny?: boolean; variant?: number } | undefined,
+    payload: { species?: number; shiny?: boolean; variant?: number; miniIcon?: boolean } | undefined,
     xCentre: number,
     yCentre: number,
     container: Phaser.GameObjects.Container,
@@ -496,7 +496,7 @@ export class TitleUiHandler extends OptionSelectUiHandler {
       const frame = sp.getIconId(false, 0, shiny, variant);
       const icon = globalScene.add.sprite(xCentre, yCentre, atlas);
       icon.setFrame(frame);
-      icon.setOrigin(0.5, 0.5).setScale(1);
+      icon.setOrigin(0.5, 0.5).setScale(payload.miniIcon === true ? 0.5 : 1);
       container.add(icon);
     } catch {
       // Unknown species id / missing icon frame - render nothing (body text remains).

@@ -2043,7 +2043,7 @@ export class CommandPhase extends FieldPhase {
       // co-op relay taps own that path) + when not recording - so solo / co-op are both unaffected.
       recordSinglePlayerCommand(this.fieldIndex, command, cursor);
       // #player-telemetry: capture this client's OWN committed decision as a (state, action) pair in
-      // player-run modes. Showdown/tournament versus sessions are explicitly excluded by the recorder.
+      // every player mode; the recorder partitions solo/co-op/showdown/tournament sessions.
       recordTelemetryDecision(this.fieldIndex, command, cursor, "self");
       this.end();
     }
