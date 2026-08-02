@@ -851,9 +851,7 @@ test("campaign move driving resumes a Fight submenu opened before round admissio
       seatsWithInput: [0],
       selectedOptionId: "move:94:slot:3",
       optionIds: ["move:94:slot:3"],
-      moveSlots: [
-        { index: 3, optionId: "move:94:slot:3", moveId: 94, category: "SPECIAL", power: 90, usable: true },
-      ],
+      moveSlots: [{ index: 3, optionId: "move:94:slot:3", moveId: 94, category: "SPECIAL", power: 90, usable: true }],
       ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
     },
   };
