@@ -71,6 +71,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -2141,7 +2142,11 @@ export class BattleScene extends SceneBase {
    * @returns The generated trainer.
    */
   private generateNewBattleTrainer(waveIndex: number): Trainer {
-    const trainerType = Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType ?? this.arena.randomTrainerType(waveIndex);
+    const trainerOverride = Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType;
+    const trainerType = trainerOverride ?? this.arena.randomTrainerType(waveIndex, false, getLastGenericTrainerType());
+    if (trainerOverride === undefined) {
+      markGenericTrainerType(trainerType);
+    }
     const config = trainerConfigs[trainerType];
 
     let doubleTrainer: boolean;

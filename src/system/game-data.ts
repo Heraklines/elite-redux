@@ -66,6 +66,10 @@ import {
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
+import {
+  getLastGenericTrainerType,
+  restoreGenericTrainerTracking,
+} from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { getErGhostRepeatLedger, restoreErGhostRepeatLedger } from "#data/elite-redux/er-ghost-teams";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
@@ -1968,6 +1972,7 @@ export class GameData {
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
+      erLastGenericTrainerType: getLastGenericTrainerType() ?? undefined,
       // ER custom trainers use separate authored keys and one-per-window density.
       // Persist both sets so refresh/Continue cannot repeat a trainer or consume
       // adjacent waves from the same spawn window.
@@ -5132,6 +5137,7 @@ export class GameData {
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
+    restoreGenericTrainerTracking(fromSession.erLastGenericTrainerType);
     restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);
     restoreErGhostRepeatLedger(fromSession.erGhostRepeatLedger);
     restoreErMoneyStreaks(fromSession.erMoneyStreaks);

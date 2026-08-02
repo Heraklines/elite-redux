@@ -43,6 +43,7 @@ import {
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -7537,6 +7538,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 });
               }
               resetErRunTrainerTracking();
+              resetGenericTrainerTracking();
               resetErCustomTrainerTracking();
               resetErGhostRunState();
               resetErMapNodes();

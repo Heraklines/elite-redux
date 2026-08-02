@@ -10745,6 +10745,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Generic trainers do not repeat on consecutive waves",
+    description:
+      "Generic-trainer repeat fix. A production run selected Musician Tony on\n"
+      + "waves 72, 73, and 74 because the normal trainer pool had no memory of\n"
+      + "the previous class. The last generated generic trainer class is now\n"
+      + "saved with the run and excluded from the next eligible tier whenever\n"
+      + "that tier has another option. CHECK: play several trainer-heavy waves,\n"
+      + "including a refresh and Continue. Continuing the current wave must\n"
+      + "reconstruct that exact battle, but the following trainer wave must not\n"
+      + "reuse the same class when another class is available.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.NASTY_PLOT, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) IV chart shows an isolated perfect stat",
+    description:
+      "IV radar-chart visibility fix. A mon with IVs shaped like [0,31,0,...]\n"
+      + "showed the numeric Attack 31 but no green Attack spoke because the two\n"
+      + "adjacent zero axes made that filled polygon section have zero area. The\n"
+      + "IV polygon now keeps a matching outline. CHECK: inspect a mon whose only\n"
+      + "high IV is between two zero IVs. Its radar spoke must visibly reach the\n"
+      + "correct distance, including after the one-second chart animation.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.NYMBLE, {
+          moveset: [MoveId.LUNGE, MoveId.DETECT, MoveId.DOUBLE_KICK, MoveId.POUNCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Mega forms share their base's candy",
     description:
       "Candy-pooling fix (dex/UI, not battle-testable). An ER custom Mega (e.g. Flygon\n"

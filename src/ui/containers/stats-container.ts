@@ -21,6 +21,22 @@ const ivChartLabelyOffset = [0, 5, 0, 5, 0, 0]; // doing this so attack does not
 const ivChartStatIndexes = [0, 1, 2, 5, 4, 3]; // swap special attack and speed
 
 const defaultIvChartData: number[] = new Array(12).fill(0);
+const defaultIvChartColor = 0x98d8a0;
+
+/** Keep zero-area radar spikes visible when both neighboring axes are zero. */
+export function applyIvChartOutline(chart: Phaser.GameObjects.Polygon, color = defaultIvChartColor): void {
+  chart.setStrokeStyle(1, color, 1);
+}
+
+/** Convert IV values into the radar polygon's display-order coordinates. */
+export function buildIvChartData(ivs: readonly number[]): number[] {
+  return new Array(6)
+    .fill(null)
+    .flatMap((_, i) => [
+      (ivs[ivChartStatIndexes[i]] / 31) * ivChartSize * ivChartStatCoordMultipliers[ivChartStatIndexes[i]][0],
+      (ivs[ivChartStatIndexes[i]] / 31) * ivChartSize * ivChartStatCoordMultipliers[ivChartStatIndexes[i]][1],
+    ]);
+}
 
 export class StatsContainer extends Phaser.GameObjects.Container {
   private readonly showDiff: boolean;
@@ -74,9 +90,12 @@ export class StatsContainer extends Phaser.GameObjects.Container {
       return line;
     });
 
-    this.ivChart = globalScene.add //
-      .polygon(ivChartBg.x, ivChartBg.y, defaultIvChartData, 0x98d8a0, 0.75)
-      .setOrigin(0);
+    this.ivChart = globalScene.add.polygon(ivChartBg.x, ivChartBg.y, defaultIvChartData, defaultIvChartColor, 0.75);
+    // A fill alone cannot show an isolated non-zero axis when both adjacent
+    // IVs are zero: that spike has zero area. Keep an outline so a perfect
+    // Attack in [0,31,0,...], for example, remains visibly full-length.
+    applyIvChartOutline(this.ivChart);
+    this.ivChart.setOrigin(0);
 
     this.add(ivChartBg);
     ivChartBgLines.map(l => this.add(l));
@@ -117,12 +136,7 @@ export class StatsContainer extends Phaser.GameObjects.Container {
       return;
     }
 
-    const ivChartData = new Array(6)
-      .fill(null)
-      .flatMap((_, i) => [
-        (ivs[ivChartStatIndexes[i]] / 31) * ivChartSize * ivChartStatCoordMultipliers[ivChartStatIndexes[i]][0],
-        (ivs[ivChartStatIndexes[i]] / 31) * ivChartSize * ivChartStatCoordMultipliers[ivChartStatIndexes[i]][1],
-      ]);
+    const ivChartData = buildIvChartData(ivs);
     const lastIvChartData = this.statsIvsCache || defaultIvChartData;
     const perfectIVColor: string = getTextColor(TextStyle.SUMMARY_GOLD, false);
     this.statsIvsCache = ivChartData.slice(0);
@@ -146,7 +160,7 @@ export class StatsContainer extends Phaser.GameObjects.Container {
       text.setText(`[shadow]${label}[/shadow]`);
     });
 
-    const newColor = ivs.every(iv => iv === 31) ? Number.parseInt(perfectIVColor.slice(1), 16) : 0x98d8a0;
+    const newColor = ivs.every(iv => iv === 31) ? Number.parseInt(perfectIVColor.slice(1), 16) : defaultIvChartColor;
     const oldColor = this.ivChart.fillColor;
     const interpolateColor =
       oldColor === newColor
@@ -164,12 +178,13 @@ export class StatsContainer extends Phaser.GameObjects.Container {
           (v: number, i: number) => v * progress + lastIvChartData[i] * (1 - progress),
         );
         if (interpolateColor) {
-          this.ivChart.setFillStyle(
-            Phaser.Display.Color.ValueToColor(
-              Phaser.Display.Color.Interpolate.ColorWithColor(interpolateColor[0], interpolateColor[1], 1, progress),
-            ).color,
-            0.75,
-          );
+          const interpolatedColor = Phaser.Display.Color.ValueToColor(
+            Phaser.Display.Color.Interpolate.ColorWithColor(interpolateColor[0], interpolateColor[1], 1, progress),
+          ).color;
+          this.ivChart.setFillStyle(interpolatedColor, 0.75);
+          applyIvChartOutline(this.ivChart, interpolatedColor);
+        } else {
+          applyIvChartOutline(this.ivChart, newColor);
         }
         this.ivChart.setTo(interpolatedData);
       },

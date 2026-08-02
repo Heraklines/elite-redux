@@ -18,6 +18,7 @@ import { resolveErBiomeBackground, selectErBiomeBackgroundSetIndex } from "#data
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErBiomeStartWave } from "#data/elite-redux/er-biome-structure";
+import { withoutImmediateTrainerRepeat } from "#data/elite-redux/er-generic-trainer-run-state";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -758,7 +759,11 @@ export class Arena {
   // #endregion
   // #region Trainers
 
-  public randomTrainerType(waveIndex: number, isBoss = false): TrainerType {
+  public randomTrainerType(
+    waveIndex: number,
+    isBoss = false,
+    excludedTrainerType: TrainerType | null = null,
+  ): TrainerType {
     const isTrainerBoss =
       this.trainerPool[BiomePoolTier.BOSS].length > 0
       && (globalScene.gameMode.isTrainerBoss(waveIndex, this.biomeId, globalScene.offsetGym) || isBoss);
@@ -773,7 +778,15 @@ export class Arena {
     }
 
     const tierPool = this.trainerPool[tier];
-    return tierPool.length > 0 ? randSeedItem(tierPool) : TrainerType.BREEDER;
+    if (tierPool.length === 0) {
+      return TrainerType.BREEDER;
+    }
+
+    // Generic trainer selection previously had no memory at all, so the same
+    // class (and therefore the same signature team) could be selected on three
+    // consecutive waves. Avoid the immediately previous class whenever this
+    // tier has an alternative; a one-entry pool still has a safe fallback.
+    return randSeedItem(withoutImmediateTrainerRepeat(tierPool, excludedTrainerType));
   }
 
   // #endregion
