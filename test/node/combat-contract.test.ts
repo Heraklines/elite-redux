@@ -477,6 +477,7 @@ describe("ER combat AI contract", () => {
       modelType: "sklearn_forest",
       aggregation: "mean",
       baseScore: 0,
+      candidateScope: "move-only",
       trees: [
         [
           { feature: 0, threshold: 0.5, left: 1, right: 2 },
@@ -486,6 +487,9 @@ describe("ER combat AI contract", () => {
       ],
     };
     expect(validateErTreeModel(model)).toEqual([]);
+    expect(validateErTreeModel({ ...model, candidateScope: "invalid" } as unknown as ErTreeModelArtifact)).toContain(
+      "unsupported candidate scope invalid",
+    );
     expect(scoreErTreeModel(model, [0, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.2);
     expect(scoreErTreeModel(model, [1, ...new Array(model.featureCount - 1).fill(0)])).toBe(0.8);
   });

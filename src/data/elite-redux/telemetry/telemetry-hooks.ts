@@ -184,6 +184,17 @@ function safeDifficulty(): string {
   }
 }
 
+/** Fail-closed eligibility check shared by every player-telemetry capture path. */
+export function isCurrentPlayerTelemetryBattleEligible(): boolean {
+  try {
+    const mode = globalScene?.gameMode;
+    const versus = isVersusSession() || (mode?.isShowdown ?? false);
+    return isPlayerTelemetryBattleEligible(versus, mode?.isCoop ?? false);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Ensure a telemetry session exists for the CURRENT run (lazy begin, seed-keyed). Returns true when
  * recording is active afterward. Cheap no-op when telemetry is off (store == null) or no run is active.
@@ -192,8 +203,8 @@ function ensureSession(): boolean {
   if (store == null || base == null) {
     return false; // telemetry not enabled / not initialized
   }
-  if (!isPlayerTelemetryBattleEligible(isVersusSession())) {
-    return false; // Showdown and tournament battles retain their independent telemetry path.
+  if (!isCurrentPlayerTelemetryBattleEligible()) {
+    return false; // Co-op and versus battles retain their independent data paths.
   }
   const seed = globalScene?.seed ?? "";
   if (seed === "" || globalScene?.currentBattle == null) {

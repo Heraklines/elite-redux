@@ -135,6 +135,12 @@ import {
 } from "#data/elite-redux/ai/combat-tree-model";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import {
+  clearTournamentMatchContext,
+  isTournamentMatch,
+  setTournamentMatchContext,
+} from "#data/elite-redux/showdown/tournament-match-context";
+import { isCurrentPlayerTelemetryBattleEligible } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { AiType } from "#enums/ai-type";
@@ -3167,18 +3173,20 @@ function chooseTreeCandidate(
   epsilon: number,
   policyKey: string,
 ): ErCombatCandidate | null {
-  if (candidates.length === 0) {
+  const scopedCandidates =
+    model.candidateScope === "move-only" ? candidates.filter(candidate => candidate.kind === "move") : candidates;
+  if (scopedCandidates.length === 0) {
     return null;
   }
-  const ranked = candidates
+  const ranked = scopedCandidates
     .map(candidate => ({
       candidate,
       score: scoreErTreeModel(model, extractErCombatCandidateFeatures(observation, candidate)),
     }))
     .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id));
   const explore = epsilon > 0 && deterministicPolicyFraction(`${policyKey}:explore`) < epsilon;
-  const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * candidates.length);
-  return (explore ? candidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate ?? null;
+  const randomIndex = Math.floor(deterministicPolicyFraction(`${policyKey}:candidate`) * scopedCandidates.length);
+  return (explore ? scopedCandidates[randomIndex] : ranked[0]?.candidate) ?? ranked[0]?.candidate ?? null;
 }
 
 async function chooseNeuralCandidate(
@@ -4511,13 +4519,15 @@ function flushAiDataset(): void {
 const EASY_ABILITY_ADDITION_CHECK = process.env.ER_ABILITY_EASY_ADDITIONS === "1";
 const NEWCOMER_SIGNATURE_CHECK = process.env.ER_NEWCOMER_SIGNATURE_CHECK === "1";
 const AI_CONTRACT_CHECK = process.env.ER_AI_CONTRACT_CHECK === "1";
+const TELEMETRY_ISOLATION_CHECK = process.env.ER_TELEMETRY_ISOLATION_CHECK === "1";
 const SELF_CHECK =
   process.env.ER_SCENARIO === "1"
   && !process.env.ER_RUN_SCENARIO
   && !process.env.ER_RUN_COMBAT_BATCH
   && !EASY_ABILITY_ADDITION_CHECK
   && !NEWCOMER_SIGNATURE_CHECK
-  && !AI_CONTRACT_CHECK;
+  && !AI_CONTRACT_CHECK
+  && !TELEMETRY_ISOLATION_CHECK;
 
 /** Run one inline spec through the full pipeline and return the summary + the game. */
 async function runInline(
@@ -6332,6 +6342,60 @@ describe.skipIf(!EASY_ABILITY_ADDITION_CHECK)("headless scenario runner - easy a
     },
     180_000,
   );
+});
+
+describe.skipIf(!TELEMETRY_ISOLATION_CHECK)("headless scenario runner - player telemetry isolation", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let soloMode: ReturnType<typeof getGameMode>;
+
+  beforeAll(async () => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    const spec: RunnerInput = {
+      v: 1,
+      name: "player telemetry mode isolation",
+      run: { wave: 3, level: 15, difficulty: "youngster" },
+      party: [{ species: SpeciesId.PIKACHU, moves: [MoveId.THUNDER_SHOCK] }],
+      enemy: { kind: "wild", wild: { species: SpeciesId.RATTATA, level: 15, moves: [MoveId.TACKLE] } },
+    };
+    game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true });
+    soloMode = game.scene.gameMode;
+  }, 180_000);
+
+  it("allows a real solo battle", () => {
+    clearTournamentMatchContext();
+    game.scene.gameMode = soloMode;
+    expect(game.scene.currentBattle).toBeDefined();
+    expect(game.scene.gameMode.isCoop ?? false).toBe(false);
+    expect(game.scene.gameMode.isShowdown ?? false).toBe(false);
+    expect(isCurrentPlayerTelemetryBattleEligible()).toBe(true);
+  });
+
+  it("rejects a real co-op battle mode", () => {
+    clearTournamentMatchContext();
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    expect(game.scene.gameMode.isCoop).toBe(true);
+    expect(isCurrentPlayerTelemetryBattleEligible()).toBe(false);
+  });
+
+  it("rejects a real Showdown battle mode before runtime negotiation", () => {
+    clearTournamentMatchContext();
+    game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+    expect(game.scene.gameMode.isShowdown).toBe(true);
+    expect(isTournamentMatch()).toBe(false);
+    expect(isCurrentPlayerTelemetryBattleEligible()).toBe(false);
+  });
+
+  it("rejects a tournament-tagged Showdown battle mode", () => {
+    setTournamentMatchContext({
+      tournamentId: "headless-tournament",
+      matchId: "headless-tournament-r1-m0",
+      expectedOpponent: "opponent",
+    });
+    game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+    expect(isTournamentMatch()).toBe(true);
+    expect(isCurrentPlayerTelemetryBattleEligible()).toBe(false);
+  });
 });
 
 describe.skipIf(!AI_CONTRACT_CHECK)("headless scenario runner - combat observation contract", () => {

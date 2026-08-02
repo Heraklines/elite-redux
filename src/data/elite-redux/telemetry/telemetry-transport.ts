@@ -32,9 +32,9 @@ export interface PlayerTelemetryEnv {
   VITE_SERVER_URL?: string;
 }
 
-/** Player-run capture deliberately excludes Showdown and tournament versus sessions. */
-export function isPlayerTelemetryBattleEligible(isVersus: boolean): boolean {
-  return !isVersus;
+/** Player-run capture deliberately excludes co-op, Showdown, and tournament sessions. */
+export function isPlayerTelemetryBattleEligible(isVersus: boolean, isCoop = false): boolean {
+  return !isVersus && !isCoop;
 }
 
 /** Resolve the player-decision ingest host. Showdown telemetry uses a different Worker and env key. */

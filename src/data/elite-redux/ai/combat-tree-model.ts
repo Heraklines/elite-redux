@@ -23,6 +23,8 @@ export interface ErSingleTreeModelArtifact {
   aggregation: "mean" | "sum_logit" | "sum_raw";
   baseScore: number;
   trees: ErTreeNode[][];
+  /** Legacy-v1 human telemetry cannot supervise switches because it did not capture the bench. */
+  candidateScope?: "combat-command" | "move-only" | undefined;
 }
 
 export interface ErStackedTreeModelArtifact {
@@ -36,6 +38,7 @@ export interface ErStackedTreeModelArtifact {
   memberScales: number[];
   weights: number[];
   intercept: number;
+  candidateScope?: "combat-command" | "move-only" | undefined;
 }
 
 export type ErTreeModelArtifact = ErSingleTreeModelArtifact | ErStackedTreeModelArtifact;
@@ -47,6 +50,13 @@ function validateCommonModelShape(model: ErTreeModelArtifact): string[] {
   }
   if (model.featureCount !== ER_COMBAT_FEATURE_NAMES.length) {
     errors.push(`feature count ${model.featureCount} does not match runtime ${ER_COMBAT_FEATURE_NAMES.length}`);
+  }
+  if (
+    model.candidateScope !== undefined
+    && model.candidateScope !== "combat-command"
+    && model.candidateScope !== "move-only"
+  ) {
+    errors.push(`unsupported candidate scope ${String(model.candidateScope)}`);
   }
   return errors;
 }

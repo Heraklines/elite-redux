@@ -66,9 +66,11 @@ function envelope(sessionId = "sess-1", mode: "solo" | "coop" | "showdown" = "so
 }
 
 describe("player telemetry endpoint", () => {
-  it("excludes Showdown and tournament versus battles", () => {
+  it("accepts solo battles and excludes co-op, Showdown, and tournament battles", () => {
     expect(isPlayerTelemetryBattleEligible(true)).toBe(false);
-    expect(isPlayerTelemetryBattleEligible(false)).toBe(true);
+    expect(isPlayerTelemetryBattleEligible(true, false)).toBe(false);
+    expect(isPlayerTelemetryBattleEligible(false, true)).toBe(false);
+    expect(isPlayerTelemetryBattleEligible(false, false)).toBe(true);
   });
 
   it("uses the save API and ignores the Showdown telemetry Worker", () => {

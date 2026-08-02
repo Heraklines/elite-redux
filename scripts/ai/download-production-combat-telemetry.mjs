@@ -2,4 +2,4 @@
 
 import { runCombatTelemetryImport } from "./combat-telemetry-import.mjs";
 
-await runCombatTelemetryImport("staging");
+await runCombatTelemetryImport("production");

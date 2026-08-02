@@ -19,6 +19,17 @@ megabytes and are not selected runtime candidates. A second data pass runs the
 selected tree with deterministic 15% legal-action exploration. Retraining keeps
 the expert rows plus successful exploratory trajectories.
 
+The legacy production-telemetry lane is a separate compatibility baseline.
+`scripts/ai/download-production-combat-telemetry.mjs` performs a read-only import
+from the explicitly named production bucket and partitions records strictly by
+`playerIdHash`. Because schema v1 has no bench snapshot or legal switch
+candidates, `ml/baselines/train_legacy_human_tree.py` fits a move-only Random
+Forest and exports it with `candidateScope: "move-only"`. This approximately
+29 MiB artifact is intentionally allowed for the frozen headless benchmark; it
+is not a production-serving candidate. Legacy turn outcomes train only
+immediate transition models. They never imply terminal victory, defeat, value,
+or winner-only policy labels.
+
 The tree lane exports separate diagnostic and policy artifacts.
 `selected-model.json` optimizes held-out action imitation over all episodes and
 is never treated as strength evidence. `outcome-selected-model.json` is fitted

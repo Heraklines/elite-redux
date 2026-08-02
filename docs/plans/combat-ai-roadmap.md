@@ -6,7 +6,8 @@ dataset the rest of this stands on.
 
 ## The arc
 
-1. **Telemetry** (this pipeline) - capture real (state, action) play in every mode -> R2 dataset.
+1. **Telemetry** (this pipeline) - capture eligible solo-run (state, action) play -> R2 dataset. Co-op,
+   Showdown, and tournaments remain excluded.
 2. **Behavior stats / GBDT baseline** - per-surface descriptive stats + a gradient-boosted-trees baseline
    (e.g. "given this state, P(switch) / P(move x)") to sanity-check features and ship a cheap first policy.
 3. **Imitation-learned policy** - a neural policy trained to predict the human action from the state
@@ -158,13 +159,12 @@ never randomly** (adjacent decisions within one run leak - a random split inflat
 early-warning gauge: **anchor Elo up + human-prediction down = the policy is drifting** away from
 human-like play (over-fitting to self-play quirks); tighten the KL leash to the imitation prior.
 
-### Passive human eval in prod (the unfair advantage)
+### Production model boundary
 
-Ship candidate checkpoints as **low-frequency AI trainers / ghost-trainer drivers in prod.** Every player
-battle against one is a **recorded human-vs-model game** via telemetry - **zero-recruitment human eval at
-scale.** Track the **correlation of offline metrics (anchor Elo, held-out CE) with real human win-rate**;
-once that correlation is established, the offline metrics become **trusted proxies** and most iteration
-never needs to touch prod.
+Experimental models are not served in production. Human telemetry is observational only; candidates run
+in the non-production headless gauntlet against frozen ghost rosters and hardest trainer AI. Any future
+player-facing model experiment requires a separate design, privacy review, explicit maintainer approval,
+and an independent rollout. It is not part of the current training pipeline.
 
 ### Promotion gate
 
@@ -305,8 +305,13 @@ ENJOY facing and feed it back into design:
 - **Caveats:** GitHub has **no free GPU** runners; Cloudflare **Workers AI is catalog-inference only** (not
   custom-model training or hosting) - use it only if a listed model fits, not for our own weights.
 
-## Immediate next steps (post-telemetry)
+## Immediate next steps (2026-08-01)
 
-- Land telemetry on staging, accumulate a first dataset, validate feature coverage against the schema.
-- Stand up the offline reader (R2 -> deduped (state, action) parquet/webdataset).
-- Ship the GBDT baseline per surface as the first sanity policy; measure against held-out human actions.
+- Keep production on legacy schema v1 until the contract-v3 rollout gate in
+  `docs/plans/combat-ai-human-telemetry-rollout.md` passes and the maintainer explicitly approves it.
+- Evaluate the account-split legacy human tree on the frozen 100-pair mirrored ghost benchmark. Treat
+  offline Top-1 as diagnostic only.
+- After contract-v3 accumulates terminal-labelled human data, train policy primarily from human wins and
+  value from every completed outcome. Hardest AI remains evaluation/sparring only.
+- Resume checkpoint-league self-play only after a human-initialized policy improves actual mirrored
+  battle win rate. Do not scale the current transformer recipe.
