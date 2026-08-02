@@ -349,18 +349,29 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
 });
 
 test("party-mutating reward matrix drives every non-held mutation and nested item workflow into wave two", async () => {
-  const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign, browserEntry] =
-    await Promise.all([
-      readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
-      readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
-      readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
-      readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
-      readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
-      readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
-      readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
-      readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
-      readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
-    ]);
+  const [
+    workflow,
+    registry,
+    selectModifier,
+    selectStarter,
+    starterHandler,
+    config,
+    harness,
+    policy,
+    campaign,
+    browserEntry,
+  ] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+  ]);
 
   assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
   const exactVariantRewardIds = new Set([
