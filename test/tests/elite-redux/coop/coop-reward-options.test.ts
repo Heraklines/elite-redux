@@ -74,7 +74,7 @@ describe("co-op reward-option host-streaming (#633 Fix #2) - registry round-trip
     const rebuilt = reconstructRewardOptions(serialized, []);
     expect(rebuilt).not.toBeNull();
     expect(rebuilt![0].type.id).toBe(id);
-    expect((rebuilt![0].type as { getPregenArgs(): unknown[] }).getPregenArgs()).toEqual([variant]);
+    expect((rebuilt![0].type as unknown as { getPregenArgs(): unknown[] }).getPregenArgs()).toEqual([variant]);
   });
 });
 
