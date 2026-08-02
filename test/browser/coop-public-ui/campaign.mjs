@@ -4983,7 +4983,8 @@ export async function runCampaign(rig) {
         event => event.kind === "campaign-ability-choice" && event.phase === "ErAbilityCapsulePhase",
       );
       const ownerOutcomes = events.filter(
-        event => event.kind === "console" && /capsule OWNER relay OUTCOME .* op=CAP_CYCLE data=\[11\]/u.test(event.text ?? ""),
+        event =>
+          event.kind === "console" && /capsule OWNER relay OUTCOME .* op=CAP_CYCLE data=\[11\]/u.test(event.text ?? ""),
       );
       const watcherOutcomes = events.filter(
         event =>
