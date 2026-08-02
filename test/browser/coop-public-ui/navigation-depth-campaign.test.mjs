@@ -173,7 +173,7 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   );
   assert.match(
     registry,
-    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignSurvivalFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
   );
   assert.match(starterHandler, /getCoopBrowserNavigationFixtureStarters\(\)/u);
   assert.match(

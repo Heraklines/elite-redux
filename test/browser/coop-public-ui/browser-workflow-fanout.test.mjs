@@ -373,7 +373,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     registry,
-    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
+    /shouldPauseCoopBrowserLongitudinalFixtureEvolutions\(\)[\s\S]*isCoopBrowserCampaignSurvivalFixtureActive\(\)[\s\S]*isCoopBrowserNavigationFixtureActive\(\)/u,
     "survival/navigation fixtures remain paused while evolution-sync remains live",
   );
   assert.match(
