@@ -29,6 +29,7 @@ PROFILES = {
         "epochs": 2,
         "patience": 2,
         "batch_size": 8,
+        "resume_batch_size": 8,
         "history_length": 8,
         "trajectory_layers": 1,
         "transfer_pretrain_epochs": 1,
@@ -41,6 +42,7 @@ PROFILES = {
         "epochs": 60,
         "patience": 8,
         "batch_size": 128,
+        "resume_batch_size": 32,
         "history_length": 8,
         "trajectory_layers": 2,
         "transfer_pretrain_epochs": 4,
@@ -53,6 +55,7 @@ PROFILES = {
         "epochs": 80,
         "patience": 10,
         "batch_size": 32,
+        "resume_batch_size": 8,
         "history_length": 8,
         "trajectory_layers": 4,
         "transfer_pretrain_epochs": 8,
@@ -201,6 +204,7 @@ def build_training_command(
     data_dir = bundle_root / "data"
     trainer = bundle_root / "ml" / "policy" / "train_candidate_transformer.py"
     seed_output = output_root / f"seed-{seed}"
+    batch_size = effective_batch_size(profile, init_model_dir is not None)
     command = [
         sys.executable,
         str(trainer),
@@ -220,7 +224,7 @@ def build_training_command(
         "--patience",
         str(profile["patience"]),
         "--batch-size",
-        str(profile["batch_size"]),
+        str(batch_size),
         "--d-model",
         str(profile["d_model"]),
         "--layers",
@@ -256,6 +260,12 @@ def build_training_command(
     if init_model_dir is not None:
         command.extend(["--init-model-dir", str(init_model_dir)])
     return command
+
+
+def effective_batch_size(profile: dict[str, int], checkpoint_resume: bool) -> int:
+    if checkpoint_resume:
+        return min(profile["batch_size"], profile.get("resume_batch_size", profile["batch_size"]))
+    return profile["batch_size"]
 
 
 def run_training(
@@ -340,6 +350,8 @@ def main() -> None:
     )
     if transfer_pretrain_epochs < 0:
         raise RuntimeError("ER_AI_TRANSFER_PRETRAIN_EPOCHS must be non-negative")
+    checkpoint_resume = (bundle_root / "initial-model" / "config.json").is_file()
+    batch_size = effective_batch_size(profile_config, checkpoint_resume)
 
     print(
         json.dumps(
@@ -349,6 +361,8 @@ def main() -> None:
                 "seeds": seeds,
                 "bundle": bundle_source,
                 "transferPretrainEpochs": transfer_pretrain_epochs,
+                "batchSize": batch_size,
+                "checkpointResume": checkpoint_resume,
             }
         ),
         flush=True,
@@ -362,6 +376,8 @@ def main() -> None:
                 "cudaDevice": torch.cuda.get_device_name(0),
                 "torchVersion": torch.__version__,
                 "transferPretrainEpochs": transfer_pretrain_epochs,
+                "batchSize": batch_size,
+                "checkpointResume": checkpoint_resume,
             },
             indent=2,
         )

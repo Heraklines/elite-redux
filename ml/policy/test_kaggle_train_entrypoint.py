@@ -12,6 +12,7 @@ from kaggle_train_entrypoint import (
     build_training_command,
     compatible_torch_install_command,
     cuda_architecture_supported,
+    effective_batch_size,
     find_training_source,
     materialize_training_bundle,
 )
@@ -35,6 +36,11 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
         self.assertIn("--elite-rollouts", command)
         self.assertIn("--amp", command)
         self.assertIn("--fast-kernels", command)
+
+    def test_baseline_batch_is_unchanged_without_checkpoint_resume(self) -> None:
+        command = build_training_command(Path("bundle"), Path("output"), PROFILES["baseline"], 17)
+        self.assertEqual(command[command.index("--batch-size") + 1], "128")
+        self.assertEqual(effective_batch_size(PROFILES["baseline"], False), 128)
 
     def test_transfer_bundle_enables_masked_domain_pretraining(self) -> None:
         command = build_training_command(
@@ -71,6 +77,8 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
             init_model_dir=initial_model,
         )
         self.assertEqual(command[command.index("--init-model-dir") + 1], str(initial_model))
+        self.assertEqual(command[command.index("--batch-size") + 1], "32")
+        self.assertEqual(effective_batch_size(PROFILES["baseline"], True), 32)
         self.assertNotIn("--transfer-data", command)
 
     def write_bundle(self, root: Path) -> None:

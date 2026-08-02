@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
+from torch.nn import functional as F
 
 
 @dataclass(frozen=True)
@@ -286,14 +287,28 @@ class CandidateSetTransformer(nn.Module):
             + self.feature_presence_projection(visible_presence.to(normalized.dtype))
             + self.domain_embedding(domain_ids).unsqueeze(1)
         )
-        embedded_tokens = self.token_embedding(token_ids)
-        group_ids = torch.arange(self.config.token_group_count, device=token_ids.device)
-        embedded_tokens = embedded_tokens + self.token_group_embedding(group_ids)[None, None, :, None, :]
-        expanded_token_mask = token_mask.unsqueeze(-1).to(embedded_tokens.dtype)
-        pooled_groups = (embedded_tokens * expanded_token_mask).sum(dim=3) / expanded_token_mask.sum(dim=3).clamp_min(1)
+        pooled_groups = self._pool_token_groups(token_ids, token_mask)
         token_encoded = self.token_projection(pooled_groups.flatten(start_dim=2))
         encoded = dense_encoded + token_encoded
         return self.encoder(encoded, src_key_padding_mask=~candidate_mask)
+
+    def _pool_token_groups(self, token_ids: Tensor, token_mask: Tensor) -> Tensor:
+        """Mean-pool token roles without materializing every token embedding."""
+        masked_token_ids = token_ids.masked_fill(~token_mask, self.token_embedding.padding_idx)
+        flat_token_ids = masked_token_ids.reshape(-1, masked_token_ids.shape[-1])
+        pooled_groups = F.embedding_bag(
+            flat_token_ids,
+            self.token_embedding.weight,
+            mode="sum",
+            padding_idx=self.token_embedding.padding_idx,
+        ).reshape(*token_ids.shape[:-1], self.config.d_model)
+        token_counts = token_mask.sum(dim=-1, keepdim=True).clamp_min(1).to(pooled_groups.dtype)
+        pooled_groups = pooled_groups / token_counts
+        group_ids = torch.arange(self.config.token_group_count, device=token_ids.device)
+        group_embeddings = self.token_group_embedding(group_ids)
+        group_shape = (1,) * (token_ids.ndim - 2) + group_embeddings.shape
+        nonempty_groups = token_mask.any(dim=-1, keepdim=True).to(pooled_groups.dtype)
+        return pooled_groups + group_embeddings.reshape(group_shape) * nonempty_groups
 
 
 def parameter_count(model: nn.Module) -> int:

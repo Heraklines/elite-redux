@@ -6,6 +6,31 @@ from candidate_transformer import CandidateSetTransformer, CandidateTransformerC
 
 
 class CandidateSetTransformerTest(unittest.TestCase):
+    def test_embedding_bag_pooling_matches_explicit_masked_mean(self) -> None:
+        torch.manual_seed(3)
+        model = CandidateSetTransformer(
+            CandidateTransformerConfig(
+                feature_count=3,
+                token_vocabulary_size=16,
+                d_model=8,
+                layers=1,
+                heads=2,
+                feedforward=16,
+            )
+        ).eval()
+        token_ids = torch.randint(1, 16, (2, 3, 5, 7))
+        token_mask = torch.rand_like(token_ids, dtype=torch.float32) > 0.35
+        token_mask[0, 1, 2] = False
+        group_ids = torch.arange(model.config.token_group_count)
+        explicit = model.token_embedding(token_ids)
+        explicit = explicit + model.token_group_embedding(group_ids)[None, None, :, None, :]
+        expanded_mask = token_mask.unsqueeze(-1).to(explicit.dtype)
+        explicit = (explicit * expanded_mask).sum(dim=3) / expanded_mask.sum(dim=3).clamp_min(1)
+
+        pooled = model._pool_token_groups(token_ids, token_mask)
+
+        torch.testing.assert_close(pooled, explicit, atol=1e-6, rtol=1e-6)
+
     def test_candidate_permutation_only_permutes_policy_scores(self) -> None:
         torch.manual_seed(7)
         model = CandidateSetTransformer(
