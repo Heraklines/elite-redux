@@ -1429,10 +1429,7 @@ test("reward targeting follows nested move and ability choices instead of requir
     }),
     "party-option:ability-slot-0",
   );
-  assert.equal(
-    chooseRewardPartyActionOption({ optionIds: ["party-option:summary", "party-option:cancel"] }),
-    null,
-  );
+  assert.equal(chooseRewardPartyActionOption({ optionIds: ["party-option:summary", "party-option:cancel"] }), null);
 });
 
 test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {
