@@ -546,6 +546,21 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(campaign, /DNA Splicers secondary target action or immediate fusion commit/u);
   assert.match(campaign, /resolution: "immediate"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
+  assert.match(
+    campaign,
+    /PARTY_REWARD_PRESENTATION_SURFACES[\s\S]*EVOLUTION_ITEM[\s\S]*battle:evolution[\s\S]*FORM_CHANGE_ITEM[\s\S]*battle:form-change/u,
+    "animations-on item coverage must name the evolution-style presentation classes it owns",
+  );
+  assert.match(
+    campaign,
+    /assertPartyRewardPresentationParity[\s\S]*renderProfile !== "animations-on-surface"[\s\S]*client\.evidence\.events\.slice\(from\)[\s\S]*event\.kind === "browser-surface2"[\s\S]*campaign-party-reward-presentation-proof/u,
+    "the exact item action must be followed by a fresh semantic cutscene on both real browsers",
+  );
+  assert.match(
+    campaign,
+    /presentationCursors: Object\.fromEntries\([\s\S]*client\.evidence\.cursor\(\)[\s\S]*assertPartyRewardPresentationParity\([\s\S]*targetAction\.presentationCursors/u,
+    "unrelated earlier battle presentation cannot satisfy the item-specific oracle",
+  );
   assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
   assert.match(campaign, /function latestPartyMaterialObservation\(client, minWave\)/u);

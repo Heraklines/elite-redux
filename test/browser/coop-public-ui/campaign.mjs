@@ -3528,6 +3528,87 @@ function partyRewardMutationProjection(slot) {
       };
 }
 
+const PARTY_REWARD_PRESENTATION_SURFACES = new Map([
+  [
+    "EVOLUTION_ITEM",
+    { surfaceId: "battle:evolution", phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]) },
+  ],
+  [
+    "RARE_EVOLUTION_ITEM",
+    { surfaceId: "battle:evolution", phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]) },
+  ],
+  [
+    "FORM_CHANGE_ITEM",
+    { surfaceId: "battle:form-change", phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]) },
+  ],
+  [
+    "RARE_FORM_CHANGE_ITEM",
+    { surfaceId: "battle:form-change", phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]) },
+  ],
+]);
+
+/**
+ * A converged final form/species proves mechanics, but it does not prove the user-visible cutscene.
+ * Under the animations-on profile, require both public browsers to expose a fresh, input-ready
+ * evolution-scene surface after the exact reward action. This catches the V2 failure mode where the
+ * authority plays the ordinary phase while the complete result silently teleports the watcher to the
+ * final material without installing its mechanics-free renderer.
+ */
+export function assertPartyRewardPresentationParity(clients, rewardId, presentationCursors, renderProfile) {
+  const contract = PARTY_REWARD_PRESENTATION_SURFACES.get(rewardId);
+  if (renderProfile !== "animations-on-surface" || contract == null) {
+    return null;
+  }
+  const proof = clients.map(client => {
+    const from = presentationCursors?.[client.label];
+    if (!Number.isSafeInteger(from)) {
+      throw new Error(
+        `[campaign-party-reward] ${rewardId} omitted the ${client.label} pre-action presentation cursor`,
+      );
+    }
+    const seen = new Map();
+    for (const event of client.evidence.events.slice(from)) {
+      const observation = event.kind === "browser-surface2" ? event.observation : null;
+      if (
+        observation?.surfaceId !== contract.surfaceId
+        || observation.uiMode !== "EVOLUTION_SCENE"
+        || !contract.phases.has(observation.phase)
+        || observation.ready?.handlerActive !== true
+        || !Number.isSafeInteger(observation.phaseInstance)
+      ) {
+        continue;
+      }
+      const identity = JSON.stringify([
+        observation.phase,
+        observation.phaseInstance,
+        observation.surfaceGeneration ?? null,
+      ]);
+      seen.set(identity, {
+        phase: observation.phase,
+        phaseInstance: observation.phaseInstance,
+        surfaceGeneration: observation.surfaceGeneration ?? null,
+        address: observation.address,
+      });
+    }
+    return { client: client.label, observations: [...seen.values()] };
+  });
+  const missing = proof.filter(entry => entry.observations.length === 0);
+  if (missing.length > 0) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} omitted animations-enabled ${contract.surfaceId} presentation: `
+        + JSON.stringify(proof),
+    );
+  }
+  for (const client of clients) {
+    client.evidence.record("campaign-party-reward-presentation-proof", {
+      rewardId,
+      surfaceId: contract.surfaceId,
+      clients: proof,
+    });
+  }
+  return proof;
+}
+
 function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abilityChoices) {
   const beforeProjection = partyRewardMutationProjection(before);
   const afterProjection = partyRewardMutationProjection(after);
@@ -3885,6 +3966,9 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       ownerSeat: owner.publicSeat,
       partySlot: targetSlot,
       rewardId: target.rewardId,
+      presentationCursors: Object.fromEntries(
+        Object.values(rig.clients).map(client => [client.label, client.evidence.cursor()]),
+      ),
       beforePartySlot: boundary.authority.partySlots?.find(slot => slot.slot === targetSlot) ?? null,
       selectedOptionId: optionEvent.observation.selectedOptionId,
       optionIds: optionEvent.observation.optionIds,
@@ -5625,6 +5709,12 @@ export async function runCampaign(rig) {
           targetAction.beforePartySlot,
           finalSlots[0],
           abilityChoices,
+        );
+        assertPartyRewardPresentationParity(
+          clients,
+          configuredId,
+          targetAction.presentationCursors,
+          policy.renderProfile,
         );
         const proof = {
           rewardId: configuredId,
