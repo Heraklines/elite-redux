@@ -17,6 +17,7 @@ import {
   chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
   chooseRevivalPartySlot,
+  chooseRewardPartyActionOption,
   chooseRewardPartyTargetSlot,
   chooseStormglassOption,
   classifyRewardTargetApplyOutcome,
@@ -1409,6 +1410,29 @@ test("reward targeting prefers the acting seat's legal mon when utility is other
     slots: [1, 0],
     rewardId: "RARE_CANDY",
   });
+});
+
+test("reward targeting follows nested move and ability choices instead of requiring APPLY", () => {
+  assert.equal(
+    chooseRewardPartyActionOption({
+      optionIds: ["party-option:apply", "party-option:summary", "party-option:cancel"],
+    }),
+    "party-option:apply",
+  );
+  assert.equal(
+    chooseRewardPartyActionOption({ optionIds: ["party-option:move-1", "party-option:cancel"] }),
+    "party-option:move-1",
+  );
+  assert.equal(
+    chooseRewardPartyActionOption({
+      optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:cancel"],
+    }),
+    "party-option:ability-slot-0",
+  );
+  assert.equal(
+    chooseRewardPartyActionOption({ optionIds: ["party-option:summary", "party-option:cancel"] }),
+    null,
+  );
 });
 
 test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {

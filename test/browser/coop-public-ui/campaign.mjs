@@ -3279,6 +3279,30 @@ export function chooseRewardPartyTargetSlot(boundary, fallbackSlot = 0) {
 }
 
 /**
+ * Choose the public PARTY submenu action that actually applies the selected reward.
+ *
+ * Most modifiers expose APPLY, but move-targeting rewards (Ether, PP Up, etc.) descend
+ * directly into MOVE_1..MOVE_5 and ability modifiers descend into an ability-slot row.
+ * Those are complete, player-actionable choices rather than a missing APPLY button.
+ * Keep this list closed so Summary/Cancel or a newly introduced menu cannot be pressed
+ * through while the journey claims it proved the reward continuation.
+ */
+export function chooseRewardPartyActionOption(observation) {
+  const options = Array.isArray(observation?.optionIds)
+    ? observation.optionIds.filter(optionId => typeof optionId === "string")
+    : [];
+  const apply = options.find(optionId => optionId === "party-option:apply");
+  if (apply != null) {
+    return apply;
+  }
+  return (
+    options.find(optionId =>
+      /^party-option:(?:teach|splice|select|move-[1-5]|move-index:\d+|ability-slot-[0-3])$/u.test(optionId),
+    ) ?? null
+  );
+}
+
+/**
  * Classify only public evidence emitted after applying a party-target reward.
  *
  * A valid application can briefly return to the PARTY slot list before its V2 result advances the
@@ -3530,19 +3554,17 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       selectedOptionId: optionEvent.observation.selectedOptionId,
       optionIds: optionEvent.observation.optionIds,
     });
-    const applyOptionId = optionEvent.observation.optionIds?.includes("party-option:apply")
-      ? "party-option:apply"
-      : null;
-    if (applyOptionId == null) {
+    const actionOptionId = chooseRewardPartyActionOption(optionEvent.observation);
+    if (actionOptionId == null) {
       throw new Error(
-        `[campaign-reward-target] no APPLY option after selecting slot ${targetSlot}: `
+        `[campaign-reward-target] no supported reward action after selecting slot ${targetSlot}: `
           + `${JSON.stringify(optionEvent.observation.optionIds)}`,
       );
     }
     const applyCursor = owner.evidence.cursor();
     await selectOptionById(owner, {
       surfaceId: "party:reward-target",
-      targetId: applyOptionId,
+      targetId: actionOptionId,
       navKeys: ["ArrowDown", "ArrowUp"],
       submitKey: "Space",
       timeoutMs: rig.config.timeoutMs,
