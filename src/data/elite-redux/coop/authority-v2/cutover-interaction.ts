@@ -1029,6 +1029,9 @@ export function successorOfCoopV2InteractionEnvelope(
         : shared("op:colosseum", "COLO_PICK", operation.id, operation.owner, ["COLO_PICK"], resultOperationIds);
     }
     case "ABILITY_PICK":
+      if (!COOP_V2_INTERACTION_REGISTRY.ABILITY_PICK.validatePayload(operation.payload)) {
+        return null;
+      }
       return wait(
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         payload?.allowNextWaveStart === true,
