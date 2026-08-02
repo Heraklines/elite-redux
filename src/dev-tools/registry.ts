@@ -542,7 +542,7 @@ export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
   }
   const subjectSpecies =
     rewardId === "EVOLUTION_ITEM"
-      ? SpeciesId.MILCERY
+      ? SpeciesId.KUBFU
       : rewardId === "RARE_EVOLUTION_ITEM"
         ? SpeciesId.KUBFU
         : rewardId === "FORM_CHANGE_ITEM"

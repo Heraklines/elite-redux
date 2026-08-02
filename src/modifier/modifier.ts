@@ -8,6 +8,7 @@ import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
 import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
@@ -2976,6 +2977,15 @@ export class EvolutionItemModifier extends ConsumablePokemonModifier {
   public declare type: EvolutionItemModifierType;
   /** Exact V2 successor permit supplied by the reward surface that constructed this consumable. */
   public coopAllowNextWaveStart = false;
+  /** Exact retained reward operation whose immutable result must wait for the asynchronous evolution. */
+  public coopRewardOperationId: string | null = null;
+  /** Authority-only settlement hook. It captures the evolved post-image; it never runs on a replica replay. */
+  public coopSettleRewardEvolution:
+    | ((
+        presentation: Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>,
+        requiresLearnMoveDecision: boolean,
+      ) => boolean)
+    | null = null;
   /**
    * Applies {@linkcode EvolutionItemModifier}
    * @param playerPokemon The {@linkcode PlayerPokemon} that should evolve via item
@@ -3006,6 +3016,8 @@ export class EvolutionItemModifier extends ConsumablePokemonModifier {
         true,
         [],
         this.coopAllowNextWaveStart,
+        this.coopRewardOperationId,
+        this.coopSettleRewardEvolution,
       );
       return true;
     }

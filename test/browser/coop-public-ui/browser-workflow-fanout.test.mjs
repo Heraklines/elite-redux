@@ -509,7 +509,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(
     registry,
     /partyRewardFixture === "EVOLUTION_ITEM"[\s\S]*\? 30/u,
-    "the ordinary evolution fixture retains a legal Milcery above Strawberry Sweet's level floor",
+    "the ordinary evolution fixture retains a deterministic legal Kubfu",
   );
   assert.match(
     selectModifier,
@@ -518,12 +518,12 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     selectModifier,
-    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.STRAWBERRY_SWEET[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
+    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_DARKNESS[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
     "the exact fixtures must use item edges that remain reachable after the ER evolution rewrite",
   );
   assert.match(
     registry,
-    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.MILCERY[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
+    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
   );
   assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
   assert.match(
@@ -543,8 +543,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(harness, /expectedPartyRewardFixtureSpecies\(this\.config\.partyRewardId\)/u);
   assert.match(
     harness,
-    /MILCERY_SPECIES_ID = 868[\s\S]*EVOLUTION_ITEM: MILCERY_SPECIES_ID/u,
-    "the browser roster oracle must follow the production Milcery evolution fixture",
+    /KUBFU_SPECIES_ID = 891[\s\S]*EVOLUTION_ITEM: KUBFU_SPECIES_ID/u,
+    "the browser roster oracle must follow the production Kubfu evolution fixture",
   );
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
@@ -605,6 +605,16 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "an evolve-move picker must inherit the terminal reward's successor permit",
   );
   assert.match(
+    selectModifier,
+    /coopPendingEvolutionSettlementOperationId[\s\S]*coopSettleRewardEvolution[\s\S]*coopCommitPendingAuthorityResult\(operationId\)/u,
+    "an evolution reward must not commit until its asynchronous exact post-image exists",
+  );
+  assert.match(
+    evolutionPhase,
+    /installCoopV2TerminalSuccessor[\s\S]*proveCoopRewardEvolutionSettlement[\s\S]*coopSettleRewardEvolution[\s\S]*this\.postEvolve\(evolvedPokemon\)/u,
+    "the live EvolutionPhase must install and prove the delayed reward successor before releasing children",
+  );
+  assert.match(
     learnMovePhase,
     /nextInteraction == null[\s\S]*this\.coopParentAllowsNextWaveStart/u,
     "the retained learn-move result must authorize wave N+1 when its item-evolution parent did",
@@ -648,8 +658,8 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     operationEnvelope,
-    /readonly presentation\?: Extract<CoopBattleEvent, \{ readonly k: "formChange" \}>/u,
-    "the immutable reward result must carry its exact form-change presentation event",
+    /readonly presentation\?:[\s\S]*Extract<CoopBattleEvent, \{ readonly k: "formChange" \}>[\s\S]*CoopWaveProgressionPresentationV2[\s\S]*readonly k: "evolution"/u,
+    "the immutable reward result must carry exact form-change or evolution presentation material",
   );
   assert.match(
     battleScene,
@@ -663,12 +673,12 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     rewardOperation,
-    /isStrictCoopBattleEvent\(presentation\)[\s\S]*presentation\.k !== "formChange"[\s\S]*presentation: structuredClone\(presentation\)/u,
-    "malformed or non-form presentation material cannot enter a reward commit",
+    /isStrictCoopBattleEvent\(presentation\)[\s\S]*isValidWaveProgressionPresentation\(presentation\)[\s\S]*presentation: structuredClone\(presentation\)/u,
+    "malformed presentation material cannot enter a reward commit",
   );
   assert.match(
     coopRuntime,
-    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*return false;/u,
+    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*settleCoopPresentationOutcome[\s\S]*return false;/u,
     "the replica must withhold material completion until its mechanics-free replay reaches a bounded terminal",
   );
 });

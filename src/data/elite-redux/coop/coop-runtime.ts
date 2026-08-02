@@ -377,6 +377,7 @@ import {
   type CoopPresentationOutcomeToken,
   coopPresentationOutcome,
   createCoopPresentationOutcomeToken,
+  settleCoopPresentationOutcome,
 } from "#data/elite-redux/coop/coop-presentation-outcome";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
@@ -11096,6 +11097,17 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   if (op.kind === "REWARD") {
     const payload = op.payload as CoopRewardActionPayload;
     const presentation = payload.result?.presentation;
+    const validFormChangePresentation =
+      presentation !== undefined
+      && isStrictCoopBattleEvent(presentation)
+      && presentation.k === "formChange"
+      && presentation.actor.side === "player"
+      && presentation.presentation === "evolution"
+      && presentation.animate === true;
+    const validEvolutionPresentation =
+      presentation !== undefined
+      && isValidWaveProgressionPresentation(presentation)
+      && presentation.k === "evolution";
     const expectedSurfaceBand = payload.rewardSurface == null ? 0 : payload.rewardSurface.ordinal + 1;
     if (
       typeof payload?.label !== "string"
@@ -11110,12 +11122,7 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
       || (payload.rewardSurface !== undefined && !isValidCoopRewardSurfaceIdentity(payload.rewardSurface))
       || Math.floor(ordinal / COOP_REWARD_SURFACE_ACTION_STRIDE) !== expectedSurfaceBand
       || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
-      || (presentation !== undefined
-        && (!isStrictCoopBattleEvent(presentation)
-          || presentation.k !== "formChange"
-          || presentation.actor.side !== "player"
-          || presentation.presentation !== "evolution"
-          || presentation.animate !== true))
+      || (presentation !== undefined && !validFormChangePresentation && !validEvolutionPresentation)
     ) {
       return false;
     }
@@ -11136,17 +11143,34 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
         }
         return true;
       }
-      const target = globalScene
-        .getPlayerParty()
-        .find(
-          pokemon =>
-            pokemon.id === presentation.actor.pokemonId && pokemon.species.speciesId === presentation.speciesId,
-        );
-      if (
-        target == null
-        || (target.formIndex !== presentation.preFormIndex && target.formIndex !== presentation.formIndex)
-      ) {
-        return false;
+      if (presentation.k === "formChange") {
+        const target = globalScene
+          .getPlayerParty()
+          .find(
+            pokemon =>
+              pokemon.id === presentation.actor.pokemonId && pokemon.species.speciesId === presentation.speciesId,
+          );
+        if (
+          target == null
+          || (target.formIndex !== presentation.preFormIndex && target.formIndex !== presentation.formIndex)
+        ) {
+          return false;
+        }
+      } else {
+        const target = globalScene.getPlayerParty().find(pokemon => pokemon.id === presentation.pokemonId);
+        const matchesPreImage =
+          target != null
+          && target.species.speciesId === presentation.fromSpeciesId
+          && target.formIndex === presentation.fromFormIndex
+          && target.getSpriteKey(true) === presentation.fromSpriteKey;
+        const matchesPostImage =
+          target != null
+          && target.species.speciesId === presentation.toSpeciesId
+          && target.formIndex === presentation.toFormIndex
+          && target.getSpriteKey(true) === presentation.toSpriteKey;
+        if (target == null || (!matchesPreImage && !matchesPostImage)) {
+          return false;
+        }
       }
     }
     runtime.interactionRelay.materializeCommittedInteractionChoice(
@@ -11171,12 +11195,41 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
     if (presentation != null) {
       const outcomeToken = createCoopPresentationOutcomeToken();
       runtime.v2RewardPresentationOutcomes.set(op.id, outcomeToken);
-      globalScene.phaseManager.unshiftNew("CoopFormChangeReplayPhase", structuredClone(presentation), outcomeToken);
-      coopLog(
-        "v2-interaction",
-        `reward presentation queued op=${op.id} pokemon=${presentation.actor.pokemonId} `
-          + `form=${presentation.preFormIndex}->${presentation.formIndex}`,
-      );
+      if (presentation.k === "formChange") {
+        globalScene.phaseManager.unshiftNew("CoopFormChangeReplayPhase", structuredClone(presentation), outcomeToken);
+        coopLog(
+          "v2-interaction",
+          `reward presentation queued op=${op.id} pokemon=${presentation.actor.pokemonId} `
+            + `form=${presentation.preFormIndex}->${presentation.formIndex}`,
+        );
+      } else {
+        const settleEvolutionReplay = (succeeded: boolean, reason: string): void => {
+          runWhenCoopRuntimeActive(runtime, () => {
+            settleCoopPresentationOutcome(
+              outcomeToken,
+              succeeded
+                ? { kind: "rendered", actorFingerprint: String(presentation.pokemonId) }
+                : { kind: "failed", reason, actorFingerprint: String(presentation.pokemonId) },
+            );
+            const completed = coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries() ?? 0;
+            if (completed > 0) {
+              coopLog("v2-interaction", `reward evolution completed ${completed} retained V2 entry`);
+            }
+          });
+        };
+        globalScene.phaseManager.unshiftNew(
+          "CoopWaveProgressionReplayPhase",
+          envelope.wave,
+          [structuredClone(presentation)],
+          succeeded => settleEvolutionReplay(succeeded, "reward-evolution-presentation-failed"),
+          () => settleEvolutionReplay(false, "reward-evolution-presentation-retired"),
+        );
+        coopLog(
+          "v2-interaction",
+          `reward evolution queued op=${op.id} pokemon=${presentation.pokemonId} `
+            + `species=${presentation.fromSpeciesId}->${presentation.toSpeciesId}`,
+        );
+      }
       return false;
     }
     return true;

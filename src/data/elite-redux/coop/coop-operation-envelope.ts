@@ -22,6 +22,7 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopBattleEvent,
@@ -241,7 +242,10 @@ export interface CoopRewardActionPayload {
      * event itself so the replica never guesses a form edge from its local modifier catalog, and material
      * completion remains ordered behind the mechanics-free replay.
      */
-    readonly presentation?: Extract<CoopBattleEvent, { readonly k: "formChange" }> | undefined;
+    readonly presentation?:
+      | Extract<CoopBattleEvent, { readonly k: "formChange" }>
+      | Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>
+      | undefined;
     /** Exact nested picker opened by this result, when one exists. */
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
     /**

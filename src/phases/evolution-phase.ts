@@ -5,7 +5,15 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
-import { recordCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import {
+  failCoopSharedSession,
+  getCoopController,
+  getCoopRuntime,
+  recordCoopWaveProgressionPresentation,
+  runWhenCoopRuntimeActive,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getTypeRgb } from "#data/type";
@@ -51,6 +59,24 @@ export class EvolutionPhase extends Phase {
   private readonly evolutionChoices: SpeciesFormEvolution[];
   /** True only for an evolution queued by a terminal reward whose successor may enter wave N+1. */
   private readonly coopAllowNextWaveStart: boolean;
+  /** Exact terminal reward whose complete result is settled only after this asynchronous evolution. */
+  private readonly coopRewardOperationId: string | null;
+  private readonly coopSettleRewardEvolution:
+    | ((
+        presentation: Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>,
+        requiresLearnMoveDecision: boolean,
+      ) => boolean)
+    | null;
+  private readonly coopOwningRuntime = getCoopRuntime();
+  private readonly coopRewardSourceWave: number;
+  private readonly coopRewardSourceTurn: number;
+  private coopRewardTerminalSettlement:
+    | {
+        readonly operationId: string;
+        readonly successor: Extract<CoopNextControl, { readonly kind: "AWAIT_SUCCESSOR" }>;
+        readonly settle: () => boolean;
+      }
+    | null = null;
   private fusionSpeciesEvolved: boolean; // Whether the evolution is of the fused species
   private evolutionBgm: AnySound | null;
   private evolutionHandler: EvolutionSceneUiHandler;
@@ -77,6 +103,8 @@ export class EvolutionPhase extends Phase {
    * @param evolutionChoices - When the line offers more than one valid evolution, the candidates to
    *  let the player pick between. Defaults to just `evolution` (no choice).
    * @param coopAllowNextWaveStart - Inherit a terminal reward's wave-crossing permit through evolve-move prompts.
+   * @param coopRewardOperationId - Exact retained reward whose complete result waits for this evolution.
+   * @param coopSettleRewardEvolution - Authority-only post-image settlement callback for that reward.
    */
   constructor(
     pokemon: PlayerPokemon,
@@ -85,6 +113,13 @@ export class EvolutionPhase extends Phase {
     canCancel = true,
     evolutionChoices: SpeciesFormEvolution[] = [],
     coopAllowNextWaveStart = false,
+    coopRewardOperationId: string | null = null,
+    coopSettleRewardEvolution:
+      | ((
+          presentation: Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>,
+          requiresLearnMoveDecision: boolean,
+        ) => boolean)
+      | null = null,
   ) {
     super();
 
@@ -95,10 +130,60 @@ export class EvolutionPhase extends Phase {
     this.canCancel = canCancel;
     this.evolutionChoices = evolutionChoices;
     this.coopAllowNextWaveStart = coopAllowNextWaveStart;
+    this.coopRewardOperationId = coopRewardOperationId;
+    this.coopSettleRewardEvolution = coopRewardOperationId == null ? null : coopSettleRewardEvolution;
+    this.coopRewardSourceWave = this.scene.currentBattle?.waveIndex ?? 0;
+    this.coopRewardSourceTurn = this.scene.currentBattle?.turn ?? 0;
     this.coopPreEvolutionSpeciesId = pokemon.species.speciesId;
     this.coopPreEvolutionFormIndex = pokemon.formIndex;
     this.coopPreEvolutionSpriteKey = pokemon.getSpriteKey(true);
     this.coopPreEvolutionPokemon = JSON.parse(JSON.stringify(new PokemonData(pokemon))) as Record<string, unknown>;
+  }
+
+  /** Install the exact terminal successor while this phase is the scheduler's live reward boundary. */
+  public installCoopV2TerminalSuccessor(
+    operationId: string,
+    successor: Extract<CoopNextControl, { readonly kind: "AWAIT_SUCCESSOR" }>,
+    settle: () => boolean,
+  ): boolean {
+    if (
+      this.coopRewardOperationId !== operationId
+      || successor.afterOperationId !== operationId
+      || successor.epoch !== getCoopController()?.sessionEpoch
+      || successor.wave !== this.coopRewardSourceWave
+      || successor.turn !== this.coopRewardSourceTurn
+    ) {
+      return false;
+    }
+    if (this.coopRewardTerminalSettlement != null) {
+      return (
+        this.coopRewardTerminalSettlement.operationId === operationId
+        && JSON.stringify(this.coopRewardTerminalSettlement.successor) === JSON.stringify(successor)
+      );
+    }
+    this.coopRewardTerminalSettlement = { operationId, successor: structuredClone(successor), settle };
+    return true;
+  }
+
+  /** Queue the signed structural bridge before proving the exact delayed reward result complete. */
+  private proveCoopRewardEvolutionSettlement(): boolean {
+    if (this.coopRewardOperationId == null) {
+      return true;
+    }
+    const terminal = this.coopRewardTerminalSettlement;
+    if (terminal == null || terminal.operationId !== this.coopRewardOperationId) {
+      return false;
+    }
+    if (terminal.successor.allowNextWaveStart) {
+      this.scene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
+      this.scene.phaseManager.pushNew("NewBattlePhase", {
+        afterOperationId: terminal.successor.afterOperationId,
+        epoch: terminal.successor.epoch,
+        wave: terminal.successor.wave,
+        turn: terminal.successor.turn,
+      });
+    }
+    return terminal.settle();
   }
 
   validate(): boolean {
@@ -528,23 +613,37 @@ export class EvolutionPhase extends Phase {
     });
   }
 
-  private postEvolve(evolvedPokemon: Pokemon): void {
+  private evolutionLevelMoves() {
     const learnSituation: LearnMoveSituation = this.fusionSpeciesEvolved
       ? LearnMoveSituation.EVOLUTION_FUSED
       : this.pokemon.fusionSpecies
         ? LearnMoveSituation.EVOLUTION_FUSED_BASE
         : LearnMoveSituation.EVOLUTION;
-    const levelMoves = this.pokemon
+    return this.pokemon
       .getLevelMoves(this.lastLevel + 1, true, false, false, learnSituation)
       .filter(lm => lm[0] === EVOLVE_MOVE);
-    for (const lm of levelMoves) {
+  }
+
+  /** Whether at least one evolve move will require human replacement after deterministic empty-slot learns. */
+  private evolutionRequiresLearnMoveDecision(): boolean {
+    const moveset = this.pokemon.getMoveset(true);
+    const knownMoves = new Set(moveset.map(move => move.moveId));
+    const novelMoves = this.evolutionLevelMoves().filter(([, moveId]) => !knownMoves.has(moveId));
+    const emptySlots = Math.max(0, this.pokemon.getMaxMoveCount() - moveset.length);
+    return novelMoves.length > emptySlots;
+  }
+
+  private postEvolve(evolvedPokemon: Pokemon): void {
+    const levelMoves = this.evolutionLevelMoves();
+    for (let index = 0; index < levelMoves.length; index++) {
+      const lm = levelMoves[index];
       globalScene.phaseManager.unshiftNew(
         "LearnMovePhase",
         globalScene.getPlayerParty().indexOf(this.pokemon),
         lm[1],
         LearnMoveType.LEARN_MOVE,
         -1,
-        this.coopAllowNextWaveStart,
+        this.coopAllowNextWaveStart && index === levelMoves.length - 1,
       );
     }
     globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
@@ -596,9 +695,9 @@ export class EvolutionPhase extends Phase {
       this.evolutionHandler.canCancel = this.canCancel && !globalScene.gameMode.isCoop;
 
       this.pokemon.evolve(this.evolution, this.pokemon.species).then(() => {
-        const partySlot = globalScene.getPlayerParty().indexOf(this.pokemon);
+        const partySlot = this.scene.getPlayerParty().indexOf(this.pokemon);
         if (partySlot >= 0) {
-          recordCoopWaveProgressionPresentation({
+          const presentation = {
             k: "evolution",
             partySlot,
             pokemonId: this.pokemon.id,
@@ -610,7 +709,31 @@ export class EvolutionPhase extends Phase {
             toSpriteKey: this.pokemon.getSpriteKey(true),
             prePokemon: this.coopPreEvolutionPokemon,
             postPokemon: JSON.parse(JSON.stringify(new PokemonData(this.pokemon))) as Record<string, unknown>,
-          });
+          } as const satisfies Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>;
+          const finishEvolution = (): void => {
+            recordCoopWaveProgressionPresentation(presentation, this.coopOwningRuntime);
+            if (this.coopSettleRewardEvolution != null) {
+              const committed = this.coopSettleRewardEvolution(
+                presentation,
+                this.evolutionRequiresLearnMoveDecision(),
+              );
+              if (!committed || !this.proveCoopRewardEvolutionSettlement()) {
+                failCoopSharedSession(`Evolution reward ${this.coopRewardOperationId ?? "unknown"} could not settle`);
+                return;
+              }
+            }
+            this.postEvolve(evolvedPokemon);
+          };
+          if (this.coopSettleRewardEvolution != null && this.coopOwningRuntime != null) {
+            runWhenCoopRuntimeActive(this.coopOwningRuntime, finishEvolution);
+          } else {
+            finishEvolution();
+          }
+          return;
+        }
+        if (this.coopSettleRewardEvolution != null) {
+          failCoopSharedSession(`Evolution reward ${this.coopRewardOperationId ?? "unknown"} lost its party target`);
+          return;
         }
         this.postEvolve(evolvedPokemon);
       });

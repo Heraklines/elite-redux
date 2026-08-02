@@ -167,7 +167,7 @@ const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTyp
   FULL_HEAL: () => modifierTypes.FULL_HEAL,
   SACRED_ASH: () => modifierTypes.SACRED_ASH,
   EVOLUTION_ITEM: () => () =>
-    new EvolutionItemModifierType(EvolutionItem.STRAWBERRY_SWEET).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
+    new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_DARKNESS).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
   RARE_EVOLUTION_ITEM: () => () =>
     new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_WATERS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
   FORM_CHANGE_ITEM: () => () =>
@@ -341,6 +341,8 @@ export class SelectModifierPhase extends BattlePhase {
   private coopPendingAuthorityPresentation:
     | NonNullable<NonNullable<CoopRewardActionPayload["result"]>["presentation"]>
     | undefined;
+  /** A terminal item evolution cannot commit until EvolutionPhase supplies its exact immutable post-image. */
+  private coopPendingEvolutionSettlementOperationId: string | null = null;
   /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
@@ -398,6 +400,9 @@ export class SelectModifierPhase extends BattlePhase {
    */
   protected coopProveV2RewardOperationComplete(operationId: string | null | undefined): void {
     if (operationId == null || operationId.length === 0) {
+      return;
+    }
+    if (this.coopPendingEvolutionSettlementOperationId === operationId) {
       return;
     }
     this.coopV2ControlOperationId = operationId;
@@ -1357,6 +1362,32 @@ export class SelectModifierPhase extends BattlePhase {
       // A free reward consumes its parent and is allowed to enter wave N+1. Paid market applications retain
       // the current shop, so they must not inherit that broader successor edge through an evolve-move picker.
       modifier.coopAllowNextWaveStart = globalScene.gameMode.isCoop && cost === -1;
+      const operationId = this.coopPendingAuthorityOperationId;
+      if (
+        cost === -1
+        && operationId != null
+        && getCoopController()?.role === "host"
+        && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)
+      ) {
+        this.coopPendingEvolutionSettlementOperationId = operationId;
+        modifier.coopRewardOperationId = operationId;
+        modifier.coopSettleRewardEvolution = (presentation, requiresLearnMoveDecision) => {
+          if (this.coopPendingEvolutionSettlementOperationId !== operationId) {
+            failCoopSharedSession(`Evolution reward ${operationId} lost its exact settlement owner`);
+            return false;
+          }
+          this.coopPendingEvolutionSettlementOperationId = null;
+          this.coopPendingAuthorityPresentation = structuredClone(presentation);
+          this.coopPendingAuthorityNextInteraction = requiresLearnMoveDecision
+            ? { kind: "learn-move", wave: this.coopRewardWave(), turn: this.coopRewardTurn() }
+            : undefined;
+          const committed = this.coopCommitPendingAuthorityResult(operationId);
+          if (committed) {
+            this.coopAdvanceInteraction();
+          }
+          return committed;
+        };
+      }
     }
     const formTarget =
       modifier instanceof PokemonFormChangeItemModifier
@@ -1467,6 +1498,12 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopEndMirror();
       globalScene.ui.clearText();
       const finish = (): void => {
+        if (this.coopPendingEvolutionSettlementOperationId === operationId) {
+          // EvolutionPhase must run before the host result can exist. Retire this input owner without
+          // advancing the interaction; the exact async settlement callback commits and advances once.
+          this.coopEndOwningPhaseIfCurrent("deferred evolution reward settlement");
+          return;
+        }
         this.coopProveV2RewardOperationComplete(operationId);
         if (!this.coopCommitPendingAuthorityResult(operationId)) {
           return;
@@ -2192,6 +2229,9 @@ export class SelectModifierPhase extends BattlePhase {
     if (operationId == null || !isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)) {
       return true;
     }
+    if (this.coopPendingEvolutionSettlementOperationId === operationId) {
+      return false;
+    }
     if (getCoopController()?.role !== "host") {
       return false;
     }
@@ -2217,6 +2257,7 @@ export class SelectModifierPhase extends BattlePhase {
     }
     this.coopPendingAuthorityNextInteraction = undefined;
     this.coopPendingAuthorityPresentation = undefined;
+    this.coopPendingEvolutionSettlementOperationId = null;
     return true;
   }
 

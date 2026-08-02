@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   applyCoopOperationAuthorityState,
   captureCoopOperationAuthorityState,
@@ -1078,11 +1079,14 @@ function buildCompleteRewardResultPayload(
         || nextInteraction.turn !== prepared.turn
         || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability")))
     || (presentation !== undefined
-      && (!isStrictCoopBattleEvent(presentation)
-        || presentation.k !== "formChange"
-        || presentation.actor.side !== "player"
-        || presentation.presentation !== "evolution"
-        || presentation.animate !== true))
+      && !(
+        (isStrictCoopBattleEvent(presentation)
+          && presentation.k === "formChange"
+          && presentation.actor.side === "player"
+          && presentation.presentation === "evolution"
+          && presentation.animate === true)
+        || (isValidWaveProgressionPresentation(presentation) && presentation.k === "evolution")
+      ))
   ) {
     return null;
   }

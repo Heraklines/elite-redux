@@ -33,6 +33,7 @@ import type {
   CoopFrameContextV2,
   CoopNextControl,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthorityV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
@@ -183,7 +184,9 @@ function rewardPayload(value: unknown): boolean {
         && value.result.presentation.k === "formChange"
         && value.result.presentation.actor.side === "player"
         && value.result.presentation.presentation === "evolution"
-        && value.result.presentation.animate === true))
+        && value.result.presentation.animate === true)
+      || (isValidWaveProgressionPresentation(value.result.presentation)
+        && value.result.presentation.k === "evolution"))
     && (value.result.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.result.nextInteraction))
     && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))
   );
