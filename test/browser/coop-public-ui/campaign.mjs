@@ -4244,6 +4244,7 @@ export function currentPairedBattleKind(rig, wave) {
   const fields = observation => ({
     battleType: observation.battleType,
     trainerBoss: observation.trainerBoss,
+    bossEnemyCount: observation.bossEnemyCount,
     maxBossSegments: observation.maxBossSegments,
   });
   if (
@@ -5019,7 +5020,14 @@ export async function runCampaign(rig) {
       if (policy.targetWaves >= 7 && ghostSeven?.battleType !== "TRAINER") {
         throw new Error(`[campaign-mystery] wave 7 kind mismatch: ${JSON.stringify({ ghostSeven })}`);
       }
-      if (policy.targetWaves >= 8 && (bossEight?.battleType !== "WILD" || bossEight.maxBossSegments < 2)) {
+      // EncounterPhase intentionally distributes a multi-bar wild boss across every enemy in a double
+      // battle. Two generated two-bar bosses therefore become two one-bar bosses before command opens.
+      // Prove the retained mechanical invariant (boss identity on the full enemy side), not the discarded
+      // pre-balancing segment count.
+      if (
+        policy.targetWaves >= 8
+        && (bossEight?.battleType !== "WILD" || bossEight.bossEnemyCount < 2 || bossEight.maxBossSegments < 1)
+      ) {
         throw new Error(
           `[campaign-mystery] wave 8 was not the scripted segmented wild boss: ${JSON.stringify(bossEight)}`,
         );

@@ -90,6 +90,7 @@ interface CoopBrowserSurfaceObservationV1 {
   readonly stateDigest: string;
   readonly battleType: string;
   readonly trainerBoss: boolean;
+  readonly bossEnemyCount: number;
   readonly maxBossSegments: number;
 }
 
@@ -581,6 +582,7 @@ function observeContinuationSurface(): void {
       stateDigest,
       battleType: BattleType[battle.battleType],
       trainerBoss: battle.trainer?.config.isBoss === true,
+      bossEnemyCount: globalScene.getEnemyParty().filter(pokemon => pokemon.isBoss()).length,
       maxBossSegments: Math.max(0, ...globalScene.getEnemyParty().map(pokemon => pokemon.bossSegments ?? 0)),
     };
     console.info(`${SURFACE_PREFIX}${JSON.stringify(observation)}`);

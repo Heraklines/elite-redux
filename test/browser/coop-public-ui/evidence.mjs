@@ -636,6 +636,8 @@ function continuationSurfaceView(text) {
     || value.stateDigest === CHECKSUM_SENTINEL
     || !["WILD", "TRAINER", "MYSTERY_ENCOUNTER"].includes(value.battleType)
     || typeof value.trainerBoss !== "boolean"
+    || !Number.isSafeInteger(value.bossEnemyCount)
+    || value.bossEnemyCount < 0
     || !Number.isSafeInteger(value.maxBossSegments)
     || value.maxBossSegments < 0
   ) {

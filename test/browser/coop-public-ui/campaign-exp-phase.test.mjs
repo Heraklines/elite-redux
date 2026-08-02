@@ -178,6 +178,7 @@ test("battle-kind classification accepts a V2-only passive command watcher", () 
       wave: 5,
       battleType: "TRAINER",
       trainerBoss: false,
+      bossEnemyCount: 0,
       maxBossSegments: 0,
     },
   });
@@ -191,6 +192,7 @@ test("battle-kind classification accepts a V2-only passive command watcher", () 
         wave: 4,
         battleType: "WILD",
         trainerBoss: false,
+        bossEnemyCount: 0,
         maxBossSegments: 0,
       },
     },
@@ -207,7 +209,7 @@ test("battle-kind classification accepts a V2-only passive command watcher", () 
 
   assert.deepEqual(
     currentPairedBattleKind({ clients: { owner: { evidence: owner }, watcher: { evidence: watcher } } }, 5),
-    { wave: 5, battleType: "TRAINER", trainerBoss: false, maxBossSegments: 0 },
+    { wave: 5, battleType: "TRAINER", trainerBoss: false, bossEnemyCount: 0, maxBossSegments: 0 },
   );
 });
 
@@ -217,7 +219,14 @@ test("battle-kind classification still rejects current owner observations that d
     sink.events.push({
       index: 0,
       kind: "browser-surface",
-      observation: { surface: "command", wave: 5, battleType, trainerBoss: false, maxBossSegments: 0 },
+      observation: {
+        surface: "command",
+        wave: 5,
+        battleType,
+        trainerBoss: false,
+        bossEnemyCount: 0,
+        maxBossSegments: 0,
+      },
     });
     return sink;
   };

@@ -758,6 +758,7 @@ function comparableSurfaceObservation(observation) {
     stateDigest: observation.stateDigest,
     battleType: observation.battleType,
     trainerBoss: observation.trainerBoss,
+    bossEnemyCount: observation.bossEnemyCount,
     maxBossSegments: observation.maxBossSegments,
   };
 }

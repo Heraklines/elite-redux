@@ -1623,7 +1623,9 @@ test("campaign requires paired runConfig, the exact semantic schedule, and retai
   assert.match(campaign, /return "target-reached"/u);
   assert.match(campaign, /wave-\$\{event\.wave\}-mystery-terminal/u);
   assert.match(campaign, /battleType: observation\.battleType/u);
+  assert.match(campaign, /bossEnemyCount: observation\.bossEnemyCount/u);
   assert.match(campaign, /maxBossSegments: observation\.maxBossSegments/u);
+  assert.match(campaign, /bossEight\.bossEnemyCount < 2 \|\| bossEight\.maxBossSegments < 1/u);
   assert.match(campaign, /observation\.mysteryEncounterType === authority\.mysteryEncounterType/u);
   assert.match(campaign, /if \(!observations\.every\(matchesAuthority\)\)/u);
   assert.match(campaign, /paired Mystery \$\{stage\} convergence at/u);
