@@ -237,9 +237,10 @@ def build_training_command(
         str(profile["history_length"]),
         "--trajectory-layers",
         str(profile["trajectory_layers"]),
-        "--amp",
         "--fast-kernels",
     ]
+    if init_model_dir is None:
+        command.append("--amp")
     if transfer_data is not None:
         command.extend(
             [
@@ -352,6 +353,7 @@ def main() -> None:
         raise RuntimeError("ER_AI_TRANSFER_PRETRAIN_EPOCHS must be non-negative")
     checkpoint_resume = (bundle_root / "initial-model" / "config.json").is_file()
     batch_size = effective_batch_size(profile_config, checkpoint_resume)
+    amp_enabled = not checkpoint_resume
 
     print(
         json.dumps(
@@ -363,6 +365,7 @@ def main() -> None:
                 "transferPretrainEpochs": transfer_pretrain_epochs,
                 "batchSize": batch_size,
                 "checkpointResume": checkpoint_resume,
+                "amp": amp_enabled,
             }
         ),
         flush=True,
@@ -378,6 +381,7 @@ def main() -> None:
                 "transferPretrainEpochs": transfer_pretrain_epochs,
                 "batchSize": batch_size,
                 "checkpointResume": checkpoint_resume,
+                "amp": amp_enabled,
             },
             indent=2,
         )

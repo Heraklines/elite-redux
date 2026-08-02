@@ -79,6 +79,7 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
         self.assertEqual(command[command.index("--init-model-dir") + 1], str(initial_model))
         self.assertEqual(command[command.index("--batch-size") + 1], "32")
         self.assertEqual(effective_batch_size(PROFILES["baseline"], True), 32)
+        self.assertNotIn("--amp", command)
         self.assertNotIn("--transfer-data", command)
 
     def write_bundle(self, root: Path) -> None:
