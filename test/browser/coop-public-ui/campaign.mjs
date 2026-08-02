@@ -3407,6 +3407,17 @@ function partyRewardMutationProjection(slot) {
   return slot == null
     ? null
     : {
+        pokemonId: slot.pokemonId,
+        speciesId: slot.speciesId,
+        formIndex: slot.formIndex,
+        fusionSpeciesId: slot.fusionSpeciesId,
+        fusionFormIndex: slot.fusionFormIndex,
+        hp: slot.hp,
+        maxHp: slot.maxHp,
+        fainted: slot.fainted,
+        level: slot.level,
+        exp: slot.exp,
+        statusEffect: slot.statusEffect,
         abilityIndex: slot.abilityIndex,
         abilityId: slot.abilityId,
         innateAbilityIds: slot.innateAbilityIds,
@@ -3447,10 +3458,61 @@ function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abi
     (rewardId === "TM_CASE"
       || rewardId === "ER_LEARNERS_SHROOM"
       || rewardId === "MEMORY_MUSHROOM"
-      || rewardId === "TM_COMMON")
+      || rewardId === "TM_COMMON"
+      || rewardId === "TM_GREAT"
+      || rewardId === "TM_ULTRA")
     && JSON.stringify(before.moves?.map(move => move.moveId)) === JSON.stringify(after.moves?.map(move => move.moveId))
   ) {
     throw new Error(`[campaign-party-reward] ${rewardId} accepted teaching but retained the old move ids`);
+  }
+  if (/^(?:POTION|SUPER_POTION|HYPER_POTION|MAX_POTION|FULL_RESTORE)$/u.test(rewardId) && after.hp <= before.hp) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not restore HP: ${JSON.stringify({ before, after })}`);
+  }
+  if (
+    /^(?:REVIVE|MAX_REVIVE)$/u.test(rewardId)
+    && (before.fainted !== true || after.fainted === true || after.hp <= 0)
+  ) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} did not revive the target: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:FULL_RESTORE|FULL_HEAL)$/u.test(rewardId) && (before.statusEffect == null || after.statusEffect != null)) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not clear status: ${JSON.stringify({ before, after })}`);
+  }
+  if (rewardId === "RARE_CANDY" && after.level <= before.level) {
+    throw new Error(
+      `[campaign-party-reward] Rare Candy did not raise the target level: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:EVOLUTION_ITEM|RARE_EVOLUTION_ITEM)$/u.test(rewardId) && after.speciesId === before.speciesId) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} did not evolve the target: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:FORM_CHANGE_ITEM|RARE_FORM_CHANGE_ITEM)$/u.test(rewardId) && after.formIndex === before.formIndex) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not change form: ${JSON.stringify({ before, after })}`);
+  }
+  if (rewardId === "TERA_SHARD" && after.teraType === before.teraType) {
+    throw new Error(`[campaign-party-reward] Tera Shard retained the old type: ${JSON.stringify({ before, after })}`);
+  }
+  if (/^(?:PP_UP|PP_MAX)$/u.test(rewardId)) {
+    const beforePp = before.moves?.map(move => move.ppUp) ?? [];
+    const afterPp = after.moves?.map(move => move.ppUp) ?? [];
+    if (!afterPp.some((value, index) => value > (beforePp[index] ?? value))) {
+      throw new Error(
+        `[campaign-party-reward] ${rewardId} did not raise move PP: ${JSON.stringify({ before, after })}`,
+      );
+    }
+  }
+  if (/^(?:ETHER|MAX_ETHER|ELIXIR|MAX_ELIXIR)$/u.test(rewardId)) {
+    const beforeUsed = before.moves?.reduce((sum, move) => sum + (move.ppUsed ?? 0), 0) ?? 0;
+    const afterUsed = after.moves?.reduce((sum, move) => sum + (move.ppUsed ?? 0), 0) ?? 0;
+    if (afterUsed >= beforeUsed) {
+      throw new Error(`[campaign-party-reward] ${rewardId} did not restore PP: ${JSON.stringify({ before, after })}`);
+    }
+  }
+  if (rewardId === "DNA_SPLICERS" && after.fusionSpeciesId == null) {
+    throw new Error(`[campaign-party-reward] DNA Splicers did not install a fusion species: ${JSON.stringify(after)}`);
   }
 }
 
@@ -3620,6 +3682,63 @@ async function inspectRewardPartySummary(rig, owner, boundary, targetSlot, optio
   return openRewardPartyApply(rig, owner, boundary, targetSlot);
 }
 
+async function finishRewardFusion(rig, owner, boundary, primarySlot, fromCursor) {
+  const primary = boundary.authority.partySlots?.find(slot => slot.slot === primarySlot) ?? null;
+  const secondarySlot = boundary.authority.partySlots?.find(
+    slot =>
+      slot.slot !== primarySlot
+      && slot.coopOwner === primary?.coopOwner
+      && slot.fainted !== true
+      && slot.allowedInBattle === true,
+  )?.slot;
+  if (!Number.isSafeInteger(secondarySlot)) {
+    throw new Error(
+      `[campaign-reward-fusion] no same-owner secondary target for slot ${primarySlot}: `
+        + JSON.stringify(boundary.authority.partySlots ?? null),
+    );
+  }
+  let slotEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(fromCursor, "party:reward-target");
+      const observation = candidate?.observation;
+      return candidate != null
+        && JSON.stringify(observation?.address) === JSON.stringify(boundary.authority.address)
+        && /^party-slot:\d+$/u.test(observation.selectedOptionId ?? "")
+        && isActionableSemanticObservation(observation)
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "DNA Splicers secondary party selector" },
+  );
+  slotEvent = await moveRewardPartyCursor(rig, owner, slotEvent, secondarySlot);
+  const optionEvent = await openRewardPartyApply(rig, owner, boundary, secondarySlot);
+  if (!optionEvent.observation.optionIds?.includes("party-option:splice")) {
+    throw new Error(
+      `[campaign-reward-fusion] slot ${secondarySlot} exposed no splice action: `
+        + JSON.stringify(optionEvent.observation.optionIds ?? null),
+    );
+  }
+  owner.evidence.record("campaign-reward-fusion-secondary", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    primarySlot,
+    secondarySlot,
+  });
+  const spliceCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:splice",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: optionEvent.index,
+  });
+  return owner.evidence.waitForCondition(
+    sink => classifyRewardTargetApplyOutcome(sink.events, spliceCursor, boundary.authority.address),
+    { timeoutMs: rig.config.timeoutMs, description: "DNA Splicers accepted or visibly rejected" },
+  );
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0);
   const forcedSlot = driver.partySlot ?? 0;
@@ -3662,10 +3781,16 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       timeoutMs: rig.config.timeoutMs,
       fromCursor: optionEvent.index,
     });
-    const outcome = await owner.evidence.waitForCondition(
-      sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
-      { timeoutMs: rig.config.timeoutMs, description: `reward target ${targetSlot} accepted or visibly rejected` },
-    );
+    const outcome =
+      target.rewardId === "DNA_SPLICERS" && actionOptionId === "party-option:apply"
+        ? await finishRewardFusion(rig, owner, boundary, targetSlot, applyCursor)
+        : await owner.evidence.waitForCondition(
+            sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
+            {
+              timeoutMs: rig.config.timeoutMs,
+              description: `reward target ${targetSlot} accepted or visibly rejected`,
+            },
+          );
     if (outcome.status === "accepted") {
       return {
         addressKey: authoritativeAddressKey(boundary.authority.address),
@@ -4028,6 +4153,14 @@ async function driveOnePendingSurface(
       }
       const targetId =
         capsuleTarget ?? partyRewardTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      if (policy.partyMutatingReward.direct && targetId === policy.partyMutatingReward.rewardId) {
+        client.evidence.record("campaign-direct-party-reward-action", {
+          address: mechanicalBoundary.authority.address,
+          ownerSeat: client.publicSeat,
+          rewardId: targetId,
+          beforePartySlots: mechanicalBoundary.authority.partySlots,
+        });
+      }
       if (targetId == null) {
         if (isExplicitEmptyRewardShop(mechanicalBoundary.authority)) {
           client.evidence.record("campaign-empty-reward-continue", {
@@ -5199,62 +5332,131 @@ export async function runCampaign(rig) {
         event => event.kind === "campaign-learn-move-accepted" && event.rewardId === configuredId,
       );
       const abilityChoices = allEvents.filter(event => event.kind === "campaign-ability-choice");
-      if (targetActions.length !== 1) {
-        throw new Error(
-          `[campaign-party-reward] ${configuredId} did not produce exactly one public party action: `
-            + JSON.stringify(targetActions),
+      if (policy.partyMutatingReward.direct) {
+        const directActions = allEvents.filter(
+          event => event.kind === "campaign-direct-party-reward-action" && event.rewardId === configuredId,
         );
-      }
-      if (policy.partyMutatingReward.acceptLearnMove && learnAccepts.length !== 1) {
-        throw new Error(
-          `[campaign-party-reward] ${configuredId} did not accept exactly one full-moveset learn prompt: `
-            + JSON.stringify(learnAccepts),
+        if (directActions.length !== 1 || !Array.isArray(directActions[0].beforePartySlots)) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not produce one observable direct mutation: `
+              + JSON.stringify(directActions),
+          );
+        }
+        const finalParties = clients.map(client => {
+          const command = client.evidence.events.findLast(
+            event =>
+              event.kind === "browser-surface2"
+              && event.observation?.operationClass === "command"
+              && event.observation?.address?.wave >= 2
+              && Array.isArray(event.observation.partySlots),
+          );
+          return command?.observation.partySlots ?? null;
+        });
+        if (finalParties.some(party => party == null)) {
+          throw new Error(`[campaign-party-reward] ${configuredId} never exposed both wave-2 parties`);
+        }
+        const finalProjections = finalParties.map(party =>
+          party.map(partyRewardMutationProjection).sort((left, right) => left.pokemonId - right.pokemonId),
         );
-      }
-      const targetAction = targetActions[0];
-      if (targetAction.partySlot !== policy.rewardTargetSlot || targetAction.beforePartySlot?.coopOwner !== "guest") {
-        throw new Error(
-          `[campaign-party-reward] ${configuredId} did not target the guest-owned combined party slot: `
-            + JSON.stringify(targetAction),
+        if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} whole-party material diverged at wave 2: `
+              + JSON.stringify(finalProjections),
+          );
+        }
+        const beforeSlots = directActions[0].beforePartySlots;
+        const afterById = new Map(finalParties[0].map(slot => [slot.pokemonId, slot]));
+        if (
+          configuredId === "RARER_CANDY"
+          && !beforeSlots.every(slot => (afterById.get(slot.pokemonId)?.level ?? slot.level) > slot.level)
+        ) {
+          throw new Error(`[campaign-party-reward] Rarer Candy did not level the whole party`);
+        }
+        if (configuredId === "SACRED_ASH") {
+          const faintedBefore = beforeSlots.filter(slot => slot.fainted === true);
+          if (
+            faintedBefore.length < 2
+            || faintedBefore.some(slot => {
+              const after = afterById.get(slot.pokemonId);
+              return after == null || after.fainted === true || after.hp <= 0;
+            })
+          ) {
+            throw new Error(
+              `[campaign-party-reward] Sacred Ash did not revive both prepared reserves: `
+                + JSON.stringify({ beforeSlots, after: finalParties[0] }),
+            );
+          }
+        }
+        const proof = {
+          rewardId: configuredId,
+          directAction: directActions[0],
+          finalParty: finalParties[0],
+        };
+        for (const client of clients) {
+          client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+        }
+      } else {
+        if (targetActions.length !== 1) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not produce exactly one public party action: `
+              + JSON.stringify(targetActions),
+          );
+        }
+        if (policy.partyMutatingReward.acceptLearnMove && learnAccepts.length !== 1) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not accept exactly one full-moveset learn prompt: `
+              + JSON.stringify(learnAccepts),
+          );
+        }
+        const targetAction = targetActions[0];
+        if (targetAction.partySlot !== policy.rewardTargetSlot || targetAction.beforePartySlot?.coopOwner !== "guest") {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not target the guest-owned combined party slot: `
+              + JSON.stringify(targetAction),
+          );
+        }
+        const targetPokemonId = targetAction.beforePartySlot?.pokemonId;
+        if (!Number.isSafeInteger(targetPokemonId)) {
+          throw new Error(`[campaign-party-reward] ${configuredId} target exposed no stable Pokemon id`);
+        }
+        const finalSlots = clients.map(client => {
+          const command = client.evidence.events.findLast(
+            event =>
+              event.kind === "browser-surface2"
+              && event.observation?.operationClass === "command"
+              && event.observation?.address?.wave >= 2
+              && Array.isArray(event.observation.partySlots),
+          );
+          return command?.observation.partySlots.find(slot => slot.pokemonId === targetPokemonId) ?? null;
+        });
+        if (finalSlots.some(slot => slot == null)) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} never reached a wave-2 command with the target visible on both clients`,
+          );
+        }
+        const finalProjections = finalSlots.map(partyRewardMutationProjection);
+        if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} target material diverged at wave 2: `
+              + JSON.stringify(finalProjections),
+          );
+        }
+        assertPartyRewardChangedConfiguredMaterial(
+          configuredId,
+          targetAction.beforePartySlot,
+          finalSlots[0],
+          abilityChoices,
         );
-      }
-      const finalSlots = clients.map(client => {
-        const command = client.evidence.events.findLast(
-          event =>
-            event.kind === "browser-surface2"
-            && event.observation?.operationClass === "command"
-            && event.observation?.address?.wave >= 2
-            && Array.isArray(event.observation.partySlots),
-        );
-        return command?.observation.partySlots.find(slot => slot.slot === policy.rewardTargetSlot) ?? null;
-      });
-      if (finalSlots.some(slot => slot == null)) {
-        throw new Error(
-          `[campaign-party-reward] ${configuredId} never reached a wave-2 command with the target visible on both clients`,
-        );
-      }
-      const finalProjections = finalSlots.map(partyRewardMutationProjection);
-      if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
-        throw new Error(
-          `[campaign-party-reward] ${configuredId} target material diverged at wave 2: `
-            + JSON.stringify(finalProjections),
-        );
-      }
-      assertPartyRewardChangedConfiguredMaterial(
-        configuredId,
-        targetAction.beforePartySlot,
-        finalSlots[0],
-        abilityChoices,
-      );
-      const proof = {
-        rewardId: configuredId,
-        targetAction,
-        learnAccept: learnAccepts[0] ?? null,
-        abilityChoice: abilityChoices[0] ?? null,
-        finalTarget: finalSlots[0],
-      };
-      for (const client of clients) {
-        client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+        const proof = {
+          rewardId: configuredId,
+          targetAction,
+          learnAccept: learnAccepts[0] ?? null,
+          abilityChoice: abilityChoices[0] ?? null,
+          finalTarget: finalSlots[0],
+        };
+        for (const client of clients) {
+          client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+        }
       }
     }
     if (policy.abilityCapsule.required) {

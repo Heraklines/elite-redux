@@ -127,16 +127,47 @@ const allowedPartyRewardIds = new Set([
   "ER_LEARNERS_SHROOM",
   "MEMORY_MUSHROOM",
   "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
   "ER_ABILITY_CAPSULE",
   "ER_GREATER_ABILITY_CAPSULE",
   "ER_GREATER_ABILITY_RANDOMIZER",
   "ABILITY_RANDOMIZER",
   "MOVE_SLOT_EXPANDER",
   "PP_UP",
+  "PP_MAX",
   "ETHER",
+  "MAX_ETHER",
+  "ELIXIR",
+  "MAX_ELIXIR",
   "MINT",
+  "TERA_SHARD",
+  "RARE_CANDY",
+  "RARER_CANDY",
+  "POTION",
+  "SUPER_POTION",
+  "HYPER_POTION",
+  "MAX_POTION",
+  "FULL_RESTORE",
+  "REVIVE",
+  "MAX_REVIVE",
+  "FULL_HEAL",
+  "SACRED_ASH",
+  "EVOLUTION_ITEM",
+  "RARE_EVOLUTION_ITEM",
+  "FORM_CHANGE_ITEM",
+  "RARE_FORM_CHANGE_ITEM",
+  "DNA_SPLICERS",
 ]);
-const partyRewardLearnMoveIds = new Set(["TM_CASE", "ER_LEARNERS_SHROOM", "MEMORY_MUSHROOM", "TM_COMMON"]);
+const partyRewardLearnMoveIds = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
+]);
+const directPartyRewardIds = new Set(["RARER_CANDY", "SACRED_ASH"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -214,6 +245,7 @@ export function loadCampaignPolicy() {
       required: partyRewardId != null,
       rewardId: partyRewardId,
       acceptLearnMove: partyRewardId != null && partyRewardLearnMoveIds.has(partyRewardId),
+      direct: partyRewardId != null && directPartyRewardIds.has(partyRewardId),
     },
     navigation: {
       required: navigationRequired,

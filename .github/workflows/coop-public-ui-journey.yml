@@ -346,9 +346,14 @@ jobs:
     timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 100 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'same-tab-rejoin') && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
+      # The repository account exposes forty hosted runners, with eight reserved for the other active
+      # workstream. The complete consumable matrix is intentionally wider than that budget, so Actions
+      # queues the tail rather than ever exceeding the agreed 32-runner ceiling (the build has finished
+      # before this job starts, leaving four additional slots for summaries/transient overlap).
+      max-parallel: 28
       matrix:
         commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
-        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","ETHER","MINT"]' || '["NONE"]') }}
+        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS"]' || '["NONE"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -441,7 +446,7 @@ jobs:
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
           COOP_UI_REWARD_MODE: ${{ (inputs.journey == 'ability-capsule' || inputs.journey == 'party-mutating-rewards') && 'pick-first' || 'leave' }}
           COOP_UI_PARTY_REWARD_ID: ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || '' }}
-          COOP_UI_REWARD_PARTY_SLOT: ${{ inputs.journey == 'party-mutating-rewards' && '1' || '0' }}
+          COOP_UI_REWARD_PARTY_SLOT: ${{ inputs.journey == 'party-mutating-rewards' && contains(fromJSON('["POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL"]'), matrix.party_reward_id) && '3' || inputs.journey == 'party-mutating-rewards' && '1' || '0' }}
           COOP_UI_RAISE_SPEED: "1"
           COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS

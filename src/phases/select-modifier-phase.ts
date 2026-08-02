@@ -5,6 +5,7 @@ import {
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { EvolutionItem } from "#data/balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
@@ -79,6 +80,8 @@ import { FormChangeItem } from "#enums/form-change-item";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
+import { Nature } from "#enums/nature";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -98,6 +101,8 @@ import {
   ErGreaterAbilityRandomizerModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
+  EvolutionItemModifierType,
+  FormChangeItemModifierType,
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
@@ -105,10 +110,12 @@ import {
   PokemonAddMoveSlotModifierType,
   PokemonModifierType,
   PokemonMoveModifierType,
+  PokemonNatureChangeModifierType,
   PokemonPpRestoreModifierType,
   PokemonPpUpModifierType,
   RememberMoveModifierType,
   regenerateModifierPoolThresholds,
+  TerastallizeModifierType,
   TmModifierType,
 } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
@@ -126,14 +133,41 @@ const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, ModifierTypeFunc>
   ER_LEARNERS_SHROOM: modifierTypes.ER_LEARNERS_SHROOM,
   MEMORY_MUSHROOM: modifierTypes.MEMORY_MUSHROOM,
   TM_COMMON: modifierTypes.TM_COMMON,
+  TM_GREAT: modifierTypes.TM_GREAT,
+  TM_ULTRA: modifierTypes.TM_ULTRA,
   ER_ABILITY_CAPSULE: modifierTypes.ER_ABILITY_CAPSULE,
   ER_GREATER_ABILITY_CAPSULE: modifierTypes.ER_GREATER_ABILITY_CAPSULE,
   ER_GREATER_ABILITY_RANDOMIZER: modifierTypes.ER_GREATER_ABILITY_RANDOMIZER,
   ABILITY_RANDOMIZER: modifierTypes.ABILITY_RANDOMIZER,
   MOVE_SLOT_EXPANDER: modifierTypes.MOVE_SLOT_EXPANDER,
   PP_UP: modifierTypes.PP_UP,
+  PP_MAX: modifierTypes.PP_MAX,
   ETHER: modifierTypes.ETHER,
-  MINT: modifierTypes.MINT,
+  MAX_ETHER: modifierTypes.MAX_ETHER,
+  ELIXIR: modifierTypes.ELIXIR,
+  MAX_ELIXIR: modifierTypes.MAX_ELIXIR,
+  MINT: () => new PokemonNatureChangeModifierType(Nature.ADAMANT).withIdFromFunc(modifierTypes.MINT),
+  TERA_SHARD: () => new TerastallizeModifierType(PokemonType.FIRE).withIdFromFunc(modifierTypes.TERA_SHARD),
+  RARE_CANDY: modifierTypes.RARE_CANDY,
+  RARER_CANDY: modifierTypes.RARER_CANDY,
+  POTION: modifierTypes.POTION,
+  SUPER_POTION: modifierTypes.SUPER_POTION,
+  HYPER_POTION: modifierTypes.HYPER_POTION,
+  MAX_POTION: modifierTypes.MAX_POTION,
+  FULL_RESTORE: modifierTypes.FULL_RESTORE,
+  REVIVE: modifierTypes.REVIVE,
+  MAX_REVIVE: modifierTypes.MAX_REVIVE,
+  FULL_HEAL: modifierTypes.FULL_HEAL,
+  SACRED_ASH: modifierTypes.SACRED_ASH,
+  EVOLUTION_ITEM: () =>
+    new EvolutionItemModifierType(EvolutionItem.WATER_STONE).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
+  RARE_EVOLUTION_ITEM: () =>
+    new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_DARKNESS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
+  FORM_CHANGE_ITEM: () =>
+    new FormChangeItemModifierType(FormChangeItem.GRACIDEA).withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM),
+  RARE_FORM_CHANGE_ITEM: () =>
+    new FormChangeItemModifierType(FormChangeItem.GRISEOUS_CORE).withIdFromFunc(modifierTypes.RARE_FORM_CHANGE_ITEM),
+  DNA_SPLICERS: modifierTypes.DNA_SPLICERS,
 };
 
 /** Construction-time provenance for the reward phase's co-op address. */

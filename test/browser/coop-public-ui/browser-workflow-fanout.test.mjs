@@ -343,7 +343,7 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
 });
 
-test("party-mutating reward matrix drives every nested mutation family into wave two", async () => {
+test("party-mutating reward matrix drives every non-held target mutation family into wave two", async () => {
   const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign, browserEntry] =
     await Promise.all([
       readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
@@ -363,14 +363,37 @@ test("party-mutating reward matrix drives every nested mutation family into wave
     "ER_LEARNERS_SHROOM",
     "MEMORY_MUSHROOM",
     "TM_COMMON",
+    "TM_GREAT",
+    "TM_ULTRA",
     "ER_ABILITY_CAPSULE",
     "ER_GREATER_ABILITY_CAPSULE",
     "ER_GREATER_ABILITY_RANDOMIZER",
     "ABILITY_RANDOMIZER",
     "MOVE_SLOT_EXPANDER",
     "PP_UP",
+    "PP_MAX",
     "ETHER",
+    "MAX_ETHER",
+    "ELIXIR",
+    "MAX_ELIXIR",
     "MINT",
+    "TERA_SHARD",
+    "RARE_CANDY",
+    "RARER_CANDY",
+    "POTION",
+    "SUPER_POTION",
+    "HYPER_POTION",
+    "MAX_POTION",
+    "FULL_RESTORE",
+    "REVIVE",
+    "MAX_REVIVE",
+    "FULL_HEAL",
+    "SACRED_ASH",
+    "EVOLUTION_ITEM",
+    "RARE_EVOLUTION_ITEM",
+    "FORM_CHANGE_ITEM",
+    "RARE_FORM_CHANGE_ITEM",
+    "DNA_SPLICERS",
   ]) {
     assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
     assert.match(registry, new RegExp(`COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS[\\s\\S]*${rewardId}`, "u"));
@@ -394,10 +417,14 @@ test("party-mutating reward matrix drives every nested mutation family into wave
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
   assert.match(campaign, /driveLearnMoveAccept/u);
+  assert.match(campaign, /finishRewardFusion/u);
+  assert.match(campaign, /targetId: "party-option:splice"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
   assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
   assert.match(campaign, /event\.observation\?\.address\?\.wave >= 2/u);
   assert.match(browserEntry, /maxMoveCount: pokemon\.getMaxMoveCount\(\)/u);
+  assert.match(browserEntry, /fusionSpeciesId: pokemon\.fusionSpecies\?\.speciesId \?\? null/u);
+  assert.match(browserEntry, /statusEffect: pokemon\.status\?\.effect \?\? null/u);
   assert.match(browserEntry, /innateAbilityIds: safeInnateIds\(pokemon\)/u);
   assert.match(browserEntry, /moves: pokemon\.getMoveset\(\)\.map/u);
 });

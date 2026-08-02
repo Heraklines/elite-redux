@@ -6,6 +6,7 @@ import {
   consumePendingDevStarters,
   getCoopBrowserLongitudinalFixtureStartingLevel,
   getCoopBrowserNavigationFixtureStartingMoney,
+  getCoopBrowserPartyRewardFixtureId,
   isCoopBrowserEvolutionFixtureActive,
   isCoopBrowserNavigationFixtureActive,
   shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
@@ -86,6 +87,7 @@ import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
 import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
 import { getErShinyLabEquippedNameForSpecies, getErShinyLabSavedLookForSpecies } from "#sprites/er-shiny-lab-sprite-fx";
@@ -960,6 +962,31 @@ export class SelectStarterPhase extends Phase {
         setErCustomTrainerDevForce(pendingCustomTrainerForce);
       }
       globalScene.newBattle();
+      const partyRewardFixtureId = getCoopBrowserPartyRewardFixtureId();
+      if (partyRewardFixtureId === "TERA_SHARD") {
+        globalScene.addModifier(modifierTypes.TERA_ORB().withIdFromFunc(modifierTypes.TERA_ORB).newModifier(), true);
+      }
+      const fixtureReserve = party[3];
+      if (
+        fixtureReserve != null
+        && ["POTION", "SUPER_POTION", "HYPER_POTION", "MAX_POTION", "FULL_RESTORE"].includes(partyRewardFixtureId ?? "")
+      ) {
+        fixtureReserve.hp = Math.max(1, Math.floor(fixtureReserve.getMaxHp() / 4));
+      }
+      if (fixtureReserve != null && ["FULL_RESTORE", "FULL_HEAL"].includes(partyRewardFixtureId ?? "")) {
+        fixtureReserve.doSetStatus(StatusEffect.BURN);
+      }
+      if (fixtureReserve != null && ["REVIVE", "MAX_REVIVE"].includes(partyRewardFixtureId ?? "")) {
+        fixtureReserve.hp = 0;
+      }
+      if (partyRewardFixtureId === "SACRED_ASH") {
+        for (const reserveSlot of [2, 3]) {
+          const reserve = party[reserveSlot];
+          if (reserve != null) {
+            reserve.hp = 0;
+          }
+        }
+      }
       // ER (dev-tools only): a staff tester picking a custom trainer from the
       // in-game Dev Scenarios picker arms a one-shot dev force. The FIRST wave of a
       // run never runs NewBattlePhase (which normally installs custom trainers), so

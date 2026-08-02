@@ -205,14 +205,37 @@ const COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS = new Set([
   "ER_LEARNERS_SHROOM",
   "MEMORY_MUSHROOM",
   "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
   "ER_ABILITY_CAPSULE",
   "ER_GREATER_ABILITY_CAPSULE",
   "ER_GREATER_ABILITY_RANDOMIZER",
   "ABILITY_RANDOMIZER",
   "MOVE_SLOT_EXPANDER",
   "PP_UP",
+  "PP_MAX",
   "ETHER",
+  "MAX_ETHER",
+  "ELIXIR",
+  "MAX_ELIXIR",
   "MINT",
+  "TERA_SHARD",
+  "RARE_CANDY",
+  "RARER_CANDY",
+  "POTION",
+  "SUPER_POTION",
+  "HYPER_POTION",
+  "MAX_POTION",
+  "FULL_RESTORE",
+  "REVIVE",
+  "MAX_REVIVE",
+  "FULL_HEAL",
+  "SACRED_ASH",
+  "EVOLUTION_ITEM",
+  "RARE_EVOLUTION_ITEM",
+  "FORM_CHANGE_ITEM",
+  "RARE_FORM_CHANGE_ITEM",
+  "DNA_SPLICERS",
 ]);
 
 /** Whether this immutable bundle was built for the party-mutating reward matrix. */
@@ -499,31 +522,42 @@ export function getCoopBrowserAbilityCapsuleFixtureStarters(): Starter[] | null 
 }
 
 /**
- * One full-moveset target per seat for the party-mutating reward matrix.
+ * One full-moveset subject and one reserve per seat for the party-mutating reward matrix.
  *
  * The host deliberately targets combined party slot 1, which belongs to the guest. Four existing
  * moves force TM Case, ordinary TM, Memory Mushroom, and Learner's Shroom through the nested
- * owner-only forget picker that exposed the live successor bug. The same Garchomp also supplies
- * multiple ability slots and a legal remembered/compatible move pool for the other matrix entries.
+ * owner-only forget picker that exposed the live successor bug. Item-specific subjects make evolution
+ * and form-change items legal; a reserve supplies deterministic healing/revival and DNA splice targets.
  */
 export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
-  if (getCoopBrowserPartyRewardFixtureId() == null) {
+  const rewardId = getCoopBrowserPartyRewardFixtureId();
+  if (rewardId == null) {
     return null;
   }
-  return [
-    {
-      speciesId: SpeciesId.GARCHOMP,
-      shiny: false,
-      variant: 0,
-      formIndex: 0,
-      abilityIndex: 0,
-      passive: false,
-      nature: Nature.HARDY,
-      moveset: [MoveId.WATER_SPOUT, MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT] as StarterMoveset,
-      pokerus: false,
-      ivs: new Array(6).fill(31),
-    },
-  ];
+  const subjectSpecies =
+    rewardId === "EVOLUTION_ITEM"
+      ? SpeciesId.STARYU
+      : rewardId === "RARE_EVOLUTION_ITEM"
+        ? SpeciesId.KUBFU
+        : rewardId === "FORM_CHANGE_ITEM"
+          ? SpeciesId.SHAYMIN
+          : rewardId === "RARE_FORM_CHANGE_ITEM"
+            ? SpeciesId.GIRATINA
+            : SpeciesId.GARCHOMP;
+  const reserveSpecies = SpeciesId.CATERPIE;
+  const makeStarter = (speciesId: SpeciesId): Starter => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    moveset: [MoveId.WATER_SPOUT, MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  });
+  return [makeStarter(subjectSpecies), makeStarter(reserveSpecies)];
 }
 
 /**

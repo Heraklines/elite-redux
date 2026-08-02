@@ -1555,13 +1555,19 @@ function observeSemanticSurface(): void {
       );
       const partySlots = globalScene.getPlayerParty().map((pokemon, slot) => ({
         slot,
+        pokemonId: pokemon.id,
         speciesId: pokemon.species.speciesId,
+        formIndex: pokemon.formIndex,
+        fusionSpeciesId: pokemon.fusionSpecies?.speciesId ?? null,
+        fusionFormIndex: pokemon.fusionSpecies == null ? null : pokemon.fusionFormIndex,
         coopOwner: pokemon.coopOwner ?? null,
         active: pokemon.isActive(true),
         fainted: pokemon.isFainted(),
         hp: pokemon.hp,
         maxHp: pokemon.getMaxHp(),
         level: pokemon.level,
+        exp: pokemon.exp,
+        statusEffect: pokemon.status?.effect ?? null,
         abilityIndex: pokemon.abilityIndex,
         abilityId: pokemon.getAbility().id,
         innateAbilityIds: safeInnateIds(pokemon),
@@ -1831,7 +1837,7 @@ function observeSemanticSurface(): void {
     const moveSlots = readFightMoveSlots(uiMode);
     const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
-      uiMode === "PARTY" || semantic.operationClass === "command"
+      runtime != null && battle != null
         ? globalScene.getPlayerParty().map((pokemon, slot) => {
             const active = pokemon.isActive(true);
             const fainted = pokemon.isFainted();
@@ -1842,13 +1848,19 @@ function observeSemanticSurface(): void {
               runtime?.controller.isVersusSession() === true || (localRole != null && coopOwner === localRole);
             return {
               slot,
+              pokemonId: pokemon.id,
               speciesId: pokemon.species.speciesId,
+              formIndex: pokemon.formIndex,
+              fusionSpeciesId: pokemon.fusionSpecies?.speciesId ?? null,
+              fusionFormIndex: pokemon.fusionSpecies == null ? null : pokemon.fusionFormIndex,
               coopOwner,
               active,
               fainted,
               hp: pokemon.hp,
               maxHp: pokemon.getMaxHp(),
               level: pokemon.level,
+              exp: pokemon.exp,
+              statusEffect: pokemon.status?.effect ?? null,
               abilityIndex: pokemon.abilityIndex,
               abilityId: pokemon.getAbility().id,
               innateAbilityIds: safeInnateIds(pokemon),
