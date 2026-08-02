@@ -243,6 +243,15 @@ function safeInnateIds(pokemon: Pokemon): number[] {
   }
 }
 
+/** Read-only active/innate applicability at slots 0..3, including permanent and run-only unlock gates. */
+function safeAbilitySlotActivity(pokemon: Pokemon): boolean[] {
+  try {
+    return [pokemon.canApplyAbility(), ...[0, 1, 2].map(slot => pokemon.canApplyAbility(true, slot))];
+  } catch {
+    return [];
+  }
+}
+
 /** Stable read-only projection of persistent modifiers attached to one party member. */
 function observedPokemonModifierStacks(pokemonId: number) {
   return globalScene.modifiers
@@ -1624,6 +1633,8 @@ function observeSemanticSurface(): void {
         abilityIndex: pokemon.abilityIndex,
         abilityId: pokemon.getAbility().id,
         innateAbilityIds: safeInnateIds(pokemon),
+        abilitySlotActivity: safeAbilitySlotActivity(pokemon),
+        runUnlockedAbilitySlots: [...pokemon.customPokemonData.erRunUnlockedAbilitySlots].sort((a, b) => a - b),
         abilityActive: pokemon.canApplyAbility(),
         abilitySuppressed: pokemon.summonData.abilitySuppressed,
         nature: pokemon.getNature(),
@@ -1918,6 +1929,8 @@ function observeSemanticSurface(): void {
               abilityIndex: pokemon.abilityIndex,
               abilityId: pokemon.getAbility().id,
               innateAbilityIds: safeInnateIds(pokemon),
+              abilitySlotActivity: safeAbilitySlotActivity(pokemon),
+              runUnlockedAbilitySlots: [...pokemon.customPokemonData.erRunUnlockedAbilitySlots].sort((a, b) => a - b),
               abilityActive: pokemon.canApplyAbility(),
               abilitySuppressed: pokemon.summonData.abilitySuppressed,
               nature: pokemon.getNature(),

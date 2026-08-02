@@ -3440,6 +3440,8 @@ function partyRewardMutationProjection(slot) {
         abilityIndex: slot.abilityIndex,
         abilityId: slot.abilityId,
         innateAbilityIds: slot.innateAbilityIds,
+        abilitySlotActivity: slot.abilitySlotActivity,
+        runUnlockedAbilitySlots: slot.runUnlockedAbilitySlots,
         nature: slot.nature,
         teraType: slot.teraType,
         maxMoveCount: slot.maxMoveCount,
@@ -3455,14 +3457,7 @@ function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abi
   if (beforeProjection == null || afterProjection == null) {
     throw new Error(`[campaign-party-reward] ${rewardId} had no before/after target material`);
   }
-  let changed = JSON.stringify(beforeProjection) !== JSON.stringify(afterProjection);
-  if (
-    rewardId === "ER_ABILITY_CAPSULE"
-    || rewardId === "ER_GREATER_ABILITY_CAPSULE"
-    || rewardId === "ER_GREATER_ABILITY_RANDOMIZER"
-  ) {
-    changed = changed || abilityChoices.length === 1;
-  }
+  const changed = JSON.stringify(beforeProjection) !== JSON.stringify(afterProjection);
   if (!changed) {
     throw new Error(
       `[campaign-party-reward] ${rewardId} crossed into the next wave without changing its target: `

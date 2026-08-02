@@ -426,6 +426,14 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     }
   }
   assert.match(config, /"party-mutating-rewards"/u);
+  assert.match(browserEntry, /function safeAbilitySlotActivity\(pokemon: Pokemon\): boolean\[\]/u);
+  assert.match(browserEntry, /abilitySlotActivity: safeAbilitySlotActivity\(pokemon\)/u);
+  assert.match(browserEntry, /runUnlockedAbilitySlots:/u);
+  assert.doesNotMatch(
+    campaign,
+    /changed = changed \|\| abilityChoices\.length/u,
+    "an ability picker click is not proof that its Pokémon mutation committed",
+  );
   assert.match(
     selectModifier,
     /modifierQueuesContinuation[\s\S]*modifierType instanceof ErDexNavModifierType/u,
