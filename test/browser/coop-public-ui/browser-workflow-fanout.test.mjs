@@ -291,7 +291,12 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
   assert.match(
     starterHandler,
-    /const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters\(\)[\s\S]*getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*\?\? coopBrowserNavigationStarters[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{[\s\S]*allowUncaught: true,[\s\S]*allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters/u,
+    /const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters\(\)[\s\S]*const coopBrowserPartyRewardStarters = getCoopBrowserPartyRewardFixtureStarters\(\)[\s\S]*const coopBrowserStarters =[\s\S]*\?\? coopBrowserPartyRewardStarters[\s\S]*\?\? coopBrowserNavigationStarters/u,
+    "the visible starter UI resolves the exact-gated navigation and party-reward fixtures",
+  );
+  assert.match(
+    starterHandler,
+    /globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{[\s\S]*allowUncaught: true,[\s\S]*allowOverValueLimit:[\s\S]*coopBrowserStarters === coopBrowserNavigationStarters[\s\S]*\|\| coopBrowserStarters === coopBrowserPartyRewardStarters/u,
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
   );
 });
