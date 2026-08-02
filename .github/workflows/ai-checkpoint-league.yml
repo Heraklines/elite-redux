@@ -30,6 +30,11 @@ on:
         required: true
         default: "0.08"
         type: string
+      reuse_run_id:
+        description: Completed checkpoint-league run to reuse; skips combat and reruns training only
+        required: false
+        default: ""
+        type: string
 
 permissions:
   actions: read
@@ -41,7 +46,7 @@ concurrency:
 
 jobs:
   model:
-    if: github.repository == 'Heraklines/elite-redux' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Seal starting checkpoint
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -116,7 +121,7 @@ jobs:
           if-no-files-found: error
 
   identity:
-    if: github.repository == 'Heraklines/elite-redux' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Seal current combat identity
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -148,7 +153,7 @@ jobs:
           if-no-files-found: error
 
   self-play:
-    if: github.repository == 'Heraklines/elite-redux' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: github.repository == 'Heraklines/elite-redux' && inputs.reuse_run_id == '' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
     name: Checkpoint self-play shard ${{ matrix.shard }}
     needs: [model, identity]
     runs-on: ubuntu-latest
@@ -271,7 +276,7 @@ jobs:
           if-no-files-found: warn
 
   train-and-package:
-    if: github.repository == 'Heraklines/elite-redux' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))
+    if: always() && github.repository == 'Heraklines/elite-redux' && (inputs.reuse_run_id != '' || (needs.self-play.result == 'success' && (github.event_name != 'push' || contains(github.event.head_commit.message, '[checkpoint-league]'))))
     name: Winner-only tree and resumed-transformer bundle
     needs: self-play
     runs-on: ubuntu-latest
@@ -286,14 +291,20 @@ jobs:
           pattern: ai-checkpoint-league-shard-*
           path: ai-data
           merge-multiple: true
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v6
         with:
           name: ai-checkpoint-league-dictionary
           path: ai-dictionary
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v6
         with:
           name: ai-checkpoint-league-starting-model
           path: ai-model
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ github.token }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
