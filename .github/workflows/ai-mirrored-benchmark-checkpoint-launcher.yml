@@ -1,0 +1,26 @@
+name: AI Checkpoint Mirrored Benchmark Launcher (Non-Production)
+
+# Branch-only launcher for the reusable artifact benchmark. Restricting the push
+# path to this file makes the launch explicit and prevents later code pushes from
+# consuming the six-runner benchmark allocation.
+on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-mirrored-benchmark-checkpoint-launcher.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  benchmark:
+    uses: ./.github/workflows/ai-mirrored-benchmark.yml
+    with:
+      control_kernel: michaelferjani/er-ai-fw-v5-matched-control-gpu-20260731
+      transfer_kernel: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
+      candidate_kernel: michaelferjani/er-ai-checkpoint-league-rebased-gpu-20260802
+      tree_run_id: "30735474224"
+      tree_artifact_name: ai-checkpoint-league-tree-output
+    secrets: inherit
