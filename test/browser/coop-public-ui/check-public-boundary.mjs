@@ -370,13 +370,13 @@ if (
     "campaign battle selection must use the strongest read-only visible move and public keys, with explicit alternates and exact key overrides retained",
   );
 }
+// Mutation continuations are validated after the picker closes and wave-2 command opens, while
+// evolution/fusion can also reorder the roster. Keep the stable party projection on every
+// addressed gameplay surface instead of limiting it to PARTY/COMMAND with a UI-mode allowlist.
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
-  || // Mutation continuations are validated after the picker closes and wave-2 command opens, while
-  // evolution/fusion can also reorder the roster. Keep the stable party projection on every
-  // addressed gameplay surface instead of limiting it to PARTY/COMMAND with a UI-mode allowlist.
-  !browserEntry.includes("const partySlots =")
+  || !browserEntry.includes("const partySlots =")
   || !browserEntry.includes("? globalScene.getPlayerParty().map((pokemon, slot) => {")
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
   || !campaign.includes("export function rewardPartyTargetCandidates(")
