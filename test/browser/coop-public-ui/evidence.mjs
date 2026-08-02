@@ -121,6 +121,7 @@ const HEARTBEAT_OWNERSHIP_LOSS = /P33 heartbeat lost authenticated ownership sta
 /** The browser's automatic resource-error twin of that same handled beat. */
 const HEARTBEAT_RESOURCE_ERROR = /Failed to load resource:.*(?:401|403)/u;
 const HEARTBEAT_PATHNAME = /\/coop\/v3\/heartbeat$/u;
+const REJOIN_PATHNAME = /\/coop\/v3\/rejoin$/u;
 const SESSION_LEAVE_PATHNAME = /\/coop\/v3\/leave$/u;
 const COMPATIBLE_PRESENTATION_MISMATCH =
   /^\[coop:checksum\] PRESENTATION MISMATCH sections=[^\n]+ - simulation compatible - /u;
@@ -2062,6 +2063,13 @@ export class EvidenceSink {
     // bounded (a repeating 401 means the stop did NOT hold - that stays fatal).
     let excusableSignalingErrors =
       this.heartbeatOwnershipLossObserved || this.expectedSharedTerminalAfterGameOver != null ? 2 : 0;
+    // A same-tab hot rejoin rotates the seat's authenticated ownership. A heartbeat that was
+    // already in flight with the previous ownership can therefore lose the race with a successful
+    // POST /rejoin and return one 401/403 even though the replacement connection is healthy. The
+    // browser does not emit the client's normal ownership-loss line for that superseded request.
+    // License exactly one heartbeat resource error only after an observed successful rejoin
+    // response; unrelated, preceding, or repeated signaling refusals remain fatal.
+    let excusableRejoinHeartbeatErrors = 1;
     const remaining = this.failures.filter(event => {
       const isSignalingRefusal =
         event?.kind === "console"
@@ -2071,11 +2079,29 @@ export class EvidenceSink {
         this.expectedSharedTerminalAfterGameOver != null && event.index > this.expectedSharedTerminalAfterGameOver;
       const licensedByOwnershipLoss =
         this.heartbeatOwnershipLossObserved && HEARTBEAT_PATHNAME.test(event.source ?? "");
+      const licensedBySuccessfulRejoin =
+        HEARTBEAT_PATHNAME.test(event.source ?? "")
+        && this.events.some(
+          candidate =>
+            candidate.kind === "response"
+            && candidate.status === 200
+            && candidate.method === "POST"
+            && REJOIN_PATHNAME.test(candidate.url ?? "")
+            && candidate.index < event.index,
+        );
       if (isSignalingRefusal && (licensedByTerminal || licensedByOwnershipLoss) && excusableSignalingErrors > 0) {
         excusableSignalingErrors -= 1;
         this.record("console-error-expected", {
           source: event.source,
           reason: "bounded post-terminal signaling refusal after exact paired GameOver/ownership loss",
+        });
+        return false;
+      }
+      if (isSignalingRefusal && licensedBySuccessfulRejoin && excusableRejoinHeartbeatErrors > 0) {
+        excusableRejoinHeartbeatErrors -= 1;
+        this.record("console-error-expected", {
+          source: event.source,
+          reason: "bounded superseded heartbeat refusal after successful same-tab rejoin",
         });
         return false;
       }

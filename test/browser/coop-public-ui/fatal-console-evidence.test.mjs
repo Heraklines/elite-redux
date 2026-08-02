@@ -350,3 +350,37 @@ test("a third post-GameOver signaling refusal remains fatal", async () => {
     assert.throws(() => sink.assertClean(), /1 fatal browser event\(s\)/u);
   });
 });
+
+test("successful rejoin licenses one superseded in-flight heartbeat refusal", async () => {
+  await withSink(async ({ page, sink }) => {
+    const refusal = "Failed to load resource: the server responded with a status of 401 ()";
+    sink.record("response", {
+      status: 200,
+      method: "POST",
+      url: "https://er-coop-api.test/coop/v3/rejoin",
+      fromCache: false,
+    });
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+
+    assert.equal(sink.failures.length, 1, "the browser error stays recorded until final classification");
+    assert.doesNotThrow(() => sink.assertClean());
+    assert.match(sink.events.at(-1).reason, /superseded heartbeat refusal/u);
+  });
+});
+
+test("rejoin heartbeat exemption is ordered and bounded", async () => {
+  await withSink(async ({ page, sink }) => {
+    const refusal = "Failed to load resource: the server responded with a status of 401 ()";
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+    sink.record("response", {
+      status: 200,
+      method: "POST",
+      url: "https://er-coop-api.test/coop/v3/rejoin",
+      fromCache: false,
+    });
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+    page.emit("console", errorAt(refusal, "https://er-coop-api.test/coop/v3/heartbeat"));
+
+    assert.throws(() => sink.assertClean(), /2 fatal browser event\(s\)/u);
+  });
+});
