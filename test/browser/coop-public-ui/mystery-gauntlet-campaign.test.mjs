@@ -540,8 +540,8 @@ test("workflow builds the staging-only fifth difficulty and fans a configurable 
   );
   assert.match(
     campaign,
-    /requireExp:\s*!\(policy\.navigation\.required \|\| policy\.mysteryGauntlet\.required \|\| policy\.registeredInteractions\.required\)/u,
-    "the level-100 Mystery fixture must retain ledger equality without inventing an EXP cue",
+    /requireExp:[\s\S]*policy\.navigation\.required[\s\S]*policy\.market\.requiredPurchases > 0[\s\S]*policy\.mysteryGauntlet\.required[\s\S]*policy\.registeredInteractions\.required/u,
+    "level-100 navigation, market, Mystery, and registered-interaction fixtures must not invent an EXP cue",
   );
   assert.match(
     battleScene,

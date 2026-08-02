@@ -4885,7 +4885,12 @@ export async function runCampaign(rig) {
         // authority-vs-renderer ledger equality proof above, but reserve the mandatory EXP cue
         // for normal-level journeys that can actually gain EXP.
         requireExp:
-          !(policy.navigation.required || policy.mysteryGauntlet.required || policy.registeredInteractions.required)
+          !(
+            policy.navigation.required
+            || policy.market.requiredPurchases > 0
+            || policy.mysteryGauntlet.required
+            || policy.registeredInteractions.required
+          )
           && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
       });
       await Promise.all(clients.map(client => client.checkpoint(`wave-${waveNo}-cleared`)));
