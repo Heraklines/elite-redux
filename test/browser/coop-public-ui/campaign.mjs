@@ -3559,9 +3559,7 @@ export function assertPartyRewardPresentationParity(clients, rewardId, presentat
   const proof = clients.map(client => {
     const from = presentationCursors?.[client.label];
     if (!Number.isSafeInteger(from)) {
-      throw new Error(
-        `[campaign-party-reward] ${rewardId} omitted the ${client.label} pre-action presentation cursor`,
-      );
+      throw new Error(`[campaign-party-reward] ${rewardId} omitted the ${client.label} pre-action presentation cursor`);
     }
     const seen = new Map();
     for (const event of client.evidence.events.slice(from)) {
