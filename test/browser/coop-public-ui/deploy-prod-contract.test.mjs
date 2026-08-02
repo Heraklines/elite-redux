@@ -36,14 +36,14 @@ test("production verifies one save-worker and browser contract before publishing
   assert.ok(telemetryWorker < pages, "both production APIs must be live before the browser is published");
 });
 
-test("production enables partitioned player, Showdown, and tournament telemetry without co-op or developer bindings", () => {
+test("production enables player and Showdown telemetry while keeping tournaments, co-op, and developer tools gated", () => {
   assert.match(workflow, /echo "VITE_SERVER_URL=https:\/\/er-save-api\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_TELEMETRY=prod"/u);
-  assert.match(workflow, /echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"/u);
   assert.match(workflow, /command: deploy --config workers\/er-save-api\/wrangler\.toml/u);
   assert.match(workflow, /command: deploy --config workers\/er-telemetry\/wrangler\.toml/u);
   assert.doesNotMatch(workflow, /VITE_SERVER_URL_PLAYER_TELEMETRY/u);
+  assert.doesNotMatch(workflow, /VITE_ENABLE_SHOWDOWN_TOURNAMENTS/u);
   assert.doesNotMatch(workflow, /echo "VITE_DEV_TOOLS=/u);
   assert.doesNotMatch(workflow, /VITE_COOP_SERVER_URL/u);
   assert.doesNotMatch(workflow, /workers\/er-coop-api/u);
