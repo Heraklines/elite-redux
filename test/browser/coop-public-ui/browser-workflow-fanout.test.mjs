@@ -358,6 +358,15 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     ]);
 
   assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
+  const exactVariantRewardIds = new Set([
+    "MINT",
+    "TERA_SHARD",
+    "EVOLUTION_ITEM",
+    "RARE_EVOLUTION_ITEM",
+    "FORM_CHANGE_ITEM",
+    "RARE_FORM_CHANGE_ITEM",
+    "BASE_STAT_BOOSTER",
+  ]);
   for (const rewardId of [
     "TM_CASE",
     "ER_LEARNERS_SHROOM",
@@ -405,6 +414,13 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
       new RegExp(`${rewardId}: \\(\\) =>`, "u"),
       `${rewardId} must resolve after initModifierTypes instead of capturing the empty registry at module load`,
     );
+    if (!exactVariantRewardIds.has(rewardId)) {
+      assert.match(
+        selectModifier,
+        new RegExp(`${rewardId}: \\(\\) => modifierTypes\\.${rewardId},`, "u"),
+        `${rewardId} must preserve its original registry function so the presentation has a canonical id`,
+      );
+    }
   }
   assert.match(config, /"party-mutating-rewards"/u);
   assert.match(
@@ -424,7 +440,7 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
   assert.match(policy, /partyRewardLearnMoveIds/u);
   assert.match(policy, /nestedDirectRewardIds/u);
-  assert.match(workflow, /inputs\.journey == 'party-mutating-rewards' && '1'/u);
+  assert.match(workflow, /party-mutating-rewards" \]\]; then[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u);
   assert.match(campaign, /driveLearnMoveAccept/u);
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);

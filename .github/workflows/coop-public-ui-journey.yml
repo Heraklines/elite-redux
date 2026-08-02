@@ -437,9 +437,7 @@ jobs:
           # Each visit must buy Wide Lens once, return to the same grid, leave normally and prove
           # the following public command surface. This is one real run, so no save/runtime
           # fixture or cross-job aggregation can counterfeit the owner alternation.
-          # Party-reward shards prove their complete continuation after wave 1 by reaching the
-          # synchronized wave-2 command. Playing another nineteen battles adds no item-path coverage.
-          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || inputs.journey == 'party-mutating-rewards' && '1' || '20' }}
+          COOP_UI_CAMPAIGN_WAVES: ${{ inputs.journey == 'navigation-depth-30' && '30' || '20' }}
           COOP_UI_CAMPAIGN_MODE: ${{ inputs.journey == 'navigation-depth-30' && 'nightly' || 'gating' }}
           # The measured default 2-vCPU runner reached synchronized wave 13 at the old 45-minute
           # market deadline. Give the continuous wave-20 proof its measured 85-minute lifecycle;

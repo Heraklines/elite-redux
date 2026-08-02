@@ -130,51 +130,53 @@ import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
 
-const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, ModifierTypeFunc>> = {
+const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTypeFunc>> = {
   // `modifierTypes` is populated by initModifierTypes() after module evaluation. Keep every registry
-  // lookup late-bound: capturing these properties here freezes `undefined` into the matrix and silently
-  // falls back to an ordinary random reward pool in the exact browser fixture.
-  TM_CASE: () => modifierTypes.TM_CASE(),
-  ER_LEARNERS_SHROOM: () => modifierTypes.ER_LEARNERS_SHROOM(),
-  MEMORY_MUSHROOM: () => modifierTypes.MEMORY_MUSHROOM(),
-  TM_COMMON: () => modifierTypes.TM_COMMON(),
-  TM_GREAT: () => modifierTypes.TM_GREAT(),
-  TM_ULTRA: () => modifierTypes.TM_ULTRA(),
-  ER_ABILITY_CAPSULE: () => modifierTypes.ER_ABILITY_CAPSULE(),
-  ER_GREATER_ABILITY_CAPSULE: () => modifierTypes.ER_GREATER_ABILITY_CAPSULE(),
-  ER_GREATER_ABILITY_RANDOMIZER: () => modifierTypes.ER_GREATER_ABILITY_RANDOMIZER(),
-  ABILITY_RANDOMIZER: () => modifierTypes.ABILITY_RANDOMIZER(),
-  MOVE_SLOT_EXPANDER: () => modifierTypes.MOVE_SLOT_EXPANDER(),
-  PP_UP: () => modifierTypes.PP_UP(),
-  PP_MAX: () => modifierTypes.PP_MAX(),
-  ETHER: () => modifierTypes.ETHER(),
-  MAX_ETHER: () => modifierTypes.MAX_ETHER(),
-  ELIXIR: () => modifierTypes.ELIXIR(),
-  MAX_ELIXIR: () => modifierTypes.MAX_ELIXIR(),
-  MINT: () => new PokemonNatureChangeModifierType(Nature.ADAMANT).withIdFromFunc(modifierTypes.MINT),
-  TERA_SHARD: () => new TerastallizeModifierType(PokemonType.FIRE).withIdFromFunc(modifierTypes.TERA_SHARD),
-  RARE_CANDY: () => modifierTypes.RARE_CANDY(),
-  RARER_CANDY: () => modifierTypes.RARER_CANDY(),
-  POTION: () => modifierTypes.POTION(),
-  SUPER_POTION: () => modifierTypes.SUPER_POTION(),
-  HYPER_POTION: () => modifierTypes.HYPER_POTION(),
-  MAX_POTION: () => modifierTypes.MAX_POTION(),
-  FULL_RESTORE: () => modifierTypes.FULL_RESTORE(),
-  REVIVE: () => modifierTypes.REVIVE(),
-  MAX_REVIVE: () => modifierTypes.MAX_REVIVE(),
-  FULL_HEAL: () => modifierTypes.FULL_HEAL(),
-  SACRED_ASH: () => modifierTypes.SACRED_ASH(),
-  EVOLUTION_ITEM: () =>
+  // lookup late-bound: capturing these properties here freezes `undefined` into the matrix. Return the
+  // original registry function—not a wrapper that constructs its result—so guaranteed reward generation
+  // can recover the canonical id before serializing the authoritative presentation.
+  TM_CASE: () => modifierTypes.TM_CASE,
+  ER_LEARNERS_SHROOM: () => modifierTypes.ER_LEARNERS_SHROOM,
+  MEMORY_MUSHROOM: () => modifierTypes.MEMORY_MUSHROOM,
+  TM_COMMON: () => modifierTypes.TM_COMMON,
+  TM_GREAT: () => modifierTypes.TM_GREAT,
+  TM_ULTRA: () => modifierTypes.TM_ULTRA,
+  ER_ABILITY_CAPSULE: () => modifierTypes.ER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_CAPSULE: () => modifierTypes.ER_GREATER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_RANDOMIZER: () => modifierTypes.ER_GREATER_ABILITY_RANDOMIZER,
+  ABILITY_RANDOMIZER: () => modifierTypes.ABILITY_RANDOMIZER,
+  MOVE_SLOT_EXPANDER: () => modifierTypes.MOVE_SLOT_EXPANDER,
+  PP_UP: () => modifierTypes.PP_UP,
+  PP_MAX: () => modifierTypes.PP_MAX,
+  ETHER: () => modifierTypes.ETHER,
+  MAX_ETHER: () => modifierTypes.MAX_ETHER,
+  ELIXIR: () => modifierTypes.ELIXIR,
+  MAX_ELIXIR: () => modifierTypes.MAX_ELIXIR,
+  MINT: () => () => new PokemonNatureChangeModifierType(Nature.ADAMANT).withIdFromFunc(modifierTypes.MINT),
+  TERA_SHARD: () => () => new TerastallizeModifierType(PokemonType.FIRE).withIdFromFunc(modifierTypes.TERA_SHARD),
+  RARE_CANDY: () => modifierTypes.RARE_CANDY,
+  RARER_CANDY: () => modifierTypes.RARER_CANDY,
+  POTION: () => modifierTypes.POTION,
+  SUPER_POTION: () => modifierTypes.SUPER_POTION,
+  HYPER_POTION: () => modifierTypes.HYPER_POTION,
+  MAX_POTION: () => modifierTypes.MAX_POTION,
+  FULL_RESTORE: () => modifierTypes.FULL_RESTORE,
+  REVIVE: () => modifierTypes.REVIVE,
+  MAX_REVIVE: () => modifierTypes.MAX_REVIVE,
+  FULL_HEAL: () => modifierTypes.FULL_HEAL,
+  SACRED_ASH: () => modifierTypes.SACRED_ASH,
+  EVOLUTION_ITEM: () => () =>
     new EvolutionItemModifierType(EvolutionItem.WATER_STONE).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
-  RARE_EVOLUTION_ITEM: () =>
+  RARE_EVOLUTION_ITEM: () => () =>
     new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_DARKNESS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
-  FORM_CHANGE_ITEM: () =>
+  FORM_CHANGE_ITEM: () => () =>
     new FormChangeItemModifierType(FormChangeItem.GRACIDEA).withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM),
-  RARE_FORM_CHANGE_ITEM: () =>
+  RARE_FORM_CHANGE_ITEM: () => () =>
     new FormChangeItemModifierType(FormChangeItem.GRISEOUS_CORE).withIdFromFunc(modifierTypes.RARE_FORM_CHANGE_ITEM),
-  DNA_SPLICERS: () => modifierTypes.DNA_SPLICERS(),
-  BASE_STAT_BOOSTER: () => new BaseStatBoosterModifierType(Stat.ATK).withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER),
-  ER_DEX_NAV: () => modifierTypes.ER_DEX_NAV(),
+  DNA_SPLICERS: () => modifierTypes.DNA_SPLICERS,
+  BASE_STAT_BOOSTER: () => () =>
+    new BaseStatBoosterModifierType(Stat.ATK).withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER),
+  ER_DEX_NAV: () => modifierTypes.ER_DEX_NAV,
 };
 
 /** Construction-time provenance for the reward phase's co-op address. */
@@ -654,7 +656,7 @@ export class SelectModifierPhase extends BattlePhase {
 
     const coopBrowserPartyRewardId = getCoopBrowserPartyRewardFixtureId();
     const coopBrowserPartyRewardType =
-      coopBrowserPartyRewardId == null ? null : (COOP_BROWSER_PARTY_REWARD_TYPES[coopBrowserPartyRewardId] ?? null);
+      coopBrowserPartyRewardId == null ? null : (COOP_BROWSER_PARTY_REWARD_TYPES[coopBrowserPartyRewardId]?.() ?? null);
     if (
       coopController != null
       && !coopIsWatcher
