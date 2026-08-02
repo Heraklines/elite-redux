@@ -1494,19 +1494,21 @@ function observeSemanticSurface(): void {
       semanticPhaseInstance += 1;
     }
     // A fresh P33 controller cannot have an accepted gameplay binding until the host chooses New Game/Resume
-    // and (for Resume) the guest accepts the offer. Those Title/MESSAGE callbacks are therefore legitimate
-    // pre-binding human boundaries on BOTH roles: the host owns save discovery while the guest can remain at
-    // epoch zero awaiting the immutable offer. Every non-title gameplay surface still fails closed below.
-    const preBindingLaunchMessage =
+    // and (for Resume) the guest accepts the offer. The Title/MESSAGE callback and the CONFIRM surface it opens
+    // are therefore legitimate pre-binding human boundaries on BOTH roles: the host owns save discovery while
+    // the guest can remain at epoch zero awaiting the immutable offer. Every non-title gameplay surface still
+    // fails closed below. Keeping CONFIRM hidden deadlocked the keyboard-only resume journey after its first,
+    // successful Space press even though a human could see and answer the real Yes/No modal.
+    const preBindingLaunchSurface =
       phase === "TitlePhase"
-      && uiMode === "MESSAGE"
+      && (uiMode === "MESSAGE" || uiMode === "CONFIRM")
       && runtime != null
       && runtime.controller.hasAuthenticatedPairing
       && runtime.controller.p33FrameContext() == null;
     if (
       phase === "TitlePhase"
       && uiMode === "MESSAGE"
-      && !preBindingLaunchMessage
+      && !preBindingLaunchSurface
       && (runtime == null || runtime.controller.sessionEpoch <= 0)
     ) {
       return;
@@ -1702,8 +1704,8 @@ function observeSemanticSurface(): void {
     if (runtime != null) {
       // The exact launch prompt above is intentionally observable before the binding transaction. Every other
       // P33 surface must use the accepted frame axes; otherwise provisional membership can masquerade as play.
-      const membership = preBindingLaunchMessage ? runtime.membership.snapshot() : observedMembershipAxes(runtime);
-      if (membership == null || (membership.state !== "active" && !preBindingLaunchMessage)) {
+      const membership = preBindingLaunchSurface ? runtime.membership.snapshot() : observedMembershipAxes(runtime);
+      if (membership == null || (membership.state !== "active" && !preBindingLaunchSurface)) {
         return;
       }
       coop = true;
