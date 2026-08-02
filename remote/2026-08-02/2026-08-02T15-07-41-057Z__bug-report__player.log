@@ -1,0 +1,2120 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:c0a6f3191ea4aad9ae3455b01656b2fe6e84ed75:run-30730228599.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1680x1050 @1.25x  devmem:4 GB
+boot:     boot-start@0ms -> loading-complete@12642ms -> title-shown@16613ms
+lastSess: ok (reached title)
+mode:     0  wave:30  difficulty:ace
+seed:     vVEjzDqpZeM5O8mhZHmIfw4c
+party:    Zeraora(L24 70/83), Spiritomb Redux(L18 61/61)
+
+----- DESCRIPTION -----
+Pokemon sprite overlapping after finishing training event, because of that hp bar is not working in battle scene, pokemon name also does not change when pokemon are changed.
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:c0a6f3191ea4aad9ae3455b01656b2fe6e84ed75:run-30730228599.1","source":"github","sha":"c0a6f3191ea4aad9ae3455b01656b2fe6e84ed75","workflow":{"provider":"github-actions","runId":"30730228599","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[14:33:54.872] LOG: Applied X Speed 
+[14:33:54.875] LOG: Applied X Speed 
+[14:33:54.878] LOG: Applied X Speed 
+[14:33:54.894] LOG: Applied X Speed 
+[14:33:54.897] LOG: Applied X Speed 
+[14:33:54.902] LOG: Applied X Speed 
+[14:33:54.905] LOG: Applied X Speed 
+[14:33:54.917] LOG: Battle Seed: Ai4bxWed3c2fe91o
+[14:33:54.935] LOG: Move Pool: ["Scratch","Defense Curl","Fury Swipes"]
+[14:33:54.936] LOG: Move Scores: [12,2,34.5]
+[14:33:54.936] LOG: Sorted Move Pool: ["Fury Swipes","Scratch","Defense Curl"]
+[14:33:54.936] LOG: Chosen Move: Fury Swipes
+[14:33:54.936] LOG: %cStart Phase TurnStartPhase color:green;
+[14:33:54.940] LOG: Applied X Speed 
+[14:33:54.942] LOG: Applied X Speed 
+[14:33:54.948] LOG: Applied X Speed 
+[14:33:54.953] LOG: Applied X Speed 
+[14:33:54.956] LOG: Applied X Speed 
+[14:33:54.959] LOG: Applied X Speed 
+[14:33:54.962] LOG: Applied X Speed 
+[14:33:54.966] LOG: Applied X Speed 
+[14:33:54.970] LOG: Applied X Speed 
+[14:33:54.972] LOG: Applied X Speed 
+[14:33:54.975] LOG: Applied X Speed 
+[14:33:54.979] LOG: %cStart Phase MovePhase color:green;
+[14:33:54.979] LOG: %cUser: Zeraora
+Move: FIRE_PUNCH
+Use Mode: NORMAL color:orchid
+[14:33:54.982] LOG: Applied X Speed 
+[14:33:54.985] LOG: Applied X Speed 
+[14:33:54.989] LOG: Applied X Speed 
+[14:33:54.993] LOG: Applied X Speed 
+[14:33:54.996] LOG: Applied X Speed 
+[14:33:54.998] LOG: Applied X Speed 
+[14:33:55.002] LOG: Applied X Speed 
+[14:33:55.005] LOG: Applied X Speed 
+[14:33:55.006] LOG: %cStart Phase MessagePhase color:green;
+[14:33:55.042] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:33:55.049] LOG: crit stage: +0
+[14:33:55.058] LOG: Move: Fire Punch | Base damage: 50.841 | Power: 143.65 | Source attack: 35 | Target defense: 14
+[14:33:55.061] LOG: Move: Fire Punch | Attack damage: 44
+[14:33:55.064] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:33:55.080] LOG: %cStart Phase FaintPhase color:green;
+[14:33:55.083] LOG: Applied X Speed 
+[14:33:55.086] LOG: Applied X Speed 
+[14:33:55.592] LOG: Applied X Speed 
+[14:33:55.595] LOG: Applied X Speed 
+[14:33:55.596] LOG: %cStart Phase MessagePhase color:green;
+[14:33:55.824] LOG: %cStart Phase VictoryPhase color:green;
+[14:33:55.829] LOG: Applied X Speed 
+[14:33:55.831] LOG: %cStart Phase ExpPhase color:green;
+[14:33:55.831] LOG: Applied Super EXP. Charm 
+[14:33:55.831] LOG: Applied EXP. Charm 
+[14:33:56.142] LOG: %cStart Phase LevelUpPhase color:green;
+[14:33:56.143] LOG: %cStart Phase ExpPhase color:green;
+[14:33:56.143] LOG: Applied Super EXP. Charm 
+[14:33:56.143] LOG: Applied EXP. Charm 
+[14:33:56.351] LOG: %cStart Phase MoveEndPhase color:green;
+[14:33:56.351] LOG: %cStart Phase TurnInitPhase color:green;
+[14:33:56.351] LOG: %cStart Phase TurnInitPhase color:green;
+[14:33:56.351] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:33:56.351] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:33:56.351] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:33:56.351] LOG: %cStart Phase BerryPhase color:green;
+[14:33:56.355] LOG: Applied X Speed 
+[14:33:56.357] LOG: Applied X Speed 
+[14:33:56.359] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:33:56.362] LOG: Applied X Speed 
+[14:33:56.365] LOG: Applied X Speed 
+[14:33:56.365] LOG: %cStart Phase TurnEndPhase color:green;
+[14:33:56.368] LOG: Applied X Speed 
+[14:33:56.370] LOG: Applied X Speed 
+[14:33:56.372] LOG: %cStart Phase BattleEndPhase color:green;
+[14:33:56.372] LOG: Battle Score: 71 (2 Turns x0.84)
+[14:33:56.372] LOG: Total Score: 715
+[14:33:56.384] LOG: %cStart Phase EggLapsePhase color:green;
+[14:33:56.384] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:33:56.384] LOG: Wave Seed: fUzTju]E_H}xjX}YvDs 16
+[14:33:56.388] LOG: Applied X Speed 
+[14:33:56.391] LOG: Applied X Speed 
+[14:33:56.396] LOG: Applied X Speed 
+[14:33:56.398] LOG: Applied X Speed 
+[14:33:56.404] LOG: Applied X Speed 
+[14:33:56.407] LOG: Applied X Speed 
+[14:34:01.756] LOG: %cStart Phase NewBattlePhase color:green;
+[14:34:01.756] LOG: Wave Seed: gV{Ukv^F`I~ykY~ZwEt 17
+[14:34:01.757] LOG: Applied Lure 
+[14:34:01.758] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:34:01.759] LOG: Starting species pool tier: COMMON
+[14:34:01.779] LOG: Pokemon: Wild Bidoof | Species ID: 399 | Level: 11 | Nature: Serious (-)
+[14:34:01.779] LOG: Stats (IVs): HP: 38 (23), Atk: 15 (2), Def: 19 (13), Spatk: 13 (9), Spdef: 13 (1), Spd: 12 (7)
+[14:34:01.780] LOG: Ability: Lumberjack | Passive Ability: Unaware 
+[14:34:01.780] LOG: Moveset: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[14:34:01.980] DEBUG: Session data saved to slot 0!
+[14:34:01.981] LOG: Wave Seed: gV{Ukv^F`I~ykY~ZwEt 17
+[14:34:02.397] LOG: %cStart Phase ReturnPhase color:green;
+[14:34:02.431] LOG: Applied X Speed 
+[14:34:02.506] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:34:02.563] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:34:02.563] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:34:02.563] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:02.563] LOG: Ran PSP for: Bidoof
+[14:34:02.564] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:02.564] LOG: %cStart Phase CommandPhase color:green;
+[14:34:03.585] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:03.586] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:03.597] LOG: Battle Seed: ZK5VKBAaeEdrwkjf
+[14:34:03.603] LOG: Move Pool: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[14:34:03.603] LOG: Move Scores: [28.5,18,2,0]
+[14:34:03.603] LOG: Sorted Move Pool: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[14:34:03.603] LOG: Chosen Move: Hyper Fang
+[14:34:03.603] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:03.604] LOG: Applied X Speed 
+[14:34:03.606] LOG: Applied X Speed 
+[14:34:03.607] LOG: Applied X Speed 
+[14:34:03.608] LOG: %cStart Phase MovePhase color:green;
+[14:34:03.608] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:03.610] LOG: Applied X Speed 
+[14:34:03.612] LOG: Applied X Speed 
+[14:34:03.613] LOG: %cStart Phase MessagePhase color:green;
+[14:34:03.706] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:03.710] LOG: crit stage: +1
+[14:34:03.713] LOG: Move: One-Inch Punch | Base damage: 44.652042105263156 | Power: 152.1 | Source attack: 37 | Target defense: 19
+[14:34:03.716] LOG: Move: One-Inch Punch | Attack damage: 81
+[14:34:03.718] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:03.729] LOG: %cStart Phase MessagePhase color:green;
+[14:34:03.929] LOG: %cStart Phase FaintPhase color:green;
+[14:34:05.117] LOG: %cStart Phase MessagePhase color:green;
+[14:34:05.222] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:05.223] LOG: %cStart Phase ExpPhase color:green;
+[14:34:05.223] LOG: Applied Super EXP. Charm 
+[14:34:05.223] LOG: Applied EXP. Charm 
+[14:34:05.562] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:34:05.562] LOG: Applied Super EXP. Charm 
+[14:34:05.562] LOG: Applied EXP. Charm 
+[14:34:05.563] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:34:05.563] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:05.563] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:05.563] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:05.563] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:34:05.563] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:05.563] LOG: %cStart Phase BerryPhase color:green;
+[14:34:05.564] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:34:05.564] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:05.564] LOG: %cStart Phase BattleEndPhase color:green;
+[14:34:05.564] LOG: Battle Score: 32 (1 Turns x1)
+[14:34:05.564] LOG: Total Score: 747
+[14:34:05.566] LOG: Applied Calcium 
+[14:34:05.572] LOG: %cStart Phase EggLapsePhase color:green;
+[14:34:05.572] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:34:05.572] LOG: Wave Seed: gV{Ukv^F`I~ykY~ZwEt 17
+[14:34:08.266] LOG: Applied Calcium 
+[14:34:08.273] LOG: %cStart Phase NewBattlePhase color:green;
+[14:34:08.273] LOG: Wave Seed: hW|Vlw_GaJzlZ[xFu 18
+[14:34:08.274] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:34:08.275] LOG: Starting species pool tier: COMMON
+[14:34:08.294] LOG: Pokemon: Wild Sentret | Species ID: 161 | Level: 12 | Nature: Jolly (+Spd/-SpAtk)
+[14:34:08.294] LOG: Stats (IVs): HP: 34 (31), Atk: 19 (7), Def: 16 (28), Spatk: 12 (12), Spdef: 21 (14), Spd: 27 (19)
+[14:34:08.294] LOG: Ability: Sap Sipper | Passive Ability: Frisk 
+[14:34:08.294] LOG: Moveset: ["Scratch","Fury Swipes","Defense Curl"]
+[14:34:08.381] DEBUG: Session data saved to slot 0!
+[14:34:08.382] LOG: Wave Seed: hW|Vlw_GaJzlZ[xFu 18
+[14:34:08.798] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:34:08.798] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:34:08.798] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:34:08.799] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:08.799] LOG: Ran PSP for: Sentret
+[14:34:08.799] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:08.800] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:34:08.965] LOG: %cStart Phase MessagePhase color:green;
+[14:34:09.261] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:34:09.285] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:09.285] LOG: %cStart Phase CommandPhase color:green;
+[14:34:10.229] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:10.231] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:10.241] LOG: Battle Seed: haATmOgstn7QBM17
+[14:34:10.248] LOG: Move Pool: ["Scratch","Fury Swipes","Defense Curl"]
+[14:34:10.248] LOG: Move Scores: [12,34.5,2]
+[14:34:10.248] LOG: Sorted Move Pool: ["Fury Swipes","Scratch","Defense Curl"]
+[14:34:10.248] LOG: Chosen Move: Scratch
+[14:34:10.248] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:10.250] LOG: Applied X Speed 
+[14:34:10.252] LOG: Applied X Speed 
+[14:34:10.255] LOG: Applied X Speed 
+[14:34:10.256] LOG: %cStart Phase MovePhase color:green;
+[14:34:10.256] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:10.257] LOG: Applied X Speed 
+[14:34:10.261] LOG: Applied X Speed 
+[14:34:10.261] LOG: %cStart Phase MessagePhase color:green;
+[14:34:10.351] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:10.356] LOG: crit stage: +1
+[14:34:10.359] LOG: Move: One-Inch Punch | Base damage: 52.6493 | Power: 152.1 | Source attack: 37 | Target defense: 16
+[14:34:10.362] LOG: Move: One-Inch Punch | Attack damage: 153
+[14:34:10.364] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:10.374] LOG: %cStart Phase MessagePhase color:green;
+[14:34:10.560] LOG: %cStart Phase MessagePhase color:green;
+[14:34:10.768] LOG: %cStart Phase FaintPhase color:green;
+[14:34:11.255] LOG: %cStart Phase MessagePhase color:green;
+[14:34:11.576] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:11.576] LOG: %cStart Phase ExpPhase color:green;
+[14:34:11.576] LOG: Applied Super EXP. Charm 
+[14:34:11.577] LOG: Applied EXP. Charm 
+[14:34:11.935] LOG: %cStart Phase LevelUpPhase color:green;
+[14:34:11.936] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:34:11.936] LOG: Applied Super EXP. Charm 
+[14:34:11.936] LOG: Applied EXP. Charm 
+[14:34:11.937] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:34:11.937] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:11.937] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:11.937] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:11.937] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:34:11.937] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:11.937] LOG: %cStart Phase BerryPhase color:green;
+[14:34:11.938] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:34:11.938] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:11.938] LOG: %cStart Phase BattleEndPhase color:green;
+[14:34:11.939] LOG: Battle Score: 34 (1 Turns x1)
+[14:34:11.939] LOG: Total Score: 781
+[14:34:11.941] LOG: Applied Calcium 
+[14:34:11.947] LOG: %cStart Phase EggLapsePhase color:green;
+[14:34:11.987] LOG: %cStart Phase MessagePhase color:green;
+[14:34:12.108] LOG: %cStart Phase EggSummaryPhase color:green;
+[14:34:12.108] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.110] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.110] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.110] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.111] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.111] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:12.111] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:22.611] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:34:22.611] LOG: Wave Seed: hW|Vlw_GaJzlZ[xFu 18
+[14:34:26.301] LOG: %cStart Phase LevelUpPhase color:green;
+[14:34:26.302] LOG: %cStart Phase NewBattlePhase color:green;
+[14:34:26.302] LOG: Wave Seed: iX}Wmx`HbK{m[\yGv 19
+[14:34:26.303] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:34:26.304] LOG: Starting species pool tier: COMMON
+[14:34:26.322] LOG: Pokemon: Wild Yungoos | Species ID: 734 | Level: 13 | Nature: Bold (+Def/-Atk)
+[14:34:26.322] LOG: Stats (IVs): HP: 37 (15), Atk: 23 (23), Def: 18 (30), Spatk: 14 (16), Spdef: 15 (23), Spd: 19 (23)
+[14:34:26.323] LOG: Ability: Hustle | Passive Ability: Stakeout 
+[14:34:26.323] LOG: Moveset: ["Hyper Fang","Pounce","Yawn","Super Fang"]
+[14:34:26.323] LOG: Starting species pool tier: COMMON
+[14:34:26.342] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 12 | Nature: Timid (+Spd/-Atk)
+[14:34:26.342] LOG: Stats (IVs): HP: 38 (27), Atk: 18 (6), Def: 23 (26), Spatk: 14 (5), Spdef: 19 (22), Spd: 17 (19)
+[14:34:26.343] LOG: Ability: Lingering Aroma | Passive Ability: Thick Fat 
+[14:34:26.343] LOG: Moveset: ["Hyper Fang","Tail Whip","Quick Attack","Sweet Scent"]
+[14:34:26.530] DEBUG: Session data saved to slot 0!
+[14:34:26.532] LOG: Wave Seed: iX}Wmx`HbK{m[\yGv 19
+[14:34:26.738] WARN: cry/915 not found
+[14:34:26.978] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:34:27.039] LOG: %cStart Phase SummonPhase color:green;
+[14:34:27.182] LOG: Applied Calcium 
+[14:34:27.210] WARN: cry/10817 not found
+[14:34:27.314] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:34:27.321] LOG: Applied X Speed 
+[14:34:27.325] LOG: Applied X Speed 
+[14:34:27.326] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:27.326] LOG: Ran PSP for: Yungoos
+[14:34:27.332] LOG: Applied X Speed 
+[14:34:27.334] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:27.335] LOG: Ran PSP for: Spiritomb Redux
+[14:34:27.336] LOG: Applied X Speed 
+[14:34:27.339] LOG: Applied X Speed 
+[14:34:27.343] LOG: Applied X Speed 
+[14:34:27.344] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:27.348] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:34:27.516] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:34:27.516] LOG: Battle Seed: JkoQrn4djsMJKqVI
+[14:34:27.517] LOG: %cStart Phase MessagePhase color:green;
+[14:34:27.730] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:34:27.737] LOG: %cStart Phase MessagePhase color:green;
+[14:34:27.954] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:34:27.987] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:27.987] LOG: Ran PSP for: Lechonk
+[14:34:27.992] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:27.992] LOG: %cStart Phase CommandPhase color:green;
+[14:34:28.597] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:28.598] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:34:28.875] LOG: %cStart Phase CommandPhase color:green;
+[14:34:30.027] LOG: Move: ACID_SPRAY Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:34:30.028] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:34:30.613] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:30.626] LOG: Applied X Speed 
+[14:34:30.629] LOG: Applied X Speed 
+[14:34:30.633] LOG: Applied X Speed 
+[14:34:30.636] LOG: Applied X Speed 
+[14:34:30.652] LOG: Applied X Speed 
+[14:34:30.656] LOG: Applied X Speed 
+[14:34:30.660] LOG: Applied X Speed 
+[14:34:30.663] LOG: Applied X Speed 
+[14:34:30.686] LOG: Applied X Speed 
+[14:34:30.689] LOG: Applied X Speed 
+[14:34:30.693] LOG: Applied X Speed 
+[14:34:30.696] LOG: Applied X Speed 
+[14:34:30.702] LOG: Applied X Speed 
+[14:34:30.705] LOG: Applied X Speed 
+[14:34:30.716] LOG: Applied X Speed 
+[14:34:30.719] LOG: Applied X Speed 
+[14:34:30.751] LOG: Applied X Speed 
+[14:34:30.753] LOG: Applied X Speed 
+[14:34:30.756] LOG: Applied X Speed 
+[14:34:30.759] LOG: Applied X Speed 
+[14:34:30.777] LOG: Applied X Speed 
+[14:34:30.780] LOG: Applied X Speed 
+[14:34:30.789] LOG: Applied X Speed 
+[14:34:30.791] LOG: Applied X Speed 
+[14:34:30.794] LOG: Applied X Speed 
+[14:34:30.796] LOG: Applied X Speed 
+[14:34:30.805] LOG: Applied X Speed 
+[14:34:30.807] LOG: Applied X Speed 
+[14:34:30.811] LOG: Applied X Speed 
+[14:34:30.814] LOG: Applied X Speed 
+[14:34:30.819] LOG: Applied X Speed 
+[14:34:30.823] LOG: Applied X Speed 
+[14:34:30.835] LOG: Applied X Speed 
+[14:34:30.838] LOG: Applied X Speed 
+[14:34:30.842] LOG: Applied X Speed 
+[14:34:30.845] LOG: Applied X Speed 
+[14:34:30.847] LOG: Move Pool: ["Hyper Fang","Pounce","Yawn","Super Fang"]
+[14:34:30.847] LOG: Move Scores: [-20,2.4375,5,-20]
+[14:34:30.847] LOG: Sorted Move Pool: ["Yawn","Pounce","Hyper Fang","Super Fang"]
+[14:34:30.847] LOG: Chosen Move: Yawn
+[14:34:30.847] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:30.860] LOG: Applied X Speed 
+[14:34:30.863] LOG: Applied X Speed 
+[14:34:30.867] LOG: Applied X Speed 
+[14:34:30.870] LOG: Applied X Speed 
+[14:34:30.885] LOG: Applied X Speed 
+[14:34:30.888] LOG: Applied X Speed 
+[14:34:30.892] LOG: Applied X Speed 
+[14:34:30.896] LOG: Applied X Speed 
+[14:34:30.901] LOG: Applied X Speed 
+[14:34:30.905] LOG: Applied X Speed 
+[14:34:30.914] LOG: Applied X Speed 
+[14:34:30.917] LOG: Applied X Speed 
+[14:34:30.950] LOG: Applied X Speed 
+[14:34:30.953] LOG: Applied X Speed 
+[14:34:30.965] LOG: Move Pool: ["Hyper Fang","Tail Whip","Quick Attack","Sweet Scent"]
+[14:34:30.965] LOG: Move Scores: [28.5,2,12,6]
+[14:34:30.965] LOG: Sorted Move Pool: ["Hyper Fang","Quick Attack","Sweet Scent","Tail Whip"]
+[14:34:30.965] LOG: Chosen Move: Quick Attack
+[14:34:30.965] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:30.969] LOG: Applied X Speed 
+[14:34:30.972] LOG: Applied X Speed 
+[14:34:30.977] LOG: Applied X Speed 
+[14:34:30.987] LOG: Applied X Speed 
+[14:34:30.993] LOG: Applied X Speed 
+[14:34:30.998] LOG: Applied X Speed 
+[14:34:31.001] LOG: Applied X Speed 
+[14:34:31.006] LOG: Applied X Speed 
+[14:34:31.008] LOG: Applied X Speed 
+[14:34:31.012] LOG: Applied X Speed 
+[14:34:31.018] LOG: Applied X Speed 
+[14:34:31.024] LOG: Applied X Speed 
+[14:34:31.029] LOG: Applied X Speed 
+[14:34:31.034] LOG: Applied X Speed 
+[14:34:31.041] LOG: Applied X Speed 
+[14:34:31.044] LOG: Applied X Speed 
+[14:34:31.049] LOG: Applied X Speed 
+[14:34:31.058] LOG: Applied X Speed 
+[14:34:31.063] LOG: %cStart Phase MovePhase color:green;
+[14:34:31.063] LOG: %cUser: Lechonk
+Move: QUICK_ATTACK
+Use Mode: NORMAL color:orchid
+[14:34:31.067] LOG: Applied X Speed 
+[14:34:31.069] LOG: Applied X Speed 
+[14:34:31.075] LOG: Applied X Speed 
+[14:34:31.084] LOG: Applied X Speed 
+[14:34:31.089] LOG: Applied X Speed 
+[14:34:31.093] LOG: Applied X Speed 
+[14:34:31.097] LOG: Applied X Speed 
+[14:34:31.105] LOG: Applied X Speed 
+[14:34:31.108] LOG: Applied X Speed 
+[14:34:31.113] LOG: Applied X Speed 
+[14:34:31.121] LOG: Applied X Speed 
+[14:34:31.128] LOG: Applied X Speed 
+[14:34:31.133] LOG: Applied X Speed 
+[14:34:31.139] LOG: Applied X Speed 
+[14:34:31.142] LOG: %cStart Phase MessagePhase color:green;
+[14:34:31.259] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:31.266] LOG: Applied X Speed 
+[14:34:31.269] LOG: Applied X Speed 
+[14:34:31.271] LOG: crit stage: +0
+[14:34:31.277] LOG: Move: Quick Attack | Base damage: 5.0600000000000005 | Power: 40 | Source attack: 18 | Target defense: 32
+[14:34:31.280] LOG: Move: Quick Attack | Attack damage: 7
+[14:34:31.282] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:31.303] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:31.309] LOG: Applied X Speed 
+[14:34:31.312] LOG: Applied X Speed 
+[14:34:31.318] LOG: Applied X Speed 
+[14:34:31.321] LOG: Applied X Speed 
+[14:34:31.325] LOG: %cStart Phase MovePhase color:green;
+[14:34:31.325] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:31.329] LOG: Applied X Speed 
+[14:34:31.331] LOG: Applied X Speed 
+[14:34:31.336] LOG: Applied X Speed 
+[14:34:31.345] LOG: Applied X Speed 
+[14:34:31.352] LOG: Applied X Speed 
+[14:34:31.357] LOG: Applied X Speed 
+[14:34:31.363] LOG: Applied X Speed 
+[14:34:31.370] LOG: Applied X Speed 
+[14:34:31.373] LOG: Applied X Speed 
+[14:34:31.378] LOG: Applied X Speed 
+[14:34:31.387] LOG: Applied X Speed 
+[14:34:31.395] LOG: Applied X Speed 
+[14:34:31.400] LOG: Applied X Speed 
+[14:34:31.406] LOG: Applied X Speed 
+[14:34:31.409] LOG: %cStart Phase MessagePhase color:green;
+[14:34:31.457] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:31.468] LOG: crit stage: +1
+[14:34:31.476] LOG: Move: One-Inch Punch | Base damage: 58.784 | Power: 152.1 | Source attack: 42 | Target defense: 18
+[14:34:31.479] LOG: Move: One-Inch Punch | Attack damage: 149
+[14:34:31.481] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:31.506] LOG: %cStart Phase MessagePhase color:green;
+[14:34:31.678] LOG: %cStart Phase MessagePhase color:green;
+[14:34:31.881] LOG: %cStart Phase FaintPhase color:green;
+[14:34:31.888] LOG: Applied X Speed 
+[14:34:31.892] LOG: Applied X Speed 
+[14:34:31.898] LOG: Applied X Speed 
+[14:34:31.901] LOG: Applied X Speed 
+[14:34:31.904] LOG: Applied X Speed 
+[14:34:33.422] LOG: Applied X Speed 
+[14:34:33.426] LOG: Applied X Speed 
+[14:34:33.431] LOG: Applied X Speed 
+[14:34:33.434] LOG: Applied X Speed 
+[14:34:33.438] LOG: Applied X Speed 
+[14:34:33.441] LOG: %cStart Phase MessagePhase color:green;
+[14:34:33.672] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:33.672] LOG: %cStart Phase ExpPhase color:green;
+[14:34:33.673] LOG: Applied Super EXP. Charm 
+[14:34:33.673] LOG: Applied EXP. Charm 
+[14:34:33.890] LOG: %cStart Phase ExpPhase color:green;
+[14:34:33.890] LOG: Applied Super EXP. Charm 
+[14:34:33.890] LOG: Applied EXP. Charm 
+[14:34:34.107] LOG: %cStart Phase LevelUpPhase color:green;
+[14:34:34.108] LOG: Applied Calcium 
+[14:34:34.108] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:34.112] LOG: Applied X Speed 
+[14:34:34.115] LOG: %cStart Phase MovePhase color:green;
+[14:34:34.115] LOG: %cUser: Spiritomb Redux
+Move: ACID_SPRAY
+Use Mode: NORMAL color:orchid
+[14:34:34.121] LOG: Applied X Speed 
+[14:34:34.124] LOG: Applied X Speed 
+[14:34:34.129] LOG: Applied X Speed 
+[14:34:34.132] LOG: Applied X Speed 
+[14:34:34.135] LOG: Applied X Speed 
+[14:34:34.144] LOG: Applied X Speed 
+[14:34:34.147] LOG: Applied X Speed 
+[14:34:34.152] LOG: Applied X Speed 
+[14:34:34.155] LOG: Applied X Speed 
+[14:34:34.159] LOG: Applied X Speed 
+[14:34:34.162] LOG: %cStart Phase MessagePhase color:green;
+[14:34:34.234] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:34.251] LOG: crit stage: +0
+[14:34:34.263] LOG: Move: Acid Spray | Base damage: 14.311578947368421 | Power: 40 | Source attack: 43 | Target defense: 19
+[14:34:34.270] LOG: Move: Acid Spray | Attack damage: 19
+[14:34:34.279] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:34.302] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:34:34.304] LOG: %cStart Phase MessagePhase color:green;
+[14:34:34.494] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:34.494] LOG: %cStart Phase MovePhase color:green;
+[14:34:34.495] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:34.496] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:34.496] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:34:34.496] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:34.496] LOG: %cStart Phase BerryPhase color:green;
+[14:34:34.501] LOG: Applied X Speed 
+[14:34:34.504] LOG: Applied X Speed 
+[14:34:34.509] LOG: Applied X Speed 
+[14:34:34.512] LOG: Applied X Speed 
+[14:34:34.516] LOG: Applied X Speed 
+[14:34:34.520] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:34:34.525] LOG: Applied X Speed 
+[14:34:34.527] LOG: Applied X Speed 
+[14:34:34.532] LOG: Applied X Speed 
+[14:34:34.535] LOG: Applied X Speed 
+[14:34:34.538] LOG: Applied X Speed 
+[14:34:34.540] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:34.542] LOG: Applied X Speed 
+[14:34:34.545] LOG: Applied X Speed 
+[14:34:34.550] LOG: Applied X Speed 
+[14:34:34.554] LOG: Applied X Speed 
+[14:34:34.556] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:34.556] LOG: %cStart Phase CommandPhase color:green;
+[14:34:34.946] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:34.947] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:34:35.393] LOG: %cStart Phase CommandPhase color:green;
+[14:34:35.837] LOG: Move: ACID_SPRAY Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:34:35.838] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:34:36.055] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:36.069] LOG: Applied X Speed 
+[14:34:36.071] LOG: Applied X Speed 
+[14:34:36.074] LOG: Applied X Speed 
+[14:34:36.076] LOG: Applied X Speed 
+[14:34:36.088] LOG: Applied X Speed 
+[14:34:36.090] LOG: Applied X Speed 
+[14:34:36.093] LOG: Applied X Speed 
+[14:34:36.095] LOG: Applied X Speed 
+[14:34:36.099] LOG: Applied X Speed 
+[14:34:36.101] LOG: Applied X Speed 
+[14:34:36.109] LOG: Applied X Speed 
+[14:34:36.112] LOG: Applied X Speed 
+[14:34:36.118] LOG: Battle Seed: JkoQrn4djsMJKqVI
+[14:34:36.132] LOG: Applied X Speed 
+[14:34:36.135] LOG: Applied X Speed 
+[14:34:36.147] LOG: Applied X Speed 
+[14:34:36.150] LOG: Applied X Speed 
+[14:34:36.154] LOG: Applied X Speed 
+[14:34:36.156] LOG: Applied X Speed 
+[14:34:36.167] LOG: Applied X Speed 
+[14:34:36.169] LOG: Applied X Speed 
+[14:34:36.174] LOG: Applied X Speed 
+[14:34:36.176] LOG: Applied X Speed 
+[14:34:36.178] LOG: Move Pool: ["Hyper Fang","Tail Whip","Quick Attack","Sweet Scent"]
+[14:34:36.178] LOG: Move Scores: [-20,2,-20,6]
+[14:34:36.178] LOG: Sorted Move Pool: ["Sweet Scent","Tail Whip","Hyper Fang","Quick Attack"]
+[14:34:36.178] LOG: Chosen Move: Sweet Scent
+[14:34:36.178] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:36.182] LOG: Applied X Speed 
+[14:34:36.185] LOG: Applied X Speed 
+[14:34:36.190] LOG: Applied X Speed 
+[14:34:36.195] LOG: Applied X Speed 
+[14:34:36.198] LOG: Applied X Speed 
+[14:34:36.201] LOG: Applied X Speed 
+[14:34:36.206] LOG: Applied X Speed 
+[14:34:36.213] LOG: Applied X Speed 
+[14:34:36.218] LOG: Applied X Speed 
+[14:34:36.220] LOG: Applied X Speed 
+[14:34:36.224] LOG: Applied X Speed 
+[14:34:36.226] LOG: %cStart Phase MovePhase color:green;
+[14:34:36.226] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:36.228] LOG: Applied X Speed 
+[14:34:36.231] LOG: Applied X Speed 
+[14:34:36.235] LOG: Applied X Speed 
+[14:34:36.238] LOG: Applied X Speed 
+[14:34:36.241] LOG: Applied X Speed 
+[14:34:36.244] LOG: Applied X Speed 
+[14:34:36.248] LOG: Applied X Speed 
+[14:34:36.252] LOG: Applied X Speed 
+[14:34:36.253] LOG: %cStart Phase MessagePhase color:green;
+[14:34:36.361] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:36.367] LOG: crit stage: +1
+[14:34:36.376] LOG: Move: One-Inch Punch | Base damage: 46.439652173913046 | Power: 152.1 | Source attack: 42 | Target defense: 23
+[14:34:36.379] LOG: Move: One-Inch Punch | Attack damage: 91
+[14:34:36.382] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:36.397] LOG: %cStart Phase MessagePhase color:green;
+[14:34:36.583] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:34:36.749] LOG: %cStart Phase MessagePhase color:green;
+[14:34:36.993] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:34:37.019] LOG: %cStart Phase FaintPhase color:green;
+[14:34:37.023] LOG: Applied X Speed 
+[14:34:37.026] LOG: Applied X Speed 
+[14:34:37.027] WARN: cry/915 not found
+[14:34:37.087] LOG: Applied X Speed 
+[14:34:37.089] LOG: Applied X Speed 
+[14:34:37.090] LOG: %cStart Phase MessagePhase color:green;
+[14:34:37.332] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:37.338] LOG: Applied X Speed 
+[14:34:37.340] LOG: %cStart Phase ExpPhase color:green;
+[14:34:37.340] LOG: Applied Super EXP. Charm 
+[14:34:37.340] LOG: Applied EXP. Charm 
+[14:34:37.553] LOG: %cStart Phase ExpPhase color:green;
+[14:34:37.553] LOG: Applied Super EXP. Charm 
+[14:34:37.553] LOG: Applied EXP. Charm 
+[14:34:37.768] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:37.769] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:37.769] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:37.769] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:37.769] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:34:37.769] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:37.769] LOG: %cStart Phase BerryPhase color:green;
+[14:34:37.772] LOG: Applied X Speed 
+[14:34:37.775] LOG: Applied X Speed 
+[14:34:37.777] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:34:37.780] LOG: Applied X Speed 
+[14:34:37.782] LOG: Applied X Speed 
+[14:34:37.782] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:37.785] LOG: Applied X Speed 
+[14:34:37.788] LOG: Applied X Speed 
+[14:34:37.790] LOG: %cStart Phase BattleEndPhase color:green;
+[14:34:37.790] LOG: Battle Score: 72 (2 Turns x0.84)
+[14:34:37.790] LOG: Total Score: 853
+[14:34:37.793] LOG: Applied Calcium 
+[14:34:37.800] LOG: %cStart Phase EggLapsePhase color:green;
+[14:34:37.800] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:34:37.800] LOG: Wave Seed: iX}Wmx`HbK{m[\yGv 19
+[14:34:39.299] LOG: Applied Calcium 
+[14:34:39.302] LOG: %cStart Phase NewBattlePhase color:green;
+[14:34:39.302] LOG: Wave Seed: jY~XnyaIcL|n\]zHw 20
+[14:34:39.303] LOG: Starting trainer pool tier: BOSS
+[14:34:39.307] LOG: %cStart Phase ReturnPhase color:green;
+[14:34:39.410] LOG: %cStart Phase ReturnPhase color:green;
+[14:34:39.514] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:34:39.617] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:34:39.636] LOG: Pokemon: Foe Oshawott | Species ID: 501 | Level: 13 | Nature: Brave (+Atk/-Spd)
+[14:34:39.636] LOG: Stats (IVs): HP: 39 (3), Atk: 26 (20), Def: 17 (4), Spatk: 21 (28), Spdef: 18 (22), Spd: 17 (19)
+[14:34:39.636] LOG: Ability: Swift Swim | Passive Ability: Torrent 
+[14:34:39.636] LOG: Moveset: ["Razor Shell","Brutal Swing","Tail Whip","Water Sport"]
+[14:34:39.649] LOG: Pokemon: Foe Panpour | Species ID: 515 | Level: 14 | Nature: Naive (+Spd/-SpDef)
+[14:34:39.649] LOG: Stats (IVs): HP: 44 (4), Atk: 21 (22), Def: 17 (19), Spatk: 23 (5), Spdef: 18 (2), Spd: 30 (22)
+[14:34:39.649] LOG: Ability: Sage Power | Passive Ability: Torrent 
+[14:34:39.649] LOG: Moveset: ["Scratch","Play Nice","Tail Whip"]
+[14:34:40.641] LOG: Battle Seed: NjzdL3qDNK3LSodI
+[14:34:40.641] LOG: Applied HP Up (enemy)
+[14:34:40.641] LOG: Applied Calcium (enemy)
+[14:34:40.642] LOG: Applied HP Up (enemy)
+[14:34:40.642] LOG: Applied HP Up (enemy)
+[14:34:40.642] LOG: Applied Calcium (enemy)
+[14:34:40.643] LOG: Generated AI funcs
+[14:34:40.757] DEBUG: Session data saved to slot 0!
+[14:34:40.757] LOG: Applied HP Up (enemy)
+[14:34:40.758] LOG: Applied HP Up (enemy)
+[14:34:40.758] LOG: Applied Calcium (enemy)
+[14:34:40.759] LOG: Wave Seed: jY~XnyaIcL|n\]zHw 20
+[14:34:40.965] LOG: Gym Leader Cress
+[14:34:41.323] LOG: Dialogue saved as seen: dialogue:cress.encounter.1
+[14:34:41.355] LOG: Gym Leader Cress
+[14:34:41.709] LOG: %cStart Phase SummonPhase color:green;
+[14:34:41.710] LOG: Cress
+[14:34:41.840] LOG: Applied HP Up (enemy)
+[14:34:41.840] LOG: Applied HP Up (enemy)
+[14:34:41.841] LOG: Applied Calcium (enemy)
+[14:34:41.971] LOG: %cStart Phase SummonPhase color:green;
+[14:34:42.125] LOG: Applied Calcium 
+[14:34:42.256] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:34:42.360] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:34:42.363] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:34:42.365] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:42.365] LOG: Ran PSP for: Zeraora
+[14:34:42.366] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:42.366] LOG: Ran PSP for: Oshawott
+[14:34:42.367] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:42.367] LOG: %cStart Phase CommandPhase color:green;
+[14:34:43.242] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:43.243] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:43.266] LOG: Move Pool: ["Razor Shell","Brutal Swing","Tail Whip","Water Sport"]
+[14:34:43.266] LOG: Move Scores: [30,12,2,0]
+[14:34:43.266] LOG: Sorted Move Pool: ["Razor Shell","Brutal Swing","Tail Whip","Water Sport"]
+[14:34:43.266] LOG: Chosen Move: Razor Shell
+[14:34:43.267] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:43.273] LOG: %cStart Phase MovePhase color:green;
+[14:34:43.273] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:43.277] LOG: %cStart Phase MessagePhase color:green;
+[14:34:43.353] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:43.358] LOG: crit stage: +0
+[14:34:43.362] LOG: Move: Thunder Punch | Base damage: 58.784000000000006 | Power: 143.65 | Source attack: 42 | Target defense: 17
+[14:34:43.365] LOG: Move: Thunder Punch | Attack damage: 174
+[14:34:43.368] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:43.376] LOG: %cStart Phase MessagePhase color:green;
+[14:34:43.575] LOG: %cStart Phase FaintPhase color:green;
+[14:34:44.250] LOG: %cStart Phase MessagePhase color:green;
+[14:34:44.341] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:44.342] LOG: %cStart Phase ExpPhase color:green;
+[14:34:44.342] LOG: Applied Super EXP. Charm 
+[14:34:44.342] LOG: Applied EXP. Charm 
+[14:34:44.728] LOG: 3950 4532 4428
+[14:34:44.791] LOG: %cStart Phase LevelUpPhase color:green;
+[14:34:44.792] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:34:44.792] LOG: Applied Super EXP. Charm 
+[14:34:44.792] LOG: Applied EXP. Charm 
+[14:34:44.793] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:34:44.793] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:44.793] LOG: %cStart Phase MovePhase color:green;
+[14:34:44.793] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:44.793] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:44.793] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:34:44.793] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:44.793] LOG: %cStart Phase BerryPhase color:green;
+[14:34:44.794] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:34:44.794] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:44.795] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:34:45.020] LOG: Cress
+[14:34:45.096] LOG: Applied HP Up (enemy)
+[14:34:45.096] LOG: Applied Calcium (enemy)
+[14:34:45.097] LOG: Applied HP Up (enemy)
+[14:34:45.231] LOG: %cStart Phase PostSummonPhase color:green;
+[14:34:45.231] LOG: Ran PSP for: Panpour
+[14:34:45.232] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:45.232] LOG: %cStart Phase CommandPhase color:green;
+[14:34:47.092] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:34:47.093] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:34:47.099] LOG: Battle Seed: NjzdL3qDNK3LSodI
+[14:34:47.101] LOG: Move Pool: ["Scratch","Play Nice","Tail Whip"]
+[14:34:47.101] LOG: Move Scores: [8,2,2]
+[14:34:47.101] LOG: Sorted Move Pool: ["Scratch","Play Nice","Tail Whip"]
+[14:34:47.102] LOG: Chosen Move: Scratch
+[14:34:47.102] LOG: %cStart Phase TurnStartPhase color:green;
+[14:34:47.109] LOG: %cStart Phase MovePhase color:green;
+[14:34:47.109] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:34:47.113] LOG: %cStart Phase MessagePhase color:green;
+[14:34:47.206] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:34:47.211] LOG: crit stage: +0
+[14:34:47.214] LOG: Move: Thunder Punch | Base damage: 59.15757894736843 | Power: 143.65 | Source attack: 45 | Target defense: 19
+[14:34:47.216] LOG: Move: Thunder Punch | Attack damage: 152
+[14:34:47.219] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:34:47.229] LOG: %cStart Phase MessagePhase color:green;
+[14:34:47.429] LOG: %cStart Phase FaintPhase color:green;
+[14:34:48.040] LOG: %cStart Phase MessagePhase color:green;
+[14:34:48.223] LOG: %cStart Phase VictoryPhase color:green;
+[14:34:48.224] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:34:48.224] LOG: Applied Super EXP. Charm 
+[14:34:48.224] LOG: Applied EXP. Charm 
+[14:34:48.225] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:34:48.225] LOG: %cStart Phase MoveEndPhase color:green;
+[14:34:48.225] LOG: %cStart Phase TurnInitPhase color:green;
+[14:34:48.225] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:34:48.225] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:34:48.225] LOG: %cStart Phase TurnEndPhase color:green;
+[14:34:48.225] LOG: %cStart Phase BattleEndPhase color:green;
+[14:34:48.226] LOG: Battle Score: 108 (2 Turns x0.89)
+[14:34:48.226] LOG: Total Score: 961
+[14:34:48.228] LOG: Applied Calcium 
+[14:34:48.233] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[14:34:48.234] LOG: Gym Leader Cress
+[14:34:48.234] LOG: Gym Leader Cress
+[14:34:48.623] LOG: Dialogue saved as seen: dialogue:cress.victory.1
+[14:34:48.623] LOG: %cStart Phase MoneyRewardPhase color:green;
+[14:34:49.078] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:34:49.433] LOG: %cStart Phase EggLapsePhase color:green;
+[14:34:49.537] LOG: %cStart Phase MessagePhase color:green;
+[14:34:49.609] LOG: %cStart Phase MessagePhase color:green;
+[14:34:49.866] LOG: %cStart Phase EggSummaryPhase color:green;
+[14:34:49.866] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.869] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.869] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.869] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:49.870] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:34:53.545] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:34:53.546] LOG: Applied Calcium 
+[14:34:54.225] LOG: %cStart Phase PartyHealPhase color:green;
+[14:34:56.672] LOG: %cStart Phase ResetStatusPhase color:green;
+[14:34:56.673] LOG: %cStart Phase ResetStatusPhase color:green;
+[14:34:56.673] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:35:22.151] LOG: Applied Protein 
+[14:35:22.151] LOG: Applied Calcium 
+[14:35:24.122] LOG: Applied Protein 
+[14:35:24.122] LOG: Applied Calcium 
+[14:35:27.642] LOG: Applied Protein 
+[14:35:27.642] LOG: Applied Calcium 
+[14:35:29.316] LOG: Applied Protein 
+[14:35:29.316] LOG: Applied Calcium 
+[14:35:30.625] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[14:35:32.356] LOG: %cStart Phase SelectBiomePhase color:green;
+[14:35:32.357] LOG: Wave Seed: jY~XnyaIcL|n\]zHw 20
+[14:35:35.045] LOG: %cStart Phase PartyHealPhase color:green;
+[14:35:37.492] LOG: %cStart Phase ResetStatusPhase color:green;
+[14:35:37.493] LOG: %cStart Phase ResetStatusPhase color:green;
+[14:35:37.493] LOG: %cStart Phase SwitchBiomePhase color:green;
+[14:35:37.907] LOG: %cStart Phase NewBattlePhase color:green;
+[14:35:37.907] LOG: Wave Seed: kZYozbJdM}o]^{Ix 21
+[14:35:37.908] LOG: %cStart Phase ReturnPhase color:green;
+[14:35:38.011] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:35:38.115] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[14:35:38.117] LOG: Starting species pool tier: COMMON
+[14:35:38.135] LOG: Pokemon: Wild Lotad | Species ID: 270 | Level: 14 | Nature: Impish (+Def/-SpAtk)
+[14:35:38.135] LOG: Stats (IVs): HP: 36 (7), Atk: 13 (4), Def: 17 (15), Spatk: 18 (9), Spdef: 22 (28), Spd: 16 (0)
+[14:35:38.135] LOG: Ability: Swift Swim | Passive Ability: Seaweed 
+[14:35:38.135] LOG: Moveset: ["Mega Drain","Flail","Growl","Fake Out"]
+[14:35:38.468] DEBUG: Session data saved to slot 0!
+[14:35:42.986] LOG: Wave Seed: kZYozbJdM}o]^{Ix 21
+[14:35:43.193] LOG: %cStart Phase LevelCapPhase color:green;
+[14:35:43.333] LOG: %cStart Phase SummonPhase color:green;
+[14:35:43.483] LOG: Applied Protein 
+[14:35:43.483] LOG: Applied Calcium 
+[14:35:43.614] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:35:43.718] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:35:43.720] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:35:43.720] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:35:43.722] LOG: %cStart Phase PostSummonPhase color:green;
+[14:35:43.722] LOG: Ran PSP for: Zeraora
+[14:35:43.723] LOG: %cStart Phase PostSummonPhase color:green;
+[14:35:43.723] LOG: Ran PSP for: Lotad
+[14:35:43.723] LOG: %cStart Phase TurnInitPhase color:green;
+[14:35:43.723] LOG: %cStart Phase CommandPhase color:green;
+[14:35:44.979] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:35:44.980] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:35:44.995] LOG: Battle Seed: AjBgRyUuysxGqRRl
+[14:35:45.006] LOG: Move Pool: ["Mega Drain","Flail","Growl","Fake Out"]
+[14:35:45.006] LOG: Move Scores: [15,4,2,13]
+[14:35:45.006] LOG: Sorted Move Pool: ["Mega Drain","Fake Out","Flail","Growl"]
+[14:35:45.006] LOG: Chosen Move: Mega Drain
+[14:35:45.006] LOG: %cStart Phase TurnStartPhase color:green;
+[14:35:45.012] LOG: %cStart Phase MovePhase color:green;
+[14:35:45.012] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:35:45.015] LOG: %cStart Phase MessagePhase color:green;
+[14:35:45.093] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:35:45.098] LOG: crit stage: +0
+[14:35:45.101] LOG: Move: Thunder Punch | Base damage: 75.81920000000001 | Power: 143.65 | Source attack: 52 | Target defense: 17
+[14:35:45.103] LOG: Move: Thunder Punch | Attack damage: 109
+[14:35:45.105] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:35:45.116] LOG: %cStart Phase FaintPhase color:green;
+[14:35:45.566] LOG: %cStart Phase MessagePhase color:green;
+[14:35:45.779] LOG: %cStart Phase VictoryPhase color:green;
+[14:35:45.779] LOG: %cStart Phase ExpPhase color:green;
+[14:35:45.779] LOG: Applied Super EXP. Charm 
+[14:35:45.779] LOG: Applied EXP. Charm 
+[14:35:46.122] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:35:46.122] LOG: Applied Super EXP. Charm 
+[14:35:46.122] LOG: Applied EXP. Charm 
+[14:35:46.240] LOG: %cStart Phase LevelUpPhase color:green;
+[14:35:46.240] LOG: Applied Calcium 
+[14:35:46.241] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:35:46.302] LOG: %cStart Phase MoveEndPhase color:green;
+[14:35:46.303] LOG: %cStart Phase TurnInitPhase color:green;
+[14:35:46.303] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:35:46.303] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:35:46.303] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:35:46.303] LOG: %cStart Phase BerryPhase color:green;
+[14:35:46.304] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:35:46.304] LOG: %cStart Phase TurnEndPhase color:green;
+[14:35:46.304] LOG: %cStart Phase BattleEndPhase color:green;
+[14:35:46.305] LOG: Battle Score: 25 (1 Turns x1)
+[14:35:46.305] LOG: Total Score: 986
+[14:35:46.306] LOG: Applied Protein 
+[14:35:46.307] LOG: Applied Calcium 
+[14:35:46.310] LOG: %cStart Phase EggLapsePhase color:green;
+[14:35:46.310] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:35:46.310] LOG: Wave Seed: kZYozbJdM}o]^{Ix 21
+[14:35:48.027] LOG: Applied Protein 
+[14:35:48.031] LOG: %cStart Phase LevelUpPhase color:green;
+[14:35:48.031] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[14:35:58.162] LOG: %cStart Phase NewBattlePhase color:green;
+[14:35:58.162] LOG: Wave Seed: l[Zp{cKeN~p^_|Jy 22
+[14:35:58.163] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:35:58.164] LOG: Starting species pool tier: COMMON
+[14:35:58.180] LOG: Pokemon: Wild Wooper | Species ID: 194 | Level: 15 | Nature: Jolly (+Spd/-SpAtk)
+[14:35:58.180] LOG: Stats (IVs): HP: 43 (4), Atk: 24 (12), Def: 25 (19), Spatk: 21 (10), Spdef: 23 (6), Spd: 14 (19)
+[14:35:58.180] LOG: Ability: Unaware | Passive Ability: Oblivious 
+[14:35:58.180] LOG: Moveset: ["Mud-Slap","Slam","Mud Shot","Yawn"]
+[14:35:58.405] DEBUG: Session data saved to slot 0!
+[14:35:58.406] LOG: Wave Seed: l[Zp{cKeN~p^_|Jy 22
+[14:35:58.822] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:35:58.823] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:35:58.823] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:35:58.823] LOG: %cStart Phase PostSummonPhase color:green;
+[14:35:58.823] LOG: Ran PSP for: Wooper
+[14:35:58.824] LOG: %cStart Phase PostSummonPhase color:green;
+[14:35:58.824] LOG: %cStart Phase TurnInitPhase color:green;
+[14:35:58.824] LOG: %cStart Phase CommandPhase color:green;
+[14:35:59.789] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:35:59.791] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:35:59.818] LOG: Battle Seed: Fz5LwTksB2E1MAVc
+[14:35:59.836] LOG: Move Pool: ["Mud-Slap","Slam","Mud Shot","Yawn"]
+[14:35:59.836] LOG: Move Scores: [66,19,36,5]
+[14:35:59.836] LOG: Sorted Move Pool: ["Mud-Slap","Mud Shot","Slam","Yawn"]
+[14:35:59.836] LOG: Chosen Move: Mud-Slap
+[14:35:59.836] LOG: %cStart Phase TurnStartPhase color:green;
+[14:35:59.844] LOG: %cStart Phase MovePhase color:green;
+[14:35:59.845] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:35:59.851] LOG: %cStart Phase MessagePhase color:green;
+[14:35:59.917] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:35:59.923] LOG: crit stage: +1
+[14:35:59.928] LOG: Move: One-Inch Punch | Base damage: 60.893119999999996 | Power: 152.1 | Source attack: 55 | Target defense: 25
+[14:35:59.931] LOG: Move: One-Inch Punch | Attack damage: 57
+[14:35:59.934] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:35:59.940] LOG: %cStart Phase FaintPhase color:green;
+[14:36:00.620] LOG: %cStart Phase MessagePhase color:green;
+[14:36:00.705] LOG: %cStart Phase VictoryPhase color:green;
+[14:36:00.705] LOG: %cStart Phase ExpPhase color:green;
+[14:36:00.705] LOG: Applied Super EXP. Charm 
+[14:36:00.705] LOG: Applied EXP. Charm 
+[14:36:00.939] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:36:00.939] LOG: Applied Super EXP. Charm 
+[14:36:00.939] LOG: Applied EXP. Charm 
+[14:36:00.940] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:36:00.940] LOG: %cStart Phase MoveEndPhase color:green;
+[14:36:00.940] LOG: %cStart Phase TurnInitPhase color:green;
+[14:36:00.940] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:36:00.940] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:36:00.940] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:36:00.940] LOG: %cStart Phase BerryPhase color:green;
+[14:36:00.941] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:36:00.941] LOG: %cStart Phase TurnEndPhase color:green;
+[14:36:00.941] LOG: %cStart Phase BattleEndPhase color:green;
+[14:36:00.941] LOG: Battle Score: 25 (1 Turns x1)
+[14:36:00.941] LOG: Total Score: 1011
+[14:36:00.943] LOG: Applied Protein 
+[14:36:00.943] LOG: Applied Calcium 
+[14:36:00.948] LOG: %cStart Phase EggLapsePhase color:green;
+[14:36:00.948] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:36:00.948] LOG: Wave Seed: l[Zp{cKeN~p^_|Jy 22
+[14:36:04.665] LOG: %cStart Phase NewBattlePhase color:green;
+[14:36:04.665] LOG: Wave Seed: m\[q|dLfOq_`}Kz 23
+[14:36:04.666] LOG: %cStart Phase ReturnPhase color:green;
+[14:36:04.771] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:36:04.875] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:36:05.074] DEBUG: Session data saved to slot 0!
+[14:36:05.075] LOG: Wave Seed: m\[q|dLfOq_`}Kz 23
+[14:36:06.598] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[14:36:09.639] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[14:36:09.722] LOG: %cStart Phase ErQuizPhase color:green;
+[14:36:42.341] LOG: %cStart Phase MessagePhase color:green;
+[14:36:44.100] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[14:36:44.100] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:36:44.100] LOG: Wave Seed: m\[q|dLfOq_`}Kz 23
+[14:36:56.900] LOG: Applied Protein 
+[14:36:56.900] LOG: Applied Calcium 
+[14:36:56.903] LOG: %cStart Phase EggLapsePhase color:green;
+[14:36:57.059] LOG: %cStart Phase MessagePhase color:green;
+[14:36:57.121] LOG: %cStart Phase MessagePhase color:green;
+[14:36:57.332] LOG: %cStart Phase EggSummaryPhase color:green;
+[14:36:57.332] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.334] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:36:57.335] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:05.465] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[14:37:05.465] LOG: %cStart Phase NewBattlePhase color:green;
+[14:37:05.465] LOG: Wave Seed: n]\r}eMgPr`a~L{ 24
+[14:37:05.466] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:37:05.468] LOG: Starting species pool tier: COMMON
+[14:37:05.481] LOG: Pokemon: Wild Chewtle | Species ID: 833 | Level: 16 | Nature: Mild (+SpAtk/-Def)
+[14:37:05.481] LOG: Stats (IVs): HP: 43 (7), Atk: 27 (15), Def: 19 (12), Spatk: 21 (17), Spdef: 20 (23), Spd: 22 (20)
+[14:37:05.481] LOG: Ability: Solid Rock | Passive Ability: Strong Jaw 
+[14:37:05.481] LOG: Moveset: ["Razor Shell","Growl","Tackle"]
+[14:37:05.768] DEBUG: Session data saved to slot 0!
+[14:37:05.769] LOG: Wave Seed: n]\r}eMgPr`a~L{ 24
+[14:37:06.180] LOG: %cStart Phase SummonPhase color:green;
+[14:37:06.331] LOG: Applied Protein 
+[14:37:06.331] LOG: Applied Calcium 
+[14:37:06.462] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:37:06.566] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:37:06.569] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:37:06.569] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:37:06.572] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:06.572] LOG: Ran PSP for: Zeraora
+[14:37:06.573] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:06.573] LOG: Ran PSP for: Chewtle
+[14:37:06.574] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:06.574] LOG: %cStart Phase CommandPhase color:green;
+[14:37:07.822] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:37:07.823] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:37:07.849] LOG: Battle Seed: iJoVtLh1kLsObP2E
+[14:37:07.858] LOG: Move Pool: ["Razor Shell","Growl","Tackle"]
+[14:37:07.858] LOG: Move Scores: [30,2,8]
+[14:37:07.858] LOG: Sorted Move Pool: ["Razor Shell","Tackle","Growl"]
+[14:37:07.858] LOG: Chosen Move: Razor Shell
+[14:37:07.858] LOG: %cStart Phase TurnStartPhase color:green;
+[14:37:07.866] LOG: %cStart Phase MovePhase color:green;
+[14:37:07.866] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:37:07.872] LOG: %cStart Phase MessagePhase color:green;
+[14:37:07.941] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:37:07.948] LOG: crit stage: +0
+[14:37:07.954] LOG: Move: Thunder Punch | Base damage: 75.18589473684212 | Power: 143.65 | Source attack: 55 | Target defense: 19
+[14:37:07.960] LOG: Move: Thunder Punch | Attack damage: 123
+[14:37:07.963] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:37:07.972] LOG: %cStart Phase MessagePhase color:green;
+[14:37:08.170] LOG: %cStart Phase FaintPhase color:green;
+[14:37:09.608] LOG: %cStart Phase MessagePhase color:green;
+[14:37:09.686] LOG: %cStart Phase VictoryPhase color:green;
+[14:37:09.687] LOG: %cStart Phase ExpPhase color:green;
+[14:37:09.687] LOG: Applied Super EXP. Charm 
+[14:37:09.687] LOG: Applied EXP. Charm 
+[14:37:10.123] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:10.123] LOG: Applied Protein 
+[14:37:10.123] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:37:10.124] LOG: Applied Super EXP. Charm 
+[14:37:10.124] LOG: Applied EXP. Charm 
+[14:37:10.124] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:37:10.124] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:10.125] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:10.125] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:37:10.125] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:37:10.125] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:37:10.125] LOG: %cStart Phase BerryPhase color:green;
+[14:37:10.125] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:37:10.125] LOG: %cStart Phase TurnEndPhase color:green;
+[14:37:10.126] LOG: %cStart Phase BattleEndPhase color:green;
+[14:37:10.126] LOG: Battle Score: 39 (1 Turns x1)
+[14:37:10.126] LOG: Total Score: 1050
+[14:37:10.128] LOG: Applied Protein 
+[14:37:10.128] LOG: Applied Calcium 
+[14:37:10.132] LOG: %cStart Phase EggLapsePhase color:green;
+[14:37:10.132] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:37:10.132] LOG: Wave Seed: n]\r}eMgPr`a~L{ 24
+[14:37:17.825] LOG: Applied Protein 
+[14:37:17.826] LOG: Applied Calcium 
+[14:37:17.830] LOG: %cStart Phase NewBattlePhase color:green;
+[14:37:17.830] LOG: Wave Seed: o^]s~fNhQsabM| 25
+[14:37:17.831] LOG: %cStart Phase ReturnPhase color:green;
+[14:37:17.940] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:37:18.044] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:37:18.061] LOG: Pokemon: Foe Torracat | Species ID: 726 | Level: 18 | Nature: Sassy (+SpDef/-Spd)
+[14:37:18.061] LOG: Stats (IVs): HP: 54 (5), Atk: 38 (7), Def: 25 (5), Spatk: 37 (20), Spdef: 31 (29), Spd: 37 (22)
+[14:37:18.062] LOG: Ability: Bad Luck | Passive Ability: Blaze 
+[14:37:18.062] LOG: Moveset: ["Blaze Kick","Brutal Swing","Roar","Slash"]
+[14:37:18.078] LOG: Pokemon: Foe Corvisquire | Species ID: 822 | Level: 17 | Nature: Lax (+Def/-SpDef)
+[14:37:18.078] LOG: Stats (IVs): HP: 52 (5), Atk: 24 (13), Def: 26 (8), Spatk: 28 (11), Spdef: 22 (18), Spd: 31 (3)
+[14:37:18.078] LOG: Ability: Intimidate | Passive Ability: Flock 
+[14:37:18.078] LOG: Moveset: ["Dual Wingbeat","Hone Claws","Scary Face","Leer"]
+[14:37:18.091] LOG: Pokemon: Foe Mudbray | Species ID: 749 | Level: 16 | Nature: Hardy (-)
+[14:37:18.091] LOG: Stats (IVs): HP: 44 (22), Atk: 33 (20), Def: 28 (30), Spatk: 19 (25), Spdef: 20 (14), Spd: 19 (13)
+[14:37:18.091] LOG: Ability: Stamina | Passive Ability: Own Tempo 
+[14:37:18.091] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Double Kick","Mud-Slap"]
+[14:37:18.539] LOG: Battle Seed: t2pKMqJdbZ2HvaF7
+[14:37:18.539] LOG: Applied HP Up (enemy)
+[14:37:18.539] LOG: Applied Zinc (enemy)
+[14:37:18.539] LOG: Applied HP Up (enemy)
+[14:37:18.539] LOG: Applied Zinc (enemy)
+[14:37:18.540] LOG: Applied Zinc (enemy)
+[14:37:18.540] LOG: Generated AI funcs
+[14:37:18.640] DEBUG: Session data saved to slot 0!
+[14:37:18.641] LOG: Applied HP Up (enemy)
+[14:37:18.641] LOG: Applied Zinc (enemy)
+[14:37:18.641] LOG: Applied Zinc (enemy)
+[14:37:18.643] LOG: Wave Seed: o^]s~fNhQsabM| 25
+[14:37:18.849] LOG: Rival Ivy
+[14:37:18.850] LOG: Dialogue dialogue:rival2Female.encounter.1 skipped
+[14:37:18.886] LOG: Rival Ivy
+[14:37:19.336] LOG: %cStart Phase SummonPhase color:green;
+[14:37:19.337] LOG: Ivy
+[14:37:19.468] LOG: Applied HP Up (enemy)
+[14:37:19.468] LOG: Applied Zinc (enemy)
+[14:37:19.468] LOG: Applied Zinc (enemy)
+[14:37:19.599] LOG: %cStart Phase SummonPhase color:green;
+[14:37:19.752] LOG: Applied Protein 
+[14:37:19.753] LOG: Applied Calcium 
+[14:37:19.884] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:37:19.988] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:37:19.991] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:37:19.993] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:19.993] LOG: Ran PSP for: Zeraora
+[14:37:19.994] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:19.994] LOG: Ran PSP for: Torracat
+[14:37:19.995] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:19.996] LOG: %cStart Phase CommandPhase color:green;
+[14:37:22.532] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:37:22.534] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:37:22.571] WARN: BattlerTag ER_BLEED is missing a score!
+[14:37:22.584] WARN: BattlerTag ER_BLEED is missing a score!
+[14:37:22.588] LOG: Move Pool: ["Blaze Kick","Brutal Swing","Roar","Slash"]
+[14:37:22.588] LOG: Move Scores: [31.5,12,0,17]
+[14:37:22.588] LOG: Sorted Move Pool: ["Blaze Kick","Slash","Brutal Swing","Roar"]
+[14:37:22.588] LOG: Chosen Move: Blaze Kick
+[14:37:22.588] LOG: %cStart Phase TurnStartPhase color:green;
+[14:37:22.596] LOG: %cStart Phase MovePhase color:green;
+[14:37:22.596] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:37:22.601] LOG: %cStart Phase MessagePhase color:green;
+[14:37:22.661] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:37:22.667] LOG: crit stage: +0
+[14:37:22.672] LOG: Move: Thunder Punch | Base damage: 68.6536 | Power: 143.65 | Source attack: 58 | Target defense: 23
+[14:37:22.675] LOG: Move: Thunder Punch | Attack damage: 100
+[14:37:22.678] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:37:22.691] LOG: %cStart Phase FaintPhase color:green;
+[14:37:24.669] LOG: %cStart Phase MessagePhase color:green;
+[14:37:24.796] LOG: %cStart Phase VictoryPhase color:green;
+[14:37:24.796] LOG: %cStart Phase ExpPhase color:green;
+[14:37:24.796] LOG: Applied Super EXP. Charm 
+[14:37:24.796] LOG: Applied EXP. Charm 
+[14:37:25.169] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:25.169] LOG: Applied Protein 
+[14:37:25.170] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:37:25.170] LOG: Applied Super EXP. Charm 
+[14:37:25.170] LOG: Applied EXP. Charm 
+[14:37:25.284] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:25.284] LOG: Applied Calcium 
+[14:37:25.285] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:37:25.343] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:25.344] LOG: %cStart Phase MovePhase color:green;
+[14:37:25.344] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:25.344] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:37:25.344] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:37:25.344] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:37:25.344] LOG: %cStart Phase BerryPhase color:green;
+[14:37:25.345] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:37:25.345] LOG: %cStart Phase TurnEndPhase color:green;
+[14:37:25.345] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:37:25.570] LOG: Ivy
+[14:37:25.641] LOG: Applied Zinc (enemy)
+[14:37:25.641] LOG: Applied HP Up (enemy)
+[14:37:25.641] LOG: Applied Zinc (enemy)
+[14:37:25.775] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:25.775] LOG: Ran PSP for: Mudbray
+[14:37:25.776] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:25.776] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:25.777] LOG: %cStart Phase CommandPhase color:green;
+[14:37:26.701] LOG: Move: ICE_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:37:26.703] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:37:26.733] LOG: Battle Seed: t2pKMqJdbZ2HvaF7
+[14:37:26.752] LOG: Move Pool: ["Stomping Tantrum","Mega Kick","Double Kick","Mud-Slap"]
+[14:37:26.752] LOG: Move Scores: [57,19,23,66]
+[14:37:26.752] LOG: Sorted Move Pool: ["Mud-Slap","Stomping Tantrum","Double Kick","Mega Kick"]
+[14:37:26.752] LOG: Chosen Move: Mud-Slap
+[14:37:26.752] LOG: %cStart Phase TurnStartPhase color:green;
+[14:37:26.759] LOG: %cStart Phase MovePhase color:green;
+[14:37:26.759] LOG: %cUser: Zeraora
+Move: ICE_PUNCH
+Use Mode: NORMAL color:orchid
+[14:37:26.765] LOG: %cStart Phase MessagePhase color:green;
+[14:37:26.827] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:37:26.833] LOG: crit stage: +0
+[14:37:26.837] LOG: Move: Ice Punch | Base damage: 59.46 | Power: 143.65 | Source attack: 64 | Target defense: 32
+[14:37:26.840] LOG: Move: Ice Punch | Attack damage: 128
+[14:37:26.843] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:37:26.852] LOG: %cStart Phase MessagePhase color:green;
+[14:37:27.049] LOG: %cStart Phase FaintPhase color:green;
+[14:37:28.348] LOG: %cStart Phase MessagePhase color:green;
+[14:37:28.462] LOG: %cStart Phase VictoryPhase color:green;
+[14:37:28.462] LOG: %cStart Phase ExpPhase color:green;
+[14:37:28.462] LOG: Applied Super EXP. Charm 
+[14:37:28.462] LOG: Applied EXP. Charm 
+[14:37:28.849] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:28.849] LOG: Applied Protein 
+[14:37:28.850] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:37:28.850] LOG: Applied Super EXP. Charm 
+[14:37:28.850] LOG: Applied EXP. Charm 
+[14:37:28.850] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:37:28.850] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:28.851] LOG: %cStart Phase MovePhase color:green;
+[14:37:28.851] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:28.851] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:37:28.851] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:37:28.851] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:37:28.851] LOG: %cStart Phase BerryPhase color:green;
+[14:37:28.851] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:37:28.851] LOG: %cStart Phase TurnEndPhase color:green;
+[14:37:28.852] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:37:29.077] LOG: Ivy
+[14:37:29.154] LOG: Applied Zinc (enemy)
+[14:37:29.154] LOG: Applied HP Up (enemy)
+[14:37:29.154] LOG: Applied Zinc (enemy)
+[14:37:29.288] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:29.288] LOG: Ran PSP for: Corvisquire
+[14:37:29.289] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:29.289] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:37:29.447] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:37:29.448] LOG: Battle Seed: t2pKMqJdbZ2HvaF7
+[14:37:29.449] LOG: %cStart Phase MessagePhase color:green;
+[14:37:29.653] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:37:29.677] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:29.677] LOG: %cStart Phase CommandPhase color:green;
+[14:37:30.574] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:37:30.575] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:37:30.585] WARN: BattlerTag ER_FEAR is missing a score!
+[14:37:30.591] WARN: BattlerTag ER_FEAR is missing a score!
+[14:37:30.591] LOG: Move Pool: ["Dual Wingbeat","Hone Claws","Scary Face","Leer"]
+[14:37:30.591] LOG: Move Scores: [16.875,4,6,2]
+[14:37:30.591] LOG: Sorted Move Pool: ["Dual Wingbeat","Scary Face","Hone Claws","Leer"]
+[14:37:30.591] LOG: Chosen Move: Dual Wingbeat
+[14:37:30.591] LOG: %cStart Phase TurnStartPhase color:green;
+[14:37:30.598] LOG: %cStart Phase MovePhase color:green;
+[14:37:30.599] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:37:30.604] LOG: %cStart Phase MessagePhase color:green;
+[14:37:30.694] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:37:30.701] LOG: crit stage: +0
+[14:37:30.705] LOG: Move: Thunder Punch | Base damage: 48.953028571428575 | Power: 143.65 | Source attack: 44 | Target defense: 28
+[14:37:30.707] LOG: Move: Thunder Punch | Attack damage: 148
+[14:37:30.710] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:37:30.720] LOG: %cStart Phase MessagePhase color:green;
+[14:37:30.917] LOG: %cStart Phase FaintPhase color:green;
+[14:37:32.730] LOG: %cStart Phase MessagePhase color:green;
+[14:37:32.818] LOG: %cStart Phase VictoryPhase color:green;
+[14:37:32.819] LOG: %cStart Phase ExpPhase color:green;
+[14:37:32.819] LOG: Applied Super EXP. Charm 
+[14:37:32.819] LOG: Applied EXP. Charm 
+[14:37:33.195] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:33.196] LOG: Applied Protein 
+[14:37:33.196] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:37:33.196] LOG: Applied Super EXP. Charm 
+[14:37:33.196] LOG: Applied EXP. Charm 
+[14:37:33.314] LOG: %cStart Phase LevelUpPhase color:green;
+[14:37:33.314] LOG: Applied Calcium 
+[14:37:33.314] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:37:33.376] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:33.376] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:33.376] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:37:33.376] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:37:33.376] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:37:33.376] LOG: %cStart Phase BerryPhase color:green;
+[14:37:33.377] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:37:33.377] LOG: %cStart Phase TurnEndPhase color:green;
+[14:37:33.378] LOG: %cStart Phase BattleEndPhase color:green;
+[14:37:33.378] LOG: Battle Score: 237 (3 Turns x0.84)
+[14:37:33.378] LOG: Total Score: 1287
+[14:37:33.380] LOG: Applied Protein 
+[14:37:33.380] LOG: Applied Calcium 
+[14:37:33.387] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[14:37:33.387] LOG: Rival Ivy
+[14:37:33.387] LOG: Rival Ivy
+[14:37:33.968] LOG: Dialogue dialogue:rival2Female.victory.1 skipped
+[14:37:33.968] LOG: %cStart Phase MoneyRewardPhase color:green;
+[14:37:34.267] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:37:34.268] LOG: Applied Protein 
+[14:37:34.268] LOG: Applied Calcium 
+[14:37:34.620] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:37:34.947] LOG: %cStart Phase EggLapsePhase color:green;
+[14:37:34.975] LOG: %cStart Phase MessagePhase color:green;
+[14:37:35.110] LOG: %cStart Phase EggSummaryPhase color:green;
+[14:37:35.111] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:35.114] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:35.114] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:35.114] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:35.114] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:37:35.917] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:37:35.918] LOG: Wave Seed: o^]s~fNhQsabM| 25
+[14:37:40.824] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[14:37:42.664] LOG: %cStart Phase SelectBiomePhase color:green;
+[14:37:42.664] LOG: Wave Seed: o^]s~fNhQsabM| 25
+[14:37:44.486] LOG: %cStart Phase SwitchBiomePhase color:green;
+[14:37:44.901] LOG: %cStart Phase NewBattlePhase color:green;
+[14:37:44.901] LOG: Wave Seed: p_^tgOiRtbcN} 26
+[14:37:44.903] LOG: %cStart Phase ReturnPhase color:green;
+[14:37:45.005] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:37:45.109] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[14:37:45.111] LOG: Starting species pool tier: COMMON
+[14:37:45.126] LOG: Pokemon: Wild Machop | Species ID: 66 | Level: 17 | Nature: Hardy (-)
+[14:37:45.127] LOG: Stats (IVs): HP: 55 (30), Atk: 32 (2), Def: 25 (21), Spatk: 22 (31), Spdef: 17 (3), Spd: 21 (26)
+[14:37:45.127] LOG: Ability: Iron Fist | Passive Ability: No Guard 
+[14:37:45.127] LOG: Moveset: ["Brick Break","Quick Guard","Cross Chop","Rock Smash"]
+[14:37:45.323] LOG: Battle Seed: shEJouOGsaCVYhet
+[14:37:45.409] DEBUG: Session data saved to slot 0!
+[14:37:45.410] LOG: Wave Seed: p_^tgOiRtbcN} 26
+[14:37:45.619] LOG: %cStart Phase SummonPhase color:green;
+[14:37:45.769] LOG: Applied Protein 
+[14:37:45.770] LOG: Applied Calcium 
+[14:37:45.900] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:37:46.005] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:37:46.008] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:37:46.008] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:37:46.011] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:46.011] LOG: Ran PSP for: Zeraora
+[14:37:46.012] LOG: %cStart Phase PostSummonPhase color:green;
+[14:37:46.012] LOG: Ran PSP for: Machop
+[14:37:46.013] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:46.013] LOG: %cStart Phase CommandPhase color:green;
+[14:37:46.560] LOG: Move: FIRE_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:37:46.562] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:37:46.606] LOG: Move Pool: ["Brick Break","Quick Guard","Cross Chop","Rock Smash"]
+[14:37:46.606] LOG: Move Scores: [25.5,-20,36,21]
+[14:37:46.606] LOG: Sorted Move Pool: ["Cross Chop","Brick Break","Rock Smash","Quick Guard"]
+[14:37:46.606] LOG: Chosen Move: Rock Smash
+[14:37:46.606] LOG: %cStart Phase TurnStartPhase color:green;
+[14:37:46.616] LOG: %cStart Phase MovePhase color:green;
+[14:37:46.616] LOG: %cUser: Zeraora
+Move: FIRE_PUNCH
+Use Mode: NORMAL color:orchid
+[14:37:46.623] LOG: %cStart Phase MessagePhase color:green;
+[14:37:46.685] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:37:46.691] LOG: crit stage: +0
+[14:37:46.696] LOG: Move: Fire Punch | Base damage: 88.87952000000001 | Power: 143.65 | Source attack: 70 | Target defense: 25
+[14:37:46.699] LOG: Move: Fire Punch | Attack damage: 94
+[14:37:46.702] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:37:46.716] LOG: %cStart Phase FaintPhase color:green;
+[14:37:47.873] LOG: %cStart Phase MessagePhase color:green;
+[14:37:47.927] LOG: %cStart Phase VictoryPhase color:green;
+[14:37:47.927] LOG: %cStart Phase ExpPhase color:green;
+[14:37:47.927] LOG: Applied Super EXP. Charm 
+[14:37:47.927] LOG: Applied EXP. Charm 
+[14:37:48.214] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:37:48.214] LOG: Applied Super EXP. Charm 
+[14:37:48.214] LOG: Applied EXP. Charm 
+[14:37:48.215] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:37:48.215] LOG: %cStart Phase MoveEndPhase color:green;
+[14:37:48.215] LOG: %cStart Phase TurnInitPhase color:green;
+[14:37:48.216] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:37:48.216] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:37:48.216] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:37:48.216] LOG: %cStart Phase BerryPhase color:green;
+[14:37:48.216] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:37:48.216] LOG: %cStart Phase TurnEndPhase color:green;
+[14:37:48.217] LOG: %cStart Phase BattleEndPhase color:green;
+[14:37:48.217] LOG: Battle Score: 46 (1 Turns x1)
+[14:37:48.217] LOG: Total Score: 1333
+[14:37:48.218] LOG: Applied Protein 
+[14:37:48.218] LOG: Applied Calcium 
+[14:37:48.222] LOG: %cStart Phase EggLapsePhase color:green;
+[14:37:48.222] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:37:48.222] LOG: Wave Seed: p_^tgOiRtbcN} 26
+[14:37:49.807] LOG: Applied Protein 
+[14:37:49.808] LOG: Applied Calcium 
+[14:37:49.811] LOG: %cStart Phase NewBattlePhase color:green;
+[14:37:49.811] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:37:49.812] LOG: %cStart Phase ReturnPhase color:green;
+[14:37:49.914] LOG: %cStart Phase ShowTrainerPhase color:green;
+[14:37:50.018] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:37:50.212] DEBUG: Session data saved to slot 0!
+[14:37:50.213] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:37:51.581] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[14:38:10.380] WARN: cry/10817 not found
+[14:38:22.053] WARN: cry/808 not found
+[14:38:24.902] WARN: cry/10817 not found
+[14:38:26.542] WARN: cry/10817 not found
+[14:38:49.044] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[14:38:49.129] LOG: Applied Calcium 
+[14:38:49.145] LOG: Pokemon: Wild Zeraora | Species ID: 807 | Level: 22 | Nature: Bashful (-) | Friendship: 132
+[14:38:49.145] LOG: Stats (IVs): HP: 77 (31), Atk: 70 (28), Def: 44 (31), Spatk: 54 (23), Spdef: 45 (22), Spd: 74 (31)
+[14:38:49.145] LOG: Ability: Iron Fist | Passive Ability: Speed Force | Boss Bars: 2
+[14:38:49.146] LOG: Moveset: ["Fire Punch","Ice Punch","One-Inch Punch","Thunder Punch"]
+[14:38:49.149] LOG: Battle Seed: 3Gxs06JH3b8QEkgi
+[14:38:49.149] LOG: Applied Protein (enemy)
+[14:38:49.150] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[14:38:49.151] LOG: %cStart Phase SummonPhase color:green;
+[14:38:49.151] LOG: Applied Protein (enemy)
+[14:38:49.363] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:38:49.467] LOG: %cStart Phase SummonPhase color:green;
+[14:38:49.620] LOG: Applied Calcium 
+[14:38:49.647] WARN: cry/10817 not found
+[14:38:49.751] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:38:49.756] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:38:49.762] LOG: %cStart Phase PostSummonPhase color:green;
+[14:38:49.762] LOG: Ran PSP for: Zeraora
+[14:38:49.764] LOG: %cStart Phase PostSummonPhase color:green;
+[14:38:49.764] LOG: Ran PSP for: Spiritomb Redux
+[14:38:49.767] LOG: %cStart Phase PostSummonPhase color:green;
+[14:38:49.768] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:38:49.930] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:38:49.933] LOG: %cStart Phase MessagePhase color:green;
+[14:38:50.147] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:38:50.173] LOG: %cStart Phase TurnInitPhase color:green;
+[14:38:50.174] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[14:38:50.180] LOG: %cStart Phase CommandPhase color:green;
+[14:38:51.431] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:38:51.433] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:38:51.533] LOG: Move Pool: ["Thunder Punch"]
+[14:38:51.533] LOG: Move Scores: [27]
+[14:38:51.533] LOG: Sorted Move Pool: ["Thunder Punch"]
+[14:38:51.533] LOG: Chosen Move: Thunder Punch
+[14:38:51.533] LOG: %cStart Phase TurnStartPhase color:green;
+[14:38:51.552] LOG: %cStart Phase MovePhase color:green;
+[14:38:51.552] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:38:51.565] LOG: %cStart Phase MessagePhase color:green;
+[14:38:51.612] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:38:51.624] LOG: crit stage: +0
+[14:38:51.630] LOG: Move: Thunder Punch | Base damage: 41.78 | Power: 110.5 | Source attack: 70 | Target defense: 42
+[14:38:51.635] LOG: Move: Thunder Punch | Attack damage: 57
+[14:38:51.640] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:38:51.648] LOG: %cStart Phase FaintPhase color:green;
+[14:38:51.650] WARN: cry/10817 not found
+[14:38:51.711] LOG: %cStart Phase MessagePhase color:green;
+[14:38:52.691] LOG: %cStart Phase GameOverPhase color:green;
+[14:38:54.486] LOG: Seed: qRHYQ3d3oqghOyzFBwj3OTVm
+[14:38:54.486] LOG: Wave Seed: qRHYQ3d3oqghOyzFBwj3OTVm 0
+[14:38:54.488] LOG: Getting Session Slot id: %d 0
+[14:38:54.502] LOG: Wave Seed: vVEjzDqpZeM5O8mhZHmIfw4c 0
+[14:38:54.502] LOG: Seed: vVEjzDqpZeM5O8mhZHmIfw4c
+[14:38:54.504] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:38:54.506] LOG: Applied Protein 
+[14:38:54.507] LOG: Applied Calcium 
+[14:38:54.509] LOG: Applied Protein 
+[14:38:54.510] LOG: Applied Calcium 
+[14:38:54.511] LOG: Applied Protein 
+[14:38:54.512] LOG: Applied Calcium 
+[14:38:54.513] LOG: %cStart Phase EncounterPhase color:green;
+[14:38:54.547] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:38:56.010] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[14:39:05.500] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[14:39:05.584] LOG: Applied Calcium 
+[14:39:05.599] LOG: Pokemon: Wild Zeraora | Species ID: 807 | Level: 22 | Nature: Bashful (-) | Friendship: 132
+[14:39:05.599] LOG: Stats (IVs): HP: 77 (31), Atk: 70 (28), Def: 44 (31), Spatk: 54 (23), Spdef: 45 (22), Spd: 74 (31)
+[14:39:05.599] LOG: Ability: Iron Fist | Passive Ability: Speed Force | Boss Bars: 2
+[14:39:05.600] LOG: Moveset: ["Fire Punch","Ice Punch","One-Inch Punch","Thunder Punch"]
+[14:39:05.600] LOG: Battle Seed: 3Gxs06JH3b8QEkgi
+[14:39:05.600] LOG: Applied Protein (enemy)
+[14:39:05.601] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[14:39:05.602] LOG: %cStart Phase SummonPhase color:green;
+[14:39:05.602] LOG: Applied Protein (enemy)
+[14:39:05.811] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:39:05.915] LOG: %cStart Phase SummonPhase color:green;
+[14:39:06.069] LOG: Applied Calcium 
+[14:39:06.099] WARN: cry/10817 not found
+[14:39:06.200] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:39:06.205] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:39:06.211] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:06.211] LOG: Ran PSP for: Zeraora
+[14:39:06.213] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:06.213] LOG: Ran PSP for: Spiritomb Redux
+[14:39:06.216] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:06.217] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:06.386] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:06.388] LOG: %cStart Phase MessagePhase color:green;
+[14:39:06.597] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:06.630] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:06.630] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[14:39:06.637] LOG: %cStart Phase CommandPhase color:green;
+[14:39:08.359] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:39:08.361] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:08.457] LOG: Move Pool: ["Thunder Punch"]
+[14:39:08.457] LOG: Move Scores: [27]
+[14:39:08.457] LOG: Sorted Move Pool: ["Thunder Punch"]
+[14:39:08.457] LOG: Chosen Move: Thunder Punch
+[14:39:08.457] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:08.477] LOG: %cStart Phase MovePhase color:green;
+[14:39:08.477] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:08.492] LOG: %cStart Phase MessagePhase color:green;
+[14:39:08.547] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:08.562] LOG: crit stage: +0
+[14:39:08.572] LOG: Move: Thunder Punch | Base damage: 41.78 | Power: 110.5 | Source attack: 70 | Target defense: 42
+[14:39:08.580] LOG: Move: Thunder Punch | Attack damage: 57
+[14:39:08.587] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:08.598] LOG: %cStart Phase FaintPhase color:green;
+[14:39:08.600] WARN: cry/10817 not found
+[14:39:08.659] LOG: %cStart Phase MessagePhase color:green;
+[14:39:09.657] LOG: %cStart Phase GameOverPhase color:green;
+[14:39:14.912] LOG: Seed: vX262zSSYPbbKozrkfXeg4kv
+[14:39:14.912] LOG: Wave Seed: vX262zSSYPbbKozrkfXeg4kv 0
+[14:39:14.914] LOG: Getting Session Slot id: %d 0
+[14:39:14.927] LOG: Wave Seed: vVEjzDqpZeM5O8mhZHmIfw4c 0
+[14:39:14.927] LOG: Seed: vVEjzDqpZeM5O8mhZHmIfw4c
+[14:39:14.928] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:39:14.929] LOG: Applied Protein 
+[14:39:14.930] LOG: Applied Calcium 
+[14:39:14.931] LOG: Applied Protein 
+[14:39:14.932] LOG: Applied Calcium 
+[14:39:14.934] LOG: Applied Protein 
+[14:39:14.934] LOG: Applied Calcium 
+[14:39:14.936] LOG: %cStart Phase EncounterPhase color:green;
+[14:39:14.975] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:39:16.125] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[14:39:25.310] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[14:39:25.394] LOG: Applied Protein 
+[14:39:25.407] LOG: Pokemon: Wild Spiritomb Redux | Species ID: 10817 | Level: 15 | Nature: Modest (+SpAtk/-Atk) | Friendship: 98
+[14:39:25.407] LOG: Stats (IVs): HP: 52 (31), Atk: 24 (31), Def: 42 (31), Spatk: 52 (29), Spdef: 45 (30), Spd: 20 (31)
+[14:39:25.407] LOG: Ability: Scare | Passive Ability: Spectral Shroud | Boss Bars: 2
+[14:39:25.407] LOG: Moveset: ["Giga Drain","Earth Power","Acid Spray","Shadow Sneak"]
+[14:39:25.408] LOG: Battle Seed: 3Gxs06JH3b8QEkgi
+[14:39:25.408] LOG: Applied Calcium (enemy)
+[14:39:25.409] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[14:39:25.409] LOG: %cStart Phase SummonPhase color:green;
+[14:39:25.409] LOG: Applied Calcium (enemy)
+[14:39:25.517] WARN: cry/10817 not found
+[14:39:25.621] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:39:25.623] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:39:25.624] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:25.624] LOG: Ran PSP for: Spiritomb Redux
+[14:39:25.625] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:25.625] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:25.790] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:25.792] LOG: %cStart Phase MessagePhase color:green;
+[14:39:25.996] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:26.019] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:26.019] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[14:39:26.021] LOG: %cStart Phase CommandPhase color:green;
+[14:39:28.557] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:39:28.559] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:28.598] LOG: Move Pool: ["Giga Drain","Earth Power","Acid Spray","Shadow Sneak"]
+[14:39:28.598] LOG: Move Scores: [15,48,21,12]
+[14:39:28.598] LOG: Sorted Move Pool: ["Earth Power","Acid Spray","Giga Drain","Shadow Sneak"]
+[14:39:28.598] LOG: Chosen Move: Acid Spray
+[14:39:28.598] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:28.604] LOG: %cStart Phase MovePhase color:green;
+[14:39:28.605] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:28.609] LOG: %cStart Phase MessagePhase color:green;
+[14:39:28.676] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:28.682] LOG: crit stage: +0
+[14:39:28.686] LOG: Move: Thunder Punch | Base damage: 53.714000000000006 | Power: 143.65 | Source attack: 70 | Target defense: 42
+[14:39:28.688] LOG: Move: Thunder Punch | Attack damage: 88
+[14:39:28.692] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:28.701] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:28.701] LOG: %cStart Phase FaintPhase color:green;
+[14:39:28.703] WARN: cry/10817 not found
+[14:39:28.760] LOG: %cStart Phase MessagePhase color:green;
+[14:39:29.182] LOG: %cStart Phase VictoryPhase color:green;
+[14:39:29.183] LOG: %cStart Phase ExpPhase color:green;
+[14:39:29.183] LOG: Applied Super EXP. Charm 
+[14:39:29.183] LOG: Applied EXP. Charm 
+[14:39:29.705] LOG: %cStart Phase LevelUpPhase color:green;
+[14:39:29.705] LOG: Applied Protein 
+[14:39:29.705] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:29.706] LOG: %cStart Phase MovePhase color:green;
+[14:39:29.706] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:29.706] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:39:29.706] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:39:29.706] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:39:29.706] LOG: %cStart Phase BerryPhase color:green;
+[14:39:29.706] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:39:29.706] LOG: %cStart Phase TurnEndPhase color:green;
+[14:39:29.707] LOG: %cStart Phase BattleEndPhase color:green;
+[14:39:29.707] LOG: Battle Score: 117 (1 Turns x1)
+[14:39:29.707] LOG: Total Score: 1450
+[14:39:29.708] LOG: Applied Protein 
+[14:39:29.712] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[14:39:29.713] LOG: [coop:account] account-write scope OPEN (me-own-mon) depth=1
+[14:39:29.713] LOG: Applied Protein 
+[14:39:29.714] LOG: Applied Calcium 
+[14:39:29.715] LOG: %cStart Phase MessagePhase color:green;
+[14:39:30.311] LOG: %cStart Phase MessagePhase color:green;
+[14:39:31.544] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:39:31.544] LOG: Wave Seed: q`_uhPjSucdO~ 27
+[14:39:34.491] LOG: Applied Protein 
+[14:39:34.494] LOG: %cStart Phase LevelUpPhase color:green;
+[14:39:34.495] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[14:39:40.490] LOG: %cStart Phase EggLapsePhase color:green;
+[14:39:40.490] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[14:39:40.490] LOG: %cStart Phase NewBattlePhase color:green;
+[14:39:40.490] LOG: Wave Seed: ra`viQkTvdeP 28
+[14:39:40.494] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:39:40.509] LOG: Pokemon: Foe Geodude | Species ID: 74 | Level: 17 | Nature: Jolly (+Spd/-SpAtk)
+[14:39:40.509] LOG: Stats (IVs): HP: 44 (21), Atk: 35 (18), Def: 40 (10), Spatk: 13 (2), Spdef: 19 (28), Spd: 15 (11)
+[14:39:40.509] LOG: Ability: Fort Knox | Passive Ability: Let's Roll 
+[14:39:40.509] LOG: Moveset: ["Stealth Rock","Rock Slide","Flare Blitz","Wide Guard"]
+[14:39:40.526] LOG: Pokemon: Foe Onix | Species ID: 95 | Level: 17 | Nature: Careful (+SpDef/-SpAtk)
+[14:39:40.526] LOG: Stats (IVs): HP: 54 (31), Atk: 30 (11), Def: 64 (31), Spatk: 16 (22), Spdef: 28 (13), Spd: 29 (7)
+[14:39:40.527] LOG: Ability: Stamina | Passive Ability: Sturdy 
+[14:39:40.527] LOG: Moveset: ["Wrap","Thunder Wave","Taunt","Earthquake"]
+[14:39:40.541] LOG: Pokemon: Foe Rockruff | Species ID: 744 | Level: 17 | Nature: Adamant (+Atk/-SpAtk)
+[14:39:40.541] LOG: Stats (IVs): HP: 44 (12), Atk: 35 (23), Def: 20 (9), Spatk: 13 (3), Spdef: 20 (11), Spd: 27 (12)
+[14:39:40.542] LOG: Ability: Vital Spirit | Passive Ability: Keen Eye 
+[14:39:40.542] LOG: Moveset: ["Accelerock","Substitute","Dig","Secret Power"]
+[14:39:41.206] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:39:41.206] LOG: Applied Carbos (enemy)
+[14:39:41.207] LOG: Applied Carbos (enemy)
+[14:39:41.207] LOG: Generated AI funcs
+[14:39:41.316] DEBUG: Session data saved to slot 0!
+[14:39:41.317] LOG: Applied Carbos (enemy)
+[14:39:41.318] LOG: Wave Seed: ra`viQkTvdeP 28
+[14:39:41.774] LOG: Dialogue saved as seen: dialogue:brock.encounter.1
+[14:39:42.322] LOG: %cStart Phase SummonPhase color:green;
+[14:39:42.452] LOG: Applied Carbos (enemy)
+[14:39:42.583] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:39:42.586] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:39:42.587] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:42.587] LOG: Ran PSP for: Geodude
+[14:39:42.588] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:42.588] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:42.753] LOG: %cStart Phase MovePhase color:green;
+[14:39:42.753] LOG: %cUser: Geodude
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[14:39:42.758] LOG: %cStart Phase MessagePhase color:green;
+[14:39:42.875] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:42.878] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:42.882] LOG: %cStart Phase MessagePhase color:green;
+[14:39:43.090] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:43.090] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:43.114] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:43.114] LOG: %cStart Phase CommandPhase color:green;
+[14:39:44.538] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:39:44.540] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:44.567] LOG: Move Pool: ["Stealth Rock","Rock Slide","Flare Blitz","Wide Guard"]
+[14:39:44.567] LOG: Move Scores: [0,24,19,-20]
+[14:39:44.567] LOG: Sorted Move Pool: ["Rock Slide","Flare Blitz","Stealth Rock","Wide Guard"]
+[14:39:44.567] LOG: Chosen Move: Rock Slide
+[14:39:44.567] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:44.574] LOG: %cStart Phase MovePhase color:green;
+[14:39:44.574] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:44.579] LOG: %cStart Phase MessagePhase color:green;
+[14:39:44.659] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:44.665] LOG: crit stage: +1
+[14:39:44.669] LOG: Move: One-Inch Punch | Base damage: 69.04567999999999 | Power: 152.1 | Source attack: 76 | Target defense: 40
+[14:39:44.677] LOG: Move: One-Inch Punch | Attack damage: 122
+[14:39:44.681] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:44.842] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:44.870] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:44.885] LOG: %cStart Phase MessagePhase color:green;
+[14:39:45.104] LOG: %cStart Phase MessagePhase color:green;
+[14:39:45.298] LOG: %cStart Phase MessagePhase color:green;
+[14:39:45.506] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:45.507] LOG: %cStart Phase MovePhase color:green;
+[14:39:45.507] LOG: %cUser: Geodude
+Move: ROCK_SLIDE
+Use Mode: NORMAL color:orchid
+[14:39:45.513] LOG: %cStart Phase MessagePhase color:green;
+[14:39:45.631] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:45.637] LOG: crit stage: +0
+[14:39:45.641] LOG: Move: Rock Slide | Base damage: 11.625 | Power: 75 | Source attack: 35 | Target defense: 48
+[14:39:45.643] LOG: Move: Rock Slide | Attack damage: 16
+[14:39:45.647] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:45.663] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:45.663] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:39:45.663] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:39:45.663] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:39:45.663] LOG: %cStart Phase BerryPhase color:green;
+[14:39:45.667] LOG: Applied Salac Berry (enemy)
+[14:39:45.668] LOG: Applied Carbos (enemy)
+[14:39:45.670] LOG: %cStart Phase CommonAnimPhase color:green;
+[14:39:45.670] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:45.672] LOG: %cStart Phase MessagePhase color:green;
+[14:39:45.868] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:39:45.870] LOG: %cStart Phase TurnEndPhase color:green;
+[14:39:45.873] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:45.873] LOG: %cStart Phase CommandPhase color:green;
+[14:39:46.892] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:39:46.893] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:46.914] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:39:46.921] LOG: Move Pool: ["Stealth Rock","Rock Slide","Flare Blitz","Wide Guard"]
+[14:39:46.921] LOG: Move Scores: [0,24,19,-20]
+[14:39:46.921] LOG: Sorted Move Pool: ["Rock Slide","Flare Blitz","Stealth Rock","Wide Guard"]
+[14:39:46.921] LOG: Chosen Move: Flare Blitz
+[14:39:46.921] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:46.928] LOG: %cStart Phase MovePhase color:green;
+[14:39:46.928] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:46.933] LOG: %cStart Phase MessagePhase color:green;
+[14:39:47.013] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:47.018] LOG: crit stage: +1
+[14:39:47.022] LOG: Move: One-Inch Punch | Base damage: 46.69712 | Power: 152.1 | Source attack: 76 | Target defense: 60
+[14:39:47.030] LOG: Move: One-Inch Punch | Attack damage: 64
+[14:39:47.032] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:47.043] LOG: %cStart Phase MessagePhase color:green;
+[14:39:47.242] LOG: %cStart Phase FaintPhase color:green;
+[14:39:48.923] LOG: %cStart Phase MessagePhase color:green;
+[14:39:48.983] LOG: %cStart Phase VictoryPhase color:green;
+[14:39:48.983] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:39:48.983] LOG: Applied Super EXP. Charm 
+[14:39:48.983] LOG: Applied EXP. Charm 
+[14:39:49.098] LOG: %cStart Phase LevelUpPhase color:green;
+[14:39:49.098] LOG: Applied Calcium 
+[14:39:49.099] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:39:49.160] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:49.161] LOG: %cStart Phase MovePhase color:green;
+[14:39:49.161] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:49.161] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:39:49.161] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:39:49.161] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:39:49.161] LOG: %cStart Phase BerryPhase color:green;
+[14:39:49.162] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:39:49.162] LOG: %cStart Phase TurnEndPhase color:green;
+[14:39:49.162] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:39:49.465] LOG: Applied Carbos (enemy)
+[14:39:49.599] LOG: %cStart Phase PostSummonPhase color:green;
+[14:39:49.600] LOG: Ran PSP for: Onix
+[14:39:49.601] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:49.601] LOG: %cStart Phase CommandPhase color:green;
+[14:39:50.359] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:39:50.361] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:50.386] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:39:50.388] WARN: BattlerTag TAUNT is missing a score!
+[14:39:50.393] WARN: BattlerTag TAUNT is missing a score!
+[14:39:50.399] LOG: Move Pool: ["Wrap","Thunder Wave","Taunt","Earthquake"]
+[14:39:50.399] LOG: Move Scores: [13,0,0,72]
+[14:39:50.399] LOG: Sorted Move Pool: ["Earthquake","Wrap","Thunder Wave","Taunt"]
+[14:39:50.399] LOG: Chosen Move: Earthquake
+[14:39:50.399] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:50.407] LOG: %cStart Phase MovePhase color:green;
+[14:39:50.407] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:50.411] LOG: %cStart Phase MessagePhase color:green;
+[14:39:50.485] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:50.491] LOG: crit stage: +1
+[14:39:50.494] LOG: Applied Eviolite (enemy)
+[14:39:50.495] LOG: Move: One-Inch Punch | Base damage: 29.935699999999997 | Power: 152.1 | Source attack: 76 | Target defense: 96
+[14:39:50.500] LOG: Move: One-Inch Punch | Attack damage: 66
+[14:39:50.504] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:50.668] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:50.696] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:50.711] LOG: %cStart Phase MessagePhase color:green;
+[14:39:50.922] LOG: %cStart Phase MessagePhase color:green;
+[14:39:51.131] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:51.294] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:51.295] LOG: %cStart Phase MessagePhase color:green;
+[14:39:51.499] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:51.521] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:51.689] LOG: %cStart Phase MessagePhase color:green;
+[14:39:51.929] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:51.934] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:51.960] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:51.960] LOG: %cStart Phase MovePhase color:green;
+[14:39:51.960] LOG: %cUser: Onix
+Move: EARTHQUAKE
+Use Mode: NORMAL color:orchid
+[14:39:51.967] LOG: %cStart Phase MessagePhase color:green;
+[14:39:52.075] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:52.083] LOG: crit stage: +0
+[14:39:52.088] LOG: Move: Earthquake | Base damage: 13.000000000000002 | Power: 100 | Source attack: 30 | Target defense: 48
+[14:39:52.091] LOG: Move: Earthquake | Attack damage: 39
+[14:39:52.094] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:52.107] LOG: %cStart Phase MessagePhase color:green;
+[14:39:52.304] LOG: %cStart Phase MoveEndPhase color:green;
+[14:39:52.305] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:39:52.305] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:39:52.305] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:39:52.305] LOG: %cStart Phase BerryPhase color:green;
+[14:39:52.308] LOG: Applied Liechi Berry 
+[14:39:52.309] LOG: Applied Sitrus Berry 
+[14:39:52.309] LOG: Applied Protein 
+[14:39:52.310] LOG: Applied Calcium 
+[14:39:52.313] LOG: Applied Sitrus Berry (enemy)
+[14:39:52.313] LOG: Applied Carbos (enemy)
+[14:39:52.318] LOG: %cStart Phase CommonAnimPhase color:green;
+[14:39:52.318] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:39:52.322] LOG: %cStart Phase MessagePhase color:green;
+[14:39:52.512] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:39:52.519] LOG: %cStart Phase MessagePhase color:green;
+[14:39:52.776] LOG: %cStart Phase CommonAnimPhase color:green;
+[14:39:52.776] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:39:52.781] LOG: %cStart Phase MessagePhase color:green;
+[14:39:53.040] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:39:53.043] LOG: %cStart Phase TurnEndPhase color:green;
+[14:39:53.046] LOG: %cStart Phase TurnInitPhase color:green;
+[14:39:53.046] LOG: %cStart Phase CommandPhase color:green;
+[14:39:54.780] LOG: Move: ICE_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:39:54.781] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:39:54.807] LOG: Move Pool: ["Earthquake"]
+[14:39:54.807] LOG: Move Scores: [72]
+[14:39:54.807] LOG: Sorted Move Pool: ["Earthquake"]
+[14:39:54.807] LOG: Chosen Move: Earthquake
+[14:39:54.807] LOG: %cStart Phase TurnStartPhase color:green;
+[14:39:54.815] LOG: %cStart Phase MovePhase color:green;
+[14:39:54.815] LOG: %cUser: Zeraora
+Move: ICE_PUNCH
+Use Mode: NORMAL color:orchid
+[14:39:54.821] LOG: %cStart Phase MessagePhase color:green;
+[14:39:54.887] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:39:54.893] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:39:54.894] LOG: crit stage: +0
+[14:39:54.897] LOG: Applied Eviolite (enemy)
+[14:39:54.899] LOG: Move: Ice Punch | Base damage: 28.383716666666665 | Power: 143.65 | Source attack: 114 | Target defense: 144
+[14:39:54.902] LOG: Move: Ice Punch | Attack damage: 65
+[14:39:54.905] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:54.917] LOG: %cStart Phase MessagePhase color:green;
+[14:39:55.116] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:39:55.277] LOG: %cStart Phase MessagePhase color:green;
+[14:39:55.519] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:39:55.522] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:39:55.549] LOG: %cStart Phase FaintPhase color:green;
+[14:39:57.332] LOG: %cStart Phase MessagePhase color:green;
+[14:39:57.649] LOG: %cStart Phase VictoryPhase color:green;
+[14:39:57.650] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:39:57.650] LOG: Applied Super EXP. Charm 
+[14:39:57.650] LOG: Applied EXP. Charm 
+[14:39:57.770] LOG: %cStart Phase LevelUpPhase color:green;
+[14:39:57.770] LOG: Applied Calcium 
+[14:39:57.771] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[14:40:07.136] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:40:07.192] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:07.193] LOG: %cStart Phase MovePhase color:green;
+[14:40:07.193] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:07.193] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:40:07.193] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:40:07.193] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:40:07.193] LOG: %cStart Phase BerryPhase color:green;
+[14:40:07.194] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:40:07.194] LOG: %cStart Phase TurnEndPhase color:green;
+[14:40:07.194] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:40:07.497] LOG: Applied Carbos (enemy)
+[14:40:07.631] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:07.631] LOG: Ran PSP for: Rockruff
+[14:40:07.633] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:07.633] LOG: %cStart Phase TurnInitPhase color:green;
+[14:40:07.633] LOG: %cStart Phase CommandPhase color:green;
+[14:40:08.930] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:40:08.932] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:40:08.959] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:40:08.963] LOG: Move Pool: ["Dig"]
+[14:40:08.963] LOG: Move Scores: [30]
+[14:40:08.963] LOG: Sorted Move Pool: ["Dig"]
+[14:40:08.963] LOG: Chosen Move: Dig
+[14:40:08.963] LOG: %cStart Phase TurnStartPhase color:green;
+[14:40:08.971] LOG: %cStart Phase MovePhase color:green;
+[14:40:08.971] LOG: %cUser: Rockruff
+Move: DIG
+Use Mode: NORMAL color:orchid
+[14:40:08.975] LOG: %cStart Phase MessagePhase color:green;
+[14:40:09.037] LOG: %cStart Phase MoveChargePhase color:green;
+[14:40:09.041] LOG: %cStart Phase MessagePhase color:green;
+[14:40:09.294] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:09.295] LOG: %cStart Phase MovePhase color:green;
+[14:40:09.295] LOG: %cUser: Zeraora
+Move: ONE_INCH_PUNCH
+Use Mode: NORMAL color:orchid
+[14:40:09.302] LOG: %cStart Phase MessagePhase color:green;
+[14:40:09.419] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:40:09.422] LOG: %cStart Phase MessagePhase color:green;
+[14:40:09.648] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:09.649] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:40:09.649] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:40:09.649] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:40:09.649] LOG: %cStart Phase BerryPhase color:green;
+[14:40:09.652] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:40:09.654] LOG: %cStart Phase TurnEndPhase color:green;
+[14:40:09.657] LOG: %cStart Phase TurnInitPhase color:green;
+[14:40:09.657] LOG: %cStart Phase CommandPhase color:green;
+[14:40:10.840] LOG: Move: ONE_INCH_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:40:10.841] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:40:10.841] LOG: %cStart Phase TurnStartPhase color:green;
+[14:40:10.850] LOG: %cStart Phase MovePhase color:green;
+[14:40:10.851] LOG: %cUser: Rockruff
+Move: DIG
+Use Mode: IGNORE_PP color:orchid
+[14:40:10.857] LOG: %cStart Phase MessagePhase color:green;
+[14:40:10.940] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:40:10.947] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:40:10.948] LOG: crit stage: +0
+[14:40:10.953] LOG: Move: Dig | Base damage: 16.116666666666667 | Power: 110 | Source attack: 35 | Target defense: 48
+[14:40:10.957] LOG: Move: Dig | Attack damage: 30
+[14:40:10.960] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:40:10.971] LOG: %cStart Phase MessagePhase color:green;
+[14:40:11.169] LOG: %cStart Phase FaintPhase color:green;
+[14:40:13.079] LOG: %cStart Phase MessagePhase color:green;
+[14:40:13.693] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:13.693] LOG: %cStart Phase MovePhase color:green;
+[14:40:13.693] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:13.693] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:40:13.693] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:40:13.693] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:40:13.693] LOG: %cStart Phase BerryPhase color:green;
+[14:40:13.694] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:40:13.694] LOG: %cStart Phase TurnEndPhase color:green;
+[14:40:13.694] LOG: %cStart Phase SwitchPhase color:green;
+[14:40:15.360] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:40:15.440] LOG: Applied Calcium 
+[14:40:15.440] LOG: Applied Protein 
+[14:40:15.465] WARN: cry/10817 not found
+[14:40:15.578] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:15.578] LOG: Ran PSP for: Spiritomb Redux
+[14:40:15.582] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:15.582] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:40:15.746] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:40:15.749] LOG: %cStart Phase MessagePhase color:green;
+[14:40:15.967] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:40:15.994] LOG: %cStart Phase TurnInitPhase color:green;
+[14:40:15.994] LOG: %cStart Phase CommandPhase color:green;
+[14:40:18.377] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:40:18.379] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:40:18.444] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:40:18.489] LOG: Move Pool: ["Accelerock","Substitute","Dig","Secret Power"]
+[14:40:18.489] LOG: Move Scores: [12,5,30,24]
+[14:40:18.489] LOG: Sorted Move Pool: ["Dig","Secret Power","Accelerock","Substitute"]
+[14:40:18.489] LOG: Chosen Move: Dig
+[14:40:18.489] LOG: %cStart Phase TurnStartPhase color:green;
+[14:40:18.509] LOG: %cStart Phase MovePhase color:green;
+[14:40:18.509] LOG: %cUser: Rockruff
+Move: DIG
+Use Mode: NORMAL color:orchid
+[14:40:18.518] LOG: %cStart Phase MessagePhase color:green;
+[14:40:18.567] LOG: %cStart Phase MoveChargePhase color:green;
+[14:40:18.569] LOG: %cStart Phase MessagePhase color:green;
+[14:40:18.765] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:18.766] LOG: %cStart Phase MovePhase color:green;
+[14:40:18.766] LOG: %cUser: Spiritomb Redux
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[14:40:18.780] LOG: %cStart Phase MessagePhase color:green;
+[14:40:18.890] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:40:18.899] LOG: %cStart Phase MessagePhase color:green;
+[14:40:19.119] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:19.120] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:40:19.120] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:40:19.120] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:40:19.120] LOG: %cStart Phase BerryPhase color:green;
+[14:40:19.127] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:40:19.132] LOG: %cStart Phase TurnEndPhase color:green;
+[14:40:19.139] LOG: %cStart Phase TurnInitPhase color:green;
+[14:40:19.139] LOG: %cStart Phase CommandPhase color:green;
+[14:40:20.071] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Spiritomb Redux
+[14:40:20.072] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:40:20.072] LOG: %cStart Phase TurnStartPhase color:green;
+[14:40:20.091] LOG: %cStart Phase MovePhase color:green;
+[14:40:20.091] LOG: %cUser: Rockruff
+Move: DIG
+Use Mode: IGNORE_PP color:orchid
+[14:40:20.102] LOG: %cStart Phase MessagePhase color:green;
+[14:40:20.175] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:40:20.188] LOG: Battle Seed: 6EGN2GUgWT5zvURi
+[14:40:20.189] LOG: crit stage: +0
+[14:40:20.198] LOG: Move: Dig | Base damage: 16.7304347826087 | Power: 110 | Source attack: 35 | Target defense: 46
+[14:40:20.204] LOG: Move: Dig | Attack damage: 29
+[14:40:20.210] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:40:20.231] LOG: %cStart Phase MessagePhase color:green;
+[14:40:20.404] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:20.405] LOG: %cStart Phase MovePhase color:green;
+[14:40:20.405] LOG: %cUser: Spiritomb Redux
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[14:40:20.419] LOG: %cStart Phase MessagePhase color:green;
+[14:40:20.535] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:40:20.552] LOG: crit stage: +0
+[14:40:20.562] LOG: Move: Earth Power | Base damage: 48.72800000000001 | Power: 90 | Source attack: 59 | Target defense: 20
+[14:40:20.567] LOG: Move: Earth Power | Attack damage: 96
+[14:40:20.572] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:40:20.585] LOG: %cStart Phase MessagePhase color:green;
+[14:40:20.765] LOG: %cStart Phase FaintPhase color:green;
+[14:40:21.460] LOG: %cStart Phase MessagePhase color:green;
+[14:40:22.228] LOG: %cStart Phase VictoryPhase color:green;
+[14:40:22.228] LOG: %cStart Phase ExpPhase color:green;
+[14:40:22.228] LOG: Applied Super EXP. Charm 
+[14:40:22.228] LOG: Applied EXP. Charm 
+[14:40:22.782] LOG: %cStart Phase LevelUpPhase color:green;
+[14:40:22.783] LOG: Applied Calcium 
+[14:40:22.783] LOG: %cStart Phase MoveEndPhase color:green;
+[14:40:22.783] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:40:22.783] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:40:22.783] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:40:22.783] LOG: %cStart Phase BerryPhase color:green;
+[14:40:22.785] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:40:22.785] LOG: %cStart Phase TurnEndPhase color:green;
+[14:40:22.787] LOG: %cStart Phase BattleEndPhase color:green;
+[14:40:22.787] LOG: Battle Score: 69 (8 Turns x0.47)
+[14:40:22.787] LOG: Total Score: 1519
+[14:40:22.790] LOG: Applied Calcium 
+[14:40:22.790] LOG: Applied Protein 
+[14:40:22.797] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[14:40:24.403] LOG: Dialogue saved as seen: dialogue:brock.victory.1
+[14:40:24.403] LOG: %cStart Phase MoneyRewardPhase color:green;
+[14:40:25.304] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:40:25.791] LOG: %cStart Phase ModifierRewardPhase color:green;
+[14:40:26.187] LOG: %cStart Phase EggLapsePhase color:green;
+[14:40:26.211] LOG: %cStart Phase MessagePhase color:green;
+[14:40:26.350] LOG: %cStart Phase EggSummaryPhase color:green;
+[14:40:26.350] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:40:26.357] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:40:26.357] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:40:26.357] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:40:26.357] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[14:40:27.807] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:40:27.807] LOG: Wave Seed: ra`viQkTvdeP 28
+[14:40:46.734] LOG: %cStart Phase NewBattlePhase color:green;
+[14:40:46.734] LOG: Wave Seed: sbawjRlUwefQ 29
+[14:40:46.735] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:40:46.736] LOG: Starting species pool tier: RARE
+[14:40:46.753] LOG: Pokemon: Wild Tyrogue | Species ID: 236 | Level: 19 | Nature: Quirky (-)
+[14:40:46.753] LOG: Stats (IVs): HP: 50 (3), Atk: 27 (8), Def: 21 (18), Spatk: 18 (1), Spdef: 29 (21), Spd: 30 (26)
+[14:40:46.753] LOG: Ability: Steadfast | Passive Ability: Guts 
+[14:40:46.753] LOG: Moveset: ["Brick Break","Coaching","Rapid Spin","Low Sweep"]
+[14:40:47.602] LOG: Battle Seed: cvciXxSd3or1wyfX
+[14:40:47.713] DEBUG: Session data saved to slot 0!
+[14:40:47.714] LOG: Wave Seed: sbawjRlUwefQ 29
+[14:40:48.140] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:40:48.140] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:40:48.140] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:40:48.141] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:48.141] LOG: Ran PSP for: Tyrogue
+[14:40:48.143] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:48.143] LOG: %cStart Phase PostSummonPhase color:green;
+[14:40:48.143] LOG: %cStart Phase TurnInitPhase color:green;
+[14:40:48.143] LOG: %cStart Phase CommandPhase color:green;
+[14:51:48.381] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:51:48.428] LOG: Move Pool: ["Brick Break","Coaching","Rapid Spin","Low Sweep"]
+[14:51:48.428] LOG: Move Scores: [-20,null,-20,-20]
+[14:51:48.428] LOG: Sorted Move Pool: ["Brick Break","Rapid Spin","Low Sweep","Coaching"]
+[14:51:48.428] LOG: Chosen Move: Low Sweep
+[14:51:48.428] LOG: %cStart Phase TurnStartPhase color:green;
+[14:51:48.442] LOG: %cStart Phase SwitchSummonPhase color:green;
+[14:51:48.585] LOG: Applied Protein 
+[14:51:48.585] LOG: Applied Calcium 
+[14:51:48.721] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:51:48.820] LOG: %cStart Phase PostSummonPhase color:green;
+[14:51:48.820] LOG: Ran PSP for: Zeraora
+[14:51:48.823] LOG: %cStart Phase MovePhase color:green;
+[14:51:48.823] LOG: %cUser: Tyrogue
+Move: LOW_SWEEP
+Use Mode: NORMAL color:orchid
+[14:51:48.831] LOG: %cStart Phase MessagePhase color:green;
+[14:51:48.945] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:51:48.954] LOG: crit stage: +0
+[14:51:48.960] LOG: Move: Low Sweep | Base damage: 8.48 | Power: 60 | Source attack: 27 | Target defense: 48
+[14:51:48.963] LOG: Move: Low Sweep | Attack damage: 11
+[14:51:48.969] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:51:48.985] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:51:48.988] LOG: %cStart Phase MessagePhase color:green;
+[14:51:49.174] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:49.175] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:51:49.175] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:51:49.175] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:51:49.175] LOG: %cStart Phase BerryPhase color:green;
+[14:51:49.178] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:51:49.181] LOG: %cStart Phase TurnEndPhase color:green;
+[14:51:49.184] LOG: %cStart Phase TurnInitPhase color:green;
+[14:51:49.184] LOG: %cStart Phase CommandPhase color:green;
+[14:51:53.174] LOG: Move: THUNDER_PUNCH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zeraora
+[14:51:53.175] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:51:53.204] LOG: Battle Seed: cvciXxSd3or1wyfX
+[14:51:53.222] LOG: Move Pool: ["Brick Break","Coaching","Rapid Spin","Low Sweep"]
+[14:51:53.222] LOG: Move Scores: [25.5,null,14,21]
+[14:51:53.222] LOG: Sorted Move Pool: ["Brick Break","Low Sweep","Rapid Spin","Coaching"]
+[14:51:53.222] LOG: Chosen Move: Coaching
+[14:51:53.222] LOG: %cStart Phase TurnStartPhase color:green;
+[14:51:53.232] LOG: %cStart Phase MovePhase color:green;
+[14:51:53.232] LOG: %cUser: Zeraora
+Move: THUNDER_PUNCH
+Use Mode: NORMAL color:orchid
+[14:51:53.239] LOG: %cStart Phase MessagePhase color:green;
+[14:51:53.299] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:51:53.306] LOG: crit stage: +0
+[14:51:53.312] LOG: Move: Thunder Punch | Base damage: 122.61127619047619 | Power: 143.65 | Source attack: 76 | Target defense: 21
+[14:51:53.315] LOG: Move: Thunder Punch | Attack damage: 174
+[14:51:53.318] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:51:53.329] LOG: %cStart Phase FaintPhase color:green;
+[14:51:54.494] LOG: %cStart Phase MessagePhase color:green;
+[14:51:54.559] LOG: %cStart Phase VictoryPhase color:green;
+[14:51:54.559] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:51:54.559] LOG: Applied Super EXP. Charm 
+[14:51:54.559] LOG: Applied EXP. Charm 
+[14:51:54.560] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:51:54.560] LOG: %cStart Phase MoveEndPhase color:green;
+[14:51:54.560] LOG: %cStart Phase TurnInitPhase color:green;
+[14:51:54.560] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:51:54.560] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:51:54.560] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:51:54.560] LOG: %cStart Phase BerryPhase color:green;
+[14:51:54.561] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:51:54.561] LOG: %cStart Phase TurnEndPhase color:green;
+[14:51:54.561] LOG: %cStart Phase BattleEndPhase color:green;
+[14:51:54.561] LOG: Battle Score: 28 (2 Turns x0.84)
+[14:51:54.561] LOG: Total Score: 1547
+[14:51:54.563] LOG: Applied Protein 
+[14:51:54.564] LOG: Applied Calcium 
+[14:51:54.568] LOG: %cStart Phase EggLapsePhase color:green;
+[14:51:54.568] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:51:54.568] LOG: Wave Seed: sbawjRlUwefQ 29
+[14:52:18.587] LOG: %cStart Phase LearnMovePhase color:green;
+[14:52:19.706] WARN: cry/10817 not found
+[14:52:20.832] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[14:52:22.051] LOG: %cStart Phase NewBattlePhase color:green;
+[14:52:22.051] LOG: Wave Seed: tcbxkSmVxfgR 30
+[14:52:22.052] LOG: %cStart Phase NextEncounterPhase color:green;
+[14:52:22.054] LOG: Starting species pool tier: BOSS
+[14:52:22.056] LOG: Replaced CONKELDURR with TIMBURR
+[14:52:22.074] LOG: Pokemon: Wild Timburr | Species ID: 532 | Level: 21 | Nature: Bashful (-)
+[14:52:22.074] LOG: Stats (IVs): HP: 62 (14), Atk: 44 (24), Def: 30 (12), Spatk: 18 (22), Spdef: 20 (9), Spd: 21 (13)
+[14:52:22.074] LOG: Ability: Sheer Force | Passive Ability: Long Reach | Boss Bars: 2
+[14:52:22.075] LOG: Moveset: ["Smelling Salts","Hammer Arm","Wood Hammer","Body Slam"]
+[14:52:22.447] LOG: Battle Seed: 1nCgoSxsrj0BxCDn
+[14:52:22.560] DEBUG: Session data saved to slot 0!
+[14:52:22.562] LOG: Wave Seed: tcbxkSmVxfgR 30
+[14:52:22.978] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:52:22.978] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:52:22.978] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:52:22.978] LOG: %cStart Phase PostSummonPhase color:green;
+[14:52:22.979] LOG: Ran PSP for: Timburr
+[14:52:22.980] LOG: %cStart Phase TurnInitPhase color:green;
+[14:52:22.980] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"vVEjzDqpZeM5O8mhZHmIfw4c","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":3407418734,"player":true,"species":807,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":10,"exp":1081,"levelExp":0,"gender":-1,"hp":40,"stats":[77,70,44,54,45,74],"ivs":[31,28,31,23,22,31],"nature":18,"moveset":[{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":8,"ppUsed":0,"ppUp":0},{"moveId":5149,"ppUsed":0,"ppUp":0},{"moveId":9,"ppUsed":0,"ppUp":0}],"status":null,"friendship":54,"metLevel":5,"metBiome":-1,"metSpecies":807,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[9,5149,7],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[12],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,-1,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":9,"targets":[2],"result":1,"useMode":1},{"move":9,"targets":[2],"result":1,"useMode":1},{"move":9,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1647348031,"player":true,"species":10817,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":false,"variant":0,"pokeball":0,"level":6,"exp":286,"levelExp":70,"gender":0,"hp":27,"stats":[52,24,42,52,45,20],"ivs":[31,31,31,29,30,31],"nature":15,"moveset":[{"moveId":202,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":491,"ppUsed":0,"ppUp":0},{"moveId":425,"ppUsed":0,"ppUp":0}],"status":null,"friendship":68,"metLevel":5,"metBiome":-1,"metSpecies":10817,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[11],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,-1,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":202,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":21,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":15,"kind":"reward","choice":0},{"type":"interaction","seq":16,"kind":"learnMove","choice":4},{"type":"command","wave":22,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":17,"kind":"reward","choice":2},{"type":"interaction","seq":18,"kind":"me","choice":0},{"type":"interaction","seq":19,"kind":"reward","choice":0},{"type":"command","wave":24,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":20,"kind":"reward","choice":2},{"type":"command","wave":25,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":25,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":21,"kind":"reward","choice":2},{"type":"interaction","seq":22,"kind":"crossroads","choice":1},{"type":"interaction","seq":23,"kind":"biome","choice":26},{"type":"command","wave":26,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":24,"kind":"reward","choice":0},{"type":"interaction","seq":25,"kind":"me","choice":1},{"type":"interaction","seq":26,"kind":"me","choice":2},{"type":"command","wave":27,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":27,"kind":"me","choice":2},{"type":"command","wave":27,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":28,"kind":"me","choice":1},{"type":"interaction","seq":29,"kind":"me","choice":0},{"type":"interaction","seq":30,"kind":"me","choice":2},{"type":"command","wave":27,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":31,"kind":"reward","choice":2},{"type":"interaction","seq":32,"kind":"learnMove","choice":4},{"type":"command","wave":28,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":28,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":28,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":28,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":33,"kind":"learnMove","choice":4},{"type":"command","wave":28,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":28,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":28,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":28,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":34,"kind":"reward","choice":2},{"type":"command","wave":29,"turn":1,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":1}},{"type":"command","wave":29,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":35,"kind":"reward","choice":0},{"type":"interaction","seq":36,"kind":"reward","choice":0},{"type":"interaction","seq":37,"kind":"learnMove","choice":3}],"endState":{"waveIndex":30,"money":1058,"party":[{"species":807,"level":24,"hp":70,"maxHp":83},{"species":10817,"level":18,"hp":61,"maxHp":61}]},"checkpoint":{"wave":21,"seed":"vVEjzDqpZeM5O8mhZHmIfw4c","party":[{"id":3407418734,"player":true,"species":807,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":16,"exp":4428,"levelExp":0,"gender":-1,"hp":59,"stats":[77,70,44,54,45,74],"ivs":[31,28,31,23,22,31],"nature":18,"moveset":[{"moveId":7,"ppUsed":0,"ppUp":0},{"moveId":8,"ppUsed":0,"ppUp":0},{"moveId":5149,"ppUsed":0,"ppUp":0},{"moveId":9,"ppUsed":0,"ppUp":0}],"status":null,"friendship":105,"metLevel":5,"metBiome":-1,"metSpecies":807,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[9,5149,7],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[12,1],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":9,"targets":[2],"result":1,"useMode":1},{"move":5149,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1647348031,"player":true,"species":10817,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":false,"variant":0,"pokeball":0,"level":12,"exp":2169,"levelExp":441,"gender":0,"hp":44,"stats":[52,24,42,52,45,20],"ivs":[31,31,31,29,30,31],"nature":15,"moveset":[{"moveId":202,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":491,"ppUsed":0,"ppUp":0},{"moveId":425,"ppUsed":0,"ppUp":0}],"status":null,"friendship":98,"metLevel":5,"metBiome":-1,"metSpecies":10817,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":2,"className":"MapModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[3],"args":[3407418734,3],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":2,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":1,"className":"ExpShareModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[3],"args":[1647348031,3],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":2,"className":"ExpBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[6],"args":[1647348031,6],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"ER_MENTAL_HERB","args":[3407418734,"mentalHerb",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"ER_MENTAL_HERB","args":[1647348031,"mentalHerb",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[3407418734,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[3407418734,1],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[3407418734,1],"stackCount":2,"className":"BerryModifier"}],"money":138,"pokeballCounts":{"0":10,"1":0,"2":0,"3":0,"4":0}}}
