@@ -2720,27 +2720,48 @@ async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
   }
   const confirmationCursor = owner.evidence.cursor();
   await owner.press("Space", "campaign-learn-move-forget-selected");
-  const finalConfirmation = await owner.evidence.waitForCondition(
+  const replacementResolution = await owner.evidence.waitForCondition(
     sink => {
       const candidate = sink.findLastSemanticSurface(confirmationCursor, "learn-move:confirm");
-      return candidate != null
+      if (
+        candidate != null
         && candidate.observation.uiMode === "CONFIRM"
         && candidate.observation.selectedOptionId === "yes"
         && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
         && isActionableSemanticObservation(candidate.observation)
-        ? candidate
-        : null;
+      ) {
+        return { kind: "confirmation", event: candidate };
+      }
+      // Ordinary TM variants commit immediately when the player selects the forgotten move; TM Case
+      // and mushroom flows may instead open a final Yes/No prompt. Accept the former only after the
+      // owner has observably left LearnMovePhase at the same or a later exact authority address. The
+      // journey's final party-material oracle still proves that the requested move actually changed.
+      const transitioned = sink.findLastSemanticSurface(confirmationCursor);
+      const sourceAddress = boundary.authority.address;
+      const destinationAddress = transitioned?.observation?.address;
+      const orderedTransition =
+        transitioned != null
+        && transitioned.observation.phase !== "LearnMovePhase"
+        && transitioned.observation.surfaceId !== "unclassified"
+        && destinationAddress?.epoch === sourceAddress?.epoch
+        && (destinationAddress.wave > sourceAddress.wave
+          || (destinationAddress.wave === sourceAddress.wave && destinationAddress.turn >= sourceAddress.turn));
+      return orderedTransition ? { kind: "immediate", event: transitioned } : null;
     },
-    { timeoutMs: rig.config.timeoutMs, description: "actionable learn-move final replacement confirmation" },
+    { timeoutMs: rig.config.timeoutMs, description: "learn-move replacement confirmation or immediate commit" },
   );
-  await owner.press("Space", `campaign-learn-move-confirm-replacement:${finalConfirmation.index}`);
+  if (replacementResolution.kind === "confirmation") {
+    await owner.press("Space", `campaign-learn-move-confirm-replacement:${replacementResolution.event.index}`);
+  }
   owner.evidence.record("campaign-learn-move-accepted", {
     address: boundary.authority.address,
     ownerSeat: owner.publicSeat,
     rewardId,
     selectedOptionId: picker.observation.selectedOptionId,
     navigationSteps: replacementSelection.steps,
-    confirmationEventIndex: finalConfirmation.index,
+    resolution: replacementResolution.kind,
+    confirmationEventIndex: replacementResolution.kind === "confirmation" ? replacementResolution.event.index : null,
+    transitionEventIndex: replacementResolution.kind === "immediate" ? replacementResolution.event.index : null,
   });
 }
 
@@ -2966,6 +2987,11 @@ export function chooseAbilityInteractionOption(observation) {
       ? `party-slot:${observation.interactionTargetPartySlot}`
       : null;
   }
+  if (observation.phase === "ErGreaterAbilityCapsulePhase" && options.includes("slot:1")) {
+    // Exercise the run-material branch. The permanent branch intentionally changes only the owner's
+    // account unlocks, whereas run-unlock-two must become identical current-party material on both peers.
+    return "slot:1";
+  }
   const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
   const abilitySlot = abilitySlots
     .map(slot => `party-option:ability-slot-${slot}`)
@@ -2981,7 +3007,6 @@ export function chooseAbilityInteractionOption(observation) {
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
   if (driver.abilitySurfaceKind !== "party") {
     const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation);
-    await owner.sequence(driver.keys, `campaign-${driver.name}`);
     if (driver.abilitySurfaceKind === "option" || driver.abilitySurfaceKind === "choice") {
       if (targetId == null) {
         throw new Error(
@@ -2989,12 +3014,22 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
             + `${JSON.stringify(boundary.ownerEvent.observation)}`,
         );
       }
+      await selectOptionById(owner, {
+        surfaceId: driver.v2SurfaceId,
+        targetId,
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: rig.config.timeoutMs,
+        fromCursor: boundary.ownerEvent.index,
+      });
       owner.evidence.record("campaign-ability-choice", {
         phase: driver.abilityPhase,
         surfaceId: driver.v2SurfaceId,
         targetId,
         address: boundary.authority.address,
       });
+    } else {
+      await owner.sequence(driver.keys, `campaign-${driver.name}`);
     }
     return;
   }

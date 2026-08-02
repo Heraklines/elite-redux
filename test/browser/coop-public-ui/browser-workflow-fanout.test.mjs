@@ -494,8 +494,10 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   assert.match(browserEntry, /"learn-move:cancel"/u);
   assert.match(campaign, /replacementMoveId[\s\S]*?selectOptionById\(owner,[\s\S]*?surfaceId: "learn-move:confirm"/u);
   assert.match(campaign, /selectedOptionId === "learn-move:cancel"/u);
-  assert.match(campaign, /actionable learn-move final replacement confirmation/u);
+  assert.match(campaign, /learn-move replacement confirmation or immediate commit/u);
+  assert.match(campaign, /transitioned\.observation\.phase !== "LearnMovePhase"/u);
   assert.match(campaign, /campaign-learn-move-confirm-replacement/u);
+  assert.match(campaign, /observation\.phase === "ErGreaterAbilityCapsulePhase" && options\.includes\("slot:1"\)/u);
   assert.match(campaign, /finishRewardFusion/u);
   assert.match(campaign, /targetId: "party-option:splice"/u);
   assert.match(campaign, /campaign-party-mutating-reward-coverage/u);

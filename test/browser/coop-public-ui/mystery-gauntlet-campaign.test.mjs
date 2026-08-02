@@ -259,6 +259,15 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityCapsulePhase",
+      selectedOptionId: "slot:0",
+      optionIds: ["slot:0", "slot:1", "slot:2"],
+    }),
+    "slot:1",
+    "the Greater Capsule journey must choose its run-material branch instead of an account-only permanent unlock",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption({
+      phase: "ErGreaterAbilityCapsulePhase",
       interactionTargetPartySlot: 2,
       optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],
     }),
