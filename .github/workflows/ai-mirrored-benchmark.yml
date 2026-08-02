@@ -123,7 +123,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$CANDIDATE_MODE" == "true" ]]; then
-            test "$(find ai-models/candidate -name model.safetensors -type f | wc -l)" -eq 1
+            candidate_report=$(find ai-models/candidate -name report.json -type f)
+            test "$(printf '%s\n' "$candidate_report" | wc -l)" -eq 1
+            test -f "$(dirname "$candidate_report")/model.safetensors"
           else
             test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
             test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
@@ -252,9 +254,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$CANDIDATE_MODE" == "true" ]]; then
-            candidate_weights=$(find ai-models/candidate -name model.safetensors -type f)
-            test "$(printf '%s\n' "$candidate_weights" | wc -l)" -eq 1
-            echo "CANDIDATE_MODEL=$(dirname "$candidate_weights")" >> "$GITHUB_ENV"
+            candidate_report=$(find ai-models/candidate -name report.json -type f)
+            test "$(printf '%s\n' "$candidate_report" | wc -l)" -eq 1
+            candidate_model=$(dirname "$candidate_report")
+            test -f "$candidate_model/model.safetensors"
+            echo "CANDIDATE_MODEL=$candidate_model" >> "$GITHUB_ENV"
           else
             control_weights=$(find ai-models/control -name model.safetensors -type f)
             transfer_weights=$(find ai-models/transfer -name model.safetensors -type f)

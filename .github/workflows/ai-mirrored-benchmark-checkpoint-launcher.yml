@@ -1,14 +1,15 @@
 name: AI Checkpoint Mirrored Benchmark Launcher (Non-Production)
 
 # Branch-only launcher for the reusable artifact benchmark. Restricting the push
-# path to this file makes the launch explicit and prevents later code pushes from
-# consuming the six-runner benchmark allocation.
+# paths to the benchmark workflows prevents unrelated code pushes from consuming
+# the six-runner benchmark allocation.
 on:
   push:
     branches:
       - codex/combat-ai-baselines-20260728
     paths:
       - ".github/workflows/ai-mirrored-benchmark-checkpoint-launcher.yml"
+      - ".github/workflows/ai-mirrored-benchmark.yml"
 
 permissions:
   actions: read
