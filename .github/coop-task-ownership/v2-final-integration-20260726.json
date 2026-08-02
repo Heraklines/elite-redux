@@ -3,7 +3,7 @@
   "version": 2,
   "branch": "ci/coop/v2-final-integration-20260726",
   "trainRef": "ci/coop/v2-final-integration-20260726",
-  "baseSha": "0a81120c98c40acdd1b1fc04b62461746096bb90",
+  "baseSha": "f4a35a271dec8293a13905f286d0689ebcf408d6",
   "allowedFiles": [
     ".github/coop-task-ownership/v2-final-integration-20260726.json",
     ".github/workflows/coop-focused-branch.yml",
@@ -237,6 +237,7 @@
     "test/browser/coop-public-ui/check-campaign-boundary.mjs",
     "test/browser/coop-public-ui/check-public-boundary.mjs",
     "test/browser/coop-public-ui/checkpoint-pixel-profile.test.mjs",
+    "test/browser/coop-public-ui/commander-evidence.test.mjs",
     "test/browser/coop-public-ui/config.mjs",
     "test/browser/coop-public-ui/deploy-prod-contract.test.mjs",
     "test/browser/coop-public-ui/deploy-staging-contract.test.mjs",
