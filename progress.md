@@ -6772,3 +6772,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   provisional P33 host observation to match that mapping, and restores only those same-context identities.
   It still does not promote the provisional event to a gameplay binding; the ordinary public Resume decision
   must create and acknowledge generation-2 bindings before the journey accepts them.
+
+## 2026-08-02 - committed Ability modal consumes its projected reward shell
+
+- Exact-SHA Ability journey `30725240535` passed the paired reward cursor, PARTY/Summary return, Ability
+  selection, and immutable `ABILITY_PICK` application. It then reproduced the player's real softlock: the
+  replica accepted revision 7 but stayed on wave 1 in `ErAbilityCapsulePhase`/`SelectModifierPhase`, while the
+  authority reached wave 2 and retained command revision 8 until the control-install watchdog terminated it.
+- Authority V2 projects nested Ability surfaces as modals. Their old reward phase is parked in
+  `PhaseManager.standbyPhase`; `tryRemovePhase("SelectModifierPhase")` can only remove queued phases, and normal
+  `end()` restores the parked predecessor without starting it. The replica therefore resurrected the consumed
+  reward shell instead of reaching its signed next-wave wait.
+- `PhaseManager.shiftCoopAuthoritativeModalThroughAuthorityCommit` now closes this exact scheduler edge:
+  committed Ability results retire both the result modal and its parked predecessor, select the already-queued
+  successor, record/retain the address-exact terminal result, and only then start that successor. Cancellation
+  still restores the reward shell. All four registered Ability workflows use the same seam, and focused
+  coverage proves the predecessor cannot be resurrected or shifted again.

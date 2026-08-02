@@ -411,28 +411,51 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       adoption?.accepted === true && adoption.requiresAuthorityCommit
         ? captureCoopOperationAuthorityState(this.coopSourceTurn)
         : null;
-    this.end();
-    if (adoption?.accepted === true) {
-      settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding);
-      settleCoopV2InteractionOperation(adoption.operationId, this.coopOwningRuntime);
+    const settleResult = (): boolean => {
+      if (adoption?.accepted !== true) {
+        return true;
+      }
+      if (
+        !settleCoopAbilityOperation(adoption.operationId, this.coopOperationBinding)
+        || !settleCoopV2InteractionOperation(adoption.operationId, this.coopOwningRuntime)
+      ) {
+        return false;
+      }
+      return (
+        !adoption.requiresAuthorityCommit
+        || commitAbilityWatcherOutcome(
+          adoption.operationId,
+          {
+            pinned: this.coopSeq,
+            data,
+            committed: op !== COOP_ABILITY_OP.CANCEL,
+            wave: this.coopSourceWave,
+            turn: this.coopSourceTurn,
+            authoritativeState: resultState,
+          },
+          this.coopOperationBinding,
+        )
+      );
+    };
+    const phaseManager = globalScene.phaseManager;
+    const closesProjectedModal =
+      op === COOP_ABILITY_OP.GRAND
+      && adoption?.accepted === true
+      && isCoopAbilityPresentationAuthorityActive(this.coopOperationBinding)
+      && phaseManager.getStandbyPhase() != null;
+    if (closesProjectedModal) {
+      if (!phaseManager.shiftCoopAuthoritativeModalThroughAuthorityCommit(this, settleResult)) {
+        failCoopSharedSession(
+          `Ability result ${adoption?.operationId ?? this.coopSeq} could not close its projected reward shell`,
+        );
+      }
+      return;
     }
-    if (
-      adoption?.accepted === true
-      && adoption.requiresAuthorityCommit
-      && !commitAbilityWatcherOutcome(
-        adoption.operationId,
-        {
-          pinned: this.coopSeq,
-          data,
-          committed: op !== COOP_ABILITY_OP.CANCEL,
-          wave: this.coopSourceWave,
-          turn: this.coopSourceTurn,
-          authoritativeState: resultState,
-        },
-        this.coopOperationBinding,
-      )
-    ) {
-      failCoopSharedSession(`Ability result ${adoption.operationId} could not retain complete authority state`);
+    this.end();
+    if (!settleResult()) {
+      failCoopSharedSession(
+        `Ability result ${adoption?.operationId ?? this.coopSeq} could not retain complete authority state`,
+      );
     }
   }
 

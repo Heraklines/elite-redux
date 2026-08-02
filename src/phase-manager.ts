@@ -615,6 +615,52 @@ export class PhaseManager {
   }
 
   /**
+   * Close a committed Authority V2 modal without restoring its obsolete predecessor.
+   *
+   * A projected nested interaction is installed over the live local shell by
+   * {@linkcode replaceWithCoopAuthoritativeModal}. Cancellation legitimately returns to that shell, but a
+   * committed result consumes it. Ordinary {@linkcode shiftPhase} would restore `standbyPhase` and stop there,
+   * leaving the old reward/menu phase current forever while the ordered successor waits behind it.
+   *
+   * This is the modal counterpart of {@linkcode shiftPhaseThroughCoopAuthorityCommit}: retire both the exact
+   * result phase and its parked predecessor, select the already-queued successor, retain/prove the immutable
+   * result, and only then start that successor. No caller can use this as a general queue-clearing escape hatch;
+   * both the current modal and a parked predecessor must exist.
+   */
+  public shiftCoopAuthoritativeModalThroughAuthorityCommit(phase: Phase, commitAfterClose: () => boolean): boolean {
+    if (
+      this.currentPhase !== phase
+      || this.standbyPhase == null
+      || this.coopTerminalProgressionFrozen
+      || this.coopRecoveryProgressionFrozen()
+    ) {
+      return false;
+    }
+
+    const predecessor = this.standbyPhase;
+    this.standbyPhase = null;
+    this.settleCoopMutationPhase(phase);
+    phase.retire();
+    this.settleCoopMutationPhase(predecessor);
+    predecessor.retire();
+
+    let nextPhase = this.phaseQueue.getNextPhase();
+    if (nextPhase?.is("DynamicPhaseMarker")) {
+      nextPhase = this.dynamicQueueManager.popNextPhase(nextPhase.phaseType);
+    }
+    if (nextPhase == null) {
+      this.turnStart();
+    } else {
+      this.currentPhase = nextPhase;
+    }
+    if (!commitAfterClose()) {
+      return false;
+    }
+    this.startCurrentPhase();
+    return true;
+  }
+
+  /**
    * Determine the next phase to run and start it.
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
