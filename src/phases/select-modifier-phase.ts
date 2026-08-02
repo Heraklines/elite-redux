@@ -279,6 +279,12 @@ export class SelectModifierPhase extends BattlePhase {
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
   private readonly coopAwaitingAuthorityResults = new Set<string>();
+  /**
+   * Cancels every relay wait owned by this exact reward phase when Authority V2 destructively retires it.
+   * A nested picker can consume a back-out continuation without sending another reward action; leaving that
+   * continuation's old seq parked makes the stall watchdog mistake an obsolete wait for a live softlock.
+   */
+  private readonly coopWaitLease = new AbortController();
   /** Host terminal results parked until the guest proves the exact material state was installed. */
   private readonly coopAwaitingMaterialResults = new Set<string>();
   /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
@@ -478,6 +484,11 @@ export class SelectModifierPhase extends BattlePhase {
 
   protected coopRewardTurn(): number {
     return this.coopSourceAddress?.turn ?? globalScene.currentBattle?.turn ?? 0;
+  }
+
+  public override retire(): void {
+    super.retire();
+    this.coopWaitLease.abort();
   }
 
   start() {
@@ -2174,6 +2185,8 @@ export class SelectModifierPhase extends BattlePhase {
             COOP_REWARD_WAIT_MS,
             COOP_REWARD_CHOICE_KINDS,
             this.coopRewardSurface ?? null,
+            undefined,
+            this.coopWaitLease.signal,
           );
           const disposition = await this.coopResumeOnOwningRuntimeAsync(() =>
             this.coopApplyGuestAuthoritativeResult(operationId, action),
@@ -2255,6 +2268,7 @@ export class SelectModifierPhase extends BattlePhase {
         this.rerollCount,
         COOP_REWARD_WAIT_MS,
         this.coopRewardSurface,
+        this.coopWaitLease.signal,
       );
       const adopted = await this.coopResumeOnOwningRuntimeAsync(() => {
         if (!this.coopShopSceneAlive("authoritative options apply")) {
@@ -2809,6 +2823,8 @@ export class SelectModifierPhase extends BattlePhase {
         COOP_REWARD_WAIT_MS,
         COOP_REWARD_CHOICE_KINDS,
         this.coopRewardSurface ?? null,
+        undefined,
+        this.coopWaitLease.signal,
       );
       const disposition = await this.coopResumeOnOwningRuntimeAsync(() =>
         this.coopApplyWatcherAction(seq, controller.role, action),
