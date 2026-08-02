@@ -91,13 +91,16 @@ test("lobby quarantines one save-slot failure and releases a fresh run only thro
   assert.match(journeys, /fresh run changed or removed the exact quarantined local slot/u);
   assert.match(journeys, /event\.mode === "empty" && event\.slot !== 0/u);
   assert.match(journeys, /fresh launch mutated quarantined cloud slot zero/u);
-  assert.match(harness, /async enterCoopLobby\(\)[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "new-game"/u);
   assert.match(
     harness,
-    /async enterCoopLobby\(\)[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId: "co-op"/u,
+    /async enterCoopLobby\([^)]*\)[\s\S]*surfaceId: "title-menu"[\s\S]*targetId: "new-game"/u,
+  );
+  assert.match(
+    harness,
+    /async enterCoopLobby\([^)]*\)[\s\S]*surfaceId: "option-select:TitlePhase"[\s\S]*targetId: "co-op"/u,
   );
   assert.doesNotMatch(harness, /mode-select-coop-below-classic|mode-open-coop-lobby/u);
-  assert.doesNotMatch(harness, /async enterCoopLobby\(\)[\s\S]{0,700}titleNewGameKeys/u);
+  assert.doesNotMatch(harness, /async enterCoopLobby\([^)]*\)[\s\S]{0,700}titleNewGameKeys/u);
   assert.match(localWorker, /\/__coop-fixture\/fork-session/u);
   assert.match(localWorker, /\/__coop-fixture\/session-status/u);
   assert.match(localWorker, /session\.money = originalMoney \+ 1/u);

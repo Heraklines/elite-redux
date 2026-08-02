@@ -2120,7 +2120,7 @@ test("parallel lobby pairing reselects the exact visible username before every r
   assert.match(harness, /relayTimeoutMs: OPTIONAL_LOBBY_RELAY_WAIT_MS/u);
   assert.match(harness, /optional && error instanceof Error && \/timed out waiting for request relay/u);
   assert.match(harness, /const relayed = sink\.find\(\/request target=\/u, requestCursor\)/u);
-  assert.match(harness, /const binding = sink\.findBinding\(requestCursor\)/u);
+  assert.match(harness, /const binding = sink\.findPairingRole\(requestCursor\)/u);
   assert.match(harness, /Start Phase \(\?:SelectChallengePhase\|SelectStarterPhase\)/u);
   assert.doesNotMatch(harness, /const canceled = sink\.find\(\/\\\[coop:lobby\\\] cancel\/u/u);
   assert.match(harness, /sink\.find\(\/Start Phase TitlePhase\/u, requestCursor\)/u);

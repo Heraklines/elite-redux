@@ -7099,7 +7099,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // overlay unless explicitly re-layered. Keep every third+ type beneath the
     // overlay just like the two fixed badges.
     for (const icon of this.extraTypeIcons) {
-      this.starterSelectContainer.moveBelow(icon, this.moveInfoOverlay);
+      this.starterSelectContainer.moveBelow(icon as Phaser.GameObjects.GameObject, this.moveInfoOverlay);
     }
   }
 
