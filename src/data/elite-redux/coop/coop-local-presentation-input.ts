@@ -21,6 +21,8 @@ export const COOP_LOCAL_PRESENTATION_INPUT_PHASES: ReadonlySet<string> = new Set
 export const COOP_LOCAL_PRESENTATION_INPUT_SURFACES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ["EvolutionPhase", new Set(["EVOLUTION_SCENE"])],
   ["CoopWaveProgressionReplayPhase", new Set(["EVOLUTION_SCENE"])],
+  ["FormChangePhase", new Set(["EVOLUTION_SCENE"])],
+  ["CoopFormChangeCutsceneReplayPhase", new Set(["EVOLUTION_SCENE"])],
 ]);
 
 export function isCoopLocalPresentationInputPhase(phaseName: string | null | undefined): boolean {

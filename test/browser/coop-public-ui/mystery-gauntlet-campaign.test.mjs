@@ -453,7 +453,7 @@ test("local presentation input has one registry shared by production and the two
   assert.match(registry, /COOP_LOCAL_PRESENTATION_INPUT_PHASES[\s\S]*"ScanIvsPhase"/u);
   assert.match(
     registry,
-    /COOP_LOCAL_PRESENTATION_INPUT_SURFACES[\s\S]*"EvolutionPhase"[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*"EVOLUTION_SCENE"/u,
+    /COOP_LOCAL_PRESENTATION_INPUT_SURFACES[\s\S]*"EvolutionPhase"[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*"FormChangePhase"[\s\S]*"CoopFormChangeCutsceneReplayPhase"[\s\S]*"EVOLUTION_SCENE"/u,
   );
   assert.match(gate, /\.\.\.COOP_LOCAL_PRESENTATION_INPUT_PHASES/u);
   assert.match(

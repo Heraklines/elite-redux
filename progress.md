@@ -6883,3 +6883,22 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   phase-instance fences as evolution prompts.
 - These changes were derived from the live two-browser artifacts, not inferred from the matrix conclusion.
   Verification remains remote-only after the diagnostic matrix completes.
+
+## 2026-08-02 - form-change presentation lease and evolution fixture floors
+
+- Matrix `30752299479` supplied stronger failure evidence after the semantic form surface landed. The authority
+  visibly reached the terminal "changed form" prompt with `awaitingActionInput=true`, but the observer reported
+  `inputBlocked=true`: Authority V2's single local-presentation registry admitted ordinary evolution and its
+  replay, but omitted both rich form-change phase identities. Production therefore rejected the same Space the
+  browser driver correctly refused to send, leaving the authority in `FormChangePhase` while its peer waited in
+  `NewBattlePhase`. Both `FormChangePhase` and `CoopFormChangeCutsceneReplayPhase` now lease only their exact
+  `EVOLUTION_SCENE` prompt; mechanically shared overlays in either phase remain frozen.
+- The read-only browser observer and battle-prompt driver now classify both the ordinary and mechanics-free
+  form-change cutscene phases under one `battle:form-change` surface. This makes the remote journey prove each
+  local terminal prompt is genuinely actionable rather than papering over the production input gate.
+- The same matrix proved ordinary Water Stone evolution was rejected solely because the isolated Staryu
+  fixture started at level 5 below every configured level floor. Only the exact `EVOLUTION_ITEM` fixture now
+  starts at level 30; the rare Scroll fixture remains level 70 and normal progression/evolution journeys retain
+  their existing levels.
+- No local co-op, Vitest, or browser execution was performed. These changes are queued for one new exact-SHA
+  remote 36-variant item matrix after static contracts pass.

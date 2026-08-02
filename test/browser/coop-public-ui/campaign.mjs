@@ -61,7 +61,10 @@ const BATTLE_PROMPT_PHASES = new Map([
     "battle:evolution",
     { phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
   ],
-  ["battle:form-change", { phases: new Set(["FormChangePhase"]), uiMode: "EVOLUTION_SCENE" }],
+  [
+    "battle:form-change",
+    { phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
+  ],
 ]);
 const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
   "MysteryEncounterPhase",

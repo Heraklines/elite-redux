@@ -69,7 +69,10 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
   it("leases only the local evolution scene, never the mechanically shared branch picker", () => {
     expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "EVOLUTION_SCENE")).toBe(true);
     expect(isCoopLocalPresentationInputSurface("CoopWaveProgressionReplayPhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("FormChangePhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("CoopFormChangeCutsceneReplayPhase", "EVOLUTION_SCENE")).toBe(true);
     expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "OPTION_SELECT")).toBe(false);
+    expect(isCoopLocalPresentationInputSurface("FormChangePhase", "OPTION_SELECT")).toBe(false);
   });
 });
 
