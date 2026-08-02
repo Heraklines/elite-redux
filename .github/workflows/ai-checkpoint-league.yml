@@ -48,7 +48,7 @@ on:
       kaggle_kernel_slug:
         description: Private Kaggle GPU kernel slug for checkpoint resume training
         required: false
-        default: michaelferjani/er-ai-checkpoint-league-resume-gpu-20260802
+        default: michaelferjani/er-ai-checkpoint-league-rebased-gpu-20260802
         type: string
 
 permissions:
