@@ -5,6 +5,11 @@ import { BattlePhase } from "#phases/battle-phase";
 import { applyChallenges } from "#utils/challenge-utils";
 import { BooleanHolder, fixedInt } from "#utils/common";
 
+// Audio metadata is presentation input, never progression authority.  A decoded WebAudio
+// object can exist while reporting a bogus/very large duration (seen in real Chromium), so
+// never let that value retain the automatic biome-transition phase indefinitely.
+const MAX_HEAL_PRESENTATION_MS = 12_000;
+
 export class PartyHealPhase extends BattlePhase {
   public readonly phaseName = "PartyHealPhase";
   private resumeBgm: boolean;
@@ -47,14 +52,19 @@ export class PartyHealPhase extends BattlePhase {
         }
         globalScene.ui.fadeIn(500).then(() => this.end());
       };
-      const healSong = globalScene.playSoundWithoutBgm("heal");
+      const healSong = globalScene.playSoundWithoutBgm("heal", fixedInt(MAX_HEAL_PRESENTATION_MS));
       if (!healSong) {
         // Browsers can legitimately refuse or fail to construct a sound (muted/headless/autoplay policy).
         // The old branch left the screen black and retained PartyHealPhase forever in that case.
         finish();
         return;
       }
-      globalScene.time.delayedCall(fixedInt(healSong.totalDuration * 1000), () => {
+      const reportedDurationMs = healSong.totalDuration * 1000;
+      const presentationDurationMs =
+        Number.isFinite(reportedDurationMs) && reportedDurationMs > 0
+          ? Math.min(reportedDurationMs, MAX_HEAL_PRESENTATION_MS)
+          : 0;
+      globalScene.time.delayedCall(fixedInt(presentationDurationMs), () => {
         healSong.destroy();
         finish();
       });

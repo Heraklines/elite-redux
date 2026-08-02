@@ -3697,19 +3697,31 @@ test("superseded control addresses can reopen without weakening live-address con
   );
 });
 
-test("party healing cannot retain a black transition when audio is unavailable", () => {
-  const healSong = partyHealPhase.indexOf('const healSong = globalScene.playSoundWithoutBgm("heal");');
+test("party healing cannot retain a black transition on missing or invalid audio", () => {
+  assert.match(
+    partyHealPhase,
+    /const MAX_HEAL_PRESENTATION_MS = 12_000;/u,
+    "heal presentation has an explicit finite ceiling",
+  );
+  const healSong = partyHealPhase.indexOf(
+    'const healSong = globalScene.playSoundWithoutBgm("heal", fixedInt(MAX_HEAL_PRESENTATION_MS));',
+  );
   const missingAudio = partyHealPhase.indexOf("if (!healSong)", healSong);
   const fallbackFinish = partyHealPhase.indexOf("finish();", missingAudio);
   const fallbackReturn = partyHealPhase.indexOf("return;", fallbackFinish);
+  const boundedDuration = partyHealPhase.indexOf(
+    "Math.min(reportedDurationMs, MAX_HEAL_PRESENTATION_MS)",
+    fallbackReturn,
+  );
   const timedAudio = partyHealPhase.indexOf("globalScene.time.delayedCall", fallbackReturn);
   assert.ok(healSong >= 0, "PartyHealPhase attempts its ordinary heal presentation");
   assert.ok(
     missingAudio > healSong
       && fallbackFinish > missingAudio
       && fallbackReturn > fallbackFinish
+      && boundedDuration > fallbackReturn
       && timedAudio > fallbackReturn,
-    "a refused heal sound finishes the fade/phase before the audio-timed branch",
+    "a refused sound finishes immediately and an existing sound receives a finite duration ceiling",
   );
   assert.match(
     partyHealPhase,
