@@ -57,13 +57,19 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
                 history_length=1,
                 trajectory_layers=1,
             )
-            source = CandidateSetTransformer(config)
+            old_mean = torch.tensor([1.0, -2.0, 0.5])
+            old_std = torch.tensor([0.25, 2.0, 0.5])
+            new_mean = torch.tensor([-1.0, 1.5, 3.0])
+            new_std = torch.tensor([1.5, 0.5, 2.0])
+            source = CandidateSetTransformer(config, old_mean, old_std).eval()
             with torch.no_grad():
                 source.policy_head[-1].bias.fill_(2.5)
-            save_file(
-                {key: value.detach().contiguous() for key, value in source.state_dict().items()},
-                str(model_dir / "model.safetensors"),
-            )
+            old_checkpoint_state = {
+                key: value.detach().contiguous()
+                for key, value in source.state_dict().items()
+                if key != "normalization_presence_projection.weight"
+            }
+            save_file(old_checkpoint_state, str(model_dir / "model.safetensors"))
             payload = {
                 "schemaVersion": 4,
                 "model": "er-domain-candidate-transformer-v4",
@@ -74,10 +80,38 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
             }
             (model_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
 
-            resumed = CandidateSetTransformer(config)
+            features = torch.tensor([[[2.0, 10.0, -1.0], [0.0, -3.0, 4.0]]])
+            candidate_mask = torch.ones(1, 2, dtype=torch.bool)
+            feature_presence = torch.tensor([[[True, False, True], [False, True, True]]])
+            token_ids = torch.ones((1, 2, 5, 1), dtype=torch.long)
+            token_mask = torch.ones_like(token_ids, dtype=torch.bool)
+            with torch.inference_mode():
+                expected = source(
+                    features,
+                    candidate_mask,
+                    token_ids,
+                    token_mask,
+                    feature_presence=feature_presence,
+                )
+
+            resumed = CandidateSetTransformer(config, new_mean, new_std).eval()
             metadata = initialize_from_checkpoint(resumed, model_dir, payload, "a" * 64, fixed)
             self.assertEqual(resumed.policy_head[-1].bias.tolist(), [2.5])
             self.assertEqual(len(metadata["weightsSha256"]), 64)
+            self.assertTrue(metadata["compatibilityProjectionAdded"])
+            self.assertEqual(metadata["normalization"]["changedFeatures"], 3)
+            torch.testing.assert_close(resumed.feature_mean, new_mean)
+            torch.testing.assert_close(resumed.feature_std, new_std)
+            with torch.inference_mode():
+                actual = resumed(
+                    features,
+                    candidate_mask,
+                    token_ids,
+                    token_mask,
+                    feature_presence=feature_presence,
+                )
+            torch.testing.assert_close(actual[0], expected[0], atol=1e-5, rtol=1e-5)
+            torch.testing.assert_close(actual[1], expected[1], atol=1e-5, rtol=1e-5)
 
             vocabulary = load_fixed_token_vocabulary(
                 model_dir / "config.json",

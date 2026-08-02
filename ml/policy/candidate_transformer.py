@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
 
 import torch
 from torch import Tensor, nn
@@ -54,6 +55,8 @@ class CandidateSetTransformer(nn.Module):
             nn.GELU(),
             nn.LayerNorm(config.d_model),
         )
+        self.normalization_presence_projection = nn.Linear(config.feature_count, config.d_model, bias=False)
+        nn.init.zeros_(self.normalization_presence_projection.weight)
         self.feature_presence_projection = nn.Linear(config.feature_count, config.d_model, bias=False)
         self.domain_embedding = nn.Embedding(config.domain_count, config.d_model)
         self.token_embedding = nn.Embedding(config.token_vocabulary_size, config.d_model, padding_idx=0)
@@ -282,8 +285,11 @@ class CandidateSetTransformer(nn.Module):
         normalized = normalized.masked_fill(~feature_presence, 0)
         normalized = normalized.masked_fill(~candidate_mask.unsqueeze(-1), 0)
         visible_presence = feature_presence & candidate_mask.unsqueeze(-1)
+        normalized_projection = self.input_projection[0](normalized) + self.normalization_presence_projection(
+            visible_presence.to(normalized.dtype)
+        )
         dense_encoded = (
-            self.input_projection(normalized)
+            self.input_projection[2](self.input_projection[1](normalized_projection))
             + self.feature_presence_projection(visible_presence.to(normalized.dtype))
             + self.domain_embedding(domain_ids).unsqueeze(1)
         )
@@ -313,3 +319,16 @@ class CandidateSetTransformer(nn.Module):
 
 def parameter_count(model: nn.Module) -> int:
     return sum(parameter.numel() for parameter in model.parameters())
+
+
+def load_compatible_state_dict(model: CandidateSetTransformer, state_dict: Mapping[str, Tensor]) -> bool:
+    """Load schema-v4 weights, accepting only the pre-rebase projection omission."""
+    result = model.load_state_dict(state_dict, strict=False)
+    allowed_missing = {"normalization_presence_projection.weight"}
+    missing = set(result.missing_keys)
+    unexpected = set(result.unexpected_keys)
+    if missing - allowed_missing or unexpected:
+        raise RuntimeError(
+            f"incompatible candidate-transformer weights: missing={sorted(missing)}, unexpected={sorted(unexpected)}"
+        )
+    return bool(missing)

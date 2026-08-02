@@ -47,6 +47,7 @@ from train_candidate_baselines import (  # noqa: E402
 from candidate_transformer import (  # noqa: E402
     CandidateSetTransformer,
     CandidateTransformerConfig,
+    load_compatible_state_dict,
     parameter_count,
 )
 
@@ -317,11 +318,43 @@ def initialize_from_checkpoint(
     if initial_config.get("tokenVocabulary") != token_vocabulary:
         raise ValueError("initial model token vocabulary does not exactly match the resumed vocabulary")
     weights_path = model_dir / initial_config["weights"]
-    model.load_state_dict(load_file(str(weights_path), device="cpu"), strict=True)
+    target_feature_mean = model.feature_mean.detach().clone()
+    target_feature_std = model.feature_std.detach().clone()
+    compatibility_projection_added = load_compatible_state_dict(model, load_file(str(weights_path), device="cpu"))
+    normalization = rebase_feature_normalization(model, target_feature_mean, target_feature_std)
     return {
         "modelDir": str(model_dir),
         "weightsSha256": hashlib.sha256(weights_path.read_bytes()).hexdigest(),
         "configSha256": hashlib.sha256((model_dir / "config.json").read_bytes()).hexdigest(),
+        "compatibilityProjectionAdded": compatibility_projection_added,
+        "normalization": normalization,
+    }
+
+
+def rebase_feature_normalization(
+    model: CandidateSetTransformer,
+    target_mean: Tensor,
+    target_std: Tensor,
+) -> dict[str, int]:
+    """Adopt new corpus statistics without changing the checkpoint function."""
+    if target_mean.shape != model.feature_mean.shape or target_std.shape != model.feature_std.shape:
+        raise ValueError("target feature normalization must match the checkpoint feature width")
+    old_mean = model.feature_mean.detach().clone()
+    old_std = model.feature_std.detach().clone()
+    target_mean = target_mean.to(device=old_mean.device, dtype=old_mean.dtype)
+    target_std = target_std.to(device=old_std.device, dtype=old_std.dtype).clamp_min(1e-6)
+    old_input_weight = model.input_projection[0].weight.detach().clone()
+    scale = target_std / old_std
+    presence_offset = (target_mean - old_mean) / old_std
+    with torch.no_grad():
+        model.input_projection[0].weight.mul_(scale.unsqueeze(0))
+        model.normalization_presence_projection.weight.add_(old_input_weight * presence_offset.unsqueeze(0))
+        model.feature_mean.copy_(target_mean)
+        model.feature_std.copy_(target_std)
+    changed = (~torch.isclose(old_mean, target_mean) | ~torch.isclose(old_std, target_std)).sum()
+    return {
+        "featureCount": int(old_mean.numel()),
+        "changedFeatures": int(changed.item()),
     }
 
 

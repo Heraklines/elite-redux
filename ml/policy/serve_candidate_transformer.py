@@ -18,7 +18,11 @@ from safetensors.torch import load_file
 POLICY_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(POLICY_DIR))
 
-from candidate_transformer import CandidateSetTransformer, CandidateTransformerConfig  # noqa: E402
+from candidate_transformer import (  # noqa: E402
+    CandidateSetTransformer,
+    CandidateTransformerConfig,
+    load_compatible_state_dict,
+)
 
 MODEL_NAME = "er-domain-candidate-transformer-v4"
 ENSEMBLE_NAME = "er-domain-candidate-transformer-ensemble-v4"
@@ -79,7 +83,7 @@ def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
     if not isinstance(weights_name, str) or Path(weights_name).name != weights_name:
         raise ValueError("neural policy weights must be a local filename")
     model = CandidateSetTransformer(model_config)
-    model.load_state_dict(load_file(str(model_dir / weights_name), device="cpu"), strict=True)
+    load_compatible_state_dict(model, load_file(str(model_dir / weights_name), device="cpu"))
     model.eval()
     return CandidatePolicyBundle(
         model=model,
