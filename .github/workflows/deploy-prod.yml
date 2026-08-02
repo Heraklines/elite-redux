@@ -48,7 +48,6 @@ jobs:
             echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
             echo "VITE_TELEMETRY=prod"
-            echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
           } > .env.standalone.local
 
       # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects
