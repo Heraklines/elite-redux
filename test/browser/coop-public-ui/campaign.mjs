@@ -3798,6 +3798,7 @@ async function driveOnePendingSurface(
   stats,
   strict,
   rewardRetryState,
+  policy,
   navigationCoverage = null,
 ) {
   for (const driver of dispatch) {
@@ -4062,6 +4063,7 @@ function createBattleRegisteredInteractionDriver(rig, policy, cursors, stats) {
       stats,
       policy.mode !== "shakedown",
       rewardRetryState,
+      policy,
     )) === "revival";
 }
 
@@ -4516,6 +4518,7 @@ async function advanceToNextWaveCommand(
       stats,
       !policy.autoFirst,
       rewardRetryState,
+      policy,
       navigationCoverage,
     );
     if (drove === "target-reached") {
