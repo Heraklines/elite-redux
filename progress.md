@@ -6807,3 +6807,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now emits the complete canonical generation vector, every parser checks its local element, and shared-
   frontier proofs require both clients to report the same vector. This preserves strict authentication while
   admitting the Worker's legitimate sequential hot-rejoin counters and generalizes naturally beyond two seats.
+
+## 2026-08-02 - TM Case terminal successor and party-mutating reward matrix
+
+- Player host/guest logs at dev-log tip `7261510f1feab3bf4dd5401593dfa107df87ff0d` prove the wave-5 TM Case
+  mutation itself converged. The host targeted guest-owned party slot 1, the guest selected forget slot 1, and
+  both advanced mechanically to wave 6. The host then rejected wave-6 `CONTROL_COMMIT` because the nested
+  `LEARN_MOVE` result hard-coded `allowNextWaveStart=false` after replacing the terminal reward as the V2 head.
+- `LEARN_MOVE` decisions now carry and validate a mandatory immutable `allowNextWaveStart` bit. Ordinary
+  terminal-reward teaching derives true from its captured nested return plan; Mystery/nested reward returns and
+  non-nested level-up teaching remain false. Contradictory `nextInteraction + allowNextWaveStart` material and
+  incomplete learn payloads fail closed before successor construction.
+- Shared-terminal reception now logs the authenticated peer reason, so the replica's Send Logs report identifies
+  the same causal failure instead of only showing a generic shared-terminal frame and closed data channel.
+- The matrix inventory exposed a second real synchronization gap before dispatch: concrete ordinary-TM and Mint
+  variants did not implement `getPregenArgs()`. Their watcher reconstruction could therefore re-roll and consume
+  replica RNG despite the reward stream claiming an immutable variant. Both now serialize their move/nature id,
+  with a failure-first round-trip test that reconstructs from an empty/different watcher party without rolling.
+- Added a build-and-URL-gated `party-mutating-rewards` public journey matrix. Twelve isolated remote jobs reuse one
+  sealed build and drive TM Case, Learner's Shroom, Memory Mushroom, an ordinary TM, all three custom Ability
+  workflows, Ability Randomizer, Move Slot Expander, PP Up, Ether, and Mint through two visible Chromium clients.
+  Every entry targets the guest-owned combined party slot through public keys, requires exact cross-browser
+  material parity at a wave-2 command frontier, and checks the configured mutation actually changed the target.
+- The fixture uses four-move Garchomp starters, so all teaching entries traverse the player-reported full-moveset
+  forget picker instead of the old empty-slot auto-learn shortcut. The CI observer remains read-only and now
+  exposes the party mutation fields needed for exact assertions (moves/PP/PP Up, move cap, nature, tera, and
+  ability identities); it never mutates the game or bypasses UI/relay/Authority V2.
+- Next: qualify the full remote gate after the formatter-only red is folded in, then dispatch the 12-way browser
+  matrix without exceeding the 32-runner co-op ceiling. Tera shards, fusion, evolution/form items, restoratives,
+  and status/revive preconditions need dedicated deterministic fixtures before claiming complete consumable
+  coverage; the first matrix covers every already-driveable nested picker and the exact live failure family.

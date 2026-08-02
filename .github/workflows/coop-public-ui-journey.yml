@@ -45,6 +45,7 @@ on:
           - game-over
           - registered-interactions
           - ability-capsule
+          - party-mutating-rewards
           - showdown-battle
           - resume-scan-isolation
           - save-mutations
@@ -309,7 +310,7 @@ jobs:
           VITE_BYPASS_TUTORIAL: 0
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || (inputs.journey == 'party-mutating-rewards' && 'party-mutating-rewards') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -336,7 +337,7 @@ jobs:
           if-no-files-found: error
 
   primary-journey:
-    name: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
+    name: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || (inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts') }}
     needs: browser-build
     runs-on: ubuntu-latest
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
@@ -347,6 +348,7 @@ jobs:
       fail-fast: false
       matrix:
         commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
+        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","ETHER","MINT"]' || '["NONE"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -411,7 +413,7 @@ jobs:
           # launched ordinary level-5 starters in exact-SHA run 30698494882.
           COOP_UI_JOURNEY: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
-          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
+          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           # Browser roles remain tied to their public seats regardless of which seat sends the invitation.
           # The half-wipe caller explicitly selects the replica-owned guest seat.
@@ -437,7 +439,9 @@ jobs:
           # this remains immutable and leaves 15 minutes for bounded diagnosis/artifact upload.
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || inputs.journey == 'market-wide-lens' && '5100000' || '2700000' }}
           COOP_UI_RENDER_PROFILE: animations-skipped-depth
-          COOP_UI_REWARD_MODE: ${{ inputs.journey == 'ability-capsule' && 'pick-first' || 'leave' }}
+          COOP_UI_REWARD_MODE: ${{ (inputs.journey == 'ability-capsule' || inputs.journey == 'party-mutating-rewards') && 'pick-first' || 'leave' }}
+          COOP_UI_PARTY_REWARD_ID: ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || '' }}
+          COOP_UI_REWARD_PARTY_SLOT: ${{ inputs.journey == 'party-mutating-rewards' && '1' || '0' }}
           COOP_UI_RAISE_SPEED: "1"
           COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
@@ -477,10 +481,10 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" ]]; then
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs &
             campaign_pid=$!
             (
@@ -517,7 +521,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dev-logs/coop-public-ui/**/summary.json
             dev-logs/coop-public-ui/**/*.jsonl
@@ -533,7 +537,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn

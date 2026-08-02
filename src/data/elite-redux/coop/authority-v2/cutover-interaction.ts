@@ -919,6 +919,9 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "LEARN_MOVE":
     case "LEARN_MOVE_BATCH": {
+      if (!COOP_V2_INTERACTION_REGISTRY[operation.kind].validatePayload(operation.payload)) {
+        return null;
+      }
       if (payload?.type !== "prompt") {
         return wait(
           ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],

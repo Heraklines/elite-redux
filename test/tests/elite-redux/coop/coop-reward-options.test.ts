@@ -16,11 +16,15 @@ import { modifierTypes } from "#data/data-lists";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { ModifierTier } from "#enums/modifier-tier";
+import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
 import {
   getPlayerModifierTypeOptions,
   ModifierTypeOption,
+  PokemonNatureChangeModifierType,
   regenerateModifierPoolThresholds,
+  TmModifierType,
 } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -56,6 +60,21 @@ describe("co-op reward-option host-streaming (#633 Fix #2) - registry round-trip
     expect(serialized[0].tier).toBe(ModifierTier.COMMON);
     expect(Number.isFinite(serialized[0].tier)).toBe(true);
     expect(forcedLure.tier).toBe(serialized[0].tier);
+  });
+
+  it.each([
+    ["TM_COMMON", new TmModifierType(MoveId.PROTECT), MoveId.PROTECT],
+    ["MINT", new PokemonNatureChangeModifierType(Nature.ADAMANT), Nature.ADAMANT],
+  ] as const)("pins the concrete generated %s variant without a watcher RNG roll", (id, ownerType, variant) => {
+    ownerType.id = id;
+    ownerType.setTier(ModifierTier.COMMON);
+    const serialized = serializeRewardOptions([new ModifierTypeOption(ownerType, 0, 0)]);
+    expect(serialized[0].pregenArgs).toEqual([variant]);
+
+    const rebuilt = reconstructRewardOptions(serialized, []);
+    expect(rebuilt).not.toBeNull();
+    expect(rebuilt![0].type.id).toBe(id);
+    expect((rebuilt![0].type as { getPregenArgs(): unknown[] }).getPregenArgs()).toEqual([variant]);
   });
 });
 

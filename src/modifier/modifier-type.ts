@@ -761,6 +761,10 @@ export class PokemonNatureChangeModifierType extends PokemonModifierType {
       natureName: getNatureName(this.nature, true, true, true),
     });
   }
+
+  getPregenArgs(): any[] {
+    return [this.nature];
+  }
 }
 
 /**
@@ -1565,6 +1569,10 @@ export class TmModifierType extends PokemonModifierType {
         : "modifierType:ModifierType.TmModifierType.description",
       { moveName: allMoves[this.moveId].name },
     );
+  }
+
+  getPregenArgs(): any[] {
+    return [this.moveId];
   }
 }
 

@@ -1,4 +1,8 @@
-import { consumePendingDevShop, isCoopBrowserAbilityCapsuleFixtureActive } from "#app/dev-tools/registry";
+import {
+  consumePendingDevShop,
+  getCoopBrowserPartyRewardFixtureId,
+  isCoopBrowserAbilityCapsuleFixtureActive,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
@@ -112,9 +116,25 @@ import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import { SHOP_OPTIONS_ROW_LIMIT } from "#ui/modifier-select-ui-handler";
 import { PartyOption, PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
 import { NumberHolder } from "#utils/common";
+import type { ModifierTypeFunc } from "#types/modifier-types";
 import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
+
+const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, ModifierTypeFunc>> = {
+  TM_CASE: modifierTypes.TM_CASE,
+  ER_LEARNERS_SHROOM: modifierTypes.ER_LEARNERS_SHROOM,
+  MEMORY_MUSHROOM: modifierTypes.MEMORY_MUSHROOM,
+  TM_COMMON: modifierTypes.TM_COMMON,
+  ER_ABILITY_CAPSULE: modifierTypes.ER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_CAPSULE: modifierTypes.ER_GREATER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_RANDOMIZER: modifierTypes.ER_GREATER_ABILITY_RANDOMIZER,
+  ABILITY_RANDOMIZER: modifierTypes.ABILITY_RANDOMIZER,
+  MOVE_SLOT_EXPANDER: modifierTypes.MOVE_SLOT_EXPANDER,
+  PP_UP: modifierTypes.PP_UP,
+  ETHER: modifierTypes.ETHER,
+  MINT: modifierTypes.MINT,
+};
 
 /** Construction-time provenance for the reward phase's co-op address. */
 export type SelectModifierCoopContinuation =
@@ -587,6 +607,24 @@ export class SelectModifierPhase extends BattlePhase {
         // move the real reward cursor before applying the capsule, otherwise a one-card fixture
         // cannot prove that the watcher's cosmetic cursor follows the owner.
         guaranteedModifierTypeFuncs: [modifierTypes.POKEBALL, modifierTypes.ER_ABILITY_CAPSULE],
+        fillRemaining: false,
+      };
+    }
+
+    const coopBrowserPartyRewardId = getCoopBrowserPartyRewardFixtureId();
+    const coopBrowserPartyRewardType =
+      coopBrowserPartyRewardId == null ? null : (COOP_BROWSER_PARTY_REWARD_TYPES[coopBrowserPartyRewardId] ?? null);
+    if (
+      coopController != null
+      && !coopIsWatcher
+      && coopBrowserPartyRewardType != null
+      && this.coopRewardWave() === 1
+      && this.coopRewardSurface == null
+      && !this.rerollCount
+      && !this.isCopy
+    ) {
+      this.customModifierSettings = {
+        guaranteedModifierTypeFuncs: [modifierTypes.POKEBALL, coopBrowserPartyRewardType],
         fillRemaining: false,
       };
     }

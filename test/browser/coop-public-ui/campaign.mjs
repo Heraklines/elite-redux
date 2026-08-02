@@ -2669,6 +2669,37 @@ async function driveLearnMoveDecline(rig, owner, boundary) {
   await owner.press("Space", `campaign-learn-move-stop:${stopConfirmation.index}`);
 }
 
+/** Accept a full-moveset teach and replace the currently selected move through the real Summary UI. */
+async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
+  let picker = boundary.ownerEvent;
+  if (picker.observation.uiMode !== "SUMMARY") {
+    const pickerCursor = owner.evidence.cursor();
+    await owner.press("Space", "campaign-learn-move-accept-replacement");
+    picker = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(pickerCursor, "learn-move:confirm");
+        return candidate != null
+          && candidate.observation.uiMode === "SUMMARY"
+          && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+          && isActionableSemanticObservation(candidate.observation)
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: "actionable learn-move forget picker" },
+    );
+  }
+  if (picker.observation.uiMode !== "SUMMARY") {
+    throw new Error(`[campaign-learn-move] ${owner.label} never opened the full-moveset Summary picker`);
+  }
+  owner.evidence.record("campaign-learn-move-accepted", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    rewardId,
+    selectedOptionId: picker.observation.selectedOptionId,
+  });
+  await owner.press("Space", "campaign-learn-move-forget-selected");
+}
+
 /**
  * Validate an Authority V2 ability workflow while its owner and watcher intentionally render
  * different UI modes. The owner alone may act; the watcher must remain on the phase-specific MESSAGE
@@ -3367,6 +3398,62 @@ function campaignRewardUtility(optionId) {
   return 0;
 }
 
+function visiblePartyRewardFixtureId(authority, configuredId) {
+  const options = Array.isArray(authority?.optionIds) ? authority.optionIds : [];
+  return typeof configuredId === "string" && options.includes(configuredId) ? configuredId : null;
+}
+
+function partyRewardMutationProjection(slot) {
+  return slot == null
+    ? null
+    : {
+        abilityIndex: slot.abilityIndex,
+        abilityId: slot.abilityId,
+        innateAbilityIds: slot.innateAbilityIds,
+        nature: slot.nature,
+        teraType: slot.teraType,
+        maxMoveCount: slot.maxMoveCount,
+        bonusMoveSlots: slot.bonusMoveSlots,
+        moves: slot.moves,
+      };
+}
+
+function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abilityChoices) {
+  const beforeProjection = partyRewardMutationProjection(before);
+  const afterProjection = partyRewardMutationProjection(after);
+  if (beforeProjection == null || afterProjection == null) {
+    throw new Error(`[campaign-party-reward] ${rewardId} had no before/after target material`);
+  }
+  let changed = JSON.stringify(beforeProjection) !== JSON.stringify(afterProjection);
+  if (
+    rewardId === "ER_ABILITY_CAPSULE"
+    || rewardId === "ER_GREATER_ABILITY_CAPSULE"
+    || rewardId === "ER_GREATER_ABILITY_RANDOMIZER"
+  ) {
+    changed = changed || abilityChoices.length === 1;
+  }
+  if (!changed) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} crossed into the next wave without changing its target: `
+        + JSON.stringify({ before: beforeProjection, after: afterProjection, abilityChoices }),
+    );
+  }
+  if (rewardId === "MOVE_SLOT_EXPANDER" && after.maxMoveCount !== before.maxMoveCount + 1) {
+    throw new Error(
+      `[campaign-party-reward] Move Slot Expander did not raise the exact target cap: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (
+    (rewardId === "TM_CASE"
+      || rewardId === "ER_LEARNERS_SHROOM"
+      || rewardId === "MEMORY_MUSHROOM"
+      || rewardId === "TM_COMMON")
+    && JSON.stringify(before.moves?.map(move => move.moveId)) === JSON.stringify(after.moves?.map(move => move.moveId))
+  ) {
+    throw new Error(`[campaign-party-reward] ${rewardId} accepted teaching but retained the old move ids`);
+  }
+}
+
 /**
  * Pick the highest-utility still-untried visible reward after a learn-move decline returns to the
  * same shop. The observer exposes only the option ids a player can currently see; selection still
@@ -3535,7 +3622,11 @@ async function inspectRewardPartySummary(rig, owner, boundary, targetSlot, optio
 
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0);
-  const candidateSlots = target.slots;
+  const forcedSlot = driver.partySlot ?? 0;
+  const candidateSlots =
+    driver.forcePartySlot === true && target.slots.includes(forcedSlot)
+      ? [forcedSlot, ...target.slots.filter(slot => slot !== forcedSlot)]
+      : target.slots;
   let event = boundary.ownerEvent;
   for (const targetSlot of candidateSlots) {
     event = await moveRewardPartyCursor(rig, owner, event, targetSlot);
@@ -3551,6 +3642,7 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       ownerSeat: owner.publicSeat,
       partySlot: targetSlot,
       rewardId: target.rewardId,
+      beforePartySlot: boundary.authority.partySlots?.find(slot => slot.slot === targetSlot) ?? null,
       selectedOptionId: optionEvent.observation.selectedOptionId,
       optionIds: optionEvent.observation.optionIds,
     });
@@ -3925,7 +4017,17 @@ async function driveOnePendingSurface(
         mechanicalBoundary.authority.optionIds?.includes("ER_ABILITY_CAPSULE") && policy.abilityCapsule.required
           ? "ER_ABILITY_CAPSULE"
           : null;
-      const targetId = capsuleTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      const partyRewardTarget = policy.partyMutatingReward.required
+        ? visiblePartyRewardFixtureId(mechanicalBoundary.authority, policy.partyMutatingReward.rewardId)
+        : null;
+      if (policy.partyMutatingReward.required && partyRewardTarget == null) {
+        throw new Error(
+          `[campaign-party-reward] fixture reward ${policy.partyMutatingReward.rewardId} was not visible: `
+            + JSON.stringify(mechanicalBoundary.authority.optionIds ?? null),
+        );
+      }
+      const targetId =
+        capsuleTarget ?? partyRewardTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
       if (targetId == null) {
         if (isExplicitEmptyRewardShop(mechanicalBoundary.authority)) {
           client.evidence.record("campaign-empty-reward-continue", {
@@ -3986,10 +4088,19 @@ async function driveOnePendingSurface(
     } else if (driver.name === "mystery-encounter") {
       await driveMysteryEncounterChoice(rig, client, cursors, driver.preferLastEnabledOption === true);
     } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
-      await driveLearnMoveDecline(rig, client, mechanicalBoundary);
+      if (policy.partyMutatingReward.acceptLearnMove) {
+        await driveLearnMoveAccept(rig, client, mechanicalBoundary, policy.partyMutatingReward.rewardId);
+        rewardRetryState.pendingTarget = null;
+      } else {
+        await driveLearnMoveDecline(rig, client, mechanicalBoundary);
+      }
       const pending = rewardRetryState.pendingTarget;
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
-      if (pending?.rewardId != null && pending.addressKey === addressKey) {
+      if (
+        !policy.partyMutatingReward.acceptLearnMove
+        && pending?.rewardId != null
+        && pending.addressKey === addressKey
+      ) {
         const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
         rejected.add(pending.rewardId);
         rewardRetryState.rejectedByAddress.set(addressKey, rejected);
@@ -4759,6 +4870,7 @@ export async function runCampaign(rig) {
     mysteryGauntlet: policy.mysteryGauntlet,
     registeredInteractions: policy.registeredInteractions,
     abilityCapsule: policy.abilityCapsule,
+    partyMutatingReward: policy.partyMutatingReward,
     navigation: policy.navigation,
     expectReclaim: rig.config.expectReclaim,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
@@ -4781,6 +4893,7 @@ export async function runCampaign(rig) {
       navigationFixture: policy.navigation.required || policy.market.requiredPurchases > 0,
       registeredInteractionsFixture: policy.registeredInteractions.required,
       abilityCapsuleFixture: policy.abilityCapsule.required,
+      partyRewardFixture: policy.partyMutatingReward.required,
     });
     await progress.note("fresh co-op run reached its first shared command surface");
     if (rig.config.expectReclaim) {
@@ -5073,6 +5186,77 @@ export async function runCampaign(rig) {
         client.evidence.record("campaign-registered-interaction-coverage", proof);
       }
     }
+    if (policy.partyMutatingReward.required) {
+      const configuredId = policy.partyMutatingReward.rewardId;
+      const allEvents = clients.flatMap(client => client.evidence.events);
+      const targetActions = allEvents.filter(event => {
+        if (event.kind !== "campaign-reward-target-action") {
+          return false;
+        }
+        return event.rewardId === configuredId;
+      });
+      const learnAccepts = allEvents.filter(
+        event => event.kind === "campaign-learn-move-accepted" && event.rewardId === configuredId,
+      );
+      const abilityChoices = allEvents.filter(event => event.kind === "campaign-ability-choice");
+      if (targetActions.length !== 1) {
+        throw new Error(
+          `[campaign-party-reward] ${configuredId} did not produce exactly one public party action: `
+            + JSON.stringify(targetActions),
+        );
+      }
+      if (policy.partyMutatingReward.acceptLearnMove && learnAccepts.length !== 1) {
+        throw new Error(
+          `[campaign-party-reward] ${configuredId} did not accept exactly one full-moveset learn prompt: `
+            + JSON.stringify(learnAccepts),
+        );
+      }
+      const targetAction = targetActions[0];
+      if (targetAction.partySlot !== policy.rewardTargetSlot || targetAction.beforePartySlot?.coopOwner !== "guest") {
+        throw new Error(
+          `[campaign-party-reward] ${configuredId} did not target the guest-owned combined party slot: `
+            + JSON.stringify(targetAction),
+        );
+      }
+      const finalSlots = clients.map(client => {
+        const command = client.evidence.events.findLast(
+          event =>
+            event.kind === "browser-surface2"
+            && event.observation?.operationClass === "command"
+            && event.observation?.address?.wave >= 2
+            && Array.isArray(event.observation.partySlots),
+        );
+        return command?.observation.partySlots.find(slot => slot.slot === policy.rewardTargetSlot) ?? null;
+      });
+      if (finalSlots.some(slot => slot == null)) {
+        throw new Error(
+          `[campaign-party-reward] ${configuredId} never reached a wave-2 command with the target visible on both clients`,
+        );
+      }
+      const finalProjections = finalSlots.map(partyRewardMutationProjection);
+      if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
+        throw new Error(
+          `[campaign-party-reward] ${configuredId} target material diverged at wave 2: `
+            + JSON.stringify(finalProjections),
+        );
+      }
+      assertPartyRewardChangedConfiguredMaterial(
+        configuredId,
+        targetAction.beforePartySlot,
+        finalSlots[0],
+        abilityChoices,
+      );
+      const proof = {
+        rewardId: configuredId,
+        targetAction,
+        learnAccept: learnAccepts[0] ?? null,
+        abilityChoice: abilityChoices[0] ?? null,
+        finalTarget: finalSlots[0],
+      };
+      for (const client of clients) {
+        client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+      }
+    }
     if (policy.abilityCapsule.required) {
       const events = clients.flatMap(client => client.evidence.events);
       const summaryInspections = events.filter(event => event.kind === "campaign-reward-summary-inspection");
@@ -5151,6 +5335,7 @@ export async function runCampaign(rig) {
       mysteryCoverage,
       registeredInteractionCoverage,
       abilityCapsule: policy.abilityCapsule,
+      partyMutatingReward: policy.partyMutatingReward,
       navigationCoverage,
     });
     await progress.writeStageRollup().catch(() => {});

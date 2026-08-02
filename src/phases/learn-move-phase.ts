@@ -393,10 +393,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         ? this.coopNestedReturnPlan?.onCommit
         : this.coopNestedReturnPlan?.onCancel;
     const allowNextWaveStart =
-      forgetSlot >= 0
-      && forgetSlot < maxMoveCount
-      && this.coopNestedReturnPlan != null
-      && nextInteraction == null;
+      forgetSlot >= 0 && forgetSlot < maxMoveCount && this.coopNestedReturnPlan != null && nextInteraction == null;
     const pending = this.coopPendingV2Decision;
     if (pending != null) {
       return (

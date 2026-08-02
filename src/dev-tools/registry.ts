@@ -200,6 +200,45 @@ export function isCoopBrowserAbilityCapsuleFixtureActive(): boolean {
   return new URLSearchParams(location.search).get("coopfixture") === "ability-capsule";
 }
 
+const COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "ER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_RANDOMIZER",
+  "ABILITY_RANDOMIZER",
+  "MOVE_SLOT_EXPANDER",
+  "PP_UP",
+  "ETHER",
+  "MINT",
+]);
+
+/** Whether this immutable bundle was built for the party-mutating reward matrix. */
+export function isCoopBrowserPartyRewardFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards";
+}
+
+/**
+ * Return the closed reward id selected by the public two-browser matrix.
+ *
+ * Both the immutable build identity and exact URL tokens are required. A copied URL cannot alter a
+ * staging or production reward pool, and an arbitrary modifier id cannot be injected into the test build.
+ */
+export function getCoopBrowserPartyRewardFixtureId(): string | null {
+  if (!isCoopBrowserPartyRewardFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  const query = new URLSearchParams(location.search);
+  if (query.get("coopfixture") !== "party-mutating-rewards") {
+    return null;
+  }
+  const rewardId = query.get("partyreward");
+  return rewardId != null && COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS.has(rewardId) ? rewardId : null;
+}
+
 /** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
 export function isCoopBrowserShowdownFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -453,6 +492,34 @@ export function getCoopBrowserAbilityCapsuleFixtureStarters(): Starter[] | null 
       passive: false,
       nature: Nature.HARDY,
       moveset: [MoveId.WATER_SPOUT] as StarterMoveset,
+      pokerus: false,
+      ivs: new Array(6).fill(31),
+    },
+  ];
+}
+
+/**
+ * One full-moveset target per seat for the party-mutating reward matrix.
+ *
+ * The host deliberately targets combined party slot 1, which belongs to the guest. Four existing
+ * moves force TM Case, ordinary TM, Memory Mushroom, and Learner's Shroom through the nested
+ * owner-only forget picker that exposed the live successor bug. The same Garchomp also supplies
+ * multiple ability slots and a legal remembered/compatible move pool for the other matrix entries.
+ */
+export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
+  if (getCoopBrowserPartyRewardFixtureId() == null) {
+    return null;
+  }
+  return [
+    {
+      speciesId: SpeciesId.GARCHOMP,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.HARDY,
+      moveset: [MoveId.WATER_SPOUT, MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT] as StarterMoveset,
       pokerus: false,
       ivs: new Array(6).fill(31),
     },

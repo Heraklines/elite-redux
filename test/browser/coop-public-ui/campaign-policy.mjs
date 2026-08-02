@@ -122,6 +122,21 @@ const allowedMarketModes = new Set(["leave", "target-held"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
 const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth", "mystery-gauntlet"]);
 const allowedGameSpeeds = new Set([2, 3, 4, 5, 7, 10]);
+const allowedPartyRewardIds = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "ER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_RANDOMIZER",
+  "ABILITY_RANDOMIZER",
+  "MOVE_SLOT_EXPANDER",
+  "PP_UP",
+  "ETHER",
+  "MINT",
+]);
+const partyRewardLearnMoveIds = new Set(["TM_CASE", "ER_LEARNERS_SHROOM", "MEMORY_MUSHROOM", "TM_COMMON"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -159,6 +174,10 @@ export function loadCampaignPolicy() {
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
   const registeredInteractionsRequired = envBoolean("COOP_UI_REQUIRE_REGISTERED_INTERACTIONS", false);
   const abilityCapsuleRequired = envBoolean("COOP_UI_REQUIRE_ABILITY_CAPSULE", false);
+  const partyRewardId = envTrim("COOP_UI_PARTY_REWARD_ID") || null;
+  if (partyRewardId != null && !allowedPartyRewardIds.has(partyRewardId)) {
+    throw new Error(`COOP_UI_PARTY_REWARD_ID must be one of ${[...allowedPartyRewardIds].join(", ")}`);
+  }
   const navigationRequired = envBoolean("COOP_UI_REQUIRE_NAVIGATION_DEPTH", false);
   const crossroadsRoute = envKeys("COOP_UI_CROSSROADS_ROUTE", ["stay", "leave", "stay", "leave"]);
   if (crossroadsRoute.length === 0 || crossroadsRoute.some(choice => choice !== "stay" && choice !== "leave")) {
@@ -190,6 +209,11 @@ export function loadCampaignPolicy() {
     abilityCapsule: {
       required: abilityCapsuleRequired,
       inspectSummary: envBoolean("COOP_UI_REWARD_INSPECT_SUMMARY", false),
+    },
+    partyMutatingReward: {
+      required: partyRewardId != null,
+      rewardId: partyRewardId,
+      acceptLearnMove: partyRewardId != null && partyRewardLearnMoveIds.has(partyRewardId),
     },
     navigation: {
       required: navigationRequired,
@@ -365,6 +389,7 @@ export function buildDispatchTable(policy) {
       owner: { marker: REWARD_OWNER },
       keys: [],
       partySlot: policy.rewardTargetSlot,
+      forcePartySlot: policy.partyMutatingReward.required,
       inspectSummary: policy.abilityCapsule.inspectSummary,
     },
     {

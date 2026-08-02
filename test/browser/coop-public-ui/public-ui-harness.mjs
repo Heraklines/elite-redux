@@ -1140,6 +1140,12 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
     } else if (this.config.journey === "ability-capsule") {
       entryUrl.searchParams.set("coopfixture", "ability-capsule");
+    } else if (this.config.journey === "party-mutating-rewards") {
+      if (this.config.partyRewardId == null) {
+        throw new Error("party-mutating-rewards requires COOP_UI_PARTY_REWARD_ID");
+      }
+      entryUrl.searchParams.set("coopfixture", "party-mutating-rewards");
+      entryUrl.searchParams.set("partyreward", this.config.partyRewardId);
     } else if (this.config.journey === "navigation-depth-30" || this.config.journey === "market-wide-lens") {
       entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
     } else if (this.config.journey === "evolution-sync") {
@@ -3609,6 +3615,7 @@ export class DuoPublicUiRig {
     evolutionFixture = false,
     registeredInteractionsFixture = false,
     abilityCapsuleFixture = false,
+    partyRewardFixture = false,
   } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -3707,7 +3714,9 @@ export class DuoPublicUiRig {
                             : [BULBASAUR_SPECIES_ID]
                           : abilityCapsuleFixture
                             ? [GARCHOMP_SPECIES_ID]
-                            : null;
+                            : partyRewardFixture
+                              ? [GARCHOMP_SPECIES_ID]
+                              : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {

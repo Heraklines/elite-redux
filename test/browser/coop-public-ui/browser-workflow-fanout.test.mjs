@@ -343,6 +343,65 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
 });
 
+test("party-mutating reward matrix drives every nested mutation family into wave two", async () => {
+  const [workflow, registry, selectModifier, starterHandler, config, harness, policy, campaign, browserEntry] =
+    await Promise.all([
+      readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+      readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+      readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
+      readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
+      readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+      readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    ]);
+
+  assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
+  for (const rewardId of [
+    "TM_CASE",
+    "ER_LEARNERS_SHROOM",
+    "MEMORY_MUSHROOM",
+    "TM_COMMON",
+    "ER_ABILITY_CAPSULE",
+    "ER_GREATER_ABILITY_CAPSULE",
+    "ER_GREATER_ABILITY_RANDOMIZER",
+    "ABILITY_RANDOMIZER",
+    "MOVE_SLOT_EXPANDER",
+    "PP_UP",
+    "ETHER",
+    "MINT",
+  ]) {
+    assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
+    assert.match(registry, new RegExp(`COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS[\\s\\S]*${rewardId}`, "u"));
+    assert.match(selectModifier, new RegExp(`COOP_BROWSER_PARTY_REWARD_TYPES[\\s\\S]*${rewardId}`, "u"));
+  }
+  assert.match(config, /"party-mutating-rewards"/u);
+  assert.match(
+    registry,
+    /isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"/u,
+  );
+  assert.match(registry, /getCoopBrowserPartyRewardFixtureId\(\)[\s\S]*get\("partyreward"\)/u);
+  assert.match(
+    registry,
+    /getCoopBrowserPartyRewardFixtureStarters\(\)[\s\S]*SpeciesId\.GARCHOMP[\s\S]*MoveId\.WATER_SPOUT[\s\S]*MoveId\.TACKLE[\s\S]*MoveId\.SPLASH[\s\S]*MoveId\.PROTECT/u,
+  );
+  assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
+  assert.match(
+    harness,
+    /this\.config\.journey === "party-mutating-rewards"[\s\S]*set\("coopfixture", "party-mutating-rewards"\)[\s\S]*set\("partyreward", this\.config\.partyRewardId\)/u,
+  );
+  assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
+  assert.match(policy, /partyRewardLearnMoveIds/u);
+  assert.match(campaign, /driveLearnMoveAccept/u);
+  assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
+  assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
+  assert.match(campaign, /event\.observation\?\.address\?\.wave >= 2/u);
+  assert.match(browserEntry, /maxMoveCount: pokemon\.getMaxMoveCount\(\)/u);
+  assert.match(browserEntry, /innateAbilityIds: safeInnateIds\(pokemon\)/u);
+  assert.match(browserEntry, /moves: pokemon\.getMoveset\(\)\.map/u);
+});
+
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {
   const [workflow, registry, selectStarter, starterHandler, pokemon, config, harness, journeys] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
