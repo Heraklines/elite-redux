@@ -908,6 +908,8 @@ describe("Authority V2 interaction cutover", () => {
     );
     expect(successor).toMatchObject({
       kind: "AWAIT_SUCCESSOR",
+      allowedKinds: ["INTERACTION_COMMIT"],
+      allowNextWaveStart: false,
       allowedInteractionAddresses: [{ surfaceClass, operationKind, wave: 1, turn: 1 }],
     });
   });

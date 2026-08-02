@@ -835,8 +835,11 @@ export function successorOfCoopV2InteractionEnvelope(
       // reward picks, rerolls, and terminal skips close it and must await a separately-authored successor.
       if (isPlainObject(payload?.result) && isCoopInteractionSuccessorRef(payload.result.nextInteraction)) {
         return wait(
-          ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
-          payload?.terminal === true,
+          ["INTERACTION_COMMIT"],
+          // A typed nested successor is the only legal next control. Letting the reward terminal also
+          // authorize wave N+1 made a fast NewBattlePhase race the nested picker; Dex Nav then retired the
+          // already-started battle shell and stranded the replica in its previous replay turn.
+          false,
           [interactionAddressOf(payload.result.nextInteraction)],
         );
       }
