@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import hashlib
+import heapq
 import json
 import math
 import pickle
@@ -112,8 +114,11 @@ def load_records(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]
 
 def load_winner_policy_records(
     path: Path,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    max_policy_decisions: int | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int | None]]:
     """Load only victorious policy targets without retaining the full JSON corpus."""
+    if max_policy_decisions is not None and max_policy_decisions < 1:
+        raise ValueError("max policy decisions must be positive")
     files = jsonl_files(path)
     terminals: list[dict[str, Any]] = []
     input_decisions = 0
@@ -141,7 +146,9 @@ def load_winner_policy_records(
         if terminal.get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
     }
     decisions: list[dict[str, Any]] = []
+    sampled: list[tuple[int, str, dict[str, Any]]] = []
     policy_target_decisions = 0
+    winning_policy_target_decisions = 0
     for file in files:
         with file.open("r", encoding="utf-8") as handle:
             for line_number, line in enumerate(handle, 1):
@@ -155,8 +162,25 @@ def load_winner_policy_records(
                 policy_target_decisions += 1
                 if record.get("episodeId") not in winning_episodes:
                     continue
+                winning_policy_target_decisions += 1
                 validate_decision(record, file, line_number)
-                decisions.append(record)
+                if max_policy_decisions is None:
+                    decisions.append(record)
+                    continue
+                priority = int.from_bytes(
+                    hashlib.sha256(
+                        f"{record_source_partition(record)}\0{record['decisionId']}".encode("utf-8")
+                    ).digest()[:8],
+                    "big",
+                )
+                entry = (-priority, record["decisionId"], record)
+                if len(sampled) < max_policy_decisions:
+                    heapq.heappush(sampled, entry)
+                elif entry > sampled[0]:
+                    heapq.heapreplace(sampled, entry)
+
+    if max_policy_decisions is not None:
+        decisions = [entry[2] for entry in sorted(sampled, key=lambda entry: entry[1])]
 
     if not decisions:
         raise ValueError("winner-only policy selection removed every combat decision")
@@ -166,7 +190,9 @@ def load_winner_policy_records(
     return decisions, selected_terminals, {
         "inputDecisions": input_decisions,
         "policyTargetDecisions": policy_target_decisions,
+        "winningPolicyTargetDecisions": winning_policy_target_decisions,
         "retainedDecisions": len(decisions),
+        "maxPolicyDecisions": max_policy_decisions,
         "inputEpisodes": len(terminals),
         "winningEpisodes": len(winning_episodes),
         "retainedEpisodes": len(selected_episodes),
@@ -445,29 +471,40 @@ def record_source_partition(record: dict[str, Any]) -> str:
 def make_rows(
     decisions: list[dict[str, Any]],
 ) -> tuple[np.ndarray, np.ndarray, list[str], list[str], list[str], list[str], list[int]]:
-    x_rows: list[list[float]] = []
-    labels: list[int] = []
+    first_features = decisions[0]["candidateFeatures"][0]["values"]
+    feature_count = len(first_features)
+    row_count = sum(len(decision["candidates"]) for decision in decisions)
+    x_rows = np.empty((row_count, feature_count), dtype=np.float32)
+    labels = np.empty(row_count, dtype=np.int8)
     decision_ids: list[str] = []
     episodes: list[str] = []
     split_groups: list[str] = []
     source_partitions: list[str] = []
     candidate_counts: list[int] = []
+    row_index = 0
     for decision in decisions:
         candidates = decision["candidates"]
+        features_by_id = {
+            row["candidateId"]: row["values"]
+            for row in decision["candidateFeatures"]
+        }
         candidate_counts.append(len(candidates))
         for candidate in candidates:
-            x_rows.append(embedded_candidate_features(decision, candidate))
-            labels.append(int(candidate["id"] == decision["chosenCandidateId"]))
+            values = features_by_id[candidate["id"]]
+            if len(values) != feature_count:
+                raise ValueError(
+                    f"dataset contains inconsistent feature counts: expected {feature_count}, got {len(values)}"
+                )
+            x_rows[row_index] = values
+            labels[row_index] = int(candidate["id"] == decision["chosenCandidateId"])
             decision_ids.append(decision["decisionId"])
             episodes.append(decision["episodeId"])
             split_groups.append(record_split_group(decision))
             source_partitions.append(record_source_partition(decision))
-    feature_counts = {len(row) for row in x_rows}
-    if len(feature_counts) != 1:
-        raise ValueError(f"dataset contains inconsistent feature counts: {sorted(feature_counts)}")
+            row_index += 1
     return (
-        np.asarray(x_rows, dtype=np.float32),
-        np.asarray(labels),
+        x_rows,
+        labels,
         decision_ids,
         episodes,
         split_groups,
@@ -893,9 +930,14 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("loss episode weight must be between 0 and 1")
     if args.winner_only_policy and args.loss_episode_weight != 0:
         raise ValueError("winner-only policy training requires --loss-episode-weight 0")
-    winner_only_selection: dict[str, int] | None = None
+    if args.max_policy_decisions is not None and not args.winner_only_policy:
+        raise ValueError("--max-policy-decisions requires --winner-only-policy")
+    winner_only_selection: dict[str, int | None] | None = None
     if args.winner_only_policy:
-        all_decisions, terminals, winner_only_selection = load_winner_policy_records(args.data)
+        all_decisions, terminals, winner_only_selection = load_winner_policy_records(
+            args.data,
+            args.max_policy_decisions,
+        )
     else:
         all_decisions, terminals = load_records(args.data)
     dictionary_coverage = validate_data_dictionary(args.dictionary, all_decisions)
@@ -917,6 +959,22 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         rollout_decisions,
         bool(getattr(args, "diagnostic_source_imitation", False)),
     )
+    decision_report = {
+        "decisions": len(decisions),
+        "inputDecisions": len(all_decisions),
+        "excludedPolicyDecisions": len(rollout_decisions) - len(policy_decisions),
+        "diagnosticSourceDecisions": len(decisions) if diagnostic_only else 0,
+        "sourcePolicies": Counter(record_policy_source(record) for record in all_decisions),
+        "policyTargetSources": Counter(record_policy_source(record) for record in policy_decisions),
+        "diagnosticSourcePolicies": (
+            Counter(record_policy_source(record) for record in decisions) if diagnostic_only else Counter()
+        ),
+        "formats": Counter(record["observation"]["format"] for record in decisions),
+    }
+    hashes = {
+        key: sorted({record[key] for record in decisions})
+        for key in ("buildSha", "dexHash", "dictionaryHash")
+    }
     x, y, decision_ids, episodes, split_group_ids, source_partition_ids, candidate_counts = make_rows(decisions)
     train_partitions, test_partitions = split_groups(source_partition_ids, args.seed)
     train_mask = np.asarray([partition in train_partitions for partition in source_partition_ids])
@@ -953,6 +1011,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "modelBytes": 0,
         },
     ]
+    del test_decisions, decisions, policy_decisions, rollout_decisions, all_decisions
+    gc.collect()
     artifacts: dict[str, dict[str, Any]] = {}
     fitted_models: dict[str, tuple[Any, bool]] = {}
     for name, model, scale, ranker in model_specs(args.seed):
@@ -1224,10 +1284,6 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         elif (args.models_dir / "outcome-selected-model.json").exists():
             (args.models_dir / "outcome-selected-model.json").unlink()
 
-    hashes = {
-        key: sorted({record[key] for record in decisions})
-        for key in ("buildSha", "dexHash", "dictionaryHash")
-    }
     report = {
         "schemaVersion": SCHEMA_VERSION,
         "metricScope": "offline imitation of the recorded source policy; not battle win rate",
@@ -1245,7 +1301,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         },
         "seed": args.seed,
         "data": {
-            "decisions": len(decisions),
+            "decisions": decision_report["decisions"],
             "candidateRows": len(y),
             "episodes": len(set(episodes)),
             "successfulEpisodes": len({episode for episode, successful in zip(episodes, successful_rows) if successful}),
@@ -1257,15 +1313,13 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "testSplitGroups": sorted({group for group, selected in zip(split_group_ids, test_mask) if selected}),
             "meanCandidates": float(np.mean(candidate_counts)),
             "p95Candidates": float(np.percentile(candidate_counts, 95)),
-            "inputDecisions": len(all_decisions),
-            "excludedPolicyDecisions": len(rollout_decisions) - len(policy_decisions),
-            "diagnosticSourceDecisions": len(decisions) if diagnostic_only else 0,
-            "sourcePolicies": Counter(record_policy_source(record) for record in all_decisions),
-            "policyTargetSources": Counter(record_policy_source(record) for record in policy_decisions),
-            "diagnosticSourcePolicies": (
-                Counter(record_policy_source(record) for record in decisions) if diagnostic_only else Counter()
-            ),
-            "formats": Counter(record["observation"]["format"] for record in decisions),
+            "inputDecisions": decision_report["inputDecisions"],
+            "excludedPolicyDecisions": decision_report["excludedPolicyDecisions"],
+            "diagnosticSourceDecisions": decision_report["diagnosticSourceDecisions"],
+            "sourcePolicies": decision_report["sourcePolicies"],
+            "policyTargetSources": decision_report["policyTargetSources"],
+            "diagnosticSourcePolicies": decision_report["diagnosticSourcePolicies"],
+            "formats": decision_report["formats"],
             "terminalOutcomes": Counter(record["outcome"] for record in terminals),
             "winnerOnlySelection": winner_only_selection,
             "identity": hashes,
@@ -1360,6 +1414,11 @@ def parse_args() -> argparse.Namespace:
         "--winner-only-policy",
         action="store_true",
         help="stream-select victorious policy targets before fitting and train each tree family only once",
+    )
+    parser.add_argument(
+        "--max-policy-decisions",
+        type=int,
+        help="deterministic cap for winner-only CPU fitting; all source data remains available to neural training",
     )
     parser.add_argument(
         "--diagnostic-source-imitation",

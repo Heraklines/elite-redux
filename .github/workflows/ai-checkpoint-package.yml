@@ -68,6 +68,7 @@ jobs:
           --dictionary ai-dictionary/er-combat-data-dictionary.json
           --loss-episode-weight 0
           --winner-only-policy
+          --max-policy-decisions 4000
           --report-json ai-report/leaderboard.json
           --report-md ai-report/leaderboard.md
           --models-dir ai-report/models

@@ -12,6 +12,7 @@ from train_candidate_baselines import (
     fit_stacked_tree_ensemble,
     is_policy_target,
     load_winner_policy_records,
+    make_rows,
     ordered_group_sizes,
     record_split_group,
     record_source_partition,
@@ -80,12 +81,14 @@ class CandidateBaselineContractTest(unittest.TestCase):
 
         rows = [
             decision("winner", "checkpoint-neural-v4", True),
+            decision("winner-two", "checkpoint-tree-v1", True),
             decision("loser", "checkpoint-neural-v4", True),
             decision("engine", "engine-hardest-v1", False),
             decision("heuristic", "smart-default-v1", True),
         ]
         outcomes = {
             "winner": "victory",
+            "winner-two": "victory",
             "loser": "player-wiped",
             "engine": "victory",
             "heuristic": "victory",
@@ -104,12 +107,18 @@ class CandidateBaselineContractTest(unittest.TestCase):
             path = Path(directory) / "decisions.jsonl"
             path.write_text("".join(f"{json.dumps(row)}\n" for row in rows), encoding="utf-8")
             selected, terminals, report = load_winner_policy_records(path)
+            capped, capped_terminals, capped_report = load_winner_policy_records(path, 1)
 
-        self.assertEqual([row["episodeId"] for row in selected], ["winner"])
-        self.assertEqual([row["episodeId"] for row in terminals], ["winner"])
-        self.assertEqual(report["inputDecisions"], 4)
-        self.assertEqual(report["policyTargetDecisions"], 2)
-        self.assertEqual(report["retainedDecisions"], 1)
+        self.assertEqual([row["episodeId"] for row in selected], ["winner", "winner-two"])
+        self.assertEqual([row["episodeId"] for row in terminals], ["winner", "winner-two"])
+        self.assertEqual(report["inputDecisions"], 5)
+        self.assertEqual(report["policyTargetDecisions"], 3)
+        self.assertEqual(report["retainedDecisions"], 2)
+        self.assertEqual(len(capped), 1)
+        self.assertEqual(capped_terminals[0]["episodeId"], capped[0]["episodeId"])
+        self.assertEqual(capped_report["maxPolicyDecisions"], 1)
+        feature_rows, *_ = make_rows(selected)
+        self.assertEqual(feature_rows.dtype, np.float32)
 
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {
