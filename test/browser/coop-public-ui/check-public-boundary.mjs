@@ -236,6 +236,9 @@ if (
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"')
+  || !/getCoopBrowserPartyRewardFixtureId\(\)[\s\S]*!isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*query\.get\("coopfixture"\) !== "party-mutating-rewards"[\s\S]*COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS\.has\(rewardId\)/u.test(
+    fixtureRegistry,
+  )
   || !fixtureRegistry.includes('get("coopfixture")')
   || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
@@ -250,8 +253,9 @@ if (
   )
   || !starterHandler.includes("!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)")
   || !selectStarterPhase.includes("const navigationFixtureActive = isCoopBrowserNavigationFixtureActive()")
-  || !selectStarterPhase.includes(
-    "cost: navigationFixtureActive ? 0 : globalScene.gameData.getSpeciesStarterValue(s.speciesId)",
+  || !selectStarterPhase.includes("const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId() != null")
+  || !/cost:\s*navigationFixtureActive \|\| partyRewardFixtureActive\s*\? 0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u.test(
+    selectStarterPhase,
   )
 ) {
   failures.push("Browser gameplay checkpoints must require the exact build+URL gate at their visible setup UI");
