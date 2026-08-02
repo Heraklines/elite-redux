@@ -1593,11 +1593,14 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
               driveBestCampaignMove(client, commandPurpose, {
                 timeoutMs: rig.config.timeoutMs,
                 // Ordinary campaigns keep choosing the strongest visible move. The sealed
-                // navigation fixture deliberately exposes a legal multi-type coverage set and
-                // cycles it like a human responding to an immunity; otherwise one immune trainer
-                // can consume the entire four-hour geography journey without testing navigation.
+                // navigation/market fixture deliberately exposes a legal multi-type coverage set
+                // and cycles it like a human responding to an immunity; otherwise one immune foe
+                // can consume the longitudinal journey before it reaches the target interactions.
                 commandEvent,
-                cycleIndex: policy.navigation.required ? turn - 1 : 0,
+                cycleIndex:
+                  policy.navigation.required || policy.market.requiredPurchases > 0
+                    ? turn - 1
+                    : 0,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },

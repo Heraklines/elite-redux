@@ -175,6 +175,7 @@ test("gold-standard coverage requires both owner parities and a later command af
 test("journey workflow enables the continuous two-parity contract and trace-off public lane", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const harness = await readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8");
+  const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
   assert.match(
     workflow,
     /COOP_UI_CAMPAIGN_WAVES: \$\{\{ inputs\.journey == 'navigation-depth-30' && '30' \|\| '20' \}\}/u,
@@ -203,9 +204,14 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
     "the market route must never be disguised as probe and silently lose its survival fixture",
   );
   assert.match(
-    await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    campaign,
     /navigationFixture: policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0/u,
     "the market campaign must confirm its already-seeded level-100 team instead of adding default starters",
+  );
+  assert.match(
+    campaign,
+    /cycleIndex:\s+policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0\s+\? turn - 1\s+: 0/u,
+    "the market campaign cycles its sealed coverage moves instead of looping forever on an immunity",
   );
   assert.match(
     harness,
