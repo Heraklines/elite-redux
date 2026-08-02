@@ -1729,6 +1729,7 @@ test("an embedded Mystery battle recognizes an exact shared next-wave encounter 
       seatsWithInput: [localSeat],
       membershipRevision: 3,
       connectionGeneration: 0,
+      connectionGenerations: [0, 0],
       mysteryEncounterType: 87,
       stateDigest: "next-wave-state",
       address: { epoch: 7, wave: 3, turn: 1 },

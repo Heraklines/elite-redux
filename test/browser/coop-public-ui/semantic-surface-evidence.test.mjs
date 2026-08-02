@@ -19,6 +19,7 @@ function valid(overrides = {}) {
     address: { epoch: 7, wave: 10, turn: 2 },
     membershipRevision: 3,
     connectionGeneration: 1,
+    connectionGenerations: [1, 1],
     localSeat: 0,
     localRole: "host",
     ownerSeat: 1,
@@ -47,6 +48,7 @@ test("semantic evidence ignores unrelated console lines and freezes a valid proo
   assert.ok(Object.isFrozen(parsed.address));
   assert.ok(Object.isFrozen(parsed.ready));
   assert.ok(Object.isFrozen(parsed.seatsWithInput));
+  assert.ok(Object.isFrozen(parsed.connectionGenerations));
 });
 
 test("trainer postcondition evidence is exact, frozen, and rejects a dishonest derived verdict", () => {

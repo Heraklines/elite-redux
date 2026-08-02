@@ -119,6 +119,7 @@ function commandFrontierObservation(
       address,
       membershipRevision: 9,
       connectionGeneration: 2,
+      connectionGenerations: [2, 2],
       stateDigest,
       localSeat,
       seatsWithInput: [localSeat],
@@ -137,6 +138,23 @@ test("command frontier accepts one real owner plus the half-wiped partner watche
   assert.equal(match?.address, "73:1:3");
   assert.equal(match?.hostProjection.kind, "watcher");
   assert.equal(match?.guestProjection.kind, "owner");
+});
+
+test("command frontier compares the canonical per-seat generation vector after sequential hot rejoin", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  const hostObservation = commandFrontierObservation(0, "owner");
+  hostObservation.observation.connectionGeneration = 1;
+  hostObservation.observation.connectionGenerations = [1, 2];
+  const guestObservation = commandFrontierObservation(1, "owner");
+  guestObservation.observation.connectionGeneration = 2;
+  guestObservation.observation.connectionGenerations = [1, 2];
+  host.evidence.push(hostObservation);
+  guest.evidence.push(guestObservation);
+
+  const match = findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null);
+  assert.deepEqual(match?.comparable.connectionGenerations, [1, 2]);
+  assert.equal(match?.address, "73:1:3");
 });
 
 test("command frontier accepts an exact replay waiter as a non-actionable watcher", () => {
@@ -193,7 +211,7 @@ test("command frontier rejects owner/watcher digest or generation disagreement",
   assert.equal(findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null), null);
 
   guest.evidence.events[0].observation.stateDigest = "host-state";
-  guest.evidence.events[0].observation.connectionGeneration += 1;
+  guest.evidence.events[0].observation.connectionGenerations = [2, 3];
   assert.equal(findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null), null);
 });
 

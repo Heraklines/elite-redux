@@ -1400,7 +1400,12 @@ export class CoopInteractionRelay {
     reroll: number,
     timeoutMs = this.timeoutMs,
     rewardSurface?: CoopRewardSurfaceIdentity,
+    signal?: AbortSignal,
   ): Promise<CoopSerializedRewardOption[] | null> {
+    if (signal?.aborted) {
+      coopWarn("relay", `AWAIT rewardOptions seq=${seq} reroll=${reroll} -> ABORTED before wait`);
+      return Promise.resolve(null);
+    }
     if (this.cancelledSeqs.has(seq)) {
       coopWarn(
         "relay",
@@ -1433,12 +1438,14 @@ export class CoopInteractionRelay {
     return new Promise<CoopSerializedRewardOption[] | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
+      let removeAbortListener: () => void = () => {};
       const finish = (res: CoopSerializedRewardOption[] | null) => {
         if (settled) {
           return;
         }
         settled = true;
         cancelTimer();
+        removeAbortListener();
         if (this.rewardOptionsPending.get(key) === finish) {
           this.rewardOptionsPending.delete(key);
         }
@@ -1453,6 +1460,15 @@ export class CoopInteractionRelay {
         resolve(res);
       };
       this.rewardOptionsPending.set(key, finish);
+      if (signal != null) {
+        const abort = () => finish(null);
+        signal.addEventListener("abort", abort, { once: true });
+        removeAbortListener = () => signal.removeEventListener("abort", abort);
+        if (signal.aborted) {
+          finish(null);
+          return;
+        }
+      }
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
       if (!this.isInteractionAuthorityV2()) {
         coopLog("relay", `SEND requestRewardOptions key=${key} (authoritative replay)`);

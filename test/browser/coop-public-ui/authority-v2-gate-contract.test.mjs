@@ -1422,6 +1422,17 @@ test("interaction DATA cannot wait on a successor phase that ordinary V2 project
       `${file} consumes its projected reward predecessor only after an accepted committed V2 result`,
     );
   }
+  assert.match(selectModifierPhase, /private readonly coopWaitLease = new AbortController\(\)/u);
+  assert.match(
+    selectModifierPhase,
+    /public override retire\(\): void \{[\s\S]*?super\.retire\(\);[\s\S]*?this\.coopWaitLease\.abort\(\);[\s\S]*?\}/u,
+    "a consumed reward continuation cancels every phase-owned relay wait",
+  );
+  assert.match(
+    selectModifierPhase,
+    /awaitRewardOptions\([\s\S]*?this\.coopWaitLease\.signal[\s\S]*?awaitInteractionChoice\([\s\S]*?this\.coopWaitLease\.signal/u,
+    "the reward option pool and terminal action waits share the phase retirement lease",
+  );
 });
 
 test("Mystery publishes the real actionability edge after its click-through guard expires", () => {

@@ -624,6 +624,25 @@ describe("co-op alternating-interaction relay (#633)", () => {
       expect(res).toEqual(options);
     });
 
+    it("lets a retired reward phase abort its option-pool wait without sticky-cancelling the seq", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const cancelTimer = vi.fn();
+      const schedule = vi.fn(() => cancelTimer);
+      const watcher = new CoopInteractionRelay(guest, { schedule });
+      const firstLease = new AbortController();
+
+      const retired = watcher.awaitRewardOptions(7, 0, 1_200_000, undefined, firstLease.signal);
+      firstLease.abort();
+      await expect(retired).resolves.toBeNull();
+
+      owner.sendRewardOptions(7, 0, options);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await expect(watcher.awaitRewardOptions(7, 0)).resolves.toEqual(options);
+      expect(schedule).toHaveBeenCalledOnce();
+      expect(cancelTimer, "retiring the phase must clear its relay timeout").toHaveBeenCalledOnce();
+    });
+
     it("buffers options that arrive before the watcher awaits (race fix)", async () => {
       const { host, guest } = createLoopbackPair();
       const owner = new CoopInteractionRelay(host);
