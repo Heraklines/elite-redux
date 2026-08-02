@@ -1381,6 +1381,10 @@ export class SelectModifierPhase extends BattlePhase {
           this.coopPendingAuthorityNextInteraction = requiresLearnMoveDecision
             ? { kind: "learn-move", wave: this.coopRewardWave(), turn: this.coopRewardTurn() }
             : undefined;
+          // Evolution is the action's real asynchronous terminal. Record that exact phase-owned proof
+          // before asking the authority log to reserve the result and its successor atomically; the live
+          // seam deliberately rejects a complete-looking post-image whose consumer has not yet settled.
+          this.coopProveV2RewardOperationComplete(operationId);
           const committed = this.coopCommitPendingAuthorityResult(operationId);
           if (committed) {
             this.coopAdvanceInteraction();

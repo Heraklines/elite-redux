@@ -606,13 +606,18 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   );
   assert.match(
     selectModifier,
-    /coopPendingEvolutionSettlementOperationId[\s\S]*coopSettleRewardEvolution[\s\S]*coopCommitPendingAuthorityResult\(operationId\)/u,
-    "an evolution reward must not commit until its asynchronous exact post-image exists",
+    /coopPendingEvolutionSettlementOperationId[\s\S]*coopSettleRewardEvolution[\s\S]*coopPendingEvolutionSettlementOperationId = null[\s\S]*coopPendingAuthorityPresentation = structuredClone\(presentation\)[\s\S]*coopProveV2RewardOperationComplete\(operationId\)[\s\S]*coopCommitPendingAuthorityResult\(operationId\)/u,
+    "an evolution reward must capture its asynchronous post-image and record exact terminal proof before committing",
   );
   assert.match(
     evolutionPhase,
     /installCoopV2TerminalSuccessor[\s\S]*proveCoopRewardEvolutionSettlement[\s\S]*coopSettleRewardEvolution[\s\S]*this\.postEvolve\(evolvedPokemon\)/u,
     "the live EvolutionPhase must install and prove the delayed reward successor before releasing children",
+  );
+  assert.match(
+    evolutionPhase,
+    /v2ControlLedger\.latestControl[\s\S]*v2ControlLedger\.sourceEntryOf\(successor\)[\s\S]*successor\?\.kind === "AWAIT_SUCCESSOR"[\s\S]*successor\.afterOperationId === operationId[\s\S]*successor\.wave === this\.coopRewardSourceWave[\s\S]*successor\.turn === this\.coopRewardSourceTurn[\s\S]*v2ControlLedger\.isMaterialApplied\(successor\)[\s\S]*sourceEntry\.operationId === operationId/u,
+    "the authority EvolutionPhase may recover its post-commit successor only from the exact material-applied ledger claim",
   );
   assert.match(
     learnMovePhase,

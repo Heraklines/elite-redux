@@ -13,6 +13,7 @@ import {
   getCoopRuntime,
   recordCoopWaveProgressionPresentation,
   runWhenCoopRuntimeActive,
+  settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
@@ -170,7 +171,33 @@ export class EvolutionPhase extends Phase {
     if (this.coopRewardOperationId == null) {
       return true;
     }
-    const terminal = this.coopRewardTerminalSettlement;
+    const operationId = this.coopRewardOperationId;
+    const runtime = this.coopOwningRuntime;
+    const successor = runtime?.v2ControlLedger.latestControl;
+    const sourceEntry = runtime == null || successor == null ? null : runtime.v2ControlLedger.sourceEntryOf(successor);
+    // Replica materialization installs the successor directly on this phase before it applies the
+    // presentation. The authority authored the post-image itself, so its successor exists only after the
+    // atomic log commit. Recover that authority-local binding exclusively from the exact material-applied
+    // ledger claim; a merely latest/ambient wait must never release this asynchronous evolution.
+    const authorityTerminal =
+      runtime?.controller.authorityRole === "authority"
+      && successor?.kind === "AWAIT_SUCCESSOR"
+      && successor.afterOperationId === operationId
+      && successor.epoch === runtime.controller.sessionEpoch
+      && successor.wave === this.coopRewardSourceWave
+      && successor.turn === this.coopRewardSourceTurn
+      && runtime.v2ControlLedger.isMaterialApplied(successor)
+      && sourceEntry?.kind === "INTERACTION_COMMIT"
+      && sourceEntry.operationId === operationId
+      && sourceEntry.context.sessionEpoch === successor.epoch
+      && sourceEntry.context.authoritySeatId === runtime.controller.localSeatId
+        ? {
+            operationId,
+            successor,
+            settle: () => settleCoopV2InteractionOperation(operationId, runtime),
+          }
+        : null;
+    const terminal = this.coopRewardTerminalSettlement ?? authorityTerminal;
     if (terminal == null || terminal.operationId !== this.coopRewardOperationId) {
       return false;
     }
