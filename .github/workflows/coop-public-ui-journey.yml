@@ -157,7 +157,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -187,6 +187,7 @@ jobs:
             src/phases/er-dex-nav-phase.ts \
             src/phases/er-greater-ability-capsule-phase.ts \
             src/phases/er-greater-ability-randomizer-phase.ts \
+            src/phases/party-heal-phase.ts \
             src/phases/select-modifier-phase.ts \
             src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \

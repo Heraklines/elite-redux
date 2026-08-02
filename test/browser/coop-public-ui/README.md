@@ -48,10 +48,12 @@ oracle requires the authority and retained renderer to emit the same immutable e
 client's exact actionable evolution prompt, advances both with public Space input, and reaches wave 2.
 
 The ten-wave `mystery-gauntlet` campaign has the same narrowly gated setup boundary. Its exact campaign bundle
-accepts only `coopfixture=campaign-survival`, which visibly seeds a per-seat-point-legal Seel/Castform/Spinda team.
-Both browsers submit it with public keys. Other campaign profiles receive no fixture URL and retain natural fresh-account
-starter selection. This keeps the Mystery lane focused on its five encounters, ghost, boss, Bargain, rewards, and
-replacement/control boundaries instead of failing nondeterministically on early-run party balance.
+accepts `coopfixture=campaign-survival`, which visibly seeds a per-seat-point-legal Seel/Castform/Spinda team at
+level 100. The clean animations-skipped depth profile uses the separate `coopfixture=campaign-party` token for the
+same visible point-legal roster at normal levels, preserving EXP, damage, fainting, and evolution behavior. Both
+browsers submit their teams with public keys. The animation-surface and dirty-account profiles receive neither
+token and retain account-owned starter state. This keeps Mystery focused on its scripted interaction boundaries,
+keeps depth representative without random starter-layout variance, and leaves dirty-account reclaim evidence real.
 
 The CI public-UI matrix disables only Puppeteer's optional screenshot-enabled CDP performance timeline by
 default. A measured trace artifact reached 537 MB and starved two real 10x clients even though both kept

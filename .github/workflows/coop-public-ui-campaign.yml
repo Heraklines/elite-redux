@@ -165,6 +165,7 @@ jobs:
             .github/workflows/coop-public-ui-campaign.yml \
             scripts/coop-browser-entry.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/phases/party-heal-phase.ts \
             test/browser/coop-public-ui/browser-artifact-prune.test.mjs \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
             test/browser/coop-public-ui/campaign-lifecycle.mjs \
@@ -236,8 +237,9 @@ jobs:
           # Staging/dev exposes the fifth Mystery difficulty. This exact immutable bundle therefore
           # exercises the same dev-gated picker and gauntlet schedule testers use on staging.
           VITE_DEV_TOOLS: 1
-          # The exact campaign bundle accepts one URL-gated visible starter fixture. Only the Mystery
-          # profile supplies that URL; surface/depth/dirty continue selecting fresh-account starters.
+          # The exact campaign bundle accepts URL-gated visible starter fixtures. Mystery uses the
+          # level-100 survival roster and clean depth uses the normal-level point-legal roster;
+          # surface and dirty-account profiles keep ordinary account-owned starter state.
           VITE_COOP_BROWSER_FIXTURE: campaign-survival
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           # The production-fidelity campaign must exercise the architecture being promoted, not silently

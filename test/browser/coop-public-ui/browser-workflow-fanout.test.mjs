@@ -136,6 +136,20 @@ test("journey push qualification covers ordinary gameplay phases and statically 
   );
 });
 
+test("browser qualifications statically own the biome-heal progression boundary", async () => {
+  const journeyWorkflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
+  const campaignWorkflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-campaign.yml"), "utf8");
+  const journeyBuild = jobBlock(journeyWorkflow, "browser-build");
+  const campaignBuild = jobBlock(campaignWorkflow, "browser-build");
+  assert.match(
+    journeyBuild,
+    /owned=.*src\/phases\/party-heal-phase/u,
+    "PartyHealPhase TypeScript diagnostics cannot hide in the repository baseline",
+  );
+  assert.match(journeyBuild, /pnpm exec biome check[\s\S]*src\/phases\/party-heal-phase\.ts/u);
+  assert.match(campaignBuild, /pnpm exec biome check[\s\S]*src\/phases\/party-heal-phase\.ts/u);
+});
+
 test("journey push defaults to fresh-wave2 while manual milestone runs retain fresh-resume", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8");
   const selectedJourneyExpression =
