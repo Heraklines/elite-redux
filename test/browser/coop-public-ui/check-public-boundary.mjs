@@ -235,6 +235,7 @@ if (
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "navigation-depth-30"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle"')
+  || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"')
   || !fixtureRegistry.includes('get("coopfixture")')
   || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
@@ -242,8 +243,11 @@ if (
   || !starterHandler.includes("getCoopBrowserCampaignFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserNavigationFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserEvolutionFixtureStarters()")
+  || !starterHandler.includes("getCoopBrowserPartyRewardFixtureStarters()")
   || !starterHandler.includes("allowUncaught: true")
-  || !starterHandler.includes("allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters")
+  || !/allowOverValueLimit:\s*coopBrowserStarters === coopBrowserNavigationStarters\s*\|\|\s*coopBrowserStarters === coopBrowserPartyRewardStarters/u.test(
+    starterHandler,
+  )
   || !starterHandler.includes("!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)")
   || !selectStarterPhase.includes("const navigationFixtureActive = isCoopBrowserNavigationFixtureActive()")
   || !selectStarterPhase.includes(
