@@ -11346,6 +11346,8 @@ function materializeCoopAbilityOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
     || payload == null
     || !Array.isArray(payload.data)
     || !payload.data.every(Number.isFinite)
+    || typeof payload.allowNextWaveStart !== "boolean"
+    || (payload.allowNextWaveStart && payload.nextInteraction !== undefined)
   ) {
     return false;
   }

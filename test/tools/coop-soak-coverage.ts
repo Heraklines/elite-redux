@@ -214,9 +214,10 @@ export const COOP_DEDICATED_SCENARIO_COVERAGE: ReadonlyMap<string, CoopDedicated
       testFile: "test/browser/coop-public-ui/campaign.mjs",
       surfaces: new Set([modeKey(UiMode.SUMMARY), uiOperationKey(UiMode.SUMMARY, "op:reward")]),
       residual:
-        "The exact-build ability-capsule journey drives reward PARTY -> Summary -> Back -> the same addressed "
-        + "PARTY target -> ability choice in two real browsers. The default headless soak intentionally does not "
-        + "browse this presentation-only child surface.",
+        "The exact-build ability-capsule journey moves the top-level reward cursor and proves the watcher's exact "
+        + "addressed card, then drives PARTY -> Summary -> Back -> the same addressed PARTY target -> ability "
+        + "choice in two real browsers. The default headless soak intentionally does not browse these "
+        + "presentation-only surfaces.",
       evidence: "documentation-only",
     },
   ],

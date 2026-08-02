@@ -6745,3 +6745,30 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   self-healing lobby moving, and the exact Title/MESSAGE save decision remains keyboard-actionable on either
   role before a gameplay binding exists. All battle/interaction observers still require the accepted P33 frame
   axes, and `findBinding()` filters out provisional pairing-role observations.
+
+## 2026-08-02 - Ability result successor and reward-cursor oracle
+
+- Exact-SHA Ability Capsule run `30723962028` proved the nested Summary fix and completed the capsule choice,
+  then exposed a real product failure at the next command frontier. Revision 7 installed `ABILITY_PICK` with an
+  `AWAIT_SUCCESSOR` carrying `nextWave:0`; when the host reached wave 2 turn 1, Authority V2 correctly rejected
+  its `CONTROL_COMMIT` as unauthorized and terminated both clients.
+- `ABILITY_PICK` now carries a mandatory immutable `allowNextWaveStart` result bit. Consuming an ordinary reward
+  states `true`; cancel and explicit reward/Mystery return edges state `false`. The closed registry, materializer,
+  and successor adapter reject missing or contradictory payloads, so no local phase guesses this exit.
+- The player-reported reward cursor gap was also absent from the browser oracle: the previous Ability fixture
+  offered only one card, and paired convergence was checked only before navigation. The fixture now presents
+  Poke Balls plus Ability Capsule; the driver moves through real public keys and requires the watcher to expose
+  the same selection, option list, address, digest, and sole owner before it may submit the capsule.
+- The next Ability run must qualify both the new cursor proof and the corrected wave-2 successor on one sealed
+  build. Same-tab rejoin run `30723963985` is classified separately below.
+
+## 2026-08-02 - Same-tab rejoin harness role restoration
+
+- Exact-SHA run `30723963985` proved both browsers through wave 2, reloaded the existing tabs, completed the
+  real `/coop/v3/rejoin` path and authenticated fingerprint exchange, then failed inside the driver with
+  `resumeRun requires a paired public host`. This is a harness-context red: `reloadInPlace()` correctly clears
+  page-owned public roles, but the journey never restored its already-proven account/role map before Resume.
+- The harness now snapshots the exact host/seat-0 and guest/seat-1 clients before reload, requires the new
+  provisional P33 host observation to match that mapping, and restores only those same-context identities.
+  It still does not promote the provisional event to a gameplay binding; the ordinary public Resume decision
+  must create and acknowledge generation-2 bindings before the journey accepts them.

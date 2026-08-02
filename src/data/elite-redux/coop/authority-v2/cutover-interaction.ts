@@ -299,7 +299,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
     validatePayload: value =>
       isPlainObject(value)
       && finiteArray(value.data)
-      && (value.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.nextInteraction)),
+      && typeof value.allowNextWaveStart === "boolean"
+      && (value.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.nextInteraction))
+      && !(value.allowNextWaveStart && value.nextInteraction !== undefined),
   },
   BARGAIN_PRESENT: {
     surfaceClass: "op:bargain",
@@ -1029,7 +1031,7 @@ export function successorOfCoopV2InteractionEnvelope(
     case "ABILITY_PICK":
       return wait(
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
-        false,
+        payload?.allowNextWaveStart === true,
         isCoopInteractionSuccessorRef(payload?.nextInteraction)
           ? [interactionAddressOf(payload.nextInteraction)]
           : undefined,

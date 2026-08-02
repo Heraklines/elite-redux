@@ -5180,6 +5180,19 @@ export class DuoPublicUiRig {
    */
   async sameTabReloadAndRejoin() {
     const clients = Object.values(this.clients);
+    const preReloadRoles = new Map(
+      clients.map(client => [client.label, { role: client.publicRole, seat: client.publicSeat }]),
+    );
+    const preReloadHost = clients.find(client => preReloadRoles.get(client.label)?.role === "host");
+    const preReloadGuest = clients.find(client => preReloadRoles.get(client.label)?.role === "guest");
+    if (
+      preReloadHost == null
+      || preReloadGuest == null
+      || preReloadRoles.get(preReloadHost.label)?.seat !== 0
+      || preReloadRoles.get(preReloadGuest.label)?.seat !== 1
+    ) {
+      throw new Error(`same-tab rejoin had no exact pre-reload role map: ${JSON.stringify([...preReloadRoles])}`);
+    }
     const handoffKey = "pokerogue:coop:p33-reload-resume:v1";
     const before = await Promise.all(
       clients.map(client => client.checkpoint("same-tab-rejoin-before", { full: true })),
@@ -5201,6 +5214,29 @@ export class DuoPublicUiRig {
     await Promise.all(clients.map(client => client.enterCoopLobby({ expectedLifecycle: "reload-rejoin" })));
     this.pairRoleCursors = roleCursors;
     await this.assertPairingFunctionalFingerprintMatch(roleCursors);
+
+    // reloadInPlace intentionally clears client.publicRole/publicSeat with the dead page. Before Resume,
+    // production exposes only the host's provisional P33 pairing role; the guest's gameplay binding is
+    // created by the public resume decision below. Reattach the already-proven same-context account map,
+    // but require the new host observation to agree exactly so a role flip cannot be hidden by the harness.
+    const rejoinedHostRole = await preReloadHost.evidence.waitForCondition(
+      sink => {
+        const event = sink.findPairingRole(roleCursors[preReloadHost.label]);
+        return event?.observation.role === "host" && event.observation.seat === 0 ? event : null;
+      },
+      { timeoutMs: this.config.timeoutMs, description: "same-tab provisional host role after rejoin" },
+    );
+    for (const client of clients) {
+      const prior = preReloadRoles.get(client.label);
+      client.publicRole = prior.role;
+      client.publicSeat = prior.seat;
+      client.evidence.record("same-tab-rejoin-role-restored", {
+        role: prior.role,
+        seat: prior.seat,
+        provisionalHostEventIndex: rejoinedHostRole.index,
+        source: "exact-pre-reload-context",
+      });
+    }
 
     for (const client of clients) {
       const rejoin = client.evidence.findResponse("/coop/v3/rejoin", {

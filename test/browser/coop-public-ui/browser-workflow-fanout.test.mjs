@@ -190,6 +190,11 @@ test("same-tab rejoin journey preserves browser storage and proves a post-rejoin
   );
   assert.match(harness, /pokerogue:coop:p33-reload-resume:v1/u);
   assert.match(harness, /expectedLifecycle: "reload-rejoin"/u);
+  assert.match(
+    harness,
+    /const preReloadRoles = new Map[\s\S]*same-tab provisional host role after rejoin[\s\S]*same-tab-rejoin-role-restored/u,
+    "reload must restore the exact proven role map before the human Resume decision creates the guest binding",
+  );
   assert.match(harness, /findResponse\("\/coop\/v3\/rejoin"[\s\S]*status: 200[\s\S]*method: "POST"/u);
   assert.match(harness, /P33 peer generation advanced \\d\+->\\d\+ on authenticated hello/u);
   assert.match(
@@ -320,6 +325,8 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   assert.match(campaign, /findLastSemanticSurface\(summaryCursor, "summary"\)/u);
   assert.match(campaign, /campaign-reward-summary-inspection/u);
   assert.match(campaign, /campaign-ability-capsule-coverage/u);
+  assert.match(campaign, /cursorMirrors\.some\(event => event\.navigationSteps < 1\)/u);
+  assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {

@@ -359,14 +359,17 @@ function commit(
     kind: "ABILITY_PICK",
     owner,
     status: "proposed",
-    payload: {
-      data: [...data],
-      ...(() => {
-        const plan = s.returnPlansByPinned.get(pinned);
-        const nextInteraction = committed ? plan?.onCommit : plan?.onCancel;
-        return nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) };
-      })(),
-    } satisfies CoopAbilityPickPayload,
+    payload: (() => {
+      const plan = s.returnPlansByPinned.get(pinned);
+      const nextInteraction = committed ? plan?.onCommit : plan?.onCancel;
+      return {
+        data: [...data],
+        ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
+        // A committed ordinary reward has no nested return edge because consuming the item ends its
+        // parent shop. State that wave exit explicitly; cancels and Mystery/nested returns stay same-wave.
+        allowNextWaveStart: committed && nextInteraction == null,
+      } satisfies CoopAbilityPickPayload;
+    })(),
   };
   if (expectedOperationId != null && operation.id !== expectedOperationId) {
     return false;
@@ -527,7 +530,10 @@ export function adoptAbilityWatcherOutcome(
     kind: "ABILITY_PICK",
     owner: coopInteractionOwnerSeat(params.pinned),
     status: "applied",
-    payload: { data: [...params.data] } satisfies CoopAbilityPickPayload,
+    payload: {
+      data: [...params.data],
+      allowNextWaveStart: params.committed ?? true,
+    } satisfies CoopAbilityPickPayload,
   };
   const result = g.applyEnvelope({
     version: 1,
@@ -697,6 +703,8 @@ function applyJournaledAbilityEnvelope(
       payload == null
       || !Array.isArray(payload.data)
       || !payload.data.every(Number.isFinite)
+      || typeof payload.allowNextWaveStart !== "boolean"
+      || (payload.allowNextWaveStart && payload.nextInteraction !== undefined)
       || (payload.nextInteraction !== undefined && !isCoopInteractionSuccessorRef(payload.nextInteraction))
     ) {
       return "rejected";

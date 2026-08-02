@@ -572,7 +572,10 @@ export class SelectModifierPhase extends BattlePhase {
       && !this.isCopy
     ) {
       this.customModifierSettings = {
-        guaranteedModifierTypeFuncs: [modifierTypes.ER_ABILITY_CAPSULE],
+        // Keep a harmless first card ahead of the capsule. The exact two-browser journey must
+        // move the real reward cursor before applying the capsule, otherwise a one-card fixture
+        // cannot prove that the watcher's cosmetic cursor follows the owner.
+        guaranteedModifierTypeFuncs: [modifierTypes.POKEBALL, modifierTypes.ER_ABILITY_CAPSULE],
         fillRemaining: false,
       };
     }

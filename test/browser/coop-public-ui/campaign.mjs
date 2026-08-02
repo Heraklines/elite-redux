@@ -3085,6 +3085,77 @@ async function checkpointPairedMechanicalSurface(rig, surfaceId, cursors, owner)
 }
 
 /**
+ * The reward cursor is presentation-only, but it still has to project the owner's exact visible
+ * selection on every watcher. Address/digest equality prevents a stale card from satisfying this
+ * proof, while the ownership checks ensure the watcher stayed input-inert.
+ */
+export function rewardCursorProjectionMatches(authority, observation) {
+  return (
+    observation?.surfaceId === "reward-shop"
+    && JSON.stringify(observation.address) === JSON.stringify(authority.address)
+    && observation.stateDigest === authority.stateDigest
+    && observation.ownerSeat === authority.ownerSeat
+    && observation.localSeat !== authority.ownerSeat
+    && observation.seatsWithInput?.length === 1
+    && observation.seatsWithInput[0] === authority.ownerSeat
+    && observation.selectedOptionId === authority.selectedOptionId
+    && JSON.stringify(observation.optionIds ?? null) === JSON.stringify(authority.optionIds ?? null)
+    && observation.ready?.handlerActive === true
+  );
+}
+
+async function selectRewardOptionWithMirroredCursor(rig, owner, boundary, targetId) {
+  const peers = Object.values(rig.clients).filter(client => client !== owner);
+  const peerCursors = fromEach(peers, peer => peer.evidence.cursor());
+  const navigation = await selectOptionById(owner, {
+    surfaceId: "reward-shop",
+    targetId,
+    navKeys: ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"],
+    submit: false,
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: boundary.ownerEvent.index,
+  });
+  const authorityEvent = owner.evidence.events[navigation.surfaceEventIndex];
+  const authority = authorityEvent?.observation;
+  if (
+    authority?.surfaceId !== "reward-shop"
+    || authority.selectedOptionId !== targetId
+    || JSON.stringify(authority.address) !== JSON.stringify(boundary.authority.address)
+  ) {
+    throw new Error(
+      `[campaign-reward-cursor] owner did not expose ${targetId} at the addressed reward surface: `
+        + `${JSON.stringify(authority ?? null)}`,
+    );
+  }
+  const peerEvents = await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(peerCursors[peer.label], "reward-shop");
+          return rewardCursorProjectionMatches(authority, candidate?.observation) ? candidate : null;
+        },
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: `mirrored reward cursor ${targetId} on ${peer.label}`,
+        },
+      ),
+    ),
+  );
+  const proof = {
+    address: authority.address,
+    stateDigest: authority.stateDigest,
+    ownerSeat: authority.ownerSeat,
+    selectedOptionId: targetId,
+    navigationSteps: navigation.steps,
+    watcherSeats: peerEvents.map(event => event.observation.localSeat),
+  };
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-reward-cursor-mirror", proof);
+  }
+  return { ...navigation, authorityEvent, peerEvents };
+}
+
+/**
  * A party-target reward is intentionally asymmetric while the owner chooses: the owner
  * opens PARTY and the watcher stays parked on its read-only reward replica. Prove that
  * both projections carry one address, owner and mechanical digest before sending input.
@@ -3809,7 +3880,11 @@ async function driveOnePendingSurface(
     } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
       const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
-      const targetId = chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      const capsuleTarget =
+        mechanicalBoundary.authority.optionIds?.includes("ER_ABILITY_CAPSULE") && policy.abilityCapsule.required
+          ? "ER_ABILITY_CAPSULE"
+          : null;
+      const targetId = capsuleTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
       if (targetId == null) {
         if (isExplicitEmptyRewardShop(mechanicalBoundary.authority)) {
           client.evidence.record("campaign-empty-reward-continue", {
@@ -3824,20 +3899,26 @@ async function driveOnePendingSurface(
               + `${JSON.stringify(mechanicalBoundary.authority.optionIds ?? null)}`,
           );
         }
-      } else if (targetId === mechanicalBoundary.authority.selectedOptionId) {
+      } else if (
+        targetId === mechanicalBoundary.authority.selectedOptionId
+        && !(policy.abilityCapsule.required && targetId === "ER_ABILITY_CAPSULE")
+      ) {
         await client.sequence(driver.keys, `campaign-${driver.name}`);
       } else {
-        await selectOptionById(client, {
-          surfaceId: "reward-shop",
-          targetId,
-          navKeys: ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"],
-          timeoutMs: rig.config.timeoutMs,
-          fromCursor: mechanicalBoundary.ownerEvent.index,
-        });
+        if (targetId === mechanicalBoundary.authority.selectedOptionId) {
+          const alternateId = mechanicalBoundary.authority.optionIds?.find(optionId => optionId !== targetId) ?? null;
+          if (alternateId == null) {
+            throw new Error("[campaign-reward-cursor] Ability Capsule fixture exposed no alternate reward card");
+          }
+          await selectRewardOptionWithMirroredCursor(rig, client, mechanicalBoundary, alternateId);
+        }
+        const mirroredCursor = await selectRewardOptionWithMirroredCursor(rig, client, mechanicalBoundary, targetId);
+        await client.press("Space", `campaign-${driver.name}-submit-mirrored-cursor`);
         client.evidence.record("campaign-reward-retry-alternative", {
           address: mechanicalBoundary.authority.address,
           rejectedRewardIds: [...rejected],
           targetId,
+          navigationSteps: mirroredCursor.steps,
         });
       }
     } else if (driver.name === "reward-target" && mechanicalBoundary != null) {
@@ -4880,17 +4961,32 @@ export async function runCampaign(rig) {
       const capsuleChoices = events.filter(
         event => event.kind === "campaign-ability-choice" && event.phase === "ErAbilityCapsulePhase",
       );
-      if (summaryInspections.length !== 1 || capsuleTargets.length !== 1 || capsuleChoices.length !== 1) {
+      const cursorMirrors = events.filter(
+        event => event.kind === "campaign-reward-cursor-mirror" && event.selectedOptionId === "ER_ABILITY_CAPSULE",
+      );
+      if (
+        summaryInspections.length !== 1
+        || capsuleTargets.length !== 1
+        || capsuleChoices.length !== 1
+        || cursorMirrors.length !== clients.length
+        || cursorMirrors.some(event => event.navigationSteps < 1)
+      ) {
         throw new Error(
-          "[campaign-ability-capsule] exact journey did not prove Summary return and capsule application: "
+          "[campaign-ability-capsule] exact journey did not prove mirrored reward navigation, Summary return, "
+            + "and capsule application: "
             + JSON.stringify({
               summaryInspections: summaryInspections.length,
               capsuleTargets: capsuleTargets.length,
               capsuleChoices: capsuleChoices.length,
+              cursorMirrors: cursorMirrors.map(event => ({
+                navigationSteps: event.navigationSteps,
+                selectedOptionId: event.selectedOptionId,
+              })),
             }),
         );
       }
       const proof = {
+        cursor: cursorMirrors[0],
         summary: summaryInspections[0],
         target: capsuleTargets[0],
         choice: capsuleChoices[0],
