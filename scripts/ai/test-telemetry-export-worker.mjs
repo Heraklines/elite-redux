@@ -49,6 +49,14 @@ const env = { EXPORT_TOKEN: "test-secret", TELEMETRY: bucket };
 const unauthorized = await handleRequest(new Request("https://example.test/v1/export"), env);
 assert.equal(unauthorized.status, 401);
 
+const oversized = await handleRequest(
+  new Request("https://example.test/v1/export?limit=101", {
+    headers: { authorization: "Bearer test-secret" },
+  }),
+  env,
+);
+assert.equal(oversized.status, 400);
+
 const response = await handleRequest(
   new Request("https://example.test/v1/export?contractVersion=4", {
     headers: { authorization: "Bearer test-secret" },

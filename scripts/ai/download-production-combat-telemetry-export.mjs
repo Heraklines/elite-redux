@@ -10,7 +10,7 @@ import {
 
 const PAGE_TIMEOUT_MS = 120_000;
 const MAX_PAGE_ATTEMPTS = 4;
-const DEFAULT_PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 100;
 const MAX_INVALID_OBJECTS = 10_000;
 
 function parseArgs(argv) {
