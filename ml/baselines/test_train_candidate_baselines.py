@@ -175,6 +175,114 @@ class CandidateBaselineContractTest(unittest.TestCase):
         feature_rows, *_ = make_rows(selected)
         self.assertEqual(feature_rows.dtype, np.float32)
 
+    def test_battle_winner_loader_keeps_only_decisions_from_victorious_battles(self) -> None:
+        def decision(episode: str, battle: str, turn: int, source: str = "human-v1") -> dict:
+            candidate_id = f"move:{battle}:{turn}"
+            return {
+                "schemaVersion": 4,
+                "featureSchemaVersion": 4,
+                "kind": "combat_decision",
+                "candidateScope": "combat-command",
+                "episodeId": episode,
+                "jointActionId": f"{battle}:{turn}",
+                "decisionId": f"{battle}:{turn}:0",
+                "buildSha": "build",
+                "dexHash": "dex",
+                "dictionaryHash": "dictionary",
+                "sourcePartitionId": f"account:{episode}",
+                "policySource": source,
+                "policyTarget": source == "human-v1",
+                "candidates": [{"id": candidate_id}],
+                "chosenCandidateId": candidate_id,
+                "candidateFeatures": [{"candidateId": candidate_id, "values": [0.0]}],
+                "candidateTokenGroups": [{
+                    "candidateId": candidate_id,
+                    "groups": {
+                        "actor": [],
+                        "targets": [],
+                        "destination": [],
+                        "field": [],
+                        "action": [candidate_id],
+                    },
+                }],
+                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+            }
+
+        episode = "mixed-run"
+        winning_battle = f"{episode}:17:winner"
+        losing_battle = f"{episode}:18:loser"
+        engine_battle = f"{episode}:19:engine"
+        rows = [
+            decision(episode, winning_battle, 1),
+            decision(episode, winning_battle, 2),
+            decision(episode, losing_battle, 1),
+            decision(episode, engine_battle, 1, "engine-hardest-v1"),
+            {
+                "schemaVersion": 4,
+                "kind": "battle_terminal",
+                "episodeId": episode,
+                "battleId": winning_battle,
+                "outcome": "victory",
+            },
+            {
+                "schemaVersion": 4,
+                "kind": "battle_terminal",
+                "episodeId": episode,
+                "battleId": losing_battle,
+                "outcome": "defeat",
+            },
+            {
+                "schemaVersion": 4,
+                "kind": "battle_terminal",
+                "episodeId": episode,
+                "battleId": engine_battle,
+                "outcome": "victory",
+            },
+            {
+                "schemaVersion": 4,
+                "kind": "run_terminal",
+                "episodeId": episode,
+                "splitGroupId": episode,
+                "sourcePartitionId": f"account:{episode}",
+                "outcome": "player-wiped",
+                "buildSha": "build",
+                "dexHash": "dex",
+                "dictionaryHash": "dictionary",
+            },
+            {
+                "schemaVersion": 4,
+                "kind": "run_terminal",
+                "episodeId": episode,
+                "splitGroupId": episode,
+                "sourcePartitionId": f"account:{episode}",
+                "outcome": "abandonment",
+                "buildSha": "build",
+                "dexHash": "dex",
+                "dictionaryHash": "dictionary",
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract-v4.jsonl"
+            path.write_text("".join(f"{json.dumps(row)}\n" for row in rows), encoding="utf-8")
+            selected, terminals, report = load_winner_policy_records(
+                path,
+                winner_scope="battle",
+            )
+
+        self.assertEqual([row["decisionId"] for row in selected], [
+            f"{winning_battle}:1:0",
+            f"{winning_battle}:2:0",
+        ])
+        self.assertEqual(terminals, [])
+        self.assertEqual(report["winnerScope"], "battle")
+        self.assertEqual(report["inputBattles"], 3)
+        self.assertEqual(report["winningBattles"], 2)
+        self.assertEqual(report["retainedBattles"], 1)
+        self.assertEqual(report["inputEpisodes"], 1)
+        self.assertEqual(report["inputRunTerminals"], 2)
+        self.assertEqual(report["winningPolicyTargetDecisions"], 2)
+
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {
             "schemaVersion": 3,

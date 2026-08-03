@@ -133,12 +133,16 @@ def load_records(
 def load_winner_policy_records(
     path: Path,
     max_policy_decisions: int | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int | None]]:
-    """Load only victorious policy targets without retaining the full JSON corpus."""
+    winner_scope: str = "run",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int | str | None]]:
+    """Load victorious run or battle policy targets without retaining the full corpus."""
     if max_policy_decisions is not None and max_policy_decisions < 1:
         raise ValueError("max policy decisions must be positive")
+    if winner_scope not in ("run", "battle"):
+        raise ValueError(f"unsupported winner scope {winner_scope}")
     files = jsonl_files(path)
     terminals: list[dict[str, Any]] = []
+    battle_terminals: list[dict[str, Any]] = []
     input_decisions = 0
     for file in files:
         with file.open("r", encoding="utf-8") as handle:
@@ -152,18 +156,30 @@ def load_winner_policy_records(
                     input_decisions += 1
                 elif record.get("kind") in ("episode_terminal", "run_terminal"):
                     terminals.append(record)
-                elif record.get("kind") in ("combat_auxiliary_decision", "combat_transition", "battle_terminal"):
+                elif record.get("kind") == "battle_terminal":
+                    battle_terminals.append(record)
+                elif record.get("kind") in ("combat_auxiliary_decision", "combat_transition"):
                     continue
                 else:
                     raise ValueError(f"{file}:{line_number}: unknown record kind")
 
     terminal_by_episode = {record["episodeId"]: record for record in terminals}
-    if len(terminal_by_episode) != len(terminals):
+    if winner_scope == "run" and len(terminal_by_episode) != len(terminals):
         raise ValueError("dataset contains duplicate episode terminals")
     winning_episodes = {
-        episode
-        for episode, terminal in terminal_by_episode.items()
+        terminal["episodeId"]
+        for terminal in terminals
         if terminal.get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
+    }
+    battle_terminal_by_id = {record.get("battleId"): record for record in battle_terminals}
+    if winner_scope == "battle" and (
+        None in battle_terminal_by_id or len(battle_terminal_by_id) != len(battle_terminals)
+    ):
+        raise ValueError("dataset contains missing or duplicate battle terminal ids")
+    winning_battles = {
+        battle_id
+        for battle_id, terminal in battle_terminal_by_id.items()
+        if terminal.get("outcome") == "victory"
     }
     decisions: list[dict[str, Any]] = []
     sampled: list[tuple[int, str, dict[str, Any]]] = []
@@ -180,7 +196,16 @@ def load_winner_policy_records(
                 if not is_policy_target(record):
                     continue
                 policy_target_decisions += 1
-                if record.get("episodeId") not in winning_episodes:
+                if winner_scope == "run":
+                    selected_winner = record.get("episodeId") in winning_episodes
+                else:
+                    joint_action_id = record.get("jointActionId")
+                    if not isinstance(joint_action_id, str) or ":" not in joint_action_id:
+                        raise ValueError(
+                            f"{file}:{line_number}: battle winner selection requires a joint action id"
+                        )
+                    selected_winner = joint_action_id.rsplit(":", 1)[0] in winning_battles
+                if not selected_winner:
                     continue
                 winning_policy_target_decisions += 1
                 validate_decision(record, file, line_number)
@@ -206,17 +231,35 @@ def load_winner_policy_records(
         raise ValueError("winner-only policy selection removed every combat decision")
     dataset_schema_versions(decisions)
     selected_episodes = {record["episodeId"] for record in decisions}
-    selected_terminals = [record for record in terminals if record["episodeId"] in selected_episodes]
-    validate_dataset(decisions, selected_terminals)
+    selected_terminals = (
+        [record for record in terminals if record["episodeId"] in selected_episodes]
+        if winner_scope == "run"
+        else []
+    )
+    validate_dataset(
+        decisions,
+        selected_terminals,
+        require_terminals=winner_scope == "run",
+    )
+    selected_battles = {
+        record["jointActionId"].rsplit(":", 1)[0]
+        for record in decisions
+        if isinstance(record.get("jointActionId"), str)
+    }
     return decisions, selected_terminals, {
+        "winnerScope": winner_scope,
         "inputDecisions": input_decisions,
         "policyTargetDecisions": policy_target_decisions,
         "winningPolicyTargetDecisions": winning_policy_target_decisions,
         "retainedDecisions": len(decisions),
         "maxPolicyDecisions": max_policy_decisions,
-        "inputEpisodes": len(terminals),
+        "inputEpisodes": len({record["episodeId"] for record in terminals}),
+        "inputRunTerminals": len(terminals),
         "winningEpisodes": len(winning_episodes),
         "retainedEpisodes": len(selected_episodes),
+        "inputBattles": len(battle_terminals),
+        "winningBattles": len(winning_battles),
+        "retainedBattles": len(selected_battles),
     }
 
 
@@ -987,13 +1030,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("winner-only policy training requires --loss-episode-weight 0")
     if args.max_policy_decisions is not None and not args.winner_only_policy:
         raise ValueError("--max-policy-decisions requires --winner-only-policy")
+    if args.winner_scope != "run" and not args.winner_only_policy:
+        raise ValueError("--winner-scope requires --winner-only-policy")
     if args.behavior_cloning_only and args.winner_only_policy:
         raise ValueError("behavior-cloning-only and winner-only policy modes are mutually exclusive")
-    winner_only_selection: dict[str, int | None] | None = None
+    winner_only_selection: dict[str, int | str | None] | None = None
     if args.winner_only_policy:
         all_decisions, terminals, winner_only_selection = load_winner_policy_records(
             args.data,
             args.max_policy_decisions,
+            args.winner_scope,
         )
     else:
         all_decisions, terminals = load_records(args.data, require_terminals=not args.behavior_cloning_only)
@@ -1045,11 +1091,15 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     test_episodes = {episode for episode, selected in zip(episodes, test_mask) if selected}
     weights = row_weights(y, decision_ids)
     terminal_by_episode = {terminal["episodeId"]: terminal for terminal in terminals}
-    successful_rows = np.asarray(
-        [
-            terminal_by_episode.get(episode, {}).get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
-            for episode in episodes
-        ]
+    successful_rows = (
+        np.ones(len(episodes), dtype=bool)
+        if args.winner_only_policy
+        else np.asarray(
+            [
+                terminal_by_episode.get(episode, {}).get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
+                for episode in episodes
+            ]
+        )
     )
     outcome_weights = np.asarray(
         [
@@ -1182,6 +1232,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     policy_training_reason: str | None = None
     if args.winner_only_policy:
         outcome_artifacts = dict(artifacts)
+        winner_scope_label = f"{args.winner_scope}-victory-only"
         for row in leaderboard:
             if row["model"] not in outcome_artifacts:
                 continue
@@ -1189,7 +1240,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 key: row[key]
                 for key in ("decisions", "top1", "top3", "mrr", "candidateNll")
             }
-            row["trainingObjective"] = "winner-only behavior cloning; losses excluded before materialization"
+            row["trainingObjective"] = (
+                f"{winner_scope_label} behavior cloning; non-winning decisions excluded before fitting"
+            )
     elif args.behavior_cloning_only:
         policy_training_reason = "behavior-cloning-only mode does not fit an outcome-weighted selector"
     elif diagnostic_only:
@@ -1361,13 +1414,17 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "selectedBattlePolicy": selected,
         "selectedOutcomeWeightedPolicy": outcome_selected,
         "selectedPolicyFromSuccessfulEpisodes": outcome_selected,
+        "selectedWinnerScopedPolicy": outcome_selected,
+        "winnerOnlyScope": args.winner_scope if args.winner_only_policy else None,
         "lossEpisodeWeight": args.loss_episode_weight,
         "policyTraining": {
             "available": outcome_selected is not None,
             "reason": policy_training_reason,
+            "selectionScope": args.winner_scope if args.winner_only_policy else "run-outcome-weighted",
             "candidateRows": int(policy_training_mask.sum()),
             "sourcePartitions": sorted(policy_training_partitions),
             "successfulTestRows": int(successful_test_mask.sum()),
+            "selectedScopeTestRows": int(successful_test_mask.sum()),
         },
         "seed": args.seed,
         "data": {
@@ -1438,13 +1495,18 @@ def markdown(report: dict[str, Any]) -> str:
         )
     outcome_rows = [row for row in report["leaderboard"] if row.get("successfulEpisodeMetrics")]
     if report["policyTraining"]["available"]:
+        selection_label = (
+            "Battle-victory"
+            if report.get("winnerOnlyScope") == "battle"
+            else "Successful-episode"
+        )
         lines.extend(
             [
                 "",
-                f"Successful-episode policy selector: `{report['selectedPolicyFromSuccessfulEpisodes']}`. "
+                f"{selection_label} policy selector: `{report['selectedWinnerScopedPolicy']}`. "
                 f"Loss-episode decisions carry {report['lossEpisodeWeight']:.2f}x training weight.",
                 "",
-                "| Policy model | Successful-episode Top-1 | Successful-episode NLL |",
+                f"| Policy model | {selection_label} Top-1 | {selection_label} NLL |",
                 "| --- | ---: | ---: |",
             ]
         )
@@ -1494,6 +1556,12 @@ def parse_args() -> argparse.Namespace:
         "--winner-only-policy",
         action="store_true",
         help="stream-select victorious policy targets before fitting and train each tree family only once",
+    )
+    parser.add_argument(
+        "--winner-scope",
+        choices=("run", "battle"),
+        default="run",
+        help="victory boundary used by --winner-only-policy; defaults to completed-run victories",
     )
     parser.add_argument(
         "--max-policy-decisions",
