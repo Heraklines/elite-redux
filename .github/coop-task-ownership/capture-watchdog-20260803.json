@@ -1,0 +1,12 @@
+{
+  "taskId": "capture-watchdog-20260803",
+  "version": 2,
+  "branch": "ci/coop/capture-watchdog-20260803",
+  "trainRef": "ci/coop/capture-watchdog-20260803",
+  "baseSha": "437040b171e3062af5710cacb439cc2ec4d32cd0",
+  "allowedFiles": [
+    ".github/coop-task-ownership/capture-watchdog-20260803.json",
+    "test/tests/elite-redux/coop/coop-capture-presentation.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
