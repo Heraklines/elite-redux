@@ -7345,3 +7345,30 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Ask the player to press Send Logs again on both clients or attach the downloaded reports directly. Do not
   integrate this candidate into `feat/elite-redux-port` until that capture is available and classified, unless
   the maintainer explicitly accepts the unresolved report.
+
+## 2026-08-03 - live wave-9 presentation watchdog false positive
+
+- The paired reports finally arrived at dev-log tip `e2702eb770a62cb42b0a2cd2563e9ae2b3c2251b`:
+  guest `2026-08-03T18-28-54-673Z__no-scenario__desync.log` and host
+  `2026-08-03T18-28-58-460Z__no-scenario__anon.log`. Both are exact staging build `fefa52ee2`, session epoch
+  `1828639826663409`.
+- This was not a mechanical divergence. Wave 9 turn 1 converged at state tick 44 and digest
+  `06da3761b28ca4c5` on both clients. A guest `CoopStatStageReplayPhase` legitimately took about ten seconds
+  before the next presentation phase started. The old five-second observation failed after one following
+  no-frame interval, permanently recorded `stat-watchdog-expired`, and the exact final presentation proof then
+  requested the shared terminal even though authoritative state had already converged.
+- Production commit `0877ade2f` replaces that assumed frame-rate ceiling with a 30-second rolling no-frame
+  window while retaining the independent 120-second hard wall for advancing animations whose completion
+  callback never arrives. Ten seconds of renderer starvation is tolerated; a real 30-second freeze and the
+  hard wall still fail closed.
+- The same capture exposed an independent learn-move retry leak: a committed guest decision included
+  authority-authored successor metadata absent from the original proposal, so JSON-stringifying the complete
+  payload produced different cancellation keys. Retry identity now uses only the stable human decision fields
+  plus wave/turn; the retained decision cancels its one-second resend after commit.
+- Test commit `cb4339055` updates every manual watchdog fixture to advance the runtime-owned authority clock
+  through the rolling stall window instead of treating the first callback as expiry. Exact focused run
+  `30845805626` is fully green: static/type/format, source/node contracts, B13, and aggregate. The production
+  P1 presentation lane passed in `30844705682`, and exact production candidate journey `30844705840` passed
+  fresh registration, public lobby pairing, two real Chromium clients, rewards, and the wave-2 frontier.
+- Staging deploy `30846035981` is green and public `version.json` verifies
+  `github:cb433905559a2f20ea95cb83a67a996d06ddecc5:run-30846035981.1`. Production was not touched.
