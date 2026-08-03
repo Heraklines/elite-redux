@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { importTelemetryBatches, sourceSplit, TELEMETRY_SOURCES } from "./combat-telemetry-import.mjs";
+import {
+  createTelemetryImportAccumulator,
+  importTelemetryBatches,
+  sourceSplit,
+  TELEMETRY_SOURCES,
+} from "./combat-telemetry-import.mjs";
 
 const envelope = {
   schemaVersion: 1,
@@ -59,6 +64,29 @@ assert.equal(imported.legacyDecisions[0].sourceSplit, sourceSplit("account-a"));
 assert.deepEqual(new Set(imported.sourcePartitions.map(row => row.sourcePartitionId)), new Set(["account-a"]));
 assert.equal(imported.contractRecords.length, 0);
 assert.match(imported.report.terminalOutcomePolicy, /no terminal labels are inferred/);
+
+const streamedLegacyDecisions = [];
+const streamedLegacyOutcomes = [];
+const streamingAccumulator = createTelemetryImportAccumulator(
+  { environment: "production", bucket: TELEMETRY_SOURCES.production.bucket },
+  {
+    legacyDecision: record => streamedLegacyDecisions.push(record),
+    legacyTurnOutcome: record => streamedLegacyOutcomes.push(record),
+  },
+);
+streamingAccumulator.ingestBatch({ envelope, seq: 0, events: [battleDecision, turnOutcome] });
+streamingAccumulator.ingestBatch({ envelope, seq: 0, events: [battleDecision, turnOutcome] });
+streamingAccumulator.ingestBatch({
+  envelope: { ...envelope, sessionId: "session-b" },
+  seq: 0,
+  events: [battleDecision],
+});
+const streamed = streamingAccumulator.finish();
+assert.equal(streamedLegacyDecisions.length, imported.legacyDecisions.length);
+assert.equal(streamedLegacyOutcomes.length, imported.legacyTurnOutcomes.length);
+assert.deepEqual(streamed.report, imported.report);
+assert.equal(streamed.legacyDecisions.length, 0);
+assert.equal(streamed.legacyTurnOutcomes.length, 0);
 
 const contractEnvelope = {
   ...envelope,

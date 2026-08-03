@@ -133,12 +133,14 @@ function baseImportedRecord(environment, bucket, envelope, batch, eventIndex) {
   };
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One pass classifies every supported wire event.
-export function importTelemetryBatches(batches, options) {
+export function createTelemetryImportAccumulator(options, output = {}) {
   const { environment, bucket } = options;
-  const legacyDecisions = new Map();
-  const legacyTurnOutcomes = new Map();
-  const contractRecords = new Map();
+  const legacyDecisionIds = new Set();
+  const legacyTurnOutcomeIds = new Set();
+  const contractRecordIds = new Set();
+  const legacyDecisions = [];
+  const legacyTurnOutcomes = [];
+  const contractRecords = [];
   const sourcePartitions = new Map();
   const episodes = new Set();
   const sessionModes = {};
@@ -169,12 +171,28 @@ export function importTelemetryBatches(batches, options) {
     terminalOutcomePolicy: "legacy records are terminal-outcome-unknown; no terminal labels are inferred",
   };
 
-  for (const batch of batches) {
+  function emit(kind, record) {
+    const sink = output[kind];
+    if (sink) {
+      sink(record);
+      return;
+    }
+    if (kind === "legacyDecision") {
+      legacyDecisions.push(record);
+    } else if (kind === "legacyTurnOutcome") {
+      legacyTurnOutcomes.push(record);
+    } else {
+      contractRecords.push(record);
+    }
+  }
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One pass classifies every supported wire event.
+  function ingestBatch(batch) {
     report.batches++;
     const envelope = batch?.envelope;
     if (!envelope?.sessionId || !envelope?.playerIdHash || !Array.isArray(batch?.events)) {
       report.invalidRecords++;
-      continue;
+      return;
     }
     const partition = envelope.playerIdHash;
     if (!sourcePartitions.has(partition)) {
@@ -195,11 +213,12 @@ export function importTelemetryBatches(batches, options) {
       const identity = `${envelope.sessionId}:${batch.seq}:${eventIndex}`;
       if (event?.kind === "battle_decision") {
         const decisionId = `legacy-decision:${identity}`;
-        if (legacyDecisions.has(decisionId)) {
+        if (legacyDecisionIds.has(decisionId)) {
           report.duplicateRecords++;
           continue;
         }
-        legacyDecisions.set(decisionId, {
+        legacyDecisionIds.add(decisionId);
+        emit("legacyDecision", {
           ...recordBase,
           recordType: "legacy_battle_decision",
           decisionId,
@@ -210,11 +229,12 @@ export function importTelemetryBatches(batches, options) {
         report.legacyDecisions++;
       } else if (event?.kind === "turn_outcome") {
         const transitionId = `legacy-turn-outcome:${identity}`;
-        if (legacyTurnOutcomes.has(transitionId)) {
+        if (legacyTurnOutcomeIds.has(transitionId)) {
           report.duplicateRecords++;
           continue;
         }
-        legacyTurnOutcomes.set(transitionId, {
+        legacyTurnOutcomeIds.add(transitionId);
+        emit("legacyTurnOutcome", {
           ...recordBase,
           recordType: "legacy_turn_outcome",
           transitionId,
@@ -224,39 +244,43 @@ export function importTelemetryBatches(batches, options) {
       } else if (event?.kind === "combat_contract_decision" && event.record?.kind === "combat_decision") {
         const record = event.record;
         const key = `decision:${record.decisionId}`;
-        if (!record.decisionId || !record.sourcePartitionId || contractRecords.has(key)) {
-          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+        if (!record.decisionId || !record.sourcePartitionId || contractRecordIds.has(key)) {
+          report[contractRecordIds.has(key) ? "duplicateRecords" : "invalidRecords"]++;
           continue;
         }
-        contractRecords.set(key, record);
+        contractRecordIds.add(key);
+        emit("contractRecord", record);
         report.contractDecisions++;
         increment(report.policySources, String(record.policySource ?? "unknown"));
       } else if (event?.kind === "combat_auxiliary_decision" && event.record?.kind === "combat_auxiliary_decision") {
         const record = event.record;
         const key = `auxiliary:${record.decisionId}`;
-        if (!record.decisionId || !record.sourcePartitionId || contractRecords.has(key)) {
-          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+        if (!record.decisionId || !record.sourcePartitionId || contractRecordIds.has(key)) {
+          report[contractRecordIds.has(key) ? "duplicateRecords" : "invalidRecords"]++;
           continue;
         }
-        contractRecords.set(key, record);
+        contractRecordIds.add(key);
+        emit("contractRecord", record);
         report.contractAuxiliaryDecisions++;
       } else if (event?.kind === "combat_contract_transition" && event.record?.kind === "combat_transition") {
         const record = event.record;
         const key = `transition:${record.transitionId}`;
-        if (!record.transitionId || !record.episodeId || contractRecords.has(key)) {
-          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+        if (!record.transitionId || !record.episodeId || contractRecordIds.has(key)) {
+          report[contractRecordIds.has(key) ? "duplicateRecords" : "invalidRecords"]++;
           continue;
         }
-        contractRecords.set(key, record);
+        contractRecordIds.add(key);
+        emit("contractRecord", record);
         report.contractTransitions++;
       } else if (event?.kind === "battle_terminal" && event.record?.kind === "battle_terminal") {
         const record = event.record;
         const key = `battle-terminal:${record.terminalId}`;
-        if (!record.terminalId || !record.episodeId || contractRecords.has(key)) {
-          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+        if (!record.terminalId || !record.episodeId || contractRecordIds.has(key)) {
+          report[contractRecordIds.has(key) ? "duplicateRecords" : "invalidRecords"]++;
           continue;
         }
-        contractRecords.set(key, record);
+        contractRecordIds.add(key);
+        emit("contractRecord", record);
         report.battleTerminals++;
       } else if (
         event?.kind === "run_outcome"
@@ -264,41 +288,46 @@ export function importTelemetryBatches(batches, options) {
       ) {
         const record = event.record;
         const key = `terminal:${record.episodeId}:${record.outcome}`;
-        if (!record.episodeId || contractRecords.has(key)) {
-          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+        if (!record.episodeId || contractRecordIds.has(key)) {
+          report[contractRecordIds.has(key) ? "duplicateRecords" : "invalidRecords"]++;
           continue;
         }
-        contractRecords.set(key, record);
+        contractRecordIds.add(key);
+        emit("contractRecord", record);
         report.terminals++;
       }
     }
   }
 
-  for (const split of sourcePartitions.values()) {
-    report.sourceSplits[split]++;
+  function finish() {
+    for (const split of sourcePartitions.values()) {
+      report.sourceSplits[split]++;
+    }
+    report.sourcePartitions = sourcePartitions.size;
+    report.episodes = episodes.size;
+    return {
+      legacyDecisions,
+      legacyTurnOutcomes,
+      contractRecords,
+      sourcePartitions: [...sourcePartitions.entries()]
+        .map(([sourcePartitionId, split]) => ({ sourcePartitionId, split }))
+        .sort((left, right) => left.sourcePartitionId.localeCompare(right.sourcePartitionId)),
+      report,
+    };
   }
-  report.sourcePartitions = sourcePartitions.size;
-  report.episodes = episodes.size;
+
   return {
-    legacyDecisions: [...legacyDecisions.values()],
-    legacyTurnOutcomes: [...legacyTurnOutcomes.values()],
-    contractRecords: [...contractRecords.values()],
-    sourcePartitions: [...sourcePartitions.entries()]
-      .map(([sourcePartitionId, split]) => ({ sourcePartitionId, split }))
-      .sort((left, right) => left.sourcePartitionId.localeCompare(right.sourcePartitionId)),
-    report,
+    ingestBatch,
+    finish,
   };
 }
 
-function writeJsonLines(path, records) {
-  const descriptor = openSync(path, "w");
-  try {
-    for (const record of records) {
-      writeSync(descriptor, `${JSON.stringify(record)}\n`);
-    }
-  } finally {
-    closeSync(descriptor);
+export function importTelemetryBatches(batches, options) {
+  const accumulator = createTelemetryImportAccumulator(options);
+  for (const batch of batches) {
+    accumulator.ingestBatch(batch);
   }
+  return accumulator.finish();
 }
 
 function retryDelayMs(response, attempt) {
@@ -389,11 +418,31 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
       && (args.modifiedBefore == null || modified <= args.modifiedBefore)
     );
   });
-  const batches = [];
-  for (let offset = 0; offset < objects.length; offset += READ_CONCURRENCY) {
-    batches.push(...(await Promise.all(objects.slice(offset, offset + READ_CONCURRENCY).map(readBatch))));
+
+  mkdirSync(args.output, { recursive: true });
+  const descriptors = {
+    legacyDecision: openSync(`${args.output}/legacy-decisions.jsonl`, "w"),
+    legacyTurnOutcome: openSync(`${args.output}/legacy-turn-outcomes.jsonl`, "w"),
+    contractRecord: openSync(`${args.output}/contract-records.jsonl`, "w"),
+  };
+  const writeRecord = descriptor => record => writeSync(descriptor, `${JSON.stringify(record)}\n`);
+  const accumulator = createTelemetryImportAccumulator(
+    { environment, bucket: source.bucket },
+    {
+      legacyDecision: writeRecord(descriptors.legacyDecision),
+      legacyTurnOutcome: writeRecord(descriptors.legacyTurnOutcome),
+      contractRecord: writeRecord(descriptors.contractRecord),
+    },
+  );
+  try {
+    for (let offset = 0; offset < objects.length; offset += READ_CONCURRENCY) {
+      const batches = await Promise.all(objects.slice(offset, offset + READ_CONCURRENCY).map(readBatch));
+      batches.forEach(accumulator.ingestBatch);
+    }
+  } finally {
+    Object.values(descriptors).forEach(closeSync);
   }
-  const imported = importTelemetryBatches(batches, { environment, bucket: source.bucket });
+  const imported = accumulator.finish();
   imported.report.prefix = args.prefix;
   imported.report.contractVersionFilter = args.contractVersion;
   imported.report.modifiedAfter = args.modifiedAfter == null ? null : new Date(args.modifiedAfter).toISOString();
@@ -402,10 +451,6 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
   imported.report.objects = objects.length;
   imported.report.bytes = objects.reduce((sum, object) => sum + (object.size ?? 0), 0);
 
-  mkdirSync(args.output, { recursive: true });
-  writeJsonLines(`${args.output}/legacy-decisions.jsonl`, imported.legacyDecisions);
-  writeJsonLines(`${args.output}/legacy-turn-outcomes.jsonl`, imported.legacyTurnOutcomes);
-  writeJsonLines(`${args.output}/contract-records.jsonl`, imported.contractRecords);
   writeFileSync(`${args.output}/source-splits.json`, `${JSON.stringify(imported.sourcePartitions, null, 2)}\n`);
   writeFileSync(`${args.output}/report.json`, `${JSON.stringify(imported.report, null, 2)}\n`);
   writeFileSync(
