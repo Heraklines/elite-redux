@@ -1652,8 +1652,8 @@ test("normal trainer victory retains its exact presentation lease across success
   );
   assert.match(
     coopRuntime,
-    /if \(pendingPresentation == null\)[\s\S]*runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
-    "material installation retains the lease before exposing the real phase",
+    /if \(pendingPresentation == null && !presentationAlreadyCompleted\)[\s\S]*runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    "first material installation retains the lease before exposing the real phase, while completed redelivery queues none",
   );
   const projectorStart = coopRuntime.indexOf('if (material.kind === "trainer-victory-open")');
   const projectorEnd = coopRuntime.indexOf('if (material.kind === "replacement-open")', projectorStart);
