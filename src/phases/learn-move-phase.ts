@@ -292,9 +292,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   ): boolean {
     const pokemon = this.getPokemon();
     const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const acceptsGuestOwnedPicker = ownerIsGuest && monOwner === "guest";
     const acceptsHostOwnedWatcher = !ownerIsGuest && this.coopAwaitingHostOwnedPresentation && monOwner === "host";
     const valid =
-      (ownerIsGuest || acceptsHostOwnedWatcher)
+      (acceptsGuestOwnedPicker || acceptsHostOwnedWatcher)
       && partySlot === this.partyMemberIndex
       && moveId === this.moveId
       && maxMoveCount === pokemon.getMaxMoveCount()
@@ -315,7 +316,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   }
 
   /**
-   * Bind a host-owned V2 presentation to this exact phase while it is still queued.
+   * Bind a V2 presentation to this exact phase while it is still queued.
    *
    * A reward commit queues the same LearnMovePhase on both clients before the following
    * learn-move prompt enters the ordered log. On a slow guest that prompt can be projected
@@ -323,7 +324,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * reward-continuation phase become the sole watcher when it starts; spawning a replay phase
    * in front of it would consume the result and then leave this copy to reopen a dead picker.
    */
-  public stageCoopV2HostOwnedLearnMovePresentation(
+  public stageCoopV2LearnMovePresentation(
     operationId: string,
     partySlot: number,
     moveId: number,
@@ -332,10 +333,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   ): boolean {
     const pokemon = this.getPokemon();
     const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const expectedOwner: CoopRole = ownerIsGuest ? "guest" : "host";
     if (
       this.coopRuntimeBound
-      || ownerIsGuest
-      || monOwner !== "host"
+      || monOwner !== expectedOwner
       || partySlot !== this.partyMemberIndex
       || moveId !== this.moveId
       || maxMoveCount !== pokemon.getMaxMoveCount()
@@ -345,7 +346,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return false;
     }
     this.coopV2ControlOperationId = operationId;
-    this.coopAwaitingHostOwnedPresentation = true;
+    this.coopAwaitingHostOwnedPresentation = !ownerIsGuest;
     return true;
   }
 

@@ -4079,9 +4079,9 @@ function wireCoopLearnMoveForward(relay: CoopInteractionRelay): void {
     // copy starts later and waits forever for an already-settled operation. Level-up learns have no
     // guest LearnMovePhase, so they deliberately fall through to CoopReplayLearnMovePhase below.
     let stagedOnQueuedContinuation = false;
-    if (!ownerIsGuest && operationId != null) {
+    if (operationId != null) {
       globalScene.phaseManager?.hasPhaseOfType("LearnMovePhase", phase => {
-        stagedOnQueuedContinuation = phase.stageCoopV2HostOwnedLearnMovePresentation(
+        stagedOnQueuedContinuation = phase.stageCoopV2LearnMovePresentation(
           operationId,
           partySlot,
           moveId,
@@ -7755,6 +7755,55 @@ function prepareCoopV2OrdinaryInteractionControlSurface(
     runtime.v2ProjectedInteractionControlId = controlId;
     coopLog("v2-interaction", `bound exact market generation ${controlId} to live ${current.phaseName}`);
     return true;
+  }
+
+  // Reward continuations can start their real LearnMovePhase before the ordered prompt reaches the
+  // replica. Replacing that live picker with a replay consumes the immutable result in the overlay, then
+  // uncovers the original phase waiting forever for the already-committed decision. Bind the exact V2
+  // address onto the native phase instead. If the continuation is queued but not current, stage the same
+  // address there so it becomes the sole owner/watcher when it starts. Level-up learns have no native
+  // replica phase and deliberately fall through to the replay projector below.
+  if (plan.kind === "learn-move") {
+    const ownerIsLocal = control.ownerSeatId === runtime.controller.localSeatId;
+    const liveLearnMove = current as Phase & {
+      installCoopV2LearnMovePresentation?: (
+        operationId: string,
+        partySlot: number,
+        moveId: number,
+        maxMoveCount: number,
+        ownerIsGuest: boolean,
+      ) => boolean;
+    };
+    if (
+      current.is("LearnMovePhase")
+      && liveLearnMove.installCoopV2LearnMovePresentation?.(
+        plan.operationId,
+        plan.partySlot,
+        plan.moveId,
+        plan.maxMoveCount,
+        ownerIsLocal,
+      ) === true
+    ) {
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `bound exact learn-move generation ${controlId} to live ${current.phaseName}`);
+      return true;
+    }
+    let stagedOnQueuedContinuation = false;
+    phaseManager.hasPhaseOfType("LearnMovePhase", phase => {
+      stagedOnQueuedContinuation = phase.stageCoopV2LearnMovePresentation(
+        plan.operationId,
+        plan.partySlot,
+        plan.moveId,
+        plan.maxMoveCount,
+        ownerIsLocal,
+      );
+      return stagedOnQueuedContinuation;
+    });
+    if (stagedOnQueuedContinuation) {
+      runtime.v2ProjectedInteractionControlId = controlId;
+      coopLog("v2-interaction", `staged exact learn-move generation ${controlId} on queued LearnMovePhase`);
+      return true;
+    }
   }
 
   // A Bargain can be the first ordered control after a settled combat turn. The authoritative engine opens

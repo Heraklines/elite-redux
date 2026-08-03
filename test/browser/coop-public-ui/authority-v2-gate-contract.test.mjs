@@ -2651,13 +2651,42 @@ test("a host-owned V2 learn-move prompt retains the guest at the same wave until
   );
   assert.match(
     coopRuntime,
-    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2HostOwnedLearnMovePresentation\([\s\S]*learnMoveForwardInFlight\.add\(partySlot\)[\s\S]*return;/u,
+    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2LearnMovePresentation\([\s\S]*learnMoveForwardInFlight\.add\(partySlot\)[\s\S]*return;/u,
     "a prompt-first delivery must bind the already-queued reward continuation instead of spawning a duplicate replay",
   );
   assert.match(
     learnMovePhase,
-    /stageCoopV2HostOwnedLearnMovePresentation[\s\S]*this\.coopV2ControlOperationId = operationId;[\s\S]*this\.coopAwaitingHostOwnedPresentation = true;[\s\S]*const presentationWasStaged = this\.coopV2ControlOperationId != null;[\s\S]*coopWatchHostOwnedV2Decision\(move, pokemon\)/u,
+    /stageCoopV2LearnMovePresentation[\s\S]*this\.coopV2ControlOperationId = operationId;[\s\S]*this\.coopAwaitingHostOwnedPresentation = !ownerIsGuest;[\s\S]*const presentationWasStaged = this\.coopV2ControlOperationId != null;[\s\S]*coopWatchHostOwnedV2Decision\(move, pokemon\)/u,
     "the queued phase must retain the exact operation address and start the watcher from that address",
+  );
+});
+
+test("a guest-owned V2 learn-move prompt reuses its native reward continuation", () => {
+  const projectionStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryInteractionControlSurface(");
+  const projectionEnd = coopRuntime.indexOf(
+    "\n/**\n * Construct the exact engine generation recovery",
+    projectionStart,
+  );
+  assert.ok(projectionStart >= 0 && projectionEnd > projectionStart, "ordinary interaction projector is bounded");
+  const projector = coopRuntime.slice(projectionStart, projectionEnd);
+  const nativeBinding = projector.indexOf('if (plan.kind === "learn-move")');
+  const replayFallback = projector.indexOf('|| plan.kind === "learn-move"', nativeBinding);
+  assert.ok(nativeBinding >= 0 && replayFallback > nativeBinding, "native learn-move binding precedes replay fallback");
+  const bindingBlock = projector.slice(nativeBinding, replayFallback);
+  assert.match(
+    bindingBlock,
+    /current\.is\("LearnMovePhase"\)[\s\S]*installCoopV2LearnMovePresentation\?\.\([\s\S]*ownerIsLocal[\s\S]*return true;/u,
+    "an already-running native picker receives the exact V2 address instead of being covered by a replay",
+  );
+  assert.match(
+    bindingBlock,
+    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2LearnMovePresentation\([\s\S]*ownerIsLocal[\s\S]*return true;/u,
+    "an exact queued native picker is staged before replay materialization",
+  );
+  assert.match(
+    learnMovePhase,
+    /const expectedOwner: CoopRole = ownerIsGuest \? "guest" : "host";[\s\S]*monOwner !== expectedOwner[\s\S]*this\.coopAwaitingHostOwnedPresentation = !ownerIsGuest;/u,
+    "queued native binding is address-exact for either party owner without turning a guest picker into a watcher",
   );
 });
 

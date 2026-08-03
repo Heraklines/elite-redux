@@ -7063,3 +7063,44 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Gate `30784448306` passed the complete fast source/public-UI/node-pure contract lane and all 31 substantive
   jobs. Its only underlying red was Biome requesting a one-line layout for the updated meta-contract; no type,
   behavioral, mutation, bundle, or WebRTC check failed. The formatter's exact output is applied verbatim.
+
+## 2026-08-03 - exact merged-tip gate and reward-matrix startup classification
+
+- Final gate `30785138089` is fully green at exact SHA `cba587c2b93d9a2872923bd8a65df41c465c6631`: all
+  33 jobs passed, including static/type/format, every A/B/C/P shard, all mutation-assurance shards, the sealed
+  bundle, and browser-native WebRTC.
+- Exact-SHA two-browser reward matrix `30785547999` is intentionally left running. Its first five reds
+  (`SUPER_POTION`, `MAX_REVIVE`, `TM_ULTRA`, `TM_CASE`, and `REVIVE`) are one repeated CI startup mechanism,
+  not five reward defects: no lane registered accounts or reached gameplay; both browsers fetched roughly
+  2,900 immutable upstream assets (about 32 MiB) under the 28-job fan-out, and `LoginPhase` first appeared at
+  307-311 seconds, just after the five-minute boot wait expired. Final screenshots visibly show the login
+  surface and traces contain zero key presses.
+- The same still-running matrix has already produced green real-browser reward evidence for `MAX_POTION`,
+  `POTION`, `RARER_CANDY`, and `ETHER`. Inspected artifacts prove the named reward was visibly selected through
+  the public UI, party material converged on both clients at the exact Authority V2 address, and both browsers
+  reached the actionable wave-2 command frontier. `MAX_POTION`, for example, proves slot 3 changed from 4/19
+  HP to 19/19 HP on both replicas; paired final screenshots show the synchronized wave-2 double battle.
+- Do not mutate production for the five startup reds. Finish and classify every matrix lane, then correct the
+  remote asset-loading/fan-out contract and rerun only the lanes that never crossed setup.
+
+## 2026-08-03 - reward matrix exposed the native Learn Move projector collision
+
+- `TM_GREAT`, `TM_COMMON`, `ER_LEARNERS_SHROOM`, and `MEMORY_MUSHROOM` all reached real gameplay and exposed
+  one identical product softlock. The reward continuation started a native `LearnMovePhase` on the replica,
+  but the ordinary Authority V2 projector always installed a second `CoopReplayLearnMovePhase` over it.
+  Revision 7 closed the replay and advanced the authority; the replica then uncovered the stale native phase,
+  which kept resending the already-committed choice while revision 8's wave-2 command remained at frontier
+  `8/7/7`. This is the exact user-visible frozen learn-move/party-item class the matrix was built to catch.
+- The central ordinary projector now first binds the immutable Learn Move operation address to a matching
+  running native phase. It also stages that address on an exact queued reward continuation before falling back
+  to replay materialization. Staging is owner-exact for either seat; a guest-owned picker stays interactive,
+  while only a host-owned mirror enters watcher mode. Level-up learns, which have no native replica phase,
+  retain the replay fallback.
+- The legacy forward adapter uses the same generalized current/queued binding contract. Failure-first source
+  coverage pins both the live-phase reuse and queued-phase staging ahead of replay construction, preventing a
+  future refactor from restoring two simultaneously authoritative picker objects.
+- `RARE_EVOLUTION_ITEM` is a separate CI-load classification in this 28-way run: at roughly three frames per
+  second its finite animations-disabled evolution presentation was still emitting ordered stage heartbeats
+  when the lane deadline expired. `HYPER_POTION` visibly mirrored the requested cursor in the final screenshot;
+  its harness observer timed out after the watcher applied the cursor event and therefore is not evidence of a
+  reward cursor product failure. Both remain candidates for reduced-fanout remeasurement after the product fix.
