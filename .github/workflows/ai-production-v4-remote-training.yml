@@ -123,6 +123,9 @@ jobs:
               if path.name == "failure.json":
                   payload = json.loads(path.read_text(encoding="utf-8"))
                   print(json.dumps({"failure": payload}, indent=2))
+              elif path.suffix == ".log":
+                  lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                  print(json.dumps({"kernelLogTail": lines[-240:]}, indent=2))
           PY
 
   prepare:
