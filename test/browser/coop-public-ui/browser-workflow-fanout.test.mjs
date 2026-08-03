@@ -53,6 +53,19 @@ for (const { file, fanout } of workflows) {
   });
 }
 
+test("the full gate cannot starve its sealed browser transport behind asset checkout", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-gate-sharded.yml"), "utf8");
+  const browser = jobBlock(workflow, "browser");
+  const timeout = browser.match(/timeout-minutes:\s*(\d+)/u);
+  assert.ok(timeout, "the browser transport has an explicit wall-clock ceiling");
+  assert.ok(
+    Number(timeout[1]) >= 25,
+    "the wall-clock ceiling includes the measured worst-case asset checkout plus the sealed checkpoint",
+  );
+  assert.match(browser, /submodules: recursive/u, "the measured asset checkout remains part of this job");
+  assert.match(browser, /Run two-context sealed-production transport checkpoint/u);
+});
+
 test("browser build gates report every blocking Biome diagnostic without legacy lint noise", async () => {
   for (const { file } of workflows) {
     const workflow = await readFile(resolve(root, file), "utf8");

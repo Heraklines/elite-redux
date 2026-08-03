@@ -7149,3 +7149,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   browsers first reached LoginPhase at 307-311 seconds under CDN fan-out, just beyond the old five-minute bound.
   Ordinary journeys retain the five-minute boot contract, and the matrix's 20-minute total setup ceiling is
   unchanged.
+
+## 2026-08-03 - focused reward and exact gate classification
+
+- Exact-SHA two-browser run `30788976362` passed both focused cases on candidate
+  `e32712bb37617e2b039e7136574ef78423d11914`.
+- `HYPER_POTION` mirrored the named reward cursor to the watcher, selected the exact guest-owned party target,
+  converged that target from 4/19 HP to 19/19 HP on both clients, and installed the identical wave-2 command
+  frontier and state digest. The former stale Poke Ball watcher cursor did not recur.
+- `TM_GREAT` traversed the finite native Learn Move narration, opened the exact Summary picker, committed one
+  replacement (move 323 -> move 14), closed the exact queued picker, and installed the identical wave-2 command
+  frontier on both clients. The trace contains no duplicate `CoopReplayLearnMovePhase` and no `8/7/7` stall.
+- `ER_LEARNERS_SHROOM` and `MEMORY_MUSHROOM` had already passed the same exact native-phase reuse path in run
+  `30787688209`; the final broad reward matrix will requalify them together with `TM_CASE`.
+- Full gate `30794206320` passed static/type/format, the fast Authority V2/public-UI contracts, every A/B/C/P
+  behavioral shard, all four mutation shards, the immutable bundle, and tier-1 native WebRTC. Its sole
+  underlying red was CI-only: the browser job spent 11m46s cloning the immutable assets submodule, leaving only
+  2m16s of its 15-minute job ceiling for a sealed-production checkpoint whose known-green runtime is about
+  4m31s. GitHub cancelled the step and the aggregate correctly mirrored that cancellation; no product assertion
+  failed.
+- The browser job now retains all strict transport-internal no-progress bounds but has a measured 25-minute
+  wall-clock ceiling so transient checkout latency cannot manufacture the same cancellation. A source contract
+  prevents the job budget from dropping below the measured checkout-plus-checkpoint requirement.
