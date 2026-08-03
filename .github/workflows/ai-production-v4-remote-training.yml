@@ -20,6 +20,11 @@ on:
         required: false
         type: boolean
         default: false
+      target_build_sha:
+        description: Exact production build to train; blank resolves the live production version endpoint
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -161,6 +166,22 @@ jobs:
           --contract-version 4
           --max-invalid-objects 100
           --out "$RUNNER_TEMP/production-v4-telemetry"
+      - name: Resolve exact production training build
+        env:
+          REQUESTED_BUILD_SHA: ${{ inputs.target_build_sha || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$REQUESTED_BUILD_SHA"
+          if [[ -z "$target" ]]; then
+            target=$(curl --fail --silent --show-error https://elite-redux.pages.dev/version.json | jq -er '.identity.sha')
+          fi
+          if [[ ! "$target" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid production training build SHA: $target"
+            exit 1
+          fi
+          echo "PRODUCTION_TRAINING_BUILD_SHA=$target" >> "$GITHUB_ENV"
+          echo "Training exact production build: $target"
       - name: Materialize one identity-bound training cut
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -170,7 +191,8 @@ jobs:
           node scripts/ai/select-largest-contract-identity.mjs \
             "$RUNNER_TEMP/production-v4-telemetry/contract-records.jsonl" \
             "$RUNNER_TEMP/production-v4-selected.jsonl" \
-            "$RUNNER_TEMP/production-v4-identity-report.json"
+            "$RUNNER_TEMP/production-v4-identity-report.json" \
+            --build-sha "$PRODUCTION_TRAINING_BUILD_SHA"
           node scripts/ai/materialize-human-contract-training.mjs \
             "$RUNNER_TEMP/production-v4-selected.jsonl" \
             "$RUNNER_TEMP/production-v4-training"
@@ -283,6 +305,7 @@ jobs:
             echo "- Dataset: \`$dataset_slug\` (private)"
             echo "- Kernel: \`$kernel_slug\` (private GPU)"
             echo "- Source commit: \`$GITHUB_SHA\`"
+            echo "- Production data build: \`$PRODUCTION_TRAINING_BUILD_SHA\`"
             echo "- Policy labels: victorious human battles only"
             echo "- Value labels: all completed battle wins and defeats"
           } >> "$GITHUB_STEP_SUMMARY"

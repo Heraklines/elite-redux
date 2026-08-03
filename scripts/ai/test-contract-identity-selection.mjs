@@ -72,6 +72,26 @@ try {
   assert.equal(selection.selected.decisions, 2);
   assert.equal(readFileSync(selectedPath, "utf8").trim().split("\n").length, 3);
 
+  const currentBuildPath = join(root, "current-build.jsonl");
+  const currentBuildSelection = await selectLargestContractIdentity(
+    input,
+    currentBuildPath,
+    join(root, "current-build-selection.json"),
+    { buildSha: "build-a" },
+  );
+  assert.equal(currentBuildSelection.requestedBuildSha, "build-a");
+  assert.equal(currentBuildSelection.selected.buildSha, "build-a");
+  assert.equal(readFileSync(currentBuildPath, "utf8").trim().split("\n").length, 2);
+  await assert.rejects(
+    selectLargestContractIdentity(
+      input,
+      join(root, "missing-build.jsonl"),
+      join(root, "missing-build-selection.json"),
+      { buildSha: "build-missing" },
+    ),
+    /no contract identity for build build-missing/u,
+  );
+
   const selected = await materializeHumanContractTraining(selectedPath, join(root, "strict-selected"));
   assert.deepEqual(selected.buildShas, ["build-b"]);
   assert.deepEqual(selected.dictionaryHashes, ["dictionary-b"]);

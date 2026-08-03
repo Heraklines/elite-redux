@@ -50,9 +50,10 @@ function compareCandidates(left, right) {
   );
 }
 
-export async function selectLargestContractIdentity(inputPath, outputPath, reportPath) {
+export async function selectLargestContractIdentity(inputPath, outputPath, reportPath, options = {}) {
   const input = resolve(inputPath);
   const output = resolve(outputPath);
+  const targetBuildSha = options.buildSha?.trim() || null;
   const candidates = new Map();
   await forEachRecord(input, record => {
     const identity = recordIdentity(record);
@@ -83,9 +84,15 @@ export async function selectLargestContractIdentity(inputPath, outputPath, repor
   });
 
   const ranked = [...candidates.values()].sort(compareCandidates);
-  const selected = ranked.find(candidate => candidate.decisions > 0 && candidate.battleTerminals > 0);
+  const selected = ranked.find(
+    candidate =>
+      candidate.decisions > 0
+      && candidate.battleTerminals > 0
+      && (targetBuildSha === null || candidate.buildSha === targetBuildSha),
+  );
   if (!selected) {
-    throw new Error("no contract identity contains both policy decisions and battle terminals");
+    const target = targetBuildSha === null ? "" : ` for build ${targetBuildSha}`;
+    throw new Error(`no contract identity${target} contains both policy decisions and battle terminals`);
   }
 
   const outputStream = createWriteStream(output, { encoding: "utf8" });
@@ -109,7 +116,11 @@ export async function selectLargestContractIdentity(inputPath, outputPath, repor
     sourcePartitions: candidate.sourcePartitions.size,
   });
   const report = {
-    selectionRule: "require decisions and battle terminals; then most decisions, battle terminals, and records",
+    selectionRule:
+      targetBuildSha === null
+        ? "require decisions and battle terminals; then most decisions, battle terminals, and records"
+        : "require the requested build, decisions, and battle terminals; then most decisions, battle terminals, and records",
+    requestedBuildSha: targetBuildSha,
     selected: summarize(selected),
     candidates: ranked.map(summarize),
   };
@@ -118,12 +129,19 @@ export async function selectLargestContractIdentity(inputPath, outputPath, repor
 }
 
 function usage() {
-  console.error("Usage: node scripts/ai/select-largest-contract-identity.mjs INPUT_JSONL OUTPUT_JSONL REPORT_JSON");
+  console.error(
+    "Usage: node scripts/ai/select-largest-contract-identity.mjs INPUT_JSONL OUTPUT_JSONL REPORT_JSON [--build-sha SHA]",
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  if (process.argv.length === 5) {
-    const report = await selectLargestContractIdentity(process.argv[2], process.argv[3], process.argv[4]);
+  const args = process.argv.slice(2);
+  const buildShaIndex = args.indexOf("--build-sha");
+  const positional =
+    buildShaIndex === -1 ? args : args.filter((_, index) => index !== buildShaIndex && index !== buildShaIndex + 1);
+  const buildSha = buildShaIndex === -1 ? undefined : args[buildShaIndex + 1];
+  if (positional.length === 3 && (buildShaIndex === -1 || buildSha)) {
+    const report = await selectLargestContractIdentity(positional[0], positional[1], positional[2], { buildSha });
     console.log(JSON.stringify(report, null, 2));
   } else {
     usage();
