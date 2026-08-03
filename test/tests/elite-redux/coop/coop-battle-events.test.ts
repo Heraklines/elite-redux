@@ -78,7 +78,11 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
-import { setCoopPresentationHardWallMsForTest } from "#phases/coop-presentation-watchdog";
+import {
+  armCoopPresentationProgressWatchdog,
+  COOP_PRESENTATION_STALL_MS,
+  setCoopPresentationHardWallMsForTest,
+} from "#phases/coop-presentation-watchdog";
 import {
   CoopCommonAnimReplayPhase,
   CoopFaintReplayPhase,
@@ -172,9 +176,23 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     setCoopPresentationObserver(null);
     setCoopPresentationHardWallMsForTest(null);
     clearCoopRuntime();
+  });
+
+  it("does not invalidate presentation after the transient ten-second no-frame window from the live report", () => {
+    vi.useFakeTimers();
+    const expired = vi.fn();
+    const watchdog = armCoopPresentationProgressWatchdog(expired);
+
+    vi.advanceTimersByTime(10_000);
+    expect(expired, "two throttled polling intervals are not proof of a broken renderer").not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(COOP_PRESENTATION_STALL_MS - 10_000);
+    expect(expired, "a genuinely frozen renderer remains bounded").toHaveBeenCalledTimes(1);
+    watchdog.remove();
   });
 
   it("the exact-browser observer pairs one authority event with its completed canonical renderer receipt", () => {

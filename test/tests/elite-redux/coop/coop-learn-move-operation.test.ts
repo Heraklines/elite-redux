@@ -278,7 +278,13 @@ describe("co-op learn-move operation migration", () => {
     setCoopRuntime(hostRuntime);
     expect(
       commitCoopLearnMoveDecision(
-        { payload, ownerRole: "guest", localRole: "host", wave: WAVE, turn: TURN },
+        {
+          payload: { ...payload, nextInteraction: { kind: "reward", wave: WAVE, turn: TURN } },
+          ownerRole: "guest",
+          localRole: "host",
+          wave: WAVE,
+          turn: TURN,
+        },
         hostBinding,
       ),
     ).toBe(true);

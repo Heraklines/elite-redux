@@ -778,6 +778,13 @@ test("presentation liveness uses an exact runtime wall scheduler rather than the
   assert.match(watchdog, /const scene = globalScene/u);
   assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
   assert.match(watchdog, /generation !== coopSessionGeneration\(\) \|\| getCoopBattleStreamer\(\) !== streamer/u);
+  assert.match(watchdog, /COOP_PRESENTATION_STALL_MS = 30_000/u);
+  assert.match(watchdog, /let lastProgressAt = startedAt/u);
+  assert.match(
+    watchdog,
+    /if \(frame > lastFrame\) \{[\s\S]+lastProgressAt = sampledAt;[\s\S]+sampledAt - lastProgressAt >= stallMs/u,
+    "one throttled five-second sample cannot permanently fail a presentation that later resumes",
+  );
   assert.match(watchdog, /DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000/u);
   assert.match(
     browser,

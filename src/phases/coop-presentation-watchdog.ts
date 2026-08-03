@@ -7,8 +7,10 @@
 import { globalScene } from "#app/global-scene";
 import { coopSessionGeneration, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 
-/** A renderer that makes no frame progress for this long has stalled its current presentation. */
-export const COOP_PRESENTATION_STALL_MS = 5000;
+/** Polling remains responsive without treating one throttled browser interval as a renderer failure. */
+const COOP_PRESENTATION_POLL_MS = 5_000;
+/** A visible renderer must make no frame progress for this full rolling window before it is considered stalled. */
+export const COOP_PRESENTATION_STALL_MS = 30_000;
 /** Advancing frames may be slow, but a broken animation callback still cannot hold control forever. */
 const DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000;
 let configuredCoopPresentationHardWallMs = DEFAULT_COOP_PRESENTATION_HARD_WALL_MS;
@@ -40,9 +42,10 @@ function scheduleWallClock(callback: () => void, ms: number): () => void {
 }
 
 /**
- * Bound presentation by renderer progress instead of an assumed GPU frame rate. Software WebGL can advance
- * below one frame per second while still drawing a valid animation. The callback remains the sole success
- * proof; no progress fails on the first interval and the wall ceiling catches an endlessly advancing tween.
+ * Bound presentation by renderer progress instead of an assumed GPU frame rate. Software WebGL and a
+ * background-throttled human browser can legitimately go several five-second polling intervals without
+ * producing a frame. Expire only after the rolling no-progress window, while the independent hard wall still
+ * catches an endlessly advancing tween whose completion callback never arrives.
  */
 export function armCoopPresentationProgressWatchdog(
   onExpired: () => void,
@@ -63,6 +66,7 @@ export function armCoopPresentationProgressWatchdog(
   const startedAt = now();
   const hardWallMs = configuredCoopPresentationHardWallMs;
   let lastFrame = scene.game.loop.frame;
+  let lastProgressAt = startedAt;
   let removed = false;
   let cancelTimer: (() => void) | undefined;
   const check = () => {
@@ -80,15 +84,19 @@ export function armCoopPresentationProgressWatchdog(
       removed = true;
       return;
     }
+    const sampledAt = now();
     const frame = scene.game.loop.frame;
-    if (frame > lastFrame && now() - startedAt < hardWallMs) {
+    if (frame > lastFrame) {
       lastFrame = frame;
-      cancelTimer = schedule(check, stallMs);
+      lastProgressAt = sampledAt;
+    }
+    if (sampledAt - startedAt >= hardWallMs || sampledAt - lastProgressAt >= stallMs) {
+      onExpired();
       return;
     }
-    onExpired();
+    cancelTimer = schedule(check, Math.min(COOP_PRESENTATION_POLL_MS, stallMs));
   };
-  cancelTimer = schedule(check, stallMs);
+  cancelTimer = schedule(check, Math.min(COOP_PRESENTATION_POLL_MS, stallMs));
   return {
     remove: () => {
       if (removed) {
