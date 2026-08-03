@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -17,11 +18,35 @@ from kaggle_train_entrypoint import (
     effective_batch_size,
     find_training_source,
     materialize_training_bundle,
+    run_checked_streaming,
     run_with_failure_report,
+    temporary_bundle_root,
 )
 
 
 class KaggleTrainingEntrypointTest(unittest.TestCase):
+    def test_raw_bundle_uses_temporary_storage_not_kaggle_output(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"ER_AI_TEMP_PATH": "temporary-root", "KAGGLE_WORKING_PATH": "working-root"},
+        ):
+            self.assertEqual(temporary_bundle_root(), Path("temporary-root") / "er-ai-training-bundle")
+
+    def test_child_failure_includes_bounded_output_tail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(RuntimeError, "diagnostic-line-4") as raised:
+                run_checked_streaming(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import sys; [print(f'diagnostic-line-{i}', flush=True) for i in range(5)]; sys.exit(7)",
+                    ],
+                    Path(temp),
+                    tail_lines=2,
+                )
+        self.assertNotIn("diagnostic-line-2", str(raised.exception))
+        self.assertIn("status 7", str(raised.exception))
+
     def test_detects_missing_pascal_architecture(self) -> None:
         self.assertFalse(cuda_architecture_supported((6, 0), ["sm_70", "sm_75", "sm_80"]))
         self.assertTrue(cuda_architecture_supported((6, 0), ["sm_60", "sm_70", "sm_75"]))

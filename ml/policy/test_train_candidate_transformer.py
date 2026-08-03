@@ -3,6 +3,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 
 import torch
@@ -16,15 +17,228 @@ from train_candidate_transformer import (
     build_token_vocabulary,
     checkpoint_selection_metric,
     collate,
+    dataset_hash,
     evaluate,
+    feature_normalization,
     initialize_from_checkpoint,
+    iter_selected_er_decisions,
     load_fixed_token_vocabulary,
     load_transfer_records,
     make_examples,
+    scan_er_corpus,
+    scan_selected_er_decisions,
+    train,
 )
 
 
 class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
+    def test_streamed_v4_training_runs_end_to_end(self) -> None:
+        dictionary = {
+            "schemaVersion": 3,
+            "features": {"schemaVersion": 4, "names": ["feature-a", "feature-b"]},
+            "speciesForms": {},
+            "abilities": {},
+            "moves": {"1": {"attributes": []}, "2": {"attributes": []}},
+            "items": {},
+            "modifiers": {},
+            "battlerTags": [],
+            "arenaTags": [],
+            "positionalTags": [],
+            "relics": {},
+            "mechanicNamespaces": [],
+        }
+        dictionary_bytes = json.dumps(dictionary, separators=(",", ":")).encode()
+        dictionary_hash = hashlib.sha256(dictionary_bytes).hexdigest()
+        candidates = [
+            {"id": "move:a", "kind": "move", "moveId": 1},
+            {"id": "move:b", "kind": "move", "moveId": 2},
+        ]
+
+        def groups(candidate: dict) -> dict:
+            return {
+                "candidateId": candidate["id"],
+                "groups": {
+                    "actor": [],
+                    "targets": [],
+                    "destination": [],
+                    "field": [],
+                    "action": ["action:move", f'move:{candidate["moveId"]}'],
+                },
+            }
+
+        records = []
+        for index in range(6):
+            episode_id = f"episode-{index}"
+            battle_id = f"{episode_id}:wave-1:battle-1"
+            records.extend([
+                {
+                    "schemaVersion": 4,
+                    "featureSchemaVersion": 4,
+                    "kind": "combat_decision",
+                    "candidateScope": "combat-command",
+                    "decisionId": f"decision-{index}",
+                    "jointActionId": f"{battle_id}:1",
+                    "battleId": battle_id,
+                    "episodeId": episode_id,
+                    "splitGroupId": f"source-{index}",
+                    "sourcePartitionId": f"source-{index}",
+                    "buildSha": "a" * 40,
+                    "dexHash": "b" * 64,
+                    "dictionaryHash": dictionary_hash,
+                    "policySource": "human-v1",
+                    "policyTarget": True,
+                    "observation": {"selfParty": [], "opponentActive": []},
+                    "candidates": candidates,
+                    "candidateFeatures": [
+                        {"candidateId": "move:a", "values": [float(index), 0.0]},
+                        {"candidateId": "move:b", "values": [0.0, float(index + 1)]},
+                    ],
+                    "candidateTokenGroups": [groups(candidate) for candidate in candidates],
+                    "chosenCandidateId": candidates[index % 2]["id"],
+                },
+                {
+                    "schemaVersion": 4,
+                    "kind": "battle_terminal",
+                    "battleId": battle_id,
+                    "episodeId": episode_id,
+                    "buildSha": "a" * 40,
+                    "dexHash": "b" * 64,
+                    "dictionaryHash": dictionary_hash,
+                    "outcome": "defeat" if index == 5 else "victory",
+                },
+            ])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "data"
+            data.mkdir()
+            (data / "records.jsonl").write_text(
+                "".join(json.dumps(record) + "\n" for record in records),
+                encoding="utf-8",
+            )
+            dictionary_path = root / "dictionary.json"
+            dictionary_path.write_bytes(dictionary_bytes)
+            output = root / "model"
+            report = train(Namespace(
+                data=data,
+                transfer_data=None,
+                transfer_mode="pretrain",
+                transfer_pretrain_epochs=0,
+                dictionary=dictionary_path,
+                dictionary_supplement=None,
+                token_vocabulary=None,
+                init_model_dir=None,
+                output_dir=output,
+                seed=7,
+                device="cpu",
+                epochs=1,
+                patience=1,
+                min_delta=1e-4,
+                batch_size=2,
+                learning_rate=3e-4,
+                weight_decay=1e-3,
+                gradient_clip=1.0,
+                value_weight=0.2,
+                loss_policy_weight=0.0,
+                unknown_policy_weight=0.0,
+                elite_rollouts=True,
+                d_model=8,
+                layers=1,
+                heads=2,
+                feedforward=16,
+                dropout=0.0,
+                history_length=1,
+                trajectory_layers=1,
+                amp=False,
+                fast_kernels=False,
+            ))
+            self.assertTrue((output / "model.safetensors").is_file())
+            self.assertEqual(report["data"]["decisions"], 6)
+            self.assertEqual(report["data"]["sourcePolicies"], {"human-v1": 6})
+            self.assertEqual(report["objective"]["lossEpisodePolicyWeight"], 0.0)
+
+    def test_v4_er_corpus_streams_into_compact_equivalent_examples(self) -> None:
+        candidates = [{"id": "move:a", "kind": "move", "moveId": 1}]
+        token_rows = [{
+            "candidateId": "move:a",
+            "groups": {
+                "actor": [],
+                "targets": [],
+                "destination": [],
+                "field": [],
+                "action": ["action:move", "move:1"],
+            },
+        }]
+
+        def decision(turn: int) -> dict:
+            return {
+                "schemaVersion": 4,
+                "featureSchemaVersion": 4,
+                "kind": "combat_decision",
+                "candidateScope": "combat-command",
+                "decisionId": f"decision-{turn}",
+                "jointActionId": f"episode-1:wave-1:battle-1:{turn}",
+                "battleId": "episode-1:wave-1:battle-1",
+                "episodeId": "episode-1",
+                "splitGroupId": "source-1",
+                "sourcePartitionId": "source-1",
+                "buildSha": "a" * 40,
+                "dexHash": "b" * 64,
+                "dictionaryHash": "c" * 64,
+                "policySource": "human-v1",
+                "policyTarget": True,
+                "observation": {"selfParty": [], "opponentActive": []},
+                "candidates": candidates,
+                "candidateFeatures": [{"candidateId": "move:a", "values": [float(turn), 2.0]}],
+                "candidateTokenGroups": token_rows,
+                "chosenCandidateId": "move:a",
+            }
+
+        decisions = [decision(1), decision(2)]
+        terminal = {
+            "schemaVersion": 4,
+            "kind": "battle_terminal",
+            "battleId": "episode-1:wave-1:battle-1",
+            "episodeId": "episode-1",
+            "buildSha": "a" * 40,
+            "dexHash": "b" * 64,
+            "dictionaryHash": "c" * 64,
+            "outcome": "victory",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory)
+            for index, record in enumerate((*decisions, terminal)):
+                (data / f"part-{index}.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            corpus = scan_er_corpus(data)
+            selection = scan_selected_er_decisions(data, corpus, elite_rollouts=True)
+            _, token_to_id = build_token_vocabulary(decisions, {})
+            streamed = make_examples(
+                iter_selected_er_decisions(data, corpus, elite_rollouts=True),
+                selection.terminals,
+                0.0,
+                token_to_id,
+                terminal_scope="battle",
+            )
+            expected = make_examples(decisions, [terminal], 0.0, token_to_id, terminal_scope="battle")
+            paths = sorted(data.glob("*.jsonl"))
+            expected_hash = hashlib.sha256()
+            for path in paths:
+                expected_hash.update(path.name.encode())
+                expected_hash.update(path.read_bytes())
+            self.assertEqual(dataset_hash(paths), expected_hash.hexdigest())
+
+        self.assertEqual(corpus.decision_count, 2)
+        self.assertEqual(corpus.terminal_scope, "battle")
+        self.assertEqual(selection.source_policies, {"human-v1": 2})
+        self.assertEqual([len(example.history) for example in streamed], [0, 1])
+        self.assertIsNone(streamed[0].feature_presence)
+        self.assertIsNone(streamed[0].feature_indices)
+        torch.testing.assert_close(collate(streamed)["features"], collate(expected)["features"])
+        self.assertTrue(bool(collate(streamed)["featurePresence"].all()))
+        means, stds = feature_normalization(streamed)
+        torch.testing.assert_close(means, torch.tensor([1.5, 2.0]))
+        torch.testing.assert_close(stds, torch.tensor([0.5, 1e-6]))
+
     def test_fixed_vocabulary_preserves_extra_transfer_tokens_and_validates_hash(self) -> None:
         required = ["<PAD>", "<UNK>", "action:move"]
         fixed = [*required, "domain:showdown", "showdown-move:thunderbolt"]

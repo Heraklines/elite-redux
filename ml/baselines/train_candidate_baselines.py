@@ -434,12 +434,66 @@ def validate_dataset(
         raise ValueError(f"episodes map to multiple source partitions: {inconsistent_partitions}")
 
 
-def validate_data_dictionary(
+def empty_dictionary_references() -> dict[str, set[Any]]:
+    return {
+        "moves": set(),
+        "abilities": set(),
+        "items": set(),
+        "modifiers": set(),
+        "speciesForms": set(),
+        "battlerTags": set(),
+        "arenaTags": set(),
+        "positionalTags": set(),
+        "relics": set(),
+        "mechanicNamespaces": set(),
+    }
+
+
+def accumulate_dictionary_references(
+    decision: dict[str, Any],
+    references: dict[str, set[Any]],
+) -> None:
+    observation = decision["observation"]
+    for pokemon in observation["selfParty"] + observation["opponentActive"] + observation.get("opponentKnownParty", []):
+        references["speciesForms"].add(f'{int(pokemon["species"])}:{int(pokemon["form"])}')
+        references["abilities"].update(int(value["abilityId"]) for value in pokemon.get("abilities", []))
+        references["moves"].update(int(move["moveId"]) for move in pokemon.get("moves", []))
+        held_items = pokemon.get("heldItems")
+        if isinstance(held_items, list):
+            references["items"].update(str(value["itemId"]) for value in held_items)
+        references["battlerTags"].update(str(value["effectId"]) for value in pokemon.get("tags", []))
+        references["mechanicNamespaces"].update(
+            str(value["effectId"]).split(":", 1)[0]
+            for value in pokemon.get("mechanics", [])
+        )
+    references["arenaTags"].update(str(value["effectId"]) for value in observation.get("fieldEffects", []))
+    references["positionalTags"].update(
+        str(value["effectId"]) for value in observation.get("positionalEffects", [])
+    )
+    references["mechanicNamespaces"].update(
+        str(value["effectId"]).split(":", 1)[0]
+        for value in observation.get("mechanics", [])
+    )
+    for modifier in observation.get("modifiers", []):
+        references["modifiers"].add(str(modifier["modifierId"]))
+        for field in modifier.get("state", []):
+            if field.get("key") == "kind" and isinstance(field.get("value"), str):
+                references["relics"].add(field["value"])
+    references["moves"].update(
+        int(candidate["moveId"])
+        for candidate in decision["candidates"]
+        if candidate.get("kind") == "move"
+    )
+
+
+def validate_data_dictionary_summary(
     path: Path,
-    decisions: list[dict[str, Any]],
+    recorded_feature_schema_version: int,
+    recorded_feature_counts: set[int],
+    recorded_hashes: set[Any],
+    references: dict[str, set[Any]],
     supplement_path: Path | None = None,
 ) -> dict[str, Any]:
-    _, recorded_feature_schema_version = dataset_schema_versions(decisions)
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     dictionary = json.loads(raw)
@@ -455,17 +509,11 @@ def validate_data_dictionary(
         or len(set(features["names"])) != len(features["names"])
     ):
         raise ValueError("combat data dictionary has an invalid feature-name contract")
-    recorded_feature_counts = {
-        len(row["values"])
-        for decision in decisions
-        for row in decision["candidateFeatures"]
-    }
     if recorded_feature_counts != {len(features["names"])}:
         raise ValueError(
             f"feature-name dictionary width mismatch: records={sorted(recorded_feature_counts)}, "
             f"dictionary={len(features['names'])}"
         )
-    recorded_hashes = {record.get("dictionaryHash") for record in decisions}
     if recorded_hashes != {digest}:
         raise ValueError(f"dictionary hash mismatch: records={sorted(map(str, recorded_hashes))}, file={digest}")
 
@@ -503,58 +551,17 @@ def validate_data_dictionary(
     known_positional_tags = set(dictionary.get("positionalTags", []))
     known_relics = set(dictionary.get("relics", {}))
     known_mechanic_namespaces = set(dictionary.get("mechanicNamespaces", []))
-    referenced_moves: set[int] = set()
-    referenced_abilities: set[int] = set()
-    referenced_items: set[str] = set()
-    referenced_modifiers: set[str] = set()
-    referenced_species_forms: set[str] = set()
-    referenced_battler_tags: set[str] = set()
-    referenced_arena_tags: set[str] = set()
-    referenced_positional_tags: set[str] = set()
-    referenced_relics: set[str] = set()
-    referenced_mechanic_namespaces: set[str] = set()
-    for decision in decisions:
-        observation = decision["observation"]
-        for pokemon in observation["selfParty"] + observation["opponentActive"] + observation.get("opponentKnownParty", []):
-            referenced_species_forms.add(f'{int(pokemon["species"])}:{int(pokemon["form"])}')
-            referenced_abilities.update(int(value["abilityId"]) for value in pokemon.get("abilities", []))
-            referenced_moves.update(int(move["moveId"]) for move in pokemon.get("moves", []))
-            held_items = pokemon.get("heldItems")
-            if isinstance(held_items, list):
-                referenced_items.update(str(value["itemId"]) for value in held_items)
-            referenced_battler_tags.update(str(value["effectId"]) for value in pokemon.get("tags", []))
-            referenced_mechanic_namespaces.update(
-                str(value["effectId"]).split(":", 1)[0]
-                for value in pokemon.get("mechanics", [])
-            )
-        referenced_arena_tags.update(str(value["effectId"]) for value in observation.get("fieldEffects", []))
-        referenced_positional_tags.update(str(value["effectId"]) for value in observation.get("positionalEffects", []))
-        referenced_mechanic_namespaces.update(
-            str(value["effectId"]).split(":", 1)[0]
-            for value in observation.get("mechanics", [])
-        )
-        for modifier in observation.get("modifiers", []):
-            referenced_modifiers.add(str(modifier["modifierId"]))
-            for field in modifier.get("state", []):
-                if field.get("key") == "kind" and isinstance(field.get("value"), str):
-                    referenced_relics.add(field["value"])
-        referenced_moves.update(
-            int(candidate["moveId"])
-            for candidate in decision["candidates"]
-            if candidate.get("kind") == "move"
-        )
-
     missing = {
-        "moves": sorted(referenced_moves - known_moves),
-        "abilities": sorted(referenced_abilities - known_abilities),
-        "items": sorted(referenced_items - known_items),
-        "modifiers": sorted(referenced_modifiers - known_modifiers),
-        "speciesForms": sorted(referenced_species_forms - known_species_forms),
-        "battlerTags": sorted(referenced_battler_tags - known_battler_tags),
-        "arenaTags": sorted(referenced_arena_tags - known_arena_tags),
-        "positionalTags": sorted(referenced_positional_tags - known_positional_tags),
-        "relics": sorted(referenced_relics - known_relics),
-        "mechanicNamespaces": sorted(referenced_mechanic_namespaces - known_mechanic_namespaces),
+        "moves": sorted(references["moves"] - known_moves),
+        "abilities": sorted(references["abilities"] - known_abilities),
+        "items": sorted(references["items"] - known_items),
+        "modifiers": sorted(references["modifiers"] - known_modifiers),
+        "speciesForms": sorted(references["speciesForms"] - known_species_forms),
+        "battlerTags": sorted(references["battlerTags"] - known_battler_tags),
+        "arenaTags": sorted(references["arenaTags"] - known_arena_tags),
+        "positionalTags": sorted(references["positionalTags"] - known_positional_tags),
+        "relics": sorted(references["relics"] - known_relics),
+        "mechanicNamespaces": sorted(references["mechanicNamespaces"] - known_mechanic_namespaces),
     }
     if any(missing.values()):
         raise ValueError(f"combat data dictionary misses recorded runtime ids: {missing}")
@@ -571,15 +578,38 @@ def validate_data_dictionary(
         "positionalTags": len(known_positional_tags),
         "relics": len(known_relics),
         "mechanicNamespaces": len(known_mechanic_namespaces),
-        "referencedMoves": len(referenced_moves),
-        "referencedAbilities": len(referenced_abilities),
-        "referencedItems": len(referenced_items),
-        "referencedModifiers": len(referenced_modifiers),
-        "referencedSpeciesForms": len(referenced_species_forms),
-        "referencedRelics": len(referenced_relics),
-        "referencedMechanicNamespaces": len(referenced_mechanic_namespaces),
+        "referencedMoves": len(references["moves"]),
+        "referencedAbilities": len(references["abilities"]),
+        "referencedItems": len(references["items"]),
+        "referencedModifiers": len(references["modifiers"]),
+        "referencedSpeciesForms": len(references["speciesForms"]),
+        "referencedRelics": len(references["relics"]),
+        "referencedMechanicNamespaces": len(references["mechanicNamespaces"]),
         "supplement": supplement_coverage,
     }
+
+
+def validate_data_dictionary(
+    path: Path,
+    decisions: list[dict[str, Any]],
+    supplement_path: Path | None = None,
+) -> dict[str, Any]:
+    _, recorded_feature_schema_version = dataset_schema_versions(decisions)
+    references = empty_dictionary_references()
+    for decision in decisions:
+        accumulate_dictionary_references(decision, references)
+    return validate_data_dictionary_summary(
+        path,
+        recorded_feature_schema_version,
+        {
+            len(row["values"])
+            for decision in decisions
+            for row in decision["candidateFeatures"]
+        },
+        {record.get("dictionaryHash") for record in decisions},
+        references,
+        supplement_path,
+    )
 
 
 def select_elite_rollouts(

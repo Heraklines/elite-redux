@@ -12,11 +12,11 @@ import math
 import random
 import sys
 import time
-from collections import Counter
+from collections import Counter, defaultdict, deque
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Iterator
 
 import numpy as np
 import torch
@@ -29,19 +29,21 @@ BASELINE_DIR = POLICY_DIR.parent / "baselines"
 sys.path.insert(0, str(BASELINE_DIR))
 
 from train_candidate_baselines import (  # noqa: E402
+    ROLLOUT_POLICY,
+    SUCCESSFUL_ROLLOUT_OUTCOMES,
+    SUPPORTED_SCHEMA_VERSIONS,
     TOKEN_GROUP_NAMES,
-    dataset_schema_versions,
-    embedded_candidate_features,
+    accumulate_dictionary_references,
+    empty_dictionary_references,
     is_policy_target,
     jsonl_files,
-    load_policy_trajectory_records,
     record_battle_id,
     record_policy_source,
     record_split_group,
     record_source_partition,
-    select_elite_rollouts,
     split_groups,
-    validate_data_dictionary,
+    validate_data_dictionary_summary,
+    validate_decision,
 )
 
 from candidate_transformer import (  # noqa: E402
@@ -63,8 +65,8 @@ TRANSFER_SCHEMA_VERSION = 1
 @dataclass(frozen=True)
 class DecisionState:
     features: np.ndarray
-    feature_presence: np.ndarray
-    feature_indices: np.ndarray
+    feature_presence: np.ndarray | None
+    feature_indices: np.ndarray | None
     full_feature_count: int
     token_ids: list[list[np.ndarray]]
     chosen_index: int
@@ -78,8 +80,8 @@ class DecisionExample:
     split_group_id: str
     source_partition_id: str
     features: np.ndarray
-    feature_presence: np.ndarray
-    feature_indices: np.ndarray
+    feature_presence: np.ndarray | None
+    feature_indices: np.ndarray | None
     full_feature_count: int
     token_ids: list[list[np.ndarray]]
     chosen_index: int
@@ -109,6 +111,281 @@ def terminal_value(terminal: dict[str, Any]) -> float | None:
     if terminal.get("outcome") in LOSS_OUTCOMES:
         return 0.0
     return None
+
+
+@dataclass(frozen=True)
+class ErCorpusSummary:
+    decision_count: int
+    terminals: list[dict[str, Any]]
+    terminal_scope: str
+    contract_schema_version: int
+    feature_schema_version: int
+    feature_count: int
+    dictionary_hashes: set[Any]
+    dictionary_references: dict[str, set[Any]]
+    rollout_trajectory_ids: set[str]
+    successful_rollout_trajectory_ids: set[str]
+
+
+@dataclass(frozen=True)
+class ErSelectionSummary:
+    decision_count: int
+    terminals: list[dict[str, Any]]
+    observed_tokens: set[str]
+    episode_ids: set[str]
+    source_policies: Counter[str]
+    policy_target_decisions: int
+    identity: dict[str, list[str]]
+    rollout_selection: dict[str, Any] | None
+
+
+def iter_er_jsonl_records(path: Path) -> Iterator[tuple[dict[str, Any], Path, int]]:
+    for file in jsonl_files(path):
+        with file.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if line.strip():
+                    yield json.loads(line), file, line_number
+
+
+def scan_er_corpus(path: Path) -> ErCorpusSummary:
+    decision_count = 0
+    decision_ids: set[str] = set()
+    decision_episodes: Counter[str] = Counter()
+    schema_versions: set[int] = set()
+    feature_versions: set[int] = set()
+    feature_counts: set[int] = set()
+    identity_values = {name: set() for name in ("buildSha", "dexHash", "dictionaryHash")}
+    groups_by_episode: dict[str, set[str]] = defaultdict(set)
+    partitions_by_episode: dict[str, set[str]] = defaultdict(set)
+    decisions_by_battle: dict[str, set[str]] = defaultdict(set)
+    missing_battle_identity: list[str] = []
+    run_terminals: list[dict[str, Any]] = []
+    battle_terminals: list[dict[str, Any]] = []
+    references = empty_dictionary_references()
+    rollout_trajectory_ids: set[str] = set()
+
+    for record, file, line_number in iter_er_jsonl_records(path):
+        if record.get("schemaVersion") not in SUPPORTED_SCHEMA_VERSIONS:
+            raise ValueError(f"{file}:{line_number}: unsupported schema version")
+        kind = record.get("kind")
+        if kind == "combat_decision":
+            validate_decision(record, file, line_number)
+            decision_id = record["decisionId"]
+            if decision_id in decision_ids:
+                raise ValueError("dataset contains duplicate decision ids")
+            decision_ids.add(decision_id)
+            decision_count += 1
+            episode_id = record["episodeId"]
+            decision_episodes[episode_id] += 1
+            schema_versions.add(int(record["schemaVersion"]))
+            feature_versions.add(int(record["featureSchemaVersion"]))
+            feature_counts.update(len(row["values"]) for row in record["candidateFeatures"])
+            groups_by_episode[episode_id].add(record_split_group(record))
+            partitions_by_episode[episode_id].add(record_source_partition(record))
+            for name in identity_values:
+                identity_values[name].add(record.get(name))
+            accumulate_dictionary_references(record, references)
+            battle_id = record_battle_id(record)
+            if battle_id is not None:
+                decisions_by_battle[battle_id].add(episode_id)
+            else:
+                missing_battle_identity.append(decision_id)
+            if record_policy_source(record) == ROLLOUT_POLICY:
+                rollout_trajectory_ids.add(battle_id or episode_id)
+        elif kind in ("episode_terminal", "run_terminal"):
+            run_terminals.append(record)
+        elif kind == "battle_terminal":
+            battle_terminals.append(record)
+        elif kind in ("combat_auxiliary_decision", "combat_transition"):
+            continue
+        else:
+            raise ValueError(f"{file}:{line_number}: unknown record kind")
+
+    if not decision_count:
+        raise ValueError(f"no combat decisions found under {path}")
+    if len(schema_versions) != 1 or not schema_versions.issubset(SUPPORTED_SCHEMA_VERSIONS):
+        raise ValueError(f"dataset must contain one supported contract schema, found {sorted(schema_versions)}")
+    if len(feature_versions) != 1 or min(feature_versions) < 1:
+        raise ValueError(f"dataset must contain one positive feature schema, found {sorted(feature_versions)}")
+    if len(feature_counts) != 1:
+        raise ValueError(f"dataset contains inconsistent feature widths: {sorted(feature_counts)}")
+    inconsistent_groups = sorted(episode for episode, groups in groups_by_episode.items() if len(groups) != 1)
+    if inconsistent_groups:
+        raise ValueError(f"episodes map to multiple split groups: {inconsistent_groups}")
+    inconsistent_partitions = sorted(
+        episode for episode, partitions in partitions_by_episode.items() if len(partitions) != 1
+    )
+    if inconsistent_partitions:
+        raise ValueError(f"episodes map to multiple source partitions: {inconsistent_partitions}")
+
+    if battle_terminals:
+        terminal_scope = "battle"
+        terminals = battle_terminals
+        if missing_battle_identity:
+            raise ValueError(f"decision {missing_battle_identity[0]} has no stable battle identity")
+        terminal_by_battle = {record_battle_id(record): record for record in battle_terminals}
+        if None in terminal_by_battle or len(terminal_by_battle) != len(battle_terminals):
+            raise ValueError("dataset contains missing or duplicate battle terminal ids")
+        missing_battle_ids = sorted(
+            decision_id for decision_id, episodes in decisions_by_battle.items() if not decision_id or len(episodes) != 1
+        )
+        if missing_battle_ids:
+            raise ValueError(f"battle ids map to multiple episodes: {missing_battle_ids}")
+        mismatched = sorted(
+            battle_id
+            for battle_id, terminal in terminal_by_battle.items()
+            if battle_id in decisions_by_battle and terminal.get("episodeId") not in decisions_by_battle[battle_id]
+        )
+        if mismatched:
+            raise ValueError(f"battle terminal episode mismatch: {mismatched}")
+    else:
+        terminal_scope = "episode"
+        terminals = run_terminals
+        terminal_episodes = Counter(record.get("episodeId") for record in run_terminals)
+        missing = sorted(set(decision_episodes) - set(terminal_episodes))
+        extra = sorted(set(terminal_episodes) - set(decision_episodes))
+        duplicated = sorted(episode for episode, count in terminal_episodes.items() if count != 1)
+        if missing or extra or duplicated:
+            raise ValueError(
+                "episode terminal mismatch: "
+                f"missing={missing}, extra={extra}, non_unique={duplicated}"
+            )
+        for terminal in run_terminals:
+            episode_id = terminal["episodeId"]
+            groups_by_episode[episode_id].add(record_split_group(terminal))
+            partitions_by_episode[episode_id].add(record_source_partition(terminal))
+        inconsistent_groups = sorted(episode for episode, groups in groups_by_episode.items() if len(groups) != 1)
+        if inconsistent_groups:
+            raise ValueError(f"episodes map to multiple split groups: {inconsistent_groups}")
+        inconsistent_partitions = sorted(
+            episode for episode, partitions in partitions_by_episode.items() if len(partitions) != 1
+        )
+        if inconsistent_partitions:
+            raise ValueError(f"episodes map to multiple source partitions: {inconsistent_partitions}")
+
+    for terminal in terminals:
+        for name in identity_values:
+            identity_values[name].add(terminal.get(name))
+    for name, values in identity_values.items():
+        if len(values) != 1 or None in values or "unknown" in values:
+            raise ValueError(f"dataset must have one known {name}, found {sorted(map(str, values))}")
+
+    def trajectory_id(record: dict[str, Any]) -> str | None:
+        return record.get("episodeId") if terminal_scope == "episode" else record_battle_id(record)
+
+    terminal_by_trajectory = {trajectory_id(record): record for record in terminals}
+    successful_rollouts = {
+        trajectory_id
+        for trajectory_id in rollout_trajectory_ids
+        if trajectory_id in terminal_by_trajectory
+        and terminal_by_trajectory[trajectory_id].get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
+    }
+    return ErCorpusSummary(
+        decision_count=decision_count,
+        terminals=terminals,
+        terminal_scope=terminal_scope,
+        contract_schema_version=next(iter(schema_versions)),
+        feature_schema_version=next(iter(feature_versions)),
+        feature_count=next(iter(feature_counts)),
+        dictionary_hashes=identity_values["dictionaryHash"],
+        dictionary_references=references,
+        rollout_trajectory_ids=rollout_trajectory_ids,
+        successful_rollout_trajectory_ids=successful_rollouts,
+    )
+
+
+def selected_er_decision(
+    decision: dict[str, Any],
+    corpus: ErCorpusSummary,
+    elite_rollouts: bool,
+) -> bool:
+    if not elite_rollouts or record_policy_source(decision) != ROLLOUT_POLICY:
+        return True
+    trajectory_id = (
+        decision["episodeId"]
+        if corpus.terminal_scope == "episode"
+        else record_battle_id(decision)
+    )
+    return trajectory_id in corpus.successful_rollout_trajectory_ids
+
+
+def iter_selected_er_decisions(
+    path: Path,
+    corpus: ErCorpusSummary,
+    elite_rollouts: bool,
+) -> Iterator[dict[str, Any]]:
+    for record, _, _ in iter_er_jsonl_records(path):
+        if record.get("kind") == "combat_decision" and selected_er_decision(record, corpus, elite_rollouts):
+            yield record
+
+
+def scan_selected_er_decisions(
+    path: Path,
+    corpus: ErCorpusSummary,
+    elite_rollouts: bool,
+) -> ErSelectionSummary:
+    observed_tokens: set[str] = set()
+    episode_ids: set[str] = set()
+    selected_terminal_ids: set[str] = set()
+    source_policies: Counter[str] = Counter()
+    policy_target_decisions = 0
+    identity_values = {name: set() for name in ("buildSha", "dexHash", "dictionaryHash")}
+    decision_count = 0
+    for decision in iter_selected_er_decisions(path, corpus, elite_rollouts):
+        decision_count += 1
+        episode_ids.add(decision["episodeId"])
+        source_policies[record_policy_source(decision)] += 1
+        policy_target_decisions += int(is_policy_target(decision))
+        for row in decision["candidateTokenGroups"]:
+            for group in TOKEN_GROUP_NAMES:
+                observed_tokens.update(row["groups"][group])
+        for name in identity_values:
+            identity_values[name].add(str(decision[name]))
+        terminal_id = (
+            decision["episodeId"]
+            if corpus.terminal_scope == "episode"
+            else record_battle_id(decision)
+        )
+        if terminal_id is not None:
+            selected_terminal_ids.add(terminal_id)
+    if not decision_count:
+        raise ValueError("elite rollout selection removed every decision")
+    terminals = [
+        terminal
+        for terminal in corpus.terminals
+        if (
+            terminal.get("episodeId")
+            if corpus.terminal_scope == "episode"
+            else record_battle_id(terminal)
+        )
+        in selected_terminal_ids
+    ]
+    rollout_selection = (
+        {
+            "terminalScope": corpus.terminal_scope,
+            "episodes": len(corpus.rollout_trajectory_ids),
+            "successfulEpisodes": len(corpus.successful_rollout_trajectory_ids),
+            "successRate": (
+                len(corpus.successful_rollout_trajectory_ids) / len(corpus.rollout_trajectory_ids)
+                if corpus.rollout_trajectory_ids
+                else None
+            ),
+            "decisionsBeforeSelection": corpus.decision_count,
+            "decisionsAfterSelection": decision_count,
+        }
+        if elite_rollouts
+        else None
+    )
+    return ErSelectionSummary(
+        decision_count=decision_count,
+        terminals=terminals,
+        observed_tokens=observed_tokens,
+        episode_ids=episode_ids,
+        source_policies=source_policies,
+        policy_target_decisions=policy_target_decisions,
+        identity={name: sorted(values) for name, values in identity_values.items()},
+        rollout_selection=rollout_selection,
+    )
 
 
 def transfer_jsonl_files(path: Path) -> list[Path]:
@@ -236,6 +513,14 @@ def build_token_vocabulary(
         for row in decision["candidateTokenGroups"]:
             for group in TOKEN_GROUP_NAMES:
                 tokens.update(row["groups"][group])
+    return build_token_vocabulary_from_tokens(tokens, dictionary)
+
+
+def build_token_vocabulary_from_tokens(
+    observed_tokens: set[str],
+    dictionary: dict[str, Any],
+) -> tuple[list[str], dict[str, int]]:
+    tokens = set(observed_tokens)
     for identity in dictionary.get("speciesForms", {}):
         tokens.add(f"species:{identity}")
         tokens.add(f"original-species:{identity}")
@@ -359,7 +644,7 @@ def rebase_feature_normalization(
 
 
 def make_examples(
-    decisions: list[dict[str, Any]],
+    decisions: Iterable[dict[str, Any]],
     terminals: list[dict[str, Any]],
     loss_policy_weight: float,
     token_to_id: dict[str, int],
@@ -381,27 +666,36 @@ def make_examples(
             raise ValueError(f"terminal dataset has a missing or duplicate {terminal_scope} identity")
         terminal_by_key[key] = terminal
     examples: list[DecisionExample] = []
-    history_by_trajectory: dict[str, list[DecisionState]] = {}
+    history_by_trajectory: dict[str, deque[DecisionState]] = {}
     for decision in decisions:
         candidates = decision["candidates"]
         feature_rows = {row["candidateId"]: row for row in decision["candidateFeatures"]}
         features = np.asarray([feature_rows[candidate["id"]]["values"] for candidate in candidates], dtype=np.float32)
-        feature_presence = np.asarray(
-            [feature_rows[candidate["id"]].get("presence", [True] * features.shape[1]) for candidate in candidates],
-            dtype=np.bool_,
+        has_explicit_presence = any("presence" in feature_rows[candidate["id"]] for candidate in candidates)
+        feature_presence = (
+            np.asarray(
+                [feature_rows[candidate["id"]].get("presence", [True] * features.shape[1]) for candidate in candidates],
+                dtype=np.bool_,
+            )
+            if has_explicit_presence
+            else None
         )
         resolved_feature_count = full_feature_count if full_feature_count is not None else features.shape[1]
-        feature_indices = np.asarray(
-            decision.get("trainingFeatureIndices", list(range(features.shape[1]))),
-            dtype=np.int64,
-        )
-        if (
-            feature_indices.shape != (features.shape[1],)
-            or len(set(feature_indices.tolist())) != len(feature_indices)
-            or np.any(feature_indices < 0)
-            or np.any(feature_indices >= resolved_feature_count)
-        ):
-            raise ValueError(f"decision {decision['decisionId']} has invalid training feature indices")
+        explicit_feature_indices = decision.get("trainingFeatureIndices")
+        if explicit_feature_indices is None and features.shape[1] == resolved_feature_count:
+            feature_indices = None
+        else:
+            feature_indices = np.asarray(
+                explicit_feature_indices if explicit_feature_indices is not None else range(features.shape[1]),
+                dtype=np.int64,
+            )
+            if (
+                feature_indices.shape != (features.shape[1],)
+                or len(set(feature_indices.tolist())) != len(feature_indices)
+                or np.any(feature_indices < 0)
+                or np.any(feature_indices >= resolved_feature_count)
+            ):
+                raise ValueError(f"decision {decision['decisionId']} has invalid training feature indices")
         domain_name = decision.get("trainingDomain", "elite-redux")
         if domain_name not in DOMAIN_TO_ID:
             raise ValueError(f"unsupported training domain {domain_name}")
@@ -446,7 +740,10 @@ def make_examples(
             chosen_index=chosen_index,
             domain_id=domain_id,
         )
-        trajectory_history = history_by_trajectory.setdefault(trajectory_key, [])
+        trajectory_history = history_by_trajectory.setdefault(
+            trajectory_key,
+            deque(maxlen=history_length or 1),
+        )
         examples.append(
             DecisionExample(
                 decision_id=decision["decisionId"],
@@ -462,7 +759,7 @@ def make_examples(
                 domain_id=domain_id,
                 terminal_value=value,
                 policy_weight=weight,
-                history=tuple(trajectory_history[-history_length:]) if history_length else (),
+                history=tuple(trajectory_history) if history_length else (),
             )
         )
         trajectory_history.append(state)
@@ -540,9 +837,19 @@ def collate(examples: list[DecisionExample], history_length: int | None = None) 
     history_domain_ids = torch.zeros((len(examples), retained_history), dtype=torch.long)
     for index, example in enumerate(examples):
         count = example.features.shape[0]
-        columns = torch.from_numpy(example.feature_indices)
-        features[index, :count].index_copy_(1, columns, torch.from_numpy(example.features))
-        feature_presence[index, :count].index_copy_(1, columns, torch.from_numpy(example.feature_presence))
+        if example.feature_indices is None:
+            features[index, :count] = torch.from_numpy(example.features)
+            if example.feature_presence is None:
+                feature_presence[index, :count] = True
+            else:
+                feature_presence[index, :count] = torch.from_numpy(example.feature_presence)
+        else:
+            columns = torch.from_numpy(example.feature_indices)
+            features[index, :count].index_copy_(1, columns, torch.from_numpy(example.features))
+            if example.feature_presence is None:
+                feature_presence[index, :count, columns] = True
+            else:
+                feature_presence[index, :count].index_copy_(1, columns, torch.from_numpy(example.feature_presence))
         mask[index, :count] = True
         domain_ids[index] = example.domain_id
         chosen[index] = example.chosen_index
@@ -560,17 +867,29 @@ def collate(examples: list[DecisionExample], history_length: int | None = None) 
         history_offset = retained_history - len(retained)
         for history_index, state in enumerate(retained, history_offset):
             history_count = state.features.shape[0]
-            history_columns = torch.from_numpy(state.feature_indices)
-            history_features[index, history_index, :history_count].index_copy_(
-                1,
-                history_columns,
-                torch.from_numpy(state.features),
-            )
-            history_feature_presence[index, history_index, :history_count].index_copy_(
-                1,
-                history_columns,
-                torch.from_numpy(state.feature_presence),
-            )
+            if state.feature_indices is None:
+                history_features[index, history_index, :history_count] = torch.from_numpy(state.features)
+                if state.feature_presence is None:
+                    history_feature_presence[index, history_index, :history_count] = True
+                else:
+                    history_feature_presence[index, history_index, :history_count] = torch.from_numpy(
+                        state.feature_presence
+                    )
+            else:
+                history_columns = torch.from_numpy(state.feature_indices)
+                history_features[index, history_index, :history_count].index_copy_(
+                    1,
+                    history_columns,
+                    torch.from_numpy(state.features),
+                )
+                if state.feature_presence is None:
+                    history_feature_presence[index, history_index, :history_count, history_columns] = True
+                else:
+                    history_feature_presence[index, history_index, :history_count].index_copy_(
+                        1,
+                        history_columns,
+                        torch.from_numpy(state.feature_presence),
+                    )
             history_candidate_mask[index, history_index, :history_count] = True
             history_chosen[index, history_index] = state.chosen_index
             history_step_mask[index, history_index] = True
@@ -625,11 +944,16 @@ def feature_normalization(examples: list[DecisionExample]) -> tuple[Tensor, Tens
     sums = np.zeros(feature_count, dtype=np.float64)
     squared_sums = np.zeros(feature_count, dtype=np.float64)
     for example in examples:
-        present_values = example.features * example.feature_presence
-        indices = example.feature_indices
-        counts[indices] += example.feature_presence.sum(axis=0)
-        sums[indices] += present_values.sum(axis=0)
-        squared_sums[indices] += np.square(present_values).sum(axis=0)
+        indices = example.feature_indices if example.feature_indices is not None else slice(None)
+        if example.feature_presence is None:
+            counts[indices] += example.features.shape[0]
+            sums[indices] += example.features.sum(axis=0)
+            squared_sums[indices] += np.square(example.features).sum(axis=0)
+        else:
+            present_values = example.features * example.feature_presence
+            counts[indices] += example.feature_presence.sum(axis=0)
+            sums[indices] += present_values.sum(axis=0)
+            squared_sums[indices] += np.square(present_values).sum(axis=0)
     safe_counts = counts.clip(min=1)
     means = sums / safe_counts
     variances = np.maximum(0, squared_sums / safe_counts - np.square(means))
@@ -796,7 +1120,9 @@ def dataset_hash(paths: list[Path]) -> str:
     digest = hashlib.sha256()
     for path in paths:
         digest.update(path.name.encode())
-        digest.update(path.read_bytes())
+        with path.open("rb") as handle:
+            while chunk := handle.read(8 * 1024 * 1024):
+                digest.update(chunk)
     return digest.hexdigest()
 
 
@@ -806,47 +1132,55 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     set_determinism(args.seed, args.fast_kernels)
     if not 0.0 <= args.unknown_policy_weight <= 1.0:
         raise ValueError("--unknown-policy-weight must be between 0 and 1")
-    er_decisions, er_terminals, er_terminal_scope = load_policy_trajectory_records(args.data)
-    contract_schema_version, feature_schema_version = dataset_schema_versions(er_decisions)
-    dictionary_coverage = validate_data_dictionary(
+    print(json.dumps({"stage": "scan-er-corpus", "status": "started"}), flush=True)
+    er_corpus = scan_er_corpus(args.data)
+    contract_schema_version = er_corpus.contract_schema_version
+    feature_schema_version = er_corpus.feature_schema_version
+    if er_corpus.feature_count < 1:
+        raise ValueError("ER dataset contains inconsistent feature widths")
+    dictionary_coverage = validate_data_dictionary_summary(
         args.dictionary,
-        er_decisions,
+        feature_schema_version,
+        {er_corpus.feature_count},
+        er_corpus.dictionary_hashes,
+        er_corpus.dictionary_references,
         args.dictionary_supplement,
     )
     dictionary = json.loads(args.dictionary.read_text(encoding="utf-8"))
     feature_names = dictionary["features"]["names"]
-    rollout_selection: dict[str, Any] | None = None
-    if args.elite_rollouts:
-        er_decisions, rollout_selection = select_elite_rollouts(
-            er_decisions,
-            er_terminals,
-            er_terminal_scope,
-        )
-        selected_terminal_ids = {
-            decision["episodeId"]
-            if er_terminal_scope == "episode"
-            else record_battle_id(decision)
-            for decision in er_decisions
-        }
-        er_terminals = [
-            terminal
-            for terminal in er_terminals
-            if (
-                terminal["episodeId"]
-                if er_terminal_scope == "episode"
-                else record_battle_id(terminal)
-            )
-            in selected_terminal_ids
-        ]
-    feature_count = len(er_decisions[0]["candidateFeatures"][0]["values"])
+    print(
+        json.dumps(
+            {
+                "stage": "scan-er-corpus",
+                "status": "completed",
+                "decisions": er_corpus.decision_count,
+                "terminals": len(er_corpus.terminals),
+                "featureCount": er_corpus.feature_count,
+            }
+        ),
+        flush=True,
+    )
+    print(json.dumps({"stage": "scan-selected-policy", "status": "started"}), flush=True)
+    er_selection = scan_selected_er_decisions(args.data, er_corpus, args.elite_rollouts)
+    rollout_selection = er_selection.rollout_selection
+    er_terminals = er_selection.terminals
+    er_terminal_scope = er_corpus.terminal_scope
+    feature_count = er_corpus.feature_count
     if feature_count != len(feature_names):
         raise ValueError("ER decision width does not match the dictionary feature-name contract")
     transfer_decisions: list[dict[str, Any]] = []
     transfer_terminals: list[dict[str, Any]] = []
     if args.transfer_data is not None:
         transfer_decisions, transfer_terminals = load_transfer_records(args.transfer_data, feature_names)
-    decisions = er_decisions + transfer_decisions
-    required_vocabulary, _ = build_token_vocabulary(decisions, dictionary)
+    transfer_tokens: set[str] = set()
+    for decision in transfer_decisions:
+        for row in decision["candidateTokenGroups"]:
+            for group in TOKEN_GROUP_NAMES:
+                transfer_tokens.update(row["groups"][group])
+    required_vocabulary, _ = build_token_vocabulary_from_tokens(
+        er_selection.observed_tokens | transfer_tokens,
+        dictionary,
+    )
     initial_config = load_initial_model_config(args.init_model_dir) if args.init_model_dir is not None else None
     fixed_vocabulary_path = (
         args.token_vocabulary
@@ -866,8 +1200,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     )
     token_to_id = {token: index for index, token in enumerate(token_vocabulary)}
     token_vocabulary_sha256 = vocabulary_hash(token_vocabulary)
+    print(
+        json.dumps(
+            {
+                "stage": "materialize-compact-examples",
+                "status": "started",
+                "decisions": er_selection.decision_count,
+            }
+        ),
+        flush=True,
+    )
     er_examples = make_examples(
-        er_decisions,
+        iter_selected_er_decisions(args.data, er_corpus, args.elite_rollouts),
         er_terminals,
         args.loss_policy_weight,
         token_to_id,
@@ -889,6 +1233,17 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         )
         if transfer_decisions
         else []
+    )
+    print(
+        json.dumps(
+            {
+                "stage": "materialize-compact-examples",
+                "status": "completed",
+                "erExamples": len(er_examples),
+                "transferExamples": len(transfer_examples),
+            }
+        ),
+        flush=True,
     )
     examples = er_examples + transfer_examples
     train_partition_ids, validation_partition_ids = split_groups(
@@ -1060,10 +1415,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "tokenVocabularySha256": token_vocabulary_sha256,
         },
     )
-    identity = {
-        key: sorted({record[key] for record in er_decisions})
-        for key in ("buildSha", "dexHash", "dictionaryHash")
-    }
+    identity = er_selection.identity
+    transfer_source_policies = Counter(record_policy_source(decision) for decision in transfer_decisions)
+    source_policies = er_selection.source_policies + transfer_source_policies
+    policy_target_decisions = er_selection.policy_target_decisions + sum(
+        is_policy_target(decision) for decision in transfer_decisions
+    )
     report = {
         "schemaVersion": 4,
         "model": "er-domain-candidate-transformer-v4",
@@ -1105,9 +1462,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "trainSplitGroups": len({example.split_group_id for example in train_examples}),
             "validationSplitGroups": len({example.split_group_id for example in validation_examples}),
             "domains": dict(Counter(DOMAIN_NAMES[example.domain_id] for example in examples)),
-            "sourcePolicies": dict(Counter(record_policy_source(decision) for decision in decisions)),
-            "policyTargetDecisions": sum(is_policy_target(decision) for decision in decisions),
-            "excludedPolicyDecisions": sum(not is_policy_target(decision) for decision in decisions),
+            "sourcePolicies": dict(source_policies),
+            "policyTargetDecisions": policy_target_decisions,
+            "excludedPolicyDecisions": len(examples) - policy_target_decisions,
             "terminalOutcomes": dict(
                 Counter(
                     terminal.get("outcome", f'value:{terminal.get("value")}')

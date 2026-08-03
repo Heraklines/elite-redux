@@ -11,6 +11,7 @@ import subprocess
 import sys
 import traceback
 import zipfile
+from collections import deque
 from pathlib import Path
 
 import torch
@@ -127,6 +128,10 @@ def required_environment(name: str, default: str | None = None) -> str:
     if value is None or not value.strip():
         raise RuntimeError(f"missing required environment variable {name}")
     return value.strip()
+
+
+def temporary_bundle_root() -> Path:
+    return Path(required_environment("ER_AI_TEMP_PATH", "/tmp")) / "er-ai-training-bundle"
 
 
 def find_training_source(input_root: Path) -> tuple[str, Path]:
@@ -279,6 +284,33 @@ def effective_batch_size(profile: dict[str, int], checkpoint_resume: bool) -> in
     return profile["batch_size"]
 
 
+def run_checked_streaming(command: list[str], cwd: Path, tail_lines: int = 200) -> None:
+    """Stream child output live while retaining a bounded diagnostic tail."""
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    tail: deque[str] = deque(maxlen=tail_lines)
+    assert process.stdout is not None
+    for line in process.stdout:
+        print(line, end="", flush=True)
+        tail.append(line.rstrip())
+    process.stdout.close()
+    return_code = process.wait()
+    if return_code:
+        command_name = Path(command[1] if len(command) > 1 else command[0]).name
+        rendered_tail = "\n".join(tail)
+        raise RuntimeError(
+            f"{command_name} exited with status {return_code}; last child output:\n{rendered_tail}"
+        )
+
+
 def run_training(
     bundle_root: Path,
     output_root: Path,
@@ -317,21 +349,20 @@ def run_training(
             token_vocabulary if token_vocabulary.is_file() else None,
             init_model_dir if (init_model_dir / "config.json").is_file() else None,
         )
-        subprocess.run(command, check=True, cwd=bundle_root)
+        run_checked_streaming(command, bundle_root)
         report = json.loads((seed_output / "report.json").read_text(encoding="utf-8"))
         if not str(report.get("device", "")).startswith("cuda"):
             raise RuntimeError(f"seed {seed} did not train on CUDA")
 
     if len(seeds) > 1:
-        subprocess.run(
+        run_checked_streaming(
             [
                 sys.executable,
                 str(bundle_root / "ml" / "policy" / "build_candidate_ensemble.py"),
                 "--root",
                 str(output_root),
             ],
-            check=True,
-            cwd=bundle_root,
+            bundle_root,
         )
 
 
@@ -340,7 +371,7 @@ def main() -> None:
     prove_cuda_runtime()
     input_root = Path(required_environment("KAGGLE_INPUT_PATH", "/kaggle/input"))
     working_root = Path(required_environment("KAGGLE_WORKING_PATH", "/kaggle/working"))
-    bundle_root = working_root / "er-ai-training-bundle"
+    bundle_root = temporary_bundle_root()
     output_root = working_root / "er-ai-candidate-transformer"
     shutil.rmtree(output_root, ignore_errors=True)
     output_root.mkdir(parents=True)
