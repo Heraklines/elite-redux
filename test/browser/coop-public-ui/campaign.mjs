@@ -5028,16 +5028,17 @@ async function advanceToNextWaveCommand(
   const betweenWaveTimeoutMs = rig.config.timeoutMs * 3;
   const fixedDeadline = Date.now() + betweenWaveTimeoutMs;
   // Runs 30205274431 and 30241841635 reached the old ceiling while both real browsers were still
-  // advancing ordered presentation, then proved the next shared command 44s and 22s later. That is a
-  // harness false red, not permission to wait indefinitely: animations-on alone may refresh the deadline
-  // from observed phase/authority/renderer progress, and the absolute ceiling is the same measured
-  // per-event software-WebGL budget used for one dense turn. All faster profiles retain the fixed deadline.
+  // advancing ordered presentation, then proved the next shared command 44s and 22s later. Run
+  // 30779783513 subsequently proved the turn-only ceiling was still too narrow for one finite chain of
+  // reward -> retained evolution -> learn-move -> next-encounter presentation: both clients reached wave 2,
+  // but the ceiling expired while one renderer was entering CoopReplayTurnPhase. That is a harness false
+  // red, not permission to wait indefinitely. The animations-on chain therefore gets the ordinary
+  // between-wave window plus at most one measured dense-presentation ceiling. Only causal phase/stream
+  // progress refreshes the sliding deadline, and the sum remains an immutable outer bound. All faster
+  // profiles retain the fixed deadline.
   const betweenWaveBudget = policy.moveAnimationsExpected
     ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
-        hardCeilingMs: Math.max(
-          betweenWaveTimeoutMs + ANIMATION_PROGRESS_ALLOWANCE_MS,
-          ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS,
-        ),
+        hardCeilingMs: betweenWaveTimeoutMs + ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS,
       })
     : null;
   // Mystery difficulty deliberately chains encounters without opening a battle command between them, and the

@@ -7000,3 +7000,25 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Focused source/behavior contracts cover the single-projector cutover, batch parity, role-label reversal, and
   explicit-null transitional observation. No local co-op, Vitest, Chromium, or compilation run was performed;
   the next measurement is the same two-variant animations-on journey on one frozen exact SHA.
+
+## 2026-08-03 - rare evolution is mechanically complete; chained-presentation ceiling corrected
+
+- Exact-SHA run `30779783513` is the first combined proof after the single-projector cutover. Ordinary
+  `EVOLUTION_ITEM` passed fully. `RARE_EVOLUTION_ITEM` opened exactly one `CoopReplayLearnMovePhase`, installed
+  its exact actionable picker at revision 6, applied the decline once at revision 7, closed that picker, and
+  advanced both real browsers to wave 2. There is no duplicate Learn Move phase, revision gap, desync, or
+  stationary wait in this artifact.
+- The rare lane's red is harness-only. The immutable animations-on between-wave ceiling expired at
+  `03:03:45.891` while both traces were still recording causal ordered phase/stream progress. At that instant
+  one client had entered wave-2 `CoopReplayTurnPhase`; the other was rendering the same wave's encounter-entry
+  ability sequence. Final screenshots visibly show both clients in wave 2. The guest admitted revision 8's
+  exact command frontier seconds later, but diagnostics began before the renderer could finish the finite
+  pre-command presentation.
+- The old outer bound allowed only one dense turn for the entire chained boundary. Animations-on between-wave
+  waits now receive the ordinary fixed between-wave window plus one measured dense-presentation ceiling.
+  Their sliding deadline still refreshes only from causal phase/authority/renderer evidence and remains clipped
+  by that immutable sum; a stationary softlock retains the ordinary no-progress deadline, and every
+  animations-skipped profile is unchanged.
+- The source contract now pins this composition so later timeout cleanup cannot reintroduce the false red.
+  No production code changed for this classification, and no local co-op, Vitest, Chromium, or compilation
+  execution was performed.
