@@ -36,6 +36,7 @@ jobs:
         run: >-
           node scripts/ai/download-production-combat-telemetry.mjs
           --contract-version 4
+          --read-concurrency 24
           --out "$RUNNER_TEMP/production-v4-telemetry"
       - name: Materialize aggregate contract counts
         run: >-
