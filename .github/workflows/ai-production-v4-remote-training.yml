@@ -49,6 +49,7 @@ jobs:
           node scripts/ai/download-production-combat-telemetry.mjs
           --contract-version 4
           --read-concurrency 24
+          --max-invalid-objects 100
           --out "$RUNNER_TEMP/production-v4-telemetry"
       - name: Materialize one identity-bound training cut
         env:

@@ -3,10 +3,24 @@
 import assert from "node:assert/strict";
 import {
   createTelemetryImportAccumulator,
+  decodeTelemetryObjectPayload,
   importTelemetryBatches,
   sourceSplit,
   TELEMETRY_SOURCES,
 } from "./combat-telemetry-import.mjs";
+
+assert.deepEqual(decodeTelemetryObjectPayload('{"ok":true}', false), {
+  batch: { ok: true },
+  invalidReason: null,
+});
+assert.deepEqual(decodeTelemetryObjectPayload('{"private":"payload"', false), {
+  batch: null,
+  invalidReason: "json",
+});
+assert.deepEqual(decodeTelemetryObjectPayload("", false), {
+  batch: null,
+  invalidReason: "decode",
+});
 
 const envelope = {
   schemaVersion: 1,

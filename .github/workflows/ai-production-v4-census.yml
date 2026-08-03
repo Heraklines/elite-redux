@@ -38,6 +38,7 @@ jobs:
           node scripts/ai/download-production-combat-telemetry.mjs
           --contract-version 4
           --read-concurrency 24
+          --max-invalid-objects 100
           --out "$RUNNER_TEMP/production-v4-telemetry"
       - name: Materialize aggregate contract counts
         run: >-
@@ -65,6 +66,10 @@ jobs:
               "contractVersionFilter": imported["contractVersionFilter"],
               "objects": imported["objects"],
               "compressedBytes": imported["bytes"],
+              "importedObjects": imported["importedObjects"],
+              "importedBytes": imported["importedBytes"],
+              "invalidObjects": imported["invalidObjects"],
+              "invalidObjectReasons": imported["invalidObjectReasons"],
               "events": imported["events"],
               "sourcePartitions": materialized["sourcePartitions"],
               "episodes": imported["episodes"],
@@ -93,6 +98,8 @@ jobs:
               "Raw telemetry remained in ephemeral runner storage and was not uploaded.",
               "",
               f"- Objects: {summary['objects']:,} ({mib:,.1f} MiB compressed)",
+              f"- Imported objects: {summary['importedObjects']:,}",
+              f"- Invalid objects skipped: {summary['invalidObjects']:,} ({summary['invalidObjectReasons']})",
               f"- Events: {summary['events']:,}",
               f"- Human policy decisions: {summary['decisions']:,}",
               f"- Auxiliary decisions: {summary['auxiliaryDecisions']:,}",

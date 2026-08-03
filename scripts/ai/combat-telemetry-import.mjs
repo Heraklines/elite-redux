@@ -10,6 +10,8 @@ const API_ROOT = "https://api.cloudflare.com/client/v4";
 const SPLIT_SEED = "er-human-telemetry-split-v1";
 const DEFAULT_READ_CONCURRENCY = 4;
 const MAX_READ_CONCURRENCY = 64;
+const DEFAULT_MAX_INVALID_OBJECTS = 0;
+const MAX_INVALID_OBJECTS = 10_000;
 const MAX_READ_ATTEMPTS = 6;
 const READ_TIMEOUT_MS = 30_000;
 
@@ -31,7 +33,8 @@ function usage(environment, message) {
   const source = TELEMETRY_SOURCES[environment];
   console.error(
     `Usage: node scripts/ai/download-${environment}-combat-telemetry.mjs [--out DIR] [--prefix YYYY-MM-DD/] `
-      + "[--contract-version N] [--modified-after ISO] [--modified-before ISO] [--read-concurrency N]\n"
+      + "[--contract-version N] [--modified-after ISO] [--modified-before ISO] [--read-concurrency N] "
+      + "[--max-invalid-objects N]\n"
       + `Reads ${environment} R2 bucket ${source.bucket} only. Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.`,
   );
 }
@@ -60,6 +63,7 @@ function parseArgs(environment, argv) {
   let modifiedAfter = null;
   let modifiedBefore = null;
   let readConcurrency = DEFAULT_READ_CONCURRENCY;
+  let maxInvalidObjects = DEFAULT_MAX_INVALID_OBJECTS;
   const remaining = [...argv];
   while (remaining.length > 0) {
     const arg = remaining.shift();
@@ -95,6 +99,12 @@ function parseArgs(environment, argv) {
       if (!Number.isInteger(readConcurrency) || readConcurrency < 1 || readConcurrency > MAX_READ_CONCURRENCY) {
         throw new Error(`--read-concurrency must be between 1 and ${MAX_READ_CONCURRENCY}`);
       }
+    } else if (arg === "--max-invalid-objects") {
+      const value = remaining.shift();
+      maxInvalidObjects = Number.parseInt(value ?? "", 10);
+      if (!Number.isInteger(maxInvalidObjects) || maxInvalidObjects < 0 || maxInvalidObjects > MAX_INVALID_OBJECTS) {
+        throw new Error(`--max-invalid-objects must be between 0 and ${MAX_INVALID_OBJECTS}`);
+      }
     } else if (arg === "--help" || arg === "-h") {
       usage(environment);
       return null;
@@ -111,7 +121,7 @@ function parseArgs(environment, argv) {
   if (modifiedAfter != null && modifiedBefore != null && modifiedAfter >= modifiedBefore) {
     throw new Error("--modified-after must be earlier than --modified-before");
   }
-  return { output, prefix, contractVersion, modifiedAfter, modifiedBefore, readConcurrency };
+  return { output, prefix, contractVersion, modifiedAfter, modifiedBefore, readConcurrency, maxInvalidObjects };
 }
 
 function increment(counts, key) {
@@ -372,6 +382,19 @@ async function readOnlyFetch(url, headers) {
   );
 }
 
+export function decodeTelemetryObjectPayload(encoded, compressed) {
+  const json = compressed ? decompressFromBase64(encoded) : encoded;
+  if (!json) {
+    return { batch: null, invalidReason: "decode" };
+  }
+  try {
+    return { batch: JSON.parse(json), invalidReason: null };
+  } catch {
+    // Never propagate JSON.parse's payload-bearing error message into CI logs.
+    return { batch: null, invalidReason: "json" };
+  }
+}
+
 export async function runCombatTelemetryImport(environment, argv = process.argv.slice(2)) {
   const source = TELEMETRY_SOURCES[environment];
   if (!source) {
@@ -422,14 +445,13 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
   async function readBatch(object) {
     const response = await readOnlyFetch(`${objectBase}/${encodeURIComponent(object.key)}`, headers);
     if (!response.ok) {
-      throw new Error(`R2 object read failed: ${response.status} ${object.key}`);
+      throw new Error(`R2 object read failed with HTTP ${response.status}`);
     }
     const encoded = await response.text();
-    const json = object.custom_metadata?.enc === "lz" ? decompressFromBase64(encoded) : encoded;
-    if (!json) {
-      throw new Error(`R2 object decode failed: ${object.key}`);
-    }
-    return JSON.parse(json);
+    return {
+      ...decodeTelemetryObjectPayload(encoded, object.custom_metadata?.enc === "lz"),
+      bytes: object.size ?? 0,
+    };
   }
 
   const listedObjects = await listObjects();
@@ -467,13 +489,34 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
       contractRecord: writeRecord(descriptors.contractRecord),
     },
   );
+  let importedObjects = 0;
+  let importedBytes = 0;
+  let invalidObjects = 0;
+  const invalidObjectReasons = {};
   try {
     for (let offset = 0; offset < objects.length; offset += args.readConcurrency) {
-      const batches = await Promise.all(objects.slice(offset, offset + args.readConcurrency).map(readBatch));
-      batches.forEach(accumulator.ingestBatch);
-      const completed = Math.min(objects.length, offset + batches.length);
+      const reads = await Promise.all(objects.slice(offset, offset + args.readConcurrency).map(readBatch));
+      for (const read of reads) {
+        if (read.batch == null) {
+          invalidObjects++;
+          increment(invalidObjectReasons, read.invalidReason ?? "unknown");
+          if (invalidObjects > args.maxInvalidObjects) {
+            throw new Error(
+              `telemetry contained ${invalidObjects} invalid object(s), exceeding --max-invalid-objects `
+                + `${args.maxInvalidObjects}; reasons=${JSON.stringify(invalidObjectReasons)}`,
+            );
+          }
+          continue;
+        }
+        accumulator.ingestBatch(read.batch);
+        importedObjects++;
+        importedBytes += read.bytes;
+      }
+      const completed = Math.min(objects.length, offset + reads.length);
       if (completed === objects.length || completed % 1_000 < args.readConcurrency) {
-        console.error(JSON.stringify({ event: "telemetry-read-progress", completed, total: objects.length }));
+        console.error(
+          JSON.stringify({ event: "telemetry-read-progress", completed, total: objects.length, invalidObjects }),
+        );
       }
     }
   } finally {
@@ -487,7 +530,12 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
   imported.report.listedObjects = listedObjects.length;
   imported.report.objects = objects.length;
   imported.report.bytes = objects.reduce((sum, object) => sum + (object.size ?? 0), 0);
+  imported.report.importedObjects = importedObjects;
+  imported.report.importedBytes = importedBytes;
+  imported.report.invalidObjects = invalidObjects;
+  imported.report.invalidObjectReasons = invalidObjectReasons;
   imported.report.readConcurrency = args.readConcurrency;
+  imported.report.maxInvalidObjects = args.maxInvalidObjects;
 
   writeFileSync(`${args.output}/source-splits.json`, `${JSON.stringify(imported.sourcePartitions, null, 2)}\n`);
   writeFileSync(`${args.output}/report.json`, `${JSON.stringify(imported.report, null, 2)}\n`);
