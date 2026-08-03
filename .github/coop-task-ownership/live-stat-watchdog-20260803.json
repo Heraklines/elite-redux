@@ -1,0 +1,16 @@
+{
+  "taskId": "live-stat-watchdog-20260803",
+  "version": 2,
+  "branch": "ci/coop/live-stat-watchdog-20260803",
+  "trainRef": "ci/coop/live-stat-watchdog-20260803",
+  "baseSha": "ae4e43394280218bb561cfca13f5a551fb0a320f",
+  "allowedFiles": [
+    ".github/coop-task-ownership/live-stat-watchdog-20260803.json",
+    "src/data/elite-redux/coop/coop-learn-move-operation.ts",
+    "src/phases/coop-presentation-watchdog.ts",
+    "test/scripts/coop-presentation-authority.test.mjs",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts",
+    "test/tests/elite-redux/coop/coop-learn-move-operation.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
