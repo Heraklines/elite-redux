@@ -7055,3 +7055,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   `this.end(); onComplete()` after an earlier assertion in the same test already required the atomic
   `shiftPhaseThroughCoopAuthorityCommit()` scheduler. That final legacy assertion now rejects the unsafe old
   ordering instead. The aggregate red is consequential only.
+- Exact-SHA gate `30783864052` again passed all 31 substantive production/type/shard/mutation/WebRTC jobs.
+  Its fast source lane advanced beyond the progression contract and found one dependent meta-contract still
+  matching the old B1 assertion's English prose. The contract now names the actual invariant: a projected
+  single-Learn-Move terminal must not delegate retirement to an ambient async UI callback. B13's apparent
+  delay was GitHub infrastructure (checkout consumed 8m42s); the isolated test shard itself completed green.
