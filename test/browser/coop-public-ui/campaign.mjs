@@ -106,6 +106,19 @@ const OUTCOME_HARD_CEILING_MS = 360_000;
 const ANIMATIONS_ON_MEASURED_PER_EVENT_MS = 18_000;
 const ANIMATIONS_ON_MAX_TURN_EVENTS = 32;
 const ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS = ANIMATIONS_ON_MEASURED_PER_EVENT_MS * ANIMATIONS_ON_MAX_TURN_EVENTS;
+const MYSTERY_PROGRESSING_BATTLE_MAX_TURNS = 30;
+
+/**
+ * Mystery encounters can deliberately create longer legal battles than the ordinary fast lane. Run
+ * 30824237635 was still installing the paired command frontier at turn 13 when the generic 12-turn cap
+ * mislabeled it a softlock. Preserve the strict default everywhere else, but give a visibly progressing
+ * Mystery battle bounded headroom under the campaign's separate immutable wall-clock deadline.
+ */
+export function campaignBattleTurnBudget(configuredMaxTurns, policy) {
+  return policy.mysteryGauntlet.required
+    ? Math.max(configuredMaxTurns, MYSTERY_PROGRESSING_BATTLE_MAX_TURNS)
+    : configuredMaxTurns;
+}
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -1662,7 +1675,10 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
     await rig.assertRetainedContinuation(cursors, proofName);
     return "reward";
   };
-  for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
+  const maxBattleTurns = campaignBattleTurnBudget(rig.config.maxTurns, policy);
+  const cycleCampaignMoves =
+    policy.navigation.required || policy.market.requiredPurchases > 0 || policy.mysteryGauntlet.required;
+  for (let turn = 1; turn <= maxBattleTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
     await reportProgress("battle turn started", {
       wave: stats.wave,
@@ -1703,7 +1719,7 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
                 // and cycles it like a human responding to an immunity; otherwise one immune foe
                 // can consume the longitudinal journey before it reaches the target interactions.
                 commandEvent,
-                cycleIndex: policy.navigation.required || policy.market.requiredPurchases > 0 ? turn - 1 : 0,
+                cycleIndex: cycleCampaignMoves ? turn - 1 : 0,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },
@@ -1870,7 +1886,7 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
     }
     commandCursors = from;
   }
-  throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} rounds`);
+  throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${maxBattleTurns} rounds`);
 }
 
 /**

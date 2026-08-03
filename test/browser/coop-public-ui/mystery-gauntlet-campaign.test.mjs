@@ -14,6 +14,7 @@ import {
   assertAsymmetricRevivalProjection,
   assertAsymmetricStormglassProjection,
   assertMysteryFixtureParty,
+  campaignBattleTurnBudget,
   chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
   chooseRevivalPartySlot,
@@ -786,6 +787,20 @@ test("ordinary campaign turns keep the strongest visible move instead of weakeni
   assert.match(
     campaign,
     /driveBestCampaignMove\(client, commandPurpose, \{[\s\S]*?commandEvent,[\s\S]*?preferredMoveId:/u,
+  );
+  assert.match(
+    campaign,
+    /const cycleCampaignMoves =[\s\S]*policy\.navigation\.required[\s\S]*policy\.market\.requiredPurchases > 0[\s\S]*policy\.mysteryGauntlet\.required[\s\S]*cycleIndex: cycleCampaignMoves \? turn - 1 : 0/u,
+    "longitudinal and Mystery fixtures rotate their proven damaging moves instead of repeating an immunity",
+  );
+});
+
+test("a mechanically progressing Mystery battle is not mislabeled a softlock on turn thirteen", () => {
+  assert.equal(campaignBattleTurnBudget(12, { mysteryGauntlet: { required: true } }), 30);
+  assert.equal(
+    campaignBattleTurnBudget(12, { mysteryGauntlet: { required: false } }),
+    12,
+    "ordinary fast campaigns retain the stricter runaway-battle signal",
   );
 });
 

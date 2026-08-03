@@ -232,6 +232,7 @@ jobs:
             test/browser/coop-public-ui/local-worker-vite.config.mjs \
             test/browser/coop-public-ui/market-gold-standard.test.mjs \
             test/browser/coop-public-ui/market-journey.mjs \
+            test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs \
             test/browser/coop-public-ui/navigation-depth-campaign.test.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/preview-server.test.mjs \
@@ -294,6 +295,9 @@ jobs:
 
       - name: Verify human-skew trainer settlement contracts
         run: node --test test/browser/coop-public-ui/campaign-exp-phase.test.mjs
+
+      - name: Verify progressing Mystery battle contracts
+        run: node --test test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
 
       - name: Verify strict Commander browser evidence contracts
         run: node --test test/browser/coop-public-ui/commander-evidence.test.mjs
