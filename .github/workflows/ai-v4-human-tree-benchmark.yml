@@ -45,10 +45,16 @@ jobs:
       max-parallel: 4
       matrix:
         include:
-          - { shard: 0, start: 0, count: 25 }
-          - { shard: 1, start: 25, count: 25 }
-          - { shard: 2, start: 50, count: 25 }
-          - { shard: 3, start: 75, count: 25 }
+          # Keep every Vitest process below the observed ~103-leg heap ceiling.
+          # max-parallel remains four so co-op retains the other 36 runners.
+          - { shard: 0, start: 0, count: 13 }
+          - { shard: 1, start: 13, count: 12 }
+          - { shard: 2, start: 25, count: 13 }
+          - { shard: 3, start: 38, count: 12 }
+          - { shard: 4, start: 50, count: 13 }
+          - { shard: 5, start: 63, count: 12 }
+          - { shard: 6, start: 75, count: 13 }
+          - { shard: 7, start: 88, count: 12 }
     steps:
       - uses: actions/checkout@v6
         with:
