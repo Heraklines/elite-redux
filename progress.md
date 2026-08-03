@@ -7395,3 +7395,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   public keys to open Settings during a live reward, move its cursor, capture the screen, Escape twice, prove
   the exact reward is restored, leave rewards, and converge at the wave-2 command frontier. This closes the
   coverage hole: prior Settings walks happened only before pairing, so they never intersected the V2 freeze.
+
+## 2026-08-03 - live double-trainer double-KO replacement frontier
+
+- Paired dev logs at `heraklines/dev-logs` tip `38999871e3dcda2300a9a9b8748a9e570657845f`
+  reproduce the report `double battle ko then not switch in` on staging build `cb4339055`. The host and guest
+  were mechanically identical after wave 14 turn 1 except for `saveDataDigest`: the host's temporary generic
+  trainer shell selected a COMMON-pool class while the renderer selected RARE, leaving their module-scoped
+  `erLastGenericTrainerType` cursors different. Both authoritative enemy switch events reached the guest, but
+  the unresolved preceding TURN_COMMIT held them behind the V2 revision gap until the authority deadline.
+- Production commit `19d2310ad` adds the generic-trainer no-repeat cursor to ordinary authoritative material
+  and full snapshots, restores it before save-data checksum verification, and registers it in the replication
+  contract. The direct save-data regression proves a divergent renderer cursor is detected, adopted, and
+  converged.
+- The first exact gate `30853730581` was 31/32 substantive jobs green. Its sole red was a failure-first test
+  fixture error: a random double ACE_TRAINER legally generated only three total enemies, while the new test
+  required two leads plus two per-trainer-slot reserves. This was not a product failure; browser-native WebRTC
+  and every other gate job passed.
+- Harness-only commit `296b89e01` pins only the missing reserve for each real trainer slot before the live
+  battle is mirrored; all command, faint, switch, replay, and presentation code remains production. Exact B8
+  evidence in run `30854723189` is green: 46/46 tests, `erLastGenericTrainerType host=35 -> restored`, two real
+  `SwitchSummonPhase` starts, `continuationReady`, and final checksum matches.
+- Exact final-SHA full co-op gate `30854723189` is fully green: all 33 jobs passed on
+  `296b89e01aa25e61b049c92ef88fba98bb85735b`, including every A/B/C/P shard, mutation assurance,
+  static/type/format, immutable browser bundle, and browser-native production WebRTC/rejoin.
+- Staging deploy `30855403585` succeeded and public `/version.json` verifies
+  `github:296b89e01aa25e61b049c92ef88fba98bb85735b:run-30855403585.1`. Production was not touched.
+- Continuous two-real-browser 30-wave journey `30854725171` remains active and must not be cancelled. Its live
+  heartbeats show successful fresh-account onboarding, settings-attested 10x speed, public lobby pairing,
+  level-100 three-mon fixtures on both seats, and both clients at the shared wave-1 command frontier. Continue
+  monitoring it through the first trainer replacement and eventual wave-30 terminal.
