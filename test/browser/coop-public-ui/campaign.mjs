@@ -1092,19 +1092,19 @@ export function createBattlePromptAdvancer(
         }));
         const authorityPair = pairedEvents.find(({ client: peer }) => peer === rig.host);
         const authorityObservation = authorityPair?.event?.observation;
+        // Only the authoritative engine executes BattleEndPhase. The renderer enters its retained
+        // TrainerVictoryPhase directly from the signed CONTROL_COMMIT, so requiring a renderer-local
+        // BattleEnd marker makes a healthy exact pair permanently undiscoverable. Prove the causal
+        // successor once on the host, then require both CURRENT prompts to name that same immutable
+        // successor address. The replica cannot manufacture this surface: production exposes it only
+        // after applying the retained trainer-victory-open material.
         const pairIsCurrentAndUnspent = pairedEvents.every(({ client: peer, event }) => {
           const observation = event?.observation;
           return (
             event != null
             && observation?.phase === "TrainerVictoryPhase"
             && observation.surfaceId === "battle:message"
-            && // Only the authoritative engine executes BattleEndPhase. The renderer enters its retained
-            // TrainerVictoryPhase directly from the signed CONTROL_COMMIT, so requiring a renderer-local
-            // BattleEnd marker makes a healthy exact pair permanently undiscoverable. Prove the causal
-            // successor once on the host, then require both CURRENT prompts to name that same immutable
-            // successor address. The replica cannot manufacture this surface: production exposes it only
-            // after applying the retained trainer-victory-open material.
-            observation.address?.epoch === authorityObservation?.address?.epoch
+            && observation.address?.epoch === authorityObservation?.address?.epoch
             && observation.address?.wave === authorityObservation?.address?.wave
             && observation.address?.turn === authorityObservation?.address?.turn
             && observation.ready?.handlerActive === true
