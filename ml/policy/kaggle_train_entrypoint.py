@@ -167,8 +167,11 @@ def verify_bundle(bundle_root: Path) -> dict[str, object]:
         file_path = bundle_root / relative_path
         if not file_path.is_file():
             raise RuntimeError(f"training bundle is missing {relative_path}")
-        digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
-        if digest != entry.get("sha256"):
+        digest = hashlib.sha256()
+        with file_path.open("rb") as input_file:
+            while chunk := input_file.read(1024 * 1024):
+                digest.update(chunk)
+        if digest.hexdigest() != entry.get("sha256"):
             raise RuntimeError(f"training bundle checksum mismatch for {relative_path}")
         if file_path.stat().st_size != entry.get("bytes"):
             raise RuntimeError(f"training bundle byte count mismatch for {relative_path}")

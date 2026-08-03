@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { createInterface } from "node:readline";
-import JSZip from "jszip";
 
 const [
   dataArg,
@@ -115,8 +115,28 @@ function portableRelative(parent, child) {
   return relative(parent, child).split(sep).join("/");
 }
 
-function sha256(content) {
-  return createHash("sha256").update(content).digest("hex");
+async function sha256File(path) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
+}
+
+async function runStreamingZip(specPath) {
+  const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
+  const helperPath = resolve(root, "scripts/ai/stream_zip_bundle.py");
+  await new Promise((resolveRun, rejectRun) => {
+    const child = spawn(python, [helperPath, specPath], { stdio: "inherit" });
+    child.once("error", rejectRun);
+    child.once("exit", (code, signal) => {
+      if (code === 0) {
+        resolveRun();
+      } else {
+        rejectRun(new Error(`streaming ZIP helper failed with ${signal ?? `exit code ${code}`}`));
+      }
+    });
+  });
 }
 
 if (!(await stat(dictionaryPath)).isFile()) {
@@ -172,56 +192,40 @@ const hasDictionarySupplement = await stat(supplementPath)
   .then(entry => entry.isFile())
   .catch(() => false);
 
-const zip = new JSZip();
 const manifestFiles = [];
+const archiveEntries = [];
+
+async function addArchiveFile(path, archivePath) {
+  const fileStat = await stat(path);
+  if (!fileStat.isFile()) {
+    throw new Error(`training bundle input is not a file: ${path}`);
+  }
+  archiveEntries.push({ source: path, archivePath });
+  manifestFiles.push({ path: archivePath, bytes: fileStat.size, sha256: await sha256File(path) });
+}
+
 for (const path of decisionPaths) {
-  const content = await readFile(path);
   const archivePath = `data/${portableRelative(dataRoot, path)}`;
-  zip.file(archivePath, content);
-  manifestFiles.push({ path: archivePath, bytes: content.length, sha256: sha256(content) });
+  await addArchiveFile(path, archivePath);
 }
 for (const path of transferPaths) {
-  const content = await readFile(path);
   const archivePath = `transfer-data/${transferIsFile ? basename(path) : portableRelative(transferRoot, path)}`;
-  zip.file(archivePath, content);
-  manifestFiles.push({ path: archivePath, bytes: content.length, sha256: sha256(content) });
+  await addArchiveFile(path, archivePath);
 }
-const dictionary = await readFile(dictionaryPath);
-zip.file("dictionary/er-combat-data-dictionary.json", dictionary);
-manifestFiles.push({
-  path: "dictionary/er-combat-data-dictionary.json",
-  bytes: dictionary.length,
-  sha256: sha256(dictionary),
-});
+await addArchiveFile(dictionaryPath, "dictionary/er-combat-data-dictionary.json");
 if (hasDictionarySupplement) {
-  const supplement = await readFile(supplementPath);
-  zip.file("dictionary/runtime-item-dictionary-supplement.json", supplement);
-  manifestFiles.push({
-    path: "dictionary/runtime-item-dictionary-supplement.json",
-    bytes: supplement.length,
-    sha256: sha256(supplement),
-  });
+  await addArchiveFile(supplementPath, "dictionary/runtime-item-dictionary-supplement.json");
 }
 if (tokenVocabularyPath) {
-  const vocabulary = await readFile(tokenVocabularyPath);
-  zip.file("vocabulary/token-vocabulary.json", vocabulary);
-  manifestFiles.push({
-    path: "vocabulary/token-vocabulary.json",
-    bytes: vocabulary.length,
-    sha256: sha256(vocabulary),
-  });
+  await addArchiveFile(tokenVocabularyPath, "vocabulary/token-vocabulary.json");
 }
 for (const path of initModelPaths) {
-  const content = await readFile(path);
   const archivePath = `initial-model/${basename(path)}`;
-  zip.file(archivePath, content);
-  manifestFiles.push({ path: archivePath, bytes: content.length, sha256: sha256(content) });
+  await addArchiveFile(path, archivePath);
 }
 for (const path of sourcePaths) {
-  const content = await readFile(path);
   const archivePath = portableRelative(root, path);
-  zip.file(archivePath, content);
-  manifestFiles.push({ path: archivePath, bytes: content.length, sha256: sha256(content) });
+  await addArchiveFile(path, archivePath);
 }
 const manifest = {
   schemaVersion: 1,
@@ -240,18 +244,25 @@ const manifest = {
   dictionarySupplement: hasDictionarySupplement ? "runtime-item-dictionary-supplement.json" : null,
   files: manifestFiles.sort((a, b) => a.path.localeCompare(b.path)),
 };
-zip.file("bundle-manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
-const payload = await zip.generateAsync({
-  type: "nodebuffer",
-  compression: "DEFLATE",
-  compressionOptions: { level: 9 },
-});
 await mkdir(dirname(outputPath), { recursive: true });
-await writeFile(outputPath, payload);
+const temporaryManifestPath = `${outputPath}.manifest-${process.pid}.json`;
+const temporarySpecPath = `${outputPath}.spec-${process.pid}.json`;
+await writeFile(temporaryManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+archiveEntries.push({ source: temporaryManifestPath, archivePath: "bundle-manifest.json" });
+await writeFile(
+  temporarySpecPath,
+  `${JSON.stringify({ output: outputPath, compressionLevel: 9, entries: archiveEntries }, null, 2)}\n`,
+);
+try {
+  await runStreamingZip(temporarySpecPath);
+} finally {
+  await Promise.all([rm(temporaryManifestPath, { force: true }), rm(temporarySpecPath, { force: true })]);
+}
+const outputStat = await stat(outputPath);
 console.log(
   JSON.stringify({
     output: outputPath,
-    bytes: payload.length,
+    bytes: outputStat.size,
     decisionShards: decisionPaths.length,
     transferShards: transferPaths.length,
     files: manifest.files.length,
