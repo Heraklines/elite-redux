@@ -18,7 +18,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink, waitForPublicInputDispatch } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputDispatch, waitForPublicInputFrameSettle } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -1649,36 +1649,24 @@ export class PublicUiClient {
           await this.page.keyboard.up(key);
         }
       }
-      await waitForPublicInputDispatch(this.evidence, {
+      const dispatchReceipt = await waitForPublicInputDispatch(this.evidence, {
         from: echoCursor,
         domKeysBefore,
       });
-      // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
-      // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a
-      // fixed sleep. A press that legitimately changes nothing (menu-edge arrow) falls
-      // back to the legacy fixed delay - robustness floor, not speed ceiling.
+      // A single input can synchronously close one MESSAGE and open the next inside the SAME Phaser
+      // update. An active-handler echo from that new prompt is not yet safe input authority: a second
+      // key in the same update is discarded by production's input guards. Wait for the observer's exact
+      // post-dispatch frame receipt instead of sleeping or trusting a UI-name change. This preserves the
+      // optimized event-driven path while matching the earliest instant a human's next key can be consumed.
       if (this.config.inputAcks) {
         const ackStartedMs = Date.now();
-        try {
-          await this.evidence.waitForCondition(
-            sink => {
-              for (let i = echoCursor; i < sink.events.length; i++) {
-                // Only an ACTIVE-handler echo acknowledges the press: an echo emitted
-                // mid-transition (handler not yet accepting input) must NOT release the
-                // next key - that outran the Settings submenu on CI and dropped keys.
-                if (sink.events[i].kind === "browser-input-echo" && sink.events[i].observation?.active === true) {
-                  return sink.events[i];
-                }
-              }
-              return;
-            },
-            { timeoutMs: Math.max(150, this.config.actionDelayMs * 2), description: `input echo for ${purpose}` },
-          );
-          this.evidence.recordInputAck(Date.now() - ackStartedMs, false);
-        } catch {
-          // No visible change within the window: legacy-pace this press and move on.
-          this.evidence.recordInputAck(Date.now() - ackStartedMs, true);
-        }
+        await waitForPublicInputFrameSettle(this.evidence, {
+          from: dispatchReceipt.index + 1,
+          domKeys: dispatchReceipt.observation.domKeys,
+          keydownFrame: dispatchReceipt.observation.keydownFrame,
+          timeoutMs: Math.max(5_000, this.config.actionDelayMs * 10),
+        });
+        this.evidence.recordInputAck(Date.now() - ackStartedMs, false);
       } else {
         await delay(this.config.actionDelayMs);
       }

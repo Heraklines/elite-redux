@@ -2438,22 +2438,43 @@ setInterval(() => {
 let lastHealthDomKeys = 0;
 let lastHealthFrame = -1;
 let lastHealthDownKeys = 0;
+let pendingInputSettleFrame = -1;
 let inputHealthSeq = 0;
 setInterval(() => {
   try {
     const snapshot = inputLayerSnapshot();
     const frameAdvancing = snapshot.frame !== lastHealthFrame;
     const domKeysChanged = snapshot.domKeys !== lastHealthDomKeys;
+    if (domKeysChanged) {
+      // A raw key can synchronously advance MESSAGE A into MESSAGE B inside one Phaser update. The
+      // browser driver must not spend B's key in that same update: production's input guards can quite
+      // correctly discard it, while an append-only semantic observer would otherwise mark B consumed
+      // forever. Keep one read-only receipt armed until the game's OWN frame counter crosses the keydown
+      // frame. This is pacing evidence only; it neither schedules nor advances the scene.
+      pendingInputSettleFrame = snapshot.keydownFrame;
+    }
     const heldFrameAdvanced = snapshot.downKeys > 0 && frameAdvancing;
     const holdStateChanged = snapshot.downKeys !== lastHealthDownKeys;
+    const inputFrameSettled =
+      pendingInputSettleFrame >= 0 && snapshot.downKeys === 0 && snapshot.frame > pendingInputSettleFrame;
     lastHealthFrame = snapshot.frame;
-    if (!domKeysChanged && !heldFrameAdvanced && !holdStateChanged) {
+    if (!domKeysChanged && !heldFrameAdvanced && !holdStateChanged && !inputFrameSettled) {
       return;
     }
     lastHealthDomKeys = snapshot.domKeys;
     lastHealthDownKeys = snapshot.downKeys;
     inputHealthSeq += 1;
-    console.info(`[coop-browser:input-health] ${JSON.stringify({ seq: inputHealthSeq, ...snapshot, frameAdvancing })}`);
+    console.info(
+      `[coop-browser:input-health] ${JSON.stringify({
+        seq: inputHealthSeq,
+        ...snapshot,
+        frameAdvancing,
+        inputFrameSettled,
+      })}`,
+    );
+    if (inputFrameSettled) {
+      pendingInputSettleFrame = -1;
+    }
   } catch {
     /* diagnostics only - never fail the observer */
   }

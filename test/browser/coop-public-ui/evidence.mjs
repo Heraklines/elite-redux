@@ -67,6 +67,33 @@ export async function waitForPublicInputDispatch(evidence, { from, domKeysBefore
   );
 }
 
+/** Wait until the game's own loop has crossed the frame that consumed this exact public key. */
+export async function waitForPublicInputFrameSettle(evidence, { from, domKeys, keydownFrame, timeoutMs = 5_000 }) {
+  let scanned = Math.max(0, from);
+  return evidence.waitForCondition(
+    sink => {
+      for (; scanned < sink.events.length; scanned += 1) {
+        const event = sink.events[scanned];
+        const observation = event?.kind === "browser-input-health" ? event.observation : null;
+        if (
+          observation == null
+          || observation.domKeys !== domKeys
+          || observation.downKeys !== 0
+          || observation.inputFrameSettled !== true
+          || observation.frameAdvancing !== true
+          || !Number.isFinite(observation.frame)
+          || observation.frame <= keydownFrame
+        ) {
+          continue;
+        }
+        return event;
+      }
+      return;
+    },
+    { timeoutMs, description: "public keyboard dispatch to cross one real Phaser frame" },
+  );
+}
+
 const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
