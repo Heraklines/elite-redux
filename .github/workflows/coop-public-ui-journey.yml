@@ -36,8 +36,8 @@ on:
         options:
           - probe
           - fresh-wave2
-          - reward-pause-settings
           - fresh-resume
+          - reward-pause-settings
           - same-tab-rejoin
           - reverse-resume
           - faint-replacement
