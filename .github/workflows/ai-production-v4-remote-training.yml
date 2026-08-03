@@ -24,6 +24,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  launch-existing-kaggle:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && github.event_name == 'workflow_dispatch'
+      && inputs.reuse_existing_dataset
+    name: Launch GPU from ready private dataset
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==1.8.4
+      - name: Build private Kaggle kernel manifest
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: >-
+          python scripts/ai/build_private_kaggle_manifests.py
+          "$RUNNER_TEMP"
+          "$KAGGLE_USERNAME"
+      - name: Launch private GPU kernel
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
+          if [[ "$dataset_status" != "ready" ]]; then
+            echo "::error::Existing private Kaggle dataset is not ready (status: ${dataset_status:-unavailable})"
+            exit 1
+          fi
+          kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
+
   prepare:
     if: >-
       github.repository == 'Heraklines/elite-redux'
@@ -113,57 +153,10 @@ jobs:
       - name: Build private Kaggle manifests
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$KAGGLE_USERNAME"
-          mkdir -p "$RUNNER_TEMP/ai-kaggle-kernel"
-          cp ml/policy/kaggle_train_entrypoint.py "$RUNNER_TEMP/ai-kaggle-kernel/"
-          export DATASET_SLUG="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
-          export KERNEL_SLUG="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          temp = Path(os.environ["RUNNER_TEMP"])
-          dataset_slug = os.environ["DATASET_SLUG"]
-          kernel_slug = os.environ["KERNEL_SLUG"]
-          (temp / "ai-kaggle-dataset" / "dataset-metadata.json").write_text(
-              json.dumps(
-                  {
-                      "title": "ER AI Production V4 Human Training 20260803",
-                      "id": dataset_slug,
-                      "licenses": [{"name": "other"}],
-                  },
-                  indent=2,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          (temp / "ai-kaggle-kernel" / "kernel-metadata.json").write_text(
-              json.dumps(
-                  {
-                      "id": kernel_slug,
-                      "title": "ER AI Production V4 Human Baseline GPU 20260803",
-                      "code_file": "kaggle_train_entrypoint.py",
-                      "language": "python",
-                      "kernel_type": "script",
-                      "is_private": "true",
-                      "enable_gpu": "true",
-                      "enable_tpu": "false",
-                      "enable_internet": "true",
-                      "dataset_sources": [dataset_slug],
-                      "competition_sources": [],
-                      "kernel_sources": [],
-                      "model_sources": [],
-                  },
-                  indent=2,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          PY
+        run: >-
+          python scripts/ai/build_private_kaggle_manifests.py
+          "$RUNNER_TEMP"
+          "$KAGGLE_USERNAME"
       - name: Publish private dataset and launch private GPU kernel
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -176,7 +169,7 @@ jobs:
           test -n "$KAGGLE_KEY"
           dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
           kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
-          dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null || true)
+          dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
           if [[ "$REUSE_EXISTING_DATASET" == "true" ]]; then
             test -n "$dataset_status"
             echo "Reusing existing private Kaggle dataset with status: $dataset_status"
@@ -188,7 +181,7 @@ jobs:
             kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
           fi
           for attempt in $(seq 1 360); do
-            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null || true)
+            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
             [[ "$dataset_status" == "ready" ]] && break
             if [[ "$dataset_status" == "error" || "$dataset_status" == "failed" ]]; then
               echo "::error::Private Kaggle dataset entered terminal status: $dataset_status"
@@ -203,7 +196,9 @@ jobs:
             echo "::error::Private Kaggle dataset did not become ready within 60 minutes (status: ${dataset_status:-unavailable})"
             exit 1
           fi
-          kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
+          if [[ "$REUSE_EXISTING_DATASET" != "true" ]]; then
+            kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
+          fi
           {
             echo "### Private production-v4 GPU training"
             echo "- Dataset: \`$dataset_slug\` (private)"
