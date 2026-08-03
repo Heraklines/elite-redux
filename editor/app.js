@@ -1442,8 +1442,8 @@ function closeAbilDrops() {
 // =============================================================================
 
 // Trainer-class sprite picker: a curated set of TrainerType enum NAMES known to
-// ship a BW sprite (images/trainer/<name>.png in er-assets). Free text is also
-// accepted; the game falls back to a default sprite for an unknown class.
+// ship a BW sprite (images/trainer/<name>.png in er-assets). The editor uses a
+// closed select: display-only sprite labels must never be saved as TrainerTypes.
 const TRAINER_CLASS_OPTIONS = [
   "ACE_TRAINER",
   "BEAUTY",
@@ -3184,11 +3184,20 @@ function renderCustomTrainers(root) {
       sprite =>
         `<option value="${esc(sprite.key)}"${t.trainerSprite === sprite.key ? " selected" : ""}>${esc(sprite.label || prettify(sprite.key))}</option>`,
     ).join("");
+    const currentTrainerClass = (t.trainerClass || "").trim().toUpperCase();
+    const invalidTrainerClassOption =
+      currentTrainerClass && !trainerClassByName.has(currentTrainerClass)
+        ? `<option value="${esc(currentTrainerClass)}" selected disabled>INVALID: ${esc(currentTrainerClass)} — choose a runtime class</option>`
+        : "";
+    const trainerClassOptions = TRAINER_CLASSES.map(
+      trainerClass =>
+        `<option value="${esc(trainerClass.name)}"${currentTrainerClass === trainerClass.name ? " selected" : ""}>${esc(prettify(trainerClass.name))}</option>`,
+    ).join("");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="text" id="ctr-id" value="${t.id}" readonly tabindex="-1" style="width:80px;opacity:.6" /></label>
-        <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <label>Battle class <select id="ctr-class" style="width:190px">${invalidTrainerClassOption}${trainerClassOptions}</select></label>
         <label title="Optional uploaded appearance. Battle behavior still comes from Sprite / class.">Uploaded art
           <select id="ctr-sprite"><option value="">(class sprite)</option>${spriteSel}</select>
         </label>
@@ -5803,15 +5812,13 @@ async function init() {
     adl.id = "abilities-list";
     adl.innerHTML = ABILS_RICH.map(a => `<option value="${esc(a.name)}"></option>`).join("");
     document.body.appendChild(adl);
-    // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
+    // Custom Trainers: species picker (full universe). Trainer classes use a
+    // closed select in the form so a display-only sprite label can never be
+    // committed as a runtime TrainerType again.
     const sdl = document.createElement("datalist");
     sdl.id = "species-list";
     sdl.innerHTML = POKEDEX_SPECIES.map(s => `<option value="${s.const}">${esc(s.name)}</option>`).join("");
     document.body.appendChild(sdl);
-    const tcdl = document.createElement("datalist");
-    tcdl.id = "trainerclass-list";
-    tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
-    document.body.appendChild(tcdl);
     // NB: the held-item datalist (#helditems-list) is rendered INSIDE the Custom
     // Trainers section (heldItemsDatalistHtml) so it reflects the full grouped
     // HELD_ITEMS catalog loaded above — no global body-level datalist here.

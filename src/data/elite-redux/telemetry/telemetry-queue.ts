@@ -58,7 +58,11 @@ export const DEFAULT_TELEMETRY_QUEUE_CONFIG: TelemetryQueueConfig = {
   persistDebounceMs: 1000,
   flushWaveInterval: 10,
   flushIntervalMs: 15 * 60 * 1000,
-  sizeThresholdBytes: 256 * 1024,
+  // Contract-v4 decisions are intentionally complete and substantially larger
+  // than the legacy event. A 256 KiB threshold could therefore serialize and
+  // gzip a batch almost every turn in triples. Match the existing bounded batch
+  // ceiling so uploads stay rare without dropping or coarsening any records.
+  sizeThresholdBytes: 768 * 1024,
   maxLocalBytes: 20 * 1024 * 1024,
   maxBeaconTailBytes: 2 * 1024 * 1024,
   batchReadLimit: 5000,

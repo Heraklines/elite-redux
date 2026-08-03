@@ -8,6 +8,7 @@ import { TrainerType } from "#enums/trainer-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import shippedCustomTrainers from "../../../src/data/elite-redux/er-custom-trainers.json";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -22,6 +23,10 @@ describe.skipIf(!RUN)("shipped custom trainer catalog", () => {
 
   afterAll(() => {
     phaserGame.destroy(true);
+  });
+
+  it("resolves every shipped editor record instead of silently dropping an invalid entry", () => {
+    expect(getErCustomTrainers()).toHaveLength(Object.keys(shippedCustomTrainers).length);
   });
 
   it("resolves both authored Volo variants into the live picker catalog", () => {
