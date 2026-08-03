@@ -420,10 +420,12 @@ async function rewardPauseSettings(rig) {
       clients.find(client => {
         const event = client.evidence.findLastSemanticSurface(0, "reward-shop");
         const observation = event?.observation;
-        return observation?.localSeat === client.publicSeat
+        return (
+          observation?.localSeat === client.publicSeat
           && observation.ownerSeat === client.publicSeat
           && observation.seatsWithInput?.includes(client.publicSeat)
-          && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true });
+          && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        );
       }),
     { timeoutMs: rig.config.timeoutMs, description: "actionable shared reward owner before pause overlay" },
   );

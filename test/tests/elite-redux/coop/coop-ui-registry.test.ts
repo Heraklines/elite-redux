@@ -110,9 +110,9 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
 
     it("allows settings and nested local chrome only below a real pause-menu ancestor", () => {
       expect(coopLocalOverlayInputAllowed(UiMode.SETTINGS, [UiMode.MODIFIER_SELECT, UiMode.MENU])).toBe(true);
-      expect(
-        coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.SETTINGS]),
-      ).toBe(true);
+      expect(coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.SETTINGS])).toBe(
+        true,
+      );
     });
 
     it("does not exempt generic or settings chrome without pause-menu provenance", () => {
@@ -121,9 +121,9 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
     });
 
     it("fails closed when a mirrored surface appears below the pause menu", () => {
-      expect(
-        coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.PARTY]),
-      ).toBe(false);
+      expect(coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.PARTY])).toBe(
+        false,
+      );
       expect(coopLocalOverlayInputAllowed(UiMode.MODIFIER_SELECT, [UiMode.MENU])).toBe(false);
     });
   });
