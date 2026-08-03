@@ -1090,25 +1090,40 @@ export function createBattlePromptAdvancer(
           client: peer,
           event: peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0),
         }));
+        const authorityPair = pairedEvents.find(({ client: peer }) => peer === rig.host);
+        const authorityObservation = authorityPair?.event?.observation;
         const pairIsCurrentAndUnspent = pairedEvents.every(({ client: peer, event }) => {
           const observation = event?.observation;
           return (
             event != null
             && observation?.phase === "TrainerVictoryPhase"
             && observation.surfaceId === "battle:message"
-            && battlePromptMatchesAddress(peer, from[peer.label] ?? 0, event, expectedAddress)
+            // Only the authoritative engine executes BattleEndPhase. The renderer enters its retained
+            // TrainerVictoryPhase directly from the signed CONTROL_COMMIT, so requiring a renderer-local
+            // BattleEnd marker makes a healthy exact pair permanently undiscoverable. Prove the causal
+            // successor once on the host, then require both CURRENT prompts to name that same immutable
+            // successor address. The replica cannot manufacture this surface: production exposes it only
+            // after applying the retained trainer-victory-open material.
+            && observation.address?.epoch === authorityObservation?.address?.epoch
+            && observation.address?.wave === authorityObservation?.address?.wave
+            && observation.address?.turn === authorityObservation?.address?.turn
             && observation.ready?.handlerActive === true
             && observation.ready?.awaitingActionInput === true
             && observation.ready?.inputBlocked !== true
             && !consumedInstances.has(instanceKeyFor(peer, observation))
           );
         });
-        if (!pairIsCurrentAndUnspent) {
+        if (
+          authorityPair?.event == null
+          || !battlePromptMatchesAddress(
+            authorityPair.client,
+            from[authorityPair.client.label] ?? 0,
+            authorityPair.event,
+            expectedAddress,
+          )
+          || !pairIsCurrentAndUnspent
+        ) {
           continue;
-        }
-        const authorityPair = pairedEvents.find(({ client: peer }) => peer === rig.host);
-        if (authorityPair?.event == null) {
-          throw new Error(`${purpose}: paired trainer-victory proof had no authority prompt`);
         }
         await advanceReadyPrompt(authorityPair.client, authorityPair.event);
         await delay(rig.trainerVictoryStaggerMs ?? 1_500);

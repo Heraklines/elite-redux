@@ -1425,7 +1425,9 @@ test("successor-address trainer victory survives authority-first human input ske
   });
   assert.equal(await advance(), false, "one-sided trainer victory cannot advance while its partner is parked");
 
-  renderer.evidence.pushConsole("Start Phase BattleEndPhase");
+  // The authoritative renderer never executes BattleEndPhase. Its exact signed trainer-victory-open
+  // projection starts TrainerVictoryPhase directly; requiring a local structural marker would make the
+  // real two-browser driver ignore a healthy actionable prompt forever.
   renderer.evidence.pushBattleReadiness("battle:message", "TrainerVictoryPhase", true, 31, true, {
     epoch: 7,
     wave: 5,
