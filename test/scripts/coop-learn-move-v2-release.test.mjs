@@ -218,10 +218,7 @@ test("exact host/guest owner material is the sole replica release and duplicate 
     "the projected picker proves terminal atomically before its retained successor starts",
   );
   assert.doesNotMatch(projected, /super\.end\(\)/u, "the projected picker cannot restore an unstarted standby blindly");
-  assert.match(
-    duo,
-    /the single-move V2 terminal cannot delegate phase retirement to an ambient async UI callback/u,
-  );
+  assert.match(duo, /the single-move V2 terminal cannot delegate phase retirement to an ambient async UI callback/u);
   assert.match(
     duo,
     /firstConfirmGeneration[\s\S]+getSurfaceGeneration\?\.\(\)[\s\S]+> firstConfirmGeneration/u,

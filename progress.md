@@ -7060,3 +7060,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   matching the old B1 assertion's English prose. The contract now names the actual invariant: a projected
   single-Learn-Move terminal must not delegate retirement to an ambient async UI callback. B13's apparent
   delay was GitHub infrastructure (checkout consumed 8m42s); the isolated test shard itself completed green.
+- Gate `30784448306` passed the complete fast source/public-UI/node-pure contract lane and all 31 substantive
+  jobs. Its only underlying red was Biome requesting a one-line layout for the updated meta-contract; no type,
+  behavioral, mutation, bundle, or WebRTC check failed. The formatter's exact output is applied verbatim.
