@@ -8694,10 +8694,10 @@ export class PlayerPokemon extends Pokemon {
    * same index — so a Redux Kadabra (index 1) carried into Alakazam (index 1 =
    * "mega") would become Mega Alakazam.
    *
-   * Logic: if the carried form is fine (exists and is not battle-only), keep it.
-   * Otherwise prefer a NON-battle-only form whose key matches the pre-evolution
-   * form key (Redux -> Redux, e.g. Kadabra Redux -> Alakazam Redux), then fall
-   * back to the canonical base form ("").
+   * Logic: first prefer a NON-battle-only form whose key matches the
+   * pre-evolution form key (Redux -> Redux, e.g. Kadabra Redux -> Alakazam
+   * Redux). If the target has no matching semantic key, keep a safe carried
+   * index; otherwise fall back to the canonical base form ("").
    */
   private resolveSafeEvolvedFormIndex(
     species: PokemonSpecies | null,
@@ -8718,15 +8718,18 @@ export class PlayerPokemon extends Pokemon {
     if (!forms || forms.length === 0) {
       return carriedIndex;
     }
-    const carried = forms[carriedIndex];
-    if (carried && !battleOnlyFormKeys.includes(carried.formKey)) {
-      return carriedIndex;
-    }
+    // Form indexes are only meaningful within one species. A Redux Doublade's
+    // numeric slot can point at an unrelated ordinary Aegislash form, so match
+    // the semantic key before accepting the carried index.
     if (preferredFormKey) {
       const preferred = forms.findIndex(f => f.formKey === preferredFormKey && !battleOnlyFormKeys.includes(f.formKey));
       if (preferred >= 0) {
         return preferred;
       }
+    }
+    const carried = forms[carriedIndex];
+    if (carried && !battleOnlyFormKeys.includes(carried.formKey)) {
+      return carriedIndex;
     }
     const normalIndex = forms.findIndex(f => f.formKey === "");
     return normalIndex >= 0 ? normalIndex : 0;

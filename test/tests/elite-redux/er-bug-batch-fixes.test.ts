@@ -26,7 +26,7 @@
 // =============================================================================
 
 import type { AbAttrBaseParams } from "#abilities/ab-attrs";
-import { modifierTypes } from "#data/data-lists";
+import { allMoves, modifierTypes } from "#data/data-lists";
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { clearAllErStatuses } from "#data/elite-redux/er-status-cure";
@@ -35,6 +35,8 @@ import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
+import { ErMoveId } from "#enums/er-move-id";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { PokemonHpRestoreModifier } from "#modifiers/modifier";
@@ -113,6 +115,10 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
   it("Ursaluna Bloodmoon has its 3 ER innate passives (not the single vanilla Berserk)", () => {
     const ursaluna = getPokemonSpecies(SpeciesId.BLOODMOON_URSALUNA);
     expect(ursaluna.getPassiveCount()).toBe(3);
+  });
+
+  it("Rip and Tear is a biting move", () => {
+    expect(allMoves[ErMoveId.RIP_AND_TEAR].hasFlag(MoveFlags.BITING_MOVE)).toBe(true);
   });
 
   it("Full Reset (Fresh Start) does not block catching a non-starter wild", async () => {
