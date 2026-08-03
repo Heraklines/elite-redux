@@ -380,8 +380,8 @@ import {
   createCoopPresentationOutcomeToken,
   settleCoopPresentationOutcome,
 } from "#data/elite-redux/coop/coop-presentation-outcome";
-import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { withCoopOrderedControlPhasePermit } from "#data/elite-redux/coop/coop-renderer-gate";
+import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   isCoopRevivalOperationEnabled,
   resetCoopRevivalOperationState,
