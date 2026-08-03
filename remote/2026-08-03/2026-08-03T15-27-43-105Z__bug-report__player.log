@@ -1,0 +1,34 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:c939e2c2d79bbf6c1131ec9d493f12215c683ed7:run-30796046499.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   2560x1440 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@8965ms -> title-shown@12174ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     6Q7ie6z0xKt2s5Wm3jYVQAgp
+party:    
+
+----- DESCRIPTION -----
+double and triple battles are laggy, unsure of how performance was prior as i've only been playing for the past day though
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:c939e2c2d79bbf6c1131ec9d493f12215c683ed7:run-30796046499.1","source":"github","sha":"c939e2c2d79bbf6c1131ec9d493f12215c683ed7","workflow":{"provider":"github-actions","runId":"30796046499","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[15:26:51.449] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:26:52.187] LOG: [ER] build {"version":1,"id":"github:c939e2c2d79bbf6c1131ec9d493f12215c683ed7:run-30796046499.1","source":"github","sha":"c939e2c2d79bbf6c1131ec9d493f12215c683ed7","workflow":{"provider":"github-actions","runId":"30796046499","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[15:26:59.113] DEBUG: Destroying loading scene
+[15:26:59.113] DEBUG: Destroyed loading scene
+[15:26:59.302] LOG: Seed: 6Q7ie6z0xKt2s5Wm3jYVQAgp
+[15:26:59.303] LOG: Wave Seed: 6Q7ie6z0xKt2s5Wm3jYVQAgp 0
+[15:27:01.686] LOG: %cStart Phase LoginPhase color:green;
+[15:27:01.847] LOG: Client Session: BMlr5kJV436zHy3t7cqyYTap2G4DJIHF
+[15:27:02.181] DEBUG: Using cached system data
+[15:27:02.296] LOG: %cStart Phase TitlePhase color:green;
+[15:27:02.307] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
