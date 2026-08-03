@@ -5071,7 +5071,15 @@ export function recordNavigationCommandFrontier(rig, coverage, wave) {
       displayedWave: observation.displayedWave,
     };
   });
-  const canonical = projections.map(({ label: _label, ...projection }) => JSON.stringify(projection));
+  const canonical = projections.map(({ label: _label, presentation, ...projection }) =>
+    JSON.stringify({
+      ...projection,
+      presentation: {
+        trainerVisible: presentation.trainerVisible,
+        enemyTrainerPresented: presentation.enemyTrainerPresented,
+      },
+    }),
+  );
   if (canonical[0] !== canonical[1]) {
     throw new Error(
       `[campaign-navigation] command arena/presentation diverged at wave ${wave}: ${JSON.stringify(projections)}`,

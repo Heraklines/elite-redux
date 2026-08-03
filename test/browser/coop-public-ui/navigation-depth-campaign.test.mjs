@@ -23,24 +23,38 @@ function party() {
   ];
 }
 
-function rigAt(wave, biomeId = 2, trainerVisible = false) {
+function rigAt(wave, biomeId = 2, trainerVisible = false, guestPresentation = null) {
   const records = [];
-  const observation = {
+  const baseObservation = {
     operationClass: "command",
     address: { epoch: 7, wave, turn: 1 },
     partySlots: party(),
     arena: { biomeId, weather: 0, terrain: 0 },
-    presentation: { trainerVisible },
+    presentation: {
+      trainerVisible,
+      enemyTrainerVisible: false,
+      enemyTrainerAlpha: 0,
+      enemyTrainerPresented: false,
+    },
     displayedWave: wave,
   };
-  const makeClient = label => ({
-    label,
-    evidence: {
-      events: [],
-      findLastSemanticSurface: () => ({ observation }),
-      record: (kind, detail) => records.push({ label, kind, detail }),
-    },
-  });
+  const makeClient = label => {
+    const observation =
+      label === "guest-seat" && guestPresentation != null
+        ? {
+            ...baseObservation,
+            presentation: { ...baseObservation.presentation, ...guestPresentation },
+          }
+        : baseObservation;
+    return {
+      label,
+      evidence: {
+        events: [],
+        findLastSemanticSurface: () => ({ observation }),
+        record: (kind, detail) => records.push({ label, kind, detail }),
+      },
+    };
+  };
   return { clients: { host: makeClient("host-seat"), guest: makeClient("guest-seat") }, records };
 }
 
@@ -68,6 +82,24 @@ test("navigation command frontier requires paired arena and trainer cleanup pari
   assert.deepEqual(frontier.arena, { biomeId: 8, weather: 0, terrain: 0 });
   assert.equal(frontier.presentation.trainerVisible, false);
   assert.equal(coverage.commandFrontiers.length, 1);
+});
+
+test("navigation command frontier compares rendered trainer presentation, not a transparent sprite's stale flag", () => {
+  const transparent = { commandFrontiers: [] };
+  const transparentRig = rigAt(5, 0, false, {
+    enemyTrainerVisible: true,
+    enemyTrainerAlpha: 0,
+    enemyTrainerPresented: false,
+  });
+  assert.doesNotThrow(() => recordNavigationCommandFrontier(transparentRig, transparent, 5));
+
+  const rendered = { commandFrontiers: [] };
+  const renderedRig = rigAt(5, 0, false, {
+    enemyTrainerVisible: true,
+    enemyTrainerAlpha: 1,
+    enemyTrainerPresented: true,
+  });
+  assert.throws(() => recordNavigationCommandFrontier(renderedRig, rendered, 5), /presentation diverged/u);
 });
 
 function completeCoverage() {
