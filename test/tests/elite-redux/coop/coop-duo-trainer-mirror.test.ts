@@ -55,6 +55,7 @@ import {
   installDuoLogCapture,
   withClient,
 } from "#test/tools/coop-duo-harness";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -224,6 +225,25 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     // rarity pool. That one module value split saveDataDigest, so TURN_COMMIT stayed pending and both already-
     // received switch-ins remained trapped behind it until the authority deadline terminated the session.
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.TYRANITAR);
+    // Random double trainers can legally roll only three total party members. The live failure had one reserve
+    // for each lead, and partnered trainer switches are slot-gated, so cardinality alone cannot manufacture
+    // that precondition. Add only the missing reserve for each real lead slot before buildDuo mirrors the
+    // battle; command, faint, switch scheduling, transport, replay, and presentation all remain production.
+    const hostBattle = game.scene.currentBattle;
+    const enemyLeads = game.scene.getEnemyField();
+    const enemyLeadIds = new Set(enemyLeads.map(mon => mon.id));
+    for (const trainerSlot of new Set(enemyLeads.map(mon => mon.trainerSlot))) {
+      const leadCount = enemyLeads.filter(mon => mon.trainerSlot === trainerSlot).length;
+      const lead = enemyLeads.find(mon => mon.trainerSlot === trainerSlot)!;
+      while (
+        hostBattle.enemyParty.filter(mon => mon.trainerSlot === trainerSlot && !enemyLeadIds.has(mon.id)).length
+        < leadCount
+      ) {
+        hostBattle.enemyParty.push(
+          game.scene.addEnemyPokemon(getPokemonSpecies(SpeciesId.SHUCKLE), lead.level, trainerSlot),
+        );
+      }
+    }
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     expect(rig.hostScene.getEnemyParty().length, "the double trainer has two reserve switch-ins").toBeGreaterThan(3);
