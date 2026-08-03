@@ -1,0 +1,12 @@
+{
+  "taskId": "live-stat-watchdog-r3-20260803",
+  "version": 2,
+  "branch": "ci/coop/live-stat-watchdog-r3-20260803",
+  "trainRef": "ci/coop/live-stat-watchdog-r3-20260803",
+  "baseSha": "0877ade2f20ec4d527012cedc51082a6671daf7a",
+  "allowedFiles": [
+    ".github/coop-task-ownership/live-stat-watchdog-r3-20260803.json",
+    "test/tests/elite-redux/coop/coop-battle-events.test.ts"
+  ],
+  "lockedSchemaFiles": []
+}
