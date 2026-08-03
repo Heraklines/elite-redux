@@ -18,6 +18,7 @@ import {
   isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { BattleType } from "#enums/battle-type";
 import { StatusEffect } from "#enums/status-effect";
 
 /**
@@ -163,6 +164,9 @@ export class CoopTurnCommitPhase extends Phase {
         {
           mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true,
           ...(deferredWaveOutcome == null ? {} : { deferredWaveOutcome }),
+          ...(deferredWaveOutcome === "win" && globalScene.currentBattle?.battleType === BattleType.TRAINER
+            ? { trainerVictoryPresentation: true }
+            : {}),
           pendingMutationTokens: mutationAfter.pendingTokens,
         },
       );

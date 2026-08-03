@@ -2149,6 +2149,7 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   const stagedWait = battleStream.slice(stagedWaitStart, stagedWaitEnd);
   assert.match(stagedWait, /allowedKinds: \["CONTROL_COMMIT", "WAVE_ADVANCE"\]/u);
   assert.match(stagedWait, /materialKind: "replacement-open"[\s\S]*turn: turn \+ 1/u);
+  assert.match(stagedWait, /materialKind: "trainer-victory-open"[\s\S]*turn: turn \+ 1/u);
   assert.match(stagedWait, /allowNextWaveStart: false/u);
 
   const switchStart = switchPhase.indexOf("const controlBoundary = establishCoopV2ReplacementControlBoundary(");

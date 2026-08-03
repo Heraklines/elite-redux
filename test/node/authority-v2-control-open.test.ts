@@ -436,14 +436,12 @@ describe("authority-v2 explicit command-open boundary", () => {
       afterOperationId: "TURN/e3/w4/t1",
       epoch: context.sessionEpoch,
       wave: 4,
-      turn: 1,
-      allowedKinds: [
-        "CONTROL_COMMIT",
-        "REPLACEMENT_COMMIT",
-        "INTERACTION_COMMIT",
-        "WAVE_ADVANCE",
-        "TERMINAL_COMMIT",
-      ] as const,
+      turn: 2,
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"] as const,
+      allowedControlAddresses: [
+        { materialKind: "replacement-open" as const, wave: 4, turn: 2, operationId: null },
+        { materialKind: "trainer-victory-open" as const, wave: 4, turn: 2, operationId: null },
+      ],
       allowNextWaveStart: false,
       expectedOperationId: null,
     };
@@ -452,6 +450,16 @@ describe("authority-v2 explicit command-open boundary", () => {
     expect(committed.nextControl).toEqual(successor);
     expect(isValidAuthorityEntry(committed)).toBe(true);
     expect(controlAllowsSuccessorEntry(resolvingTurnWait, resolvingTurnWait.afterOperationId, committed)).toBe(true);
+    expect(
+      controlAllowsSuccessorEntry(
+        {
+          ...resolvingTurnWait,
+          allowedControlAddresses: [resolvingTurnWait.allowedControlAddresses[0]],
+        },
+        resolvingTurnWait.afterOperationId,
+        committed,
+      ),
+    ).toBe(false);
     expect(decodeTrainerVictoryOpenEntry(committed)).toEqual(open);
     expect(
       decodeTrainerVictoryOpenEntry({

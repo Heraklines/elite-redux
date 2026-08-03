@@ -133,6 +133,8 @@ export interface CoopTurnBoundaryIdentity {
    * the real WAVE_ADVANCE. Only the runtime that owns the staged transition may set this marker.
    */
   readonly deferredWaveOutcome?: "win" | "capture" | "flee";
+  /** True only when the staged win came from a normal trainer battle and must present TrainerVictoryPhase. */
+  readonly trainerVictoryPresentation?: boolean;
   /** Runtime mutation-barrier depth at capture; V2 refuses a non-zero value even after outer checks. */
   readonly pendingMutationTokens?: number;
 }
@@ -535,6 +537,16 @@ export function deferredCoopV2WaveSuccessorWait(
         turn: turn + 1,
         operationId: null,
       },
+      ...(boundary.deferredWaveOutcome === "win" && boundary.trainerVictoryPresentation === true
+        ? [
+            {
+              materialKind: "trainer-victory-open" as const,
+              wave,
+              turn: turn + 1,
+              operationId: null,
+            },
+          ]
+        : []),
     ],
     allowNextWaveStart: false,
     expectedOperationId: null,

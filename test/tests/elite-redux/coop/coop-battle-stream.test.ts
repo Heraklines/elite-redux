@@ -238,6 +238,24 @@ describe("Authority V2 turn successor classification", () => {
     expect(
       deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
         mysteryBattle: false,
+        deferredWaveOutcome: "win",
+        trainerVictoryPresentation: true,
+      }),
+    ).toEqual({
+      ...expected,
+      allowedControlAddresses: [
+        ...expected.allowedControlAddresses,
+        {
+          materialKind: "trainer-victory-open",
+          wave: 4,
+          turn: 2,
+          operationId: null,
+        },
+      ],
+    });
+    expect(
+      deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+        mysteryBattle: false,
       }),
     ).toBeNull();
     expect(() =>
