@@ -215,6 +215,20 @@ jobs:
           "$RUNNER_TEMP/er-combat-data-dictionary.json"
           "$RUNNER_TEMP/ai-kaggle-dataset/er-ai-training-bundle.zip"
           baseline 20260803
+      - name: Preserve sanitized census before model fitting
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-census
+          cp "$RUNNER_TEMP/production-v4-telemetry/report.json" ai-census/import-report.json
+          cp "$RUNNER_TEMP/production-v4-training/report.json" ai-census/materialized-report.json
+          cp "$RUNNER_TEMP/production-v4-identity-report.json" ai-census/identity-selection.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-production-v4-remote-census
+          path: ai-census
+          retention-days: 30
+          if-no-files-found: error
       - name: Build private Kaggle manifests
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -280,6 +294,7 @@ jobs:
           --dictionary-supplement "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json"
           --winner-only-policy
           --winner-scope battle
+          --max-policy-decisions 4000
           --report-json "$RUNNER_TEMP/ai-tree/leaderboard.json"
           --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md"
           --models-dir "$RUNNER_TEMP/ai-tree/models"

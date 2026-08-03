@@ -163,6 +163,43 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertTrue(is_policy_target({"policySource": "human-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "search-relabel-v1", "policyTarget": True}))
 
+    def test_dictionary_validation_uses_the_recorded_feature_schema(self) -> None:
+        payload = {
+            "schemaVersion": 3,
+            "features": {"schemaVersion": 4, "names": ["f0"]},
+            "moves": {},
+            "abilities": {},
+            "items": {},
+            "modifiers": {},
+            "speciesForms": {},
+            "relics": {},
+            "battlerTags": [],
+            "arenaTags": [],
+            "positionalTags": [],
+            "mechanicNamespaces": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dictionary.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            decision = {
+                "schemaVersion": 4,
+                "featureSchemaVersion": 4,
+                "dictionaryHash": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "observation": {
+                    "selfParty": [],
+                    "opponentActive": [],
+                    "opponentKnownParty": [],
+                    "fieldEffects": [],
+                    "positionalEffects": [],
+                    "modifiers": [],
+                },
+                "candidates": [{"kind": "switch"}],
+                "candidateFeatures": [{"values": [0.0]}],
+            }
+            coverage = validate_data_dictionary(path, [decision])
+
+        self.assertEqual(coverage["features"], 1)
+
     def test_diagnostic_imitation_is_explicit_and_never_creates_policy_targets(self) -> None:
         excluded = [
             {"policySource": "smart-default-v1", "policyTarget": False},
@@ -381,6 +418,8 @@ class CandidateBaselineContractTest(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             decision = {
+                "schemaVersion": 3,
+                "featureSchemaVersion": 2,
                 "dictionaryHash": digest,
                 "observation": {
                     "selfParty": [{
@@ -439,6 +478,8 @@ class CandidateBaselineContractTest(unittest.TestCase):
             }
             supplement_path.write_text(json.dumps(supplement), encoding="utf-8")
             decision = {
+                "schemaVersion": 3,
+                "featureSchemaVersion": 2,
                 "dictionaryHash": digest,
                 "observation": {
                     "selfParty": [{

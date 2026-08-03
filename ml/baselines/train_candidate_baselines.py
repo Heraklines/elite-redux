@@ -439,6 +439,7 @@ def validate_data_dictionary(
     decisions: list[dict[str, Any]],
     supplement_path: Path | None = None,
 ) -> dict[str, Any]:
+    _, recorded_feature_schema_version = dataset_schema_versions(decisions)
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     dictionary = json.loads(raw)
@@ -447,7 +448,7 @@ def validate_data_dictionary(
     features = dictionary.get("features")
     if (
         not isinstance(features, dict)
-        or features.get("schemaVersion") != FEATURE_SCHEMA_VERSION
+        or features.get("schemaVersion") != recorded_feature_schema_version
         or not isinstance(features.get("names"), list)
         or not features["names"]
         or any(not isinstance(name, str) or not name for name in features["names"])
