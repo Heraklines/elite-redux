@@ -1691,10 +1691,7 @@ test("normal trainer victory retains its exact presentation lease across success
     "the real presentation retires its exact lease before the phase manager can advance",
   );
   const controlProjectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
-  const controlProjectorEnd = coopRuntime.indexOf(
-    "function markCoopV2ControlMaterialApplied",
-    controlProjectorStart,
-  );
+  const controlProjectorEnd = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied", controlProjectorStart);
   assert.ok(
     controlProjectorStart >= 0 && controlProjectorEnd > controlProjectorStart,
     "the ordinary control projector has a bounded block",

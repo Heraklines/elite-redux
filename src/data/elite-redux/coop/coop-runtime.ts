@@ -7057,8 +7057,7 @@ function buildCoopV2LiveSeams(
             return false;
           }
           if (material.kind === "trainer-victory-open") {
-            const presentationAlreadyCompleted =
-              runtime.v2CompletedTrainerVictoryPresentations.has(material.wave);
+            const presentationAlreadyCompleted = runtime.v2CompletedTrainerVictoryPresentations.has(material.wave);
             if (
               !presentationAlreadyCompleted
               && installCoopTrainerVictoryMaterial(globalScene, material.trainerVictory) == null
