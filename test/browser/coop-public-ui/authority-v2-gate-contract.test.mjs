@@ -4145,8 +4145,8 @@ test("the animations-on campaign extends a live between-wave renderer without we
   assert.match(campaignDriver, /const betweenWaveTimeoutMs = rig\.config\.timeoutMs \* 3/u);
   assert.match(
     campaignDriver,
-    /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: betweenWaveTimeoutMs \+ ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS/u,
-    "one bounded between-wave window plus one measured dense-presentation ceiling covers evolution -> learn-move -> next encounter",
+    /const retainedPartyEvolutionExpected = retainedPartyEvolutionNeedsProgressBudget\(policy\.partyMutatingReward\);[\s\S]*const betweenWaveBudget =[\s\S]*policy\.moveAnimationsExpected \|\| retainedPartyEvolutionExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*policy\.moveAnimationsExpected \? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS/u,
+    "one bounded between-wave window covers normal animation qualification and retained party evolutions",
   );
   assert.match(
     campaignDriver,

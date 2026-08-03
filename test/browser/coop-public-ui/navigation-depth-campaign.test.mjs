@@ -207,7 +207,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);
   assert.match(observer, /level: pokemon\.level/u);
-  assert.match(observer, /trainerVisible: globalScene\.trainer\?\.visible === true/u);
+  assert.match(observer, /function coopBrowserPresentationSnapshot\(\)/u);
+  assert.match(observer, /trainerVisible: playerTrainer\?\.visible === true/u);
+  assert.match(observer, /enemyTrainerVisible/u);
+  assert.match(observer, /enemyTrainerAlpha/u);
+  assert.match(observer, /enemyTrainerPresented/u);
   assert.match(workflow, /navigation-depth-30' && 240/u);
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS:[^\n]*13800000/u);
   assert.match(workflow, /COOP_UI_REQUIRE_NAVIGATION_DEPTH:[^\n]*navigation-depth-30/u);

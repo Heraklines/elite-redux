@@ -71,9 +71,7 @@ describe("Mystery battle reward preparation boundary", () => {
       /this\.meSettlementStage === "prepare-only"[\s\S]*?this\.end\(\);[\s\S]*?return;[\s\S]*?encounter\.doEncounterRewards\(\)/u,
     );
     expect(trainerVictory).toContain('settleCoopTrainerPresentation("enemy")');
-    expect(trainerVictory).toMatch(
-      /settleCoopTrainerPresentation\("enemy"\);[\s\S]*?this\.end\(\)/u,
-    );
+    expect(trainerVictory).toMatch(/settleCoopTrainerPresentation\("enemy"\);[\s\S]*?this\.end\(\)/u);
   });
 
   it("requires a retained no-battle state image before a typed raw reward carrier can open UI", () => {

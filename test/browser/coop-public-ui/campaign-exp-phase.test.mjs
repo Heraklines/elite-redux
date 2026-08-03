@@ -1423,6 +1423,7 @@ test("successor-address trainer victory advances only after the browser observes
     turn: 6,
   });
   assert.equal(await advance(), true, "the paired trainer-victory prompts are real human-action surfaces");
+  assert.equal(await advance(), true, "the renderer receives its own public trainer-victory input");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
     ["Space"],

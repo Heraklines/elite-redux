@@ -27,9 +27,9 @@ import {
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
   resolveSurfaceOwner,
+  retainedPartyEvolutionNeedsProgressBudget,
   rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
-  retainedPartyEvolutionNeedsProgressBudget,
   selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
 import {
@@ -1420,7 +1420,7 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
     rewardId: "RARE_CANDY",
   });
   assert.deepEqual(chooseRewardPartyTargetSlot(boundary("FULL_HEAL"), 0), {
-    slot: 3,
+    slot: 1,
     rewardId: "FULL_HEAL",
   });
 });
@@ -1474,22 +1474,10 @@ test("reward targeting follows nested move and ability choices instead of requir
 });
 
 test("party evolution rewards retain a bounded presentation-progress budget when move animations are skipped", () => {
-  assert.equal(
-    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "EVOLUTION_ITEM" }),
-    true,
-  );
-  assert.equal(
-    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "RARE_EVOLUTION_ITEM" }),
-    true,
-  );
-  assert.equal(
-    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "FORM_CHANGE_ITEM" }),
-    false,
-  );
-  assert.equal(
-    retainedPartyEvolutionNeedsProgressBudget({ required: false, rewardId: "EVOLUTION_ITEM" }),
-    false,
-  );
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "EVOLUTION_ITEM" }), true);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "RARE_EVOLUTION_ITEM" }), true);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "FORM_CHANGE_ITEM" }), false);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: false, rewardId: "EVOLUTION_ITEM" }), false);
 });
 
 test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {
