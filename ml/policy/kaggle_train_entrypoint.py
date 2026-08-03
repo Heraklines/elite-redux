@@ -14,6 +14,9 @@ import zipfile
 from collections import deque
 from pathlib import Path
 
+# Variable candidate/history shapes otherwise fragment the P100 allocator between batches.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import torch
 
 
@@ -32,6 +35,7 @@ PROFILES = {
         "patience": 2,
         "batch_size": 8,
         "resume_batch_size": 8,
+        "gradient_accumulation_steps": 1,
         "history_length": 8,
         "trajectory_layers": 1,
         "transfer_pretrain_epochs": 1,
@@ -43,8 +47,9 @@ PROFILES = {
         "feedforward": 960,
         "epochs": 60,
         "patience": 8,
-        "batch_size": 128,
-        "resume_batch_size": 32,
+        "batch_size": 32,
+        "resume_batch_size": 16,
+        "gradient_accumulation_steps": 4,
         "history_length": 8,
         "trajectory_layers": 2,
         "transfer_pretrain_epochs": 4,
@@ -58,6 +63,7 @@ PROFILES = {
         "patience": 10,
         "batch_size": 32,
         "resume_batch_size": 8,
+        "gradient_accumulation_steps": 4,
         "history_length": 8,
         "trajectory_layers": 4,
         "transfer_pretrain_epochs": 8,
@@ -236,6 +242,8 @@ def build_training_command(
         str(profile["patience"]),
         "--batch-size",
         str(batch_size),
+        "--gradient-accumulation-steps",
+        str(profile["gradient_accumulation_steps"]),
         "--d-model",
         str(profile["d_model"]),
         "--layers",

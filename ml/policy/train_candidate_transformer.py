@@ -1076,15 +1076,17 @@ def train_epoch(
     gradient_clip: float,
     amp_enabled: bool,
     scaler: torch.amp.GradScaler,
+    gradient_accumulation_steps: int = 1,
 ) -> dict[str, float]:
     model.train()
     totals = Counter()
-    for batch in loader:
+    optimizer.zero_grad(set_to_none=True)
+    batch_count = len(loader)
+    for batch_index, batch in enumerate(loader):
         features = batch["features"].to(device)
         mask = batch["mask"].to(device)
         chosen = batch["chosen"].to(device)
         policy_weights = batch["policyWeights"].to(device)
-        optimizer.zero_grad(set_to_none=True)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp_enabled):
             logits, value_logits = model_forward(model, batch, device)
             per_example_policy = nn.functional.cross_entropy(logits, chosen, reduction="none")
@@ -1102,11 +1104,15 @@ def train_epoch(
             raise FloatingPointError(
                 f"non-finite training loss: policy={float(policy_loss.detach())}, value={float(value_loss.detach())}"
             )
-        scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
-        nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
-        scaler.step(optimizer)
-        scaler.update()
+        window_start = (batch_index // gradient_accumulation_steps) * gradient_accumulation_steps
+        window_size = min(gradient_accumulation_steps, batch_count - window_start)
+        scaler.scale(loss / window_size).backward()
+        if (batch_index + 1) % gradient_accumulation_steps == 0 or batch_index + 1 == batch_count:
+            scaler.unscale_(optimizer)
+            nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)
         count = features.shape[0]
         totals["examples"] += count
         totals["loss"] += float(loss.detach()) * count
@@ -1129,6 +1135,8 @@ def dataset_hash(paths: list[Path]) -> str:
 def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.transfer_pretrain_epochs < 0:
         raise ValueError("--transfer-pretrain-epochs must be non-negative")
+    if args.gradient_accumulation_steps < 1:
+        raise ValueError("--gradient-accumulation-steps must be positive")
     set_determinism(args.seed, args.fast_kernels)
     if not 0.0 <= args.unknown_policy_weight <= 1.0:
         raise ValueError("--unknown-policy-weight must be between 0 and 1")
@@ -1345,6 +1353,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 args.gradient_clip,
                 amp_enabled,
                 scaler,
+                args.gradient_accumulation_steps,
             )
             pretrain_history.append({"epoch": epoch, **metrics})
             print(f"transfer epoch {epoch:03d}: loss={metrics['loss']:.4f}", flush=True)
@@ -1366,6 +1375,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             args.gradient_clip,
             amp_enabled,
             scaler,
+            args.gradient_accumulation_steps,
         )
         validation_metrics = evaluate(model, validation_loader, device)
         current_metric_name, current_metric = checkpoint_selection_metric(validation_metrics)
@@ -1437,6 +1447,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "device": str(device),
         "mixedPrecision": amp_enabled,
         "fastKernels": args.fast_kernels,
+        "batchSize": args.batch_size,
+        "gradientAccumulationSteps": args.gradient_accumulation_steps,
+        "effectiveBatchSize": args.batch_size * args.gradient_accumulation_steps,
         "trainSeconds": time.perf_counter() - started,
         "bestEpoch": best_epoch,
         "checkpointSelection": {"metric": selection_metric_name, "best": best_metric},
@@ -1536,6 +1549,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patience", type=int, default=6)
     parser.add_argument("--min-delta", type=float, default=1e-4)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-3)
     parser.add_argument("--gradient-clip", type=float, default=1.0)

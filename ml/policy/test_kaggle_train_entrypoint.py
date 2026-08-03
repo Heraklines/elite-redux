@@ -68,8 +68,9 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
 
     def test_baseline_batch_is_unchanged_without_checkpoint_resume(self) -> None:
         command = build_training_command(Path("bundle"), Path("output"), PROFILES["baseline"], 17)
-        self.assertEqual(command[command.index("--batch-size") + 1], "128")
-        self.assertEqual(effective_batch_size(PROFILES["baseline"], False), 128)
+        self.assertEqual(command[command.index("--batch-size") + 1], "32")
+        self.assertEqual(command[command.index("--gradient-accumulation-steps") + 1], "4")
+        self.assertEqual(effective_batch_size(PROFILES["baseline"], False), 32)
 
     def test_transfer_bundle_enables_masked_domain_pretraining(self) -> None:
         command = build_training_command(
@@ -106,8 +107,8 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
             init_model_dir=initial_model,
         )
         self.assertEqual(command[command.index("--init-model-dir") + 1], str(initial_model))
-        self.assertEqual(command[command.index("--batch-size") + 1], "32")
-        self.assertEqual(effective_batch_size(PROFILES["baseline"], True), 32)
+        self.assertEqual(command[command.index("--batch-size") + 1], "16")
+        self.assertEqual(effective_batch_size(PROFILES["baseline"], True), 16)
         self.assertNotIn("--amp", command)
         self.assertNotIn("--transfer-data", command)
 

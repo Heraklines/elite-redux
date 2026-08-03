@@ -135,6 +135,7 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
                 patience=1,
                 min_delta=1e-4,
                 batch_size=2,
+                gradient_accumulation_steps=1,
                 learning_rate=3e-4,
                 weight_decay=1e-3,
                 gradient_clip=1.0,
