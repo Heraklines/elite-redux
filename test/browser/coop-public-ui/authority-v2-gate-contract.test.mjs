@@ -1690,10 +1690,16 @@ test("normal trainer victory retains its exact presentation lease across success
     finishStart >= 0 && completeAt > finishStart && endAt > completeAt,
     "the real presentation retires its exact lease before the phase manager can advance",
   );
-  const projectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
-  const projectorEnd = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied", projectorStart);
-  assert.ok(projectorStart >= 0 && projectorEnd > projectorStart, "the ordinary control projector has a bounded block");
-  const projector = coopRuntime.slice(projectorStart, projectorEnd);
+  const controlProjectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
+  const controlProjectorEnd = coopRuntime.indexOf(
+    "function markCoopV2ControlMaterialApplied",
+    controlProjectorStart,
+  );
+  assert.ok(
+    controlProjectorStart >= 0 && controlProjectorEnd > controlProjectorStart,
+    "the ordinary control projector has a bounded block",
+  );
+  const projector = coopRuntime.slice(controlProjectorStart, controlProjectorEnd);
   assert.match(
     projector,
     /sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*kind: "deferred"/u,
