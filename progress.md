@@ -7104,3 +7104,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   when the lane deadline expired. `HYPER_POTION` visibly mirrored the requested cursor in the final screenshot;
   its harness observer timed out after the watcher applied the cursor event and therefore is not evidence of a
   reward cursor product failure. Both remain candidates for reduced-fanout remeasurement after the product fix.
+
+## 2026-08-03 - post-fix gate fixture migration
+
+- Exact-SHA gate `30787474307` passed 30 substantive jobs and exposed only two Lane-A crashes in
+  `coop-learn-move-inline-park.test.ts`. Both stopped before their behavioral assertions because the minimal
+  fake PhaseManager lacked the real `hasPhaseOfType()` query newly used by the native-continuation preflight.
+  Production PhaseManager has this API; this is a stale fixture surface, not a runtime failure.
+- The fixture now faithfully reports that it contains no queued native `LearnMovePhase`, allowing the two
+  tests to continue covering their owned fallback cases: inline replay over a parked renderer and queued replay
+  when the renderer is drainable. No production behavior changed for this gate repair.
