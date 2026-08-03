@@ -7026,3 +7026,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   started exactly one `CoopReplayLearnMovePhase`; the authority started exactly one native `LearnMovePhase`;
   revision 7 converged at `frontier=7/7/7`; and revision 8 installed the wave-2 command at
   `frontier=8/8/8`. Both final screenshots show the same evolved party and actionable wave-2 command UI.
+
+## 2026-08-03 - merged-tip gate red classification
+
+- The first full gate on the clean feat integration merge (`45549616c`, run `30782657795`) completed all 33
+  jobs. Browser-native WebRTC and every shard except B1/B11 passed. The aggregate red consists of three stale
+  assertions plus one newly merged feat type-contract regression; it did not expose a new co-op product
+  desync, softlock, or recovery failure.
+- The presentation source contract still required Evolution to pass an inline object literal. Production now
+  creates one typed immutable `presentation` value and gives that same value to both the retained progression
+  recorder and reward settlement. The contract now verifies this stronger single-result invariant.
+- B1 still expected the projected single-Learn-Move terminal to retire through `setModeBoundedWhen()` and its
+  ambient asynchronous callback. The V2 terminal deliberately closes through the exact phase projector, so
+  the failure-first check is inverted: invoking that legacy async tail is now a failure.
+- B11 still expected V2 to populate the legacy learn-move forward-in-flight registry. The exact projected phase
+  and public panel were demonstrably parked until their immutable commit; the legacy registry must remain
+  empty after the single-projector cutover. The assertion now binds that intended architecture.
+- The nine `ab-attrs.ts` override diagnostics share one cause: merged feat added optional `useMode` without the
+  explicit `| undefined` required by the repository's exact-optional parameter contract. The other two merged
+  diagnostics are a missing non-null guard around the Superego WeakMap value. Both production typing repairs
+  are narrowly scoped and preserve runtime behavior.
+- Local Biome inspection itself hit the known Windows worker stack-overflow before producing a verdict. No
+  local co-op, Vitest, Chromium, or compilation run was performed. The repaired exact SHA will be verified by
+  the remote full gate.

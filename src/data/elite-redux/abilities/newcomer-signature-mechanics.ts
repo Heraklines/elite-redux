@@ -1315,7 +1315,7 @@ export function snapshotNewcomerSignatureMechanics(pokemon: Pokemon): NewcomerSi
     ]);
   }
   const superego = SUPEREGO_TURN.get(pokemon);
-  if (superego?.size > 0) {
+  if (superego != null && superego.size > 0) {
     add("superego", [["usedStats", [...superego.entries()].map(([stat, turn]) => `${stat}:${turn}`).join(",")]]);
   }
   return snapshots;

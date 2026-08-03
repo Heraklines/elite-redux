@@ -984,7 +984,16 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
   assert.match(exp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "field"/u);
   assert.match(partyExp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "party"/u);
   assert.match(levelUp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "levelUp"/u);
-  assert.match(evolution, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "evolution"/u);
+  assert.match(
+    evolution,
+    /const presentation = \{[\s\S]+k: "evolution"[\s\S]+prePokemon:[\s\S]+postPokemon:[\s\S]+as const satisfies Extract<CoopWaveProgressionPresentationV2/u,
+    "evolution captures one complete immutable presentation result before either consumer can act",
+  );
+  assert.match(
+    evolution,
+    /recordCoopWaveProgressionPresentation\(presentation, this\.coopOwningRuntime\);[\s\S]+this\.coopSettleRewardEvolution\([\s\S]+presentation,/u,
+    "the presentation recorder and retained interaction settlement consume the same typed result",
+  );
   assert.match(runtime, /progression,[\s\S]+commitHostWave/u);
   const replayGate = runtime.indexOf("if (!transaction.progressionReady)");
   const stateApply = runtime.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)", replayGate);

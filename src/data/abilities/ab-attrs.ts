@@ -723,7 +723,7 @@ export interface PostMoveInteractionAbAttrParams extends AugmentMoveInteractionA
   /** The amount of damage dealt in the interaction. */
   readonly damage: number;
   /** How the triggering move was executed (normal input, automatic indirect move, etc.). */
-  readonly useMode?: MoveUseMode;
+  readonly useMode?: MoveUseMode | undefined;
 }
 
 export class PostDefendAbAttr extends AbAttr {

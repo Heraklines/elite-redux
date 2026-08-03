@@ -1114,14 +1114,14 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       );
     });
     const guestSetModeBoundedWhen = rig.guestScene.ui.setModeBoundedWhen.bind(rig.guestScene.ui);
-    let guestTerminalAmbientInverted = false;
+    let guestTerminalUsedAsyncModeTail = false;
     const guestTerminalSpy = vi.spyOn(rig.guestScene.ui, "setModeBoundedWhen").mockImplementation((...args) =>
       guestSetModeBoundedWhen(...args).then(result => {
-        // FAILURE-FIRST: a two-engine callback can resume after the harness restored the peer browser's
-        // globals. The terminal must park until its captured guest runtime/scene pair is active again.
+        // A V2 exact terminal must not route through this obsolete async UI tail: the Authority V2
+        // projector owns phase retirement and its captured runtime/scene pair synchronously.
         initGlobalScene(rig.hostScene);
         setCoopRuntime(rig.hostRuntime);
-        guestTerminalAmbientInverted = true;
+        guestTerminalUsedAsyncModeTail = true;
         return result;
       }),
     );
@@ -1138,9 +1138,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     guestTerminalSpy.mockRestore();
     offSpy();
     expect(
-      guestTerminalAmbientInverted,
-      "the single-move terminal resumes under the peer ambient before its captured runtime reactivates",
-    ).toBe(true);
+      guestTerminalUsedAsyncModeTail,
+      "the single-move V2 terminal cannot delegate phase retirement to an ambient async UI callback",
+    ).toBe(false);
     expect(v2PromptCommitted, "the forget prompt entered the immutable V2 log (never legacy-only)").toBe(true);
     expect(v2DecisionCommitted, "the host retained the complete immutable learn-move decision").toBe(true);
     expect(hostRawResults, "the authority emitted no legacy result carrier after V2 cutover").toBe(0);
