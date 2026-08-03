@@ -335,6 +335,62 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
         self.assertEqual(batch["historyStepMask"].tolist(), [[False, False], [False, True], [True, True]])
         self.assertEqual(batch["historyChosen"].tolist(), [[0, 0], [0, 0], [0, 1]])
 
+    def test_v4_battle_terminals_reset_history_and_control_policy_weight(self) -> None:
+        candidates = [{"id": "move:a", "kind": "move"}]
+        token_rows = [{
+            "candidateId": "move:a",
+            "groups": {
+                "actor": [],
+                "targets": [],
+                "destination": [],
+                "field": [],
+                "action": ["action:move"],
+            },
+        }]
+
+        def decision(battle_id: str, turn: int) -> dict:
+            return {
+                "decisionId": f"{battle_id}:{turn}:0",
+                "jointActionId": f"{battle_id}:{turn}",
+                "episodeId": "one-run",
+                "sourcePartitionId": "one-player",
+                "policySource": "human-v1",
+                "policyTarget": True,
+                "candidates": candidates,
+                "candidateFeatures": [{"candidateId": "move:a", "values": [float(turn)]}],
+                "candidateTokenGroups": token_rows,
+                "chosenCandidateId": "move:a",
+            }
+
+        won_battle = "one-run:17:won"
+        lost_battle = "one-run:18:lost"
+        incomplete_battle = "one-run:19:incomplete"
+        decisions = [
+            decision(won_battle, 1),
+            decision(won_battle, 2),
+            decision(lost_battle, 1),
+            decision(incomplete_battle, 1),
+        ]
+        terminals = [
+            {"battleId": won_battle, "outcome": "victory"},
+            {"battleId": lost_battle, "outcome": "defeat"},
+        ]
+        _, token_to_id = build_token_vocabulary(decisions, {})
+        examples = make_examples(
+            decisions,
+            terminals,
+            loss_policy_weight=0.25,
+            token_to_id=token_to_id,
+            history_length=2,
+            terminal_scope="battle",
+        )
+
+        self.assertEqual([len(example.history) for example in examples], [0, 1, 0, 0])
+        self.assertEqual([example.terminal_value for example in examples], [1.0, 1.0, 0.0, None])
+        self.assertEqual([example.policy_weight for example in examples], [1.0, 1.0, 0.25, 0.0])
+        batch = collate(examples, history_length=2)
+        self.assertEqual(batch["valueMask"].tolist(), [True, True, True, False])
+
     def test_transfer_loader_preserves_domain_and_feature_presence(self) -> None:
         groups = {"actor": ["domain:showdown"], "targets": [], "destination": [], "field": [], "action": ["action:move"]}
         record = {

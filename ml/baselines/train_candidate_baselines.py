@@ -50,6 +50,16 @@ def record_policy_source(record: dict[str, Any]) -> str:
     return str(record.get("policySource", record.get("sourcePolicy", "unknown")))
 
 
+def record_battle_id(record: dict[str, Any]) -> str | None:
+    explicit = record.get("battleId")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    joint_action_id = record.get("jointActionId")
+    if isinstance(joint_action_id, str) and ":" in joint_action_id:
+        return joint_action_id.rsplit(":", 1)[0]
+    return None
+
+
 def is_policy_target(record: dict[str, Any]) -> bool:
     source = record_policy_source(record)
     if source in NON_POLICY_TARGET_SOURCES:
@@ -130,6 +140,70 @@ def load_records(
     return decisions, terminals
 
 
+def load_policy_trajectory_records(
+    path: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+    """Load ER policy rows with battle terminals when available, else legacy run terminals."""
+    decisions: list[dict[str, Any]] = []
+    run_terminals: list[dict[str, Any]] = []
+    battle_terminals: list[dict[str, Any]] = []
+    for file in jsonl_files(path):
+        with file.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                if record.get("schemaVersion") not in SUPPORTED_SCHEMA_VERSIONS:
+                    raise ValueError(f"{file}:{line_number}: unsupported schema version")
+                kind = record.get("kind")
+                if kind == "combat_decision":
+                    validate_decision(record, file, line_number)
+                    decisions.append(record)
+                elif kind in ("episode_terminal", "run_terminal"):
+                    run_terminals.append(record)
+                elif kind == "battle_terminal":
+                    battle_terminals.append(record)
+                elif kind in ("combat_auxiliary_decision", "combat_transition"):
+                    continue
+                else:
+                    raise ValueError(f"{file}:{line_number}: unknown record kind")
+    if not decisions:
+        raise ValueError(f"no combat decisions found under {path}")
+    dataset_schema_versions(decisions)
+    validate_dataset(decisions, [], require_terminals=False)
+    if not battle_terminals:
+        validate_dataset(decisions, run_terminals)
+        return decisions, run_terminals, "episode"
+
+    terminal_by_battle = {record_battle_id(record): record for record in battle_terminals}
+    if None in terminal_by_battle or len(terminal_by_battle) != len(battle_terminals):
+        raise ValueError("dataset contains missing or duplicate battle terminal ids")
+    decisions_by_battle: dict[str, set[str]] = defaultdict(set)
+    for decision in decisions:
+        battle_id = record_battle_id(decision)
+        if battle_id is None:
+            raise ValueError(f"decision {decision['decisionId']} has no stable battle identity")
+        decisions_by_battle[battle_id].add(decision["episodeId"])
+    inconsistent = sorted(
+        battle_id for battle_id, episodes in decisions_by_battle.items() if len(episodes) != 1
+    )
+    if inconsistent:
+        raise ValueError(f"battle ids map to multiple episodes: {inconsistent}")
+    mismatched = sorted(
+        battle_id
+        for battle_id, terminal in terminal_by_battle.items()
+        if battle_id in decisions_by_battle
+        and terminal.get("episodeId") not in decisions_by_battle[battle_id]
+    )
+    if mismatched:
+        raise ValueError(f"battle terminal episode mismatch: {mismatched}")
+    for identity in ("buildSha", "dexHash", "dictionaryHash"):
+        values = {record.get(identity) for record in decisions + battle_terminals}
+        if len(values) != 1 or None in values or "unknown" in values:
+            raise ValueError(f"dataset must have one known {identity}, found {sorted(map(str, values))}")
+    return decisions, battle_terminals, "battle"
+
+
 def load_winner_policy_records(
     path: Path,
     max_policy_decisions: int | None = None,
@@ -199,12 +273,12 @@ def load_winner_policy_records(
                 if winner_scope == "run":
                     selected_winner = record.get("episodeId") in winning_episodes
                 else:
-                    joint_action_id = record.get("jointActionId")
-                    if not isinstance(joint_action_id, str) or ":" not in joint_action_id:
+                    battle_id = record_battle_id(record)
+                    if battle_id is None:
                         raise ValueError(
                             f"{file}:{line_number}: battle winner selection requires a joint action id"
                         )
-                    selected_winner = joint_action_id.rsplit(":", 1)[0] in winning_battles
+                    selected_winner = battle_id in winning_battles
                 if not selected_winner:
                     continue
                 winning_policy_target_decisions += 1
@@ -242,9 +316,9 @@ def load_winner_policy_records(
         require_terminals=winner_scope == "run",
     )
     selected_battles = {
-        record["jointActionId"].rsplit(":", 1)[0]
+        record_battle_id(record)
         for record in decisions
-        if isinstance(record.get("jointActionId"), str)
+        if record_battle_id(record) is not None
     }
     return decisions, selected_terminals, {
         "winnerScope": winner_scope,
@@ -508,28 +582,40 @@ def validate_data_dictionary(
 
 
 def select_elite_rollouts(
-    decisions: list[dict[str, Any]], terminals: list[dict[str, Any]]
+    decisions: list[dict[str, Any]],
+    terminals: list[dict[str, Any]],
+    terminal_scope: str = "episode",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    terminal_by_episode = {record["episodeId"]: record for record in terminals}
-    rollout_episodes = {
-        record["episodeId"] for record in decisions if record_policy_source(record) == ROLLOUT_POLICY
+    if terminal_scope not in ("episode", "battle"):
+        raise ValueError(f"unsupported terminal scope {terminal_scope}")
+
+    def identity(record: dict[str, Any]) -> str | None:
+        return record.get("episodeId") if terminal_scope == "episode" else record_battle_id(record)
+
+    terminal_by_identity = {identity(record): record for record in terminals}
+    if None in terminal_by_identity or len(terminal_by_identity) != len(terminals):
+        raise ValueError(f"dataset contains missing or duplicate {terminal_scope} terminals")
+    rollout_identities = {
+        identity(record) for record in decisions if record_policy_source(record) == ROLLOUT_POLICY
     }
     successful = {
-        episode
-        for episode in rollout_episodes
-        if terminal_by_episode[episode]["outcome"] in SUCCESSFUL_ROLLOUT_OUTCOMES
+        key
+        for key in rollout_identities
+        if key in terminal_by_identity
+        and terminal_by_identity[key]["outcome"] in SUCCESSFUL_ROLLOUT_OUTCOMES
     }
     selected = [
         record
         for record in decisions
-        if record_policy_source(record) != ROLLOUT_POLICY or record["episodeId"] in successful
+        if record_policy_source(record) != ROLLOUT_POLICY or identity(record) in successful
     ]
     if not selected:
         raise ValueError("elite rollout selection removed every decision")
     return selected, {
-        "episodes": len(rollout_episodes),
+        "terminalScope": terminal_scope,
+        "episodes": len(rollout_identities),
         "successfulEpisodes": len(successful),
-        "successRate": len(successful) / len(rollout_episodes) if rollout_episodes else None,
+        "successRate": len(successful) / len(rollout_identities) if rollout_identities else None,
         "decisionsBeforeSelection": len(decisions),
         "decisionsAfterSelection": len(selected),
     }

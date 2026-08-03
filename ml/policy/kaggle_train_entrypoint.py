@@ -146,14 +146,15 @@ def verify_bundle(bundle_root: Path) -> dict[str, object]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     expected_versions = {
         "schemaVersion": 1,
-        "contractSchemaVersion": 3,
-        "featureSchemaVersion": 2,
         "dictionarySchemaVersion": 3,
         "neuralArtifactSchemaVersion": 4,
     }
     for key, expected in expected_versions.items():
         if manifest.get(key) != expected:
             raise RuntimeError(f"training bundle {key} must be {expected}, got {manifest.get(key)!r}")
+    contract_identity = (manifest.get("contractSchemaVersion"), manifest.get("featureSchemaVersion"))
+    if contract_identity not in {(3, 2), (4, 4)}:
+        raise RuntimeError(f"unsupported training bundle contract identity {contract_identity}")
     files = manifest.get("files")
     if not isinstance(files, list) or not files:
         raise RuntimeError("training bundle manifest has no files")
@@ -201,6 +202,7 @@ def build_training_command(
     init_model_dir: Path | None = None,
 ) -> list[str]:
     dictionary = bundle_root / "dictionary" / "er-combat-data-dictionary.json"
+    dictionary_supplement = bundle_root / "dictionary" / "runtime-item-dictionary-supplement.json"
     data_dir = bundle_root / "data"
     trainer = bundle_root / "ml" / "policy" / "train_candidate_transformer.py"
     seed_output = output_root / f"seed-{seed}"
@@ -239,6 +241,8 @@ def build_training_command(
         str(profile["trajectory_layers"]),
         "--fast-kernels",
     ]
+    if dictionary_supplement.is_file():
+        command.extend(["--dictionary-supplement", str(dictionary_supplement)])
     if init_model_dir is None:
         command.append("--amp")
     if transfer_data is not None:

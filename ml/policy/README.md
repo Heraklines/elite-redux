@@ -1,8 +1,8 @@
 # ER candidate-transformer policy
 
 This directory contains the non-production neural combat baseline. It consumes
-the exact legal candidate rows recorded by combat contract v3 / feature schema
-v2, learns a listwise policy over each candidate set, and learns a terminal
+the exact legal candidate rows recorded by combat contract v3/v4 and their
+matching feature schema v2/v4, learns a listwise policy over each candidate set, and learns a terminal
 battle-value auxiliary target. A causal trajectory encoder also conditions each
 decision on the last eight actions actually chosen in the current battle; early
 turns use an explicit pre-episode token rather than fabricated history.
@@ -32,8 +32,9 @@ persistent JSONL sidecar. This path exists only for training and evaluation:
 production, staging, Showdown, tournaments, and the browser game do not load the
 checkpoint or Torch.
 
-The sidecar rejects artifacts unless contract schema 3, feature schema 2,
-artifact schema 4, all five token roles, both declared domains, the dictionary hash, and the token
+The sidecar rejects artifacts unless the contract/feature pair is v3/v2 or
+v4/v4 and the artifact uses schema 4, all five token roles, both declared
+domains, the dictionary hash, and the token
 vocabulary hash match. Old dense-only checkpoints are intentionally
 incompatible.
 

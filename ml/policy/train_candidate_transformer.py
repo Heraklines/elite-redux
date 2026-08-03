@@ -29,13 +29,13 @@ BASELINE_DIR = POLICY_DIR.parent / "baselines"
 sys.path.insert(0, str(BASELINE_DIR))
 
 from train_candidate_baselines import (  # noqa: E402
-    FEATURE_SCHEMA_VERSION,
-    SCHEMA_VERSION,
     TOKEN_GROUP_NAMES,
+    dataset_schema_versions,
     embedded_candidate_features,
     is_policy_target,
     jsonl_files,
-    load_records,
+    load_policy_trajectory_records,
+    record_battle_id,
     record_policy_source,
     record_split_group,
     record_source_partition,
@@ -52,7 +52,7 @@ from candidate_transformer import (  # noqa: E402
 )
 
 WIN_OUTCOMES = {"victory", "max-waves"}
-LOSS_OUTCOMES = {"player-wiped"}
+LOSS_OUTCOMES = {"defeat", "player-wiped"}
 PAD_TOKEN = "<PAD>"
 UNKNOWN_TOKEN = "<UNK>"
 DOMAIN_NAMES = ("elite-redux", "showdown")
@@ -365,12 +365,23 @@ def make_examples(
     token_to_id: dict[str, int],
     history_length: int = 8,
     full_feature_count: int | None = None,
+    terminal_scope: str = "episode",
+    unknown_policy_weight: float = 0.0,
 ) -> list[DecisionExample]:
     if history_length < 0:
         raise ValueError("history_length must be non-negative")
-    terminal_by_episode = {terminal["episodeId"]: terminal for terminal in terminals}
+    if terminal_scope not in ("episode", "battle"):
+        raise ValueError(f"unsupported terminal scope {terminal_scope}")
+    if not 0.0 <= unknown_policy_weight <= 1.0:
+        raise ValueError("unknown policy weight must be between 0 and 1")
+    terminal_by_key: dict[str, dict[str, Any]] = {}
+    for terminal in terminals:
+        key = terminal.get("episodeId") if terminal_scope == "episode" else record_battle_id(terminal)
+        if not isinstance(key, str) or not key or key in terminal_by_key:
+            raise ValueError(f"terminal dataset has a missing or duplicate {terminal_scope} identity")
+        terminal_by_key[key] = terminal
     examples: list[DecisionExample] = []
-    history_by_episode: dict[str, list[DecisionState]] = {}
+    history_by_trajectory: dict[str, list[DecisionState]] = {}
     for decision in decisions:
         candidates = decision["candidates"]
         feature_rows = {row["candidateId"]: row for row in decision["candidateFeatures"]}
@@ -398,8 +409,22 @@ def make_examples(
         chosen_index = next(
             index for index, candidate in enumerate(candidates) if candidate["id"] == decision["chosenCandidateId"]
         )
-        value = terminal_value(terminal_by_episode[decision["episodeId"]])
-        outcome_weight = 1.0 if value == 1.0 else loss_policy_weight if value == 0.0 else 0.5
+        trajectory_key = (
+            decision["episodeId"]
+            if terminal_scope == "episode"
+            else record_battle_id(decision)
+        )
+        if not isinstance(trajectory_key, str) or not trajectory_key:
+            raise ValueError(f"decision {decision['decisionId']} has no {terminal_scope} identity")
+        terminal = terminal_by_key.get(trajectory_key)
+        value = terminal_value(terminal) if terminal is not None else None
+        outcome_weight = (
+            1.0
+            if value == 1.0
+            else loss_policy_weight
+            if value == 0.0
+            else unknown_policy_weight
+        )
         weight = outcome_weight if is_policy_target(decision) else 0.0
         tokens_by_candidate = {row["candidateId"]: row["groups"] for row in decision["candidateTokenGroups"]}
         candidate_token_ids = [
@@ -421,7 +446,7 @@ def make_examples(
             chosen_index=chosen_index,
             domain_id=domain_id,
         )
-        episode_history = history_by_episode.setdefault(decision["episodeId"], [])
+        trajectory_history = history_by_trajectory.setdefault(trajectory_key, [])
         examples.append(
             DecisionExample(
                 decision_id=decision["decisionId"],
@@ -437,10 +462,10 @@ def make_examples(
                 domain_id=domain_id,
                 terminal_value=value,
                 policy_weight=weight,
-                history=tuple(episode_history[-history_length:]) if history_length else (),
+                history=tuple(trajectory_history[-history_length:]) if history_length else (),
             )
         )
-        episode_history.append(state)
+        trajectory_history.append(state)
     return examples
 
 
@@ -779,15 +804,40 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.transfer_pretrain_epochs < 0:
         raise ValueError("--transfer-pretrain-epochs must be non-negative")
     set_determinism(args.seed, args.fast_kernels)
-    er_decisions, er_terminals = load_records(args.data)
-    dictionary_coverage = validate_data_dictionary(args.dictionary, er_decisions)
+    if not 0.0 <= args.unknown_policy_weight <= 1.0:
+        raise ValueError("--unknown-policy-weight must be between 0 and 1")
+    er_decisions, er_terminals, er_terminal_scope = load_policy_trajectory_records(args.data)
+    contract_schema_version, feature_schema_version = dataset_schema_versions(er_decisions)
+    dictionary_coverage = validate_data_dictionary(
+        args.dictionary,
+        er_decisions,
+        args.dictionary_supplement,
+    )
     dictionary = json.loads(args.dictionary.read_text(encoding="utf-8"))
     feature_names = dictionary["features"]["names"]
     rollout_selection: dict[str, Any] | None = None
     if args.elite_rollouts:
-        er_decisions, rollout_selection = select_elite_rollouts(er_decisions, er_terminals)
-        selected_episodes = {decision["episodeId"] for decision in er_decisions}
-        er_terminals = [terminal for terminal in er_terminals if terminal["episodeId"] in selected_episodes]
+        er_decisions, rollout_selection = select_elite_rollouts(
+            er_decisions,
+            er_terminals,
+            er_terminal_scope,
+        )
+        selected_terminal_ids = {
+            decision["episodeId"]
+            if er_terminal_scope == "episode"
+            else record_battle_id(decision)
+            for decision in er_decisions
+        }
+        er_terminals = [
+            terminal
+            for terminal in er_terminals
+            if (
+                terminal["episodeId"]
+                if er_terminal_scope == "episode"
+                else record_battle_id(terminal)
+            )
+            in selected_terminal_ids
+        ]
     feature_count = len(er_decisions[0]["candidateFeatures"][0]["values"])
     if feature_count != len(feature_names):
         raise ValueError("ER decision width does not match the dictionary feature-name contract")
@@ -796,7 +846,6 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.transfer_data is not None:
         transfer_decisions, transfer_terminals = load_transfer_records(args.transfer_data, feature_names)
     decisions = er_decisions + transfer_decisions
-    terminals = er_terminals + transfer_terminals
     required_vocabulary, _ = build_token_vocabulary(decisions, dictionary)
     initial_config = load_initial_model_config(args.init_model_dir) if args.init_model_dir is not None else None
     fixed_vocabulary_path = (
@@ -817,16 +866,31 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     )
     token_to_id = {token: index for index, token in enumerate(token_vocabulary)}
     token_vocabulary_sha256 = vocabulary_hash(token_vocabulary)
-    examples = make_examples(
-        decisions,
-        terminals,
+    er_examples = make_examples(
+        er_decisions,
+        er_terminals,
         args.loss_policy_weight,
         token_to_id,
         args.history_length,
         feature_count,
+        terminal_scope=er_terminal_scope,
+        unknown_policy_weight=args.unknown_policy_weight,
     )
-    er_examples = [example for example in examples if example.domain_id == DOMAIN_TO_ID["elite-redux"]]
-    transfer_examples = [example for example in examples if example.domain_id != DOMAIN_TO_ID["elite-redux"]]
+    transfer_examples = (
+        make_examples(
+            transfer_decisions,
+            transfer_terminals,
+            args.loss_policy_weight,
+            token_to_id,
+            args.history_length,
+            feature_count,
+            terminal_scope="episode",
+            unknown_policy_weight=args.unknown_policy_weight,
+        )
+        if transfer_decisions
+        else []
+    )
+    examples = er_examples + transfer_examples
     train_partition_ids, validation_partition_ids = split_groups(
         [example.source_partition_id for example in er_examples],
         args.seed,
@@ -991,8 +1055,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         metadata={
             "model": "er-domain-candidate-transformer-v4",
             "schemaVersion": "4",
-            "contractSchemaVersion": str(SCHEMA_VERSION),
-            "featureSchemaVersion": str(FEATURE_SCHEMA_VERSION),
+            "contractSchemaVersion": str(contract_schema_version),
+            "featureSchemaVersion": str(feature_schema_version),
             "tokenVocabularySha256": token_vocabulary_sha256,
         },
     )
@@ -1003,8 +1067,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schemaVersion": 4,
         "model": "er-domain-candidate-transformer-v4",
-        "contractSchemaVersion": SCHEMA_VERSION,
-        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "contractSchemaVersion": contract_schema_version,
+        "featureSchemaVersion": feature_schema_version,
         "architecture": asdict(config),
         "tokenGroups": list(TOKEN_GROUP_NAMES),
         "domains": list(DOMAIN_NAMES),
@@ -1022,6 +1086,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "objective": {
             "policy": "trajectory-conditioned listwise candidate cross entropy",
             "lossEpisodePolicyWeight": args.loss_policy_weight,
+            "unknownOutcomePolicyWeight": args.unknown_policy_weight,
+            "erTerminalScope": er_terminal_scope,
             "transferMode": args.transfer_mode if transfer_examples else None,
             "transferPretrainEpochs": args.transfer_pretrain_epochs if pretrain_loader is not None else 0,
             "value": "battle terminal binary cross entropy",
@@ -1043,7 +1109,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "policyTargetDecisions": sum(is_policy_target(decision) for decision in decisions),
             "excludedPolicyDecisions": sum(not is_policy_target(decision) for decision in decisions),
             "terminalOutcomes": dict(
-                Counter(terminal.get("outcome", f'value:{terminal.get("value")}') for terminal in terminals)
+                Counter(
+                    terminal.get("outcome", f'value:{terminal.get("value")}')
+                    for terminal in er_terminals + transfer_terminals
+                )
             ),
             "rolloutSelection": rollout_selection,
             "identity": identity,
@@ -1061,8 +1130,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     config_payload = {
         "schemaVersion": 4,
         "model": report["model"],
-        "contractSchemaVersion": SCHEMA_VERSION,
-        "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+        "contractSchemaVersion": contract_schema_version,
+        "featureSchemaVersion": feature_schema_version,
         "architecture": asdict(config),
         "dictionaryHash": dictionary_coverage["sha256"],
         "tokenGroups": list(TOKEN_GROUP_NAMES),
@@ -1089,6 +1158,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transfer-pretrain-epochs", type=int, default=8)
     parser.add_argument("--dictionary", type=Path, required=True)
     parser.add_argument(
+        "--dictionary-supplement",
+        type=Path,
+        help="hash-bound runtime dictionary additions for generated combat ids",
+    )
+    parser.add_argument(
         "--token-vocabulary",
         type=Path,
         help="optional fixed vocabulary/config used to keep transfer ablations architecture-matched",
@@ -1114,6 +1188,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.0,
         help="policy loss weight for losing episodes; losses still train the value head",
+    )
+    parser.add_argument(
+        "--unknown-policy-weight",
+        type=float,
+        default=0.0,
+        help="policy loss weight for incomplete, capture, flee, or otherwise unlabelled battles",
     )
     parser.add_argument(
         "--elite-rollouts",

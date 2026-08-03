@@ -12,12 +12,14 @@ from train_candidate_baselines import (
     dataset_schema_versions,
     fit_stacked_tree_ensemble,
     is_policy_target,
+    load_policy_trajectory_records,
     load_records,
     load_winner_policy_records,
     make_rows,
     ordered_group_sizes,
     record_split_group,
     record_source_partition,
+    record_battle_id,
     select_training_decisions,
     select_elite_rollouts,
     split_groups,
@@ -77,6 +79,82 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertEqual(decisions, [decision])
         self.assertEqual(terminals, [])
         self.assertEqual(dataset_schema_versions(decisions), (4, 4))
+
+    def test_policy_trajectory_loader_prefers_battle_terminals_and_stable_ids(self) -> None:
+        def decision(battle_id: str, turn: int) -> dict:
+            candidate_id = f"move:{turn}"
+            return {
+                "schemaVersion": 4,
+                "featureSchemaVersion": 4,
+                "kind": "combat_decision",
+                "candidateScope": "combat-command",
+                "episodeId": "run-a",
+                "jointActionId": f"{battle_id}:{turn}",
+                "decisionId": f"{battle_id}:{turn}:0",
+                "buildSha": "build",
+                "dexHash": "dex",
+                "dictionaryHash": "dictionary",
+                "sourcePartitionId": "account-a",
+                "policySource": "human-v1",
+                "policyTarget": True,
+                "candidates": [{"id": candidate_id}],
+                "chosenCandidateId": candidate_id,
+                "candidateFeatures": [{"candidateId": candidate_id, "values": [0.0]}],
+                "candidateTokenGroups": [{
+                    "candidateId": candidate_id,
+                    "groups": {
+                        "actor": [],
+                        "targets": [],
+                        "destination": [],
+                        "field": [],
+                        "action": [candidate_id],
+                    },
+                }],
+                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+            }
+
+        first_battle = "run-a:17:first"
+        second_battle = "run-a:18:second"
+        rows = [
+            decision(first_battle, 1),
+            decision(second_battle, 1),
+            *[
+                {
+                    "schemaVersion": 4,
+                    "kind": "battle_terminal",
+                    "episodeId": "run-a",
+                    "battleId": battle_id,
+                    "outcome": outcome,
+                    "buildSha": "build",
+                    "dexHash": "dex",
+                    "dictionaryHash": "dictionary",
+                }
+                for battle_id, outcome in ((first_battle, "victory"), (second_battle, "defeat"))
+            ],
+            *[
+                {
+                    "schemaVersion": 4,
+                    "kind": "run_terminal",
+                    "episodeId": "run-a",
+                    "outcome": outcome,
+                    "buildSha": "build",
+                    "dexHash": "dex",
+                    "dictionaryHash": "dictionary",
+                }
+                for outcome in ("player-wiped", "abandonment")
+            ],
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract-v4.jsonl"
+            path.write_text("".join(f"{json.dumps(row)}\n" for row in rows), encoding="utf-8")
+            decisions, terminals, scope = load_policy_trajectory_records(path)
+
+        self.assertEqual(scope, "battle")
+        self.assertEqual(len(decisions), 2)
+        self.assertEqual([terminal["outcome"] for terminal in terminals], ["victory", "defeat"])
+        self.assertEqual(record_battle_id(decisions[0]), first_battle)
+        self.assertEqual(record_battle_id(terminals[1]), second_battle)
 
     def test_engine_and_heuristic_rows_are_not_policy_targets(self) -> None:
         self.assertFalse(is_policy_target({"policySource": "engine-hardest-v1", "policyTarget": False}))

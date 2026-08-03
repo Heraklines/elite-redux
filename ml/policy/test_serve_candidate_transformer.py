@@ -16,7 +16,11 @@ from serve_candidate_transformer import load_bundle, load_ensemble, score_candid
 
 
 class CandidateTransformerSidecarTests(unittest.TestCase):
-    def make_bundle(self, root: Path) -> CandidateSetTransformer:
+    def make_bundle(
+        self,
+        root: Path,
+        contract_identity: tuple[int, int] = (3, 2),
+    ) -> CandidateSetTransformer:
         config = CandidateTransformerConfig(
             feature_count=4,
             token_vocabulary_size=4,
@@ -36,8 +40,8 @@ class CandidateTransformerSidecarTests(unittest.TestCase):
                 {
                     "schemaVersion": 4,
                     "model": "er-domain-candidate-transformer-v4",
-                    "contractSchemaVersion": 3,
-                    "featureSchemaVersion": 2,
+                    "contractSchemaVersion": contract_identity[0],
+                    "featureSchemaVersion": contract_identity[1],
                     "architecture": asdict(config),
                     "dictionaryHash": "a" * 64,
                     "tokenGroups": ["actor", "targets", "destination", "field", "action"],
@@ -65,6 +69,20 @@ class CandidateTransformerSidecarTests(unittest.TestCase):
             self.assertEqual(len(scores), 2)
             self.assertGreaterEqual(value, 0.0)
             self.assertLessEqual(value, 1.0)
+
+    def test_loads_contract_v4_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.make_bundle(root, (4, 4))
+            bundle = load_bundle(root)
+            self.assertEqual((bundle.contract_schema_version, bundle.feature_schema_version), (4, 4))
+
+    def test_rejects_unsupported_contract_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.make_bundle(root, (4, 2))
+            with self.assertRaisesRegex(ValueError, "unsupported contract/feature schema pair"):
+                load_bundle(root)
 
     def test_rejects_wrong_feature_width(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -126,6 +144,10 @@ class CandidateTransformerSidecarTests(unittest.TestCase):
                 groups,
             )
             self.assertEqual(manifest["members"], ["seed-1", "seed-2"])
+            self.assertEqual(
+                (manifest["contractSchemaVersion"], manifest["featureSchemaVersion"]),
+                (3, 2),
+            )
             self.assertEqual(len(models), 2)
             self.assertEqual(len(scores), 2)
             self.assertGreaterEqual(value, 0.0)

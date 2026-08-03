@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import process from "node:process";
+import { createInterface } from "node:readline";
 import JSZip from "jszip";
 
 const [
@@ -76,6 +78,39 @@ async function walk(directory) {
   return files;
 }
 
+async function readCombatContractIdentity(paths) {
+  const ordered = [...paths].sort((left, right) => {
+    const leftPolicy = basename(left).includes("policy") ? 0 : 1;
+    const rightPolicy = basename(right).includes("policy") ? 0 : 1;
+    return leftPolicy - rightPolicy || left.localeCompare(right);
+  });
+  for (const path of ordered) {
+    const stream = createReadStream(path, { encoding: "utf8" });
+    const lines = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
+    try {
+      for await (const line of lines) {
+        if (!line.trim()) {
+          continue;
+        }
+        const record = JSON.parse(line);
+        if (record.kind !== "combat_decision") {
+          continue;
+        }
+        const contractSchemaVersion = Number(record.schemaVersion);
+        const featureSchemaVersion = Number(record.featureSchemaVersion);
+        if (!Number.isInteger(contractSchemaVersion) || !Number.isInteger(featureSchemaVersion)) {
+          throw new Error(`combat decision has an invalid contract identity in ${path}`);
+        }
+        return { contractSchemaVersion, featureSchemaVersion };
+      }
+    } finally {
+      lines.close();
+      stream.destroy();
+    }
+  }
+  throw new Error(`no combat_decision record found under ${dataRoot}`);
+}
+
 function portableRelative(parent, child) {
   return relative(parent, child).split(sep).join("/");
 }
@@ -124,6 +159,18 @@ const transferPaths = transferRoot
 if (transferRoot && transferPaths.length === 0) {
   throw new Error(`no JSONL transfer shards found under ${transferRoot}`);
 }
+const contractIdentity = await readCombatContractIdentity(decisionPaths);
+const parsedDictionary = JSON.parse(await readFile(dictionaryPath, "utf8"));
+if (parsedDictionary?.features?.schemaVersion !== contractIdentity.featureSchemaVersion) {
+  throw new Error(
+    `dictionary feature schema ${parsedDictionary?.features?.schemaVersion} does not match `
+      + `combat data ${contractIdentity.featureSchemaVersion}`,
+  );
+}
+const supplementPath = resolve(dataRoot, "runtime-item-dictionary-supplement.json");
+const hasDictionarySupplement = await stat(supplementPath)
+  .then(entry => entry.isFile())
+  .catch(() => false);
 
 const zip = new JSZip();
 const manifestFiles = [];
@@ -146,6 +193,15 @@ manifestFiles.push({
   bytes: dictionary.length,
   sha256: sha256(dictionary),
 });
+if (hasDictionarySupplement) {
+  const supplement = await readFile(supplementPath);
+  zip.file("dictionary/runtime-item-dictionary-supplement.json", supplement);
+  manifestFiles.push({
+    path: "dictionary/runtime-item-dictionary-supplement.json",
+    bytes: supplement.length,
+    sha256: sha256(supplement),
+  });
+}
 if (tokenVocabularyPath) {
   const vocabulary = await readFile(tokenVocabularyPath);
   zip.file("vocabulary/token-vocabulary.json", vocabulary);
@@ -169,8 +225,7 @@ for (const path of sourcePaths) {
 }
 const manifest = {
   schemaVersion: 1,
-  contractSchemaVersion: 3,
-  featureSchemaVersion: 2,
+  ...contractIdentity,
   dictionarySchemaVersion: 3,
   neuralArtifactSchemaVersion: 4,
   trainingProfile,
@@ -182,6 +237,7 @@ const manifest = {
   transferPretrainEpochs: transferPaths.length > 0 ? transferPretrainEpochs : 0,
   fixedTokenVocabulary: tokenVocabularyPath ? basename(tokenVocabularyPath) : null,
   initialModel: initModelRoot ? basename(initModelRoot) : null,
+  dictionarySupplement: hasDictionarySupplement ? "runtime-item-dictionary-supplement.json" : null,
   files: manifestFiles.sort((a, b) => a.path.localeCompare(b.path)),
 };
 zip.file("bundle-manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);

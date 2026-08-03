@@ -82,7 +82,7 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
         self.assertNotIn("--amp", command)
         self.assertNotIn("--transfer-data", command)
 
-    def write_bundle(self, root: Path) -> None:
+    def write_bundle(self, root: Path, contract_identity: tuple[int, int] = (3, 2)) -> None:
         payload = root / "data" / "decisions.jsonl"
         payload.parent.mkdir(parents=True)
         payload.write_text('{"decisionId":"one"}\n', encoding="utf-8")
@@ -91,8 +91,8 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
             json.dumps(
                 {
                     "schemaVersion": 1,
-                    "contractSchemaVersion": 3,
-                    "featureSchemaVersion": 2,
+                    "contractSchemaVersion": contract_identity[0],
+                    "featureSchemaVersion": contract_identity[1],
                     "dictionarySchemaVersion": 3,
                     "neuralArtifactSchemaVersion": 4,
                     "trainingProfile": "smoke",
@@ -118,6 +118,26 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
             self.assertEqual(manifest["trainingProfile"], "smoke")
             self.assertTrue(description.startswith("directory:"))
             self.assertTrue((root / "working" / "data" / "decisions.jsonl").is_file())
+
+    def test_materializes_contract_v4_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "input" / "dataset"
+            self.write_bundle(source, (4, 4))
+            manifest, _ = materialize_training_bundle(root / "input", root / "working")
+            self.assertEqual(
+                (manifest["contractSchemaVersion"], manifest["featureSchemaVersion"]),
+                (4, 4),
+            )
+
+    def test_forwards_runtime_dictionary_supplement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = Path(temp)
+            supplement = bundle / "dictionary" / "runtime-item-dictionary-supplement.json"
+            supplement.parent.mkdir(parents=True)
+            supplement.write_text("{}\n", encoding="utf-8")
+            command = build_training_command(bundle, bundle / "output", PROFILES["smoke"], 17)
+            self.assertEqual(command[command.index("--dictionary-supplement") + 1], str(supplement))
 
     def test_materializes_raw_zip_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

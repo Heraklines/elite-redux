@@ -26,8 +26,7 @@ from candidate_transformer import (  # noqa: E402
 
 MODEL_NAME = "er-domain-candidate-transformer-v4"
 ENSEMBLE_NAME = "er-domain-candidate-transformer-ensemble-v4"
-CONTRACT_SCHEMA_VERSION = 3
-FEATURE_SCHEMA_VERSION = 2
+SUPPORTED_CONTRACTS = {(3, 2), (4, 4)}
 TOKEN_GROUP_NAMES = ("actor", "targets", "destination", "field", "action")
 DOMAIN_NAMES = ("elite-redux", "showdown")
 
@@ -39,6 +38,8 @@ class CandidatePolicyBundle:
     token_to_id: dict[str, int]
     dictionary_hash: str
     domains: tuple[str, ...]
+    contract_schema_version: int
+    feature_schema_version: int
 
 
 def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
@@ -46,14 +47,9 @@ def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     if config.get("schemaVersion") != 4 or config.get("model") != MODEL_NAME:
         raise ValueError(f"unsupported neural policy config: {config_path}")
-    if config.get("contractSchemaVersion") != CONTRACT_SCHEMA_VERSION:
-        raise ValueError(
-            f"contract schema mismatch: expected {CONTRACT_SCHEMA_VERSION}, got {config.get('contractSchemaVersion')}"
-        )
-    if config.get("featureSchemaVersion") != FEATURE_SCHEMA_VERSION:
-        raise ValueError(
-            f"feature schema mismatch: expected {FEATURE_SCHEMA_VERSION}, got {config.get('featureSchemaVersion')}"
-        )
+    contract_identity = (config.get("contractSchemaVersion"), config.get("featureSchemaVersion"))
+    if contract_identity not in SUPPORTED_CONTRACTS:
+        raise ValueError(f"unsupported contract/feature schema pair: {contract_identity}")
     architecture = config.get("architecture")
     if not isinstance(architecture, dict):
         raise ValueError("neural policy config is missing architecture")
@@ -91,6 +87,8 @@ def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
         token_to_id={token: index for index, token in enumerate(token_vocabulary)},
         dictionary_hash=dictionary_hash,
         domains=DOMAIN_NAMES,
+        contract_schema_version=contract_identity[0],
+        feature_schema_version=contract_identity[1],
     )
 
 
@@ -119,6 +117,17 @@ def load_ensemble(model_dir: Path) -> list[CandidatePolicyBundle]:
     configurations = {bundle.model.config for bundle in models}
     if len(configurations) != 1:
         raise ValueError("neural ensemble members use different architectures")
+    contract_identities = {
+        (bundle.contract_schema_version, bundle.feature_schema_version) for bundle in models
+    }
+    if len(contract_identities) != 1:
+        raise ValueError("neural ensemble members use different contract schemas")
+    contract_schema_version, feature_schema_version = next(iter(contract_identities))
+    if (
+        payload.get("contractSchemaVersion") != contract_schema_version
+        or payload.get("featureSchemaVersion") != feature_schema_version
+    ):
+        raise ValueError("neural ensemble manifest contract identity does not match its members")
     return models
 
 
@@ -318,10 +327,10 @@ def serve(model_dir: Path) -> None:
                 "type": "ready",
                 "model": MODEL_NAME if len(models) == 1 else ENSEMBLE_NAME,
                 "members": len(models),
-                "featureSchemaVersion": FEATURE_SCHEMA_VERSION,
+                "featureSchemaVersion": models[0].feature_schema_version,
                 "featureCount": models[0].model.config.feature_count,
                 "historyLength": models[0].model.config.history_length,
-                "contractSchemaVersion": CONTRACT_SCHEMA_VERSION,
+                "contractSchemaVersion": models[0].contract_schema_version,
                 "tokenGroups": list(TOKEN_GROUP_NAMES),
                 "domains": list(models[0].domains),
                 "dictionaryHash": models[0].dictionary_hash,
