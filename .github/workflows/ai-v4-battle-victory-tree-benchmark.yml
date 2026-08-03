@@ -85,7 +85,7 @@ jobs:
           --turns 80 --real-rng
           --ai-model ml/evaluation/production-v4-battle-victory-tree/selected-model.json
           --test-timeout-ms 3600000
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-battle-victory-tree-results.json"
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-human-v4-battle-victory-tree-results.json"
       - name: Upload combat-only shard
         if: always()
         uses: actions/upload-artifact@v4
