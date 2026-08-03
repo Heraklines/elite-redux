@@ -2694,9 +2694,7 @@ export async function driveLearnMoveDecline(rig, owner, boundary) {
         && Number.isSafeInteger(observedAddress.turn)
         && (observedAddress.wave > expectedAddress.wave
           || (observedAddress.wave === expectedAddress.wave && observedAddress.turn >= expectedAddress.turn));
-      return latest != null
-        && !latest.observation.surfaceId.startsWith("learn-move:")
-        && sameOrLaterAddress
+      return latest != null && !latest.observation.surfaceId.startsWith("learn-move:") && sameOrLaterAddress
         ? { kind: "closed", event: latest }
         : null;
     },
