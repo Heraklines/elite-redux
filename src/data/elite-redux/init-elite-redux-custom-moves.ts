@@ -982,6 +982,7 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- Bleed / fear riders (ER tags), gated by Move.chance ----
     case 956: // Rip and Tear — lowers foe Speed + can't be used twice
       // (50% bleed comes from its chance-status BLEED row).
+      move.bitingMove();
       move.attr(StatStageChangeAttr, [Stat.SPD], -1);
       move.restriction(consecutiveUseRestriction);
       break;

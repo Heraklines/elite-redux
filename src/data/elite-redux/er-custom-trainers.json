@@ -4158,7 +4158,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
@@ -4332,7 +4332,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
@@ -4448,7 +4448,7 @@
         }
       }
     ],
-    "trainerClass": "SBCLEADER",
+    "trainerClass": "GIOVANNI",
     "trainerSprite": "jacinthe_1",
     "victoryDialogue": "The agony of defeat is nothing compared to the joy of witnessing such magnificent might!",
     "weight": 5
@@ -4555,7 +4555,7 @@
         "species": 995
       }
     ],
-    "trainerClass": "POKESTAR",
+    "trainerClass": "SCIENTIST",
     "trainerSprite": "pokestar_invader_alien",
     "victoryDialogue": "...We have to leave this planet with the mothership...",
     "weight": 5
@@ -4687,7 +4687,7 @@
         "species": 10097
       }
     ],
-    "trainerClass": "CHAMPION",
+    "trainerClass": "RED",
     "trainerSprite": "red_masters_ex",
     "victoryDialogue": "...",
     "weight": 5
@@ -4819,7 +4819,7 @@
         "species": 70001
       }
     ],
-    "trainerClass": "TRAINER",
+    "trainerClass": "COLRESS",
     "trainerSprite": "trainer_n_masters_ex_1",
     "victoryDialogue": "Your Pokémon... It was just saying how much it likes you—and how it's happy to be with you.",
     "weight": 1
