@@ -243,6 +243,8 @@ def build_training_command(
         str(profile["history_length"]),
         "--trajectory-layers",
         str(profile["trajectory_layers"]),
+        "--loss-policy-weight",
+        "0",
         "--fast-kernels",
     ]
     if dictionary_supplement.is_file():

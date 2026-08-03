@@ -39,6 +39,7 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
         self.assertIn("--elite-rollouts", command)
         self.assertIn("--amp", command)
         self.assertIn("--fast-kernels", command)
+        self.assertEqual(command[command.index("--loss-policy-weight") + 1], "0")
 
     def test_baseline_batch_is_unchanged_without_checkpoint_resume(self) -> None:
         command = build_training_command(Path("bundle"), Path("output"), PROFILES["baseline"], 17)
