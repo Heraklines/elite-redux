@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "taskId": "trainer-victory-final-20260803",
+  "branch": "ci/coop/trainer-victory-final-20260803",
+  "trainRef": "fix/coop-party-mutating-rewards-20260802",
+  "baseSha": "8695cfa89c88d0901a9f7025315ce0127dd7bd2b",
+  "allowedFiles": [
+    ".github/coop-task-ownership/trainer-victory-final-20260803.json",
+    "progress.md",
+    "src/data/elite-redux/coop/coop-runtime.ts",
+    "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
+    "test/tools/coop-soak-driver.ts"
+  ],
+  "lockedSchemaFiles": []
+}
