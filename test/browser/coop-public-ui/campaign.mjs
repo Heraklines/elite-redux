@@ -1291,6 +1291,14 @@ export function createRegisteredSurfaceProgressBudget(
   });
 }
 
+/** Whether a skipped-move-animation journey still retains a finite native evolution cutscene. */
+export function retainedPartyEvolutionNeedsProgressBudget(partyMutatingReward) {
+  return (
+    partyMutatingReward?.required === true
+    && /^(?:EVOLUTION_ITEM|RARE_EVOLUTION_ITEM)$/u.test(partyMutatingReward.rewardId ?? "")
+  );
+}
+
 /**
  * Prove that an embedded battle has already crossed into the next wave's public encounter presentation.
  *
@@ -3451,6 +3459,18 @@ export function rewardPartyTargetCandidates(boundary, fallbackSlot = 0) {
   let candidates = [];
   if (typeof rewardId === "string" && /REVIVE/u.test(rewardId)) {
     candidates = usableSlots.filter(slot => slot.fainted === true);
+  } else if (typeof rewardId === "string" && /^(?:FULL_HEAL|FULL_RESTORE)$/u.test(rewardId)) {
+    // Full Heal is legal on a full-HP status target, while Full Restore is legal for either
+    // missing HP or status. Run 30795897194 proved the old generic healing predicate discarded
+    // the exact burned reserve, exhausted two healthy active slots, and left an otherwise
+    // actionable production PARTY handler parked. Keep legality derived from the public party
+    // material so this remains a real UI driver rather than a fixture-specific slot shortcut.
+    candidates = usableSlots.filter(
+      slot =>
+        slot.fainted !== true
+        && (slot.statusEffect != null
+          || (typeof slot.hp === "number" && typeof slot.maxHp === "number" && slot.hp < slot.maxHp)),
+    );
   } else if (
     typeof rewardId === "string"
     && /POTION|RESTORE|HEAL|WATER|SODA|LEMONADE|MOOMOO_MILK|ENERGY_ROOT|BERRY/u.test(rewardId)
@@ -5080,9 +5100,18 @@ async function advanceToNextWaveCommand(
   // between-wave window plus at most one measured dense-presentation ceiling. Only causal phase/stream
   // progress refreshes the sliding deadline, and the sum remains an immutable outer bound. All faster
   // profiles retain the fixed deadline.
-  const betweenWaveBudget = policy.moveAnimationsExpected
+  // Party-mutation fixtures deliberately retain the native evolution presentation even when
+  // ordinary move animations are skipped. Under the 28-way matrix in run 30795897194 the
+  // authoritative evolution and mirrored party material completed, but the finite cutscene was
+  // still emitting monotonically advancing stage heartbeats when the fixed 270s deadline fired.
+  // Reuse the same causal progress budget as normal presentation qualification, with a smaller
+  // immutable ceiling. Keepalives and repeated phase names still cannot extend it.
+  const retainedPartyEvolutionExpected = retainedPartyEvolutionNeedsProgressBudget(policy.partyMutatingReward);
+  const betweenWaveBudget = policy.moveAnimationsExpected || retainedPartyEvolutionExpected
     ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
-        hardCeilingMs: betweenWaveTimeoutMs + ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS,
+        hardCeilingMs:
+          betweenWaveTimeoutMs
+          + (policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS),
       })
     : null;
   // Mystery difficulty deliberately chains encounters without opening a battle command between them, and the

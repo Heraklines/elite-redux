@@ -29,6 +29,7 @@ import {
   resolveSurfaceOwner,
   rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
+  retainedPartyEvolutionNeedsProgressBudget,
   selectLatestMysteryAuthorityEvent,
 } from "./campaign.mjs";
 import {
@@ -1399,6 +1400,7 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
     { slot: 0, fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
     { slot: 1, fainted: false, hp: 7, maxHp: 20, allowedInBattle: true },
     { slot: 2, fainted: true, hp: 0, maxHp: 20, allowedInBattle: false },
+    { slot: 3, fainted: false, hp: 20, maxHp: 20, statusEffect: 6, allowedInBattle: true },
   ];
   const boundary = rewardId => ({
     authority: { partySlots },
@@ -1416,6 +1418,10 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
   assert.deepEqual(chooseRewardPartyTargetSlot(boundary("RARE_CANDY"), 0), {
     slot: 0,
     rewardId: "RARE_CANDY",
+  });
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("FULL_HEAL"), 0), {
+    slot: 3,
+    rewardId: "FULL_HEAL",
   });
 });
 
@@ -1465,6 +1471,25 @@ test("reward targeting follows nested move and ability choices instead of requir
     "party-option:ability-slot-0",
   );
   assert.equal(chooseRewardPartyActionOption({ optionIds: ["party-option:summary", "party-option:cancel"] }), null);
+});
+
+test("party evolution rewards retain a bounded presentation-progress budget when move animations are skipped", () => {
+  assert.equal(
+    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "EVOLUTION_ITEM" }),
+    true,
+  );
+  assert.equal(
+    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "RARE_EVOLUTION_ITEM" }),
+    true,
+  );
+  assert.equal(
+    retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "FORM_CHANGE_ITEM" }),
+    false,
+  );
+  assert.equal(
+    retainedPartyEvolutionNeedsProgressBudget({ required: false, rewardId: "EVOLUTION_ITEM" }),
+    false,
+  );
 });
 
 test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {
