@@ -23,7 +23,12 @@ function scene(biomeId: BiomeId = BiomeId.TOWN): BattleScene {
   return { arena: { biomeId } } as BattleScene;
 }
 
-function trainerBattle(wave: number, trainerType: TrainerType, reward: ModifierTypeFunc, name: string): Battle {
+function trainerBattle(
+  wave: number,
+  trainerType: TrainerType,
+  rewards: ModifierTypeFunc | readonly ModifierTypeFunc[],
+  name: string,
+): Battle {
   return {
     waveIndex: wave,
     battleType: BattleType.TRAINER,
@@ -31,7 +36,7 @@ function trainerBattle(wave: number, trainerType: TrainerType, reward: ModifierT
       config: {
         trainerType,
         moneyMultiplier: wave,
-        modifierRewardFuncs: [reward],
+        modifierRewardFuncs: typeof rewards === "function" ? [rewards] : [...rewards],
         isBoss: false,
         hasCharSprite: true,
         victoryBgm: `victory-${wave}`,
@@ -75,6 +80,26 @@ describe("co-op retained trainer-victory boundary", () => {
       getCoopTrainerVictoryBoundary(renderer, 6),
       "a rejected material image cannot leak into the ledger",
     ).toBeNull();
+  });
+
+  it("round-trips the first Rival's complete two-reward material", () => {
+    const authority = scene(BiomeId.TOWN);
+    const renderer = scene(BiomeId.TOWN);
+    const source = trainerBattle(
+      8,
+      TrainerType.RIVAL,
+      [modifierTypes.SUPER_EXP_CHARM, modifierTypes.EXP_SHARE],
+      "Rival Ivy",
+    );
+
+    const material = captureCoopTrainerVictoryMaterial(authority, source);
+    expect(material?.modifierRewardTypeIds).toEqual(["SUPER_EXP_CHARM", "EXP_SHARE"]);
+
+    const installed = installCoopTrainerVictoryMaterial(renderer, structuredClone(material!));
+    expect(installed?.trainerType).toBe(TrainerType.RIVAL);
+    expect(installed?.modifierRewardFuncs).toEqual([modifierTypes.SUPER_EXP_CHARM, modifierTypes.EXP_SHARE]);
+
+    clearCoopTrainerVictoryBoundary(renderer, 8);
   });
 
   it("keeps exact source-wave trainer rewards after the ambient battle advances", () => {

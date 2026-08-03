@@ -5894,6 +5894,23 @@ function projectCoopV2InteractionControl(
 ): CoopControlInstallResult {
   const controlId = controlIdOf(control);
   if (control.kind === "AWAIT_SUCCESSOR") {
+    const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
+    const sourceMaterial = sourceEntry?.kind === "CONTROL_COMMIT" ? decodeControlOpenEntry(sourceEntry) : null;
+    if (
+      runtime.controller.authorityRole === "replica"
+      && sourceMaterial?.kind === "trainer-victory-open"
+      && !runtime.v2CompletedTrainerVictoryPresentations.has(sourceMaterial.wave)
+    ) {
+      // The ordered phase being present/actionable is not the terminal proof for this finite presentation.
+      // If we sign controlInstalled here, the authority may retire this entry and publish WAVE_ADVANCE while
+      // the replica is still reading its trainer-victory prompt. The wave projector can then supersede that
+      // phase, leaving its exact lease live until a later trainer battle rejects the conflicting address.
+      // Hold the global frontier until TrainerVictoryPhase's real finish callback records completion.
+      return {
+        kind: "deferred",
+        reason: `awaiting completed trainer-victory presentation for wave ${sourceMaterial.wave}`,
+      };
+    }
     const result = runtime.v2ControlLedger.project(control, null, runtime.controller.localSeatId);
     if (result.kind === "installed" || result.kind === "already-installed") {
       runtime.v2InstalledInteractionTargets.add(result.controlId);
@@ -7040,7 +7057,17 @@ function buildCoopV2LiveSeams(
             return false;
           }
           if (material.kind === "trainer-victory-open") {
-            if (installCoopTrainerVictoryMaterial(globalScene, material.trainerVictory) == null) {
+            const presentationAlreadyCompleted = runtime.v2CompletedTrainerVictoryPresentations.has(material.wave);
+            if (
+              !presentationAlreadyCompleted
+              && installCoopTrainerVictoryMaterial(globalScene, material.trainerVictory) == null
+            ) {
+              coopWarn(
+                "v2-control",
+                `trainer-victory-open rev=${entry.revision} failed immutable material install `
+                  + `w${material.wave}/t${material.turn} trainer=${material.trainerVictory.trainerType} `
+                  + `rewards=[${material.trainerVictory.modifierRewardTypeIds.join(",")}]`,
+              );
               return false;
             }
             if (globalScene.currentBattle?.turn + 1 === material.turn) {
@@ -7051,9 +7078,19 @@ function buildCoopV2LiveSeams(
               globalScene.currentBattle?.waveIndex !== material.wave
               || globalScene.currentBattle.turn !== material.turn
             ) {
+              coopWarn(
+                "v2-control",
+                `trainer-victory-open rev=${entry.revision} failed cursor install w${material.wave}/t${material.turn} `
+                  + `(current=w${globalScene.currentBattle?.waveIndex ?? "none"}`
+                  + `/t${globalScene.currentBattle?.turn ?? "none"})`,
+              );
               return false;
             }
             if (entry.nextControl.kind !== "AWAIT_SUCCESSOR") {
+              coopWarn(
+                "v2-control",
+                `trainer-victory-open rev=${entry.revision} carried successor ${entry.nextControl.kind}`,
+              );
               return false;
             }
             const pendingPresentation = runtime.v2PendingTrainerVictoryPresentation;
@@ -7063,9 +7100,14 @@ function buildCoopV2LiveSeams(
                 || pendingPresentation.wave !== material.wave
                 || pendingPresentation.turn !== material.turn)
             ) {
+              coopWarn(
+                "v2-control",
+                `trainer-victory-open rev=${entry.revision} conflicts with retained presentation `
+                  + `${pendingPresentation.operationId}/w${pendingPresentation.wave}/t${pendingPresentation.turn}`,
+              );
               return false;
             }
-            if (pendingPresentation == null) {
+            if (pendingPresentation == null && !presentationAlreadyCompleted) {
               runtime.v2PendingTrainerVictoryPresentation = {
                 operationId: entry.operationId,
                 wave: material.wave,
@@ -7083,6 +7125,7 @@ function buildCoopV2LiveSeams(
               return "deferred";
             }
             if (!markCoopV2ControlMaterialApplied(runtime, entry)) {
+              coopWarn("v2-control", `trainer-victory-open rev=${entry.revision} could not mark material applied`);
               return false;
             }
             coopLog(
@@ -9120,6 +9163,10 @@ export function completeCoopV2TrainerVictoryPresentation(wave: number): void {
     }
     runtime.v2CompletedTrainerVictoryPresentations.delete(oldest);
   }
+  // Completion is the proof edge for this finite presentation. Retry in a microtask so the phase finish
+  // callback can shift the real phase tree before the retained entry signs controlInstalled and releases
+  // its ordered successor. The shared retry is idempotent and remains address-exact through the V2 ledger.
+  scheduleCoopV2CommandProofRetry(runtime);
 }
 
 /** Whether this renderer already owns or crossed the exact ordered trainer presentation for a source wave. */

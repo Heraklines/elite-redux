@@ -1690,6 +1690,23 @@ test("normal trainer victory retains its exact presentation lease across success
     finishStart >= 0 && completeAt > finishStart && endAt > completeAt,
     "the real presentation retires its exact lease before the phase manager can advance",
   );
+  const projectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
+  const projectorEnd = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied", projectorStart);
+  assert.ok(projectorStart >= 0 && projectorEnd > projectorStart, "the ordinary control projector has a bounded block");
+  const projector = coopRuntime.slice(projectorStart, projectorEnd);
+  assert.match(
+    projector,
+    /sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*kind: "deferred"/u,
+    "a replica cannot sign the ordered successor wait before its real trainer presentation completes",
+  );
+  const completionStart = coopRuntime.indexOf("export function completeCoopV2TrainerVictoryPresentation(");
+  const completionEnd = coopRuntime.indexOf("\n/**", completionStart + 1);
+  const completion = coopRuntime.slice(completionStart, completionEnd);
+  assert.match(
+    completion,
+    /v2CompletedTrainerVictoryPresentations\.add\(wave\)[\s\S]*scheduleCoopV2CommandProofRetry\(runtime\)/u,
+    "real phase completion retries the retained entry only after recording its exact presentation proof",
+  );
 });
 
 test("an embedded Mystery trainer battle retains and renders its trainer presentation", () => {

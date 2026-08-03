@@ -318,6 +318,16 @@ jobs:
       - name: Verify public journey uses the release Authority V2 cutover
         run: node --test test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs
 
+      - name: Verify immutable trainer-victory material before browser launch
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: npx vitest run test/tests/elite-redux/coop/coop-trainer-victory-boundary.test.ts --reporter=dot
+
       - name: Verify exact two-browser Showdown admission and turn contracts
         run: node --test test/browser/coop-public-ui/showdown-browser-evidence.test.mjs
 

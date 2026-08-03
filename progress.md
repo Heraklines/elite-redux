@@ -7229,3 +7229,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   input on both browsers. Its focused contract now requires one call to press both seats exactly once. No
   production code changed for this classification; the guest's visible trainer was still the active victory
   presentation, not a stale sprite after completion.
+
+## 2026-08-03 - live repeated-trainer presentation overtake
+
+- Paired staging logs from exact build `e7857b72b` show wave 5's normal trainer control reached
+  `controlInstalled`, then the session continued through shops and later battles. At wave 8 the guest applied
+  authoritative state tick 139 but rejected the new Rival `trainer-victory-open` revision 48 before projection.
+  The generic material error hid which invariant failed.
+- Root architectural gap: a `trainer-victory-open` entry used `AWAIT_SUCCESSOR` as its successor, and the
+  ordinary projector signed that wait as installed as soon as immutable material/phase construction existed.
+  It did not wait for the replica's finite TrainerVictory prompt to complete. A following WAVE entry could
+  therefore overtake the prompt and leave its exact pending presentation lease alive until a later trainer
+  battle conflicted with it.
+- Candidate change holds the replica's final control proof until the exact real `TrainerVictoryPhase` finish
+  records completion, then retries the retained V2 entry on the existing address-exact microtask path. The
+  projector does not queue the presentation again after completion. Every trainer material/cursor/successor/
+  lease/ledger rejection now emits a specific diagnostic. A Rival regression covers both
+  `SUPER_EXP_CHARM` and `EXP_SHARE` material instead of only one Voucher reward.
+- TODO: commit/push without local execution, run remote static plus the owned trainer boundary/runtime shards,
+  then run a two-browser journey that crosses at least two trainer victories before deploying the corrected
+  exact SHA to staging. Preserve active runs `30822228534` and `30824237635` for artifact classification.
