@@ -2474,7 +2474,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
       authorityNowMs += COOP_PRESENTATION_STALL_MS;
       watchdogCallbacks[1]();
-      expect(endSpy, "no progress in the renewed interval still fails closed").toHaveBeenCalledTimes(1);
+    expect(endSpy, "no progress for the full renewed stall window still fails closed").toHaveBeenCalledTimes(1);
       expect(cancelTimers[1], "completion retires the active renewed watchdog").toHaveBeenCalledTimes(1);
     } finally {
       loop.frame = originalFrame;
