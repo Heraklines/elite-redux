@@ -7022,3 +7022,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The source contract now pins this composition so later timeout cleanup cannot reintroduce the false red.
   No production code changed for this classification, and no local co-op, Vitest, Chromium, or compilation
   execution was performed.
+- Exact-SHA rerun `30781406128` passed in two real Chromium clients with animations enabled. The replica
+  started exactly one `CoopReplayLearnMovePhase`; the authority started exactly one native `LearnMovePhase`;
+  revision 7 converged at `frontier=7/7/7`; and revision 8 installed the wave-2 command at
+  `frontier=8/8/8`. Both final screenshots show the same evolved party and actionable wave-2 command UI.
