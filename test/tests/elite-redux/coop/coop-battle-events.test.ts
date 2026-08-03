@@ -543,6 +543,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     await startCoopGuest();
     const runtime = getCoopRuntime()!;
     const token = createCoopPresentationOutcomeToken();
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     let expireWatchdog!: () => void;
     const cancelTimer = vi.fn();
     vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -557,6 +559,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
 
     phase.start();
+    authorityNowMs = COOP_PRESENTATION_STALL_MS;
     expireWatchdog();
 
     expect(killSpy).toHaveBeenCalledWith(globalScene.abilityBar);
@@ -564,6 +567,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(coopPresentationOutcome(token)).toEqual({ kind: "rendered", actorFingerprint: "ability-bar" });
     expect(cancelTimer).toHaveBeenCalledOnce();
     expect(endSpy).toHaveBeenCalledOnce();
+    nowSpy.mockRestore();
   });
 
   it("an exact ability identity survives a stale post-reorder battler index", async () => {
@@ -1028,6 +1032,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     vi.spyOn(globalScene, "addPlayerPokemon").mockReturnValueOnce(detached);
     const destroy = vi.spyOn(detached, "destroy");
     const runtime = getCoopRuntime()!;
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     let watchdogCallback: (() => void) | undefined;
     const cancelTimer = vi.fn();
     vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -1055,6 +1061,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     phase.start();
     expect(coopPresentationOutcome(token)).toBeUndefined();
+    authorityNowMs = COOP_PRESENTATION_STALL_MS;
     watchdogCallback?.();
 
     expect(coopPresentationOutcome(token)).toMatchObject({
@@ -1067,6 +1074,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       shift,
       "the failed receipt reaches the finalizer instead of retaining the loader forever",
     ).toHaveBeenCalledOnce();
+    nowSpy.mockRestore();
   });
 
   it("retirement cancels a pending form preimage load and its late completion cannot queue a cutscene", async () => {
@@ -1170,6 +1178,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const setupSprites = vi
       .spyOn(phase as unknown as { setupPokemonSprites(): void }, "setupPokemonSprites")
       .mockImplementation(() => {});
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     let watchdogCallback: (() => void) | undefined;
     const cancelTimer = vi.fn();
     vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -1182,6 +1192,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     const start = phase.start();
     expect(coopPresentationOutcome(token), "the hung mode open has no receipt").toBeUndefined();
+    authorityNowMs = COOP_PRESENTATION_STALL_MS;
     watchdogCallback?.();
 
     expect(coopPresentationOutcome(token)).toMatchObject({
@@ -1201,6 +1212,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(doEvolution, "the retired late open cannot restart presentation").not.toHaveBeenCalled();
     expect(shift, "the obsolete start continuation cannot advance the successor twice").toHaveBeenCalledOnce();
     expect(coopPresentationOutcome(token)).toMatchObject({ kind: "failed" });
+    nowSpy.mockRestore();
   });
 
   it("an authority Transform event installs copied passives and appearance without local derivation", async () => {
@@ -2393,6 +2405,8 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     const animSpy = vi.spyOn(CommonBattleAnim.prototype, "play").mockImplementation(() => {});
     const updateSpy = vi.spyOn(pokemon, "updateInfo").mockReturnValue(new Promise(() => {}));
     const runtime = getCoopRuntime()!;
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     let watchdogCallback: (() => void) | undefined;
     const cancelTimer = vi.fn();
     const timerSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -2404,6 +2418,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     phase.start();
     expect(endSpy, "the phase is genuinely waiting on the missing animation callback").not.toHaveBeenCalled();
+    authorityNowMs = COOP_PRESENTATION_STALL_MS;
     watchdogCallback?.();
 
     expect(pokemon.hp, "the timeout still installs the immutable authority HP").toBe(toHp);
@@ -2412,6 +2427,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
     animSpy.mockRestore();
     updateSpy.mockRestore();
+    nowSpy.mockRestore();
     timerSpy.mockRestore();
     endSpy.mockRestore();
   });
@@ -2456,6 +2472,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       ).not.toHaveBeenCalled();
       expect(watchdogCallbacks, "progress renews one bounded observation").toHaveLength(2);
 
+      authorityNowMs += COOP_PRESENTATION_STALL_MS;
       watchdogCallbacks[1]();
       expect(endSpy, "no progress in the renewed interval still fails closed").toHaveBeenCalledTimes(1);
       expect(cancelTimers[1], "completion retires the active renewed watchdog").toHaveBeenCalledTimes(1);
