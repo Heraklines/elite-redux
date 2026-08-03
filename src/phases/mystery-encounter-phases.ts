@@ -1431,16 +1431,24 @@ export class MysteryEncounterRewardsPhase extends Phase {
   private readonly authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null;
   /** Settlement retained after automatic reward preparation on the authoritative host. */
   private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
+  /**
+   * An embedded battle splits non-interactive preparation from its public reward surface so the retained
+   * state can release both clients into the same TrainerVictory tail. Non-battle and legacy paths keep the
+   * established combined phase.
+   */
+  private readonly meSettlementStage: "combined" | "prepare-only" | "open-prepared";
 
   constructor(
     addHealPhase = false,
     authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null = null,
     meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+    meSettlementStage: "combined" | "prepare-only" | "open-prepared" = "combined",
   ) {
     super();
     this.addHealPhase = addHealPhase;
     this.authoritativeRewardSurfaces = authoritativeRewardSurfaces;
     this.meSettlementPlan = meSettlementPlan;
+    this.meSettlementStage = meSettlementStage;
   }
 
   /**
@@ -1527,13 +1535,18 @@ export class MysteryEncounterRewardsPhase extends Phase {
     }
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
-    if (encounter.doContinueEncounter) {
+    if (this.meSettlementStage === "prepare-only" && this.meSettlementPlan == null) {
+      failCoopSharedSession("A staged Mystery battle reward preparation omitted its retained settlement plan.");
+      return;
+    }
+
+    if (encounter.doContinueEncounter && this.meSettlementStage !== "open-prepared") {
       encounter.doContinueEncounter().then(() => {
         this.end();
       });
     } else {
       globalScene.executeWithSeedOffset(() => {
-        if (encounter.onRewards) {
+        if (encounter.onRewards && this.meSettlementStage !== "open-prepared") {
           encounter.onRewards().then(() => {
             this.doEncounterRewardsAndContinue();
           });
@@ -1570,7 +1583,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
   async doEncounterRewardsAndContinue(): Promise<void> {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
-    if (encounter.doEncounterExp) {
+    if (this.meSettlementStage !== "prepare-only" && encounter.doEncounterExp) {
       encounter.doEncounterExp();
     }
 
@@ -1578,7 +1591,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // and encounters that clear/replace doEncounterRewards cannot accidentally reuse a stale helper plan.
     const rewardPlan =
       encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
-    if (rewardPlan != null) {
+    if (rewardPlan != null && this.meSettlementStage !== "open-prepared") {
       try {
         const preparation = rewardPlan.prepareAutomaticEffects();
         if (preparation != null) {
@@ -1603,6 +1616,13 @@ export class MysteryEncounterRewardsPhase extends Phase {
       if (!battleSettlementRetained) {
         commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);
       }
+    }
+
+    if (this.meSettlementStage === "prepare-only") {
+      // The retained battle-settled entry releases both clients into the same TrainerVictory/Money tail.
+      // This phase owns no public UI and must not also open the reward surfaces ahead of that presentation.
+      this.end();
+      return;
     }
 
     if (encounter.doEncounterRewards) {

@@ -2,7 +2,8 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopTrainerPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
 import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
@@ -227,6 +228,13 @@ export class TrainerVictoryPhase extends BattlePhase {
     }
     const { authoritativeGuest, victory, liveTrainerMatches } = resolved;
     const finish = () => {
+      if (globalScene.gameMode.isCoop) {
+        // TrainerVictory deliberately reveals the defeated trainer on both clients. Make its terminal
+        // postcondition equally explicit: no following reward/menu/command surface may inherit a visible
+        // trainer or an entrance tween that can restore it on the next frame.
+        settleCoopTrainerPresentation("enemy");
+        coopLog("renderer", `trainer victory presentation settled sourceWave=${victory.sourceWave}`);
+      }
       this.end();
       if (authoritativeGuest) {
         clearCoopTrainerVictoryBoundary(globalScene, victory.sourceWave);

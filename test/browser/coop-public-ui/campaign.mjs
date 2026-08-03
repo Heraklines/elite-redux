@@ -975,6 +975,24 @@ export function createBattlePromptAdvancer(
       observation.phaseInstance,
       observation.surfaceGeneration ?? null,
     ]);
+  const pairedTrainerVictoryIsReady = observation => {
+    if (observation.phase !== "TrainerVictoryPhase") {
+      return true;
+    }
+    return clients.every(peer => {
+      const paired = peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0)?.observation;
+      return (
+        paired?.phase === "TrainerVictoryPhase"
+        && paired.surfaceId === "battle:message"
+        && paired.address?.epoch === observation.address?.epoch
+        && paired.address?.wave === observation.address?.wave
+        && paired.address?.turn === observation.address?.turn
+        && paired.ready?.handlerActive === true
+        && paired.ready?.awaitingActionInput === true
+        && paired.ready?.inputBlocked !== true
+      );
+    });
+  };
   return async () => {
     if (expectedAddress == null && requireSharedCommandAddress) {
       expectedAddress = currentSharedCommandAddress(clients);
@@ -1007,6 +1025,7 @@ export function createBattlePromptAdvancer(
           && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
           && observation.ready?.inputBlocked !== true
+          && pairedTrainerVictoryIsReady(observation)
           && !consumedInstances.has(instanceKey)
         );
       });

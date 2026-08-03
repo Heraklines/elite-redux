@@ -43,6 +43,7 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   isCoopAuthoritativeGuest,
+  shouldDeferCoopMeBattleSettlementUntilRewardPreparation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_SUB_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -1630,6 +1631,22 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
     if (isCoopAuthoritativeGuest()) {
       return;
     }
+    // Standard Mystery rewards may apply automatic mechanical effects before their first public picker.
+    // Run that non-interactive preparation immediately after BattleEnd, retain its complete state image,
+    // and only then let either browser enter TrainerVictory. Previously the host entered its local
+    // TrainerVictoryPhase first while the guest remained parked in BattleEnd, creating an asymmetric human
+    // prompt and the live wave-9 softlock. The later rewards phase opens the already-prepared surfaces only.
+    const stagedAuthoritativeRewards =
+      continuation === "rewards" && shouldDeferCoopMeBattleSettlementUntilRewardPreparation();
+    if (stagedAuthoritativeRewards) {
+      globalScene.phaseManager.pushNew(
+        "MysteryEncounterRewardsPhase",
+        addHealPhase,
+        null,
+        settlementPlan,
+        "prepare-only",
+      );
+    }
     if (trainerVictory) {
       globalScene.phaseManager.pushNew("TrainerVictoryPhase");
     }
@@ -1638,7 +1655,8 @@ export function handleMysteryEncounterVictory(addHealPhase = false, doNotContinu
         "MysteryEncounterRewardsPhase",
         addHealPhase,
         null,
-        continuation === "rewards" ? settlementPlan : null,
+        continuation === "rewards" && !stagedAuthoritativeRewards ? settlementPlan : null,
+        stagedAuthoritativeRewards ? "open-prepared" : "combined",
       );
       if (!encounter.doContinueEncounter) {
         // Only lapse eggs once for multi-battle encounters

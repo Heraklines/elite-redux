@@ -7171,3 +7171,19 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The browser job now retains all strict transport-internal no-progress bounds but has a measured 25-minute
   wall-clock ceiling so transient checkout latency cannot manufacture the same cancellation. A source contract
   prevents the job budget from dropping below the measured checkout-plus-checkpoint requirement.
+
+## 2026-08-03 - live Mystery trainer tail split isolated
+
+- Paired staging logs from build `4693e5c26` proved a product control split after a wave-9 embedded Mystery
+  trainer battle: both clients had the same mechanical digest, but the host entered `TrainerVictoryPhase`
+  while the guest remained held in `BattleEndPhase` awaiting the later reward-prepared `battle-settled` entry.
+- The candidate now runs automatic Mystery reward preparation in a non-interactive phase immediately after
+  host BattleEnd. Its retained complete state releases both clients into the same TrainerVictory/Money tail;
+  a later phase opens the already-prepared reward surfaces without repeating automatic effects.
+- `TrainerVictoryPhase` now establishes an explicit co-op enemy-trainer hidden postcondition before ending.
+  The sealed browser observer carries exact enemy-trainer visible/alpha state on every semantic surface.
+- The public prompt driver no longer advances a one-sided TrainerVictory prompt: both real browsers must
+  expose the same actionable address first. The evidence sink fails if the first surface after TrainerVictory
+  still presents the defeated trainer.
+- TODO: commit/push the candidate and use remote GitHub runners for source/unit/type checks plus a real
+  Mystery trainer browser reproduction. Do not qualify this production fix through local gameplay tests.

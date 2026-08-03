@@ -35,6 +35,12 @@ function valid(overrides = {}) {
     mysteryEncounterType: 17,
     displayedWave: 10,
     stateDigest: "0123456789abcdef",
+    presentation: {
+      trainerVisible: false,
+      enemyTrainerVisible: true,
+      enemyTrainerAlpha: 0,
+      enemyTrainerPresented: false,
+    },
     uiMode: "MODIFIER_SELECT",
     ...overrides,
   };
@@ -49,6 +55,26 @@ test("semantic evidence ignores unrelated console lines and freezes a valid proo
   assert.ok(Object.isFrozen(parsed.ready));
   assert.ok(Object.isFrozen(parsed.seatsWithInput));
   assert.ok(Object.isFrozen(parsed.connectionGenerations));
+  assert.ok(Object.isFrozen(parsed.presentation));
+});
+
+test("semantic evidence rejects a dishonest defeated-trainer presentation verdict", () => {
+  assert.throws(
+    () =>
+      semanticSurfaceView(
+        `${PREFIX}${JSON.stringify(
+          valid({
+            presentation: {
+              trainerVisible: false,
+              enemyTrainerVisible: true,
+              enemyTrainerAlpha: 1,
+              enemyTrainerPresented: false,
+            },
+          }),
+        )}`,
+      ),
+    /invalid semantic surface/u,
+  );
 });
 
 test("trainer postcondition evidence is exact, frozen, and rejects a dishonest derived verdict", () => {

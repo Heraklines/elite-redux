@@ -104,6 +104,20 @@ const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 
+/** Pixel-adjacent trainer state carried on every semantic UI observation in the sealed CI bundle. */
+function coopBrowserPresentationSnapshot() {
+  const playerTrainer = globalScene.trainer;
+  const enemyTrainer = globalScene.currentBattle?.trainer;
+  const enemyTrainerVisible = enemyTrainer?.visible === true;
+  const enemyTrainerAlpha = enemyTrainer?.alpha ?? 0;
+  return {
+    trainerVisible: playerTrainer?.visible === true,
+    enemyTrainerVisible,
+    enemyTrainerAlpha,
+    enemyTrainerPresented: enemyTrainerVisible && enemyTrainerAlpha > 0.001,
+  } as const;
+}
+
 // Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
 // event's immutable per-turn sequence; the renderer callback runs only when the matching presentation
 // phase subtree has drained. The normal application never imports this entry or registers the observer.
@@ -1726,9 +1740,7 @@ function observeSemanticSurface(): void {
           weather: globalScene.arena?.weather?.weatherType ?? 0,
           terrain: globalScene.arena?.terrain?.terrainType ?? 0,
         },
-        presentation: {
-          trainerVisible: globalScene.trainer?.visible === true,
-        },
+        presentation: coopBrowserPresentationSnapshot(),
         stateDigest,
         uiMode,
       } as const;
@@ -2182,9 +2194,7 @@ function observeSemanticSurface(): void {
         weather: globalScene.arena?.weather?.weatherType ?? 0,
         terrain: globalScene.arena?.terrain?.terrainType ?? 0,
       },
-      presentation: {
-        trainerVisible: globalScene.trainer?.visible === true,
-      },
+      presentation: coopBrowserPresentationSnapshot(),
       // Every co-op UI-to-relay surface carries the same broad mechanical fingerprint used at
       // battle continuation boundaries. A Mystery/shop/prompt desync can no longer heal before
       // the next command and disappear from the two-browser evidence.

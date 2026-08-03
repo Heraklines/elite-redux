@@ -1414,9 +1414,21 @@ test("successor-address trainer victory advances only after the browser observes
     wave: 5,
     turn: 6,
   });
-  assert.equal(await advance(), true, "the exact trainer-victory prompt is a real human-action surface");
+  assert.equal(await advance(), false, "one-sided trainer victory cannot advance while its partner is parked");
+
+  renderer.evidence.pushConsole("Start Phase BattleEndPhase");
+  renderer.evidence.pushBattleReadiness("battle:message", "TrainerVictoryPhase", true, 31, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the paired trainer-victory prompts are real human-action surfaces");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
     ["Space"],
   );
   assert.equal(await advance(), false, "one trainer-victory prompt generation receives exactly one action");

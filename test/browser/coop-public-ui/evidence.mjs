@@ -1060,6 +1060,7 @@ export function semanticSurfaceView(text) {
   const nullableDisplayedWave = wave => wave === null || (Number.isSafeInteger(wave) && wave > 0);
   const nullableStateDigest = digest =>
     digest === null || (typeof digest === "string" && /^[0-9a-f]{16}$/iu.test(digest) && digest !== CHECKSUM_SENTINEL);
+  const presentation = value?.presentation;
   if (
     !value
     || typeof value !== "object"
@@ -1099,6 +1100,15 @@ export function semanticSurfaceView(text) {
     || !nullableMysteryEncounterType(value.mysteryEncounterType)
     || !nullableDisplayedWave(value.displayedWave)
     || !nullableStateDigest(value.stateDigest)
+    || (presentation != null
+      && (typeof presentation !== "object"
+        || typeof presentation.trainerVisible !== "boolean"
+        || typeof presentation.enemyTrainerVisible !== "boolean"
+        || typeof presentation.enemyTrainerAlpha !== "number"
+        || !Number.isFinite(presentation.enemyTrainerAlpha)
+        || typeof presentation.enemyTrainerPresented !== "boolean"
+        || presentation.enemyTrainerPresented
+          !== (presentation.enemyTrainerVisible && presentation.enemyTrainerAlpha > 0.001)))
     || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop
       && (value.localSeat === null
@@ -1114,6 +1124,7 @@ export function semanticSurfaceView(text) {
     address: Object.freeze({ ...value.address }),
     seatsWithInput: Object.freeze([...value.seatsWithInput]),
     ready: Object.freeze({ ...value.ready }),
+    ...(value.presentation == null ? {} : { presentation: Object.freeze({ ...value.presentation }) }),
     ...(Array.isArray(value.connectionGenerations)
       ? { connectionGenerations: Object.freeze([...value.connectionGenerations]) }
       : {}),
@@ -1162,6 +1173,9 @@ export class EvidenceSink {
     this.events = [];
     this.failures = [];
     this.expectedSharedTerminalAfterGameOver = null;
+    // Once this client exposes TrainerVictory, its very next public surface must prove the defeated
+    // trainer is hidden. This catches the one-frame-later tween resurrection that state-only checks miss.
+    this.pendingTrainerVictoryCleanup = false;
     this.heartbeatOwnershipLossObserved = false;
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
@@ -1736,6 +1750,20 @@ export class EvidenceSink {
           const observed = this.record("browser-surface2", { observation: semantic });
           if (semantic.surfaceId === "unclassified" || semantic.surfaceId === "observer-fault") {
             this.failures.push(observed);
+          }
+          if (semantic.phase === "TrainerVictoryPhase") {
+            this.pendingTrainerVictoryCleanup = true;
+          } else if (this.pendingTrainerVictoryCleanup) {
+            this.pendingTrainerVictoryCleanup = false;
+            if (semantic.presentation?.enemyTrainerPresented) {
+              const staleTrainer = this.record("browser-trainer-victory-cleanup-invalid", {
+                phase: semantic.phase,
+                surfaceId: semantic.surfaceId,
+                address: semantic.address,
+                presentation: semantic.presentation,
+              });
+              this.failures.push(staleTrainer);
+            }
           }
         }
       } catch (error) {
