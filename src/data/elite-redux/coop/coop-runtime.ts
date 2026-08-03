@@ -24,6 +24,7 @@ import {
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  type CoopTrainerVictoryOpenMaterialV2,
   classifyReplacementOpenCursor,
   commandOpenControlAddressesClaim,
   decodeControlOpenEntry,
@@ -4469,6 +4470,8 @@ export interface CoopRuntime {
   readonly v2MeProgressionReplayStarted: Set<string>;
   /** ME terminal presentations fully drained before their immutable interaction DATA may apply. */
   readonly v2MeProgressionReplayCompleted: Set<string>;
+  /** Source waves whose ordered pre-WAVE trainer-victory presentation fully drained on this renderer. */
+  readonly v2CompletedTrainerVictoryPresentations: Set<number>;
   /**
    * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
    * public destination installs; retaining only their immutable status makes observability honest without
@@ -6949,6 +6952,21 @@ function buildCoopV2LiveSeams(
           if (receiverScene != null && receiverScene !== globalScene) {
             return "deferred";
           }
+          const trainerVictoryCursorReady =
+            material.kind === "trainer-victory-open"
+            && globalScene.currentBattle?.waveIndex === material.wave
+            && (globalScene.currentBattle.turn === material.turn
+              || globalScene.currentBattle.turn + 1 === material.turn)
+            && globalScene.phaseManager?.getCurrentPhase()?.phaseName === "CoopFinalizeTurnPhase";
+          if (material.kind === "trainer-victory-open" && !trainerVictoryCursorReady) {
+            coopLog(
+              "v2-control",
+              `deferred trainer-victory-open rev=${entry.revision} until exact finalizer `
+                + `w${material.wave}/t${material.turn} (current=${globalScene.phaseManager?.getCurrentPhase()?.phaseName ?? "none"}`
+                + ` w${globalScene.currentBattle?.waveIndex ?? "none"}/t${globalScene.currentBattle?.turn ?? "none"})`,
+            );
+            return "deferred";
+          }
           let replacementCursorAction =
             material.kind === "replacement-open" && globalScene.currentBattle != null
               ? classifyReplacementOpenCursor(
@@ -7013,6 +7031,39 @@ function buildCoopV2LiveSeams(
             || reapplyAcceptedCoopAuthoritativeBattleState(material.authoritativeState, true);
           if (!stateApplied) {
             return false;
+          }
+          if (material.kind === "trainer-victory-open") {
+            if (installCoopTrainerVictoryMaterial(globalScene, material.trainerVictory) == null) {
+              return false;
+            }
+            if (globalScene.currentBattle?.turn + 1 === material.turn) {
+              globalScene.currentBattle.incrementTurn();
+              globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+            }
+            if (
+              globalScene.currentBattle?.waveIndex !== material.wave
+              || globalScene.currentBattle.turn !== material.turn
+            ) {
+              return false;
+            }
+            if (entry.nextControl.kind !== "AWAIT_SUCCESSOR") {
+              return false;
+            }
+            const phaseManager = globalScene.phaseManager;
+            if (!phaseManager.hasPhaseOfType("TrainerVictoryPhase")) {
+              phaseManager.unshiftNew("TrainerVictoryPhase");
+            }
+            if (!releaseCoopV2ParkedTurnBoundary(runtime, entry)) {
+              return "deferred";
+            }
+            if (!markCoopV2ControlMaterialApplied(runtime, entry)) {
+              return false;
+            }
+            coopLog(
+              "v2-control",
+              `projected ordered trainer victory rev=${entry.revision} wave=${material.wave} turn=${material.turn}`,
+            );
+            return true;
           }
           if (material.kind === "replacement-open") {
             // The CONTROL_COMMIT, not an ambient renderer phase, owns this cursor edge. Its complete state
@@ -8953,6 +9004,102 @@ export function establishCoopV2ReplacementControlBoundary(input: {
   return controlCutover.commitHostReplacementOpen({ operationId, material }) == null
     ? { kind: "failed" }
     : { kind: "ready", control };
+}
+
+/**
+ * Author the normal trainer-victory ACTION presentation before the final WAVE_ADVANCE state can exist.
+ * The committed entry carries complete trainer identity + source state and states only an ordered wait for
+ * the later wave/terminal entry. This closes the old host-local tail where the replica stayed parked in the
+ * resolving TURN_COMMIT while the authority alone entered TrainerVictoryPhase.
+ */
+export function openCoopV2TrainerVictoryPresentation(): boolean {
+  const runtime = active;
+  const battle = globalScene.currentBattle;
+  if (runtime == null || battle == null || !coopV2ControlCutovers.has(runtime)) {
+    return true;
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    return false;
+  }
+  const cutover = coopV2ControlCutovers.get(runtime);
+  const current = cutover?.authorityFrontier()?.nextControl ?? null;
+  if (cutover == null || current?.kind !== "AWAIT_SUCCESSOR" || !current.allowedKinds.includes("CONTROL_COMMIT")) {
+    coopWarn(
+      "v2-control",
+      `trainer-victory-open predecessor is ${current?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
+    );
+    return false;
+  }
+  const state = captureCoopAuthoritativeBattleState(battle.turn);
+  const trainerVictory = captureCoopTrainerVictoryMaterial(globalScene, battle);
+  if (
+    state == null
+    || state.wave !== battle.waveIndex
+    || state.turn !== battle.turn
+    || trainerVictory == null
+    || trainerVictory.sourceWave !== state.wave
+  ) {
+    return false;
+  }
+  const operationId =
+    `V2/CONTROL/TRAINER_VICTORY/e${runtime.controller.sessionEpoch}`
+    + `/w${state.wave}/t${state.turn}/trainer${trainerVictory.trainerType}`;
+  const material: CoopTrainerVictoryOpenMaterialV2 = {
+    kind: "trainer-victory-open",
+    wave: state.wave,
+    turn: state.turn,
+    authoritativeState: state,
+    trainerVictory,
+  };
+  const successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> = {
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId: operationId,
+    epoch: runtime.controller.sessionEpoch,
+    wave: state.wave,
+    turn: state.turn,
+    allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"],
+    allowNextWaveStart: false,
+    expectedOperationId: null,
+  };
+  return cutover.commitHostTrainerVictoryOpen({ operationId, material, successor }) != null;
+}
+
+/** Exact active presentation material for TrainerVictoryPhase; never falls back to ambient trainer state. */
+export function coopV2TrainerVictoryPresentationAddress(): { readonly wave: number; readonly turn: number } | null {
+  const runtime = active;
+  if (runtime == null || runtime.controller.authorityRole !== "replica") {
+    return null;
+  }
+  const control = runtime.v2ControlLedger.latestControl;
+  if (control?.kind !== "AWAIT_SUCCESSOR") {
+    return null;
+  }
+  const source = runtime.v2ControlLedger.sourceEntryOf(control);
+  const material = source == null ? null : decodeControlOpenEntry(source);
+  return material?.kind === "trainer-victory-open" && runtime.v2ControlLedger.isMaterialApplied(control)
+    ? { wave: material.wave, turn: material.turn }
+    : null;
+}
+
+/** Record real presentation completion so the later WAVE_ADVANCE bootstrap cannot queue it a second time. */
+export function completeCoopV2TrainerVictoryPresentation(wave: number): void {
+  const runtime = active;
+  if (runtime == null || runtime.controller.authorityRole !== "replica") {
+    return;
+  }
+  runtime.v2CompletedTrainerVictoryPresentations.add(wave);
+  while (runtime.v2CompletedTrainerVictoryPresentations.size > 8) {
+    const oldest = runtime.v2CompletedTrainerVictoryPresentations.values().next().value;
+    if (oldest == null) {
+      break;
+    }
+    runtime.v2CompletedTrainerVictoryPresentations.delete(oldest);
+  }
+}
+
+/** Whether this renderer already crossed the exact ordered trainer presentation for a source wave. */
+export function didCompleteCoopV2TrainerVictoryPresentation(wave: number): boolean {
+  return active?.v2CompletedTrainerVictoryPresentations.has(wave) === true;
 }
 
 /**
@@ -13911,6 +14058,7 @@ export function assembleCoopRuntime(
     v2WaveProgressionCapture: null,
     v2MeProgressionReplayStarted: new Set<string>(),
     v2MeProgressionReplayCompleted: new Set<string>(),
+    v2CompletedTrainerVictoryPresentations: new Set<number>(),
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {

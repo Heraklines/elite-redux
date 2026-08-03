@@ -23,6 +23,8 @@ import type {
 } from "#data/elite-redux/coop/authority-v2/contract";
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import { isStrictCoopEntryPresentation } from "#data/elite-redux/coop/coop-battle-event-validator";
+import { isCompleteCoopTrainerVictoryMaterial } from "#data/elite-redux/coop/coop-me-terminal-validator";
+import type { CoopTrainerVictoryMaterial } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { CoopAuthoritativeBattleStateV1, CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 export interface CoopCommandOpenMaterialV2 {
@@ -101,6 +103,19 @@ export interface CoopReplacementOpenMaterialV2 {
 }
 
 /**
+ * Complete ordered boundary that opens a normal trainer-victory presentation before WAVE_ADVANCE exists.
+ * It carries the exact trainer identity and source-wave state; its stated successor remains an ordered wait,
+ * so this presentation can never choose or apply the later post-battle mechanical transition.
+ */
+export interface CoopTrainerVictoryOpenMaterialV2 {
+  readonly kind: "trainer-victory-open";
+  readonly wave: number;
+  readonly turn: number;
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  readonly trainerVictory: CoopTrainerVictoryMaterial;
+}
+
+/**
  * The only cursor actions an authenticated replacement-open entry may authorize.
  *
  * Generic state application is deliberately cursor-neutral. A same-wave winning-turn picker is the
@@ -144,7 +159,8 @@ export function classifyReplacementOpenCursor(
 export type CoopControlOpenMaterialV2 =
   | CoopCommandOpenMaterialV2
   | CoopInteractionOpenMaterialV2
-  | CoopReplacementOpenMaterialV2;
+  | CoopReplacementOpenMaterialV2
+  | CoopTrainerVictoryOpenMaterialV2;
 
 /**
  * Address claimed by one real local CommandPhase while it is parked behind the
@@ -204,6 +220,14 @@ export interface BuildReplacementOpenEntryInput {
   readonly context: CoopFrameContextV2;
   readonly operationId: string;
   readonly material: CoopReplacementOpenMaterialV2;
+  readonly subsumes?: readonly number[];
+}
+
+export interface BuildTrainerVictoryOpenEntryInput {
+  readonly context: CoopFrameContextV2;
+  readonly operationId: string;
+  readonly material: CoopTrainerVictoryOpenMaterialV2;
+  readonly successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
   readonly subsumes?: readonly number[];
 }
 
@@ -315,6 +339,21 @@ export function isCompleteReplacementOpenMaterial(value: unknown): value is Coop
   );
 }
 
+/** Validate the complete, recoverable normal trainer-victory presentation boundary. */
+export function isCompleteTrainerVictoryOpenMaterial(value: unknown): value is CoopTrainerVictoryOpenMaterialV2 {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+  return (
+    value.kind === "trainer-victory-open"
+    && isPositiveSafeInt(value.wave)
+    && isPositiveSafeInt(value.turn)
+    && isCompleteCommandOpenState(value.authoritativeState, value.wave, value.turn)
+    && isCompleteCoopTrainerVictoryMaterial(value.trainerVictory)
+    && value.trainerVictory.sourceWave === value.wave
+  );
+}
+
 export function commandOpenMaterialDigest(material: CoopCommandOpenMaterialV2): string {
   return `command-open:${fnv1a32(canonicalJson(material))}`;
 }
@@ -325,6 +364,10 @@ export function interactionOpenMaterialDigest(material: CoopInteractionOpenMater
 
 export function replacementOpenMaterialDigest(material: CoopReplacementOpenMaterialV2): string {
   return `replacement-open:${fnv1a32(canonicalJson(material))}`;
+}
+
+export function trainerVictoryOpenMaterialDigest(material: CoopTrainerVictoryOpenMaterialV2): string {
+  return `trainer-victory-open:${fnv1a32(canonicalJson(material))}`;
 }
 
 export function buildCommandOpenEntry(input: BuildCommandOpenEntryInput): Omit<CoopAuthorityEntry, "revision"> {
@@ -454,9 +497,71 @@ export function decodeReplacementOpenEntry(entry: CoopAuthorityEntry): CoopRepla
   return material;
 }
 
+/** Build the ordered presentation-only bridge between a winning turn and its later settled wave entry. */
+export function buildTrainerVictoryOpenEntry(
+  input: BuildTrainerVictoryOpenEntryInput,
+): Omit<CoopAuthorityEntry, "revision"> {
+  if (typeof input.operationId !== "string" || input.operationId.length === 0) {
+    throw new Error("trainer-victory CONTROL_COMMIT operationId must be a non-empty string");
+  }
+  if (!isCompleteTrainerVictoryOpenMaterial(input.material)) {
+    throw new Error("trainer-victory CONTROL_COMMIT requires complete state and trainer material");
+  }
+  const validation = validateNextControl(input.successor);
+  if (!validation.ok) {
+    throw new Error(`trainer-victory CONTROL_COMMIT successor is malformed: ${validation.reason}`);
+  }
+  if (
+    input.successor.epoch !== input.context.sessionEpoch
+    || input.successor.afterOperationId !== input.operationId
+    || input.successor.wave !== input.material.wave
+    || input.successor.turn !== input.material.turn
+    || !input.successor.allowedKinds.includes("WAVE_ADVANCE")
+  ) {
+    throw new Error("trainer-victory CONTROL_COMMIT successor does not match its immutable address");
+  }
+  return {
+    context: input.context,
+    operationId: input.operationId,
+    kind: "CONTROL_COMMIT",
+    material: {
+      digest: trainerVictoryOpenMaterialDigest(input.material),
+      payload: structuredClone(input.material),
+    },
+    nextControl: structuredClone(input.successor),
+    subsumes: normalizeSubsumes(input.subsumes),
+  };
+}
+
+export function decodeTrainerVictoryOpenEntry(entry: CoopAuthorityEntry): CoopTrainerVictoryOpenMaterialV2 | null {
+  if (entry.kind !== "CONTROL_COMMIT" || !isCompleteTrainerVictoryOpenMaterial(entry.material.payload)) {
+    return null;
+  }
+  const material = entry.material.payload;
+  const control = entry.nextControl;
+  if (
+    trainerVictoryOpenMaterialDigest(material) !== entry.material.digest
+    || control.kind !== "AWAIT_SUCCESSOR"
+    || control.epoch !== entry.context.sessionEpoch
+    || control.afterOperationId !== entry.operationId
+    || control.wave !== material.wave
+    || control.turn !== material.turn
+    || !control.allowedKinds.includes("WAVE_ADVANCE")
+    || !validateNextControl(control).ok
+  ) {
+    return null;
+  }
+  return material;
+}
+
 /** Decode either closed CONTROL_COMMIT material kind without guessing from its successor. */
 export function decodeControlOpenEntry(entry: CoopAuthorityEntry): CoopControlOpenMaterialV2 | null {
-  return decodeCommandOpenEntry(entry) ?? decodeInteractionOpenEntry(entry) ?? decodeReplacementOpenEntry(entry);
+  return (
+    decodeCommandOpenEntry(entry)
+    ?? decodeInteractionOpenEntry(entry)
+    ?? decodeReplacementOpenEntry(entry)
+    ?? decodeTrainerVictoryOpenEntry(entry)
+  );
 }
 
 function normalizeSubsumes(values: readonly number[] | undefined): readonly number[] {

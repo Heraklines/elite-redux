@@ -46,9 +46,11 @@ import {
   buildCommandOpenEntry,
   buildInteractionOpenEntry,
   buildReplacementOpenEntry,
+  buildTrainerVictoryOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  type CoopTrainerVictoryOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   armReplacementOwnerWindowAfterControlProof as armReplacementOwnerWindowAfterControlProofOnContext,
@@ -817,6 +819,30 @@ export class CoopAuthorityV2Shadow {
         }),
       );
       this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=replacement-open");
+      return entry;
+    });
+  }
+
+  /** Commit the exact action-only trainer-victory bridge before the settled wave entry exists. */
+  tapTrainerVictoryOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopTrainerVictoryOpenMaterialV2;
+    readonly successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
+    readonly subsumes?: readonly number[];
+  }): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.material.wave;
+    this.lastObservedTurn = input.material.turn;
+    return this.runTap("CONTROL_COMMIT", () => {
+      const entry = this.commit(
+        buildTrainerVictoryOpenEntry({
+          context: this.frameContext,
+          operationId: input.operationId,
+          material: input.material,
+          successor: input.successor,
+          ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        }),
+      );
+      this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=trainer-victory-open");
       return entry;
     });
   }

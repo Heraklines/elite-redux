@@ -181,7 +181,8 @@ export function successorWaitAllows(
     nextKind === "CONTROL_COMMIT"
     && (controlMaterial?.kind === "command-open"
       || controlMaterial?.kind === "interaction-open"
-      || controlMaterial?.kind === "replacement-open")
+      || controlMaterial?.kind === "replacement-open"
+      || controlMaterial?.kind === "trainer-victory-open")
     && wait.allowedControlAddresses != null
   ) {
     // Exact control alternatives are likewise exhaustive. Falling through after a mismatch admitted the
@@ -399,7 +400,7 @@ function broadWaitAllowsControlCommitTurn(
       ? waitTurn
       : controlMaterial?.kind === "replacement-open"
         ? waitTurn
-        : controlMaterial?.kind === "command-open"
+        : controlMaterial?.kind === "command-open" || controlMaterial?.kind === "trainer-victory-open"
           ? waitTurn + (allowSameTurnCommand ? 0 : 1)
           : null;
   return expectedTurn != null && nextTurn === expectedTurn;
@@ -1066,7 +1067,8 @@ function successorWaitIssues(control: Record<string, unknown>): string[] {
         if (
           (candidate.materialKind !== "command-open"
             && candidate.materialKind !== "interaction-open"
-            && candidate.materialKind !== "replacement-open")
+            && candidate.materialKind !== "replacement-open"
+            && candidate.materialKind !== "trainer-victory-open")
           || !waveValid
           || !isPositiveInt(candidate.turn)
           || !operationIdValid

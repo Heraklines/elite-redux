@@ -7,9 +7,12 @@ import { settleCoopTrainerPresentation } from "#data/elite-redux/coop/coop-field
 import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
 import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  completeCoopV2TrainerVictoryPresentation,
+  coopV2TrainerVictoryPresentationAddress,
   failCoopSharedSession,
   getCoopActiveWaveTransition,
   isCoopAuthoritativeGuest,
+  openCoopV2TrainerVictoryPresentation,
   resolveCoopRetainedWaveContinuationIdentity,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -37,6 +40,7 @@ interface ResolvedTrainerVictoryBoundary {
   readonly authoritativeGuest: boolean;
   readonly victory: CoopTrainerVictoryBoundary;
   readonly liveTrainerMatches: boolean;
+  readonly orderedPresentationWave: number | null;
 }
 
 function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null {
@@ -46,7 +50,7 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     if (victory == null) {
       throw new Error("TrainerVictoryPhase started without a trainer battle");
     }
-    return { authoritativeGuest, victory, liveTrainerMatches: true };
+    return { authoritativeGuest, victory, liveTrainerMatches: true, orderedPresentationWave: null };
   }
 
   const ambientBattle = globalScene.currentBattle;
@@ -68,7 +72,27 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
       );
       return null;
     }
-    return { authoritativeGuest, victory, liveTrainerMatches };
+    return { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave: null };
+  }
+
+  const orderedPresentation = coopV2TrainerVictoryPresentationAddress();
+  if (orderedPresentation != null) {
+    const victory = getCoopTrainerVictoryBoundary(globalScene, orderedPresentation.wave);
+    if (victory == null || victory.sourceWave !== orderedPresentation.wave) {
+      failCoopSharedSession(
+        `The ordered trainer-victory presentation for wave ${orderedPresentation.wave} had no retained material.`,
+      );
+      return null;
+    }
+    const liveTrainerMatches =
+      ambientBattle?.waveIndex === victory.sourceWave
+      && ambientBattle.trainer?.config.trainerType === victory.trainerType;
+    return {
+      authoritativeGuest,
+      victory,
+      liveTrainerMatches,
+      orderedPresentationWave: orderedPresentation.wave,
+    };
   }
 
   const retainedIdentity = resolveCoopRetainedWaveContinuationIdentity(true);
@@ -112,7 +136,7 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     );
     return null;
   }
-  return { authoritativeGuest, victory, liveTrainerMatches };
+  return { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave: null };
 }
 
 function queueTrainerVictoryRewards(victory: CoopTrainerVictoryBoundary): void {
@@ -226,7 +250,15 @@ export class TrainerVictoryPhase extends BattlePhase {
     if (resolved == null) {
       return;
     }
-    const { authoritativeGuest, victory, liveTrainerMatches } = resolved;
+    const { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave } = resolved;
+    if (
+      globalScene.gameMode.isCoop
+      && !authoritativeGuest
+      && !openCoopV2TrainerVictoryPresentation()
+    ) {
+      failCoopSharedSession("Could not open the ordered trainer-victory presentation.");
+      return;
+    }
     const finish = () => {
       if (globalScene.gameMode.isCoop) {
         // TrainerVictory deliberately reveals the defeated trainer on both clients. Make its terminal
@@ -237,6 +269,9 @@ export class TrainerVictoryPhase extends BattlePhase {
       }
       this.end();
       if (authoritativeGuest) {
+        if (orderedPresentationWave != null) {
+          completeCoopV2TrainerVictoryPresentation(orderedPresentationWave);
+        }
         clearCoopTrainerVictoryBoundary(globalScene, victory.sourceWave);
       }
     };

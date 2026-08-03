@@ -172,7 +172,7 @@ function isCompleteCoopSerializedTrainer(value: unknown): value is CoopSerialize
   );
 }
 
-function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
+export function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
   if (!isPlainObject(value)) {
     return false;
   }

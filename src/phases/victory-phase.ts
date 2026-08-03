@@ -7,6 +7,7 @@ import {
   beginCoopWaveProgressionCapture,
   broadcastCoopWaveResolved,
   captureCoopAutomaticVictorySealIdentity,
+  didCompleteCoopV2TrainerVictoryPresentation,
   failCoopSharedSession,
   getCoopActiveWaveTransition,
   getCoopController,
@@ -207,7 +208,7 @@ export class VictoryPhase extends PokemonPhase {
       // run (the tournament end-of-match freeze).
       if (!gameMode.isShowdown) {
         globalScene.phaseManager.pushNew("BattleEndPhase", true, automaticVictorySeal);
-        if (isTrainerWin) {
+        if (isTrainerWin && !didCompleteCoopV2TrainerVictoryPresentation(currentWaveIndex)) {
           globalScene.phaseManager.pushNew("TrainerVictoryPhase");
         }
       }
