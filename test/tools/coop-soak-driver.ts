@@ -3868,6 +3868,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       return;
     }
     const sourceWave = destinationWave - 1;
+    const guestPhase = rig.guestScene.phaseManager.getCurrentPhase();
+    if (
+      guestPhase?.phaseName === "NewBattlePhase"
+      && rig.hostScene.currentBattle.waveIndex === destinationWave
+      && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER
+    ) {
+      // Authority V2 has already consumed the retained World Map and parked the renderer at the exact
+      // signed N -> N+1 wait. The first ME_PRESENT entry is the destination carrier that replaces this
+      // phase. Do not demand that the renderer infer another local SelectBiomePhase while the one-process
+      // interceptor deliberately holds the authority immediately before MysteryEncounterPhase.start().
+      // processMeWave starts that real surface next and its ordinary V2 projector consumes this wait.
+      actionScript.push(`wave ${sourceWave}: guest retained signed NewBattle wait for scheduled Mystery entry`);
+      return;
+    }
     const guestBiome = (await withClient(rig.guestCtx, () =>
       driveClientPhaseQueueTo(rig.guestScene, `scheduled Mystery biome predecessor ${sourceWave}`, {
         matches: phase => {

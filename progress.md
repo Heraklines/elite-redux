@@ -7211,3 +7211,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   renderer gate: CONTROL_COMMIT authority was exact, but that gate recognized only WAVE sanctions. The
   follow-up wraps construction in a synchronous consumed-once control permit. The ambient phase remains
   blocked before and after the call; only the phase object created inside the ordered projector is admitted.
+- Exact-SHA gate `30818711037` on production candidate `8695cfa89` turned the formerly failing trainer-tail
+  shards P1, B11, C3, and C5 green. The remaining C1 red occurred only because the one-process soak stopped
+  authority immediately before `MysteryEncounterPhase.start()` could emit `ME_PRESENT`, then incorrectly
+  demanded that the guest abandon its valid signed `NewBattlePhase` wait and infer a local predecessor.
+- The soak now preserves that exact signed wait when the host has already installed the destination Mystery
+  battle; the ordinary ME projector will replace it once `processMeWave` starts the real surface. This is a
+  harness-only correction with a pinned source contract. The only other gate red was import ordering, fixed
+  without changing runtime behavior. Real two-browser Mystery run `30818713774` remains active and untouched.

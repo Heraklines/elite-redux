@@ -4338,6 +4338,11 @@ test("a scheduled Mystery preserves the replica's retained World Map predecessor
   assert.match(helper, /requireCoopSourceWave\(\) === sourceWave/u);
   assert.match(helper, /guestBiome\.start\(\)/u);
   assert.match(helper, /rig\.guestScene\.arena\.biomeId !== rig\.hostScene\.arena\.biomeId/u);
+  assert.match(
+    helper,
+    /guestPhase\?\.phaseName === "NewBattlePhase"[\s\S]*rig\.hostScene\.currentBattle\.waveIndex === destinationWave[\s\S]*BattleType\.MYSTERY_ENCOUNTER[\s\S]*return;/u,
+    "an already-signed NewBattle wait is retained until the authority emits the first Mystery entry",
+  );
 
   const scheduledStart = soakDriver.indexOf("        const nextMeType = opts.meWaves?.get(wave + 1);");
   const scheduledEnd = soakDriver.indexOf("      } catch (e) {", scheduledStart);
