@@ -56,8 +56,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          node scripts/ai/materialize-human-contract-training.mjs \
+          node scripts/ai/select-largest-contract-identity.mjs \
             "$RUNNER_TEMP/production-v4-telemetry/contract-records.jsonl" \
+            "$RUNNER_TEMP/production-v4-selected.jsonl" \
+            "$RUNNER_TEMP/production-v4-identity-report.json"
+          node scripts/ai/materialize-human-contract-training.mjs \
+            "$RUNNER_TEMP/production-v4-selected.jsonl" \
             "$RUNNER_TEMP/production-v4-training"
           python - <<'PY'
           import hashlib
@@ -206,6 +210,7 @@ jobs:
           mkdir -p ai-report/tree ai-report/census
           cp "$RUNNER_TEMP/production-v4-telemetry/report.json" ai-report/census/import-report.json
           cp "$RUNNER_TEMP/production-v4-training/report.json" ai-report/census/materialized-report.json
+          cp "$RUNNER_TEMP/production-v4-identity-report.json" ai-report/census/identity-selection.json
           cp "$RUNNER_TEMP/ai-tree/leaderboard.json" ai-report/tree/
           cp "$RUNNER_TEMP/ai-tree/leaderboard.md" ai-report/tree/
           cp "$RUNNER_TEMP/ai-tree/models/selected-model.json" ai-report/tree/

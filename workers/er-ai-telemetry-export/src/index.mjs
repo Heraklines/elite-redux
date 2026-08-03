@@ -1,6 +1,6 @@
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
-const READ_BATCH_SIZE = 20;
+const READ_BATCH_SIZE = 50;
 
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {

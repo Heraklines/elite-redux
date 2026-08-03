@@ -46,6 +46,7 @@ jobs:
           node scripts/ai/materialize-human-contract-training.mjs
           "$RUNNER_TEMP/production-v4-telemetry/contract-records.jsonl"
           "$RUNNER_TEMP/production-v4-training"
+          --allow-mixed-identities
       - name: Publish sanitized census summary
         shell: bash
         run: |

@@ -17,7 +17,11 @@ async function writeLine(stream, record) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One streaming pass keeps the 1+ GiB contract cut out of memory.
-export async function materializeHumanContractTraining(inputPath, outputDirectory) {
+export async function materializeHumanContractTraining(
+  inputPath,
+  outputDirectory,
+  { requireSingleIdentity = true } = {},
+) {
   const input = resolve(inputPath);
   const output = resolve(outputDirectory);
   mkdirSync(output, { recursive: true });
@@ -130,23 +134,30 @@ export async function materializeHumanContractTraining(inputPath, outputDirector
   summary.featureSchemaVersions = [...featureSchemaVersions].sort();
   summary.buildShas = [...buildShas].sort();
   summary.dictionaryHashes = [...dictionaryHashes].sort();
-  if (summary.schemaVersions.length !== 1 || summary.featureSchemaVersions.length !== 1) {
-    throw new Error("training cut mixes contract or feature schemas");
-  }
-  if (summary.buildShas.length !== 1 || summary.dictionaryHashes.length !== 1) {
-    throw new Error("training cut mixes builds or data dictionaries");
+  if (requireSingleIdentity) {
+    if (summary.schemaVersions.length !== 1 || summary.featureSchemaVersions.length !== 1) {
+      throw new Error("training cut mixes contract or feature schemas");
+    }
+    if (summary.buildShas.length !== 1 || summary.dictionaryHashes.length !== 1) {
+      throw new Error("training cut mixes builds or data dictionaries");
+    }
   }
   writeFileSync(`${output}/report.json`, `${JSON.stringify(summary, null, 2)}\n`);
   return summary;
 }
 
 function usage() {
-  console.error("Usage: node scripts/ai/materialize-human-contract-training.mjs INPUT_JSONL OUTPUT_DIR");
+  console.error(
+    "Usage: node scripts/ai/materialize-human-contract-training.mjs INPUT_JSONL OUTPUT_DIR [--allow-mixed-identities]",
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  if (process.argv.length === 4) {
-    const summary = await materializeHumanContractTraining(process.argv[2], process.argv[3]);
+  const option = process.argv[4];
+  if (process.argv.length === 4 || (process.argv.length === 5 && option === "--allow-mixed-identities")) {
+    const summary = await materializeHumanContractTraining(process.argv[2], process.argv[3], {
+      requireSingleIdentity: option !== "--allow-mixed-identities",
+    });
     console.log(JSON.stringify(summary, null, 2));
   } else {
     usage();
