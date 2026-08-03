@@ -73,6 +73,7 @@ const allowedJourneys = new Set([
   "campaign",
   "probe",
   "fresh-wave2",
+  "reward-pause-settings",
   "fresh-resume",
   "same-tab-rejoin",
   "reverse-resume",

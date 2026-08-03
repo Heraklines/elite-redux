@@ -178,6 +178,7 @@ test("every gameplay co-op journey visibly applies its requested settings before
 
   const gameplayJourneys = [
     "fresh-wave2",
+    "reward-pause-settings",
     "fresh-resume",
     "reverse-resume",
     "faint-replacement",

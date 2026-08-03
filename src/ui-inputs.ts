@@ -239,6 +239,17 @@ export class UiInputs {
         // controller, and the mobile virtual pad instead of opening or swallowing the pause menu.
         globalScene.ui.processInput(Button.MENU);
         break;
+      case UiMode.SETTINGS:
+      case UiMode.SETTINGS_DISPLAY:
+      case UiMode.SETTINGS_AUDIO:
+      case UiMode.SETTINGS_GAMEPAD:
+      case UiMode.SETTINGS_KEYBOARD:
+        // Escape opened this local pause-menu branch, so it must also be able to leave it. Route through
+        // the settings handler's ordinary CANCEL path (navigation reset + mode-chain revert) instead of
+        // bypassing handler cleanup. In co-op the provenance-checked local-overlay lease in UI keeps this
+        // input actionable without releasing or relaying the shared interaction underneath the menu.
+        globalScene.ui.processInput(Button.CANCEL);
+        break;
       case UiMode.MENU:
         globalScene.ui.revertMode();
         globalScene.playSound("ui/select");

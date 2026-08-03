@@ -30,6 +30,7 @@ import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
 import {
   coopAuthorityContinuationSurface,
+  coopLocalOverlayInputAllowed,
   coopUiClassOf,
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
@@ -430,7 +431,16 @@ export class UI extends Phaser.GameObjects.Container {
         globalScene.phaseManager.getCurrentPhase()?.phaseName,
         UiMode[this.mode],
       );
-      if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance && !localPresentationInput) {
+      // Pause/settings are per-client overlays: they neither choose nor release the exact shared control
+      // underneath them. Keep those inputs local and actionable, but require MENU ancestry for nested generic
+      // chrome so a mechanically authoritative CONFIRM/OPTION_SELECT cannot inherit this exemption by mode.
+      const localOverlayInput = coopLocalOverlayInputAllowed(this.mode, this.modeChain);
+      if (
+        isCoopV2InteractionHumanInputFrozen()
+        && !hostEngineDialogueAdvance
+        && !localPresentationInput
+        && !localOverlayInput
+      ) {
         return false;
       }
       // The exact narration lease owns every host MESSAGE surface until the remote owner dismisses

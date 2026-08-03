@@ -472,13 +472,16 @@ test("local presentation input has one registry shared by production and the two
   assert.match(gate, /\.\.\.COOP_LOCAL_PRESENTATION_INPUT_PHASES/u);
   assert.match(
     ui,
-    /localPresentationInput = isCoopLocalPresentationInputSurface[\s\S]*UiMode\[this\.mode\][\s\S]*!hostEngineDialogueAdvance && !localPresentationInput/u,
+    /localPresentationInput = isCoopLocalPresentationInputSurface[\s\S]*UiMode\[this\.mode\][\s\S]*localOverlayInput = coopLocalOverlayInputAllowed\(this\.mode, this\.modeChain\)[\s\S]*!hostEngineDialogueAdvance[\s\S]*!localPresentationInput[\s\S]*!localOverlayInput/u,
   );
   assert.match(
     observer,
     /case "CONFIRM":[\s\S]*isCoopLocalPresentationInputSurface\(phase, uiMode\)[\s\S]*ownerModel: "local"/u,
   );
-  assert.match(observer, /v2InputFrozen[\s\S]*&& !localPresentationInput/u);
+  assert.match(
+    observer,
+    /localOverlayInput = coopLocalOverlayInputAllowed\(ui\.getMode\(\), ui\.getModeChain\(\)\)[\s\S]*v2InputFrozen[\s\S]*&& !localPresentationInput[\s\S]*&& !localOverlayInput/u,
+  );
   assert.match(policy, /name: "iv-scanner"[\s\S]*localPerClientSurface: true/u);
   assert.match(campaign, /if \(driver\.localPerClientSurface\)[\s\S]*findLocalActionableIvScannerSurface/u);
   assert.match(campaign, /targetId: "no"[\s\S]*campaign-local-presentation/u);

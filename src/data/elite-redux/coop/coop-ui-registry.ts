@@ -287,6 +287,28 @@ export function coopUiClassOf(mode: UiMode): CoopUiClass | undefined {
 }
 
 /**
+ * Whether the current input belongs to a strictly local pause-menu overlay.
+ *
+ * Authority V2 deliberately freezes a shared interaction whenever its exact phase/handler control is not
+ * installed. Opening the local pause menu temporarily replaces that handler without replacing the ordered
+ * reward/shop/encounter control underneath it, so applying the freeze blindly makes the visible menu dead.
+ *
+ * Provenance matters: generic CONFIRM and OPTION_SELECT modes can commit shared mechanics. They are allowed
+ * here only when a real MENU ancestor exists and every descendant between that menu and the current mode is
+ * classified local-only. A mirrored descendant immediately closes the exemption.
+ */
+export function coopLocalOverlayInputAllowed(currentMode: UiMode, modeChain: readonly UiMode[]): boolean {
+  if (currentMode === UiMode.MENU) {
+    return true;
+  }
+  const menuIndex = modeChain.lastIndexOf(UiMode.MENU);
+  if (menuIndex < 0) {
+    return false;
+  }
+  return [...modeChain.slice(menuIndex + 1), currentMode].every(mode => coopUiClassOf(mode) === "local-only");
+}
+
+/**
  * The DECISION half of the ui.ts tripwire (pure, so it is unit-testable). Given the target mode and
  * whether the PARTNER currently owns a live shared interaction, returns a warning string when a
  * non-mirrored, non-exempt interactive screen is opening on this client during that partner-owned

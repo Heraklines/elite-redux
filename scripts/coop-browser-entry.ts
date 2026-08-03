@@ -25,6 +25,7 @@ const [
     isCoopV2InteractionHumanInputFrozen,
   },
   { isCoopLocalPresentationInputSurface },
+  { coopLocalOverlayInputAllowed },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
   { setCoopWaveProgressionPresentationObserver },
@@ -45,6 +46,7 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/data/elite-redux/coop/coop-local-presentation-input"),
+  import("../src/data/elite-redux/coop/coop-ui-registry"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
   import("../src/data/elite-redux/coop/coop-wave-progression-observer"),
@@ -801,6 +803,14 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       return { surfaceId: "auth:login-or-register", operationClass: "authentication", ownerModel: "local" };
     case "TITLE":
       return { surfaceId: "title-menu", operationClass: "navigation", ownerModel: "local" };
+    case "MENU":
+      return { surfaceId: "pause-menu", operationClass: "local-overlay", ownerModel: "local" };
+    case "SETTINGS":
+    case "SETTINGS_DISPLAY":
+    case "SETTINGS_AUDIO":
+    case "SETTINGS_GAMEPAD":
+    case "SETTINGS_KEYBOARD":
+      return { surfaceId: "pause-settings", operationClass: "local-overlay", ownerModel: "local" };
     case "COMMAND":
     case "FIGHT":
     case "BALL":
@@ -2080,9 +2090,17 @@ function observeSemanticSurface(): void {
       && interactiveMysteryPhase
       && coopHostMeNarrationAwaitingGuestAck(runtime);
     const localPresentationInput = isCoopLocalPresentationInputSurface(phase, uiMode);
+    // Production admits only a provenance-checked local pause/settings branch while its shared V2
+    // control remains installed underneath. Project the same decision so a two-browser journey cannot
+    // call a visible but frozen overlay actionable (the live wave-13 reward-menu softlock).
+    const localOverlayInput = coopLocalOverlayInputAllowed(ui.getMode(), ui.getModeChain());
     const v2SurfaceInputBlocked =
-      v2InputFrozen && !localPresentationInput && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
-    const inputBlocked = v2SurfaceInputBlocked || handlerInputBlocked === true ? true : handlerInputBlocked;
+      v2InputFrozen
+      && !localPresentationInput
+      && !localOverlayInput
+      && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
+    const inputBlocked =
+      v2SurfaceInputBlocked || handlerInputBlocked === true ? true : localOverlayInput ? false : handlerInputBlocked;
     const phaseAuthorityOperationId = (currentPhase as unknown as { coopV2ControlOperationId?: unknown })
       .coopV2ControlOperationId;
     const authorityAddress =

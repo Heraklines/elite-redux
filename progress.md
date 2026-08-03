@@ -7372,3 +7372,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   fresh registration, public lobby pairing, two real Chromium clients, rewards, and the wave-2 frontier.
 - Staging deploy `30846035981` is green and public `version.json` verifies
   `github:cb433905559a2f20ea95cb83a67a996d06ddecc5:run-30846035981.1`. Production was not touched.
+
+## 2026-08-03 - live reward pause/settings input-lease softlock
+
+- Dev-log tip `60bfc61052f77bdd126b2961be218cfb77e3e4c8` contains the exact host/guest pair from staging build
+  `cb4339055` (run `922a05bd-2f99-46b6-8c04-776963161286`, epoch `1828644884076428`). Both engines
+  converged through wave 13 turn 2 at digest/checksum `a430b83de3719365`, then installed the same guest-owned
+  reward operation at global V2 revision 34. The host remained connected and waited for interaction choice
+  seq 13 for more than ten minutes; the guest remained in `SelectModifierPhase` with no machine wait.
+- The live softlock is an input-lease seam, not a mechanics divergence. Escape opens `UiMode.MENU` directly
+  from `UiInputs.buttonMenu`, bypassing `UI.processInput`. Once MENU/SETTINGS replaces MODIFIER_SELECT,
+  `isCoopV2InteractionHumanInputFrozen` correctly sees that the exact reward handler is no longer installed,
+  but previously rejected every local overlay key as if it could advance shared authority. Sprites continued
+  animating while cursor, Cancel, and Settings input were dead; the peer could never receive the reward choice.
+- The production fix adds `coopLocalOverlayInputAllowed`: MENU itself is local, while nested Settings/generic
+  chrome is admitted only with a real MENU ancestor and an all-`local-only` registry path. Any mirrored
+  descendant fails closed, so generic CONFIRM/OPTION_SELECT cannot acquire a mechanical bypass. Escape now
+  exits Settings through its normal CANCEL cleanup path. No overlay input is mirrored or releases the shared
+  reward lease; closing both overlays returns to the same address, digest, selection, and owner.
+- The CI observer now uses the identical production predicate and publishes actionable `pause-menu` and
+  `pause-settings` surfaces. The new `reward-pause-settings` journey uses two real Chromium clients and only
+  public keys to open Settings during a live reward, move its cursor, capture the screen, Escape twice, prove
+  the exact reward is restored, leave rewards, and converge at the wave-2 command frontier. This closes the
+  coverage hole: prior Settings walks happened only before pairing, so they never intersected the V2 freeze.
