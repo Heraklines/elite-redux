@@ -9,6 +9,7 @@
     "progress.md",
     "src/data/elite-redux/coop/coop-runtime.ts",
     "test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs",
+    "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
     "test/tools/coop-soak-driver.ts"
   ],
   "lockedSchemaFiles": []

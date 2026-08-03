@@ -7,6 +7,7 @@
 // one run, ownership alternates naturally, normal battles continue between them, and real biome changes are
 // counted. This is deliberately separate from one-event unit repros: a green result proves event teardown
 // does not poison a later event, reward shop, biome boundary, or command phase.
+// Focused closure runs select this exact C1 journey whenever its production-shaped driver contract changes.
 
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
