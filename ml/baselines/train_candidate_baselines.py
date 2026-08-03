@@ -27,6 +27,7 @@ LGBMClassifier: Any = None
 LGBMRanker: Any = None
 _LIGHTGBM_IMPORT_ATTEMPTED = False
 
+SUPPORTED_SCHEMA_VERSIONS = {3, 4}
 SCHEMA_VERSION = 3
 FEATURE_SCHEMA_VERSION = 2
 TOKEN_GROUP_NAMES = ("actor", "targets", "destination", "field", "action")
@@ -89,7 +90,20 @@ def jsonl_files(path: Path) -> list[Path]:
     return sorted(file for file in path.rglob("*.jsonl") if file.is_file())
 
 
-def load_records(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def dataset_schema_versions(decisions: list[dict[str, Any]]) -> tuple[int, int]:
+    schema_versions = {int(record.get("schemaVersion", -1)) for record in decisions}
+    feature_versions = {int(record.get("featureSchemaVersion", -1)) for record in decisions}
+    if len(schema_versions) != 1 or not schema_versions.issubset(SUPPORTED_SCHEMA_VERSIONS):
+        raise ValueError(f"dataset must contain one supported contract schema, found {sorted(schema_versions)}")
+    if len(feature_versions) != 1 or min(feature_versions) < 1:
+        raise ValueError(f"dataset must contain one positive feature schema, found {sorted(feature_versions)}")
+    return schema_versions.pop(), feature_versions.pop()
+
+
+def load_records(
+    path: Path,
+    require_terminals: bool = True,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     decisions: list[dict[str, Any]] = []
     terminals: list[dict[str, Any]] = []
     for file in jsonl_files(path):
@@ -98,18 +112,21 @@ def load_records(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]
                 if not line.strip():
                     continue
                 record = json.loads(line)
-                if record.get("schemaVersion") != SCHEMA_VERSION:
+                if record.get("schemaVersion") not in SUPPORTED_SCHEMA_VERSIONS:
                     raise ValueError(f"{file}:{line_number}: unsupported schema version")
                 if record.get("kind") == "combat_decision":
                     validate_decision(record, file, line_number)
                     decisions.append(record)
-                elif record.get("kind") == "episode_terminal":
+                elif record.get("kind") in ("episode_terminal", "run_terminal"):
                     terminals.append(record)
+                elif record.get("kind") in ("combat_auxiliary_decision", "combat_transition", "battle_terminal"):
+                    continue
                 else:
                     raise ValueError(f"{file}:{line_number}: unknown record kind")
     if not decisions:
         raise ValueError(f"no combat decisions found under {path}")
-    validate_dataset(decisions, terminals)
+    dataset_schema_versions(decisions)
+    validate_dataset(decisions, terminals, require_terminals=require_terminals)
     return decisions, terminals
 
 
@@ -129,12 +146,14 @@ def load_winner_policy_records(
                 if not line.strip():
                     continue
                 record = json.loads(line)
-                if record.get("schemaVersion") != SCHEMA_VERSION:
+                if record.get("schemaVersion") not in SUPPORTED_SCHEMA_VERSIONS:
                     raise ValueError(f"{file}:{line_number}: unsupported schema version")
                 if record.get("kind") == "combat_decision":
                     input_decisions += 1
-                elif record.get("kind") == "episode_terminal":
+                elif record.get("kind") in ("episode_terminal", "run_terminal"):
                     terminals.append(record)
+                elif record.get("kind") in ("combat_auxiliary_decision", "combat_transition", "battle_terminal"):
+                    continue
                 else:
                     raise ValueError(f"{file}:{line_number}: unknown record kind")
 
@@ -185,6 +204,7 @@ def load_winner_policy_records(
 
     if not decisions:
         raise ValueError("winner-only policy selection removed every combat decision")
+    dataset_schema_versions(decisions)
     selected_episodes = {record["episodeId"] for record in decisions}
     selected_terminals = [record for record in terminals if record["episodeId"] in selected_episodes]
     validate_dataset(decisions, selected_terminals)
@@ -215,7 +235,7 @@ def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> N
         raise ValueError(f"{prefix}: missing episode/decision identity")
     feature_rows = record.get("candidateFeatures", [])
     feature_ids = [row.get("candidateId") for row in feature_rows]
-    if record.get("featureSchemaVersion") != FEATURE_SCHEMA_VERSION:
+    if not isinstance(record.get("featureSchemaVersion"), int) or record["featureSchemaVersion"] < 1:
         raise ValueError(f"{prefix}: unsupported feature schema")
     if len(feature_ids) != len(ids) or len(set(feature_ids)) != len(ids) or set(feature_ids) != set(ids):
         raise ValueError(f"{prefix}: candidate features do not map one-to-one")
@@ -257,7 +277,11 @@ def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> N
         raise ValueError(f"{prefix}: hidden opponent modifiers crossed the Battle Info visibility boundary")
 
 
-def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, Any]]) -> None:
+def validate_dataset(
+    decisions: list[dict[str, Any]],
+    terminals: list[dict[str, Any]],
+    require_terminals: bool = True,
+) -> None:
     decision_ids = [record["decisionId"] for record in decisions]
     if len(decision_ids) != len(set(decision_ids)):
         raise ValueError("dataset contains duplicate decision ids")
@@ -267,7 +291,7 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
     missing = sorted(set(decision_episodes) - set(terminal_episodes))
     extra = sorted(set(terminal_episodes) - set(decision_episodes))
     duplicated = sorted(episode for episode, count in terminal_episodes.items() if count != 1)
-    if missing or extra or duplicated:
+    if require_terminals and (missing or extra or duplicated):
         raise ValueError(
             "episode terminal mismatch: "
             f"missing={missing}, extra={extra}, non_unique={duplicated}"
@@ -293,7 +317,11 @@ def validate_dataset(decisions: list[dict[str, Any]], terminals: list[dict[str, 
         raise ValueError(f"episodes map to multiple source partitions: {inconsistent_partitions}")
 
 
-def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dict[str, int | str]:
+def validate_data_dictionary(
+    path: Path,
+    decisions: list[dict[str, Any]],
+    supplement_path: Path | None = None,
+) -> dict[str, Any]:
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     dictionary = json.loads(raw)
@@ -322,6 +350,30 @@ def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dic
     recorded_hashes = {record.get("dictionaryHash") for record in decisions}
     if recorded_hashes != {digest}:
         raise ValueError(f"dictionary hash mismatch: records={sorted(map(str, recorded_hashes))}, file={digest}")
+
+    supplement_coverage: dict[str, Any] = {
+        "sha256": None,
+        "items": 0,
+        "modifiers": 0,
+    }
+    if supplement_path is not None:
+        supplement_raw = supplement_path.read_bytes()
+        supplement = json.loads(supplement_raw)
+        if supplement.get("schemaVersion") != 1:
+            raise ValueError(f"unsupported dictionary supplement schema {supplement.get('schemaVersion')}")
+        if supplement.get("baseDictionarySha256") != digest:
+            raise ValueError("dictionary supplement does not match the captured base dictionary")
+        for section in ("items", "modifiers"):
+            additions = supplement.get(section, {})
+            if not isinstance(additions, dict):
+                raise ValueError(f"dictionary supplement {section} must be an object")
+            target = dictionary.setdefault(section, {})
+            overlap = sorted(set(target) & set(additions))
+            if overlap:
+                raise ValueError(f"dictionary supplement attempts to replace existing {section}: {overlap}")
+            target.update(additions)
+            supplement_coverage[section] = len(additions)
+        supplement_coverage["sha256"] = hashlib.sha256(supplement_raw).hexdigest()
 
     known_moves = {int(value) for value in dictionary.get("moves", {})}
     known_abilities = {int(value) for value in dictionary.get("abilities", {})}
@@ -408,6 +460,7 @@ def validate_data_dictionary(path: Path, decisions: list[dict[str, Any]]) -> dic
         "referencedSpeciesForms": len(referenced_species_forms),
         "referencedRelics": len(referenced_relics),
         "referencedMechanicNamespaces": len(referenced_mechanic_namespaces),
+        "supplement": supplement_coverage,
     }
 
 
@@ -927,12 +980,15 @@ def outcome_weighted_model_specs(seed: int) -> list[tuple[str, Any]]:
 
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
+    global SCHEMA_VERSION, FEATURE_SCHEMA_VERSION
     if not 0.0 <= args.loss_episode_weight <= 1.0:
         raise ValueError("loss episode weight must be between 0 and 1")
     if args.winner_only_policy and args.loss_episode_weight != 0:
         raise ValueError("winner-only policy training requires --loss-episode-weight 0")
     if args.max_policy_decisions is not None and not args.winner_only_policy:
         raise ValueError("--max-policy-decisions requires --winner-only-policy")
+    if args.behavior_cloning_only and args.winner_only_policy:
+        raise ValueError("behavior-cloning-only and winner-only policy modes are mutually exclusive")
     winner_only_selection: dict[str, int | None] | None = None
     if args.winner_only_policy:
         all_decisions, terminals, winner_only_selection = load_winner_policy_records(
@@ -940,8 +996,13 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             args.max_policy_decisions,
         )
     else:
-        all_decisions, terminals = load_records(args.data)
-    dictionary_coverage = validate_data_dictionary(args.dictionary, all_decisions)
+        all_decisions, terminals = load_records(args.data, require_terminals=not args.behavior_cloning_only)
+    SCHEMA_VERSION, FEATURE_SCHEMA_VERSION = dataset_schema_versions(all_decisions)
+    dictionary_coverage = validate_data_dictionary(
+        args.dictionary,
+        all_decisions,
+        args.dictionary_supplement,
+    )
     rollout_decisions, rollout_selection = (
         select_elite_rollouts(all_decisions, terminals)
         if args.elite_rollouts
@@ -985,10 +1046,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     weights = row_weights(y, decision_ids)
     terminal_by_episode = {terminal["episodeId"]: terminal for terminal in terminals}
     successful_rows = np.asarray(
-        [terminal_by_episode[episode]["outcome"] in SUCCESSFUL_ROLLOUT_OUTCOMES for episode in episodes]
+        [
+            terminal_by_episode.get(episode, {}).get("outcome") in SUCCESSFUL_ROLLOUT_OUTCOMES
+            for episode in episodes
+        ]
     )
     outcome_weights = np.asarray(
-        [1.0 if successful else args.loss_episode_weight for successful in successful_rows],
+        [
+            1.0 if successful else (args.loss_episode_weight if episode in terminal_by_episode else 0.0)
+            for episode, successful in zip(episodes, successful_rows)
+        ],
         dtype=np.float64,
     )
     scaler = StandardScaler().fit(x[train_mask])
@@ -1104,7 +1171,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     outcome_fitted_models: dict[str, tuple[Any, bool]] = {}
     policy_training_mask = (
         np.zeros_like(train_mask, dtype=bool)
-        if diagnostic_only
+        if diagnostic_only or args.behavior_cloning_only
         else train_mask & (outcome_weights > 0)
     )
     policy_training_partitions = {
@@ -1123,6 +1190,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 for key in ("decisions", "top1", "top3", "mrr", "candidateNll")
             }
             row["trainingObjective"] = "winner-only behavior cloning; losses excluded before materialization"
+    elif args.behavior_cloning_only:
+        policy_training_reason = "behavior-cloning-only mode does not fit an outcome-weighted selector"
     elif diagnostic_only:
         policy_training_reason = "diagnostic source imitation cannot produce a trainable policy artifact"
     elif not policy_training_mask.any():
@@ -1396,9 +1465,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--dictionary", type=Path, required=True)
+    parser.add_argument(
+        "--dictionary-supplement",
+        type=Path,
+        help="hash-bound additions for runtime-generated ids omitted by a captured dictionary",
+    )
     parser.add_argument("--report-json", type=Path, required=True)
     parser.add_argument("--report-md", type=Path, required=True)
     parser.add_argument("--models-dir", type=Path)
+    parser.add_argument(
+        "--behavior-cloning-only",
+        action="store_true",
+        help="fit all eligible human policy targets without requiring or inferring a run terminal",
+    )
     parser.add_argument(
         "--elite-rollouts",
         action="store_true",

@@ -9,8 +9,10 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 
 from train_candidate_baselines import (
     artifact_scores,
+    dataset_schema_versions,
     fit_stacked_tree_ensemble,
     is_policy_target,
+    load_records,
     load_winner_policy_records,
     make_rows,
     ordered_group_sizes,
@@ -24,6 +26,58 @@ from train_candidate_baselines import (
 
 
 class CandidateBaselineContractTest(unittest.TestCase):
+    def test_contract_v4_behavior_cloning_loads_incomplete_human_runs(self) -> None:
+        candidate_id = "move:v4"
+        decision = {
+            "schemaVersion": 4,
+            "featureSchemaVersion": 4,
+            "kind": "combat_decision",
+            "candidateScope": "combat-command",
+            "episodeId": "incomplete-run",
+            "decisionId": "decision:v4",
+            "buildSha": "build",
+            "dexHash": "dictionary",
+            "dictionaryHash": "dictionary",
+            "sourcePartitionId": "account-v4",
+            "policySource": "human-v1",
+            "policyTarget": True,
+            "candidates": [{"id": candidate_id}],
+            "chosenCandidateId": candidate_id,
+            "candidateFeatures": [{"candidateId": candidate_id, "values": [0.0]}],
+            "candidateTokenGroups": [{
+                "candidateId": candidate_id,
+                "groups": {
+                    "actor": [],
+                    "targets": [],
+                    "destination": [],
+                    "field": [],
+                    "action": [candidate_id],
+                },
+            }],
+            "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract-v4.jsonl"
+            path.write_text(
+                "\n".join(
+                    json.dumps(row)
+                    for row in (
+                        decision,
+                        {
+                            "schemaVersion": 4,
+                            "kind": "combat_transition",
+                            "episodeId": "incomplete-run",
+                        },
+                    )
+                ) + "\n",
+                encoding="utf-8",
+            )
+            decisions, terminals = load_records(path, require_terminals=False)
+
+        self.assertEqual(decisions, [decision])
+        self.assertEqual(terminals, [])
+        self.assertEqual(dataset_schema_versions(decisions), (4, 4))
+
     def test_engine_and_heuristic_rows_are_not_policy_targets(self) -> None:
         self.assertFalse(is_policy_target({"policySource": "engine-hardest-v1", "policyTarget": False}))
         self.assertFalse(is_policy_target({"policySource": "diagnostic-tree-v1", "policyTarget": True}))
@@ -170,6 +224,60 @@ class CandidateBaselineContractTest(unittest.TestCase):
             decision["observation"]["selfParty"][0]["abilities"][0]["abilityId"] = 4
             with self.assertRaisesRegex(ValueError, "misses recorded runtime ids"):
                 validate_data_dictionary(path, [decision])
+
+    def test_dictionary_supplement_is_hash_bound_and_cannot_override_entries(self) -> None:
+        payload = {
+            "schemaVersion": 3,
+            "features": {"schemaVersion": 2, "names": ["f0"]},
+            "moves": {"1": {}},
+            "abilities": {},
+            "items": {},
+            "modifiers": {},
+            "speciesForms": {"6:0": {}},
+            "relics": {},
+            "battlerTags": [],
+            "arenaTags": [],
+            "positionalTags": [],
+            "mechanicNamespaces": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dictionary.json"
+            supplement_path = Path(directory) / "supplement.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            supplement = {
+                "schemaVersion": 1,
+                "baseDictionarySha256": digest,
+                "items": {"ER_WARD_STONE_MINOR": {"id": "ER_WARD_STONE_MINOR"}},
+                "modifiers": {},
+            }
+            supplement_path.write_text(json.dumps(supplement), encoding="utf-8")
+            decision = {
+                "dictionaryHash": digest,
+                "observation": {
+                    "selfParty": [{
+                        "species": 6,
+                        "form": 0,
+                        "abilities": [],
+                        "moves": [{"moveId": 1}],
+                        "heldItems": [{"itemId": "ER_WARD_STONE_MINOR"}],
+                        "tags": [],
+                        "mechanics": [],
+                    }],
+                    "opponentActive": [],
+                    "fieldEffects": [],
+                    "positionalEffects": [],
+                    "modifiers": [],
+                },
+                "candidates": [{"kind": "move", "moveId": 1}],
+                "candidateFeatures": [{"values": [0.0]}],
+            }
+            coverage = validate_data_dictionary(path, [decision], supplement_path)
+            self.assertEqual(coverage["supplement"]["items"], 1)
+            supplement["baseDictionarySha256"] = "wrong"
+            supplement_path.write_text(json.dumps(supplement), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                validate_data_dictionary(path, [decision], supplement_path)
 
     def test_inverse_pilot_legs_share_a_legacy_split_group(self) -> None:
         self.assertEqual(record_split_group({"episodeId": "pilot-20"}), "pilot-pair-10")

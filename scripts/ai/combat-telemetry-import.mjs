@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import lzString from "lz-string";
 
@@ -28,7 +28,8 @@ function usage(environment, message) {
   }
   const source = TELEMETRY_SOURCES[environment];
   console.error(
-    `Usage: node scripts/ai/download-${environment}-combat-telemetry.mjs [--out DIR] [--prefix YYYY-MM-DD/]\n`
+    `Usage: node scripts/ai/download-${environment}-combat-telemetry.mjs [--out DIR] [--prefix YYYY-MM-DD/] `
+      + "[--contract-version N] [--modified-after ISO] [--modified-before ISO]\n"
       + `Reads ${environment} R2 bucket ${source.bucket} only. Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.`,
   );
 }
@@ -53,6 +54,9 @@ function parseArgs(environment, argv) {
   const source = TELEMETRY_SOURCES[environment];
   let outDir = source.defaultOutDir;
   let prefix = "";
+  let contractVersion = null;
+  let modifiedAfter = null;
+  let modifiedBefore = null;
   const remaining = [...argv];
   while (remaining.length > 0) {
     const arg = remaining.shift();
@@ -65,6 +69,22 @@ function parseArgs(environment, argv) {
       prefix = remaining.shift();
       if (prefix == null) {
         throw new Error("--prefix requires a value");
+      }
+    } else if (arg === "--contract-version") {
+      contractVersion = remaining.shift();
+      if (!contractVersion || !/^\d+$/u.test(contractVersion)) {
+        throw new Error("--contract-version requires a non-negative integer");
+      }
+    } else if (arg === "--modified-after" || arg === "--modified-before") {
+      const value = remaining.shift();
+      const parsed = Date.parse(value ?? "");
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`${arg} requires an ISO timestamp`);
+      }
+      if (arg === "--modified-after") {
+        modifiedAfter = parsed;
+      } else {
+        modifiedBefore = parsed;
       }
     } else if (arg === "--help" || arg === "-h") {
       usage(environment);
@@ -79,7 +99,10 @@ function parseArgs(environment, argv) {
   if (outputName.includes(conflictingName)) {
     throw new Error(`${environment} telemetry cannot be written to an output named ${outputName}`);
   }
-  return { output, prefix };
+  if (modifiedAfter != null && modifiedBefore != null && modifiedAfter >= modifiedBefore) {
+    throw new Error("--modified-after must be earlier than --modified-before");
+  }
+  return { output, prefix, contractVersion, modifiedAfter, modifiedBefore };
 }
 
 function increment(counts, key) {
@@ -129,6 +152,9 @@ export function importTelemetryBatches(batches, options) {
     legacyDecisions: 0,
     legacyTurnOutcomes: 0,
     contractDecisions: 0,
+    contractAuxiliaryDecisions: 0,
+    contractTransitions: 0,
+    battleTerminals: 0,
     terminals: 0,
     duplicateRecords: 0,
     invalidRecords: 0,
@@ -205,7 +231,37 @@ export function importTelemetryBatches(batches, options) {
         contractRecords.set(key, record);
         report.contractDecisions++;
         increment(report.policySources, String(record.policySource ?? "unknown"));
-      } else if (event?.kind === "run_outcome" && event.record?.kind === "episode_terminal") {
+      } else if (event?.kind === "combat_auxiliary_decision" && event.record?.kind === "combat_auxiliary_decision") {
+        const record = event.record;
+        const key = `auxiliary:${record.decisionId}`;
+        if (!record.decisionId || !record.sourcePartitionId || contractRecords.has(key)) {
+          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+          continue;
+        }
+        contractRecords.set(key, record);
+        report.contractAuxiliaryDecisions++;
+      } else if (event?.kind === "combat_contract_transition" && event.record?.kind === "combat_transition") {
+        const record = event.record;
+        const key = `transition:${record.transitionId}`;
+        if (!record.transitionId || !record.episodeId || contractRecords.has(key)) {
+          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+          continue;
+        }
+        contractRecords.set(key, record);
+        report.contractTransitions++;
+      } else if (event?.kind === "battle_terminal" && event.record?.kind === "battle_terminal") {
+        const record = event.record;
+        const key = `battle-terminal:${record.terminalId}`;
+        if (!record.terminalId || !record.episodeId || contractRecords.has(key)) {
+          report[contractRecords.has(key) ? "duplicateRecords" : "invalidRecords"]++;
+          continue;
+        }
+        contractRecords.set(key, record);
+        report.battleTerminals++;
+      } else if (
+        event?.kind === "run_outcome"
+        && (event.record?.kind === "episode_terminal" || event.record?.kind === "run_terminal")
+      ) {
         const record = event.record;
         const key = `terminal:${record.episodeId}:${record.outcome}`;
         if (!record.episodeId || contractRecords.has(key)) {
@@ -235,7 +291,14 @@ export function importTelemetryBatches(batches, options) {
 }
 
 function writeJsonLines(path, records) {
-  writeFileSync(path, records.length > 0 ? `${records.map(record => JSON.stringify(record)).join("\n")}\n` : "");
+  const descriptor = openSync(path, "w");
+  try {
+    for (const record of records) {
+      writeSync(descriptor, `${JSON.stringify(record)}\n`);
+    }
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 function retryDelayMs(response, attempt) {
@@ -316,13 +379,26 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
     return JSON.parse(json);
   }
 
-  const objects = await listObjects();
+  const listedObjects = await listObjects();
+  const objects = listedObjects.filter(object => {
+    const modified = Date.parse(object.last_modified ?? "");
+    return (
+      (args.contractVersion == null
+        || String(object.custom_metadata?.combatContractVersion ?? "0") === args.contractVersion)
+      && (args.modifiedAfter == null || modified > args.modifiedAfter)
+      && (args.modifiedBefore == null || modified <= args.modifiedBefore)
+    );
+  });
   const batches = [];
   for (let offset = 0; offset < objects.length; offset += READ_CONCURRENCY) {
     batches.push(...(await Promise.all(objects.slice(offset, offset + READ_CONCURRENCY).map(readBatch))));
   }
   const imported = importTelemetryBatches(batches, { environment, bucket: source.bucket });
   imported.report.prefix = args.prefix;
+  imported.report.contractVersionFilter = args.contractVersion;
+  imported.report.modifiedAfter = args.modifiedAfter == null ? null : new Date(args.modifiedAfter).toISOString();
+  imported.report.modifiedBefore = args.modifiedBefore == null ? null : new Date(args.modifiedBefore).toISOString();
+  imported.report.listedObjects = listedObjects.length;
   imported.report.objects = objects.length;
   imported.report.bytes = objects.reduce((sum, object) => sum + (object.size ?? 0), 0);
 
