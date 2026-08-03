@@ -5107,13 +5107,14 @@ async function advanceToNextWaveCommand(
   // Reuse the same causal progress budget as normal presentation qualification, with a smaller
   // immutable ceiling. Keepalives and repeated phase names still cannot extend it.
   const retainedPartyEvolutionExpected = retainedPartyEvolutionNeedsProgressBudget(policy.partyMutatingReward);
-  const betweenWaveBudget = policy.moveAnimationsExpected || retainedPartyEvolutionExpected
-    ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
-        hardCeilingMs:
-          betweenWaveTimeoutMs
-          + (policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS),
-      })
-    : null;
+  const betweenWaveBudget =
+    policy.moveAnimationsExpected || retainedPartyEvolutionExpected
+      ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
+          hardCeilingMs:
+            betweenWaveTimeoutMs
+            + (policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS),
+        })
+      : null;
   // Mystery difficulty deliberately chains encounters without opening a battle command between them, and the
   // longitudinal navigation profile can encounter the same chain between two geographic frontiers. Give each
   // observer-proven public action one ordinary surface allowance; never refresh from keepalives, phase names, or
