@@ -1,0 +1,216 @@
+name: AI Production V4 Remote Training (Private)
+
+# Research-only bridge: production R2 -> ephemeral GitHub runner -> private
+# Kaggle dataset/kernel. Raw telemetry is never uploaded as an Actions artifact.
+on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-production-v4-remote-training.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-production-v4-remote-training
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Prepare private v4 GPU run and fresh winner tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/baselines/requirements.txt
+      - name: Install pinned research clients
+        run: >-
+          python -m pip install
+          --requirement ml/baselines/requirements.txt
+          kaggle==1.8.4
+      - name: Stream production v4 telemetry into ephemeral runner storage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/ai/download-production-combat-telemetry.mjs
+          --contract-version 4
+          --read-concurrency 24
+          --out "$RUNNER_TEMP/production-v4-telemetry"
+      - name: Materialize one identity-bound training cut
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node scripts/ai/materialize-human-contract-training.mjs \
+            "$RUNNER_TEMP/production-v4-telemetry/contract-records.jsonl" \
+            "$RUNNER_TEMP/production-v4-training"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          temp = Path(os.environ["RUNNER_TEMP"])
+          report = json.loads((temp / "production-v4-training" / "report.json").read_text(encoding="utf-8"))
+          hashes = report.get("dictionaryHashes")
+          if not isinstance(hashes, list) or len(hashes) != 1:
+              raise SystemExit(f"training cut must name one dictionary hash, got {hashes!r}")
+          expected = hashes[0]
+          key = urllib.parse.quote(f"dictionaries/{expected}.json", safe="")
+          url = (
+              "https://api.cloudflare.com/client/v4/accounts/"
+              f"{os.environ['CLOUDFLARE_ACCOUNT_ID']}/r2/buckets/er-telemetry/objects/{key}"
+          )
+          request = urllib.request.Request(
+              url,
+              headers={"Authorization": f"Bearer {os.environ['CLOUDFLARE_API_TOKEN']}"},
+              method="GET",
+          )
+          with urllib.request.urlopen(request, timeout=60) as response:
+              payload = response.read()
+          actual = hashlib.sha256(payload).hexdigest()
+          if actual != expected:
+              raise SystemExit(f"production dictionary hash mismatch: expected {expected}, got {actual}")
+          (temp / "er-combat-data-dictionary.json").write_bytes(payload)
+          PY
+          node scripts/ai/build-runtime-item-dictionary-supplement.mjs \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json"
+      - name: Seal baseline-profile Kaggle bundle
+        run: >-
+          node scripts/ai/prepare-kaggle-candidate-training.mjs
+          "$RUNNER_TEMP/production-v4-training"
+          "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          "$RUNNER_TEMP/ai-kaggle-dataset/er-ai-training-bundle.zip"
+          baseline 20260803
+      - name: Build private Kaggle manifests
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          mkdir -p "$RUNNER_TEMP/ai-kaggle-kernel"
+          cp ml/policy/kaggle_train_entrypoint.py "$RUNNER_TEMP/ai-kaggle-kernel/"
+          export DATASET_SLUG="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          export KERNEL_SLUG="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          temp = Path(os.environ["RUNNER_TEMP"])
+          dataset_slug = os.environ["DATASET_SLUG"]
+          kernel_slug = os.environ["KERNEL_SLUG"]
+          (temp / "ai-kaggle-dataset" / "dataset-metadata.json").write_text(
+              json.dumps(
+                  {
+                      "title": "ER AI Production V4 Human Training 20260803",
+                      "id": dataset_slug,
+                      "licenses": [{"name": "other"}],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          (temp / "ai-kaggle-kernel" / "kernel-metadata.json").write_text(
+              json.dumps(
+                  {
+                      "id": kernel_slug,
+                      "title": "ER AI Production V4 Human Baseline GPU 20260803",
+                      "code_file": "kaggle_train_entrypoint.py",
+                      "language": "python",
+                      "kernel_type": "script",
+                      "is_private": "true",
+                      "enable_gpu": "true",
+                      "enable_tpu": "false",
+                      "enable_internet": "true",
+                      "dataset_sources": [dataset_slug],
+                      "competition_sources": [],
+                      "kernel_sources": [],
+                      "model_sources": [],
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Publish private dataset and launch private GPU kernel
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
+          if kaggle datasets status "$dataset_slug" >/dev/null 2>&1; then
+            kaggle datasets version \
+              --path "$RUNNER_TEMP/ai-kaggle-dataset" \
+              --message "production v4 cut from $GITHUB_SHA"
+          else
+            kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
+          fi
+          dataset_status=""
+          for _ in $(seq 1 120); do
+            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null || true)
+            [[ "$dataset_status" == "ready" ]] && break
+            sleep 10
+          done
+          test "$dataset_status" = "ready"
+          kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
+          {
+            echo "### Private production-v4 GPU training"
+            echo "- Dataset: \`$dataset_slug\` (private)"
+            echo "- Kernel: \`$kernel_slug\` (private GPU)"
+            echo "- Source commit: \`$GITHUB_SHA\`"
+            echo "- Policy labels: victorious human battles only"
+            echo "- Value labels: all completed battle wins and defeats"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Train fresh battle-victory tree on the same remote cut
+        run: >-
+          python ml/baselines/train_candidate_baselines.py
+          --data "$RUNNER_TEMP/production-v4-training"
+          --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          --dictionary-supplement "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json"
+          --winner-only-policy
+          --winner-scope battle
+          --report-json "$RUNNER_TEMP/ai-tree/leaderboard.json"
+          --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md"
+          --models-dir "$RUNNER_TEMP/ai-tree/models"
+      - name: Publish only sanitized reports and selected tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report/tree ai-report/census
+          cp "$RUNNER_TEMP/production-v4-telemetry/report.json" ai-report/census/import-report.json
+          cp "$RUNNER_TEMP/production-v4-training/report.json" ai-report/census/materialized-report.json
+          cp "$RUNNER_TEMP/ai-tree/leaderboard.json" ai-report/tree/
+          cp "$RUNNER_TEMP/ai-tree/leaderboard.md" ai-report/tree/
+          cp "$RUNNER_TEMP/ai-tree/models/selected-model.json" ai-report/tree/
+          cat "$RUNNER_TEMP/ai-tree/leaderboard.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-production-v4-remote-training-report
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
