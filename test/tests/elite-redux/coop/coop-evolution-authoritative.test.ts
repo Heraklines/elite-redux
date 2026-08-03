@@ -19,6 +19,7 @@ import {
 import { isCoopLocalPresentationInputSurface } from "#data/elite-redux/coop/coop-local-presentation-input";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesId } from "#enums/species-id";
+import { shouldQueueCoopEvolutionReplicaNextWaveBridge } from "#phases/evolution-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -73,6 +74,13 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
     expect(isCoopLocalPresentationInputSurface("CoopFormChangeCutsceneReplayPhase", "EVOLUTION_SCENE")).toBe(true);
     expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "OPTION_SELECT")).toBe(false);
     expect(isCoopLocalPresentationInputSurface("FormChangePhase", "OPTION_SELECT")).toBe(false);
+  });
+
+  it("queues a signed next-wave bridge only on the replica renderer", () => {
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("replica", true)).toBe(true);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("authority", true)).toBe(false);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("replica", false)).toBe(false);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge(null, true)).toBe(false);
   });
 });
 

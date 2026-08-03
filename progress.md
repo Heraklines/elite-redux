@@ -6902,3 +6902,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   their existing levels.
 - No local co-op, Vitest, or browser execution was performed. These changes are queued for one new exact-SHA
   remote 36-variant item matrix after static contracts pass.
+
+## 2026-08-03 - terminal evolution authority/replica bridge split
+
+- Exact animations-on run `30772488229` completed its ordinary `EVOLUTION_ITEM` cutscene and committed the
+  immutable reward result, then the authority client failed closed with `A signed next-wave wait opened outside
+  the authoritative renderer.` The retained trace shows the authority replacing its ordinary `NewBattlePhase`
+  with the signed structural bridge immediately before starting it; this is a production role-boundary defect,
+  not a campaign timeout or input-driver failure.
+- `EvolutionPhase` now queues that signed bridge only when the local Authority V2 role is `replica`. The
+  authority keeps its normal locally-owned successor, while both roles still settle the exact terminal
+  interaction result. A focused unit contract covers authority, replica, non-wave successor, and absent-session
+  cases, and the browser source contract prevents this role guard from being silently removed.
+- The same run's `RARE_EVOLUTION_ITEM` red is deliberately not folded into this change: its evidence reaches the
+  guest-owned Learn Move commit but lets the replica begin `NextEncounterPhase` before retained presentation
+  settlement can retry the buffered successor. That separate scheduler-ordering mechanism will be fixed and
+  qualified only after the ordinary evolution role split is measured on its own exact SHA.
+- No local co-op, Vitest, Chromium, or compilation run was performed. Verification remains remote-only.

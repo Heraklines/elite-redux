@@ -7,6 +7,7 @@ import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
+import type { CoopAuthorityRole } from "#data/elite-redux/coop/coop-session-binding";
 import {
   failCoopSharedSession,
   getCoopController,
@@ -29,6 +30,18 @@ import { fixedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { fadeOutSoundIfActive } from "#utils/sound-fade";
 import i18next from "i18next";
+
+/**
+ * Only the replica renderer needs a signed structural bridge while a terminal reward evolution settles.
+ * The authority already owns its ordinary local NewBattlePhase; replacing it with a replica-only signed
+ * wait makes NewBattlePhase fail closed as soon as the authority tries to start it.
+ */
+export function shouldQueueCoopEvolutionReplicaNextWaveBridge(
+  authorityRole: CoopAuthorityRole | null | undefined,
+  allowNextWaveStart: boolean,
+): boolean {
+  return authorityRole === "replica" && allowNextWaveStart;
+}
 
 export class EvolutionPhase extends Phase {
   // FormChangePhase and its mechanics-free co-op replay inherit from this, but EvolutionPhase is not abstract.
@@ -201,7 +214,12 @@ export class EvolutionPhase extends Phase {
     if (terminal == null || terminal.operationId !== this.coopRewardOperationId) {
       return false;
     }
-    if (terminal.successor.allowNextWaveStart) {
+    if (
+      shouldQueueCoopEvolutionReplicaNextWaveBridge(
+        runtime?.controller.authorityRole,
+        terminal.successor.allowNextWaveStart,
+      )
+    ) {
       this.scene.phaseManager.removeAllPhasesOfType("NewBattlePhase");
       this.scene.phaseManager.pushNew("NewBattlePhase", {
         afterOperationId: terminal.successor.afterOperationId,

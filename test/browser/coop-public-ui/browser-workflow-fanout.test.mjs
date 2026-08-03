@@ -625,6 +625,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "the authority EvolutionPhase may recover its post-commit successor only from the exact material-applied ledger claim",
   );
   assert.match(
+    evolutionPhase,
+    /shouldQueueCoopEvolutionReplicaNextWaveBridge[\s\S]*authorityRole === "replica" && allowNextWaveStart[\s\S]*runtime\?\.controller\.authorityRole[\s\S]*terminal\.successor\.allowNextWaveStart/u,
+    "only the replica renderer may replace ordinary progression with the signed evolution successor bridge",
+  );
+  assert.match(
     learnMovePhase,
     /nextInteraction == null[\s\S]*this\.coopParentAllowsNextWaveStart/u,
     "the retained learn-move result must authorize wave N+1 when its item-evolution parent did",
