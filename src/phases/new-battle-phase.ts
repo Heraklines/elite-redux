@@ -10,7 +10,10 @@ import {
   isAuthoritativeBattleSession,
   retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
-import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  beginCoopTransitionRecording,
+  releaseCoopTransitionPresentation,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
@@ -525,12 +528,11 @@ export class NewBattlePhase extends BattlePhase {
     const controller = getCoopController();
     if (sourceWave >= 0 && isAuthoritativeBattleSession() && controller?.role === "host") {
       // `newBattle()` advances currentBattle before it narrates expiring arena tags. If the prior battle
-      // ended through a replacement-only tail, its recorder can still be open at the old turn. Recording
-      // that narration there makes the live emitter combine the NEW wave with the OLD turn; the renderer
-      // correctly rejects the cross-address packet and silently misses lines such as Sticky Web expiring.
-      // Open the destination entry prefix first. InitEncounter/Summon/TurnStart use this same scope and
-      // preserve it, so every transition cue is ordered ahead of the destination command frontier.
-      beginCoopRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
+      // enters a non-battle Mystery surface, that surface has no replay pump or command frontier. Open a
+      // deferred destination prefix first: real battles release it below, while adjacent Mystery surfaces
+      // carry it until the next signed command can durably own every cue. InitEncounter/Summon/TurnStart
+      // use this same scope and preserve it.
+      beginCoopTransitionRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
     }
     globalScene.newBattle();
 
@@ -572,6 +574,13 @@ export class NewBattlePhase extends BattlePhase {
         console.info(`[llm-director] Unshifting LLMDirectorBeatPhase for wave ${wave}`);
         globalScene.phaseManager.unshiftNew("LLMDirectorBeatPhase", wave);
       }
+    }
+
+    if (controller?.role === "host" && globalScene.currentBattle?.battleType !== BattleType.MYSTERY_ENCOUNTER) {
+      // Real battle entry has a retained CONTROL_COMMIT consumer. Non-battle Mystery surfaces deliberately
+      // keep cleanup narration deferred so the next adjacent battle can carry it instead of emitting an
+      // unconsumable best-effort packet at the selector wave.
+      releaseCoopTransitionPresentation();
     }
 
     this.end();

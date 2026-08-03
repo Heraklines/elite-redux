@@ -3656,8 +3656,13 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   );
   assert.match(
     newBattlePhase,
-    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]*?beginCoopRecording\(1, `\$\{controller\.sessionEpoch\}:\$\{sourceWave \+ 1\}`\);[\s\S]*?globalScene\.newBattle\(\);/u,
-    "the authority opens the destination presentation scope before newBattle narrates transition cleanup",
+    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]*?beginCoopTransitionRecording\(1, `\$\{controller\.sessionEpoch\}:\$\{sourceWave \+ 1\}`\);[\s\S]*?globalScene\.newBattle\(\);/u,
+    "the authority opens a deferred destination presentation scope before newBattle narrates transition cleanup",
+  );
+  assert.match(
+    newBattlePhase,
+    /battleType !== BattleType\.MYSTERY_ENCOUNTER[\s\S]*?releaseCoopTransitionPresentation\(\)/u,
+    "only a real battle releases transition cues; non-battle Mystery waves carry them to an ordered consumer",
   );
   assert.match(
     campaignDriver,

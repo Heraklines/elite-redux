@@ -39,6 +39,15 @@ interface CoopRecording {
   events: CoopBattleEvent[];
   /** Per-turn monotonic index stamped on each event as it is recorded (the LIVE emit ordering). */
   seq: number;
+  /**
+   * `NewBattlePhase` opens before `newBattle()` so post-battle cleanup is captured at the destination
+   * address. A non-battle Mystery surface has no replay pump or command seal, so those events must remain
+   * unpublished until an adjacent real battle can own them durably instead of leaking as best-effort live
+   * packets at an address the renderer cannot consume.
+   */
+  publicationDeferred: boolean;
+  /** Number of prefix events already exposed to the observer/live stream. */
+  publishedLength: number;
   /** Recorded faint occurrences waiting for their corresponding host FaintPhase to bind. */
   faintOccurrences: Map<number, number[]>;
 }
@@ -96,6 +105,54 @@ export interface CoopPresentationObservation {
 
 type CoopPresentationObserver = (observation: CoopPresentationObservation) => void;
 let presentationObserver: CoopPresentationObserver | null = null;
+
+function publishRecordedEvent(active: CoopRecording, seq: number, event: CoopBattleEvent): void {
+  if (presentationObserver != null) {
+    try {
+      presentationObserver({ stage: "authority-recorded", turn: active.turn, seq, event });
+    } catch {
+      // The observer is diagnostic only. The authority event and its durable batch remain valid.
+      coopWarn("turn", `presentation observer threw at authority turn=${active.turn} seq=${seq} k=${event.k}`);
+    }
+  }
+  if (liveEmitter != null) {
+    try {
+      liveEmitter(active.turn, seq, event);
+    } catch {
+      // A live-emit failure must never break the host's turn. The retained entry/batch remains authoritative.
+      coopWarn(
+        "turn",
+        `host recorder: live emit threw turn=${active.turn} seq=${seq} k=${event.k} (handled, batch still sent)`,
+      );
+    }
+  }
+}
+
+function publishDeferredPrefix(active: CoopRecording): void {
+  while (active.publishedLength < active.events.length) {
+    const seq = active.publishedLength;
+    const event = active.events[seq];
+    if (event == null) {
+      break;
+    }
+    publishRecordedEvent(active, seq, event);
+    active.publishedLength++;
+  }
+}
+
+function adjacentRecordingScopes(source: string | undefined, destination: string | undefined): boolean {
+  const parse = (scope: string | undefined): { session: string; wave: number } | null => {
+    const match = scope?.match(/^(.+):(-?\d+)$/u);
+    if (match == null) {
+      return null;
+    }
+    const wave = Number(match[2]);
+    return Number.isSafeInteger(wave) ? { session: match[1], wave } : null;
+  };
+  const from = parse(source);
+  const to = parse(destination);
+  return from != null && to != null && from.session === to.session && to.wave === from.wave + 1;
+}
 
 /**
  * Install a read-only presentation observer. The normal application never registers one; the exact-SHA
@@ -188,7 +245,77 @@ export function beginCoopRecording(turn: number, scope?: string): void {
       `host recorder: begin scope=${scope ?? "none"} turn=${turn} REPLACES open scope=${recording.scope ?? "none"} turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
     );
   }
-  recording = { turn, scope, entryPresentationLength: undefined, events: [], seq: 0, faintOccurrences: new Map() };
+  recording = {
+    turn,
+    scope,
+    entryPresentationLength: undefined,
+    events: [],
+    seq: 0,
+    publicationDeferred: false,
+    publishedLength: 0,
+    faintOccurrences: new Map(),
+  };
+}
+
+/**
+ * HOST transition boundary: open the destination turn-one prefix without publishing it yet.
+ *
+ * `newBattle()` can synchronously narrate arena cleanup after it advances `currentBattle`. A real battle
+ * releases this prefix as soon as its type is known. A non-battle Mystery surface deliberately leaves it
+ * deferred; the next exact adjacent transition carries it forward and the next real command commit owns it.
+ * Only an unpublished, unsealed, adjacent turn-one transition is eligible. An ordinary unfinished battle
+ * recording therefore keeps the existing fail-closed discard behavior.
+ */
+export function beginCoopTransitionRecording(turn: number, scope?: string): void {
+  if (recording != null && scope != null && recording.scope === scope && recording.turn === turn) {
+    coopLog(
+      "turn",
+      `host recorder: preserve deferred transition scope=${scope} turn=${turn} events=${recording.events.length}`,
+    );
+    return;
+  }
+  const canCarryOpenTransition =
+    recording != null
+    && turn === 1
+    && recording.turn === 1
+    && recording.publicationDeferred
+    && recording.publishedLength === 0
+    && recording.entryPresentationLength === undefined
+    && adjacentRecordingScopes(recording.scope, scope);
+  const carriedEvents = canCarryOpenTransition && recording != null ? recording.events.slice() : [];
+  if (recording == null) {
+    coopLog("turn", `host recorder: begin deferred transition turn=${turn} scope=${scope ?? "none"}`);
+  } else if (canCarryOpenTransition) {
+    coopLog(
+      "turn",
+      `host recorder: carry ${carriedEvents.length} unpublished transition event(s) ${recording.scope} -> ${scope}`,
+    );
+  } else {
+    coopWarn(
+      "turn",
+      `host recorder: deferred transition scope=${scope ?? "none"} turn=${turn} REPLACES open `
+        + `scope=${recording.scope ?? "none"} turn=${recording.turn} events=${recording.events.length}`,
+    );
+  }
+  recording = {
+    turn,
+    scope,
+    entryPresentationLength: undefined,
+    events: carriedEvents,
+    seq: carriedEvents.length,
+    publicationDeferred: true,
+    publishedLength: 0,
+    faintOccurrences: new Map(),
+  };
+}
+
+/** Release the current transition prefix at the real battle address exactly once. */
+export function releaseCoopTransitionPresentation(): void {
+  if (recording == null || !recording.publicationDeferred) {
+    return;
+  }
+  recording.publicationDeferred = false;
+  publishDeferredPrefix(recording);
 }
 
 /** Whether a recording is currently open (the queueMessage tap checks this - inert otherwise). */
@@ -231,14 +358,6 @@ export function recordCoopEvent(event: CoopBattleEvent): number | null {
     recording.faintOccurrences.set(event.bi, occurrences);
   }
   recording.events.push(event);
-  if (presentationObserver != null) {
-    try {
-      presentationObserver({ stage: "authority-recorded", turn: recording.turn, seq, event });
-    } catch {
-      // The observer is diagnostic only. The authority event and its durable batch remain valid.
-      coopWarn("turn", `presentation observer threw at authority turn=${recording.turn} seq=${seq} k=${event.k}`);
-    }
-  }
   // HOT PATH (per recorded battle event): build the trace string only when debug is on.
   if (isCoopDebug()) {
     coopLog(
@@ -246,16 +365,9 @@ export function recordCoopEvent(event: CoopBattleEvent): number | null {
       `host recorder: append turn=${recording.turn} seq=${seq} k=${event.k} total=${recording.events.length} live=${liveEmitter != null}`,
     );
   }
-  if (liveEmitter != null) {
-    try {
-      liveEmitter(recording.turn, seq, event);
-    } catch {
-      // a live-emit failure must never break the host's turn - the turn-end batch + checkpoint still go
-      coopWarn(
-        "turn",
-        `host recorder: live emit threw turn=${recording.turn} seq=${seq} k=${event.k} (handled, batch still sent)`,
-      );
-    }
+  if (!recording.publicationDeferred) {
+    publishRecordedEvent(recording, seq, event);
+    recording.publishedLength++;
   }
   return seq;
 }
@@ -269,6 +381,9 @@ export function sealCoopEntryPresentation(): CoopBattleEvent[] | null {
   if (recording == null) {
     return null;
   }
+  // A command frontier is itself proof that this destination is a real battle. Publish any transition
+  // prefix before constructing its immutable CONTROL_COMMIT, even if a future route forgot the eager release.
+  releaseCoopTransitionPresentation();
   recording.entryPresentationLength ??= recording.events.length;
   return recording.events.slice(0, recording.entryPresentationLength);
 }
@@ -326,6 +441,8 @@ export function endCoopRecording(): CoopRecording {
     entryPresentationLength: undefined,
     events: [],
     seq: 0,
+    publicationDeferred: false,
+    publishedLength: 0,
     faintOccurrences: new Map(),
   };
   if (recording == null) {
