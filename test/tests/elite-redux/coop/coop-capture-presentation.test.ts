@@ -30,6 +30,7 @@ import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
+import { COOP_PRESENTATION_STALL_MS } from "#phases/coop-presentation-watchdog";
 import { CoopCaptureReplayPhase } from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -172,6 +173,8 @@ describe.skipIf(!RUN)("co-op CoopCaptureReplayPhase is hardened to always end() 
 
   it("a stalled capture is released by the runtime wall scheduler even when Phaser time cannot advance", () => {
     const runtime = getCoopRuntime()!;
+    let authorityNowMs = 0;
+    const nowSpy = vi.spyOn(runtime.battleStream, "authorityNow").mockImplementation(() => authorityNowMs);
     let expire!: () => void;
     const cancelTimer = vi.fn();
     const scheduleSpy = vi.spyOn(runtime.battleStream, "scheduleAuthorityRetry").mockImplementation(callback => {
@@ -194,11 +197,13 @@ describe.skipIf(!RUN)("co-op CoopCaptureReplayPhase is hardened to always end() 
       expect(sceneTimerSpy, "the liveness ceiling cannot disappear with a paused scene clock").not.toHaveBeenCalled();
       expect(endSpy, "the deliberately stalled ball tween keeps the phase pending").not.toHaveBeenCalled();
 
+      authorityNowMs = COOP_PRESENTATION_STALL_MS;
       expire();
       expect(endSpy, "the runtime wall releases the stalled cosmetic phase").toHaveBeenCalledOnce();
       expect(cancelTimer, "release retires the exact runtime timer").toHaveBeenCalledOnce();
     } finally {
       globalScene.moveAnimations = originalAnimations;
+      nowSpy.mockRestore();
       scheduleSpy.mockRestore();
       sceneTimerSpy.mockRestore();
       tweenSpy.mockRestore();
