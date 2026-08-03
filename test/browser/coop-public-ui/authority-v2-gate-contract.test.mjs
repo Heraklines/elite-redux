@@ -1657,7 +1657,10 @@ test("normal trainer victory retains its exact presentation lease across success
   );
   const addressStart = coopRuntime.indexOf("export function coopV2TrainerVictoryPresentationAddress(");
   const addressEnd = coopRuntime.indexOf("\n/**", addressStart + 1);
-  assert.ok(addressStart >= 0 && addressEnd > addressStart, "the exact presentation resolver has a bounded source block");
+  assert.ok(
+    addressStart >= 0 && addressEnd > addressStart,
+    "the exact presentation resolver has a bounded source block",
+  );
   const addressSource = coopRuntime.slice(addressStart, addressEnd);
   assert.match(addressSource, /v2PendingTrainerVictoryPresentation/u);
   assert.doesNotMatch(addressSource, /latestControl|resolveCoopRetainedWaveContinuationIdentity/u);
