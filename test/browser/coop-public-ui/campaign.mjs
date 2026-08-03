@@ -993,6 +993,28 @@ export function createBattlePromptAdvancer(
       );
     });
   };
+  const advanceReadyPrompt = async (client, readyEvent) => {
+    cursors.set(client.label, readyEvent.index + 1);
+    const { surfaceId, phase, phaseInstance } = readyEvent.observation;
+    consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
+    const statName =
+      surfaceId === "battle:evolution" || surfaceId === "battle:form-change"
+        ? "postBattleEvolutionPrompts"
+        : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
+          ? "postBattleExpPrompts"
+          : "battleMessagePrompts";
+    stats[statName] = (stats[statName] ?? 0) + 1;
+    client.evidence.record("campaign-battle-prompt-advance", {
+      surfaceId,
+      phase,
+      phaseInstance,
+      readyEventIndex: readyEvent.index,
+      promptOrdinal: stats[statName],
+      inputSeat: client.label,
+      authority: client === rig.host,
+    });
+    await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+  };
   return async () => {
     if (expectedAddress == null && requireSharedCommandAddress) {
       expectedAddress = currentSharedCommandAddress(clients);
@@ -1042,6 +1064,34 @@ export function createBattlePromptAdvancer(
         cursors.set(client.label, readyEvent.index + 1);
         continue;
       }
+      if (readyEvent.observation.phase === "TrainerVictoryPhase") {
+        // Both victory messages are local human-input surfaces. Pressing the authority first and returning
+        // let it enter the reward shop before the next poll; the reciprocal readiness gate then saw that
+        // newer host surface and permanently refused the still-actionable renderer prompt. Once the exact
+        // addressed pair is simultaneously ready, spend one keyboard action on each browser atomically.
+        const pairedEvents = clients.map(peer => ({
+          client: peer,
+          event: peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0),
+        }));
+        const pairIsCurrentAndUnspent = pairedEvents.every(({ client: peer, event }) => {
+          const observation = event?.observation;
+          return (
+            event != null
+            && observation?.phase === "TrainerVictoryPhase"
+            && observation.surfaceId === "battle:message"
+            && battlePromptMatchesAddress(peer, from[peer.label] ?? 0, event, expectedAddress)
+            && observation.ready?.handlerActive === true
+            && observation.ready?.awaitingActionInput === true
+            && observation.ready?.inputBlocked !== true
+            && !consumedInstances.has(instanceKeyFor(peer, observation))
+          );
+        });
+        if (!pairIsCurrentAndUnspent) {
+          continue;
+        }
+        await Promise.all(pairedEvents.map(({ client: peer, event }) => advanceReadyPrompt(peer, event)));
+        return true;
+      }
       // The semantic mirror is frame-driven and can lag the production phase boundary on a heavily
       // throttled browser. In market-wide-lens 30691739712, SwitchPhase had already started but the
       // last semantic observation was still the preceding MessagePhase for another ten seconds. A
@@ -1060,26 +1110,7 @@ export function createBattlePromptAdvancer(
       if (isPartyPickerSurfaceOpen(latestSurface?.observation)) {
         continue;
       }
-      cursors.set(client.label, readyEvent.index + 1);
-      const { surfaceId, phase, phaseInstance } = readyEvent.observation;
-      consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
-      const statName =
-        surfaceId === "battle:evolution" || surfaceId === "battle:form-change"
-          ? "postBattleEvolutionPrompts"
-          : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
-            ? "postBattleExpPrompts"
-            : "battleMessagePrompts";
-      stats[statName] = (stats[statName] ?? 0) + 1;
-      client.evidence.record("campaign-battle-prompt-advance", {
-        surfaceId,
-        phase,
-        phaseInstance,
-        readyEventIndex: readyEvent.index,
-        promptOrdinal: stats[statName],
-        inputSeat: client.label,
-        authority: client === rig.host,
-      });
-      await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+      await advanceReadyPrompt(client, readyEvent);
       return true;
     }
     return false;

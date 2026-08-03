@@ -1422,8 +1422,7 @@ test("successor-address trainer victory advances only after the browser observes
     wave: 5,
     turn: 6,
   });
-  assert.equal(await advance(), true, "the paired trainer-victory prompts are real human-action surfaces");
-  assert.equal(await advance(), true, "the renderer receives its own public trainer-victory input");
+  assert.equal(await advance(), true, "the exact paired trainer-victory prompts advance in one atomic drive");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
     ["Space"],
@@ -1432,7 +1431,7 @@ test("successor-address trainer victory advances only after the browser observes
     renderer.presses.map(entry => entry.key),
     ["Space"],
   );
-  assert.equal(await advance(), false, "one trainer-victory prompt generation receives exactly one action");
+  assert.equal(await advance(), false, "the paired trainer-victory generation receives exactly one action per browser");
 });
 
 test("successor-address trainer settlement drains money and modifier reward prompts", async () => {

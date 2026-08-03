@@ -7219,3 +7219,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   battle; the ordinary ME projector will replace it once `processMeWave` starts the real surface. This is a
   harness-only correction with a pinned source contract. The only other gate red was import ordering, fixed
   without changing runtime behavior. Real two-browser Mystery run `30818713774` remains active and untouched.
+- Focused closure run `30820751128` passed static, all source/node contracts, and all six selected shards,
+  including the exact C1 45-wave journey that previously rejected the signed Mystery destination wait.
+- Two-browser Mystery run `30818713774` proved both clients installed the ordered normal trainer-victory
+  control at revision 35. Its red was driver-only: both local prompts were actionable, but the helper pressed
+  the host and returned; once the host entered rewards, its reciprocal-readiness check permanently refused
+  the guest's still-actionable prompt, so only the host arrived at `shop:7:6`.
+- The prompt driver now consumes an exact paired TrainerVictory generation atomically through ordinary Space
+  input on both browsers. Its focused contract now requires one call to press both seats exactly once. No
+  production code changed for this classification; the guest's visible trainer was still the active victory
+  presentation, not a stale sprite after completion.
