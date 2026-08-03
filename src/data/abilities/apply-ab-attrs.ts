@@ -50,18 +50,20 @@ interface ApplyAbAttrConfig<T extends AbAttrString> {
    * Any {@linkcode AbAttr}s for which this returns `false` will be skipped during attribute application.
    */
   attrFilter?: AbAttrPredicate<T>;
+  /** The caller already obtained this source from getActiveAbilitySources(). */
+  sourceAlreadyActive?: boolean;
 }
 
 function applySingleAbAttrs<T extends AbAttrString>(
   attrType: T,
   params: AbAttrParamMap[T],
-  { attrFilter = () => true, messages }: ApplyAbAttrConfig<T> = {},
+  { attrFilter = () => true, messages, sourceAlreadyActive = false }: ApplyAbAttrConfig<T> = {},
 ) {
   const { simulated = false, passive = false, pokemon } = params;
   // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
   // that set `passive: true` without specifying a slot (legacy behavior).
   const slot = params.passiveSlot ?? 0;
-  if (!pokemon.canApplyAbility(passive, slot)) {
+  if (!sourceAlreadyActive && !pokemon.canApplyAbility(passive, slot)) {
     return;
   }
 
@@ -155,7 +157,13 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
   for (const source of params.pokemon.getActiveAbilitySources()) {
     params.passive = source.passive;
     params.passiveSlot = source.passiveSlot;
-    applySingleAbAttrs(attrType, params, config);
+    // getActiveAbilitySources() has just applied the same slot, unlock and
+    // suppression gates. Re-running canApplyAbility for every source of every
+    // simulated damage attribute was pure duplicate work in telemetry previews.
+    applySingleAbAttrs(attrType, params, {
+      ...config,
+      sourceAlreadyActive: params.simulated === true,
+    });
   }
 
   // Restore passive/passiveSlot if they were undefined on entry to allow re-use of parameter objects

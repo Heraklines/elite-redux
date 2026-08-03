@@ -283,6 +283,29 @@ describe("custom-trainers merge core (worker)", () => {
     }
   });
 
+  it("fails closed before writing when an untouched baseline entry makes the merged catalog invalid", async () => {
+    let writes = 0;
+    const existing = {
+      OLD_INVALID: trainer(70001, "Old", { trainerClass: "DISPLAY_ONLY_CLASS" }),
+    };
+    const result = await commitCustomTrainersWithRetry({
+      read: async () => ({ sha: "sha", existing }),
+      write: async () => {
+        writes++;
+        return { ok: true };
+      },
+      merge: e => mergeCustomTrainersDelta(e, { NEW: trainer(1, "New") }, {}),
+      validate: merged =>
+        Object.values(merged).some(value => (value as { trainerClass?: string }).trainerClass === "DISPLAY_ONLY_CLASS")
+          ? "merged custom trainer catalog is invalid"
+          : null,
+      serialize: merged => JSON.stringify(merged),
+    });
+
+    expect(result).toEqual({ ok: false, error: "merged custom trainer catalog is invalid" });
+    expect(writes).toBe(0);
+  });
+
   it("does NOT retry on a non-conflict (fatal) write error", async () => {
     let writes = 0;
     const result = await commitCustomTrainersWithRetry({

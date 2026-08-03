@@ -338,6 +338,33 @@ export interface PokemonAbilitySource {
   readonly passiveSlot?: number;
 }
 
+type ActiveAbilitySourceCache = WeakMap<Pokemon, Map<boolean, readonly PokemonAbilitySource[]>>;
+
+/**
+ * Reuse active-ability resolution while a caller performs a read-only batch of
+ * combat simulations against one immutable field state. Damage previews ask the
+ * same battlers about their abilities many times; resolving every innate and
+ * every field-suppression gate again for each simulated target was the dominant
+ * double/triple-battle telemetry cost.
+ *
+ * The cache is deliberately scoped to the synchronous callback. Ordinary battle
+ * code never retains it across a state change, and nested preview batches share
+ * the outer scope.
+ */
+export function withPokemonActiveAbilitySourceCache<T>(read: () => T): T {
+  if (activeAbilitySourceCache) {
+    return read();
+  }
+  activeAbilitySourceCache = new WeakMap();
+  try {
+    return read();
+  } finally {
+    activeAbilitySourceCache = null;
+  }
+}
+
+let activeAbilitySourceCache: ActiveAbilitySourceCache | null = null;
+
 export abstract class Pokemon extends Phaser.GameObjects.Container {
   /**
    * This pokemon's {@link https://bulbapedia.bulbagarden.net/wiki/Personality_value | Personality value/PID},
@@ -2877,7 +2904,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * and unlock gates so a disabled earlier slot cannot mask a later duplicate.
    */
   public getActiveAbilitySources(ignoreOverride = false): readonly PokemonAbilitySource[] {
-    return this.collectAbilitySources(ignoreOverride, true);
+    const cached = activeAbilitySourceCache?.get(this)?.get(ignoreOverride);
+    if (cached) {
+      return cached;
+    }
+    const sources = this.collectAbilitySources(ignoreOverride, true);
+    if (activeAbilitySourceCache) {
+      let byOverride = activeAbilitySourceCache.get(this);
+      if (!byOverride) {
+        byOverride = new Map();
+        activeAbilitySourceCache.set(this, byOverride);
+      }
+      byOverride.set(ignoreOverride, sources);
+    }
+    return sources;
   }
 
   /**

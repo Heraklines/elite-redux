@@ -1093,6 +1093,13 @@ async function handleSaveCustomTrainers(body: SaveBody, target: EditableFile, en
   const result = await commitCustomTrainersWithRetry({
     read: () => readRepoJson(path, target.label, env),
     merge: existing => mergeCustomTrainersDelta(existing, delta, baselines),
+    // Validate the entire post-merge file, not only the submitted delta. This
+    // prevents an older invalid baseline entry from surviving another editor
+    // commit and then disappearing from the runtime/dev-scenario catalog.
+    validate: merged => {
+      const fullCatalog = target.validate(merged);
+      return fullCatalog.ok ? null : `merged custom trainer catalog is invalid: ${fullCatalog.error}`;
+    },
     serialize: merged => `${JSON.stringify(sortKeysDeep(merged), null, 2)}\n`,
     isUnchanged: (merged, existing) => stableStringify(merged) === stableStringify(existing),
     write: async (content, sha) => {
