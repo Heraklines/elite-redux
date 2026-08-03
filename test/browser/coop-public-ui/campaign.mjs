@@ -1065,10 +1065,14 @@ export function createBattlePromptAdvancer(
         continue;
       }
       if (readyEvent.observation.phase === "TrainerVictoryPhase") {
-        // Both victory messages are local human-input surfaces. Pressing the authority first and returning
-        // let it enter the reward shop before the next poll; the reciprocal readiness gate then saw that
-        // newer host surface and permanently refused the still-actionable renderer prompt. Once the exact
-        // addressed pair is simultaneously ready, spend one keyboard action on each browser atomically.
+        // Both victory messages are local human-input surfaces. Real players do not dismiss them on the
+        // same frame, and the production Authority V2 contract must keep the ordered successor fenced while
+        // either exact presentation remains open. Start only after both addressed prompts are proven, then
+        // deliberately advance the authority first and hold a short human-sized skew before advancing the
+        // renderer. Re-prove the renderer after the skew: an older implementation let WAVE_ADVANCE overtake
+        // this prompt, so blindly spending the saved key would conceal the product failure instead of
+        // detecting it. The in-flight pair is completed in this call, avoiding the old next-poll bug where
+        // the authority's newer reward surface made the still-actionable renderer prompt undiscoverable.
         const pairedEvents = clients.map(peer => ({
           client: peer,
           event: peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0),
@@ -1089,7 +1093,33 @@ export function createBattlePromptAdvancer(
         if (!pairIsCurrentAndUnspent) {
           continue;
         }
-        await Promise.all(pairedEvents.map(({ client: peer, event }) => advanceReadyPrompt(peer, event)));
+        const authorityPair = pairedEvents.find(({ client: peer }) => peer === rig.host);
+        if (authorityPair?.event == null) {
+          throw new Error(`${purpose}: paired trainer-victory proof had no authority prompt`);
+        }
+        await advanceReadyPrompt(authorityPair.client, authorityPair.event);
+        await delay(rig.trainerVictoryStaggerMs ?? 1_500);
+        for (const paired of pairedEvents) {
+          if (paired.client === rig.host || paired.event == null) {
+            continue;
+          }
+          const current = paired.client.evidence.findLastSemanticSurface(paired.event.index);
+          if (
+            current == null
+            || current.observation.phase !== "TrainerVictoryPhase"
+            || current.observation.surfaceId !== "battle:message"
+            || instanceKeyFor(paired.client, current.observation)
+              !== instanceKeyFor(paired.client, paired.event.observation)
+            || current.observation.ready?.handlerActive !== true
+            || current.observation.ready?.awaitingActionInput !== true
+            || current.observation.ready?.inputBlocked === true
+          ) {
+            throw new Error(
+              `${purpose}: renderer trainer-victory prompt was superseded during the authority-first human input skew`,
+            );
+          }
+          await advanceReadyPrompt(paired.client, current);
+        }
         return true;
       }
       // The semantic mirror is frame-driven and can lag the production phase boundary on a heavily

@@ -1390,10 +1390,19 @@ test("successor-address faint narration advances only after the browser observes
   assert.equal(await advance(), false, "one faint prompt generation receives exactly one action");
 });
 
-test("successor-address trainer victory advances only after the browser observes BattleEndPhase", async () => {
+test("successor-address trainer victory survives authority-first human input skew", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
-  const rig = { host: authority, clients: { authority, renderer } };
+  const pressOrder = [];
+  authority.press = async function press(key, purpose) {
+    this.presses.push({ key, purpose });
+    pressOrder.push(this.label);
+  };
+  renderer.press = async function press(key, purpose) {
+    this.presses.push({ key, purpose });
+    pressOrder.push(this.label);
+  };
+  const rig = { host: authority, clients: { authority, renderer }, trainerVictoryStaggerMs: 0 };
   const from = { authority: 0, renderer: 0 };
   authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
   renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
@@ -1422,7 +1431,8 @@ test("successor-address trainer victory advances only after the browser observes
     wave: 5,
     turn: 6,
   });
-  assert.equal(await advance(), true, "the exact paired trainer-victory prompts advance in one atomic drive");
+  assert.equal(await advance(), true, "the exact paired trainer-victory prompts survive a staggered drive");
+  assert.deepEqual(pressOrder, ["authority", "renderer"], "the journey reproduces authority-first human skew");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
     ["Space"],
