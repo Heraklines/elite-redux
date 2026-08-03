@@ -34,8 +34,10 @@ import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 const root = resolve(import.meta.dirname, "../../..");
 
 class FakeEvidence {
-  constructor(texts = []) {
-    this.events = texts.map((text, index) => ({ index, text }));
+  constructor(entries = []) {
+    this.events = entries.map((entry, index) =>
+      typeof entry === "string" ? { index, text: entry } : { index, ...entry },
+    );
   }
 
   find(pattern, from = 0) {
@@ -151,15 +153,36 @@ function evolutionRig(hostLines, guestLines) {
 }
 
 test("retained evolution proof requires exact authority/renderer identity and depth coverage", () => {
-  const host = "[coop:progression] HOST progression capture wave=17 seq=3 k=evolution slot=0 species=1->2";
-  const guest = "[coop:progression] GUEST retained evolution complete wave=17 slot=0 species=1->2";
-  assert.deepEqual(assertRetainedEvolutionPresentationParity(evolutionRig([host], [guest]), { targetWaves: 30 }), {
-    authority: ["17:0:1->2"],
-    renderer: ["17:0:1->2"],
-    required: true,
+  const lifecycle = (stage, role, toSpeciesId = 2) => ({
+    kind: "browser-progression-event",
+    observation: {
+      stage,
+      role,
+      wave: 17,
+      event: { k: "evolution", partySlot: 0, fromSpeciesId: 1, toSpeciesId },
+    },
   });
+  const authority = lifecycle("authority-recorded", "host");
+  const renderer = lifecycle("renderer-completed", "guest");
+  // Deliberately reverse the harness labels: the lifecycle role, not the account label, owns the proof.
+  assert.deepEqual(
+    assertRetainedEvolutionPresentationParity(evolutionRig([renderer], [authority]), { targetWaves: 30 }),
+    {
+      authority: ["17:0:1->2"],
+      renderer: ["17:0:1->2"],
+      required: true,
+    },
+  );
   assert.throws(
-    () => assertRetainedEvolutionPresentationParity(evolutionRig([host], []), { targetWaves: 30 }),
+    () => assertRetainedEvolutionPresentationParity(evolutionRig([], [authority]), { targetWaves: 30 }),
+    /presentation mismatch/u,
+  );
+  assert.throws(
+    () =>
+      assertRetainedEvolutionPresentationParity(
+        evolutionRig([lifecycle("renderer-completed", "guest", 3)], [authority]),
+        { targetWaves: 30 },
+      ),
     /presentation mismatch/u,
   );
   assert.throws(

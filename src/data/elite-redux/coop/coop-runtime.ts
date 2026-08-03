@@ -11780,6 +11780,15 @@ function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuth
   if (op?.kind === "LEARN_MOVE") {
     const payload = op.payload as CoopLearnMovePayload;
     if (payload.type === "prompt") {
+      // Authority V2 projects this exact public picker from its typed SHARED_INTERACTION control below.
+      // Re-emitting the legacy learnMoveForward carrier here creates a second queue-owned replay phase:
+      // the projector opens the correct modal immediately, then the obsolete FIFO copy reopens after the
+      // committed result starts NewBattlePhase (two-browser run 30778145880). The retained entry is already
+      // complete material, so acknowledge it without granting the compatibility carrier presentation
+      // authority. Legacy authoritative sessions still use the forward listener unchanged.
+      if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+        return true;
+      }
       runtime.interactionRelay.materializeCommittedInteractionOutcome(
         COOP_LEARN_MOVE_FWD_SEQ_BASE + payload.partySlot,
         {
@@ -11815,6 +11824,12 @@ function materializeCoopLearnMoveFromOp(runtime: CoopRuntime, envelope: CoopAuth
   const payload = op.payload as CoopLearnMoveBatchPayload;
   const seq = COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE + payload.partySlot;
   if (payload.type === "prompt") {
+    // The V2 control projector owns the batch panel for the same reason as the single-move picker above.
+    // Keeping the legacy forward carrier live as a second presentation authority leaves a queued duplicate
+    // that can reopen only after the immutable result has already released its successor.
+    if (isCoopV2InteractionCutoverActive(runtime.durability)) {
+      return true;
+    }
     runtime.interactionRelay.materializeCommittedInteractionOutcome(
       seq,
       {

@@ -171,6 +171,16 @@ test("exact host/guest owner material is the sole replica release and duplicate 
     exactRelease >= 0 && rawCompatibility > exactRelease,
     "V2 returns through the exact consumer before the legacy raw-result materializer",
   );
+  const promptStart = materializer.indexOf('if (payload.type === "prompt") {');
+  const promptCutover = materializer.indexOf("if (isCoopV2InteractionCutoverActive", promptStart);
+  const promptEnd = materializer.indexOf("if (isCoopV2InteractionCutoverActive", promptCutover + 1);
+  const prompt = materializer.slice(promptStart, promptEnd);
+  assert.ok(promptStart >= 0 && promptCutover > promptStart && promptEnd > promptCutover);
+  assert.match(prompt, /isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*return true/u);
+  assert.ok(
+    prompt.indexOf("return true") < prompt.indexOf("materializeCommittedInteractionOutcome("),
+    "V2 prompt material is acknowledged before the legacy forward carrier can queue a duplicate picker",
+  );
 
   const queueOwned = section(
     learnMove,

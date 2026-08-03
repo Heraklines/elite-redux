@@ -125,16 +125,19 @@ export function initialBattleCommandCursors(clients) {
 }
 
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
-const HOST_RETAINED_EVOLUTION =
-  /\[coop:progression\] HOST progression capture wave=(\d+) seq=\d+ k=evolution slot=(\d+) species=(\d+)->(\d+)/u;
-const GUEST_RETAINED_EVOLUTION =
-  /\[coop:progression\] GUEST retained evolution complete wave=(\d+) slot=(\d+) species=(\d+)->(\d+)/u;
-
-function retainedEvolutionKeys(client, pattern) {
-  return client.evidence.events.flatMap(event => {
-    const match = pattern.exec(event.text ?? "");
-    return match == null ? [] : [`${match[1]}:${match[2]}:${match[3]}->${match[4]}`];
-  });
+function retainedEvolutionKeys(rig, stage, role) {
+  const keys = new Set();
+  for (const client of Object.values(rig.clients)) {
+    for (const entry of client.evidence.events) {
+      const observation = entry.kind === "browser-progression-event" ? entry.observation : null;
+      const event = observation?.event;
+      if (observation?.stage !== stage || observation.role !== role || event?.k !== "evolution") {
+        continue;
+      }
+      keys.add(`${observation.wave}:${event.partySlot}:${event.fromSpeciesId}->${event.toSpeciesId}`);
+    }
+  }
+  return [...keys];
 }
 
 /**
@@ -143,8 +146,11 @@ function retainedEvolutionKeys(client, pattern) {
  * silently omit this presentation class while only testing low-level protocol validators.
  */
 export function assertRetainedEvolutionPresentationParity(rig, policy) {
-  const authority = retainedEvolutionKeys(rig.host, HOST_RETAINED_EVOLUTION).toSorted();
-  const renderer = retainedEvolutionKeys(rig.guest, GUEST_RETAINED_EVOLUTION).toSorted();
+  // Browser labels describe which account/page the harness launched first; WebRTC role selection may place
+  // the authority on either label. Compare the strict lifecycle ledger by its embedded role/stage instead
+  // of scraping legacy console prose from rig.host/rig.guest (run 30778145880 had the roles reversed).
+  const authority = retainedEvolutionKeys(rig, "authority-recorded", "host").toSorted();
+  const renderer = retainedEvolutionKeys(rig, "renderer-completed", "guest").toSorted();
   const proof = { authority, renderer, required: policy.targetWaves >= 30 && policy.navigation?.required !== true };
   for (const client of Object.values(rig.clients)) {
     client.evidence.record("campaign-retained-evolution-proof", proof);

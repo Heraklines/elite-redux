@@ -4477,8 +4477,13 @@ test("a passive command watcher carries the same visible-wave proof as an action
   assert.ok(watcherStart >= 0 && watcherEnd > watcherStart, "command watcher observation has a bounded source block");
   assert.match(
     browserEntry.slice(watcherStart, watcherEnd),
-    /displayedWave:\s*globalScene\.getDisplayedBiomeWaveIndex\(\)/u,
+    /displayedWave:\s*globalScene\.getDisplayedBiomeWaveIndex\(\) \?\? null/u,
     "the watcher cannot emit a mechanically valid proof while omitting its visible HUD wave",
+  );
+  assert.match(
+    browserEntry,
+    /const displayedWave = globalScene\.getDisplayedBiomeWaveIndex\(\) \?\? null/u,
+    "a transitional active surface must emit explicit null instead of omitting the required displayedWave field",
   );
 });
 

@@ -6975,3 +6975,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   real successor stall behind a harness timeout. It now accepts either a fresh actionable confirmation or a
   fresh non-Learn-Move successor surface at the same or a later ordered address. Focused behavioral contracts cover both
   scheduler branches; verification remains one combined remote animations-on reward journey.
+
+## 2026-08-03 - V2 Learn Move has one projector and role-owned evolution evidence
+
+- Combined exact-SHA run `30778145880` proved the ordinary reward path mechanically complete: the evolution
+  rendered, both parties converged, and both clients reached the shared wave-2 command frontier. Its final red
+  was evidence-only. WebRTC assigned the host authority role to the page labeled `guest-seat`, while the legacy
+  depth assertion scraped host/guest prose from fixed harness labels. The strict `browser-progression-event`
+  records already contained the exact `authority-recorded` and `renderer-completed` pair. Evolution breadth now
+  compares those typed lifecycle records by embedded role and stage across both pages, retaining exact identity
+  equality and the mandatory depth-evolution requirement.
+- The rare variant exposed the remaining product mechanism. Revision 6's typed SHARED_INTERACTION projector
+  opened the correct `CoopReplayLearnMovePhase`, but its live materializer also emitted the legacy
+  `learnMoveForward` carrier and queued a second replay copy. After revision 7 closed the exact projected modal
+  and started `NewBattlePhase`, that obsolete copy reopened at the wave-2 address and permanently deferred the
+  replica's command commit. Under V2, single and batch prompt material is now acknowledged without invoking the
+  legacy presentation carrier; the central projector is the sole phase creator. Legacy sessions retain the
+  forward path unchanged.
+- The rare trace also recorded one CI-only fatal observation during the pre-picker `EVOLUTION_SCENE`: the visible
+  wave parser returned `undefined`, so JSON serialization omitted the schema-required `displayedWave` field.
+  Both active and passive semantic observers now emit explicit `null` until the HUD has painted. This does not
+  weaken the visible-wave contract; a later actionable gameplay surface must still carry its positive parsed
+  wave.
+- Focused source/behavior contracts cover the single-projector cutover, batch parity, role-label reversal, and
+  explicit-null transitional observation. No local co-op, Vitest, Chromium, or compilation run was performed;
+  the next measurement is the same two-variant animations-on journey on one frozen exact SHA.

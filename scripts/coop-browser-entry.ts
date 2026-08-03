@@ -1719,7 +1719,7 @@ function observeSemanticSurface(): void {
         // The passive renderer must satisfy the same visible-HUD proof contract as an
         // actionable command surface. Omitting this field makes an otherwise valid
         // command watcher fail closed in the public two-browser oracle.
-        displayedWave: globalScene.getDisplayedBiomeWaveIndex(),
+        displayedWave: globalScene.getDisplayedBiomeWaveIndex() ?? null,
         mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
         arena: {
           biomeId: globalScene.arena?.biomeId ?? null,
@@ -2102,7 +2102,10 @@ function observeSemanticSurface(): void {
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
-    const displayedWave = globalScene.getDisplayedBiomeWaveIndex();
+    // Transitional UI modes (for example EVOLUTION_SCENE before its first visible HUD paint) legitimately
+    // have no parsed wave yet. Emit the schema's explicit null instead of letting JSON.stringify omit the
+    // required field and manufacture a fatal browser-evidence event.
+    const displayedWave = globalScene.getDisplayedBiomeWaveIndex() ?? null;
     const phasePartyIndex = (currentPhase as unknown as { partyIndex?: unknown }).partyIndex;
     const interactionTargetPartySlot =
       semantic.operationClass === "ability" && Number.isSafeInteger(phasePartyIndex) && (phasePartyIndex as number) >= 0
