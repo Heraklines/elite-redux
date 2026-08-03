@@ -1,0 +1,123 @@
+name: AI Production V4 Census (Read-Only)
+
+# One-runner, read-only telemetry census. Raw player records exist only under
+# RUNNER_TEMP and are never uploaded as Actions artifacts.
+on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-production-v4-census.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-production-v4-census
+  cancel-in-progress: false
+
+jobs:
+  census:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Count production contract-v4 records remotely
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Stream production v4 telemetry into ephemeral runner storage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/ai/download-production-combat-telemetry.mjs
+          --contract-version 4
+          --out "$RUNNER_TEMP/production-v4-telemetry"
+      - name: Materialize aggregate contract counts
+        run: >-
+          node scripts/ai/materialize-human-contract-training.mjs
+          "$RUNNER_TEMP/production-v4-telemetry/contract-records.jsonl"
+          "$RUNNER_TEMP/production-v4-training"
+      - name: Publish sanitized census summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          cp "$RUNNER_TEMP/production-v4-telemetry/report.json" ai-report/import-report.json
+          cp "$RUNNER_TEMP/production-v4-training/report.json" ai-report/materialized-report.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          imported = json.loads(Path("ai-report/import-report.json").read_text(encoding="utf-8"))
+          materialized = json.loads(Path("ai-report/materialized-report.json").read_text(encoding="utf-8"))
+          summary = {
+              "measuredAt": datetime.now(timezone.utc).isoformat(),
+              "environment": imported["environment"],
+              "bucket": imported["bucket"],
+              "contractVersionFilter": imported["contractVersionFilter"],
+              "objects": imported["objects"],
+              "compressedBytes": imported["bytes"],
+              "events": imported["events"],
+              "sourcePartitions": materialized["sourcePartitions"],
+              "episodes": imported["episodes"],
+              "decisions": materialized["decisions"],
+              "auxiliaryDecisions": materialized["auxiliaryDecisions"],
+              "transitions": materialized["transitions"],
+              "battleTerminals": materialized["battleTerminals"],
+              "runTerminals": materialized["runTerminals"],
+              "formats": materialized["formats"],
+              "battleOutcomes": materialized["battleOutcomes"],
+              "runOutcomes": materialized["runOutcomes"],
+              "schemaVersions": materialized["schemaVersions"],
+              "featureSchemaVersions": materialized["featureSchemaVersions"],
+              "buildShas": materialized["buildShas"],
+              "dictionaryHashes": materialized["dictionaryHashes"],
+          }
+          Path("ai-report/production-v4-census.json").write_text(
+              json.dumps(summary, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          mib = summary["compressedBytes"] / (1024 * 1024)
+          lines = [
+              "# Production combat contract v4 census",
+              "",
+              f"Measured at `{summary['measuredAt']}` from read-only bucket `{summary['bucket']}`.",
+              "Raw telemetry remained in ephemeral runner storage and was not uploaded.",
+              "",
+              f"- Objects: {summary['objects']:,} ({mib:,.1f} MiB compressed)",
+              f"- Events: {summary['events']:,}",
+              f"- Human policy decisions: {summary['decisions']:,}",
+              f"- Auxiliary decisions: {summary['auxiliaryDecisions']:,}",
+              f"- Transitions: {summary['transitions']:,}",
+              f"- Battle terminals: {summary['battleTerminals']:,}",
+              f"- Run terminals: {summary['runTerminals']:,}",
+              f"- Solo sessions: {summary['episodes']:,}",
+              f"- Pseudonymous source partitions: {summary['sourcePartitions']:,}",
+              "",
+              "```json",
+              json.dumps(
+                  {
+                      "formats": summary["formats"],
+                      "battleOutcomes": summary["battleOutcomes"],
+                      "runOutcomes": summary["runOutcomes"],
+                  },
+                  indent=2,
+              ),
+              "```",
+              "",
+          ]
+          Path("ai-report/production-v4-census.md").write_text("\n".join(lines), encoding="utf-8")
+          PY
+          cat ai-report/production-v4-census.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-production-v4-census
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
