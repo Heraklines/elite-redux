@@ -1,0 +1,15 @@
+name = "er-ai-telemetry-export"
+main = "src/index.mjs"
+compatibility_date = "2026-08-03"
+workers_dev = true
+preview_urls = false
+
+[[r2_buckets]]
+binding = "TELEMETRY"
+bucket_name = "er-telemetry"
+
+[limits]
+subrequests = 1000
+
+[observability]
+enabled = false

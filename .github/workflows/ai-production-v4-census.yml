@@ -9,6 +9,8 @@ on:
     paths:
       - ".github/workflows/ai-production-v4-census.yml"
       - "scripts/ai/combat-telemetry-import.mjs"
+      - "scripts/ai/download-production-combat-telemetry-export.mjs"
+      - "workers/er-ai-telemetry-export/**"
   workflow_dispatch:
 
 permissions:
@@ -32,12 +34,11 @@ jobs:
       - uses: ./.github/actions/setup-deps
       - name: Stream production v4 telemetry into ephemeral runner storage
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TELEMETRY_EXPORT_TOKEN: ${{ secrets.ER_AI_TELEMETRY_EXPORT_TOKEN }}
+          TELEMETRY_EXPORT_URL: https://er-ai-telemetry-export.heraklines.workers.dev/v1/export
         run: >-
-          node scripts/ai/download-production-combat-telemetry.mjs
+          node scripts/ai/download-production-combat-telemetry-export.mjs
           --contract-version 4
-          --read-concurrency 24
           --max-invalid-objects 100
           --out "$RUNNER_TEMP/production-v4-telemetry"
       - name: Materialize aggregate contract counts
