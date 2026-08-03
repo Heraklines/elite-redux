@@ -1697,6 +1697,14 @@ test("normal trainer victory retains its exact presentation lease across success
     "the ordinary control projector has a bounded block",
   );
   const projector = coopRuntime.slice(controlProjectorStart, controlProjectorEnd);
+  const localWaitInstallAt = projector.indexOf(
+    "const result = runtime.v2ControlLedger.project(control, null, runtime.controller.localSeatId);",
+  );
+  const completionFenceAt = projector.indexOf('sourceMaterial?.kind === "trainer-victory-open"');
+  assert.ok(
+    localWaitInstallAt >= 0 && completionFenceAt > localWaitInstallAt,
+    "the exact successor wait enters the local ledger before its external completion proof is withheld",
+  );
   assert.match(
     projector,
     /sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*kind: "deferred"/u,

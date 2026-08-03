@@ -5896,6 +5896,12 @@ function projectCoopV2InteractionControl(
   if (control.kind === "AWAIT_SUCCESSOR") {
     const sourceEntry = runtime.v2ControlLedger.sourceEntryOf(control);
     const sourceMaterial = sourceEntry?.kind === "CONTROL_COMMIT" ? decodeControlOpenEntry(sourceEntry) : null;
+    // Install the immutable wait in the local ledger before withholding the external controlInstalled
+    // receipt. TrainerVictoryPhase is itself one of this wait's exact action-only settlement surfaces; if
+    // activeControl stays on the preceding TURN wait, the physical-input gate cannot grant the renderer's
+    // MESSAGE lease and completion becomes circularly impossible. Local ledger installation is not the
+    // terminal proof: the deferred result below still prevents the authority from retiring this revision.
+    const result = runtime.v2ControlLedger.project(control, null, runtime.controller.localSeatId);
     if (
       runtime.controller.authorityRole === "replica"
       && sourceMaterial?.kind === "trainer-victory-open"
@@ -5911,7 +5917,6 @@ function projectCoopV2InteractionControl(
         reason: `awaiting completed trainer-victory presentation for wave ${sourceMaterial.wave}`,
       };
     }
-    const result = runtime.v2ControlLedger.project(control, null, runtime.controller.localSeatId);
     if (result.kind === "installed" || result.kind === "already-installed") {
       runtime.v2InstalledInteractionTargets.add(result.controlId);
       const waveTransaction = matchingCoopV2WaveTransaction(runtime, control);
