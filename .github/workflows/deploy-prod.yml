@@ -43,11 +43,16 @@ jobs:
 
       - name: Write standalone login env (PROD - no dev tools)
         run: |
+          node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          AI_DICTIONARY_HASH="$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)"
+          echo "AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}" >> "$GITHUB_ENV"
           {
             echo "VITE_BYPASS_LOGIN=0"
             echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry.heraklines.workers.dev"
             echo "VITE_TELEMETRY=prod"
+            echo "VITE_BUILD_SHA=${PROMOTED_SHA}"
+            echo "VITE_AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}"
           } > .env.standalone.local
 
       # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects
@@ -190,6 +195,17 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-telemetry/wrangler.toml
+
+      - name: Upload combat data dictionary (production R2)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            r2 object put
+            "er-telemetry/dictionaries/${{ env.AI_DICTIONARY_HASH }}.json"
+            --file "${{ runner.temp }}/er-combat-data-dictionary.json"
+            --content-type application/json
 
       - name: Deploy to Cloudflare Pages (PRODUCTION)
         uses: cloudflare/wrangler-action@v3

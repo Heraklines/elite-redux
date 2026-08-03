@@ -25,6 +25,7 @@ test("production verifies one save-worker and browser contract before publishing
   const contract = requiredOffset("- name: Verify production promotion contract");
   const worker = requiredOffset("- name: Deploy cloud-save API (production)");
   const telemetryWorker = requiredOffset("- name: Deploy tournament telemetry API (production)");
+  const dictionary = requiredOffset("- name: Upload combat data dictionary (production R2)");
   const pages = requiredOffset("- name: Deploy to Cloudflare Pages (PRODUCTION)");
 
   assert.ok(sealSource < build, "the checked-out source must be sealed before the browser build");
@@ -33,13 +34,18 @@ test("production verifies one save-worker and browser contract before publishing
   assert.ok(verify < contract, "the assembled bundle must verify before the production contract");
   assert.ok(contract < worker, "all local verification must finish before production mutates");
   assert.ok(worker < telemetryWorker, "the save identity contract must be live before telemetry is published");
-  assert.ok(telemetryWorker < pages, "both production APIs must be live before the browser is published");
+  assert.ok(telemetryWorker < dictionary, "the telemetry API must be live before its dictionary is published");
+  assert.ok(dictionary < pages, "the exact data dictionary must be live before the browser is published");
 });
 
 test("production enables player and Showdown telemetry while keeping tournaments, co-op, and developer tools gated", () => {
   assert.match(workflow, /echo "VITE_SERVER_URL=https:\/\/er-save-api\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_TELEMETRY=prod"/u);
+  assert.match(workflow, /echo "VITE_BUILD_SHA=\$\{PROMOTED_SHA\}"/u);
+  assert.match(workflow, /echo "VITE_AI_DICTIONARY_HASH=\$\{AI_DICTIONARY_HASH\}"/u);
+  assert.match(workflow, /node scripts\/export-data-dictionary\.mjs/u);
+  assert.match(workflow, /er-telemetry\/dictionaries\/\$\{\{ env\.AI_DICTIONARY_HASH \}\}\.json/u);
   assert.match(workflow, /command: deploy --config workers\/er-save-api\/wrangler\.toml/u);
   assert.match(workflow, /command: deploy --config workers\/er-telemetry\/wrangler\.toml/u);
   assert.doesNotMatch(workflow, /VITE_SERVER_URL_PLAYER_TELEMETRY/u);
