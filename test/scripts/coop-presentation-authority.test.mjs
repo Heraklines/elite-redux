@@ -1005,6 +1005,11 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
   );
   assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
   assert.match(
+    progressionReplay,
+    /shiftPhaseThroughCoopAuthorityCommit\(this,[\s\S]*this\.onComplete\(!this\.presentationFailed\)/u,
+    "retained presentation completion retries V2 after selecting, but before starting, the local successor",
+  );
+  assert.match(
     waveAdapter,
     /readonly prePokemon: Readonly<Record<string, unknown>>;[\s\S]+readonly postPokemon: Readonly<Record<string, unknown>>;/u,
     "an evolution commit retains complete immutable before and after Pokemon images",

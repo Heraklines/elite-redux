@@ -382,7 +382,8 @@ export class CoopWaveProgressionReplayPhase extends Phase {
 
   private readonly wave: number;
   private readonly events: readonly CoopWaveProgressionPresentationV2[];
-  private readonly onComplete: (succeeded: boolean) => void;
+  /** Return false to keep a newly selected local successor parked until the ordered V2 callback activates. */
+  private readonly onComplete: (succeeded: boolean) => boolean;
   private readonly onRetired: () => void;
   private readonly renderControllers = new Set<AbortController>();
   private completed = false;
@@ -391,7 +392,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
   constructor(
     wave: number,
     events: readonly CoopWaveProgressionPresentationV2[],
-    onComplete: (succeeded: boolean) => void,
+    onComplete: (succeeded: boolean) => boolean,
     onRetired: () => void = () => undefined,
   ) {
     super();
@@ -826,10 +827,22 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     }
     this.completed = true;
     coopLog("progression", `GUEST retained presentation complete wave=${this.wave} events=${this.events.length}`);
-    // Restore the parked BattleEndPhase first. The callback retries the exact V2 entry against that real
-    // boundary, so DATA can never apply while this cosmetic override is still current.
-    this.end();
-    this.onComplete(!this.presentationFailed);
+    // Select the parked/queued boundary without starting it, then let the completion callback retry the exact
+    // V2 entry. A buffered successor may atomically replace that selected shell; the scheduler detects that
+    // replacement and never starts either the obsolete local tail or the projected modal twice.
+    const shifted = globalScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () =>
+      this.onComplete(!this.presentationFailed),
+    );
+    if (!shifted) {
+      if (globalScene.phaseManager.getCurrentPhase() === this) {
+        coopWarn(
+          "progression",
+          `GUEST retained presentation could not close its exact scheduler boundary wave=${this.wave}`,
+        );
+      } else {
+        coopLog("progression", `GUEST retained presentation parked its ordered successor wave=${this.wave}`);
+      }
+    }
   }
 
   /** Cancel detached UI work when recovery or a newer authority entry destructively replaces this phase. */

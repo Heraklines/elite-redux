@@ -74,6 +74,7 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
+import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopRewardSurfaceIdentity,
@@ -1006,6 +1007,19 @@ export function commitRewardAuthoritativeResult(
         + `legacyRevision=${res.envelope.revision}`,
     );
     return null;
+  }
+  // A reward-owned evolution is retained by INTERACTION_COMMIT after the ordinary WAVE_ADVANCE capture
+  // has already closed. Publish the same read-only authority receipt used by the browser presentation
+  // oracle only after this exact immutable result enters the negotiated log. Without this seam the real
+  // replica renderer completed the cutscene, but the oracle compared it against an empty host ledger.
+  const progressionPresentation = surfaceResult?.presentation;
+  if (progressionPresentation != null && isValidWaveProgressionPresentation(progressionPresentation)) {
+    observeCoopWaveProgressionPresentation({
+      stage: "authority-recorded",
+      wave: prepared.wave,
+      seq: 0,
+      event: progressionPresentation,
+    });
   }
   advancePreparedWatcher(prepared);
   coopLog(

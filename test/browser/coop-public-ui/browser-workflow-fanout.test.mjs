@@ -630,6 +630,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
     "only the replica renderer may replace ordinary progression with the signed evolution successor bridge",
   );
   assert.match(
+    coopRuntime,
+    /settleEvolutionReplay[\s\S]*mayStartSelectedSuccessor[\s\S]*terminalWait = runtime\.v2ControlLedger\.latestControl[\s\S]*terminalWait\?\.kind === "AWAIT_SUCCESSOR"[\s\S]*terminalWait\.afterOperationId === op\.id[\s\S]*terminalWait\.allowNextWaveStart/u,
+    "a delayed nested learn-move entry must keep the replica's unsigned local successor unstarted",
+  );
+  assert.match(
     learnMovePhase,
     /nextInteraction == null[\s\S]*this\.coopParentAllowsNextWaveStart/u,
     "the retained learn-move result must authorize wave N+1 when its item-evolution parent did",

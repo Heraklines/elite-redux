@@ -78,6 +78,11 @@ test("the authority closes the real phase, proves it, retains exact state, and o
   const callback = scheduler.lastIndexOf("commitAfterClose()");
   const start = scheduler.indexOf("this.startCurrentPhase()", callback);
   assert.ok(callback >= 0 && start > callback, "the queued successor cannot start before result retention succeeds");
+  assert.match(
+    scheduler,
+    /const selectedSuccessor = this\.currentPhase;[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*this\.currentPhase !== selectedSuccessor[\s\S]*!startSelectedSuccessor[\s\S]*this\.startCurrentPhase\(\)/u,
+    "a V2 modal projected by the atomic callback owns its single start and suppresses the obsolete successor",
+  );
 });
 
 test("every host-owned prompt and decline continuation re-enters its captured V2 runtime", () => {

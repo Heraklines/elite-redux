@@ -705,7 +705,9 @@ export class PhaseManager {
    * successor open before its immutable Authority V2 entry exists. This seam separates those two scheduler
    * edges without exposing the phase tree: `commitAfterClose` runs after `phase` is no longer current, but
    * before a newly dequeued successor starts. Returning false leaves that successor unstarted so the shared
-   * terminal path can fail closed; a parked standby is restored exactly as ordinary `shiftPhase` does.
+   * terminal path can fail closed; a parked standby is restored exactly as ordinary `shiftPhase` does. The
+   * commit may atomically replace and start the selected successor (for example, by projecting a buffered V2
+   * modal). In that case this method must not start the replacement a second time.
    */
   public shiftPhaseThroughCoopAuthorityCommit(phase: Phase, commitAfterClose: () => boolean): boolean {
     if (this.currentPhase !== phase || this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
@@ -727,7 +729,12 @@ export class PhaseManager {
     } else {
       this.currentPhase = nextPhase;
     }
-    if (!commitAfterClose()) {
+    const selectedSuccessor = this.currentPhase;
+    const startSelectedSuccessor = commitAfterClose();
+    if (this.currentPhase !== selectedSuccessor) {
+      return true;
+    }
+    if (!startSelectedSuccessor) {
       return false;
     }
     this.startCurrentPhase();

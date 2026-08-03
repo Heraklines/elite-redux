@@ -5359,8 +5359,10 @@ function bootstrapCoopV2WaveTransaction(runtime: CoopRuntime, transaction: CoopV
   return true;
 }
 
-function completeCoopV2WaveProgressionReplay(runtime: CoopRuntime, wave: number, entryRevision: number): void {
+function completeCoopV2WaveProgressionReplay(runtime: CoopRuntime, wave: number, entryRevision: number): boolean {
+  let activated = false;
   runWhenCoopRuntimeActive(runtime, () => {
+    activated = true;
     const transaction = runtime.v2WaveTransactions.get(wave);
     if (transaction == null || transaction.entryRevision !== entryRevision || transaction.progressionReady) {
       return;
@@ -5375,6 +5377,7 @@ function completeCoopV2WaveProgressionReplay(runtime: CoopRuntime, wave: number,
       coopLog("v2-wave", `presentation boundary completed ${completed} retained V2 entry`);
     }
   });
+  return activated;
 }
 
 function beginCoopV2WaveProgressionReplay(runtime: CoopRuntime, transaction: CoopV2WaveLiveTransaction): boolean {
@@ -5445,7 +5448,9 @@ function prepareCoopV2MeProgressionPresentation(
     return false;
   }
   const phase = phaseManager.create("CoopWaveProgressionReplayPhase", envelope.wave, progression, () => {
+    let activated = false;
     runWhenCoopRuntimeActive(runtime, () => {
+      activated = true;
       runtime.v2MeProgressionReplayStarted.delete(entry.operationId);
       // Only one Mystery encounter can be live. Retain the latest exact id for duplicate delivery without
       // growing an unbounded second history beside the Authority V2 log.
@@ -5457,6 +5462,7 @@ function prepareCoopV2MeProgressionPresentation(
       );
       coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries();
     });
+    return activated;
   });
   runtime.v2MeProgressionReplayStarted.add(entry.operationId);
   if (!phaseManager.overridePhase(phase)) {
@@ -11201,8 +11207,16 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
             + `form=${presentation.preFormIndex}->${presentation.formIndex}`,
         );
       } else {
-        const settleEvolutionReplay = (succeeded: boolean, reason: string): void => {
+        const settleEvolutionReplay = (succeeded: boolean, reason: string): boolean => {
+          let activated = false;
+          let mayStartSelectedSuccessor = false;
           runWhenCoopRuntimeActive(runtime, () => {
+            activated = true;
+            const terminalWait = runtime.v2ControlLedger.latestControl;
+            mayStartSelectedSuccessor =
+              terminalWait?.kind === "AWAIT_SUCCESSOR"
+              && terminalWait.afterOperationId === op.id
+              && terminalWait.allowNextWaveStart;
             settleCoopPresentationOutcome(
               outcomeToken,
               succeeded
@@ -11214,6 +11228,7 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
               coopLog("v2-interaction", `reward evolution completed ${completed} retained V2 entry`);
             }
           });
+          return activated && mayStartSelectedSuccessor;
         };
         globalScene.phaseManager.unshiftNew(
           "CoopWaveProgressionReplayPhase",

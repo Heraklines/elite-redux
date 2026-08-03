@@ -6919,3 +6919,39 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   settlement can retry the buffered successor. That separate scheduler-ordering mechanism will be fixed and
   qualified only after the ordinary evolution role split is measured on its own exact SHA.
 - No local co-op, Vitest, Chromium, or compilation run was performed. Verification remains remote-only.
+
+## 2026-08-03 - retained evolution closes before its nested successor starts
+
+- The `RARE_EVOLUTION_ITEM` artifact from run `30772488229` proves a second production defect. On the replica,
+  the retained evolution reported completion at `23:59:10.399`; ordinary `NewBattlePhase` started three
+  milliseconds later and `NextEncounterPhase` another three milliseconds after that. Only then did the replay
+  completion callback retry reward revision 5. The replica was already on wave 2, so it correctly rejected the
+  wave-1 reward image as cross-wave; the guest-owned Learn Move revision 6 consequently remained a permanent
+  `frontier=5/4/4` gap.
+- Retained progression completion now uses the existing atomic authority-commit scheduler seam: it selects but
+  does not start the queued local successor, invokes the exact V2 completion callback, and starts that local
+  successor only if the callback neither projected a replacement nor left an ordered same-wave wait pending.
+  This also handles a genuinely delayed revision 6: the unsigned local tail remains selected but unstarted
+  until the network-delivered interaction replaces it, rather than relying on revision 6 already being buffered.
+- The scheduler now detects a modal installed and started by its callback, preventing a second `start()` call.
+  Behavioral tests cover both the projected-modal and delayed-entry branches; source contracts bind retained
+  progression and reward-evolution settlement to the atomic path and the explicit `allowNextWaveStart` fence.
+- Focused ordinary Evolution Item run `30774089940` crossed the previously failing bridge, completed the
+  animations-on evolution, converged both parties on Raichu, reached wave 2, and exposed the shared command
+  frontier. That isolates this scheduler change to the separate nested rare-evolution mechanism. No local
+  co-op, Vitest, Chromium, or compilation run was performed.
+
+## 2026-08-03 - reward-owned evolution authority ledger evidence
+
+- The only red after ordinary run `30774089940` had completed gameplay was the final presentation oracle:
+  `authority=[]` versus one replica `renderer-completed` evolution. Both final screenshots and semantic
+  observations show wave 2, equivalent parties, and the same state digest, so this is a harness-evidence red,
+  not a product desync or softlock.
+- The authority did retain the complete evolution inside revision-5 `INTERACTION_COMMIT`; the read-only
+  authority observer was simply attached only to the earlier `WAVE_ADVANCE` capture, which is already closed
+  when a reward-owned evolution finishes. `commitRewardAuthoritativeResult` now emits the authority receipt
+  only after that exact immutable reward result successfully enters the negotiated log. The equality oracle
+  remains strict; it is no longer relaxed to accept renderer-only evidence.
+- A remote source contract binds the reward observer to the post-retention seam. The next focused
+  animations-on measurements are ordinary `EVOLUTION_ITEM` and nested `RARE_EVOLUTION_ITEM` on the combined
+  scheduler/evidence tip.

@@ -51,6 +51,7 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
     observer,
     runtime,
     replay,
+    rewardOperation,
     playerBattleInfo,
     entry,
     evidence,
@@ -62,6 +63,7 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
     read("src/data/elite-redux/coop/coop-wave-progression-observer.ts"),
     read("src/data/elite-redux/coop/coop-runtime.ts"),
     read("src/phases/coop-wave-progression-replay-phase.ts"),
+    read("src/data/elite-redux/coop/coop-reward-operation.ts"),
     read("src/ui/battle-info/player-battle-info.ts"),
     read("scripts/coop-browser-entry.ts"),
     read("test/browser/coop-public-ui/evidence.mjs"),
@@ -97,6 +99,11 @@ test("authority and replica publish one lifecycle-owned progression ledger", asy
     "PlayerBattleInfo must bypass the render-tick tween and honor instant through recursive level-boundary EXP updates",
   );
   assert.match(entry, /setCoopWaveProgressionPresentationObserver[\s\S]*PROGRESSION_EVENT_PREFIX/u);
+  assert.match(
+    rewardOperation,
+    /retainEnvelope\(res\.envelope, binding\)[\s\S]*isValidWaveProgressionPresentation\(progressionPresentation\)[\s\S]*stage: "authority-recorded"[\s\S]*wave: prepared\.wave/u,
+    "reward-owned evolution presentation must enter the authority evidence ledger only after its immutable result is retained",
+  );
   assert.match(evidence, /sink\.record\("browser-progression-event"/u);
   assert.match(
     harness,
