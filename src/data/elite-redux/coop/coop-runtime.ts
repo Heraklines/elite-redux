@@ -157,7 +157,6 @@ import {
   setShowdownSeatAuthorityResolver,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { setCoopAuthorityStateHooks } from "#data/elite-redux/coop/coop-authority-state-hooks";
-import { withCoopOrderedControlPhasePermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   armCoopBargainJournalMaterialization,
   COOP_BARGAIN_PRESENT_KIND,
@@ -382,6 +381,7 @@ import {
   settleCoopPresentationOutcome,
 } from "#data/elite-redux/coop/coop-presentation-outcome";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { withCoopOrderedControlPhasePermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   isCoopRevivalOperationEnabled,
   resetCoopRevivalOperationState,
