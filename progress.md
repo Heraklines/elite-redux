@@ -7425,3 +7425,28 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   heartbeats show successful fresh-account onboarding, settings-attested 10x speed, public lobby pairing,
   level-100 three-mon fixtures on both seats, and both clients at the shared wave-1 command frontier. Continue
   monitoring it through the first trainer replacement and eventual wave-30 terminal.
+
+## 2026-08-03 - double-KO closure and browser input pacing
+
+- The continuous run `30854725171` exposed a harness-only trainer-cleanup mismatch: it compared Phaser's raw
+  `visible` bit even though both trainer sprites had alpha zero and the public rendered-presentation contract
+  correctly reported them absent. Harness commit `8521d2dcb` now compares canonical rendered trainer
+  presentation and carries a regression for transparent-but-visible sprite shells. Production code is unchanged.
+- Its successor run `30857009580` reached the wave-5 trainer victory but redlined at reward rendezvous
+  `shop:5:4`. Artifact traces prove the authority and replica had both completed the trainer battle; the replica
+  was still on the actionable voucher `MESSAGE` immediately before the shop. The public-key driver issued the
+  next Space in the same Phaser frame as the previous prompt transition, treated the voucher as consumed, and
+  never retried it. The rendezvous correctly failed closed because one browser had been left behind; this was
+  not a product or Authority V2 defect.
+- Harness commit `689d9e86f` adds an event-driven input receipt: every public DOM key waits until a strictly later
+  Phaser frame observes the key released before another key may be sent. The exact remote build job proves
+  format, both public-driver boundaries, the wait/rendering contract suite, and the sealed browser bundle.
+- Exact focused two-real-browser run `30860049050` is fully green at `689d9e86f`. It cleared six continuous
+  waves with ordinary public keyboard/DOM control, including the exact wave-5 trainer victory, host-owned
+  reward, and `shop:5:4` handoff; both clients then converged at the wave-6 command frontier and ultimately the
+  addressed wave-7 mystery frontier. The artifact summary reports `status: passed`, `finalWave: 7`, no error,
+  graceful cleanup, zero fallback turns, and no recovery. The compact evidence is retained under
+  `.artifacts-doubleko-depth-30860049050-compact/`.
+- The production double-KO fix remains the already deployed staging bundle
+  `github:296b89e01aa25e61b049c92ef88fba98bb85735b:run-30855403585.1`. Commits `8521d2dcb` and `689d9e86f`
+  are test/observer-only, so no additional staging deploy is required. Production remains untouched.
