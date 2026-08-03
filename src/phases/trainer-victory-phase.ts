@@ -251,11 +251,7 @@ export class TrainerVictoryPhase extends BattlePhase {
       return;
     }
     const { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave } = resolved;
-    if (
-      globalScene.gameMode.isCoop
-      && !authoritativeGuest
-      && !openCoopV2TrainerVictoryPresentation()
-    ) {
+    if (globalScene.gameMode.isCoop && !authoritativeGuest && !openCoopV2TrainerVictoryPresentation()) {
       failCoopSharedSession("Could not open the ordered trainer-victory presentation.");
       return;
     }

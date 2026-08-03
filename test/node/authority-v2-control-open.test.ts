@@ -437,7 +437,13 @@ describe("authority-v2 explicit command-open boundary", () => {
       epoch: context.sessionEpoch,
       wave: 4,
       turn: 1,
-      allowedKinds: ["CONTROL_COMMIT", "REPLACEMENT_COMMIT", "INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowedKinds: [
+        "CONTROL_COMMIT",
+        "REPLACEMENT_COMMIT",
+        "INTERACTION_COMMIT",
+        "WAVE_ADVANCE",
+        "TERMINAL_COMMIT",
+      ] as const,
       allowNextWaveStart: false,
       expectedOperationId: null,
     };
