@@ -157,6 +157,7 @@ import {
   setShowdownSeatAuthorityResolver,
 } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { setCoopAuthorityStateHooks } from "#data/elite-redux/coop/coop-authority-state-hooks";
+import { withCoopOrderedControlPhasePermit } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
   armCoopBargainJournalMaterialization,
   COOP_BARGAIN_PRESENT_KIND,
@@ -7074,7 +7075,9 @@ function buildCoopV2LiveSeams(
               // gate neutralizes it. Presence in the phase tree is therefore not proof that the ordered
               // consumer exists. The V2 lease is the duplicate guard: its first install always queues one
               // authorized phase; redelivery of the same material queues none.
-              globalScene.phaseManager.unshiftNew("TrainerVictoryPhase");
+              withCoopOrderedControlPhasePermit("TrainerVictoryPhase", () =>
+                globalScene.phaseManager.unshiftNew("TrainerVictoryPhase"),
+              );
             }
             if (!releaseCoopV2ParkedTurnBoundary(runtime, entry)) {
               return "deferred";

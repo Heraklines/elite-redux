@@ -7187,3 +7187,27 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   still presents the defeated trainer.
 - TODO: commit/push the candidate and use remote GitHub runners for source/unit/type checks plus a real
   Mystery trainer browser reproduction. Do not qualify this production fix through local gameplay tests.
+
+## 2026-08-03 - ordered normal trainer-victory control and exact consumer lease
+
+- The first V2 normal-trainer candidate proved that `TrainerVictoryPhase` needed its own typed
+  `trainer-victory-open` CONTROL_COMMIT between the settled TURN and WAVE entries. The commit carries the
+  complete authoritative state, immutable trainer identity, and a mandatory ordered successor wait; the
+  projector installs the exact replica presentation and the phase establishes enemy-trainer-hidden before
+  completion.
+- Gate evidence then exposed two real ordering races. First, the won-wave predecessor wait did not admit the
+  new control address; it now names only the exact trainer-victory coordinate (plus the existing exact
+  replacement address where applicable). Second, a following WAVE entry could replace `latestControl` before
+  the trainer phase started; an address-exact pending runtime lease now survives that admission and is cleared
+  only by the real phase completion or hard epoch reset.
+- Exact-SHA gate `30817216159` exposed the final race: a legacy guest tail could briefly construct an
+  unsanctioned `TrainerVictoryPhase`, the renderer gate neutralized it, and the V2 projector's phase-tree query
+  then mistook that object for its authorized consumer and queued nothing. Tip `07465e273` makes the first
+  exact lease installation always queue one ordered consumer; the lease itself is the only duplicate guard.
+- Final remote qualification is running at exact SHA `07465e273`: full gate `30817902430` and 10-wave
+  two-real-browser Mystery campaign `30817905195`. The older gate and Mystery run remain untouched as
+  failure-first evidence. No local gameplay, Vitest, Chromium, or compilation process was run.
+- Gate `30817902430` proved that first-lease construction was still neutralized by the older strict-tail
+  renderer gate: CONTROL_COMMIT authority was exact, but that gate recognized only WAVE sanctions. The
+  follow-up wraps construction in a synchronous consumed-once control permit. The ambient phase remains
+  blocked before and after the call; only the phase object created inside the ordered projector is admitted.

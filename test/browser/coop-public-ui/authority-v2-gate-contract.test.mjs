@@ -1657,14 +1657,21 @@ test("normal trainer victory retains its exact presentation lease across success
   );
   const projectorStart = coopRuntime.indexOf('if (material.kind === "trainer-victory-open")');
   const projectorEnd = coopRuntime.indexOf('if (material.kind === "replacement-open")', projectorStart);
-  assert.ok(
-    projectorStart >= 0 && projectorEnd > projectorStart,
-    "the trainer projector has a bounded source block",
-  );
+  assert.ok(projectorStart >= 0 && projectorEnd > projectorStart, "the trainer projector has a bounded source block");
   assert.doesNotMatch(
     coopRuntime.slice(projectorStart, projectorEnd),
     /hasPhaseOfType\("TrainerVictoryPhase"\)/u,
     "an unsanctioned legacy phase cannot impersonate the ordered V2 consumer",
+  );
+  assert.match(
+    coopRuntime.slice(projectorStart, projectorEnd),
+    /withCoopOrderedControlPhasePermit\("TrainerVictoryPhase",[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    "the CONTROL_COMMIT grants its exact phase construction a consumed renderer permit",
+  );
+  assert.match(
+    rendererGate,
+    /withCoopOrderedControlPhasePermit<[\s\S]*orderedControlPhasePermit[\s\S]*permit\.consumed[\s\S]*finally[\s\S]*orderedControlPhasePermit = null/u,
+    "the renderer permit is synchronous, consumed, and always cleared",
   );
   const addressStart = coopRuntime.indexOf("export function coopV2TrainerVictoryPresentationAddress(");
   const addressEnd = coopRuntime.indexOf("\n/**", addressStart + 1);
