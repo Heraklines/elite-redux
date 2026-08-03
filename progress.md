@@ -7144,3 +7144,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   unique prompt generation once through the public keyboard path, and then requires the exact actionable
   Summary picker. A pure contract test distinguishes that prompt from wrong-address/stale material and from the
   completed picker. No production change was made for the `TM_GREAT` classification.
+- The full 36-item matrix keeps its 28-runner throughput but now receives a measured seven-minute first-load
+  budget. This is scoped only to `party-mutating-rewards`: run `30785547999` proved five setup-only reds whose
+  browsers first reached LoginPhase at 307-311 seconds under CDN fan-out, just beyond the old five-minute bound.
+  Ordinary journeys retain the five-minute boot contract, and the matrix's 20-minute total setup ceiling is
+  unchanged.

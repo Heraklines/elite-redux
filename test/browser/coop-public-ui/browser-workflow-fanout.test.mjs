@@ -390,6 +390,11 @@ test("party-mutating reward matrix drives every non-held mutation and nested ite
   ]);
 
   assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
+  assert.match(
+    workflow,
+    /COOP_UI_BOOT_TIMEOUT_MS: \$\{\{ inputs\.journey == 'party-mutating-rewards' && '420000' \|\| '300000' \}\}/u,
+    "only the measured high-fanout reward matrix receives extra immutable-asset boot headroom",
+  );
   assert.match(workflow, /party_reward_ids:[\s\S]*Optional closed JSON subset/u);
   assert.match(
     workflow,

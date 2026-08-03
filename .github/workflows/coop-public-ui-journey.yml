@@ -448,6 +448,10 @@ jobs:
           COOP_UI_GUEST_LOCALE: ${{ inputs.journey == 'game-over' && 'en' || 'de' }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
+          # The 36-item reward matrix can push jsDelivr's immutable first-load past five minutes
+          # without entering gameplay (run 30785547999 reached LoginPhase at 307-311s). Preserve the
+          # ordinary strict boot budget and give only this high-fanout diagnostic profile measured headroom.
+          COOP_UI_BOOT_TIMEOUT_MS: ${{ inputs.journey == 'party-mutating-rewards' && '420000' || '300000' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
           # The continuous wave-1 -> wave-20 profile naturally reaches the wave-10 guest-owned
