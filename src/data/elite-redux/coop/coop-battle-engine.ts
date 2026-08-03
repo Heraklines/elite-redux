@@ -79,6 +79,10 @@ import {
   setErBiomeStructureExtent,
 } from "#data/elite-redux/er-biome-structure";
 import {
+  getLastGenericTrainerType,
+  restoreGenericTrainerTracking,
+} from "#data/elite-redux/er-generic-trainer-run-state";
+import {
   getErMapSaveData,
   restoreErMapState,
   setAuthoritativeMapTravelClassification,
@@ -2667,6 +2671,10 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       erMoneyStreaks: getErMoneyStreakEntries(),
       biomeOverstayAnchor: erBiomeOverstayAnchor(),
       erRelicBattleState: getErRelicBattleState(),
+      // Generic-trainer no-repeat cursor: the pure renderer can construct a transient local trainer shell
+      // from a different rarity pool before enemy authority lands. The value is part of SessionSaveData,
+      // so carry the authority's exact cursor and adopt it before saveDataDigest convergence is checked.
+      erLastGenericTrainerType: getLastGenericTrainerType(),
       // Biome-structure extent (#841 item 5): rolled length + start wave. The saveDataDigest DETECTS a
       // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
       // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
@@ -2844,6 +2852,7 @@ function captureCoopAuthoritativeBattleMaterial(turn: number): CoopAuthoritative
       erMoneyStreaks: getErMoneyStreakEntries(),
       biomeOverstayAnchor: erBiomeOverstayAnchor(),
       erRelicBattleState: getErRelicBattleState(),
+      erLastGenericTrainerType: getLastGenericTrainerType(),
       // Biome-structure extent (#841 item 5): rolled length + start wave. The saveDataDigest DETECTS a
       // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
       // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
@@ -4701,6 +4710,7 @@ function restoreCoopModuleLetSubstrates(
     | "erMoneyStreaks"
     | "biomeOverstayAnchor"
     | "erRelicBattleState"
+    | "erLastGenericTrainerType"
     | "erBiomeStructure"
     | "erMapState"
     | "erPendingNodes"
@@ -4728,6 +4738,10 @@ function restoreCoopModuleLetSubstrates(
         `erRelicBattleState host wave=${(snapshot.erRelicBattleState as ErRelicBattleStateData).wave} -> restored (#837)`,
       );
       restoreErRelicBattleState(snapshot.erRelicBattleState);
+    }
+    if (snapshot.erLastGenericTrainerType !== undefined) {
+      coopLog("adopt", `erLastGenericTrainerType host=${snapshot.erLastGenericTrainerType ?? "none"} -> restored`);
+      restoreGenericTrainerTracking(snapshot.erLastGenericTrainerType);
     }
     // ER WORLD-MAP STATE (#865 / audit #841 item 1): adopt the host's map state (revealed nodes / travel
     // target / fragments / journey / structure) THEN re-seat the routing PENDING-NODE set. Order matters:

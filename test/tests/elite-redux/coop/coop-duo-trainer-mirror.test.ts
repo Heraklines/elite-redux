@@ -32,6 +32,11 @@ import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redu
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  getLastGenericTrainerType,
+  resetGenericTrainerTracking,
+  restoreGenericTrainerTracking,
+} from "#data/elite-redux/er-generic-trainer-run-state";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { GameModes } from "#enums/game-modes";
@@ -113,6 +118,7 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     resetCoopRendezvousWaitMs();
     accuracySpy?.mockRestore();
     accuracySpy = undefined;
+    resetGenericTrainerTracking();
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
@@ -209,6 +215,59 @@ describe.skipIf(!RUN)("co-op DUO trainer-wave mirror: two real engines, faithful
     const guestChk1 = await withClient(rig.guestCtx, () => captureCoopChecksum());
     expect(guestChk1, "post-enemy-switch: guest checksum matches host").toBe(hostChk1);
 
+    logs.flush();
+  }, 300_000);
+
+  it("retires a double-KO turn before rendering both enemy switch-ins when the renderer rolled a different trainer cursor", async () => {
+    // Live wave-14 failure: Heat Wave KO'd both enemy leads. The host emitted two switch events, but the
+    // renderer's transient trainer construction had advanced erLastGenericTrainerType through a different
+    // rarity pool. That one module value split saveDataDigest, so TURN_COMMIT stayed pending and both already-
+    // received switch-ins remained trapped behind it until the authority deadline terminated the session.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.DRAGONITE, SpeciesId.TYRANITAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    expect(rig.hostScene.getEnemyParty().length, "the double trainer has two reserve switch-ins").toBeGreaterThan(3);
+
+    const leadsBefore = rig.hostScene.getEnemyField().map(mon => mon.id);
+    const turn = rig.hostScene.currentBattle.turn;
+    await driveDuoGuestTackleThroughPublicUi(game, rig, {
+      restartAlreadyOpenHost: false,
+      submitHostTackle: true,
+      hostMoveId: KO_MOVE,
+      guestMoveId: KO_MOVE,
+      hostTarget: BattlerIndex.ENEMY,
+      guestTarget: BattlerIndex.ENEMY_2,
+    });
+    const authorityTrainerCursor = TrainerType.MUSICIAN;
+    await withClient(rig.hostCtx, async () => {
+      restoreGenericTrainerTracking(authorityTrainerCursor);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
+    });
+
+    // Model the renderer's observed RARE-vs-COMMON shell roll immediately before the immutable host turn is
+    // applied. Pre-fix this exact value survived every retry because no authority carrier owned it.
+    await withClient(rig.guestCtx, async () => {
+      restoreGenericTrainerTracking(TrainerType.HIKER);
+      await driveGuestReplayTurn(rig.guestScene, turn);
+    });
+    expect(getLastGenericTrainerType(), "turn material restored the host's trainer no-repeat cursor").toBe(
+      authorityTrainerCursor,
+    );
+
+    // Run one harmless turn so both switch presentations have crossed the retained boundary and the field is
+    // stable. If the old turn cannot retire, this public-command round never opens and the test times out/fails.
+    await playTurn(rig, HOLD_MOVE, HOLD_MOVE);
+    const leadsAfter = rig.hostScene.getEnemyField().map(mon => mon.id);
+    expect(leadsAfter, "both trainer slots replaced their KO'd leads").toHaveLength(2);
+    expect(leadsAfter[0], "slot 0 received a different reserve").not.toBe(leadsBefore[0]);
+    expect(leadsAfter[1], "slot 1 received a different reserve").not.toBe(leadsBefore[1]);
+
+    const hostFieldSpecies = rig.hostScene.getEnemyField().map(mon => mon.species.speciesId);
+    const guestFieldSpecies = rig.guestScene.getEnemyField().map(mon => mon.species.speciesId);
+    expect(guestFieldSpecies, "the renderer presented both authoritative switch-ins").toEqual(hostFieldSpecies);
+    const hostChecksum = await withClient(rig.hostCtx, () => captureCoopChecksum());
+    const guestChecksum = await withClient(rig.guestCtx, () => captureCoopChecksum());
+    expect(guestChecksum, "the double-KO replacement turn converged end-to-end").toBe(hostChecksum);
     logs.flush();
   }, 300_000);
 });

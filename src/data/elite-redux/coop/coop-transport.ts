@@ -867,6 +867,13 @@ export interface CoopFullBattleSnapshot {
   /** ER per-battle relic counters (Cursed Idol / Pharaoh's Ankh), wave-scoped (audit Part 1 #3). */
   erRelicBattleState?: ErRelicBattleStateData | undefined;
   /**
+   * Last generic trainer class selected by the authority. The renderer still constructs a temporary local
+   * trainer shell before the host's enemy carrier arrives, which can advance this run-scoped module value
+   * through a different rarity pool. Because the session-save digest hashes the value, it must ride every
+   * authoritative state image and be adopted before turn convergence is checked.
+   */
+  erLastGenericTrainerType?: number | null | undefined;
+  /**
    * #486 biome-structure EXTENT (rolled biome length + start wave). Rides the saveDataDigest via
    * erMapState's biome-structure trio (`normalizeCoopErMapState`), but - unlike `biomeOverstayAnchor` -
    * NO per-turn/resync heal carried it, so a divergence loop-DETECTED with no heal path (audit #841 item
@@ -1070,6 +1077,8 @@ export interface CoopAuthoritativeBattleStateV1 {
   erMoneyStreaks?: [number, number][] | undefined;
   biomeOverstayAnchor?: number | null | undefined;
   erRelicBattleState?: ErRelicBattleStateData | undefined;
+  /** Host-authoritative generic-trainer no-repeat cursor; see the full-snapshot field above. */
+  erLastGenericTrainerType?: number | null | undefined;
   /** #486 biome-structure EXTENT (rolled length + start wave); healed via restoreErBiomeStructure (audit #841 item 5). */
   erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
   /**

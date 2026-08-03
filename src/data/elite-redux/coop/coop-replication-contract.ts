@@ -207,6 +207,11 @@ export const COOP_AUTHORITATIVE_WIRE_FIELDS: readonly CoopWireFieldDescriptor[] 
     hash: { kind: "derived", into: ["saveDataDigest"] },
   },
   {
+    name: "erLastGenericTrainerType",
+    applied: true, // restoreCoopModuleLetSubstrates -> restoreGenericTrainerTracking.
+    hash: { kind: "derived", into: ["saveDataDigest"] },
+  },
+  {
     name: "erBiomeStructure",
     applied: true, // restoreCoopModuleLetSubstrates -> setErBiomeStructureExtent.
     hash: { kind: "derived", into: ["saveDataDigest"] },
@@ -259,6 +264,7 @@ export const COOP_CHECKSUM_FIELDS: readonly CoopChecksumFieldDescriptor[] = [
       "erMoneyStreaks",
       "biomeOverstayAnchor",
       "erRelicBattleState",
+      "erLastGenericTrainerType",
       "erBiomeStructure",
       "erMapState",
       "erPendingNodes",

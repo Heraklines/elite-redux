@@ -51,6 +51,10 @@ import {
   setErBiomeOverstayAnchor,
 } from "#data/elite-redux/er-biome-structure";
 import {
+  getLastGenericTrainerType,
+  restoreGenericTrainerTracking,
+} from "#data/elite-redux/er-generic-trainer-run-state";
+import {
   getRevealedMapNodes,
   resetErMapNodes,
   revealMapNodes,
@@ -68,6 +72,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerType } from "#enums/trainer-type";
 import { BerryModifier } from "#modifiers/modifier";
 import { BerryModifierType } from "#modifiers/modifier-type";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
@@ -373,6 +378,53 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     expect(healed.relic.lists.cursedIdol, "relic-battle-state healed through restoreErRelicBattleState").toEqual([
       111, 222,
     ]);
+    logs.flush();
+  }, 300_000);
+
+  it("DOUBLE-TRAINER KO: a renderer-local trainer roll is overwritten by authoritative state before save-data convergence", async () => {
+    // Live wave-14 repro: a resumed double trainer battle let both clients construct a trainer shell.
+    // The host selected COMMON while the renderer selected RARE, advancing their module-scoped
+    // erLastGenericTrainerType values differently. Both enemy switch events arrived, but the preceding turn
+    // could never retire because saveDataDigest was the only mismatched checksum field. Prove that the same
+    // state carrier used by every ordinary turn now owns and heals that no-repeat cursor.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildSavedataDuo(pair);
+    wireGuestCommand(rig);
+
+    const authorityType = TrainerType.MUSICIAN;
+    const rendererType = TrainerType.HIKER;
+    const host = await withClient(rig.hostCtx, () => {
+      restoreGenericTrainerTracking(authorityType);
+      return {
+        digest: captureCoopSaveDataDigest(),
+        snapshot: captureCoopFullSnapshot(),
+      };
+    });
+    expect(host.snapshot, "the authority built a complete state carrier").not.toBeNull();
+    expect(
+      host.snapshot?.authoritativeState?.erLastGenericTrainerType,
+      "ordinary authoritative material carries the exact trainer no-repeat cursor",
+    ).toBe(authorityType);
+
+    const guestBefore = await withClient(rig.guestCtx, () => {
+      restoreGenericTrainerTracking(rendererType);
+      return captureCoopSaveDataDigest();
+    });
+    expect(guestBefore, "a different renderer-local trainer roll is visible to the save-data comparator").not.toBe(
+      host.digest,
+    );
+
+    const guestAfter = await withClient(rig.guestCtx, () => {
+      restoreGenericTrainerTracking(rendererType);
+      applyCoopFullSnapshot(host.snapshot!, /* authoritativeGuest */ true, /* suppressResummon */ false);
+      return {
+        digest: captureCoopSaveDataDigest(),
+        trainerType: getLastGenericTrainerType(),
+      };
+    });
+    expect(guestAfter.trainerType, "the renderer adopted the authority's trainer cursor").toBe(authorityType);
+    expect(guestAfter.digest, "the old turn can retire before its already-received switch events").toBe(host.digest);
     logs.flush();
   }, 300_000);
 
