@@ -7249,3 +7249,99 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - TODO: commit/push without local execution, run remote static plus the owned trainer boundary/runtime shards,
   then run a two-browser journey that crosses at least two trainer victories before deploying the corrected
   exact SHA to staging. Preserve active runs `30822228534` and `30824237635` for artifact classification.
+
+## 2026-08-03 - trainer-victory completion fence and human-skew qualification
+
+- Paired live staging logs at exact build `e7857b72b` proved a repeated-trainer overtake: the guest signed
+  `trainer-victory-open` as installed before its finite prompt completed, a later WAVE entry advanced, and
+  wave 8 rejected the next trainer lease against the stale wave-5 presentation.
+- Production commit `6d67e02a7` now withholds the replica's `controlInstalled` proof until the exact real
+  TrainerVictory phase records completion, then retries the retained V2 entry through the existing
+  address-exact projector. Completed retained redelivery cannot queue the presentation again. Exact rejection
+  diagnostics and a Rival multi-reward regression were added.
+- Staging deploy `30826469191` is green at build marker `github:6674542b37d3cbb6f3e885af11645ec58f436e3d:run-30826469191.1`.
+  No production deployment was made.
+- Depth run `30825927786` at the first fenced product reached wave 5 TrainerVictory on both browsers with
+  identical state digest. It exposed a second product defect: the guest remained at frontier `24/24/23`, but
+  its exact real prompt reported `awaitingActionInput=true,inputBlocked=true`. The projector returned deferred
+  before installing the immutable successor wait locally, so the physical-input gate still saw the prior TURN
+  control and made the completion proof circularly impossible.
+- Final production commit `bd87ac311` deliberately leaves the successor claim uninstalled (so even an early
+  authenticated successor remains fail-closed) and grants a narrow pre-install input lease only when the
+  replica role, source operation, `trainer-victory-open` material, retained operation ID, wave, turn, current
+  phase, and actionable MESSAGE handler all match. The authority cannot overtake the prompt, but the renderer
+  can dismiss it. A source-order contract and the real two-browser staggered driver pin both sides.
+- The public browser driver now deliberately presses the authority's paired TrainerVictory prompt first,
+  delays, proves the replica's exact prompt remains actionable, then presses the replica. This reproduces
+  human timing instead of atomically pressing both clients. Remote pure-driver coverage pins the call chain.
+- Mystery run `30824237635` was another harness red: synchronized command authority progressed through turn
+  13 on wave 6, but the generic 12-turn cap mislabeled it as a softlock. Only Mystery receives a 30-turn
+  ceiling and cycles observer-proven damaging moves; the independent campaign wall clock remains fail-closed.
+- Runs `30829379718` and `30829450654` are preserved evidence for the superseded early-install draft and must
+  not qualify the final product. Exact `bd87ac311` run `30829771979` passed remote owned type/format, every
+  public source/driver contract, the focused trainer-victory Vitest, sealed build, and artifact publication;
+  its fresh two-browser leg is queued/running. Ten-wave depth `30829775259` and ten-wave Mystery
+  `30829978557` are the exact long-form qualifications.
+- Staging deploy `30829928856` succeeded with public marker
+  `github:bd87ac3113a60ae27db99c24a14dba37f4091620:run-30829928856.1`. Production remains untouched.
+- Exact short journey `30829771979` is fully green: remote type/format/contracts/Vitest/build plus two real
+  Chromium clients completing fresh registration, public lobby pairing, and the wave-2 frontier in 743s.
+  Its compact artifact reports `status=passed,error=null` and contains no desync, softlock, material rejection,
+  or unexpected control-deferred line.
+- Do not run gameplay/Vitest/TypeScript locally; use GitHub-hosted workflows and preserve the 32-runner
+  ceiling.
+
+## 2026-08-03 - trainer driver correction and Mystery transition presentation retention
+
+- Exact depth artifact `30829775259` did not reproduce a product input block at wave 5. Both real browsers
+  exposed the same actionable `TrainerVictoryPhase`, but the driver required a replica-local `BattleEndPhase`
+  marker that an authoritative renderer can never produce. Harness commit `b69d2c381` proves the causal
+  BattleEnd successor on the host, then requires both immutable trainer-victory addresses and advances both
+  public prompts with human skew. The regression fixture now models the real direct CONTROL projection.
+- Exact Mystery artifact `30829978557` exposed a separate production presentation loss. The authority recorded
+  one wave-6 arena-cleanup message (`The pointed stones disappeared...`), the guest received only its
+  best-effort live packet at a non-battle address with no replay consumer, and opening wave 7 discarded the
+  still-unsealed recorder. Mechanics stayed converged, but the ordered presentation ledger correctly failed
+  67 authority events versus 66 renderer receipts.
+- Production commit `86f977e59` opens `newBattle()` cleanup in a deferred transition recorder. Only an
+  unpublished, unsealed turn-one prefix from the same session and exactly adjacent wave may carry across a
+  non-battle Mystery surface; published battle material, wrong sessions, non-adjacent waves, and ordinary stale
+  recordings remain fail-closed. The next real battle releases the prefix and its CONTROL commit retains it.
+  Node and source contracts cover the exact carry plus every rejection fence.
+- Full co-op-only gate `30833666863` is green on `86f977e59`: static/type/format, public and Authority V2
+  contracts, every A/B/C/P shard, all mutation shards, immutable browser bundle, and native WebRTC/rejoin.
+- Formatter-only harness commits produced final exact staging tip `fefa52ee2`. Staging deploy `30834358397`
+  succeeded and public `version.json` verifies marker
+  `github:fefa52ee2d78c032e102a4936e78d13c64a87081:run-30834358397.1`. Production was not touched.
+- Ten-wave Mystery `30834049605` and normal-depth `30834244287` are the active exact-tip two-browser
+  qualifications. Preserve both runs and classify their artifacts before any further product change.
+- The player's new Send Logs upload had still not reached the dev-log branch after repeated pulls (2,096 total,
+  zero new), so no claim about that specific report may be made until the upload appears.
+
+## 2026-08-03 - final-tip browser qualification and scaled manual-depth budget
+
+- Exact final-production-tip Mystery journey `30834049605` passed on `fefa52ee2`: two real browsers cleared ten
+  target waves and arrived at wave 11, crossed six-plus Mystery surfaces, alternated reward ownership, crossed
+  the real wave-7 trainer-victory prompt with parity and trainer-presentation cleanup proof, and reported no
+  desync, softlock, or authoritative material rejection.
+- Exact animations-enabled surface journey `30835172528` passed on the same production tip. Both real browsers
+  rendered the complete wave-1 and wave-2 battle presentation, exercised both reward-owner directions, replayed
+  the wave-3 ability presentation, and converged at the wave-3 command frontier with no product error.
+- Ten-wave normal-depth run `30834244287` was a harness-budget red, not a product assertion: it cleared seven
+  complete waves, including a real normal trainer victory at wave 5, and was entering the wave-8 trainer
+  presentation with parity true and revision 43 installed when the fixed 45-minute campaign lifecycle timer
+  killed the process. No desync, softlock, session failure, or material rejection preceded the timeout.
+- Harness-only commit `e22f070b5` preserves the calibrated 45-minute budget for the ordinary four-wave depth
+  profile but grants manually requested depth journeys above four waves an 80-minute campaign lifecycle and
+  matching 83/90-minute step/job ceilings. Product code is unchanged.
+- Exact pushed-tip smoke `30838327971` is fully green at `e22f070b5`: workflow selection, sealed bundle,
+  format/boundary/contracts, solo navigation, and the one-wave two-real-browser campaign all completed. The
+  paired clients issued a synchronized command, crossed rewards, and converged at the wave-2 frontier.
+- Staging remains the already-qualified production bundle
+  `github:fefa52ee2d78c032e102a4936e78d13c64a87081:run-30834358397.1`; the harness-only commit was not deployed
+  and production was not touched.
+- The newly reported human desync is deliberately unresolved rather than guessed. Repeated pulls still show
+  zero new files and 2,096 total reports; remote `dev-logs` remains at `1379dbd2b52eb1fa89f6e2fb3a1a7ae7752321ce`.
+  Ask the player to press Send Logs again on both clients or attach the downloaded reports directly. Do not
+  integrate this candidate into `feat/elite-redux-port` until that capture is available and classified, unless
+  the maintainer explicitly accepts the unresolved report.
