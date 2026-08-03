@@ -44,22 +44,34 @@ function matchesContractVersion(object, contractVersion) {
   return contractVersion == null || String(object.customMetadata?.combatContractVersion ?? "0") === contractVersion;
 }
 
+function toBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 32_768) {
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32_768)));
+  }
+  return btoa(chunks.join(""));
+}
+
 async function readObject(bucket, object) {
   try {
     const stored = await bucket.get(object.key);
     if (!stored) {
       return { body: null, invalidReason: "missing", size: object.size ?? 0 };
     }
-    const body =
-      object.customMetadata?.enc === "gz"
-        ? await new Response(stored.body.pipeThrough(new DecompressionStream("gzip"))).text()
-        : await stored.text();
-    return {
-      body,
+    const row = {
       customMetadata: object.customMetadata ?? {},
       lastModified: object.uploaded instanceof Date ? object.uploaded.toISOString() : null,
       size: object.size ?? 0,
     };
+    if (object.customMetadata?.enc === "gz") {
+      return {
+        ...row,
+        bodyBase64: toBase64(await stored.arrayBuffer()),
+        transferEncoding: "base64-gzip",
+      };
+    }
+    return { ...row, body: await stored.text(), transferEncoding: "text" };
   } catch {
     return { body: null, invalidReason: "decode", size: object.size ?? 0 };
   }

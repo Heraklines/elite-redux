@@ -2,6 +2,7 @@
 
 import { closeSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
 import { resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import {
   createTelemetryImportAccumulator,
   decodeTelemetryObjectPayload,
@@ -124,6 +125,21 @@ function increment(counts, key) {
   counts[key] = (counts[key] ?? 0) + 1;
 }
 
+function decodeExportRow(row) {
+  if (row.transferEncoding === "base64-gzip" && typeof row.bodyBase64 === "string") {
+    try {
+      const json = gunzipSync(Buffer.from(row.bodyBase64, "base64")).toString("utf8");
+      return decodeTelemetryObjectPayload(json, false);
+    } catch {
+      return { batch: null, invalidReason: "decode" };
+    }
+  }
+  if (row.body == null) {
+    return { batch: null, invalidReason: row.invalidReason ?? "missing" };
+  }
+  return decodeTelemetryObjectPayload(row.body, row.customMetadata?.enc === "lz");
+}
+
 function openOutputDescriptors(output) {
   return {
     legacyDecision: openSync(`${output}/legacy-decisions.jsonl`, "w"),
@@ -147,10 +163,7 @@ function buildPageUrl(exportUrl, args, cursor) {
 
 function ingestRows(rows, args, state, accumulator) {
   for (const row of rows) {
-    const decoded =
-      row.body == null
-        ? { batch: null, invalidReason: row.invalidReason ?? "missing" }
-        : decodeTelemetryObjectPayload(row.body, row.customMetadata?.enc === "lz");
+    const decoded = decodeExportRow(row);
     if (decoded.batch == null) {
       state.invalidObjects++;
       increment(state.invalidObjectReasons, decoded.invalidReason ?? "unknown");
