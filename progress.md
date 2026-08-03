@@ -7049,3 +7049,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Local Biome inspection itself hit the known Windows worker stack-overflow before producing a verdict. No
   local co-op, Vitest, Chromium, or compilation run was performed. The repaired exact SHA will be verified by
   the remote full gate.
+- Remote gate `30783417776` verified the merged type repair, B1, B11, every other A/B/C/P shard, all four P33
+  mutation shards, the sealed production bundle, and browser-native WebRTC: 31 substantive jobs passed. Its
+  sole underlying red was the source-contract file reaching one later obsolete assertion that still demanded
+  `this.end(); onComplete()` after an earlier assertion in the same test already required the atomic
+  `shiftPhaseThroughCoopAuthorityCommit()` scheduler. That final legacy assertion now rejects the unsafe old
+  ordering instead. The aggregate red is consequential only.

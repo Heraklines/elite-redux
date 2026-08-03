@@ -1088,7 +1088,11 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
     /const cleanupTimeout = setTimeout\(resolve, EVOLUTION_CLEANUP_WATCHDOG_MS\)[\s\S]+clearTimeout\(cleanupTimeout\)/u,
     "a damaged UI cannot turn evolution cleanup itself into an unbounded wave wait",
   );
-  assert.match(progressionReplay, /this\.end\(\);[\s\S]+this\.onComplete\(\)/u);
+  assert.doesNotMatch(
+    progressionReplay,
+    /this\.end\(\);[\s\S]+this\.onComplete\(\)/u,
+    "retained completion cannot start a local successor before the V2 completion callback projects control",
+  );
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {
