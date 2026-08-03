@@ -1,0 +1,130 @@
+name: AI V4 Remote Tree Benchmark (Non-Production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      training_run_id:
+        description: Successful AI Production V4 Remote Training run containing the selected tree
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ai-v4-remote-tree-benchmark-${{ inputs.training_run_id }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Remote tree shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - { shard: 0, start: 0, count: 13 }
+          - { shard: 1, start: 13, count: 12 }
+          - { shard: 2, start: 25, count: 13 }
+          - { shard: 3, start: 38, count: 12 }
+          - { shard: 4, start: 50, count: 13 }
+          - { shard: 5, start: 63, count: 12 }
+          - { shard: 6, start: 75, count: 13 }
+          - { shard: 7, start: 88, count: 12 }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-production-v4-remote-training-report
+          path: ai-model
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.training_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify remote winner-tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const model = JSON.parse(fs.readFileSync("ai-model/tree/selected-model.json", "utf8"));
+          const report = JSON.parse(fs.readFileSync("ai-model/tree/leaderboard.json", "utf8"));
+          if (
+            model.featureSchemaVersion !== 4
+            || model.featureCount !== 4324
+            || model.trainingRole !== "policy-target"
+          ) {
+            throw new Error("remote winner tree has an invalid runtime identity");
+          }
+          if (
+            report.winnerOnlyScope !== "battle"
+            || report.trainingRole !== "policy-target"
+            || report.selectedBattlePolicy !== model.modelName
+          ) {
+            throw new Error("remote winner-tree report does not select the downloaded model");
+          }
+          NODE
+      - name: Build frozen difficulty-balanced mirrored batch
+        run: >-
+          node scripts/ai/make-ghost-eval-batch.mjs
+          ml/evaluation/ghost-winner-teams.v3.json
+          "${{ matrix.start }}" "${{ matrix.count }}"
+          ai-gauntlet
+          "shard-${{ matrix.shard }}"
+          "human-v4-remote-tree-${{ inputs.training_run_id }}"
+      - name: Play remote winner tree against hardest trainer AI
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ai-model/tree/selected-model.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-remote-tree-results.json"
+      - name: Upload combat-only shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-remote-tree-${{ inputs.training_run_id }}-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          retention-days: 30
+          if-no-files-found: error
+
+  report:
+    if: always() && github.repository == 'Heraklines/elite-redux'
+    name: Aggregate remote-tree benchmark
+    needs: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-v4-remote-tree-${{ inputs.training_run_id }}-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+      - name: Build win-rate report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/remote-tree-benchmark.json \
+            ai-report/remote-tree-benchmark.md
+          cat ai-report/remote-tree-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-remote-tree-${{ inputs.training_run_id }}-benchmark-report
+          path: ai-report
+          retention-days: 90
+          if-no-files-found: error
