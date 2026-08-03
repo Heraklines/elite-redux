@@ -36,7 +36,9 @@ concurrency:
 
 jobs:
   benchmark:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[human-v4-benchmark]'))
     name: Mirrored benchmark shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -148,7 +150,9 @@ jobs:
           if-no-files-found: error
 
   report:
-    if: always() && github.repository == 'Heraklines/elite-redux'
+    if: >-
+      always() && github.repository == 'Heraklines/elite-redux'
+      && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[human-v4-benchmark]'))
     name: Aggregate mirrored benchmark
     needs: benchmark
     runs-on: ubuntu-latest

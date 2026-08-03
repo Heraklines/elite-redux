@@ -1,0 +1,131 @@
+name: AI V4 Battle-Victory Tree Benchmark (Non-Production)
+
+# Combat-only evaluation. No environment, cloud credentials, deployment, or
+# production endpoint is available to this workflow.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/combat-ai-v4-eval-20260803
+    paths:
+      - ".github/workflows/ai-v4-battle-victory-tree-benchmark.yml"
+      - "ml/evaluation/production-v4-battle-victory-tree/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-v4-battle-victory-tree-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[battle-victory-benchmark]'))
+    name: Battle-victory tree shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      # Four runners leave the other 36 available for co-op and unrelated work.
+      max-parallel: 4
+      matrix:
+        include:
+          - { shard: 0, start: 0, count: 13 }
+          - { shard: 1, start: 13, count: 12 }
+          - { shard: 2, start: 25, count: 13 }
+          - { shard: 3, start: 38, count: 12 }
+          - { shard: 4, start: 50, count: 13 }
+          - { shard: 5, start: 63, count: 12 }
+          - { shard: 6, start: 75, count: 13 }
+          - { shard: 7, start: 88, count: 12 }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Verify sealed battle-victory tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const model = JSON.parse(
+            fs.readFileSync("ml/evaluation/production-v4-battle-victory-tree/selected-model.json", "utf8"),
+          );
+          const report = JSON.parse(
+            fs.readFileSync("ml/evaluation/production-v4-battle-victory-tree/training-report.json", "utf8"),
+          );
+          if (
+            model.featureSchemaVersion !== 4
+            || model.featureCount !== 4324
+            || model.trainingRole !== "policy-target"
+            || model.modelName !== "lightgbm"
+          ) {
+            throw new Error("battle-victory tree has an invalid runtime identity");
+          }
+          if (report.winnerOnlyScope !== "battle" || report.selectedBattlePolicy !== "lightgbm") {
+            throw new Error("battle-victory training report does not select the sealed model");
+          }
+          NODE
+      - name: Build frozen difficulty-balanced mirrored batch
+        run: >-
+          node scripts/ai/make-ghost-eval-batch.mjs
+          ml/evaluation/ghost-winner-teams.v3.json
+          "${{ matrix.start }}" "${{ matrix.count }}"
+          ai-gauntlet
+          "shard-${{ matrix.shard }}"
+          "human-v4-battle-victory-tree"
+      - name: Play battle-victory tree against hardest trainer AI
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ml/evaluation/production-v4-battle-victory-tree/selected-model.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-battle-victory-tree-results.json"
+      - name: Upload combat-only shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-battle-victory-tree-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          retention-days: 30
+          if-no-files-found: error
+
+  report:
+    if: >-
+      always() && github.repository == 'Heraklines/elite-redux'
+      && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[battle-victory-benchmark]'))
+    name: Aggregate battle-victory benchmark
+    needs: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-v4-battle-victory-tree-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+      - name: Build win-rate report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/battle-victory-tree-benchmark.json \
+            ai-report/battle-victory-tree-benchmark.md
+          cat ai-report/battle-victory-tree-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-battle-victory-tree-benchmark-report
+          path: ai-report
+          retention-days: 90
+          if-no-files-found: error
