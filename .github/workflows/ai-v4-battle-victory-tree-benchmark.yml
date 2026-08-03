@@ -12,6 +12,7 @@ on:
       - "ml/evaluation/production-v4-battle-victory-tree/**"
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -46,27 +47,33 @@ jobs:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
-      - name: Verify sealed battle-victory tree
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-production-v4-remote-training-report
+          path: ai-model
+          repository: ${{ github.repository }}
+          run-id: 30849968624
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify remote battle-victory tree
         shell: bash
         run: |
           set -euo pipefail
           node - <<'NODE'
           const fs = require("node:fs");
-          const model = JSON.parse(
-            fs.readFileSync("ml/evaluation/production-v4-battle-victory-tree/selected-model.json", "utf8"),
-          );
-          const report = JSON.parse(
-            fs.readFileSync("ml/evaluation/production-v4-battle-victory-tree/training-report.json", "utf8"),
-          );
+          const model = JSON.parse(fs.readFileSync("ai-model/tree/selected-model.json", "utf8"));
+          const report = JSON.parse(fs.readFileSync("ai-model/tree/leaderboard.json", "utf8"));
           if (
             model.featureSchemaVersion !== 4
             || model.featureCount !== 4324
             || model.trainingRole !== "policy-target"
-            || model.modelName !== "lightgbm"
           ) {
             throw new Error("battle-victory tree has an invalid runtime identity");
           }
-          if (report.winnerOnlyScope !== "battle" || report.selectedBattlePolicy !== "lightgbm") {
+          if (
+            report.winnerOnlyScope !== "battle"
+            || report.trainingRole !== "policy-target"
+            || report.selectedBattlePolicy !== model.modelName
+          ) {
             throw new Error("battle-victory training report does not select the sealed model");
           }
           NODE
@@ -77,15 +84,15 @@ jobs:
           "${{ matrix.start }}" "${{ matrix.count }}"
           ai-gauntlet
           "shard-${{ matrix.shard }}"
-          "human-v4-battle-victory-tree"
+          "human-v4-remote-tree-30849968624"
       - name: Play battle-victory tree against hardest trainer AI
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
           --turns 80 --real-rng
-          --ai-model ml/evaluation/production-v4-battle-victory-tree/selected-model.json
+          --ai-model ai-model/tree/selected-model.json
           --test-timeout-ms 3600000
-          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-human-v4-battle-victory-tree-results.json"
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-human-v4-remote-tree-results.json"
       - name: Upload combat-only shard
         if: always()
         uses: actions/upload-artifact@v4
