@@ -82,10 +82,11 @@ describe.skipIf(!RUN)("ER type-nativization battle equivalence", () => {
     mon.destroy();
   });
 
-  it("Grounded holder (Dodrio) is Ground natively: takes 2x from Water", () => {
+  it("Grounded holder (Dodrio) is Ground natively: takes 2x from Water and is immune to Electric", () => {
     const mon = spawn("SPECIES_DODRIO");
     expect(mon.getTypes()).toContain(PokemonType.GROUND);
     expect(mon.getAttackTypeEffectiveness(PokemonType.WATER)).toBeGreaterThanOrEqual(2);
+    expect(mon.getAttackTypeEffectiveness(PokemonType.ELECTRIC)).toBe(0);
     mon.destroy();
   });
 

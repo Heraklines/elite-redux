@@ -50,6 +50,8 @@ export interface TelemetryQueueConfig {
   maxBeaconTailBytes: number;
   /** Max events per uploaded batch. */
   batchReadLimit: number;
+  /** Max approximate uncompressed event bytes per upload; one oversized event is still sent alone. */
+  maxBatchBytes: number;
 }
 
 export const DEFAULT_TELEMETRY_QUEUE_CONFIG: TelemetryQueueConfig = {
@@ -60,7 +62,21 @@ export const DEFAULT_TELEMETRY_QUEUE_CONFIG: TelemetryQueueConfig = {
   maxLocalBytes: 20 * 1024 * 1024,
   maxBeaconTailBytes: 2 * 1024 * 1024,
   batchReadLimit: 5000,
+  maxBatchBytes: 768 * 1024,
 };
+
+function boundedBatch(records: StoredRecord[], maxBytes: number): StoredRecord[] {
+  const selected: StoredRecord[] = [];
+  let bytes = 0;
+  for (const record of records) {
+    if (selected.length > 0 && bytes + record.bytes > maxBytes) {
+      break;
+    }
+    selected.push(record);
+    bytes += record.bytes;
+  }
+  return selected;
+}
 
 /** Approx serialized size of an event (UTF-16 chars ~ bytes for the ascii-heavy telemetry payload). */
 function approxBytes(event: TelemetryEvent): number {
@@ -180,19 +196,29 @@ export class TelemetryQueue {
     });
   }
 
-  /**
-   * Terminal drain. Waiting for the first flush and then starting a fresh one closes the race where a
-   * decision was captured after an already-running flush had snapshotted its batch.
-   */
+  /** Terminal drain: upload bounded chunks until empty, stopping immediately if an upload makes no progress. */
   async finalize(): Promise<void> {
-    await this.flush();
-    await this.flush();
+    await this.persist();
+    for (let chunk = 0; chunk < 64; chunk++) {
+      const before = (await this.store.readSession(this.envelope.sessionId, 1))[0]?.key;
+      if (before == null) {
+        return;
+      }
+      await this.flush();
+      const after = (await this.store.readSession(this.envelope.sessionId, 1))[0]?.key;
+      if (after === before) {
+        return;
+      }
+    }
   }
 
   private async flushInternal(currentWave: number): Promise<void> {
     try {
       await this.persist();
-      const records = await this.store.readSession(this.envelope.sessionId, this.config.batchReadLimit);
+      const records = boundedBatch(
+        await this.store.readSession(this.envelope.sessionId, this.config.batchReadLimit),
+        this.config.maxBatchBytes,
+      );
       if (records.length === 0) {
         this.lastFlushAt = this.now();
         this.lastFlushWave = currentWave;
@@ -205,7 +231,7 @@ export class TelemetryQueue {
       if (ok) {
         const keys = records.map(r => r.key).filter((k): k is number => k != null);
         await this.store.remove(keys);
-        this.dropFromBeaconTail(records.length);
+        this.dropFromBeaconTail(records);
         this.pendingBytes = 0;
       }
       this.lastFlushAt = this.now();
@@ -244,7 +270,10 @@ export class TelemetryQueue {
       for (const sessionId of sessions) {
         // Loop this session's records in batches until drained (or a batch fails).
         for (;;) {
-          const records = await this.store.readSession(sessionId, this.config.batchReadLimit);
+          const records = boundedBatch(
+            await this.store.readSession(sessionId, this.config.batchReadLimit),
+            this.config.maxBatchBytes,
+          );
           if (records.length === 0) {
             break;
           }
@@ -270,11 +299,22 @@ export class TelemetryQueue {
     }
   }
 
-  private dropFromBeaconTail(count: number): void {
-    const removed = this.beaconTail.splice(0, count);
-    for (const r of removed) {
-      this.beaconTailBytes -= r.bytes;
+  private dropFromBeaconTail(uploaded: readonly StoredRecord[]): void {
+    const counts = new Map<string, number>();
+    for (const record of uploaded) {
+      const identity = JSON.stringify(record.event);
+      counts.set(identity, (counts.get(identity) ?? 0) + 1);
     }
+    this.beaconTail = this.beaconTail.filter(record => {
+      const identity = JSON.stringify(record.event);
+      const remaining = counts.get(identity) ?? 0;
+      if (remaining === 0) {
+        return true;
+      }
+      counts.set(identity, remaining - 1);
+      this.beaconTailBytes -= record.bytes;
+      return false;
+    });
     if (this.beaconTailBytes < 0) {
       this.beaconTailBytes = 0;
     }

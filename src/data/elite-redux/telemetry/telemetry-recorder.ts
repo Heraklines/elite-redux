@@ -73,6 +73,14 @@ export function maybeFlushTelemetry(wave: number): void {
   void queue.maybeFlush(wave);
 }
 
+/** Force a durable normal flush at a genuine run terminal. */
+export function flushTelemetry(wave: number): void {
+  if (queue == null) {
+    return;
+  }
+  void queue.flush(wave);
+}
+
 /** Session-end best-effort beacon (pagehide/visibilitychange). No-op unless recording. */
 export function flushTelemetryBeacon(): void {
   if (queue == null) {

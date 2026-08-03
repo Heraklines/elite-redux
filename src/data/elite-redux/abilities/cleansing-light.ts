@@ -52,6 +52,10 @@ function bumpKoCount(pokemon: Pokemon): number {
   return count;
 }
 
+export function erCleansingLightKoState(pokemon: Pokemon): Readonly<{ key: string; count: number }> | undefined {
+  return CLEANSING_LIGHT_KO_COUNT.get(pokemon);
+}
+
 export class CleansingLightAbAttr extends PostVictoryAbAttr {
   /** The lowest-HP living ally, or `undefined` in singles / when none survive. */
   private lowestAlly(pokemon: Pokemon): Pokemon | undefined {

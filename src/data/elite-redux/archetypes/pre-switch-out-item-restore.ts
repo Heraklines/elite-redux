@@ -61,6 +61,10 @@ export class PostSummonRetrieverSnapshotAbAttr extends PostSummonAbAttr {
   }
 }
 
+export function erRetrieverOriginalHeldItems(pokemon: Pokemon): readonly PokemonHeldItemModifier[] {
+  return retrieverOriginalHeldItems.get(pokemon) ?? [];
+}
+
 export class PreSwitchOutItemRestoreAbAttr extends PreSwitchOutAbAttr {
   constructor() {
     super(true);

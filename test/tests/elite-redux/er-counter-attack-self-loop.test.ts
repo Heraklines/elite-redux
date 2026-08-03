@@ -12,6 +12,7 @@
 
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { describe, expect, it } from "vitest";
 
 type CanApplyParams = Parameters<CounterAttackOnHitAbAttr["canApply"]>[0];
@@ -25,14 +26,46 @@ describe("ER counter-attack-on-hit guards (self-loop fix)", () => {
 
   it("does NOT fire on a self-inflicted hit (self-target move / confusion)", () => {
     const self = mon();
-    expect(attr.canApply({ pokemon: self, opponent: self, move: attackMove } as CanApplyParams)).toBe(false);
+    expect(
+      attr.canApply({
+        pokemon: self,
+        opponent: self,
+        move: attackMove,
+        useMode: MoveUseMode.NORMAL,
+      } as CanApplyParams),
+    ).toBe(false);
   });
 
   it("does NOT fire on a non-damaging (status) move", () => {
-    expect(attr.canApply({ pokemon: mon(), opponent: mon(), move: statusMove } as CanApplyParams)).toBe(false);
+    expect(
+      attr.canApply({
+        pokemon: mon(),
+        opponent: mon(),
+        move: statusMove,
+        useMode: MoveUseMode.NORMAL,
+      } as CanApplyParams),
+    ).toBe(false);
   });
 
   it("DOES fire when hit by an opponent's damaging move", () => {
-    expect(attr.canApply({ pokemon: mon(), opponent: mon(), move: attackMove } as CanApplyParams)).toBe(true);
+    expect(
+      attr.canApply({
+        pokemon: mon(),
+        opponent: mon(),
+        move: attackMove,
+        useMode: MoveUseMode.NORMAL,
+      } as CanApplyParams),
+    ).toBe(true);
+  });
+
+  it("does NOT counter an automatic counter attack", () => {
+    expect(
+      attr.canApply({
+        pokemon: mon(),
+        opponent: mon(),
+        move: attackMove,
+        useMode: MoveUseMode.INDIRECT,
+      } as CanApplyParams),
+    ).toBe(false);
   });
 });

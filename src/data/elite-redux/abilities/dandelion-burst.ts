@@ -78,3 +78,7 @@ export class DandelionBurstAbAttr extends PostDamageAbAttr {
     }
   }
 }
+
+export function erDandelionBurstUsedWave(pokemon: Pokemon): number | undefined {
+  return DANDELION_BURST_USED.get(pokemon);
+}

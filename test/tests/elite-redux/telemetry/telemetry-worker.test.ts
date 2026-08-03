@@ -104,7 +104,16 @@ describe("telemetry ingest route (worker)", () => {
     const now = Date.UTC(2026, 6, 14, 10, 30, 0); // 2026-07-14
     const res = await handleTelemetryIngest(
       ingestRequest(
-        { mode: "coop", sessionId: "sess-ABC", seq: "7", build: "0.0.5.6", schemaVersion: "1", uidHash: "deadbeef" },
+        {
+          mode: "coop",
+          sessionId: "sess-ABC",
+          seq: "7",
+          build: "0.0.6.0",
+          schemaVersion: "2",
+          contractVersion: "3",
+          uidHash: "deadbeef",
+          startedAt: String(now),
+        },
         body,
       ),
       AUTH,
@@ -120,11 +129,36 @@ describe("telemetry ingest route (worker)", () => {
     expect(new Uint8Array(put.value as Uint8Array)).toEqual(body);
     // Metadata carries the pseudonymous hash + build + schema, and NEVER the raw username.
     expect(put.options?.customMetadata?.userIdHash).toBe("deadbeef");
-    expect(put.options?.customMetadata?.build).toBe("0.0.5.6");
-    expect(put.options?.customMetadata?.schemaVersion).toBe("1");
+    expect(put.options?.customMetadata?.build).toBe("0.0.6.0");
+    expect(put.options?.customMetadata?.schemaVersion).toBe("2");
+    expect(put.options?.customMetadata?.combatContractVersion).toBe("3");
     const metaBlob = JSON.stringify(put.options);
     expect(metaBlob).not.toContain("SomePlayer");
     expect(put.options?.httpMetadata?.contentEncoding).toBe("gzip");
+  });
+
+  it("uses the session start date so retrying the same sequence cannot create a second dated key", async () => {
+    const { bucket, puts } = makeBucket();
+    const startedAt = Date.UTC(2026, 6, 14, 23, 59, 0);
+    const query = { mode: "solo", sessionId: "stable", seq: "4", startedAt: String(startedAt) };
+    await handleTelemetryIngest(
+      ingestRequest(query, "first"),
+      AUTH,
+      { TELEMETRY: bucket },
+      CORS,
+      Date.UTC(2026, 6, 14, 23, 59, 30),
+    );
+    await handleTelemetryIngest(
+      ingestRequest(query, "retry"),
+      AUTH,
+      { TELEMETRY: bucket },
+      CORS,
+      Date.UTC(2026, 6, 15, 0, 1, 0),
+    );
+    expect(puts.map(put => put.key)).toEqual([
+      "2026-07-14/solo/stable/4.jsonl.gz",
+      "2026-07-14/solo/stable/4.jsonl.gz",
+    ]);
   });
 
   it.each(["solo", "showdown", "tournament"])("persists %s battles in their own R2 partition", async mode => {

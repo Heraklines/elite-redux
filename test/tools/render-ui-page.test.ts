@@ -101,6 +101,7 @@ import {
   restoreGlobalScene,
 } from "#test/tools/render-harness";
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
+import { buildIvChartData, StatsContainer } from "#ui/containers/stats-container";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
@@ -1699,6 +1700,21 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
     },
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // Production IV-chart repro: HP=0 and Defense=0 sit on either side of Attack=31.
+  // A fill-only polygon has zero area there, so the number rendered but the spoke did not.
+  // The matching outline must visibly reach the full Attack axis on the STATS page.
+  "summary-isolated-iv-axis": {
+    render: (_game, ctx) => {
+      const ivs = [0, 31, 0, 20, 21, 10];
+      const stats = new StatsContainer(0, 0).setPosition(600, 360).setScale(6);
+      stats.updateIvs(ivs);
+      // Finish the chart animation deterministically for the still-image harness.
+      const chart = (stats as unknown as { ivChart: Phaser.GameObjects.Polygon }).ivChart;
+      chart.setTo(buildIvChartData(ivs));
+      ctx.scene.add.existing(stats);
+    },
+    diffTolerance: 0,
   },
   // ER Omniform mons (#partner-eevee): a Partner Eevee lead shows the evolution
   // browser STRIP in the TOP HEADER bar (bare icons, no box) - Eevee + the 8

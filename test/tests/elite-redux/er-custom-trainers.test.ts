@@ -60,6 +60,11 @@ import {
   setErCustomTrainerSpawnConfigForTesting,
   setErCustomTrainersForTesting,
 } from "#data/elite-redux/er-custom-trainers";
+import {
+  getLastGenericTrainerType,
+  markGenericTrainerType,
+  resetGenericTrainerTracking,
+} from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
@@ -68,6 +73,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { PERMANENT_STATS } from "#enums/stat";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { Trainer } from "#field/trainer";
 import { BaseStatModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -196,6 +202,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     // tests override the config to exercise the density roll itself.
     setErCustomTrainerSpawnConfigForTesting({ windowSize: 10, windowChancePct: 100 });
     resetErCustomTrainerTracking();
+    resetGenericTrainerTracking();
     setErCustomTrainerDevForce(null);
     // NB: do NOT set an enemySpecies/enemyLevel override — either forces every
     // addEnemyPokemon (incl. buildErCustomTrainerMember) to that species/level,
@@ -209,6 +216,7 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     setErCustomTrainerSpawnConfigForTesting(undefined);
     setErCustomTrainerDevForce(null);
     resetErCustomTrainerTracking();
+    resetGenericTrainerTracking();
     resetErDifficulty();
   });
 
@@ -523,6 +531,18 @@ describe.skipIf(!RUN)("ER Custom Trainers — ingestion gates + exact party + BS
     expect(selectErCustomTrainerForWave(anchor + 1)).toBeNull();
     // Later windows may field the other trainer, but never the one already fought.
     expect(playRun(11, 200).some(p => p.key === first.key)).toBe(false);
+  });
+
+  it("persists the last generic trainer class across a real session reload", async () => {
+    markGenericTrainerType(TrainerType.MUSICIAN);
+    expect(game.scene.gameData.getSessionSaveData().erLastGenericTrainerType).toBe(TrainerType.MUSICIAN);
+    await game.scene.gameData.saveAll();
+
+    resetGenericTrainerTracking();
+    expect(getLastGenericTrainerType()).toBeNull();
+    await game.reload.reloadSession();
+
+    expect(getLastGenericTrainerType()).toBe(TrainerType.MUSICIAN);
   });
 
   it("at most one custom trainer per window (density caps density, not trainer count)", () => {

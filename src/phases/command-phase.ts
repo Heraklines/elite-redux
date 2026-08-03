@@ -66,7 +66,7 @@ import {
   buildShowdownSwitchCommand,
 } from "#data/elite-redux/showdown/showdown-guest-command";
 import { broadcastShowdownSyncPlayerCommand } from "#data/elite-redux/showdown/showdown-sync-command";
-import { recordTelemetryDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
+import { prepareTelemetryDecision, recordTelemetryDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -1202,6 +1202,9 @@ export class CommandPhase extends FieldPhase {
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
   private openOwnCommandUi(): void {
+    // Precompute the immutable solo contract before input opens. This is a hard no-op for co-op,
+    // Showdown, tournaments and telemetry-disabled builds.
+    prepareTelemetryDecision(this.fieldIndex);
     if (
       globalScene.currentBattle.isBattleMysteryEncounter()
       && globalScene.currentBattle.mysteryEncounter?.skipToFightInput
@@ -2044,7 +2047,11 @@ export class CommandPhase extends FieldPhase {
       recordSinglePlayerCommand(this.fieldIndex, command, cursor);
       // #player-telemetry: capture this client's OWN committed decision as a (state, action) pair in
       // every player mode; the recorder partitions solo/co-op/showdown/tournament sessions.
-      recordTelemetryDecision(this.fieldIndex, command, cursor, "self");
+      const automaticCombatCommand =
+        (command === Command.FIGHT || command === Command.TERA) && (move != null || cursor < 0);
+      if (!automaticCombatCommand) {
+        recordTelemetryDecision(this.fieldIndex, command, cursor, "self");
+      }
       this.end();
     }
 

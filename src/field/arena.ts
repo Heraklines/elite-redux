@@ -18,6 +18,7 @@ import { resolveErBiomeBackground, selectErBiomeBackgroundSetIndex } from "#data
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { getErBiomeStartWave } from "#data/elite-redux/er-biome-structure";
+import { withoutImmediateTrainerRepeat } from "#data/elite-redux/er-generic-trainer-run-state";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -479,7 +480,9 @@ export class Arena {
       weatherDuration.value = turnsOverride;
     }
 
-    this.weather = weather ? new Weather(weather, weatherDuration.value, weatherDuration.value) : null;
+    this.weather = weather
+      ? new Weather(weather, weatherDuration.value, weatherDuration.value, user?.id ?? null, user?.isPlayer() ?? null)
+      : null;
 
     if (
       [WeatherType.HAIL, WeatherType.SNOW].includes(oldWeatherType)
@@ -651,7 +654,9 @@ export class Arena {
       globalScene.applyModifier(FieldEffectModifier, user.isPlayer(), user, terrainDuration);
     }
 
-    this.terrain = terrain ? new Terrain(terrain, terrainDuration.value, terrainDuration.value) : null;
+    this.terrain = terrain
+      ? new Terrain(terrain, terrainDuration.value, terrainDuration.value, user?.id ?? null, user?.isPlayer() ?? null)
+      : null;
 
     this.eventTarget.dispatchEvent(
       new TerrainChangedEvent(oldTerrainType, this.terrain?.terrainType!, this.terrain?.turnsLeft!),
@@ -758,7 +763,11 @@ export class Arena {
   // #endregion
   // #region Trainers
 
-  public randomTrainerType(waveIndex: number, isBoss = false): TrainerType {
+  public randomTrainerType(
+    waveIndex: number,
+    isBoss = false,
+    excludedTrainerType: TrainerType | null = null,
+  ): TrainerType {
     const isTrainerBoss =
       this.trainerPool[BiomePoolTier.BOSS].length > 0
       && (globalScene.gameMode.isTrainerBoss(waveIndex, this.biomeId, globalScene.offsetGym) || isBoss);
@@ -773,7 +782,15 @@ export class Arena {
     }
 
     const tierPool = this.trainerPool[tier];
-    return tierPool.length > 0 ? randSeedItem(tierPool) : TrainerType.BREEDER;
+    if (tierPool.length === 0) {
+      return TrainerType.BREEDER;
+    }
+
+    // Generic trainer selection previously had no memory at all, so the same
+    // class (and therefore the same signature team) could be selected on three
+    // consecutive waves. Avoid the immediately previous class whenever this
+    // tier has an alternative; a one-entry pool still has a safe fallback.
+    return randSeedItem(withoutImmediateTrainerRepeat(tierPool, excludedTrainerType));
   }
 
   // #endregion

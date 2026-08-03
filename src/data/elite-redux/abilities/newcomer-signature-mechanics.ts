@@ -1185,6 +1185,142 @@ export function applyCenterOfAttentionPenalty(attacker: Pokemon, target: Pokemon
 }
 const CENTER_PENALTY_RECORD = new WeakMap<Pokemon, object>();
 
+export type NewcomerSignatureMechanicStateValue = string | number | boolean | null;
+
+export interface NewcomerSignatureMechanicSnapshot {
+  effectId: string;
+  sourceMoveId?: number;
+  sourceEntityId?: number;
+  state: ReadonlyArray<readonly [string, NewcomerSignatureMechanicStateValue]>;
+}
+
+/**
+ * Decision-relevant state that otherwise lives only in module-local WeakMaps.
+ * This is intentionally a read-only projection: combat telemetry must never
+ * mutate an ability's live state while taking an observation.
+ */
+export function snapshotNewcomerSignatureMechanics(pokemon: Pokemon): NewcomerSignatureMechanicSnapshot[] {
+  const snapshots: NewcomerSignatureMechanicSnapshot[] = [];
+  const add = (
+    effectId: string,
+    state: ReadonlyArray<readonly [string, NewcomerSignatureMechanicStateValue]>,
+    source?: { moveId?: number; entityId?: number },
+  ): void => {
+    snapshots.push({
+      effectId,
+      ...(source?.moveId == null ? {} : { sourceMoveId: source.moveId }),
+      ...(source?.entityId == null ? {} : { sourceEntityId: source.entityId }),
+      state,
+    });
+  };
+
+  if (VOLUNTARY_ENTRY.has(pokemon) || FINAL_SEASON_PENDING_FOG.has(pokemon)) {
+    add("final-season", [
+      ["voluntaryEntry", VOLUNTARY_ENTRY.has(pokemon)],
+      ["pendingFog", FINAL_SEASON_PENDING_FOG.has(pokemon)],
+    ]);
+  }
+  const foul = FOUL_HARVEST.get(pokemon);
+  if (foul) {
+    add("foul-harvest", [["charges", foul.charges]]);
+  }
+  const porous = POROUS.get(pokemon);
+  if (porous) {
+    add("porous", [["stacks", porous.stacks]]);
+  }
+  const anneal = ANNEAL.get(pokemon);
+  if (anneal) {
+    add("anneal", [["gained", anneal.gained]]);
+  }
+  const heavyweightTurn = HEAVYWEIGHT_DROP_TURN.get(pokemon);
+  if (heavyweightTurn) {
+    add("heavyweight", [["lastDropTurn", heavyweightTurn]]);
+  }
+  const twoFacedLastTurn = TWO_FACED_LAST_TURN.get(pokemon);
+  const twoFacedActiveTurn = TWO_FACED_ACTIVE_TURN.get(pokemon);
+  if (twoFacedLastTurn || twoFacedActiveTurn) {
+    add("two-faced", [
+      ["lastTurn", twoFacedLastTurn ?? null],
+      ["activeTurn", twoFacedActiveTurn ?? null],
+      ["ready", twoFacedReady(pokemon)],
+    ]);
+  }
+  const setlist = SETLIST.get(pokemon);
+  if (setlist) {
+    add("setlist", [
+      ["moves", setlist.moves.join(",")],
+      ["expectedMoveId", setlist.expected ?? null],
+      ["crescendo", setlist.crescendo],
+    ]);
+  }
+  const ringEntryTurn = RING_ENTRY_TURN.get(pokemon);
+  if (ringEntryTurn) {
+    add("ring-general", [["entryTurn", ringEntryTurn]]);
+  }
+  const deadeyeTarget = DEADEYE_MARK.get(pokemon);
+  if (deadeyeTarget) {
+    add("deadeye-draw", [["targetEntityId", deadeyeTarget.id]], { entityId: deadeyeTarget.id });
+  }
+  const eclipseWave = ECLIPSE_USED_WAVE.get(pokemon);
+  const eclipseTarget = ECLIPSE_COUNTER_TARGET.get(pokemon);
+  if (eclipseWave != null || eclipseTarget) {
+    add(
+      "eclipse-wing",
+      [
+        ["usedWave", eclipseWave ?? null],
+        ["counterTargetEntityId", eclipseTarget?.id ?? null],
+      ],
+      eclipseTarget ? { entityId: eclipseTarget.id } : undefined,
+    );
+  }
+  const encore = ENCORE_SET.get(pokemon);
+  if (encore) {
+    add(
+      "encore-set",
+      [["previousMoveId", encore.previous?.id ?? null]],
+      encore.previous ? { moveId: encore.previous.id } : undefined,
+    );
+  }
+  const skyhookTurn = SKYHOOK_TURN.get(pokemon);
+  if (skyhookTurn) {
+    add("skyhook", [["lastTriggerTurn", skyhookTurn]]);
+  }
+  const reduction = REDUCTION_ACTIVE.get(pokemon);
+  if (reduction) {
+    add(
+      "reduction",
+      [
+        ["moveId", reduction.move.id],
+        ["turn", reduction.turn],
+      ],
+      { moveId: reduction.move.id },
+    );
+  }
+  const crackedWave = CRACKED_USED_WAVE.get(pokemon);
+  const crackedTypes = CRACKED_TYPES.get(pokemon);
+  if (crackedWave != null || crackedTypes) {
+    add("cracked-vessel", [
+      ["usedWave", crackedWave ?? null],
+      ["remainingTypes", crackedTypes?.join(",") ?? ""],
+    ]);
+  }
+  const shape = SHAPE_MEMORY.get(pokemon);
+  if (shape) {
+    add("living-chrome", [
+      ["wave", shape.wave],
+      ["count", shape.count],
+      ["types", shape.types.join(",")],
+      ["flat", shape.flat],
+      ["expiresTurn", shape.expires],
+    ]);
+  }
+  const superego = SUPEREGO_TURN.get(pokemon);
+  if (superego?.size > 0) {
+    add("superego", [["usedStats", [...superego.entries()].map(([stat, turn]) => `${stat}:${turn}`).join(",")]]);
+  }
+  return snapshots;
+}
+
 export function notifySignatureHazardRemoval(user: Pokemon, removed: number): void {
   const removedBloom = globalScene.arena.removeTagOnSide(ArenaTagType.SEDIMENT_BLOOM, ownSide(user), true);
   if (removed > 0 || removedBloom) {

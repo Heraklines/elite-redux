@@ -20,10 +20,12 @@
 
 import { EntryHazardTag } from "#data/arena-tag";
 import { allMoves } from "#data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ErTacticalItemModifier, erTacticalItemType } from "#data/elite-redux/er-tactical-items";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -264,6 +266,31 @@ describe.skipIf(!RUN)("ER tactical held items", () => {
     game.move.select(MoveId.SPLASH);
     await game.toNextTurn();
     expect(player.getStatStage(Stat.ATK), "Growl blocked by Clear Amulet").toBe(0);
+  });
+
+  it("Clear Amulet blocks a hostile stat drop propagated by Sharing Is Caring", async () => {
+    const sharingIsCaring = ER_ID_MAP.abilities[577] as AbilityId;
+    game.override
+      .battleStyle("double")
+      .ability(sharingIsCaring)
+      .moveset([MoveId.SPLASH])
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.CHARM);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.MAGIKARP);
+    const [holder, ally] = game.scene.getPlayerField();
+    const amulet = new ErTacticalItemModifier(erTacticalItemType("clearAmulet"), ally.id, "clearAmulet", false, 0, 1);
+    game.scene.addModifier(amulet, true, false, false, false);
+
+    game.move.select(MoveId.SPLASH, 0);
+    game.move.select(MoveId.SPLASH, 1);
+    await game.move.forceEnemyMove(MoveId.CHARM, BattlerIndex.PLAYER);
+    await game.move.forceEnemyMove(MoveId.SPLASH, BattlerIndex.PLAYER_2);
+    await game.setTurnOrder([BattlerIndex.ENEMY, BattlerIndex.ENEMY_2, BattlerIndex.PLAYER, BattlerIndex.PLAYER_2]);
+    await game.toEndOfTurn();
+
+    expect(holder.getStatStage(Stat.ATK), "the directly targeted holder was lowered").toBe(-2);
+    expect(ally.getStatStage(Stat.ATK), "the propagated hostile drop was blocked").toBe(0);
   });
 
   it("Muscle Band boosts physical damage by 10%", async () => {

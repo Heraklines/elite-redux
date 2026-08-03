@@ -74,3 +74,7 @@ export function erTryLifePreserver(defender: Pokemon, source: Pokemon | undefine
   source.addTag(BattlerTagType.ER_DRENCHED, 2, MoveId.NONE, holder.id);
   return true;
 }
+
+export function erLifePreserverUsedWave(pokemon: Pokemon): number | undefined {
+  return LIFE_PRESERVER_USED.get(pokemon);
+}

@@ -5,10 +5,11 @@
  */
 
 // =============================================================================
-// PLAYER TELEMETRY SCHEMA v1 (#player-telemetry). PURE TYPES + version constant, zero runtime.
+// PLAYER TELEMETRY ENVELOPE v2 (#player-telemetry). PURE TYPES + version constant, zero runtime.
 //
-// The telemetry pipeline captures every player DECISION as a semantic event stream, in ALL modes
-// (solo / co-op / showdown / tournament), for one purpose: TRAINING A COMBAT AI on how real players play. So the
+// Schema v2 captures committed SOLO player combat decisions through the versioned ER combat contract.
+// Legacy v1 event types remain below so existing R2 objects and downloaders stay readable. Co-op,
+// Showdown, tournament, UI, shop, reward, and raw-input activity are not v2 policy targets. The
 // schema is built as (STATE, ACTION) pairs from day one: a `TelemetryBattleDecision` carries BOTH the
 // full both-sides field STATE and the ACTION the player took, so each battle decision is reconstructable
 // as a supervised training example WITHOUT joining any external data.
@@ -33,7 +34,16 @@
 // =============================================================================
 
 /** Bump on an incompatible wire-shape change. Stamped into every session envelope + the R2 object metadata. */
-export const TELEMETRY_SCHEMA_VERSION = 1;
+import type {
+  ErCombatAuxiliaryDecisionRecord,
+  ErCombatBattleTerminal,
+  ErCombatBattleTerminalRecord,
+  ErCombatDecisionRecord,
+  ErCombatTerminalRecord,
+  ErCombatTransitionRecord,
+} from "#data/elite-redux/ai/combat-contract";
+
+export const TELEMETRY_SCHEMA_VERSION = 2;
 
 /** Which broad game mode a session was played in (partitions the dataset for training). */
 export type TelemetryMode = "solo" | "coop" | "showdown" | "tournament";
@@ -155,6 +165,38 @@ export interface TelemetryTurnOutcomeEvent extends TelemetryEventBase {
   faints: string[];
 }
 
+/** Training-quality contract for one genuinely committed solo human combat command. */
+export interface TelemetryCombatContractEvent extends TelemetryEventBase {
+  kind: "combat_contract_decision";
+  record: ErCombatDecisionRecord;
+}
+
+/** Committed ball/run input retained outside the policy action space. */
+export interface TelemetryCombatAuxiliaryDecisionEvent extends TelemetryEventBase {
+  kind: "combat_auxiliary_decision";
+  record: ErCombatAuxiliaryDecisionRecord;
+}
+
+/** Resolved successor/outcome for one committed joint action. */
+export interface TelemetryCombatTransitionEvent extends TelemetryEventBase {
+  kind: "combat_contract_transition";
+  record: ErCombatTransitionRecord;
+}
+
+/** Stable battle terminal, including captures/flees whose commands are outside the combat-policy action space. */
+export interface TelemetryBattleTerminalEvent extends TelemetryEventBase {
+  kind: "battle_terminal";
+  outcome: ErCombatBattleTerminal;
+  record: ErCombatBattleTerminalRecord;
+}
+
+/** Genuine solo run terminal used for offline value/terminal labelling. */
+export interface TelemetryRunOutcomeEvent extends TelemetryEventBase {
+  kind: "run_outcome";
+  outcome: "victory" | "player-wiped" | "abandonment";
+  record: ErCombatTerminalRecord;
+}
+
 /** An interactive SURFACE opened (a menu / option list): its id + the option labels offered. */
 export interface TelemetrySurfaceOpenEvent extends TelemetryEventBase {
   kind: "surface_open";
@@ -190,6 +232,11 @@ export interface TelemetryInputEvent extends TelemetryEventBase {
 export type TelemetryEvent =
   | TelemetryBattleDecisionEvent
   | TelemetryTurnOutcomeEvent
+  | TelemetryCombatContractEvent
+  | TelemetryCombatAuxiliaryDecisionEvent
+  | TelemetryCombatTransitionEvent
+  | TelemetryBattleTerminalEvent
+  | TelemetryRunOutcomeEvent
   | TelemetrySurfaceOpenEvent
   | TelemetrySurfaceChoiceEvent
   | TelemetryInputEvent;
@@ -201,6 +248,8 @@ export type TelemetryEvent =
  */
 export interface TelemetrySessionEnvelope {
   schemaVersion: number;
+  /** Version of the nested ER combat decision/transition contract. */
+  combatContractVersion?: number;
   /** Random per-session id (also the R2 key's `{sessionId}` segment). */
   sessionId: string;
   /** Pseudonymous, stable-per-account player id: hash(accountId + serverSalt). No raw username. */
@@ -214,6 +263,8 @@ export interface TelemetrySessionEnvelope {
   gameModeId: number;
   /** Run RNG seed. */
   seed: string;
+  /** Wave where capture began, including resumed runs. */
+  startWave?: number;
   /** ER difficulty ("youngster" | "ace" | "elite" | "hell" | "mystery"). */
   difficulty: string;
   /** Epoch ms at session start. */

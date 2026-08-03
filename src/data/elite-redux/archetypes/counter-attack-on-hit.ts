@@ -114,7 +114,7 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, opponent, move } = params;
+    const { pokemon, opponent, move, useMode = MoveUseMode.NORMAL } = params;
     if (!opponent || opponent.isFainted() || pokemon.isFainted()) {
       return false;
     }
@@ -123,7 +123,7 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     // the holder as its own "attacker", so the counter fired at itself, whose
     // hit re-triggered the counter → an infinite self-Hyper-Voice loop
     // (user-reported: "Cosmic Power made Mega Chimecho hit itself repeatedly").
-    if (opponent === pokemon || !move.is("AttackMove")) {
+    if (opponent === pokemon || !move.is("AttackMove") || useMode === MoveUseMode.INDIRECT) {
       return false;
     }
     if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {

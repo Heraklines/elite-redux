@@ -80,3 +80,7 @@ export function erTryLastHost(pokemon: Pokemon): boolean {
   host.damageAndUpdate(toDmgValue(host.getMaxHp() * LAST_HOST_HOST_DAMAGE_FRACTION, 1), { result: HitResult.INDIRECT });
   return true;
 }
+
+export function erLastHostUsedWave(pokemon: Pokemon): number | undefined {
+  return LAST_HOST_USED.get(pokemon);
+}

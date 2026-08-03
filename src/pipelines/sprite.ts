@@ -4,9 +4,9 @@ import { MysteryEncounterIntroVisuals } from "#field/mystery-encounter-intro";
 import { Pokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
 import { getErShinyLabPaletteVariantCacheKey, variantColorCache } from "#sprites/variant";
-import { rgbHexToRgba } from "#utils/color-utils";
 import spriteFragShader from "./glsl/sprite-frag-shader.frag?raw";
 import spriteVertShader from "./glsl/sprite-shader.vert?raw";
+import { getSpriteFusionPaletteUniforms, getSpriteVariantPaletteUniforms } from "./sprite-palette-uniforms";
 
 export class SpritePipeline extends FieldSpritePipeline {
   constructor(game: Phaser.Game) {
@@ -93,25 +93,9 @@ export class SpritePipeline extends FieldSpritePipeline {
       const fusionSpriteColors = ((ignoreOverride && data["fusionSpriteColorsBase"])
         || data["fusionSpriteColors"]
         || []) as number[][];
-
-      const emptyColors = [0, 0, 0, 0];
-      const flatSpriteColors: number[] = [];
-      const flatFusionSpriteColors: number[] = [];
-      for (let c = 0; c < 32; c++) {
-        flatSpriteColors.splice(
-          flatSpriteColors.length,
-          0,
-          ...(c < spriteColors.length ? spriteColors[c].map(x => x / 255.0) : emptyColors),
-        );
-        flatFusionSpriteColors.splice(
-          flatFusionSpriteColors.length,
-          0,
-          ...(c < fusionSpriteColors.length ? fusionSpriteColors[c] : emptyColors),
-        );
-      }
-
-      this.set4fv("spriteColors", flatSpriteColors.flat()) //
-        .set4iv("fusionSpriteColors", flatFusionSpriteColors.flat());
+      const uniforms = getSpriteFusionPaletteUniforms(sprite, spriteColors, fusionSpriteColors);
+      this.set4fv("spriteColors", uniforms.spriteColors as number[]) //
+        .set4iv("fusionSpriteColors", uniforms.fusionSpriteColors as number[]);
     }
   }
 
@@ -125,43 +109,17 @@ export class SpritePipeline extends FieldSpritePipeline {
         : sprite.parentContainer instanceof Pokemon
           ? sprite.parentContainer.variant
           : 0;
-      let variantColors: { [x: string]: string }[];
-
-      const emptyColors = [0, 0, 0, 0];
-      const flatBaseColors: number[] = [];
-      const flatVariantColors: number[] = [];
-
       const variantCacheKey =
         sprite.parentContainer instanceof Pokemon
           ? (getErShinyLabPaletteVariantCacheKey(sprite.parentContainer, sprite.texture.key) ?? sprite.texture.key)
           : data["spriteKey"];
-
-      if (
-        (sprite.parentContainer instanceof Pokemon ? sprite.parentContainer.shiny : !!data["shiny"])
-        && (variantColors = variantColorCache[variantCacheKey])
-        && Object.hasOwn(variantColors, variant)
-      ) {
-        const baseColors = Object.keys(variantColors[variant]);
-        for (let c = 0; c < 32; c++) {
-          if (c < baseColors.length) {
-            const baseColor = Array.from(Object.values(rgbHexToRgba(baseColors[c])));
-            const variantColor = Array.from(Object.values(rgbHexToRgba(variantColors[variant][baseColors[c]])));
-            flatBaseColors.splice(flatBaseColors.length, 0, ...baseColor.map(c => c / 255.0));
-            flatVariantColors.splice(flatVariantColors.length, 0, ...variantColor.map(c => c / 255.0));
-          } else {
-            flatBaseColors.splice(flatBaseColors.length, 0, ...emptyColors);
-            flatVariantColors.splice(flatVariantColors.length, 0, ...emptyColors);
-          }
-        }
-      } else {
-        for (let c = 0; c < 32; c++) {
-          flatBaseColors.splice(flatBaseColors.length, 0, ...emptyColors);
-          flatVariantColors.splice(flatVariantColors.length, 0, ...emptyColors);
-        }
-      }
-
-      this.set4fv("baseVariantColors", flatBaseColors.flat()) //
-        .set4fv("variantColors", flatVariantColors.flat());
+      const isShiny = sprite.parentContainer instanceof Pokemon ? sprite.parentContainer.shiny : !!data["shiny"];
+      const variantPalettes = variantColorCache[variantCacheKey] as Record<number, Record<string, string>> | undefined;
+      const uniforms = getSpriteVariantPaletteUniforms(
+        isShiny && variantPalettes && Object.hasOwn(variantPalettes, variant) ? variantPalettes[variant] : undefined,
+      );
+      this.set4fv("baseVariantColors", uniforms.baseVariantColors as number[]) //
+        .set4fv("variantColors", uniforms.variantColors as number[]);
     }
 
     super.onBatch(gameObject);

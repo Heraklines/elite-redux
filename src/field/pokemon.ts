@@ -3059,8 +3059,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /** Mark the Pokémon's ability as revealed. */
-  public revealAbility(): void {
+  public revealAbility(passive = false, passiveSlot = 0): void {
     this.waveData.abilityRevealed = true;
+    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
+    if (ability) {
+      const source = passive ? (passiveSlot >= 3 ? "gift" : "innate") : "active";
+      this.waveData.revealedAbilityKeys.add(`${source}:${passive ? passiveSlot : -1}:${ability.id}`);
+    }
+  }
+
+  /** Record item identities that an explicit battle effect disclosed to the opponent. */
+  public revealHeldItems(itemTypeIds: readonly string[], complete = false): void {
+    for (const itemTypeId of itemTypeIds) {
+      if (itemTypeId) {
+        this.waveData.revealedHeldItemIds.add(itemTypeId);
+      }
+    }
+    this.waveData.heldItemKnowledgeComplete ||= complete;
+  }
+
+  /**
+   * ER battle UI disclosure: once an opposing Pokemon enters the field, its
+   * complete ability/innate and held-item loadout is public battle state.
+   */
+  public revealEntryBattleInfo(): void {
+    this.waveData.seenInBattle = true;
+    this.revealAbility(false);
+    this.getPassiveAbilities().forEach((_ability, slot) => this.revealAbility(true, slot));
+    this.revealHeldItems(
+      this.getHeldItems().map(item => item.type.id),
+      true,
+    );
   }
 
   /**
@@ -6621,6 +6650,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return;
     }
     this.getMoveHistory().push(turnMove);
+    if (turnMove.move !== MoveId.NONE) {
+      this.waveData.revealedMoveIds.add(turnMove.move);
+    }
   }
 
   /**

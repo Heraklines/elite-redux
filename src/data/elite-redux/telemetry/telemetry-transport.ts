@@ -48,6 +48,11 @@ export function resolvePlayerTelemetryMode(options: {
   return options.isCoop ? "coop" : "solo";
 }
 
+/** Human policy capture is deliberately isolated from co-op, Showdown, and tournaments. */
+export function shouldCaptureHumanCombatTelemetry(mode: TelemetryMode): boolean {
+  return mode === "solo";
+}
+
 /** Resolve the player-decision ingest host. The separate match-summary telemetry keeps its own Worker. */
 export function resolvePlayerTelemetryBase(env: PlayerTelemetryEnv): string | null {
   const url = env.VITE_SERVER_URL_PLAYER_TELEMETRY ?? env.VITE_SERVER_URL ?? "";
@@ -100,7 +105,9 @@ export function buildIngestUrl(
     seq: String(seq),
     build: envelope.build,
     schemaVersion: String(envelope.schemaVersion),
+    contractVersion: String(envelope.combatContractVersion ?? 0),
     uidHash: envelope.playerIdHash,
+    startedAt: String(envelope.startedAt),
     enc,
   });
   if (token) {

@@ -17,6 +17,7 @@ import type { Nature } from "#enums/nature";
 import type { PlayerGender } from "#enums/player-gender";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
+import type { TrainerType } from "#enums/trainer-type";
 import type { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import type { Variant } from "#sprites/variant";
 import type { ArenaData } from "#system/arena-data";
@@ -143,6 +144,11 @@ export interface SessionSaveData {
    * compatibility (older saves restore an empty set, i.e. a fresh pool).
    */
   erUsedTrainerKeys?: string[];
+  /**
+   * Last generic trainer class generated in this run. Used to prevent immediate
+   * repeats after both normal wave advancement and a save/Continue boundary.
+   */
+  erLastGenericTrainerType?: TrainerType;
   /**
    * ER editor custom-trainer keys already encountered in this run. Kept
    * separate from the regular ER trainer registry because the key spaces and

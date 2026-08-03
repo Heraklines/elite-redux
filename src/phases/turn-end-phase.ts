@@ -45,10 +45,10 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.phaseManager.queueCoopTurnCommitPhase();
     }
 
-    globalScene.currentBattle.incrementTurn();
     // #player-telemetry: capture the resolved both-sides field OUTCOME for the turn that just ended, so
     // state transitions are learnable. Passive observer, no-op unless a telemetry build is recording.
     recordTelemetryTurnOutcome();
+    globalScene.currentBattle.incrementTurn();
     globalScene.eventTarget.dispatchEvent(new TurnEndEvent(globalScene.currentBattle.turn));
     globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
 

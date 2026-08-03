@@ -71,6 +71,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -82,8 +83,8 @@ import {
   maybePrefetchGhostTeams,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
-import { ER_IOS_DEFERRED_BGM_FILES, isIOSDevice } from "#data/elite-redux/er-ios";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
+import { ER_MOBILE_DEFERRED_BGM_FILES, shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { resetErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
@@ -2141,7 +2142,11 @@ export class BattleScene extends SceneBase {
    * @returns The generated trainer.
    */
   private generateNewBattleTrainer(waveIndex: number): Trainer {
-    const trainerType = Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType ?? this.arena.randomTrainerType(waveIndex);
+    const trainerOverride = Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType;
+    const trainerType = trainerOverride ?? this.arena.randomTrainerType(waveIndex, false, getLastGenericTrainerType());
+    if (trainerOverride === undefined) {
+      markGenericTrainerType(trainerType);
+    }
     const config = trainerConfigs[trainerType];
 
     let doubleTrainer: boolean;
@@ -3368,11 +3373,11 @@ export class BattleScene extends SceneBase {
       fadeOut = false;
     }
     this.bgmCache.add(bgmName);
-    // #ios-stability: a track deferred off the iOS boot preload (victory/evolution BGM)
+    // #mobile-stability: a track deferred off the mobile boot preload (victory/evolution BGM)
     // lives under `bw/`, so the default `${key}.mp3` on-demand fetch would 404. Look its
     // real filename up so this first play load-then-plays seamlessly. Desktop preloads every
     // track (deferredBgmFile is undefined), so the load call is byte-identical there.
-    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(bgmName) : undefined;
+    const deferredBgmFile = shouldUseMobileBootMitigations() ? ER_MOBILE_DEFERRED_BGM_FILES.get(bgmName) : undefined;
     if (deferredBgmFile) {
       this.loadBgm(bgmName, deferredBgmFile);
     } else {
@@ -3557,11 +3562,11 @@ export class BattleScene extends SceneBase {
 
   playSoundWithoutBgm(soundName: string, pauseDuration?: number): AnySound | null {
     this.bgmCache.add(soundName);
-    // #ios-stability: a track deferred off the iOS boot preload (e.g. "evolution") may not be
+    // #mobile-stability: a track deferred off the mobile boot preload (e.g. "evolution") may not be
     // cached the first time it's requested here as an SE-style sound. Load-then-play it instead
     // of failing silently (which would also strand the just-paused BGM). Once cached, the retry
     // takes the normal path below. Desktop preloads every track, so this branch never runs there.
-    const deferredBgmFile = isIOSDevice() ? ER_IOS_DEFERRED_BGM_FILES.get(soundName) : undefined;
+    const deferredBgmFile = shouldUseMobileBootMitigations() ? ER_MOBILE_DEFERRED_BGM_FILES.get(soundName) : undefined;
     if (deferredBgmFile && !this.cache.audio.exists(soundName)) {
       this.loadBgm(soundName, deferredBgmFile);
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {

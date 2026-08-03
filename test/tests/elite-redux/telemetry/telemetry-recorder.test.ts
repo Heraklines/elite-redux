@@ -30,6 +30,7 @@ import { MemoryTelemetryStore } from "#data/elite-redux/telemetry/telemetry-stor
 import {
   resolvePlayerTelemetryBase,
   resolvePlayerTelemetryMode,
+  shouldCaptureHumanCombatTelemetry,
 } from "#data/elite-redux/telemetry/telemetry-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -301,6 +302,59 @@ describe("telemetry queue", () => {
     }
     await q.maybeFlush(1); // pendingBytes now well over 500
     expect(uploads).toHaveLength(1);
+  });
+
+  it("captures the human combat contract in solo only", () => {
+    expect(shouldCaptureHumanCombatTelemetry("solo")).toBe(true);
+    expect(shouldCaptureHumanCombatTelemetry("coop")).toBe(false);
+    expect(shouldCaptureHumanCombatTelemetry("showdown")).toBe(false);
+    expect(shouldCaptureHumanCombatTelemetry("tournament")).toBe(false);
+  });
+
+  it("bounds recovery and normal uploads by uncompressed bytes", async () => {
+    const cfg = { ...DEFAULT_TELEMETRY_QUEUE_CONFIG, maxBatchBytes: 700 };
+    const q = new TelemetryQueue(store, envelope(), upload, cfg, () => 5000);
+    for (let i = 0; i < 8; i++) {
+      q.enqueue(decisionEvent(i));
+    }
+    await q.flush(8);
+    expect(uploads[0].events.length).toBeGreaterThan(0);
+    expect(uploads[0].events.length).toBeLessThan(8);
+    expect(JSON.stringify(uploads[0].events).length).toBeLessThan(1200);
+    expect(await store.totalBytes()).toBeGreaterThan(0);
+  });
+
+  it("drains every bounded chunk at a genuine session terminal", async () => {
+    const cfg = { ...DEFAULT_TELEMETRY_QUEUE_CONFIG, maxBatchBytes: 500 };
+    const q = new TelemetryQueue(store, envelope("bounded-terminal"), upload, cfg, () => 5000);
+    for (let i = 0; i < 10; i++) {
+      q.enqueue(decisionEvent(i));
+    }
+
+    await q.finalize();
+
+    expect(uploads.length).toBeGreaterThan(2);
+    expect(uploads.flatMap(batch => batch.events)).toHaveLength(10);
+    expect(await store.totalBytes()).toBe(0);
+  });
+
+  it("keeps the capped newest beacon tail when an older normal batch uploads", async () => {
+    const cfg = {
+      ...DEFAULT_TELEMETRY_QUEUE_CONFIG,
+      maxBatchBytes: 400,
+      maxBeaconTailBytes: 700,
+    };
+    const q = new TelemetryQueue(store, envelope("beacon-tail"), upload, cfg, () => 5000);
+    for (let wave = 1; wave <= 6; wave++) {
+      q.enqueue(decisionEvent(wave));
+    }
+
+    await q.flush(6);
+    q.flushBeacon();
+    await vi.waitFor(() => expect(uploads).toHaveLength(2));
+
+    expect(uploads[0].events).toHaveLength(1);
+    expect(uploads[1].events.map(event => event.wave)).toEqual([4, 5, 6]);
   });
 
   it("keeps events durable when upload fails (at-least-once) and retries later", async () => {

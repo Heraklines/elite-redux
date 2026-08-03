@@ -37,6 +37,11 @@ export class PostSummonPhase extends PokemonPhase {
     }
 
     const pokemon = this.getPokemon();
+    if (pokemon.isEnemy()) {
+      // Enemy initial sends and switch-ins do not all pass through the same
+      // SummonPhase path. PostSummon is the common entry boundary.
+      pokemon.revealEntryBattleInfo();
+    }
     console.log("Ran PSP for:", pokemon.name);
     if (pokemon.status?.effect === StatusEffect.TOXIC) {
       pokemon.status.toxicTurnCount = 0;

@@ -342,7 +342,14 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   }
 
   queuePostSummon(): void {
-    this.getPokemon().turnData.summonedThisTurn = true;
+    const pokemon = this.getPokemon();
+    pokemon.turnData.summonedThisTurn = true;
+    if (pokemon.isEnemy()) {
+      // ER exposes the active ability and every innate for a fielded opponent. Keep the
+      // policy visibility model aligned with that entry disclosure, including sources
+      // whose effect does not happen to open an ability bar on this exact switch-in.
+      pokemon.revealEntryBattleInfo();
+    }
   }
 
   end() {

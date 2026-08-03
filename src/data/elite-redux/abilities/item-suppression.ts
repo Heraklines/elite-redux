@@ -84,6 +84,19 @@ export function erSuppressedItemTypeId(pokemon: Pokemon): string | undefined {
   return entry && currentTurn() <= entry.expiryTurn ? entry.typeId : undefined;
 }
 
+/** Read-only projection for the suppressed item and its remaining combat window. */
+export function erHeldItemSuppressionState(
+  pokemon: Pokemon,
+  itemTypeId: string,
+): { typeId: string; expiryTurn: number; turnsLeft: number } | undefined {
+  const entry = SUPPRESSED.get(pokemon.id);
+  const turn = currentTurn();
+  if (!entry || entry.typeId !== itemTypeId || turn > entry.expiryTurn) {
+    return;
+  }
+  return { typeId: entry.typeId, expiryTurn: entry.expiryTurn, turnsLeft: entry.expiryTurn - turn + 1 };
+}
+
 /** Test helper: clear all suppression state. */
 export function resetItemSuppression(): void {
   SUPPRESSED.clear();

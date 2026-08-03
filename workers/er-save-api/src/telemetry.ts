@@ -174,8 +174,10 @@ export async function handleTelemetryIngest(
 
   const url = new URL(request.url);
   const q = url.searchParams;
+  const startedAt = Number(q.get("startedAt"));
+  const stableObjectTime = Number.isFinite(startedAt) && startedAt > 0 ? startedAt : now;
   const key = telemetryObjectKey({
-    date: telemetryDateSegment(now),
+    date: telemetryDateSegment(stableObjectTime),
     mode: q.get("mode"),
     sessionId: q.get("sessionId"),
     seq: q.get("seq"),
@@ -190,6 +192,7 @@ export async function handleTelemetryIngest(
     userIdHash: sanitizeSegment(q.get("uidHash"), "anon"),
     build: sanitizeSegment(q.get("build"), "unknown"),
     schemaVersion: sanitizeSegment(q.get("schemaVersion"), "0"),
+    combatContractVersion: sanitizeSegment(q.get("contractVersion"), "0"),
     enc,
     uploadedAt: String(now),
   };

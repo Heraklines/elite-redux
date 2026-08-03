@@ -206,6 +206,9 @@ jobs:
 
       - name: Write standalone login env
         run: |
+          node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          AI_DICTIONARY_HASH="$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)"
+          echo "AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}" >> "$GITHUB_ENV"
           {
             echo "VITE_BYPASS_LOGIN=0"
             echo "VITE_SERVER_URL=${{ vars.STAGING_SERVER_URL }}"
@@ -225,6 +228,8 @@ jobs:
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry-staging.heraklines.workers.dev"
             # Player decision telemetry uses an environment-isolated R2 bucket.
             echo "VITE_TELEMETRY=staging"
+            echo "VITE_BUILD_SHA=${PROMOTED_SHA}"
+            echo "VITE_AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
             # Pass/Fail, Send Logs). Production's Cloudflare Pages build does NOT set
@@ -369,6 +374,17 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-telemetry/wrangler.staging.toml
+
+      - name: Upload combat data dictionary (staging R2)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            r2 object put
+            "er-telemetry-staging/dictionaries/${{ env.AI_DICTIONARY_HASH }}.json"
+            --file "${{ runner.temp }}/er-combat-data-dictionary.json"
+            --content-type application/json
 
       - name: Deploy co-op signaling API (staging)
         if: inputs.deploy_coop

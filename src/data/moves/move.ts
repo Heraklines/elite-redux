@@ -4435,17 +4435,26 @@ export class HealStatusEffectAttr extends MoveEffectAttr {
     }
 
     const pokemon = this.selfTarget ? user : target;
+    let cured = false;
     if (pokemon.status && this.effects.includes(pokemon.status.effect)) {
       globalScene.phaseManager.queueMessage(
         getStatusEffectHealText(pokemon.status.effect, getPokemonNameWithAffix(pokemon)),
       );
       pokemon.resetStatus();
-      pokemon.updateInfo();
-
-      return true;
+      cured = true;
     }
 
-    return false;
+    // ER's Bleed/Frostbite/Fear are battler tags rather than StatusEffects.
+    // A move configured to cure every normal non-volatile status is a full
+    // status cure and must clear those ER ailments too.
+    if (getNonVolatileStatusEffects().every(effect => this.effects.includes(effect))) {
+      cured = clearErAilments(pokemon) || cured;
+    }
+
+    if (cured) {
+      pokemon.updateInfo();
+    }
+    return cured;
   }
 
   isOfEffect(effect: StatusEffect): boolean {
@@ -14060,13 +14069,7 @@ export function initMoves() {
       .triageMove(),
     new SelfStatusMove(MoveId.TAKE_HEART, PokemonType.PSYCHIC, -1, 10, -1, 0, 8)
       .attr(StatStageChangeAttr, [Stat.SPATK, Stat.SPDEF], 1, true)
-      .attr(HealStatusEffectAttr, true, [
-        StatusEffect.PARALYSIS,
-        StatusEffect.POISON,
-        StatusEffect.TOXIC,
-        StatusEffect.BURN,
-        StatusEffect.SLEEP,
-      ]),
+      .attr(HealStatusEffectAttr, true, getNonVolatileStatusEffects()),
     /* Unused
     new AttackMove(MoveId.G_MAX_WILDFIRE, PokemonType.Fire, MoveCategory.PHYSICAL, 10, -1, 10, -1, 0, 8)
       .target(MoveTarget.ALL_NEAR_ENEMIES)
