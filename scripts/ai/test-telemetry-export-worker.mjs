@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { gzipSync } from "node:zlib";
 import { handleRequest } from "../../workers/er-ai-telemetry-export/src/index.mjs";
 
 const objects = [
@@ -17,11 +18,23 @@ const objects = [
     customMetadata: { combatContractVersion: "0", enc: "plain" },
     body: '{"batch":"b"}',
   },
+  {
+    key: "private-gzip",
+    size: 21,
+    uploaded: new Date("2026-08-03T00:00:02Z"),
+    customMetadata: { combatContractVersion: "4", enc: "gz" },
+    body: '{"batch":"gzip"}',
+  },
 ];
 const bucket = {
   async get(key) {
     const object = objects.find(candidate => candidate.key === key);
-    return object ? { text: async () => object.body } : null;
+    if (!object) {
+      return null;
+    }
+    const bytes = object.customMetadata.enc === "gz" ? gzipSync(object.body) : object.body;
+    const response = new Response(bytes);
+    return { body: response.body, text: () => response.text() };
   },
   async list() {
     return {
@@ -43,8 +56,8 @@ const response = await handleRequest(
   env,
 );
 assert.equal(response.status, 200);
-assert.equal(response.headers.get("x-er-listed-objects"), "2");
-assert.equal(response.headers.get("x-er-selected-objects"), "1");
+assert.equal(response.headers.get("x-er-listed-objects"), "3");
+assert.equal(response.headers.get("x-er-selected-objects"), "2");
 assert.equal(response.headers.get("x-er-next-cursor"), "next-page");
 assert.deepEqual(
   (await response.text())
@@ -57,6 +70,12 @@ assert.deepEqual(
       customMetadata: { combatContractVersion: "4", enc: "plain" },
       lastModified: "2026-08-03T00:00:00.000Z",
       size: 15,
+    },
+    {
+      body: '{"batch":"gzip"}',
+      customMetadata: { combatContractVersion: "4", enc: "gz" },
+      lastModified: "2026-08-03T00:00:02.000Z",
+      size: 21,
     },
   ],
 );

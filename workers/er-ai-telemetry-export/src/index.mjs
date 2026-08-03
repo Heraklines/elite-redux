@@ -44,24 +44,32 @@ function matchesContractVersion(object, contractVersion) {
   return contractVersion == null || String(object.customMetadata?.combatContractVersion ?? "0") === contractVersion;
 }
 
+async function readObject(bucket, object) {
+  try {
+    const stored = await bucket.get(object.key);
+    if (!stored) {
+      return { body: null, invalidReason: "missing", size: object.size ?? 0 };
+    }
+    const body =
+      object.customMetadata?.enc === "gz"
+        ? await new Response(stored.body.pipeThrough(new DecompressionStream("gzip"))).text()
+        : await stored.text();
+    return {
+      body,
+      customMetadata: object.customMetadata ?? {},
+      lastModified: object.uploaded instanceof Date ? object.uploaded.toISOString() : null,
+      size: object.size ?? 0,
+    };
+  } catch {
+    return { body: null, invalidReason: "decode", size: object.size ?? 0 };
+  }
+}
+
 async function readRows(bucket, objects) {
   const rows = [];
   for (let offset = 0; offset < objects.length; offset += READ_BATCH_SIZE) {
     const chunk = objects.slice(offset, offset + READ_BATCH_SIZE);
-    const chunkRows = await Promise.all(
-      chunk.map(async object => {
-        const body = await bucket.get(object.key);
-        if (!body) {
-          return { body: null, invalidReason: "missing", size: object.size ?? 0 };
-        }
-        return {
-          body: await body.text(),
-          customMetadata: object.customMetadata ?? {},
-          lastModified: object.uploaded instanceof Date ? object.uploaded.toISOString() : null,
-          size: object.size ?? 0,
-        };
-      }),
-    );
+    const chunkRows = await Promise.all(chunk.map(object => readObject(bucket, object)));
     rows.push(...chunkRows);
   }
   return rows;
