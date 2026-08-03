@@ -74,13 +74,13 @@ import {
   resetActiveCoopRuntimeClocks,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
-import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 import type {
   CoopAuthoritativeBattleStateV1,
   CoopRewardSurfaceIdentity,
   CoopRole,
   CoopSerializedRewardOption,
 } from "#data/elite-redux/coop/coop-transport";
+import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
 export type CoopShopSurface = "reward" | "market";
