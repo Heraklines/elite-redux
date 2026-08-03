@@ -263,11 +263,11 @@ export class TrainerVictoryPhase extends BattlePhase {
         settleCoopTrainerPresentation("enemy");
         coopLog("renderer", `trainer victory presentation settled sourceWave=${victory.sourceWave}`);
       }
+      if (authoritativeGuest && orderedPresentationWave != null) {
+        completeCoopV2TrainerVictoryPresentation(orderedPresentationWave);
+      }
       this.end();
       if (authoritativeGuest) {
-        if (orderedPresentationWave != null) {
-          completeCoopV2TrainerVictoryPresentation(orderedPresentationWave);
-        }
         clearCoopTrainerVictoryBoundary(globalScene, victory.sourceWave);
       }
     };

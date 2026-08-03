@@ -1644,6 +1644,33 @@ test("Mystery trainer victory is installed from immutable terminal material", ()
   );
 });
 
+test("normal trainer victory retains its exact presentation lease across successor admission", () => {
+  assert.match(
+    coopRuntime,
+    /v2PendingTrainerVictoryPresentation:[\s\S]*operationId: string;[\s\S]*wave: number;[\s\S]*turn: number;/u,
+    "the runtime owns one exact live trainer-presentation address",
+  );
+  assert.match(
+    coopRuntime,
+    /runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    "material installation retains the lease before exposing the real phase",
+  );
+  const addressStart = coopRuntime.indexOf("export function coopV2TrainerVictoryPresentationAddress(");
+  const addressEnd = coopRuntime.indexOf("\n/**", addressStart + 1);
+  assert.ok(addressStart >= 0 && addressEnd > addressStart, "the exact presentation resolver has a bounded source block");
+  const addressSource = coopRuntime.slice(addressStart, addressEnd);
+  assert.match(addressSource, /v2PendingTrainerVictoryPresentation/u);
+  assert.doesNotMatch(addressSource, /latestControl|resolveCoopRetainedWaveContinuationIdentity/u);
+
+  const finishStart = trainerVictoryPhase.indexOf("const finish = () => {");
+  const completeAt = trainerVictoryPhase.indexOf("completeCoopV2TrainerVictoryPresentation", finishStart);
+  const endAt = trainerVictoryPhase.indexOf("this.end();", finishStart);
+  assert.ok(
+    finishStart >= 0 && completeAt > finishStart && endAt > completeAt,
+    "the real presentation retires its exact lease before the phase manager can advance",
+  );
+});
+
 test("an embedded Mystery trainer battle retains and renders its trainer presentation", () => {
   assert.match(
     operationEnvelope,

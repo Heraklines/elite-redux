@@ -4472,6 +4472,12 @@ export interface CoopRuntime {
   readonly v2MeProgressionReplayCompleted: Set<string>;
   /** Source waves whose ordered pre-WAVE trainer-victory presentation fully drained on this renderer. */
   readonly v2CompletedTrainerVictoryPresentations: Set<number>;
+  /** Exact trainer presentation retained until its real phase proves completion, even after successor admission. */
+  v2PendingTrainerVictoryPresentation: {
+    readonly operationId: string;
+    readonly wave: number;
+    readonly turn: number;
+  } | null;
   /**
    * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
    * public destination installs; retaining only their immutable status makes observability honest without
@@ -7049,6 +7055,20 @@ function buildCoopV2LiveSeams(
             if (entry.nextControl.kind !== "AWAIT_SUCCESSOR") {
               return false;
             }
+            const pendingPresentation = runtime.v2PendingTrainerVictoryPresentation;
+            if (
+              pendingPresentation != null
+              && (pendingPresentation.operationId !== entry.operationId
+                || pendingPresentation.wave !== material.wave
+                || pendingPresentation.turn !== material.turn)
+            ) {
+              return false;
+            }
+            runtime.v2PendingTrainerVictoryPresentation = {
+              operationId: entry.operationId,
+              wave: material.wave,
+              turn: material.turn,
+            };
             const phaseManager = globalScene.phaseManager;
             if (!phaseManager.hasPhaseOfType("TrainerVictoryPhase")) {
               phaseManager.unshiftNew("TrainerVictoryPhase");
@@ -9070,15 +9090,8 @@ export function coopV2TrainerVictoryPresentationAddress(): { readonly wave: numb
   if (runtime == null || runtime.controller.authorityRole !== "replica") {
     return null;
   }
-  const control = runtime.v2ControlLedger.latestControl;
-  if (control?.kind !== "AWAIT_SUCCESSOR") {
-    return null;
-  }
-  const source = runtime.v2ControlLedger.sourceEntryOf(control);
-  const material = source == null ? null : decodeControlOpenEntry(source);
-  return material?.kind === "trainer-victory-open" && runtime.v2ControlLedger.isMaterialApplied(control)
-    ? { wave: material.wave, turn: material.turn }
-    : null;
+  const pending = runtime.v2PendingTrainerVictoryPresentation;
+  return pending == null ? null : { wave: pending.wave, turn: pending.turn };
 }
 
 /** Record real presentation completion so the later WAVE_ADVANCE bootstrap cannot queue it a second time. */
@@ -9087,6 +9100,12 @@ export function completeCoopV2TrainerVictoryPresentation(wave: number): void {
   if (runtime == null || runtime.controller.authorityRole !== "replica") {
     return;
   }
+  const pending = runtime.v2PendingTrainerVictoryPresentation;
+  if (pending == null || pending.wave !== wave) {
+    failCoopSharedSession(`The ordered trainer-victory presentation completed without its exact wave ${wave} lease.`);
+    return;
+  }
+  runtime.v2PendingTrainerVictoryPresentation = null;
   runtime.v2CompletedTrainerVictoryPresentations.add(wave);
   while (runtime.v2CompletedTrainerVictoryPresentations.size > 8) {
     const oldest = runtime.v2CompletedTrainerVictoryPresentations.values().next().value;
@@ -9097,9 +9116,12 @@ export function completeCoopV2TrainerVictoryPresentation(wave: number): void {
   }
 }
 
-/** Whether this renderer already crossed the exact ordered trainer presentation for a source wave. */
+/** Whether this renderer already owns or crossed the exact ordered trainer presentation for a source wave. */
 export function didCompleteCoopV2TrainerVictoryPresentation(wave: number): boolean {
-  return active?.v2CompletedTrainerVictoryPresentations.has(wave) === true;
+  return (
+    active?.v2PendingTrainerVictoryPresentation?.wave === wave
+    || active?.v2CompletedTrainerVictoryPresentations.has(wave) === true
+  );
 }
 
 /**
@@ -13726,6 +13748,8 @@ export function assembleCoopRuntime(
       runtime.v2ProjectedReplacementControlId = null;
       runtime.v2ProjectedInteractionControlId = null;
       runtime.v2WaveTransactions.clear();
+      runtime.v2PendingTrainerVictoryPresentation = null;
+      runtime.v2CompletedTrainerVictoryPresentations.clear();
       coopLog("v2-recovery", `hard epoch boundary ${authorityV2Epoch}->${epoch}; retired prior authoritative log`);
     }
     authorityV2Epoch = epoch;
@@ -14059,6 +14083,7 @@ export function assembleCoopRuntime(
     v2MeProgressionReplayStarted: new Set<string>(),
     v2MeProgressionReplayCompleted: new Set<string>(),
     v2CompletedTrainerVictoryPresentations: new Set<number>(),
+    v2PendingTrainerVictoryPresentation: null,
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {
