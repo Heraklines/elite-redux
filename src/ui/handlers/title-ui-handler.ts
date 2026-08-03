@@ -602,8 +602,9 @@ export class TitleUiHandler extends OptionSelectUiHandler {
     );
 
     const betaText = isBeta || isDev ? " (Beta)" : "";
-    // ER: show the Elite Redux mod version (not the upstream package.json version).
-    this.appVersionText.setText("v" + ER_VERSION + betaText);
+    // ER: release tags keep a fourth patch component, while the player-facing title uses v0.0.x.
+    const displayVersion = ER_VERSION.replace(/\.0$/, "");
+    this.appVersionText.setText("v" + displayVersion + betaText);
 
     const ui = this.getUi();
 

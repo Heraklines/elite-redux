@@ -132,6 +132,10 @@ export function areShowdownTournamentsEnabled(
   search = typeof window === "undefined" ? "" : window.location.search,
   buildEnabled = SHOWDOWN_TOURNAMENTS_BUILD_ENABLED,
 ): boolean {
+  // Production omits the build flag and must stay closed even when a player supplies a test URL override.
+  if (!buildEnabled) {
+    return false;
+  }
   return isShowdownFeatureEnabled(
     search,
     SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM,
