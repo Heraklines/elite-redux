@@ -13,6 +13,7 @@ import {
   assertAsymmetricLearnMoveProjection,
   assertRetainedEvolutionPresentationParity,
   chooseUntriedRewardOption,
+  classifyLearnMovePickerProgress,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
@@ -32,6 +33,53 @@ import { isActionableSemanticObservation, planNavigationStep } from "./campaign-
 import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
+
+test("learn-move accept pumps the finite native narration before requiring the Summary picker", () => {
+  const address = { epoch: 19, wave: 1, turn: 2 };
+  const base = {
+    address,
+    localSeat: 0,
+    ownerSeat: null,
+    seatsWithInput: [0],
+    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: null },
+  };
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      { ...base, surfaceId: "battle:message", phase: "LearnMovePhase", uiMode: "MESSAGE" },
+      address,
+      0,
+    ),
+    "advance",
+  );
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      {
+        ...base,
+        surfaceId: "learn-move:confirm",
+        phase: "LearnMovePhase",
+        uiMode: "SUMMARY",
+        ownerSeat: 0,
+      },
+      address,
+      0,
+    ),
+    "ready",
+  );
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      {
+        ...base,
+        surfaceId: "battle:message",
+        phase: "LearnMovePhase",
+        uiMode: "MESSAGE",
+        address: { ...address, turn: 3 },
+      },
+      address,
+      0,
+    ),
+    "wait",
+  );
+});
 
 class FakeEvidence {
   constructor(entries = []) {

@@ -2711,24 +2711,68 @@ export async function driveLearnMoveDecline(rig, owner, boundary) {
   }
 }
 
+/** Classify the exact native prompt chain between accepting a teach and opening its Summary picker. */
+export function classifyLearnMovePickerProgress(observation, expectedAddress, localSeat) {
+  const sameAddress =
+    observation?.address?.epoch === expectedAddress?.epoch
+    && observation.address.wave === expectedAddress.wave
+    && observation.address.turn === expectedAddress.turn;
+  if (!sameAddress) {
+    return "wait";
+  }
+  if (
+    observation.surfaceId === "learn-move:confirm"
+    && observation.uiMode === "SUMMARY"
+    && isActionableSemanticObservation(observation)
+  ) {
+    return "ready";
+  }
+  if (
+    observation.surfaceId === "battle:message"
+    && observation.phase === "LearnMovePhase"
+    && observation.uiMode === "MESSAGE"
+    && observation.ready?.handlerActive === true
+    && observation.ready.awaitingActionInput === true
+    && observation.ready.inputBlocked !== true
+    && observation.seatsWithInput?.includes(localSeat)
+  ) {
+    return "advance";
+  }
+  return "wait";
+}
+
 /** Accept a full-moveset teach and replace the currently selected move through the real Summary UI. */
 async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
   let picker = boundary.ownerEvent;
   if (picker.observation.uiMode !== "SUMMARY") {
     const pickerCursor = owner.evidence.cursor();
     await owner.press("Space", "campaign-learn-move-accept-replacement");
-    picker = await owner.evidence.waitForCondition(
-      sink => {
-        const candidate = sink.findLastSemanticSurface(pickerCursor, "learn-move:confirm");
-        return candidate != null
-          && candidate.observation.uiMode === "SUMMARY"
-          && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
-          && isActionableSemanticObservation(candidate.observation)
-          ? candidate
-          : null;
-      },
-      { timeoutMs: rig.config.timeoutMs, description: "actionable learn-move forget picker" },
-    );
+    const pickerDeadline = Date.now() + rig.config.timeoutMs;
+    const advancedPrompts = new Set();
+    for (;;) {
+      const candidate = owner.evidence.findLastSemanticSurface(pickerCursor);
+      const progress = classifyLearnMovePickerProgress(
+        candidate?.observation,
+        boundary.authority.address,
+        owner.publicSeat,
+      );
+      if (progress === "ready") {
+        picker = candidate;
+        break;
+      }
+      if (progress === "advance") {
+        const identity = semanticAppearanceIdentity(candidate);
+        if (!advancedPrompts.has(identity)) {
+          advancedPrompts.add(identity);
+          await owner.press("Space", `campaign-learn-move-open-picker:${candidate.index}`);
+          continue;
+        }
+      }
+      if (Date.now() >= pickerDeadline) {
+        throw new Error(`${owner.label}: timed out waiting for actionable learn-move forget picker`);
+      }
+      await delay(100);
+    }
   }
   if (picker.observation.uiMode !== "SUMMARY") {
     throw new Error(`[campaign-learn-move] ${owner.label} never opened the full-moveset Summary picker`);

@@ -586,6 +586,9 @@ export class UI extends Phaser.GameObjects.Container {
     if (this._coopMirrorEngine == null) {
       this._coopMirrorEngine = {
         getMode: () => this.mode,
+        // Preserve the handler's readiness verdict. A CPU-dilated watcher can still be rendering
+        // the reward animation after the owner becomes actionable; the mirror retains and retries
+        // that exact cosmetic FIFO input instead of permanently losing the cursor edge.
         applyButton: (b: Button) => this.processInputInner(b),
       };
     }

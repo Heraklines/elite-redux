@@ -7114,3 +7114,33 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The fixture now faithfully reports that it contains no queued native `LearnMovePhase`, allowing the two
   tests to continue covering their owned fallback cases: inline replay over a parked renderer and queued replay
   when the renderer is drainable. No production behavior changed for this gate repair.
+
+## 2026-08-03 - reward cursor readiness race retained instead of dropped
+
+- The `HYPER_POTION` lane in run `30785547999` was not merely an observer miss. The owner became actionable,
+  moved to Hyper Potion, and sent mirror FIFO entry `n=0` while the slower watcher was still completing its
+  reward animation. `CoopUiMirror` logged an apply and consumed the entry even though the watcher's real
+  `ModifierSelectUiHandler.processInput()` returned false. Two minutes later its semantic cursor remained on
+  Poke Ball. Mechanical Authority V2 state was unaffected, but presentation was genuinely stale.
+- The mirror engine now returns the real handler readiness verdict. A false result retains the exact FIFO entry
+  and retries it at a short cadence only while the same session and UI mode remain live. Success advances the
+  high-water mark once; a mode mismatch still drops cosmetic stale input, and a renderer exception remains
+  fail-soft without poisoning later entries.
+- A failure-first loopback test reproduces the owner-ready/watcher-rendering race with no game engine and proves
+  the retained input applies exactly once after readiness. This closes the prior coverage gap: the mirror tests
+  had modeled every watcher handler as synchronously ready, unlike two real browsers under asymmetric load.
+
+## 2026-08-03 - learn-move exact-SHA remeasurement and finite prompt driver
+
+- Exact-SHA browser run `30787688209` proves the native-phase reuse production fix in three independent item
+  workflows: `TM_COMMON`, `ER_LEARNERS_SHROOM`, and `MEMORY_MUSHROOM` all passed through the real two-browser
+  UI and reached the converged wave-2 command frontier. Their former stale native picker softlock is gone.
+- `TM_GREAT` reached and bound the exact revision-6 learn-move operation to the existing native phase on the
+  replica, so it did not reproduce the product collision. Its red was a harness call-chain gap: after accepting
+  the Yes/No confirmation, native `LearnMovePhase` presents one actionable “Which move should be forgotten?”
+  MESSAGE before opening Summary. The driver waited for Summary without pressing that finite prompt, leaving
+  the authority visibly and safely awaiting human input while the replica already showed the read-only list.
+- The accept driver now recognizes only same-address, actionable `LearnMovePhase` narration, advances each
+  unique prompt generation once through the public keyboard path, and then requires the exact actionable
+  Summary picker. A pure contract test distinguishes that prompt from wrong-address/stale material and from the
+  completed picker. No production change was made for the `TM_GREAT` classification.

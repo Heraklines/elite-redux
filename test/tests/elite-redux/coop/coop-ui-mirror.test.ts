@@ -14,7 +14,7 @@
 
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror, type CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /** Flush the microtask queue so loopback deliveries land before we assert. */
 const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -160,6 +160,47 @@ describe("co-op live-cursor mirror (#633)", () => {
     expect(eng.applied).toEqual([50]); // dropped, not mis-applied
 
     watcher.dispose();
+  });
+
+  it("retains an owner cursor edge until the slower watcher's exact handler becomes actionable", async () => {
+    const { host, guest } = createLoopbackPair();
+    const watcher = new CoopUiMirror(guest);
+    const applied: number[] = [];
+    let ready = false;
+    const engine: CoopUiMirrorEngine = {
+      getMode: () => MODE,
+      applyButton(button: number) {
+        if (!ready) {
+          return false;
+        }
+        applied.push(button);
+        return true;
+      },
+    };
+    watcher.attach(engine);
+
+    // Pre-buffer the real race: the owner is actionable and sends while the watcher is still
+    // finishing its reward animation. Opening the watcher session attempts, but must not consume,
+    // the exact n=0 cursor edge.
+    host.send({ t: "uiInput", seq: SEQ, n: 0, button: 45, mode: MODE });
+    await flush();
+
+    vi.useFakeTimers();
+    try {
+      watcher.beginSession("watcher", MODE, SEQ);
+      expect(applied).toEqual([]);
+
+      ready = true;
+      await vi.advanceTimersByTimeAsync(50);
+      expect(applied).toEqual([45]);
+
+      // A later timer tick cannot replay the already-consumed FIFO entry.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(applied).toEqual([45]);
+    } finally {
+      watcher.dispose();
+      vi.useRealTimers();
+    }
   });
 
   it("ignores input for a DIFFERENT session seq and reports watcher/active state", async () => {
