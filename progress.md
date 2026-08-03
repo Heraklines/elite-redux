@@ -6955,3 +6955,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - A remote source contract binds the reward observer to the post-retention seam. The next focused
   animations-on measurements are ordinary `EVOLUTION_ITEM` and nested `RARE_EVOLUTION_ITEM` on the combined
   scheduler/evidence tip.
+
+## 2026-08-03 - projected Learn Move resumes its retained unstarted successor
+
+- Combined exact-SHA run `30775674276` proved the preceding retained-evolution scheduler change: both variants
+  retained their reward revision, both evolution presentations completed on authority and replica, and the rare
+  branch admitted and installed its guest-owned Learn Move revisions through `frontier=7/7/7`.
+- The ordinary variant reached the shared wave-2 command and failed only because its isolated level-30 fixture
+  was incorrectly subject to the normal-level mandatory-EXP cue. Party-mutating reward journeys now preserve
+  strict authority/renderer ledger equality while excluding that impossible EXP requirement.
+- The rare variant exposed one further production scheduler seam. Its projected `CoopReplayLearnMovePhase`
+  closed through ordinary `super.end()`, which restored the parked `NewBattlePhase` but—correctly for an
+  ordinary already-running modal predecessor—did not start it. The host reached wave 2 while the replica stayed
+  on that unstarted wave-1 successor. PhaseManager now records exact started phase objects and its atomic
+  Authority V2 close starts a restored successor only when that object had deliberately never started; ordinary
+  temporary modals still resume their running predecessor without a duplicate start.
+- The browser's Backspace had already submitted the projected decline and revision 7 was applied. The driver
+  nevertheless waited for a second stop-teaching confirmation that this replay path does not open, masking the
+  real successor stall behind a harness timeout. It now accepts either a fresh actionable confirmation or a
+  fresh non-Learn-Move successor surface at the same or a later ordered address. Focused behavioral contracts cover both
+  scheduler branches; verification remains one combined remote animations-on reward journey.

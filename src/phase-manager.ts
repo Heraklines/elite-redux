@@ -371,6 +371,15 @@ export class PhaseManager {
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
   /**
+   * Exact phase objects that crossed the scheduler's one production/test start seam.
+   *
+   * Ordinary temporary overrides restore an already-running standby phase and must not restart it. An
+   * Authority V2 modal can instead be installed over a successor that was deliberately selected but kept
+   * unstarted until its ordered result arrived. The object identity, rather than its phase name, distinguishes
+   * those two cases when the modal closes.
+   */
+  private readonly startedPhases = new WeakSet<Phase>();
+  /**
    * Runtime-owned authoritative-mutation leases, keyed by the exact phase object that acquired them.
    * A phase remains live across awaits, UI interruption, and modal overrides, so its token is released only
    * when that object actually leaves the scheduler (never merely because its synchronous start head returned).
@@ -705,9 +714,10 @@ export class PhaseManager {
    * successor open before its immutable Authority V2 entry exists. This seam separates those two scheduler
    * edges without exposing the phase tree: `commitAfterClose` runs after `phase` is no longer current, but
    * before a newly dequeued successor starts. Returning false leaves that successor unstarted so the shared
-   * terminal path can fail closed; a parked standby is restored exactly as ordinary `shiftPhase` does. The
-   * commit may atomically replace and start the selected successor (for example, by projecting a buffered V2
-   * modal). In that case this method must not start the replacement a second time.
+   * terminal path can fail closed. A parked standby is restored without restarting an ordinary predecessor,
+   * while an Authority V2 successor that was deliberately parked before its first start begins only after the
+   * commit succeeds. The commit may atomically replace and start the selected successor (for example, by
+   * projecting a buffered V2 modal). In that case this method must not start the replacement a second time.
    */
   public shiftPhaseThroughCoopAuthorityCommit(phase: Phase, commitAfterClose: () => boolean): boolean {
     if (this.currentPhase !== phase || this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
@@ -715,9 +725,21 @@ export class PhaseManager {
     }
     this.settleCoopMutationPhase(phase);
     if (this.standbyPhase) {
-      this.currentPhase = this.standbyPhase;
+      const selectedSuccessor = this.standbyPhase;
+      const successorWasStarted = this.startedPhases.has(selectedSuccessor);
+      this.currentPhase = selectedSuccessor;
       this.standbyPhase = null;
-      return commitAfterClose();
+      const startSelectedSuccessor = commitAfterClose();
+      if (this.currentPhase !== selectedSuccessor) {
+        return true;
+      }
+      if (!startSelectedSuccessor) {
+        return false;
+      }
+      if (!successorWasStarted) {
+        this.startCurrentPhase();
+      }
+      return true;
     }
 
     let nextPhase = this.phaseQueue.getNextPhase();
@@ -764,6 +786,9 @@ export class PhaseManager {
    */
   public prepareCurrentPhaseForStart(): void {
     const phase = this.currentPhase;
+    if (phase != null) {
+      this.startedPhases.add(phase);
+    }
     if (phase == null || phase.is("CoopTurnCommitPhase") || this.coopMutationTokens.has(phase)) {
       return;
     }

@@ -2662,23 +2662,49 @@ async function checkpointAsymmetricLearnMoveSurface(rig, cursors, owner) {
 }
 
 /** Decline a learn cleanly: decline replacement, then confirm that teaching should stop. */
-async function driveLearnMoveDecline(rig, owner, boundary) {
+export async function driveLearnMoveDecline(rig, owner, boundary) {
   const firstIdentity = semanticAppearanceIdentity(boundary.ownerEvent);
   const from = boundary.ownerEvent.index + 1;
   await owner.press("Backspace", "campaign-learn-move-decline-replacement");
-  const stopConfirmation = await owner.evidence.waitForCondition(
+  const outcome = await owner.evidence.waitForCondition(
     sink => {
       const candidate = sink.findLastSemanticSurface(from, "learn-move:confirm");
-      return candidate != null
+      if (
+        candidate != null
         && semanticAppearanceIdentity(candidate) !== firstIdentity
         && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
         && isActionableSemanticObservation(candidate.observation)
-        ? candidate
+      ) {
+        return { kind: "confirmation", event: candidate };
+      }
+      // The projected guest picker can treat Backspace on its SUMMARY cancel row as the final decline and
+      // relay the immutable result immediately; unlike the host's ordinary LearnMovePhase it then opens no
+      // second CONFIRM. A fresh non-learn-move semantic surface at this or a later ordered address proves that
+      // this exact picker has closed. Return to the outer successor proof instead of waiting 120 seconds for a
+      // UI that cannot exist (rare-evolution run 30775674276).
+      const latest = sink.findLastSemanticSurface(from);
+      const expectedAddress = boundary.authority.address;
+      const observedAddress = latest?.observation.address;
+      const sameOrLaterAddress =
+        Number.isSafeInteger(expectedAddress?.epoch)
+        && observedAddress?.epoch === expectedAddress.epoch
+        && Number.isSafeInteger(expectedAddress.wave)
+        && Number.isSafeInteger(expectedAddress.turn)
+        && Number.isSafeInteger(observedAddress.wave)
+        && Number.isSafeInteger(observedAddress.turn)
+        && (observedAddress.wave > expectedAddress.wave
+          || (observedAddress.wave === expectedAddress.wave && observedAddress.turn >= expectedAddress.turn));
+      return latest != null
+        && !latest.observation.surfaceId.startsWith("learn-move:")
+        && sameOrLaterAddress
+        ? { kind: "closed", event: latest }
         : null;
     },
-    { timeoutMs: rig.config.timeoutMs, description: "learn-move stop-teaching confirmation" },
+    { timeoutMs: rig.config.timeoutMs, description: "learn-move decline confirmation or committed close" },
   );
-  await owner.press("Space", `campaign-learn-move-stop:${stopConfirmation.index}`);
+  if (outcome.kind === "confirmation") {
+    await owner.press("Space", `campaign-learn-move-stop:${outcome.event.index}`);
+  }
 }
 
 /** Accept a full-moveset teach and replace the currently selected move through the real Summary UI. */
@@ -5418,16 +5444,17 @@ export async function runCampaign(rig) {
         wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
       }
       rig.assertWaveProgressionLedger(waveNo, `campaign-wave-${waveNo}-progression-ledger`, {
-        // The dedicated longitudinal and registered-interaction fixtures start both parties at
-        // level 100, so a completed battle correctly has no EXP presentation. Keep the complete
-        // authority-vs-renderer ledger equality proof above, but reserve the mandatory EXP cue
-        // for normal-level journeys that can actually gain EXP.
+        // The dedicated longitudinal, registered-interaction, and party-mutating reward fixtures start
+        // both parties above ordinary progression levels, so a completed battle can correctly have no EXP
+        // presentation. Keep the complete authority-vs-renderer ledger equality proof above, but reserve
+        // the mandatory EXP cue for normal-level journeys that can actually gain EXP.
         requireExp:
           !(
             policy.navigation.required
             || policy.market.requiredPurchases > 0
             || policy.mysteryGauntlet.required
             || policy.registeredInteractions.required
+            || policy.partyMutatingReward.required
           )
           && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
       });

@@ -323,13 +323,13 @@ export class CoopReplayLearnMovePhase extends Phase {
     scene.ui.retirePresentationMode(UiMode.SUMMARY, UiMode.MESSAGE);
     getCoopUiMirror()?.endSession();
     clearCoopLearnMoveForwardInFlight(this.partySlot);
-    super.end();
-    if (scene.phaseManager.getCurrentPhase() === this) {
-      failCoopSharedSession(`Committed learn-move result ${operationId} did not close its projected phase`);
-      return true;
-    }
-    if (!settleCoopV2InteractionOperation(operationId, runtime)) {
-      failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its projected terminal`);
+    const closed = scene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () =>
+      settleCoopV2InteractionOperation(operationId, runtime),
+    );
+    if (!closed) {
+      failCoopSharedSession(
+        `Committed learn-move result ${operationId} could not close and prove its exact projected terminal`,
+      );
     }
     return true;
   }

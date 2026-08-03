@@ -18,6 +18,7 @@ import {
   createBattlePromptAdvancer,
   currentPairedBattleKind,
   driveBattleFallback,
+  driveLearnMoveDecline,
   findRegisteredSurface,
   findSharedSuccessorWavePresentation,
   hasPassiveBattleProgressSurface,
@@ -465,6 +466,113 @@ test("a one-sided next-wave command does not preempt its partner's current learn
     true,
     "only the host's later current command projection admits the shared frontier proof",
   );
+});
+
+test("a projected learn-move decline accepts its committed successor without inventing a second confirmation", async () => {
+  const owner = fakeClient("owner");
+  const address = { epoch: 7, wave: 1, turn: 2 };
+  const ownerEvent = {
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "learn-move:confirm",
+      operationClass: "learn-move",
+      ownerModel: "interaction",
+      coop: true,
+      address,
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      phase: "CoopReplayLearnMovePhase",
+      phaseInstance: 24,
+      surfaceGeneration: null,
+      uiMode: "SUMMARY",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  owner.evidence.events.push(ownerEvent);
+  owner.press = async (key, purpose) => {
+    owner.presses.push({ key, purpose });
+    if (key === "Backspace") {
+      owner.evidence.events.push({
+        index: owner.evidence.events.length,
+        kind: "browser-surface2",
+        observation: {
+          surfaceId: "battle:message",
+          operationClass: "battle-progress",
+          ownerModel: "local",
+          coop: true,
+          address: { epoch: 7, wave: 2, turn: 1 },
+          localSeat: 1,
+          seatsWithInput: [1],
+          phase: "NewBattlePhase",
+          phaseInstance: 25,
+          uiMode: "MESSAGE",
+          ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+        },
+      });
+    }
+  };
+
+  await driveLearnMoveDecline({ config: { timeoutMs: 50 } }, owner, {
+    authority: ownerEvent.observation,
+    ownerEvent,
+  });
+
+  assert.deepEqual(owner.presses, [{ key: "Backspace", purpose: "campaign-learn-move-decline-replacement" }]);
+});
+
+test("an ordinary learn-move decline confirms a fresh stop-teaching prompt exactly once", async () => {
+  const owner = fakeClient("owner");
+  const address = { epoch: 7, wave: 1, turn: 2 };
+  const ownerEvent = {
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "learn-move:confirm",
+      operationClass: "learn-move",
+      ownerModel: "interaction",
+      coop: true,
+      address,
+      localSeat: 0,
+      ownerSeat: 0,
+      seatsWithInput: [0],
+      phase: "LearnMovePhase",
+      phaseInstance: 30,
+      surfaceGeneration: 1,
+      uiMode: "SUMMARY",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  owner.evidence.events.push(ownerEvent);
+  owner.press = async (key, purpose) => {
+    owner.presses.push({ key, purpose });
+    if (key === "Backspace") {
+      owner.evidence.events.push({
+        index: owner.evidence.events.length,
+        kind: "browser-surface2",
+        observation: {
+          ...ownerEvent.observation,
+          phaseInstance: 31,
+          surfaceGeneration: 2,
+          uiMode: "CONFIRM",
+          selectedOptionId: "confirm:no",
+          optionIds: ["confirm:yes", "confirm:no"],
+          ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+        },
+      });
+    }
+  };
+
+  await driveLearnMoveDecline({ config: { timeoutMs: 50 } }, owner, {
+    authority: ownerEvent.observation,
+    ownerEvent,
+  });
+
+  assert.deepEqual(owner.presses, [
+    { key: "Backspace", purpose: "campaign-learn-move-decline-replacement" },
+    { key: "Space", purpose: "campaign-learn-move-stop:1" },
+  ]);
 });
 
 function fakeClient(label, texts = []) {

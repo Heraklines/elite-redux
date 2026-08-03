@@ -116,6 +116,45 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
     expect(projectedModal.starts).toBe(1);
   });
 
+  it("starts a retained successor exactly once after its projected V2 modal commits", () => {
+    const phaseManager = new PhaseManager();
+    const retainedReplay = new RecordingMessagePhase();
+    const ordinarySuccessor = new RecordingMessagePhase();
+    const projectedModal = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = retainedReplay;
+    phaseManager.pushPhase(ordinarySuccessor);
+
+    expect(
+      phaseManager.shiftPhaseThroughCoopAuthorityCommit(retainedReplay, () =>
+        phaseManager.replaceWithCoopAuthoritativeModal(ordinarySuccessor, projectedModal),
+      ),
+    ).toBe(true);
+    expect(ordinarySuccessor.starts).toBe(0);
+    expect(projectedModal.starts).toBe(1);
+
+    expect(phaseManager.shiftPhaseThroughCoopAuthorityCommit(projectedModal, () => true)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(ordinarySuccessor);
+    expect(phaseManager.getStandbyPhase()).toBeNull();
+    expect(ordinarySuccessor.starts).toBe(1);
+    expect(projectedModal.starts).toBe(1);
+  });
+
+  it("does not restart an ordinary predecessor when a temporary modal returns to it", () => {
+    const phaseManager = new PhaseManager();
+    const ordinaryPredecessor = new RecordingMessagePhase();
+    const temporaryModal = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = ordinaryPredecessor;
+    phaseManager.prepareCurrentPhaseForStart();
+    ordinaryPredecessor.start();
+
+    expect(phaseManager.overridePhase(temporaryModal)).toBe(true);
+    expect(temporaryModal.starts).toBe(1);
+    expect(phaseManager.shiftPhaseThroughCoopAuthorityCommit(temporaryModal, () => true)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(ordinaryPredecessor);
+    expect(ordinaryPredecessor.starts).toBe(1);
+    expect(temporaryModal.starts).toBe(1);
+  });
+
   it("keeps a selected local successor unstarted while a delayed ordered entry is still absent", () => {
     const phaseManager = new PhaseManager();
     const retainedReplay = new RecordingMessagePhase();

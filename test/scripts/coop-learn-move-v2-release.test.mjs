@@ -83,6 +83,11 @@ test("the authority closes the real phase, proves it, retains exact state, and o
     /const selectedSuccessor = this\.currentPhase;[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*this\.currentPhase !== selectedSuccessor[\s\S]*!startSelectedSuccessor[\s\S]*this\.startCurrentPhase\(\)/u,
     "a V2 modal projected by the atomic callback owns its single start and suppresses the obsolete successor",
   );
+  assert.match(
+    scheduler,
+    /const successorWasStarted = this\.startedPhases\.has\(selectedSuccessor\)[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*if \(!successorWasStarted\) \{[\s\S]*this\.startCurrentPhase\(\)/u,
+    "closing a projected modal starts a retained unstarted successor without restarting an ordinary predecessor",
+  );
 });
 
 test("every host-owned prompt and decline continuation re-enters its captured V2 runtime", () => {
@@ -195,13 +200,14 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(projected, /const scene = globalScene/u);
   assert.match(projected, /retirePresentationMode\(UiMode\.SUMMARY, UiMode\.MESSAGE\)/u);
   assert.doesNotMatch(projected, /setModeBoundedWhen|runWhenCoopRuntimeActive/u);
-  const projectedEnd = projected.indexOf("super.end()");
-  const projectedClosed = projected.indexOf("scene.phaseManager.getCurrentPhase() === this", projectedEnd);
-  const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedClosed);
+  const projectedShift = projected.indexOf("shiftPhaseThroughCoopAuthorityCommit(");
+  const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedShift);
+  const projectedFailure = projected.indexOf("if (!closed)", projectedProof);
   assert.ok(
-    projectedEnd >= 0 && projectedClosed > projectedEnd && projectedProof > projectedClosed,
-    "the projected picker proves terminal only after its real phase ends",
+    projectedShift >= 0 && projectedProof > projectedShift && projectedFailure > projectedProof,
+    "the projected picker proves terminal atomically before its retained successor starts",
   );
+  assert.doesNotMatch(projected, /super\.end\(\)/u, "the projected picker cannot restore an unstarted standby blindly");
   assert.match(duo, /the single-move terminal resumes under the peer ambient before its captured runtime reactivates/u);
   assert.match(
     duo,
