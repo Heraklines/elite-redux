@@ -1702,13 +1702,21 @@ test("normal trainer victory retains its exact presentation lease across success
   );
   const completionFenceAt = projector.indexOf('sourceMaterial?.kind === "trainer-victory-open"');
   assert.ok(
-    localWaitInstallAt >= 0 && completionFenceAt > localWaitInstallAt,
-    "the exact successor wait enters the local ledger before its external completion proof is withheld",
+    completionFenceAt >= 0 && localWaitInstallAt > completionFenceAt,
+    "the exact successor claim stays uninstalled while its external completion proof is withheld",
   );
   assert.match(
     projector,
     /sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*kind: "deferred"/u,
     "a replica cannot sign the ordered successor wait before its real trainer presentation completes",
+  );
+  const inputFreezeStart = coopRuntime.indexOf("export function isCoopV2InteractionHumanInputFrozen(");
+  const inputFreezeEnd = coopRuntime.indexOf("\n/**", inputFreezeStart + 1);
+  const inputFreeze = coopRuntime.slice(inputFreezeStart, inputFreezeEnd);
+  assert.match(
+    inputFreeze,
+    /const exactTrainerVictoryPreinstallLease =[\s\S]*authorityRole === "replica"[\s\S]*sourceEntry != null[\s\S]*sourceEntry\.operationId === pending\.afterOperationId[\s\S]*sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*trainerPresentation != null[\s\S]*trainerPresentation\.operationId === sourceEntry\.operationId[\s\S]*trainerPresentation\.wave === sourceMaterial\.wave[\s\S]*trainerPresentation\.turn === sourceMaterial\.turn[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*exactTrainerVictoryPreinstallLease[\s\S]*ledger\.isMaterialApplied\(pending\)[\s\S]*successorWaitAllowsLocalPresentationInput/u,
+    "the replica receives only the exact authenticated trainer-presentation input lease before completion",
   );
   const completionStart = coopRuntime.indexOf("export function completeCoopV2TrainerVictoryPresentation(");
   const completionEnd = coopRuntime.indexOf("\n/**", completionStart + 1);
