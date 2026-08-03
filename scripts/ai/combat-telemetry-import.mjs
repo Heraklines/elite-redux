@@ -11,6 +11,7 @@ const SPLIT_SEED = "er-human-telemetry-split-v1";
 const DEFAULT_READ_CONCURRENCY = 4;
 const MAX_READ_CONCURRENCY = 64;
 const MAX_READ_ATTEMPTS = 6;
+const READ_TIMEOUT_MS = 30_000;
 
 export const TELEMETRY_SOURCES = Object.freeze({
   staging: Object.freeze({
@@ -344,16 +345,31 @@ function retryDelayMs(response, attempt) {
 }
 
 async function readOnlyFetch(url, headers) {
+  let lastError = null;
   for (let attempt = 0; attempt < MAX_READ_ATTEMPTS; attempt++) {
-    const response = await fetch(url, { headers, method: "GET" });
-    if (response.ok || (response.status !== 429 && response.status < 500)) {
-      return response;
-    }
-    if (attempt + 1 < MAX_READ_ATTEMPTS) {
-      await new Promise(done => setTimeout(done, retryDelayMs(response, attempt)));
+    try {
+      const response = await fetch(url, {
+        headers,
+        method: "GET",
+        signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+      });
+      if (response.ok || (response.status !== 429 && response.status < 500)) {
+        return response;
+      }
+      lastError = new Error(`HTTP ${response.status}`);
+      if (attempt + 1 < MAX_READ_ATTEMPTS) {
+        await new Promise(done => setTimeout(done, retryDelayMs(response, attempt)));
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < MAX_READ_ATTEMPTS) {
+        await new Promise(done => setTimeout(done, Math.min(10_000, 500 * 2 ** attempt)));
+      }
     }
   }
-  throw new Error(`R2 GET exhausted ${MAX_READ_ATTEMPTS} attempts: ${url}`);
+  throw new Error(
+    `R2 GET exhausted ${MAX_READ_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : "unknown error"}`,
+  );
 }
 
 export async function runCombatTelemetryImport(environment, argv = process.argv.slice(2)) {
@@ -426,6 +442,15 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
       && (args.modifiedBefore == null || modified <= args.modifiedBefore)
     );
   });
+  console.error(
+    JSON.stringify({
+      event: "telemetry-object-list",
+      listedObjects: listedObjects.length,
+      selectedObjects: objects.length,
+      selectedBytes: objects.reduce((sum, object) => sum + (object.size ?? 0), 0),
+      readConcurrency: args.readConcurrency,
+    }),
+  );
 
   mkdirSync(args.output, { recursive: true });
   const descriptors = {
@@ -446,6 +471,10 @@ export async function runCombatTelemetryImport(environment, argv = process.argv.
     for (let offset = 0; offset < objects.length; offset += args.readConcurrency) {
       const batches = await Promise.all(objects.slice(offset, offset + args.readConcurrency).map(readBatch));
       batches.forEach(accumulator.ingestBatch);
+      const completed = Math.min(objects.length, offset + batches.length);
+      if (completed === objects.length || completed % 1_000 < args.readConcurrency) {
+        console.error(JSON.stringify({ event: "telemetry-read-progress", completed, total: objects.length }));
+      }
     }
   } finally {
     Object.values(descriptors).forEach(closeSync);
