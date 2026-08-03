@@ -73,6 +73,8 @@ export interface SpecMon {
   /** Shiny tier: 0 normal/1 rare/2 epic. */
   variant?: number | undefined;
   female?: boolean | undefined;
+  /** Held items / modifiers assigned to this exact player party member. */
+  heldItems?: SpecItemRow[] | undefined;
 }
 
 export interface SpecEnemyMon extends SpecMon {
@@ -341,7 +343,16 @@ function toStarter(mon: SpecMon): Starter {
 function toModifierOverrides(rows: SpecItemRow[] | undefined): ModifierOverride[] {
   return (rows ?? [])
     .filter(r => r.name && Object.hasOwn(modifierTypes, r.name))
-    .map(r => ({ name: r.name, count: r.count, type: r.type }) as ModifierOverride);
+    .map(r => {
+      const override: { name: string; count?: number; type?: number } = { name: r.name };
+      if (r.count !== undefined) {
+        override.count = r.count;
+      }
+      if (r.type !== undefined) {
+        override.type = r.type;
+      }
+      return override as ModifierOverride;
+    });
 }
 
 // The mon at field slot `idx` (0 = lead, 1 = the 2nd mon in doubles).
@@ -400,23 +411,31 @@ function applyAbilitySuppression(side: "player" | "enemy", suppression: SpecAbil
 }
 
 /**
- * Apply a specific set of held-item rows to ONE already-spawned enemy mon (not
- * the whole side). Reuses the engine's own {@linkcode overrideHeldItems} builder
- * (handles ModifierTypeGenerator / pregen args) by temporarily pointing the
- * side-wide enemy override at this mon's rows, then restoring it. Synchronous, so
- * the swap is invisible to anything else.
+ * Apply held-item rows to one exact party member. Reuses the engine's own
+ * {@linkcode overrideHeldItems} builder (including generated-item arguments) by
+ * temporarily pointing the matching side-wide override at this mon's rows.
  */
-function applyEnemyHeldItemsToMon(mon: Pokemon, rows: SpecItemRow[] | undefined): void {
+function applyHeldItemsToMon(mon: Pokemon, rows: SpecItemRow[] | undefined, isPlayer: boolean): void {
   const overrides = toModifierOverrides(rows);
   if (overrides.length === 0) {
     return;
   }
-  const prev = O.ENEMY_HELD_ITEMS_OVERRIDE;
-  O.ENEMY_HELD_ITEMS_OVERRIDE = overrides;
-  try {
-    overrideHeldItems(mon, false);
-  } finally {
-    O.ENEMY_HELD_ITEMS_OVERRIDE = prev;
+  if (isPlayer) {
+    const prev = O.STARTING_HELD_ITEMS_OVERRIDE;
+    O.STARTING_HELD_ITEMS_OVERRIDE = overrides;
+    try {
+      overrideHeldItems(mon, true);
+    } finally {
+      O.STARTING_HELD_ITEMS_OVERRIDE = prev;
+    }
+  } else {
+    const prev = O.ENEMY_HELD_ITEMS_OVERRIDE;
+    O.ENEMY_HELD_ITEMS_OVERRIDE = overrides;
+    try {
+      overrideHeldItems(mon, false);
+    } finally {
+      O.ENEMY_HELD_ITEMS_OVERRIDE = prev;
+    }
   }
 }
 
@@ -665,9 +684,20 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
           mon.setBoss(true, Math.min(10, p.bossSegments));
           mon.initBattleInfo();
         }
-        applyEnemyHeldItemsToMon(mon, p.heldItems);
+        applyHeldItemsToMon(mon, p.heldItems, false);
       });
     }
+  };
+
+  const onPartyReadyFn = (): void => {
+    const playerParty = globalScene.getPlayerParty();
+    spec.party.slice(0, 6).forEach((p, i) => {
+      const mon = playerParty[i];
+      if (mon) {
+        applyHeldItemsToMon(mon, p.heldItems, true);
+      }
+    });
+    globalScene.updateModifiers(true);
   };
 
   // Build incrementally so optional fields are never set to `undefined`
@@ -676,6 +706,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     spec.enemy?.kind === "party"
     && (spec.enemy.party ?? []).some(p => p.status || p.bossSegments || (p.heldItems?.length ?? 0) > 0);
   const scenario: DevScenario = { label, description, setup: setupFn };
+  if (spec.party.some(p => (p.heldItems?.length ?? 0) > 0)) {
+    scenario.onPartyReady = onPartyReadyFn;
+  }
   if (spec.start || spec.enemy?.kind === "wild" || hasPerMonEnemyFields) {
     scenario.onBattleStart = onBattleStartFn;
   }

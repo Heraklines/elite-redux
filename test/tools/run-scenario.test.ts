@@ -56,7 +56,7 @@
 // =============================================================================
 
 import { BattleScene } from "#app/battle-scene";
-import { setPendingDevShop } from "#app/dev-tools/registry";
+import { setPendingDevPartySetup, setPendingDevShop } from "#app/dev-tools/registry";
 import {
   type BiomeShopVisit,
   buildDevScenario,
@@ -355,6 +355,8 @@ interface LaunchOpts {
   noCrit?: boolean;
   realRng?: boolean;
   minRng?: boolean;
+  /** Drive mandatory replacement menus opened by battle-entry effects before the first command. */
+  driveEntryMenus?: boolean;
 }
 
 /** Per-run scripting knobs (parameterized so both the env path and the self-checks reuse the pipeline). */
@@ -1880,11 +1882,23 @@ async function launchScenario(
     // Dev scenarios use INTENTIONAL movesets (often not in the species' learnset);
     // skip legality validation so the exact scripted moves are applied verbatim,
     // instead of being rejected and replaced by rolled level-up moves.
+    if (scenario.onPartyReady) {
+      setPendingDevPartySetup(scenario.onPartyReady);
+    }
     ssp.initBattle(starters, true);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");
-  await game.phaseInterceptor.to("CommandPhase");
+  const entryState = opts.driveEntryMenus ? newRunState(buildPolicy(spec as RunnerInput, true)) : null;
+  const stopEntryAutopilot = entryState ? installMenuAutopilot(game, entryState) : null;
+  try {
+    await game.phaseInterceptor.to("CommandPhase");
+    if (entryState?.driveError) {
+      throw entryState.driveError;
+    }
+  } finally {
+    stopEntryAutopilot?.();
+  }
   scenario.onBattleStart?.();
   // Seed the pokéball inventory from `items.pokeballs`, or auto-stock when any script
   // throws a ball (an unowned-ball throw otherwise hangs the BALL submenu).
@@ -4137,7 +4151,10 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
     activeAiSourcePartitionId = episode.sourcePartitionId?.trim() || activeAiSplitGroupId;
     const recordStart = AI_DATASET_RECORDS.length;
     const bootStart = performance.now();
-    const game = await launchScenario(phaserGame, episode.scenario, { realRng: REAL_RNG });
+    const game = await launchScenario(phaserGame, episode.scenario, {
+      realRng: REAL_RNG,
+      driveEntryMenus: true,
+    });
     const bootMs = Math.round(performance.now() - bootStart);
     // Combat-only evaluation uses the fastest production-supported speed. This
     // scales presentation waits, not turn order, RNG, damage, or policy inputs.
@@ -4285,6 +4302,7 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
       noCrit: NO_CRIT,
       realRng: REAL_RNG,
       minRng: spec.run?.battleRng === "min",
+      driveEntryMenus: true,
     });
     const bootToRunMs = Math.round(performance.now() - bootStart);
 
@@ -5174,6 +5192,40 @@ describe.skipIf(!SELF_CHECK)("headless scenario runner — capability self-check
     // Reaching here (the first CommandPhase) is the pass — the intro dialogue did not hang.
     expect(game.scene.currentBattle).toBeTruthy();
     expect(game.scene.getEnemyField().length).toBeGreaterThanOrEqual(1);
+  }, 180_000);
+
+  it("battle-entry damage can faint a lead and drive its replacement before the first command", async () => {
+    const spec: RunnerInput = {
+      v: 1,
+      name: "pre-command faint replacement",
+      run: { wave: 199, level: 200, difficulty: "hell", enemyAi: "hardest" },
+      party: [
+        { species: SpeciesId.IRON_JUGULIS, moves: [MoveId.AIR_SLASH] },
+        { species: SpeciesId.SNORLAX, moves: [MoveId.TACKLE] },
+      ],
+      enemy: {
+        kind: "party",
+        party: [
+          {
+            species: SpeciesId.CHARIZARD,
+            formIndex: 4,
+            level: 200,
+            moves: [MoveId.SPLASH],
+          },
+        ],
+      },
+    };
+    const game = await launchScenario(phaserGame, spec, { noMiss: true, noCrit: true, driveEntryMenus: true });
+    expect(
+      game.scene
+        .getPlayerParty()
+        .some(pokemon => pokemon.species.speciesId === SpeciesId.IRON_JUGULIS && pokemon.isFainted()),
+      "Wildfire should faint the lead during battle entry",
+    ).toBe(true);
+    expect(
+      game.scene.getPlayerField()[0].species.speciesId,
+      "the replacement must be active at the first command",
+    ).toBe(SpeciesId.SNORLAX);
   }, 180_000);
 
   it("player faint with a living bench does NOT hang (auto send-out)", async () => {
