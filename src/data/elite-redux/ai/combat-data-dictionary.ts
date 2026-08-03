@@ -7,6 +7,12 @@ import { allAbilities, allMoves, allSpecies, modifierTypes } from "#data/data-li
 import { ER_COMBAT_FEATURE_NAMES, ER_COMBAT_FEATURE_SCHEMA_VERSION } from "#data/elite-redux/ai/combat-features";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_RELIC_CONFIG } from "#data/elite-redux/er-relics";
+import {
+  ER_RESIST_BERRY_BY_TYPE,
+  erResistBerryModifierType,
+  erResistBerryTypeId,
+} from "#data/elite-redux/er-resist-berries";
+import { ER_WARD_STONE_TIERS, erWardStoneModifierType, erWardStoneTypeId } from "#data/elite-redux/er-ward-stones";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -142,6 +148,18 @@ function itemEntry(id: string, factory: ModifierTypeFunc): ErCombatItemDictionar
   };
 }
 
+function runtimeGeneratedItemEntry(id: string, factory: ModifierTypeFunc): ErCombatItemDictionaryEntry {
+  const item = getModifierType(factory);
+  return {
+    id,
+    name: item.name,
+    description: item.getDescription(),
+    group: item.group ?? "",
+    tier: Number.isFinite(item.tier) ? Number(item.tier) : null,
+    className: item.constructor.name,
+  };
+}
+
 /**
  * Build the ML join dictionary from the same initialized registries combat uses.
  * This deliberately runs after `initializeGame()`: draft ER ids are not runtime
@@ -233,6 +251,14 @@ export function buildErCombatDataDictionary(build: string): ErCombatDataDictiona
 
   for (const [id, factory] of Object.entries(modifierTypes).sort(([a], [b]) => a.localeCompare(b))) {
     items[id] = itemEntry(id, factory as ModifierTypeFunc);
+  }
+  for (const resistType of ER_RESIST_BERRY_BY_TYPE.keys()) {
+    const id = erResistBerryTypeId(resistType);
+    items[id] = runtimeGeneratedItemEntry(id, () => erResistBerryModifierType(resistType));
+  }
+  for (const tier of ER_WARD_STONE_TIERS) {
+    const id = erWardStoneTypeId(tier);
+    items[id] = runtimeGeneratedItemEntry(id, () => erWardStoneModifierType(tier));
   }
 
   return {

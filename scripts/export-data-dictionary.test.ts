@@ -34,6 +34,10 @@ describe("combat data dictionary export", () => {
     expect(dictionary.abilities[6003]?.name).toBeTruthy();
     expect(dictionary.abilities[6003]?.erDraftIds).toEqual([]);
     expect(dictionary.items.LEFTOVERS?.name).toBeTruthy();
+    expect(dictionary.items.ER_RESIST_BERRY_FIRE?.name).toBe("Occa Berry");
+    expect(dictionary.items.ER_RESIST_BERRY_NORMAL?.name).toBe("Chilan Berry");
+    expect(dictionary.items.ER_WARD_STONE_MINOR?.name).toBe("Minor Ward Stone");
+    expect(dictionary.items.ER_WARD_STONE_PRIME?.name).toBe("Prime Ward Stone");
     expect(dictionary.speciesForms["6:0"]?.name).toBeTruthy();
     expect(dictionary.mechanicNamespaces).toEqual(
       expect.arrayContaining([
