@@ -8,6 +8,7 @@ on:
       - codex/combat-ai-baselines-20260728
     paths:
       - ".github/workflows/ai-production-v4-census.yml"
+      - "scripts/ai/combat-telemetry-import.mjs"
   workflow_dispatch:
 
 permissions:
