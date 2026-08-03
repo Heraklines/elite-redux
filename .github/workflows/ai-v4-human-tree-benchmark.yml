@@ -1,0 +1,184 @@
+name: AI V4 Human Tree Benchmark (Non-Production)
+
+# Artifact-only combat research. This workflow has no deployment job,
+# environment, cloud credential, or write permission.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/combat-ai-v4-eval-20260803
+    paths:
+      - ".github/workflows/ai-v4-human-tree-benchmark.yml"
+      - ".github/actions/setup-deps/**"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "ml/evaluation/**"
+      - "scripts/ai/ghost-gauntlet.mjs"
+      - "scripts/ai/make-ghost-eval-batch.mjs"
+      - "scripts/ai/migrate-tree-feature-schema-v2-to-v4.mjs"
+      - "scripts/ai/summarize-ghost-batch-eval.mjs"
+      - "scripts/ai/test-migrate-tree-feature-schema-v2-to-v4.mjs"
+      - "scripts/run-combat-batch.mjs"
+      - "scripts/run-scenario.mjs"
+      - "test/framework/phase-interceptor.ts"
+      - "test/helpers/prompt-handler.ts"
+      - "test/tools/ai-neural-policy-client.ts"
+      - "test/tools/run-scenario.test.ts"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ai-v4-human-tree-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Mirrored benchmark shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - { shard: 0, start: 0, count: 25 }
+          - { shard: 1, start: 25, count: 25 }
+          - { shard: 2, start: 50, count: 25 }
+          - { shard: 3, start: 75, count: 25 }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Verify sealed tree models
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/ai/test-migrate-tree-feature-schema-v2-to-v4.mjs
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const models = [
+            ["human-v4-tree", "ml/evaluation/production-v4-human-tree/selected-model.json", "policy-target"],
+            ["previous-selected-tree", "ml/evaluation/previous-selected-tree-v1/selected-model.json", "diagnostic-imitation"],
+          ];
+          for (const [name, path, role] of models) {
+            const model = JSON.parse(fs.readFileSync(path, "utf8"));
+            if (model.featureSchemaVersion !== 4 || model.featureCount !== 4324 || model.trainingRole !== role) {
+              throw new Error(`${name} has an invalid runtime identity`);
+            }
+          }
+          const previous = JSON.parse(
+            fs.readFileSync("ml/evaluation/previous-selected-tree-v1/selected-model.json", "utf8"),
+          );
+          const migration = previous.schemaMigration;
+          if (
+            migration?.sourceSha256 !== "2d2801c0b5ec6531aef76f2e828074fbe43d9feb657da9f20931d2b650fc6750"
+            || migration.splitCount !== 7500
+            || migration.shiftedSplits !== 4580
+          ) {
+            throw new Error("previous selected-tree migration is not the sealed lossless conversion");
+          }
+          NODE
+
+      - name: Build difficulty-balanced mirrored batch
+        run: >-
+          node scripts/ai/make-ghost-eval-batch.mjs
+          ml/evaluation/ghost-winner-teams.v3.json
+          "${{ matrix.start }}" "${{ matrix.count }}"
+          ai-gauntlet
+          "shard-${{ matrix.shard }}"
+          "human-v4-tree,previous-selected-tree-v1,smart-default-v1,engine-hardest-v1"
+
+      - name: Play production-v4 human tree
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ml/evaluation/production-v4-human-tree/selected-model.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-human-v4-tree-results.json"
+
+      - name: Play previous selected tree
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model ml/evaluation/previous-selected-tree-v1/selected-model.json
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-previous-selected-tree-v1-results.json"
+
+      - name: Play smart-default baseline
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy smart-default
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-smart-default-v1-results.json"
+
+      - name: Play hardest engine baseline
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy engine-hardest
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
+
+      - name: Upload combat-only shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-human-tree-benchmark-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          retention-days: 30
+          if-no-files-found: error
+
+  report:
+    if: always() && github.repository == 'Heraklines/elite-redux'
+    name: Aggregate mirrored benchmark
+    needs: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-v4-human-tree-benchmark-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+
+      - name: Build win-rate report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/ghost-benchmark.json \
+            ai-report/ghost-benchmark.md
+
+      - name: Publish run summary
+        if: success()
+        shell: bash
+        run: cat ai-report/ghost-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-v4-human-tree-benchmark-report
+          path: ai-report
+          retention-days: 90
+          if-no-files-found: warn

@@ -15,7 +15,8 @@ interface UIPrompt {
   /** The {@linkcode UIMode} to wait for. */
   mode: UiMode;
   /** The callback function to execute. */
-  callback: () => void;
+  /** Return `false` when the public UI rejected the input and this prompt should retry. */
+  callback: () => void | boolean;
   /**
    * An optional callback function to determine if the prompt has expired and should be removed.
    * Expired prompts are removed upon the next UI mode change without executing their callback.
@@ -26,6 +27,18 @@ interface UIPrompt {
    * @defaultValue `false`
    */
   awaitingActionInput: boolean;
+  /** Additional predicate used to identify the exact prompt instance that is currently active. */
+  matchFn?: (() => boolean) | undefined;
+  /** Allow this prompt to run past unrelated FIFO entries when its phase, mode, and match predicate are active. */
+  allowOutOfOrder: boolean;
+  /** Stable diagnostic label for long unattended batches. */
+  debugLabel?: string | undefined;
+}
+
+export interface UIPromptOptions {
+  matchFn?: (() => boolean) | undefined;
+  allowOutOfOrder?: boolean | undefined;
+  debugLabel?: string | undefined;
 }
 
 /**
@@ -125,15 +138,50 @@ export class PromptHandler extends GameManagerHelper {
 
     // If the current mode, phase, and handler match the expected values, execute the callback and continue.
     // If not, leave it there.
-    if (
+    if (this.promptMatches(prompt, currentPhase, mode, currentHandler)) {
+      if (prompt.callback() !== false) {
+        this.prompts.shift();
+      }
+      return;
+    }
+
+    // Some phases are conditionally omitted. In multi battles that can leave a stale target
+    // prompt in front of the exact target prompt needed by another field slot. Only prompts
+    // explicitly marked for keyed routing may bypass FIFO, and only when their match predicate
+    // identifies the currently active phase instance.
+    const matchingIndex = this.prompts.findIndex(
+      (candidate, index) =>
+        index > 0 && candidate.allowOutOfOrder && this.promptMatches(candidate, currentPhase, mode, currentHandler),
+    );
+    if (matchingIndex > 0) {
+      const matchingPrompt = this.prompts[matchingIndex];
+      if (matchingPrompt.callback() !== false) {
+        this.prompts.splice(matchingIndex, 1);
+      }
+    }
+  }
+
+  private promptMatches(
+    prompt: UIPrompt,
+    currentPhase: PhaseString,
+    mode: UiMode,
+    currentHandler: ReturnType<UI["getHandler"]>,
+  ): boolean {
+    return (
       mode === prompt.mode
       && currentPhase === prompt.phaseTarget
       && currentHandler.active
-      && !(prompt.awaitingActionInput && !(currentHandler as AwaitableUiHandler)["awaitingActionInput"])
-    ) {
-      prompt.callback();
-      this.prompts.shift();
-    }
+      && !(prompt.awaitingActionInput && !(currentHandler as AwaitableUiHandler).awaitingActionInput)
+      && (prompt.matchFn?.() ?? true)
+    );
+  }
+
+  /** Whether any queued prompt is ready for the exact phase/mode/instance currently on screen. */
+  public hasMatchingPrompt(): boolean {
+    const currentPhase = this.game.scene.phaseManager.getCurrentPhase().phaseName;
+    const currentHandler = this.game.scene.ui.getHandler();
+    const mode = this.game.scene.ui.getMode();
+    return this.prompts.some(prompt => this.promptMatches(prompt, currentPhase, mode, currentHandler));
   }
 
   /**
@@ -152,9 +200,10 @@ export class PromptHandler extends GameManagerHelper {
   public addToNextPrompt(
     phaseTarget: PhaseString,
     mode: UiMode,
-    callback: () => void,
+    callback: () => void | boolean,
     expireFn?: () => boolean,
     awaitingActionInput = false,
+    options: UIPromptOptions = {},
   ) {
     this.prompts.push({
       phaseTarget,
@@ -162,6 +211,9 @@ export class PromptHandler extends GameManagerHelper {
       callback,
       expireFn,
       awaitingActionInput,
+      matchFn: options.matchFn,
+      allowOutOfOrder: options.allowOutOfOrder ?? false,
+      debugLabel: options.debugLabel,
     });
   }
 

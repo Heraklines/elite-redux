@@ -21,6 +21,9 @@ import { vi } from "vitest";
  */
 type StateType = "running" | "interrupted" | "idling";
 
+/** Guard against a phase queue that advances forever without reaching its requested boundary. */
+const MAX_PHASE_TRANSITIONS_PER_WAIT = 10_000;
+
 /**
  * The PhaseInterceptor is a wrapper around the `BattleScene`'s {@linkcode PhaseManager}.
  * It allows tests to exert finer control over the phase system, providing logging, manual advancing, and other helpful utilities.
@@ -32,14 +35,14 @@ export class PhaseInterceptor {
    * Entries are appended each time {@linkcode run} is called, and can be cleared manually with {@linkcode clearLogs}.
    */
   public readonly log: PhaseString[] = [];
+  /** Wall time spent inside each real phase start/end lifecycle. */
+  public readonly timings: Array<{ phase: PhaseString; ms: number }> = [];
   /**
    * The interceptor's current state.
    * @see {@linkcode StateType}
    * @defaultValue `idling`
    */
   private state: StateType = "idling";
-  /** The exact phase object whose public prompt changed {@linkcode state} to `interrupted`. */
-  private interruptedPhase: Phase | null = null;
   /** The current target that is being ran to. */
   private target: PhaseString;
 
@@ -59,7 +62,6 @@ export class PhaseInterceptor {
     // We do not use `vi.spyOn` as that will reset once the test ends
     this.scene.phaseManager["startCurrentPhase"] = () => {
       this.state = "idling";
-      this.interruptedPhase = null;
     };
   }
 
@@ -82,91 +84,56 @@ export class PhaseInterceptor {
 
     let currentPhase = pm.getCurrentPhase();
     let didLog = false;
-    let targetWasAlreadyInterrupted = false;
 
-    // NB: This has to use an interval to wait for UI prompts to activate
-    // since our UI code effectively stalls when waiting for input.
-    // This entire function can likely be made synchronous once UI code is moved to a separate scene.
     try {
-      await vi.waitUntil(
-        async () => {
-          currentPhase = pm.getCurrentPhase();
-          // A predecessor can synchronously shift into and start an interactive target before its own
-          // `start()` returns. In that race PromptHandler marks us interrupted while the phase manager is
-          // already sitting on the requested target. A stop-before-target caller must regain control so it
-          // can drive that public UI; waiting for the target to end creates an impossible dependency cycle.
-          // Observe this invocation's immutable target. `this.target` is only the PromptHandler routing
-          // slot and can be replaced by a nested/asynchronous interceptor request while this wait is
-          // still unwinding. Letting that shared slot define arrival strands the original caller on an
-          // interactive phase it has already reached.
-          if (currentPhase.phaseName === target) {
-            if (!runTarget || this.state !== "interrupted") {
-              return true;
-            }
-            // A previous/public driver can deliberately open the exact interactive target before a shared
-            // helper asks to run to it (the continuous Mystery journey does this so it can first prove the
-            // owner surface). That target has already run as far as the interceptor contract permits. Treat
-            // only the same phase OBJECT recorded by checkMode as reached; a matching name with stale global
-            // state is not sufficient, and re-running the phase would duplicate its presentation/authority.
-            if (this.interruptedPhase === currentPhase) {
-              targetWasAlreadyInterrupted = true;
-              return true;
-            }
-          }
+      let transitions = 0;
+      while (true) {
+        currentPhase = pm.getCurrentPhase();
+        if (currentPhase.is(this.target)) {
+          break;
+        }
 
-          // If we were interrupted by a UI prompt on an intermediate phase (or a run-target caller reached
-          // an interactive target), the calling code must queue inputs to end that phase manually.
-          if (this.state === "interrupted") {
-            if (!didLog) {
-              this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
-              didLog = true;
-            }
-            return false;
+        // A prompt can interrupt a phase while the caller drives its public UI.
+        // Give that single parked phase the normal watchdog budget. Completed
+        // phases reset the budget instead of sharing one timeout across an
+        // entire (potentially expensive) hardest-AI triple turn.
+        if (this.state === "interrupted") {
+          if (!didLog) {
+            this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
+            didLog = true;
           }
+          await vi.waitUntil(() => this.state !== "interrupted", { interval: 0, timeout: TEST_TIMEOUT });
+          continue;
+        }
 
-          // Current phase is different; run and wait for it to finish.
-          await this.run(currentPhase);
-          return false;
-        },
-        { interval: 0, timeout: TEST_TIMEOUT },
-      );
+        if (++transitions > MAX_PHASE_TRANSITIONS_PER_WAIT) {
+          throw new Error(`phase transition budget exceeded before reaching ${this.target}`);
+        }
+        await this.run(currentPhase);
+      }
     } catch (err) {
       // A timeout here is a soft-lock / freeze: the target phase was never reached
       // because something is waiting on input that never came. Surface the CURRENT
       // phase + active UI mode + interceptor state so the hang is diagnosable
       // instead of a bare "Timed out in waitUntil".
-      const stuck = pm.getCurrentPhase();
-      const stuckPhase = stuck?.phaseName ?? "(none)";
-      // An asynchronous phase/UI transition can settle on the exact stop-before target in the same timer
-      // turn that expires `waitUntil`. Re-read the phase after the timeout before classifying a softlock:
-      // the requested public surface being current is the complete contract of a stop-before call.
-      if (!runTarget && stuckPhase === target) {
-        this.doLog(`PhaseInterceptor.to: Recovered exact ${target} arrival at timeout boundary`);
-        return;
-      }
+      const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
       const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
       throw new Error(
-        `PhaseInterceptor.to("${target}") did not reach its target (soft-lock / freeze?): `
+        `PhaseInterceptor.to("${this.target}") did not reach its target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
-          + ` runTarget=${runTarget}, promptTarget="${this.target}".`
-          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+          + `\nOriginal: ${err instanceof Error ? (err.stack ?? err.message) : inspect(err)}`,
       );
     }
 
     // We hit the target; run as applicable and wrap up.
     if (!runTarget) {
-      this.doLog(`PhaseInterceptor.to: Stopping before running ${target}`);
-      return;
-    }
-
-    if (targetWasAlreadyInterrupted) {
-      this.doLog(`PhaseInterceptor.to: Reusing already-open ${target} public surface`);
+      this.doLog(`PhaseInterceptor.to: Stopping before running ${this.target}`);
       return;
     }
 
     await this.run(currentPhase);
     this.doLog(
-      `PhaseInterceptor.to: Stopping ${this.state === "interrupted" ? `after reaching ${getEnumStr(UiMode, this.scene.ui.getMode())} during` : "on completion of"} ${target}`,
+      `PhaseInterceptor.to: Stopping ${this.state === "interrupted" ? `after reaching ${getEnumStr(UiMode, this.scene.ui.getMode())} during` : "on completion of"} ${this.target}`,
     );
   }
 
@@ -189,29 +156,28 @@ export class PhaseInterceptor {
     const pm = this.scene.phaseManager;
     let currentPhase = pm.getCurrentPhase();
     try {
-      await vi.waitUntil(
-        async () => {
-          currentPhase = pm.getCurrentPhase();
-          // Same synchronous interactive-target race as `to(..., false)`: `toFirst` is explicitly a
-          // stop-before-driving primitive, so an already-open branch target is a successful arrival.
-          if (targetSet.has(currentPhase.phaseName)) {
-            return true;
-          }
-          if (this.state === "interrupted") {
-            return false;
-          }
-          await this.run(currentPhase);
-          return false;
-        },
-        { interval: 0, timeout: TEST_TIMEOUT },
-      );
+      let transitions = 0;
+      while (true) {
+        currentPhase = pm.getCurrentPhase();
+        if (targetSet.has(currentPhase.phaseName)) {
+          break;
+        }
+        if (this.state === "interrupted") {
+          await vi.waitUntil(() => this.state !== "interrupted", { interval: 0, timeout: TEST_TIMEOUT });
+          continue;
+        }
+        if (++transitions > MAX_PHASE_TRANSITIONS_PER_WAIT) {
+          throw new Error(`phase transition budget exceeded before reaching one of ${targets.join(", ")}`);
+        }
+        await this.run(currentPhase);
+      }
     } catch (err) {
       const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
       const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
       throw new Error(
         `PhaseInterceptor.toFirst([${targets.join(", ")}]) did not reach a target (soft-lock / freeze?): `
           + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
-          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+          + `\nOriginal: ${err instanceof Error ? (err.stack ?? err.message) : inspect(err)}`,
       );
     }
     return currentPhase.phaseName;
@@ -223,20 +189,18 @@ export class PhaseInterceptor {
    * @returns A Promise that resolves when the phase has completed running.
    */
   private async run(currentPhase: Phase): Promise<void> {
+    const started = performance.now();
     try {
       this.state = "running";
-      this.interruptedPhase = null;
       this.logPhase(currentPhase.phaseName);
-      // The interceptor replaces PhaseManager.startCurrentPhase, but it must not bypass the production
-      // Authority V2 mutation boundary that lives immediately before phase.start(). A phase token remains
-      // held across this async wait and any public UI interruption until PhaseManager.shiftPhase retires it.
-      this.scene.phaseManager.prepareCurrentPhaseForStart();
       currentPhase.start();
       await vi.waitUntil(() => this.state !== "running", { interval: 50, timeout: TEST_TIMEOUT });
     } catch (error) {
       throw error instanceof Error
         ? error
         : new Error(`Unknown error occurred while running phase ${currentPhase.phaseName}!\nError: ${inspect(error)}`);
+    } finally {
+      this.timings.push({ phase: currentPhase.phaseName, ms: performance.now() - started });
     }
   }
 
@@ -255,7 +219,6 @@ export class PhaseInterceptor {
 
     // Interrupt the phase and return control to the caller
     this.state = "interrupted";
-    this.interruptedPhase = currentPhase;
   }
 
   /**
@@ -292,6 +255,7 @@ export class PhaseInterceptor {
    */
   public clearLogs(): void {
     this.log.splice(0, this.log.length);
+    this.timings.splice(0, this.timings.length);
   }
 
   /**
