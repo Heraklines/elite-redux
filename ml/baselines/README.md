@@ -41,6 +41,9 @@ marks the policy unavailable instead of falling back to loss imitation.
 roster-partitioned out-of-fold logistic stacking. Only the real-engine gauntlet
 determines which is stronger. Exploratory rollouts use the winner-trained
 selector, never the all-episode imitation selector.
+Winner-only CPU ablations may use `--battle-type 1` to fit only recorded trainer
+battles. The filter is explicit in the report and is compared against the
+all-battle model; offline imitation scores never select a gameplay policy.
 The pre-firewall smart-default tree is retained only as a diagnostic benchmark.
 New tree policy artifacts require human wins, winning promoted-checkpoint
 trajectories, or search/advantage relabels. Hardest Hell AI is an opponent and

@@ -208,6 +208,7 @@ def load_winner_policy_records(
     path: Path,
     max_policy_decisions: int | None = None,
     winner_scope: str = "run",
+    battle_type: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int | str | None]]:
     """Load victorious run or battle policy targets without retaining the full corpus."""
     if max_policy_decisions is not None and max_policy_decisions < 1:
@@ -258,6 +259,7 @@ def load_winner_policy_records(
     decisions: list[dict[str, Any]] = []
     sampled: list[tuple[int, str, dict[str, Any]]] = []
     policy_target_decisions = 0
+    matching_battle_type_policy_target_decisions = 0
     winning_policy_target_decisions = 0
     for file in files:
         with file.open("r", encoding="utf-8") as handle:
@@ -270,6 +272,15 @@ def load_winner_policy_records(
                 if not is_policy_target(record):
                     continue
                 policy_target_decisions += 1
+                if battle_type is not None:
+                    record_battle_type = record.get("observation", {}).get("battleType")
+                    if record_battle_type is None:
+                        raise ValueError(
+                            f"{file}:{line_number}: battle-type filtering requires observation.battleType"
+                        )
+                    if record_battle_type != battle_type:
+                        continue
+                matching_battle_type_policy_target_decisions += 1
                 if winner_scope == "run":
                     selected_winner = record.get("episodeId") in winning_episodes
                 else:
@@ -324,6 +335,8 @@ def load_winner_policy_records(
         "winnerScope": winner_scope,
         "inputDecisions": input_decisions,
         "policyTargetDecisions": policy_target_decisions,
+        "battleTypeFilter": battle_type,
+        "matchingBattleTypePolicyTargetDecisions": matching_battle_type_policy_target_decisions,
         "winningPolicyTargetDecisions": winning_policy_target_decisions,
         "retainedDecisions": len(decisions),
         "maxPolicyDecisions": max_policy_decisions,
@@ -1147,6 +1160,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("winner-only policy training requires --loss-episode-weight 0")
     if args.max_policy_decisions is not None and not args.winner_only_policy:
         raise ValueError("--max-policy-decisions requires --winner-only-policy")
+    if args.battle_type is not None and not args.winner_only_policy:
+        raise ValueError("--battle-type requires --winner-only-policy")
     if args.winner_scope != "run" and not args.winner_only_policy:
         raise ValueError("--winner-scope requires --winner-only-policy")
     if args.behavior_cloning_only and args.winner_only_policy:
@@ -1157,6 +1172,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             args.data,
             args.max_policy_decisions,
             args.winner_scope,
+            args.battle_type,
         )
     else:
         all_decisions, terminals = load_records(args.data, require_terminals=not args.behavior_cloning_only)
@@ -1684,6 +1700,12 @@ def parse_args() -> argparse.Namespace:
         "--max-policy-decisions",
         type=int,
         help="deterministic cap for winner-only CPU fitting; all source data remains available to neural training",
+    )
+    parser.add_argument(
+        "--battle-type",
+        type=int,
+        choices=(0, 1, 3),
+        help="optional BattleType filter for winner-only policy fitting (0 wild, 1 trainer, 3 mystery encounter)",
     )
     parser.add_argument(
         "--diagnostic-source-imitation",

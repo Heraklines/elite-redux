@@ -320,7 +320,12 @@ class CandidateBaselineContractTest(unittest.TestCase):
                         "action": [candidate_id],
                     },
                 }],
-                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+                "observation": {
+                    "battleType": 1 if battle != losing_battle else 0,
+                    "opponentActive": [],
+                    "opponentKnownParty": [],
+                    "modifiers": [],
+                },
             }
 
         episode = "mixed-run"
@@ -384,6 +389,11 @@ class CandidateBaselineContractTest(unittest.TestCase):
                 path,
                 winner_scope="battle",
             )
+            trainer_selected, _, trainer_report = load_winner_policy_records(
+                path,
+                winner_scope="battle",
+                battle_type=1,
+            )
 
         self.assertEqual([row["decisionId"] for row in selected], [
             f"{winning_battle}:1:0",
@@ -397,6 +407,13 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertEqual(report["inputEpisodes"], 1)
         self.assertEqual(report["inputRunTerminals"], 2)
         self.assertEqual(report["winningPolicyTargetDecisions"], 2)
+        self.assertEqual(
+            [row["decisionId"] for row in trainer_selected],
+            [f"{winning_battle}:1:0", f"{winning_battle}:2:0"],
+        )
+        self.assertEqual(trainer_report["battleTypeFilter"], 1)
+        self.assertEqual(trainer_report["policyTargetDecisions"], 3)
+        self.assertEqual(trainer_report["matchingBattleTypePolicyTargetDecisions"], 2)
 
     def test_runtime_dictionary_must_cover_recorded_ids_and_match_hash(self) -> None:
         payload = {

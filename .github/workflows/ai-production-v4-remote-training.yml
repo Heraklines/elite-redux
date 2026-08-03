@@ -25,12 +25,22 @@ on:
         required: false
         type: string
         default: ""
+      cpu_tree_only:
+        description: Import the exact production cut and fit a CPU tree without publishing or launching Kaggle
+        required: false
+        type: boolean
+        default: false
+      trainer_tree:
+        description: Restrict the CPU winner tree to recorded trainer battles
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.diagnose_existing_kernel && 'ai-kaggle-diagnostics' || 'ai-production-v4-remote-training' }}
+  group: ${{ inputs.diagnose_existing_kernel && 'ai-kaggle-diagnostics' || inputs.cpu_tree_only && 'ai-production-v4-tree' || 'ai-production-v4-remote-training' }}
   cancel-in-progress: false
 
 jobs:
@@ -231,6 +241,7 @@ jobs:
             "$RUNNER_TEMP/er-combat-data-dictionary.json" \
             "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json"
       - name: Seal baseline-profile Kaggle bundle
+        if: ${{ !inputs.cpu_tree_only }}
         run: >-
           node scripts/ai/prepare-kaggle-candidate-training.mjs
           "$RUNNER_TEMP/production-v4-training"
@@ -252,6 +263,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
       - name: Build private Kaggle manifests
+        if: ${{ !inputs.cpu_tree_only }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
         run: >-
@@ -259,6 +271,7 @@ jobs:
           "$RUNNER_TEMP"
           "$KAGGLE_USERNAME"
       - name: Publish private dataset and launch private GPU kernel
+        if: ${{ !inputs.cpu_tree_only }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
@@ -310,17 +323,26 @@ jobs:
             echo "- Value labels: all completed battle wins and defeats"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Train fresh battle-victory tree on the same remote cut
-        run: >-
-          python ml/baselines/train_candidate_baselines.py
-          --data "$RUNNER_TEMP/production-v4-training"
-          --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json"
-          --dictionary-supplement "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json"
-          --winner-only-policy
-          --winner-scope battle
-          --max-policy-decisions 4000
-          --report-json "$RUNNER_TEMP/ai-tree/leaderboard.json"
-          --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md"
-          --models-dir "$RUNNER_TEMP/ai-tree/models"
+        env:
+          TRAINER_TREE: ${{ inputs.trainer_tree || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          battle_type_args=()
+          if [[ "$TRAINER_TREE" == "true" ]]; then
+            battle_type_args+=(--battle-type 1)
+          fi
+          python ml/baselines/train_candidate_baselines.py \
+            --data "$RUNNER_TEMP/production-v4-training" \
+            --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            --dictionary-supplement "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json" \
+            --winner-only-policy \
+            --winner-scope battle \
+            --max-policy-decisions 4000 \
+            "${battle_type_args[@]}" \
+            --report-json "$RUNNER_TEMP/ai-tree/leaderboard.json" \
+            --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md" \
+            --models-dir "$RUNNER_TEMP/ai-tree/models"
       - name: Publish only sanitized reports and selected tree
         shell: bash
         run: |
