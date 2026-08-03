@@ -7064,14 +7064,17 @@ function buildCoopV2LiveSeams(
             ) {
               return false;
             }
-            runtime.v2PendingTrainerVictoryPresentation = {
-              operationId: entry.operationId,
-              wave: material.wave,
-              turn: material.turn,
-            };
-            const phaseManager = globalScene.phaseManager;
-            if (!phaseManager.hasPhaseOfType("TrainerVictoryPhase")) {
-              phaseManager.unshiftNew("TrainerVictoryPhase");
+            if (pendingPresentation == null) {
+              runtime.v2PendingTrainerVictoryPresentation = {
+                operationId: entry.operationId,
+                wave: material.wave,
+                turn: material.turn,
+              };
+              // A locally-derived TrainerVictoryPhase may still be the current phase while the renderer
+              // gate neutralizes it. Presence in the phase tree is therefore not proof that the ordered
+              // consumer exists. The V2 lease is the duplicate guard: its first install always queues one
+              // authorized phase; redelivery of the same material queues none.
+              globalScene.phaseManager.unshiftNew("TrainerVictoryPhase");
             }
             if (!releaseCoopV2ParkedTurnBoundary(runtime, entry)) {
               return "deferred";

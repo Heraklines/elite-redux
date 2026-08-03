@@ -1652,8 +1652,19 @@ test("normal trainer victory retains its exact presentation lease across success
   );
   assert.match(
     coopRuntime,
-    /runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    /if \(pendingPresentation == null\)[\s\S]*runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
     "material installation retains the lease before exposing the real phase",
+  );
+  const projectorStart = coopRuntime.indexOf('if (material.kind === "trainer-victory-open")');
+  const projectorEnd = coopRuntime.indexOf('if (material.kind === "replacement-open")', projectorStart);
+  assert.ok(
+    projectorStart >= 0 && projectorEnd > projectorStart,
+    "the trainer projector has a bounded source block",
+  );
+  assert.doesNotMatch(
+    coopRuntime.slice(projectorStart, projectorEnd),
+    /hasPhaseOfType\("TrainerVictoryPhase"\)/u,
+    "an unsanctioned legacy phase cannot impersonate the ordered V2 consumer",
   );
   const addressStart = coopRuntime.indexOf("export function coopV2TrainerVictoryPresentationAddress(");
   const addressEnd = coopRuntime.indexOf("\n/**", addressStart + 1);
