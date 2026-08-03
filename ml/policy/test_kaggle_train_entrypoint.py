@@ -1,9 +1,11 @@
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 from kaggle_train_entrypoint import (
     PASCAL_COMPATIBLE_TORCH_INDEX,
@@ -15,6 +17,7 @@ from kaggle_train_entrypoint import (
     effective_batch_size,
     find_training_source,
     materialize_training_bundle,
+    run_with_failure_report,
 )
 
 
@@ -170,6 +173,19 @@ class KaggleTrainingEntrypointTest(unittest.TestCase):
             (source / "data" / "decisions.jsonl").write_text("tampered\n", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
                 materialize_training_bundle(root / "input", root / "working")
+
+    @mock.patch("kaggle_train_entrypoint.main", side_effect=RuntimeError("diagnostic marker"))
+    def test_persists_failure_report_before_reraising(self, _main: mock.Mock) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.dict(os.environ, {"KAGGLE_WORKING_PATH": temp}):
+                with self.assertRaisesRegex(RuntimeError, "diagnostic marker"):
+                    run_with_failure_report()
+            report = json.loads(
+                (Path(temp) / "er-ai-candidate-transformer" / "failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(report["exceptionType"], "RuntimeError")
+            self.assertEqual(report["message"], "diagnostic marker")
+            self.assertTrue(any("diagnostic marker" in line for line in report["traceback"]))
 
 
 if __name__ == "__main__":

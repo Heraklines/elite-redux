@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: false
+      diagnose_existing_kernel:
+        description: Inspect the private Kaggle kernel without importing telemetry or training
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,6 +34,7 @@ jobs:
       github.repository == 'Heraklines/elite-redux'
       && github.event_name == 'workflow_dispatch'
       && inputs.reuse_existing_dataset
+      && !inputs.diagnose_existing_kernel
     name: Launch GPU from ready private dataset
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -64,9 +70,65 @@ jobs:
           fi
           kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
 
+  diagnose-existing-kaggle:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && github.event_name == 'workflow_dispatch'
+      && inputs.diagnose_existing_kernel
+    name: Inspect private Kaggle training failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==1.8.4
+      - name: Inspect status and sanitized output
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-gpu-20260803"
+          python - <<'PY'
+          import json
+          import os
+          from kaggle.api.kaggle_api_extended import KaggleApi
+
+          api = KaggleApi()
+          api.authenticate()
+          status = api.kernels_status(
+              f"{os.environ['KAGGLE_USERNAME']}/er-ai-production-v4-human-baseline-gpu-20260803"
+          )
+          print(json.dumps({"status": str(status.status), "failureMessage": status.failure_message or None}))
+          PY
+          mkdir -p "$RUNNER_TEMP/kaggle-output"
+          kaggle kernels output "$kernel_slug" --path "$RUNNER_TEMP/kaggle-output" --force || true
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "kaggle-output"
+          files = sorted(path for path in root.rglob("*") if path.is_file())
+          print(json.dumps({
+              "outputFiles": [
+                  {"path": path.relative_to(root).as_posix(), "bytes": path.stat().st_size}
+                  for path in files
+              ]
+          }))
+          for path in files:
+              if path.name == "failure.json":
+                  payload = json.loads(path.read_text(encoding="utf-8"))
+                  print(json.dumps({"failure": payload}, indent=2))
+          PY
+
   prepare:
     if: >-
       github.repository == 'Heraklines/elite-redux'
+      && !inputs.diagnose_existing_kernel
       && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[v4-train]'))
     name: Prepare private v4 GPU run and fresh winner tree
     runs-on: ubuntu-latest
@@ -168,7 +230,7 @@ jobs:
           test -n "$KAGGLE_USERNAME"
           test -n "$KAGGLE_KEY"
           dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
-          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
+          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-gpu-20260803"
           dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
           if [[ "$REUSE_EXISTING_DATASET" == "true" ]]; then
             test -n "$dataset_status"

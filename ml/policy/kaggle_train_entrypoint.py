@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import traceback
 import zipfile
 from pathlib import Path
 
@@ -397,5 +398,27 @@ def main() -> None:
     )
 
 
+def run_with_failure_report() -> None:
+    try:
+        main()
+    except Exception as error:
+        working_root = Path(os.environ.get("KAGGLE_WORKING_PATH", "/kaggle/working"))
+        output_root = working_root / "er-ai-candidate-transformer"
+        output_root.mkdir(parents=True, exist_ok=True)
+        (output_root / "failure.json").write_text(
+            json.dumps(
+                {
+                    "exceptionType": type(error).__name__,
+                    "message": str(error),
+                    "traceback": traceback.format_exc().splitlines()[-120:],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        raise
+
+
 if __name__ == "__main__":
-    main()
+    run_with_failure_report()

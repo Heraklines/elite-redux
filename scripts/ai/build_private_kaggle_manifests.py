@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 DATASET_NAME = "er-ai-production-v4-human-20260803"
-KERNEL_NAME = "er-ai-production-v4-human-baseline-20260803"
+KERNEL_NAME = "er-ai-production-v4-human-baseline-gpu-20260803"
 
 
 def write_json(path: Path, value: dict[str, object]) -> None:
