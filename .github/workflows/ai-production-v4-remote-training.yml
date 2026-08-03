@@ -9,6 +9,12 @@ on:
     paths:
       - ".github/workflows/ai-production-v4-remote-training.yml"
   workflow_dispatch:
+    inputs:
+      reuse_existing_dataset:
+        description: Reuse the current private Kaggle dataset instead of publishing a new version
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,7 +30,7 @@ jobs:
       && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[v4-train]'))
     name: Prepare private v4 GPU run and fresh winner tree
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v6
         with:
@@ -162,6 +168,7 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          REUSE_EXISTING_DATASET: ${{ inputs.reuse_existing_dataset || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -169,20 +176,33 @@ jobs:
           test -n "$KAGGLE_KEY"
           dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
           kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-20260803"
-          if kaggle datasets status "$dataset_slug" >/dev/null 2>&1; then
+          dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null || true)
+          if [[ "$REUSE_EXISTING_DATASET" == "true" ]]; then
+            test -n "$dataset_status"
+            echo "Reusing existing private Kaggle dataset with status: $dataset_status"
+          elif [[ -n "$dataset_status" ]]; then
             kaggle datasets version \
               --path "$RUNNER_TEMP/ai-kaggle-dataset" \
               --message "production v4 cut from $GITHUB_SHA"
           else
             kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
           fi
-          dataset_status=""
-          for _ in $(seq 1 120); do
+          for attempt in $(seq 1 360); do
             dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null || true)
             [[ "$dataset_status" == "ready" ]] && break
+            if [[ "$dataset_status" == "error" || "$dataset_status" == "failed" ]]; then
+              echo "::error::Private Kaggle dataset entered terminal status: $dataset_status"
+              exit 1
+            fi
+            if (( attempt == 1 || attempt % 30 == 0 )); then
+              echo "Private Kaggle dataset status after $((attempt * 10))s: ${dataset_status:-unavailable}"
+            fi
             sleep 10
           done
-          test "$dataset_status" = "ready"
+          if [[ "$dataset_status" != "ready" ]]; then
+            echo "::error::Private Kaggle dataset did not become ready within 60 minutes (status: ${dataset_status:-unavailable})"
+            exit 1
+          fi
           kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
           {
             echo "### Private production-v4 GPU training"
