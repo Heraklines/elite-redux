@@ -134,11 +134,23 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_DATASET_NAME: ${{ env.AI_V4_DATASET_NAME }}
           KAGGLE_KERNEL_NAME: ${{ env.AI_V4_KERNEL_NAME }}
         shell: bash
         run: |
           set -euo pipefail
+          dataset_slug="$KAGGLE_USERNAME/$KAGGLE_DATASET_NAME"
           kernel_slug="$KAGGLE_USERNAME/$KAGGLE_KERNEL_NAME"
+          set +e
+          dataset_status=$(kaggle datasets status "$dataset_slug" 2>&1)
+          dataset_status_rc=$?
+          dataset_files=$(kaggle datasets files "$dataset_slug" 2>&1)
+          dataset_files_rc=$?
+          set -e
+          printf '{"datasetStatusExitCode":%s,"datasetFilesExitCode":%s}\n' \
+            "$dataset_status_rc" "$dataset_files_rc"
+          printf '%s\n' "$dataset_status"
+          printf '%s\n' "$dataset_files"
           python - <<'PY'
           import json
           import os
@@ -146,10 +158,21 @@ jobs:
 
           api = KaggleApi()
           api.authenticate()
-          status = api.kernels_status(
-              f"{os.environ['KAGGLE_USERNAME']}/{os.environ['KAGGLE_KERNEL_NAME']}"
-          )
-          print(json.dumps({"status": str(status.status), "failureMessage": status.failure_message or None}))
+          try:
+              status = api.kernels_status(
+                  f"{os.environ['KAGGLE_USERNAME']}/{os.environ['KAGGLE_KERNEL_NAME']}"
+              )
+          except Exception as error:
+              print(json.dumps({
+                  "kernelStatus": "unavailable",
+                  "exceptionType": type(error).__name__,
+                  "message": str(error),
+              }))
+          else:
+              print(json.dumps({
+                  "kernelStatus": str(status.status),
+                  "failureMessage": status.failure_message or None,
+              }))
           PY
           mkdir -p "$RUNNER_TEMP/kaggle-output"
           kaggle kernels output "$kernel_slug" --path "$RUNNER_TEMP/kaggle-output" --force || true
