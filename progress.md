@@ -7642,3 +7642,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   its shared-frontier matcher accepted only the root `command:command` surface. The command admission/frontier
   and depleted-seat partition now treat readiness-proven `command:fight` as the same exact addressed command
   owner, allowing the outer campaign loop to drive all three direct turns and reach the newly fixed KO tail.
+- Exact-SHA journey `30881554604` caught one browser-entry integration omission before staging: its diagnostic
+  lease mirror still called `coopHostEngineDialogueMessageAdvanceAllowed` with the pre-KO signature. The entry
+  now imports and supplies the same `coopMePostBattleContinuationActive()` proof as production UI/runtime, so
+  the observer cannot disagree with the input gate about the retained Wobbuffet continuation. This is observer
+  wiring only; the journey stopped at remote typecheck before building or exercising gameplay.

@@ -20,6 +20,7 @@ const [
   {
     coopHostEngineDialogueMessageAdvanceAllowed,
     coopHostMeNarrationAwaitingGuestAck,
+    coopMePostBattleContinuationActive,
     getCoopNetcodeMode,
     getCoopRuntime,
     isCoopV2InteractionHumanInputFrozen,
@@ -2076,6 +2077,7 @@ function observeSemanticSurface(): void {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
     const interactiveMysteryPhase =
