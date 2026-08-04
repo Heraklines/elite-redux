@@ -180,8 +180,7 @@ export class CoopTurnCommitPhase extends Phase {
         {
           // Fun and Games deliberately remains NO_BATTLE, so the generic predicate is false even though its
           // finite direct-turn handoff is still owned by the retained Mystery transaction.
-          mysteryBattle:
-            globalScene.currentBattle?.isBattleMysteryEncounter() === true || mysteryTerminalAfterTurn,
+          mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true || mysteryTerminalAfterTurn,
           ...(mysteryTerminalAfterTurn ? { mysteryTerminalAfterTurn: true } : {}),
           ...(deferredWaveOutcome == null ? {} : { deferredWaveOutcome }),
           ...(deferredWaveOutcome === "win" && globalScene.currentBattle?.battleType === BattleType.TRAINER

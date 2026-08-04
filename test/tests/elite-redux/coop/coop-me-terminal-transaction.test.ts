@@ -430,9 +430,7 @@ describe("complete retained Mystery terminal transaction", () => {
       "an embedded battle settlement admits a strict immutable progression cue",
     ).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
-    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 0, boot: "direct-turn" }))).toBe(
-      true,
-    );
+    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 0, boot: "direct-turn" }))).toBe(true);
     const missingBoot = battlePayload(12);
     delete (missingBoot.destination as { boot?: string }).boot;
     expect(isCompleteCoopMeTerminalPayload(missingBoot), "battle boot is mandatory").toBe(false);

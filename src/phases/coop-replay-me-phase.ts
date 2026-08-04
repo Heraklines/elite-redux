@@ -1787,10 +1787,7 @@ export class CoopReplayMePhase extends Phase {
       terminal === "battle-settled"
         ? current?.phaseName === "BattleEndPhase"
         : directTurnSettlement || this.isRewardSettlementSurfaceReady(current);
-    if (
-      !exactSurface
-      || (!directTurnSettlement && globalScene.currentBattle?.turn !== destination.hostTurn)
-    ) {
+    if (!exactSurface || (!directTurnSettlement && globalScene.currentBattle?.turn !== destination.hostTurn)) {
       return false;
     }
     if (detachedQuizPhantom && !abortActiveCoopReplayTurnPhase("completed mirror quiz retained reward continuation")) {

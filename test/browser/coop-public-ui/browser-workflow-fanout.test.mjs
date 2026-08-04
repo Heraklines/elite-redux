@@ -837,7 +837,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
 });
 
 test("registered-interaction journey reaches Revival, Stormglass, and its Mystery successor through public UI", async () => {
-  const [workflow, config, harness, commandPhase, campaign, registry, starterCosts] = await Promise.all([
+  const [workflow, config, harness, commandPhase, campaign, registry, starterCosts, gauntlet] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
@@ -845,6 +845,7 @@ test("registered-interaction journey reaches Revival, Stormglass, and its Myster
     readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
     readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/er-mystery-gauntlet.ts"), "utf8"),
   ]);
   assert.match(workflow, /- registered-interactions/u);
   assert.match(config, /"registered-interactions"/u);
@@ -869,6 +870,16 @@ test("registered-interaction journey reaches Revival, Stormglass, and its Myster
   );
   assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
   assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
+  assert.match(
+    gauntlet,
+    /VITE_COOP_BROWSER_FIXTURE === "registered-interactions"[\s\S]*registered-owner[\s\S]*registered-partner[\s\S]*MysteryEncounterType\.FUN_AND_GAMES/u,
+    "the exact registered journey forces the exceptional direct-turn Mystery battle",
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserNavigationFixtureStartingMoney[\s\S]*isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*return 100_000/u,
+    "the paid Mystery option is enabled only through exact initial-save fixture money",
+  );
   const fixtureStart = registry.indexOf("export function getCoopBrowserRegisteredInteractionFixtureStarters");
   const fixtureEnd = registry.indexOf("\n}\n\n/**", fixtureStart);
   const fixture = registry.slice(fixtureStart, fixtureEnd);
@@ -916,6 +927,11 @@ test("registered-interaction journey reaches Revival, Stormglass, and its Myster
     campaign,
     /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*stormglassMysterySuccessor == null[\s\S]*completedMysterySuccessor == null[\s\S]*campaign-registered-interactions/u,
     "the journey cannot pass until the t0 Mystery successor is admitted and its real terminal reaches a later wave",
+  );
+  assert.match(
+    campaign,
+    /completedMysterySuccessor\.mysteryEncounterType !== 27/u,
+    "an arbitrary no-battle Mystery completion cannot satisfy the Wobbuffet regression",
   );
 });
 

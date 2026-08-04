@@ -450,8 +450,11 @@ export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null 
           : null;
 }
 
-/** Initial-save-only purse for the four-hour navigation lane's repeated real biome-market purchases. */
+/** Initial-save-only purse for navigation markets and the paid Fun and Games interaction fixture. */
 export function getCoopBrowserNavigationFixtureStartingMoney(): number | null {
+  if (isCoopBrowserRegisteredInteractionFixtureActive()) {
+    return 100_000;
+  }
   return isCoopBrowserNavigationFixtureActive() ? 100_000 : null;
 }
 

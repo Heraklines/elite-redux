@@ -2,10 +2,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { modifierTypes } from "#data/data-lists";
-import {
-  coopHostStreamMeBattleParty,
-  coopMeOwnerRelayBattleHandoff,
-} from "#data/elite-redux/coop/coop-runtime";
+import { coopHostStreamMeBattleParty, coopMeOwnerRelayBattleHandoff } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { FieldPosition } from "#enums/field-position";

@@ -878,9 +878,7 @@ export class EncounterPhase extends BattlePhase {
     await preloadCoopFieldPresentationReady(
       {
         side: "enemy",
-        seats: battle.enemyParty
-          .slice(0, battle.arrangement.enemyCapacity)
-          .map((pokemon, slot) => ({ pokemon, slot })),
+        seats: battle.enemyParty.slice(0, battle.arrangement.enemyCapacity).map((pokemon, slot) => ({ pokemon, slot })),
         boundary: "wave-start-pre-intro",
       },
       stillCurrent,

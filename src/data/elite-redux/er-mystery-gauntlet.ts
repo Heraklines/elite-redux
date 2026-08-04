@@ -68,6 +68,23 @@ export function erGauntletPickMeType(
   if (erGauntletWaveKind(waveIndex) === "bargain") {
     return MysteryEncounterType.ER_THE_BARGAIN;
   }
+  // Exact two-browser fixture: extend the existing Revival -> Stormglass -> Mystery journey through the
+  // exceptional inline Wobbuffet combat path. Both the sealed bundle identity and one of its per-seat public
+  // URL tokens are required, so copying the query parameter into staging or production is inert. Only the
+  // host/solo picker reaches this function; the authoritative guest still adopts the retained encounter type.
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  const fixture =
+    typeof location === "undefined" ? null : new URLSearchParams(location.search).get("coopfixture");
+  const forceFunAndGames =
+    waveIndex === 2
+    && env?.VITE_COOP_BROWSER_FIXTURE === "registered-interactions"
+    && (fixture === "registered-owner" || fixture === "registered-partner");
+  if (forceFunAndGames) {
+    if (!isEligible(MysteryEncounterType.FUN_AND_GAMES)) {
+      throw new Error("Registered-interactions fixture could not satisfy Fun and Games requirements");
+    }
+    return MysteryEncounterType.FUN_AND_GAMES;
+  }
   const all = Object.values(MysteryEncounterType).filter(
     (v): v is MysteryEncounterType => typeof v === "number" && !GAUNTLET_EXCLUDED.has(v),
   );

@@ -7516,3 +7516,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   release control while the real atlas was still loading. Those continuations now await
   `settleCoopFieldPresentationReady`; ordinary trainer adoption also conceals premature enemy info panels and
   cannot end its intro until every adopted enemy seat is visually actionable.
+- The existing exact-build `registered-interactions` two-browser journey now deterministically forces Fun and
+  Games at wave 2 and supplies its paid option through initial-save fixture money. Its terminal assertion
+  requires Mystery type 27 to reach wave 3, so the same public keyboard/DOM lane proves party selection, all
+  three direct Wobbuffet turns, retained reward settlement, and the successor without adding another runner.
