@@ -10,7 +10,6 @@ import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-field-presentation";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
@@ -3367,9 +3366,15 @@ export class SelectModifierPhase extends BattlePhase {
           const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
           [party[src], party[dst]] = [party[dst], party[src]];
           if (src < fieldSize || dst < fieldSize) {
-            void settleCoopPartyReorderPresentationReady(globalScene, fieldSize).catch(error => {
-              coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
-            });
+            // This projector imports Pokemon at runtime. Load it only at the leaf boundary so the broad
+            // phase/test graph does not form abilities -> UI -> presentation -> Pokemon during module init.
+            void import("#data/elite-redux/coop/coop-field-presentation")
+              .then(({ settleCoopPartyReorderPresentationReady }) =>
+                settleCoopPartyReorderPresentationReady(globalScene, fieldSize),
+              )
+              .catch(error => {
+                coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
+              });
           }
         }
         return;
