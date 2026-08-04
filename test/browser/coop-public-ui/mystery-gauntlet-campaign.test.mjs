@@ -1996,6 +1996,9 @@ test("paired Mystery convergence follows the newest ordered address when the int
     index: 101,
     observation: {
       localRole: "host",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
       address: { epoch: 1828208874108895, wave: 3, turn: 1 },
       stateDigest: "retired-wave-three",
     },
@@ -2004,6 +2007,9 @@ test("paired Mystery convergence follows the newest ordered address when the int
     index: 202,
     observation: {
       localRole: "guest",
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
       address: { epoch: 1828208874108895, wave: 4, turn: 1 },
       stateDigest: "authorized-wave-four",
     },
@@ -2022,9 +2028,40 @@ test("paired Mystery convergence follows the newest ordered address when the int
         observation: { ...runtimeHost.observation, address: interactionOwner.observation.address },
       },
     ]).observation.localRole,
-    "host",
-    "the host remains the deterministic canonical renderer once both browsers report the same address",
+    "guest",
+    "the actionable interaction owner is canonical once both browsers report the same address",
   );
+});
+
+test("paired Mystery convergence does not canonize a transient watcher reward cursor", () => {
+  const address = { epoch: 1828721258330852, wave: 6, turn: 1 };
+  const owner = {
+    index: 5160,
+    observation: {
+      localRole: "guest",
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      selectedOptionId: "cursor:0",
+      address,
+      stateDigest: "42525210ba7056ce",
+    },
+  };
+  const transientWatcher = {
+    index: 4800,
+    observation: {
+      localRole: "host",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      selectedOptionId: "reward-action:reroll",
+      address,
+      stateDigest: "42525210ba7056ce",
+    },
+  };
+
+  assert.equal(selectLatestMysteryAuthorityEvent([transientWatcher, owner]), owner);
+  assert.equal(selectLatestMysteryAuthorityEvent([owner, transientWatcher]), owner);
 });
 
 test("the mystery narration driver advances selected-option and Bargain outcome prompts once", async () => {

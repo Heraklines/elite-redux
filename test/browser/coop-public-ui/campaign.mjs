@@ -2402,6 +2402,23 @@ export function selectLatestMysteryAuthorityEvent(events) {
         return candidateOrder[index] > selectedOrder[index] ? candidate : selected;
       }
     }
+    // Cursor/selection projection can briefly lead or trail the actual owner even after both browsers
+    // publish the same immutable address and digest. Canonizing the runtime host in that frame freezes a
+    // transient watcher cursor and waits for the owner to reproduce stale presentation (run 30928165876,
+    // wave 6 reward). At an equal ordered address the actionable interaction owner is the source of truth;
+    // runtime host remains only the deterministic fallback when neither event proves ownership.
+    const isActionableOwner = event => {
+      const observation = event?.observation;
+      return (
+        observation?.localSeat === observation?.ownerSeat
+        && observation.seatsWithInput?.includes(observation.ownerSeat)
+      );
+    };
+    const selectedIsOwner = isActionableOwner(selected);
+    const candidateIsOwner = isActionableOwner(candidate);
+    if (selectedIsOwner !== candidateIsOwner) {
+      return candidateIsOwner ? candidate : selected;
+    }
     return candidate.observation.localRole === "host" ? candidate : selected;
   }, hostEvent);
 }
