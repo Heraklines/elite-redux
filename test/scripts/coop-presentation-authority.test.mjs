@@ -866,6 +866,32 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
   assert.doesNotMatch(commit, /const UNSETTLED_TURN_MUTATORS/u);
 });
 
+test("detached battle launchers advance only the phase captured before asynchronous construction", () => {
+  const starter = read("src/phases/select-starter-phase.ts");
+  const classic = read("test/helpers/classic-mode-helper.ts");
+  const challenge = read("test/helpers/challenge-mode-helper.ts");
+  const manager = read("test/framework/game-manager.ts");
+  const devTools = read("src/dev-tools.ts");
+
+  assert.match(
+    starter,
+    /initBattleFromCurrentPhase\([\s\S]+const completingPhase = globalScene\.phaseManager\.getCurrentPhase\(\)[\s\S]+this\.initBattle\([\s\S]+completingPhase/u,
+  );
+  assert.match(starter, /completingPhase: Phase = this/u);
+  assert.match(
+    starter,
+    /if \(completingPhase === this\) \{[\s\S]+this\.end\(\)[\s\S]+\} else \{[\s\S]+shiftPhase\(completingPhase\)/u,
+  );
+  for (const [name, launcher] of [
+    ["classic helper", classic],
+    ["challenge helper", challenge],
+    ["game manager", manager],
+    ["developer tools", devTools],
+  ]) {
+    assert.match(launcher, /initBattleFromCurrentPhase\(/u, `${name} uses the identity-safe detached entrypoint`);
+  }
+});
+
 test("V2 replacement animation drains before its checkpoint can install", () => {
   const replay = read("src/phases/coop-replay-turn-phase.ts");
   const checkpoint = read("src/phases/coop-push-replacement-checkpoint-phase.ts");

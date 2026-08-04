@@ -64,7 +64,7 @@ async function runToShowdownCommand(
     const starters = generateStarters(game.scene, playerSpecies);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
     const selectStarterPhase = new SelectStarterPhase();
-    selectStarterPhase.initBattle(starters);
+    selectStarterPhase.initBattleFromCurrentPhase(starters);
   });
   // Bootstrap assertions do not need to accept command input. Stop at the exact boundary so this
   // single-engine fixture does not impersonate a production versus session without its runtime.

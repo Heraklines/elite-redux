@@ -139,7 +139,7 @@ describe.skipIf(!RUN)("Showdown versus - HOST-faints replacement ordering (two-e
       beginShowdownBattle([manifest(HOST_LEAD, hostLeadMoves)], opponent);
       const starters = generateStarters(game.scene, [HOST_LEAD, HOST_BENCH]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     await game.phaseInterceptor.to("CommandPhase", false);
     game.scene.getPlayerParty()[0].moveset = hostLeadMoves.map(m => new PokemonMove(m));

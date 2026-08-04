@@ -218,7 +218,7 @@ export class GameManager {
       const starters = generateStarters(this.scene, species);
       const selectStarterPhase = new SelectStarterPhase();
       this.scene.phaseManager.pushPhase(new EncounterPhase(false));
-      selectStarterPhase.initBattle(starters);
+      selectStarterPhase.initBattleFromCurrentPhase(starters);
     });
 
     // This will consider all battle entry dialog as seens and skip them
@@ -254,7 +254,7 @@ export class GameManager {
         const starters = generateStarters(this.scene, speciesIds);
         const selectStarterPhase = new SelectStarterPhase();
         this.scene.phaseManager.pushPhase(new EncounterPhase(false));
-        selectStarterPhase.initBattle(starters);
+        selectStarterPhase.initBattleFromCurrentPhase(starters);
       },
       () => this.isCurrentPhase("EncounterPhase"),
     );

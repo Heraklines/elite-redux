@@ -227,7 +227,7 @@ describe.skipIf(!RUN)("repro: 2026-06-22 combat bug reports", () => {
         game.scene.gameMode = getGameMode(GameModes.CLASSIC);
         const ssp = new SelectStarterPhase();
         game.scene.phaseManager.pushNew("EncounterPhase", false);
-        ssp.initBattle(starters);
+        ssp.initBattleFromCurrentPhase(starters);
       });
       await game.phaseInterceptor.to("EncounterPhase");
       await game.phaseInterceptor.to("CommandPhase");

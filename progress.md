@@ -7600,3 +7600,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   explicit. The production implementation is correct and the focused scheduler regression is green; the
   exhaustive assertion now proves the stronger invariant that a stale predecessor completion returns before
   it can settle or shift the currently installed authoritative modal.
+- The same gate's B/C/P failures all collapsed to one test-harness migration gap before any co-op runtime was
+  constructed: every failing test stopped in `TitlePhase`. The shared helpers created a detached
+  `SelectStarterPhase` and historically relied on its eventual `end()` to shift whichever phase happened to be
+  current. Identity-safe `shiftPhase(this)` correctly rejects that unrelated completion. All detached test/dev
+  launchers now use an explicit entrypoint that captures the current phase before asynchronous party/asset
+  construction and may advance only that exact phase. Normal SelectStarterPhase execution remains unchanged.
+- The migration covers the shared classic/challenge/GameManager launchers, developer scenarios, replay tools,
+  the ER player regression, and all detached Showdown test fixtures. The Showdown/tournament production modes
+  were not changed. A fast source contract pins the captured-phase entrypoint so future fixtures cannot silently
+  restore the old unrelated-phase advancement dependency.

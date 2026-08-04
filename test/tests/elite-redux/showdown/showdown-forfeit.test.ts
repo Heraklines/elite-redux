@@ -70,7 +70,7 @@ describe.skipIf(!RUN)("Showdown forfeit flow (D4)", () => {
       beginShowdownBattle([mon()], [mon()]);
       const starters = generateStarters(game.scene, [SpeciesId.MILTANK]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     await game.phaseInterceptor.to("CommandPhase");
   }

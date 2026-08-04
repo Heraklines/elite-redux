@@ -217,11 +217,11 @@ export function installDevTools(scene: BattleScene): void {
 
       // Proven test pattern (classic-mode-helper.runToSummon): construct a
       // detached SelectStarterPhase, queue the EncounterPhase, then run
-      // initBattle to build the party + first battle. The live phase manager
-      // then advances into the encounter automatically.
+      // initBattleFromCurrentPhase to build the party + first battle. The live
+      // phase manager then advances the captured TitlePhase into the encounter.
       const phase = new SelectStarterPhase();
       scene.phaseManager.pushNew("EncounterPhase", false);
-      phase.initBattle(starters);
+      phase.initBattleFromCurrentPhase(starters);
     },
   };
 

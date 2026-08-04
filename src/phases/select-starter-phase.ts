@@ -711,6 +711,31 @@ export class SelectStarterPhase extends Phase {
   }
 
   /**
+   * Build a battle from a deliberately detached starter phase and advance only the phase that was current
+   * when construction began. Test/dev launchers use this instead of relying on an unrelated phase object to
+   * shift the manager; the identity-bearing scheduler will correctly ignore that obsolete completion.
+   */
+  initBattleFromCurrentPhase(
+    starters: Starter[],
+    ignoreMovesetValidation = false,
+    coopOwners?: CoopRole[],
+    showdownManifests?: ShowdownMonManifest[],
+    startingLevels?: readonly number[],
+    pauseEvolutions = false,
+  ) {
+    const completingPhase = globalScene.phaseManager.getCurrentPhase();
+    return this.initBattle(
+      starters,
+      ignoreMovesetValidation,
+      coopOwners,
+      showdownManifests,
+      startingLevels,
+      pauseEvolutions,
+      completingPhase,
+    );
+  }
+
+  /**
    * Initialize starters before starting the first battle
    * @param starters - Array of {@linkcode Starter}s with which to start the battle
    * @param ignoreMovesetValidation - Skip starter-legality moveset validation (dev scenarios)
@@ -719,6 +744,8 @@ export class SelectStarterPhase extends Phase {
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
    * @param startingLevels - Test/dev launch only: optional per-slot construction levels.
    * @param pauseEvolutions - Test/dev launch only: persistently pause evolution on the constructed party.
+   * @param completingPhase - Exact phase authorized to advance after asynchronous construction. Defaults to
+   *   this live SelectStarterPhase; detached test/dev launchers must capture the current phase explicitly.
    */
   initBattle(
     starters: Starter[],
@@ -727,6 +754,7 @@ export class SelectStarterPhase extends Phase {
     showdownManifests?: ShowdownMonManifest[],
     startingLevels?: readonly number[],
     pauseEvolutions = false,
+    completingPhase: Phase = this,
   ) {
     const cappedStarters = enforceErBlackShinyStarterLimit(starters);
     if (cappedStarters.some((starter, index) => starter !== starters[index])) {
@@ -1015,7 +1043,11 @@ export class SelectStarterPhase extends Phase {
       globalScene.getPlayerParty().forEach(p => {
         globalScene.triggerPokemonFormChange(p, SpeciesFormChangeMoveLearnedTrigger);
       });
-      this.end();
+      if (completingPhase === this) {
+        this.end();
+      } else {
+        globalScene.phaseManager.shiftPhase(completingPhase);
+      }
     });
   }
 }

@@ -74,7 +74,7 @@ describe.skipIf(!RUN)("Showdown result -> title teardown (mrbo8q1a)", () => {
       beginShowdownBattle([mon()], [mon()]);
       const starters = generateStarters(game.scene, [SpeciesId.MILTANK]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     await game.phaseInterceptor.to("CommandPhase");
     const trainer = game.scene.currentBattle.trainer;

@@ -121,7 +121,7 @@ describe.skipIf(!RUN)("Showdown fairness — nature + forced-IV parity across tw
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       // Thread the OWN manifest so the host's own party is manifest-built (forced IVs + free nature),
       // exactly as launchShowdownBattle does for the real host launch.
-      new SelectStarterPhase().initBattle(starters, true, undefined, own);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters, true, undefined, own);
     });
     await game.phaseInterceptor.to("CommandPhase", false);
   }

@@ -11,10 +11,7 @@
 // =============================================================================
 
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import {
-  CoopRendezvous,
-  shouldAnnounceCoopSpectatorCommandArrival,
-} from "#data/elite-redux/coop/coop-rendezvous";
+import { CoopRendezvous, shouldAnnounceCoopSpectatorCommandArrival } from "#data/elite-redux/coop/coop-rendezvous";
 import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";

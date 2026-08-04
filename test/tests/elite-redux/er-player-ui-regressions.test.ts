@@ -186,7 +186,7 @@ describe.skipIf(!RUN)("reported player UI regressions", () => {
     starters[0].erBlackShiny = true;
 
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    new SelectStarterPhase().initBattle(starters);
+    new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     await game.phaseInterceptor.to("EncounterPhase");
 
     const pokemon = game.scene.getPlayerParty()[0];

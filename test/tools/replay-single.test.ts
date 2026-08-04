@@ -153,7 +153,7 @@ async function launchSoloRun(game: GameManager, starters: Starter[], seed: strin
     // Pin the run's RNG seed (the deterministic reproduction input) BEFORE the battle is built.
     game.scene.setSeed(seed);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    ssp.initBattle(starters, true);
+    ssp.initBattleFromCurrentPhase(starters, true);
   });
   await game.phaseInterceptor.to("EncounterPhase");
   await game.phaseInterceptor.to("CommandPhase");

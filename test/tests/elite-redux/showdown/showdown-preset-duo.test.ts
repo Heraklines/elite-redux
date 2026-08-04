@@ -114,7 +114,7 @@ describe.skipIf(!RUN)("Showdown Team Menu - pre-built preset -> two-engine battl
       game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
       beginShowdownBattle(hostManifests, guestManifests);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(hostStarters, true, undefined, hostManifests);
+      new SelectStarterPhase().initBattleFromCurrentPhase(hostStarters, true, undefined, hostManifests);
     });
     await game.phaseInterceptor.to("CommandPhase", false);
 

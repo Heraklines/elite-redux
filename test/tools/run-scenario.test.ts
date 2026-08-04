@@ -1282,7 +1282,7 @@ async function launchScenario(
     // Dev scenarios use INTENTIONAL movesets (often not in the species' learnset);
     // skip legality validation so the exact scripted moves are applied verbatim,
     // instead of being rejected and replaced by rolled level-up moves.
-    ssp.initBattle(starters, true);
+    ssp.initBattleFromCurrentPhase(starters, true);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");

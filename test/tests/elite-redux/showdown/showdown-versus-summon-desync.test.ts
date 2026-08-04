@@ -269,7 +269,7 @@ describe.skipIf(!RUN)("Showdown versus - turn-1 initial-summon ability desync (t
       // here too: the legacy starter-only fixture can now reach CommandPhase with no player party after
       // the strict Showdown manifest path was introduced, making this test crash before exercising the
       // authoritative summon/weather behavior it exists to prove.
-      new SelectStarterPhase().initBattle(starters, true, undefined, own);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters, true, undefined, own);
     });
     // Stop before CommandPhase starts. Production Showdown already has its authoritative runtime
     // installed at this boundary; starting the command phase first now correctly terminates an

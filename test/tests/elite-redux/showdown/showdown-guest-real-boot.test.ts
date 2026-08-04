@@ -262,7 +262,7 @@ describe.skipIf(!RUN)("Showdown versus - guest REAL launch pipeline (regression 
       beginShowdownBattle([magikarp()], opponent);
       const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     await game.phaseInterceptor.to("CommandPhase", false);
     // Bake THUNDERBOLT into the host's own Pikachu DIRECTLY (rides the mirror into the guest's ENEMY
