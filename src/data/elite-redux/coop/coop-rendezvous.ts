@@ -134,18 +134,22 @@ export interface CoopRendezvousResult {
  *
  * A one-controller battle (for example Fun & Games' embedded Wobbuffet fight) still needs both renderers
  * to announce that they reached the command frontier. The replica has no locally-owned CommandPhase in that
- * geometry, so its partner-slot auto-resolve path must provide the arrival. Requiring every expected field
- * slot to be materialized keeps an ordinary double battle with a missing/replacing ally fail-closed.
+ * geometry, so its partner-slot auto-resolve path must provide the arrival. Ordinary battles require every
+ * arranged field slot to be materialized. An explicitly declared single-controller battle instead requires
+ * exactly one ownership-proven active slot, so Fun & Games can retain the co-op arrangement without making a
+ * missing/replacing ally in an ordinary double look ready.
  */
 export function shouldAnnounceCoopSpectatorCommandArrival(
   localRole: CoopRole,
   playerCapacity: number,
   activeFieldOwners: readonly (CoopRole | null | undefined)[],
+  singleControllerBattle = false,
 ): boolean {
+  const expectedActiveSlots = singleControllerBattle ? 1 : playerCapacity;
   if (
     !Number.isSafeInteger(playerCapacity)
     || playerCapacity <= 0
-    || activeFieldOwners.length !== playerCapacity
+    || activeFieldOwners.length !== expectedActiveSlots
     || activeFieldOwners.some(owner => owner !== "host" && owner !== "guest")
   ) {
     return false;

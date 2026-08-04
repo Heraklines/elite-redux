@@ -56,10 +56,18 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
 
   it("announces a fully materialized one-controller spectator without bypassing a missing replacement slot", () => {
     expect(shouldAnnounceCoopSpectatorCommandArrival("guest", 1, ["host"])).toBe(true);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host"], true),
+      "Fun & Games retains the two-slot co-op arrangement but explicitly declares a one-controller battle",
+    ).toBe(true);
     expect(shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host", "guest"])).toBe(false);
     expect(
       shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host"]),
       "an incomplete double field can still owe the guest's replacement",
+    ).toBe(false);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host", "guest"], true),
+      "a malformed single-controller declaration cannot bless an extra active battler",
     ).toBe(false);
     expect(
       shouldAnnounceCoopSpectatorCommandArrival("guest", 1, [null]),

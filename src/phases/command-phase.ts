@@ -1102,8 +1102,9 @@ export class CommandPhase extends FieldPhase {
   /**
    * A replica-only single-controller battle has no locally-owned CommandPhase from which to announce the
    * reciprocal command point. Announce from the renderer-only partner slot after its presentation replay has
-   * reached the real phase. An incomplete multi-slot field is intentionally excluded: its absent slot may be
-   * waiting for a faint replacement and must keep the authority's command boundary closed.
+   * reached the real phase. An incomplete ordinary multi-slot field is intentionally excluded: its absent
+   * slot may be waiting for a faint replacement and must keep the authority's command boundary closed. A
+   * direct-turn NO_BATTLE Mystery explicitly declares the exceptional one-controller geometry.
    */
   private announceCoopSpectatorCommandArrival(): void {
     const controller = getCoopController();
@@ -1113,7 +1114,19 @@ export class CommandPhase extends FieldPhase {
     }
     const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
     const activeFieldOwners = globalScene.getPlayerField().map(pokemon => pokemon?.coopOwner ?? null);
-    if (!shouldAnnounceCoopSpectatorCommandArrival(controller.role, playerCapacity, activeFieldOwners)) {
+    // Fun & Games deliberately retains the co-op arrangement while constructing one player battler inline.
+    // Its NO_BATTLE CommandPhase is therefore an explicitly declared single-controller frontier, not an
+    // incomplete double that may still owe a replacement.
+    const singleControllerBattle =
+      globalScene.currentBattle.mysteryEncounter?.encounterMode === MysteryEncounterMode.NO_BATTLE;
+    if (
+      !shouldAnnounceCoopSpectatorCommandArrival(
+        controller.role,
+        playerCapacity,
+        activeFieldOwners,
+        singleControllerBattle,
+      )
+    ) {
       return;
     }
     const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;

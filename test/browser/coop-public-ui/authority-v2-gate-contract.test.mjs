@@ -1254,8 +1254,8 @@ test("a fully materialized single-controller replica announces command readiness
   );
   assert.match(
     commandPhase,
-    /activeFieldOwners = globalScene\.getPlayerField\(\)\.map[\s\S]*?shouldAnnounceCoopSpectatorCommandArrival\(controller\.role, playerCapacity, activeFieldOwners\)[\s\S]*?rendezvous\.arrive\(point\)/u,
-    "spectator arrival requires a complete, ownership-proven field and emits the exact command point",
+    /singleControllerBattle\s*=\s*globalScene\.currentBattle\.mysteryEncounter\?\.encounterMode\s*===\s*MysteryEncounterMode\.NO_BATTLE[\s\S]*?shouldAnnounceCoopSpectatorCommandArrival\([\s\S]*?controller\.role,[\s\S]*?playerCapacity,[\s\S]*?activeFieldOwners,[\s\S]*?singleControllerBattle,[\s\S]*?\)[\s\S]*?rendezvous\.arrive\(point\)/u,
+    "spectator arrival distinguishes the declared one-controller Mystery battle from an incomplete ordinary double",
   );
 });
 

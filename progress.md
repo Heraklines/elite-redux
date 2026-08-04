@@ -7588,3 +7588,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   retries despite a healthy transport. The scoped fix announces readiness from that replica path only when
   every expected field slot is materialized and none belongs to the local role; an incomplete double field
   remains closed for replacement. Engine-free and source-order regressions cover both sides of that distinction.
+- The first spectator predicate in `e549fbcf0` assumed the Wobbuffet minigame changed the battle arrangement to
+  capacity one. The captured surface proves the opposite: Fun & Games deliberately retains the two-slot co-op
+  arrangement while materializing only its selected host-owned battler. Exact rerun `30877261872` never reached
+  gameplay (cold asset proxy exhausted the public LoginPhase wait), so it neither proved nor disproved the
+  product change. The predicate now admits exactly one known non-local active owner only when the live Mystery
+  explicitly declares the direct-turn `NO_BATTLE` geometry; an ordinary capacity-two field with one missing
+  slot still fails closed. The pure regression covers both identical shapes with the declaration toggled.
