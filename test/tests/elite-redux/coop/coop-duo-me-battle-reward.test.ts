@@ -157,6 +157,12 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
       const guestBattleBoot = rig.guestScene.phaseManager.getCurrentPhase();
       expect(guestBattleBoot?.phaseName, "guest reached its real ME battle boot").toBe("MysteryEncounterBattlePhase");
       guestBattleBoot.start();
+      // The authoritative renderer intentionally releases this phase only after every reconstructed
+      // player/enemy atlas is live. That readiness proof is asynchronous even when Phaser HEADLESS has
+      // already seen the species, so assert the presentation at the real actionable successor instead of
+      // sampling the first microtask after start(). A browser likewise cannot open Command before this
+      // TurnInit boundary.
+      await driveClientPhaseQueueTo(rig.guestScene, "TurnInitPhase");
       const playerSeats = rig.guestScene
         .getPlayerParty()
         .slice(0, rig.guestScene.currentBattle.arrangement.playerCapacity);

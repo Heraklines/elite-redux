@@ -7668,3 +7668,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   chokepoints synchronously and refreshes direct abbreviated re-mirrors, while still running the real loader
   before modeling only Phaser's missing HEADLESS cache/live-key effects. A regression creates and loads a fresh
   post-install enemy and requires the exact texture, animation, and live sprite key.
+- Exact public-UI run `30882551464` is green on staging SHA `1a60ad618`: Mystery type 27 was driven by its
+  assigned guest owner through the embedded battle and retained post-KO narration, the reward surface opened,
+  and both Chromium clients reached the next Mystery frontier on wave 3. This is the human-equivalent proof
+  that the live Wobbuffet KO continuation no longer parks either client after `battle-settled`.
+- Gate `30883819101` qualified every runtime shard except B9 after the HEADLESS creation-hook repair; prior B5,
+  C1, C3, B10, and P1 Title/atlas failures are green. B9 is a test clock bug: it started the asynchronous
+  authoritative Mystery presentation and immediately asserted field seating, before the production atlas wall
+  could resolve. The regression now waits for the actual `TurnInitPhase` actionability boundary and retains all
+  field/container/sprite/info-bar assertions. The other red was the already-corrected static import/unused-arg
+  pair; neither red demonstrates a production defect.
