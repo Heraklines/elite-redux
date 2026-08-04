@@ -1,0 +1,6 @@
+oracle_game_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+oracle_branch = "ci/coop/v2-showdown-command-coordinate-20260720"
+protocol_version = "er-coop-47"
+schema_version = 1
+input_repeat_delay_ms = 250
+input_repeat_interval_ms = 250
