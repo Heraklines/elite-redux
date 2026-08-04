@@ -3208,7 +3208,11 @@ function randomPolicyAction(game: GameManager): TurnAction {
       `${activeAiEpisodeId}:${observation.wave}:${observation.turn}:${actorSlot}:player:random`,
     );
     if (!chosen) {
-      continue;
+      throw new Error(
+        `random-v1 produced no legal action for actor slot ${actorSlot}; candidates=${candidates
+          .map(candidate => candidate.id)
+          .join(",")}`,
+      );
     }
     setCandidateAction(game, action, actorSlot, chosen);
     earlier.push({

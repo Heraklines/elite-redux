@@ -1,0 +1,107 @@
+name: AI Evaluator Parity (Non-Production)
+
+# Artifact-only calibration lane. It has no environment, deployment, telemetry,
+# Kaggle, Cloudflare, or model-serving credentials.
+on:
+  push:
+    branches:
+      - codex/combat-ai-v4-eval-20260803
+    paths:
+      - ".github/workflows/ai-evaluator-parity.yml"
+      - "scripts/ai/evaluator-parity.test.mjs"
+      - "scripts/ai/make-evaluator-parity-batch.mjs"
+      - "scripts/ai/make-ghost-eval-batch.mjs"
+      - "scripts/ai/summarize-evaluator-parity.mjs"
+      - "scripts/run-combat-batch.mjs"
+      - "test/tools/run-scenario.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-evaluator-parity-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  parity:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Neutral parity shard ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Verify parity batch and report contracts
+        run: node --test scripts/ai/evaluator-parity.test.mjs scripts/combat-batch-watchdog.test.mjs
+      - name: Build balanced mirrored smoke batch
+        run: >-
+          node scripts/ai/make-evaluator-parity-batch.mjs
+          ml/evaluation/ghost-winner-teams.v3.json
+          ${{ matrix.shard }} 4
+          ai-parity shard-${{ matrix.shard }}
+      - name: Play random against identical random
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-parity/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy random
+          --opponent-ai-policy random
+          --episode-timeout-ms 300000
+          --test-timeout-ms 10800000
+          --json-out "ai-parity/shard-${{ matrix.shard }}-random-vs-random-results.json"
+      - name: Play hardest adapter against native hardest
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-parity/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy engine-hardest
+          --episode-timeout-ms 300000
+          --test-timeout-ms 10800000
+          --json-out "ai-parity/shard-${{ matrix.shard }}-engine-hardest-vs-native-results.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-evaluator-parity-shard-${{ matrix.shard }}
+          path: ai-parity
+          retention-days: 14
+          if-no-files-found: error
+
+  report:
+    if: always() && github.repository == 'Heraklines/elite-redux'
+    name: Neutral parity smoke report
+    needs: parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-evaluator-parity-shard-*
+          path: ai-parity
+          merge-multiple: true
+      - name: Require all shards and summarize paired parity
+        run: |
+          mkdir -p ai-parity-report
+          node scripts/ai/summarize-evaluator-parity.mjs \
+            ai-parity \
+            ai-parity-report/evaluator-parity.json \
+            ai-parity-report/evaluator-parity.md
+          cat ai-parity-report/evaluator-parity.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-evaluator-parity-report
+          path: ai-parity-report
+          retention-days: 30
+          if-no-files-found: error

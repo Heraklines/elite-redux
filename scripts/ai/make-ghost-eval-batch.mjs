@@ -39,11 +39,42 @@ export function buildGhostEvalBatch(fixture, pairStart, pairCount, controllers =
   if (pairStart + pairCount > availablePairs) {
     throw new Error(`pair range ${pairStart}..${pairStart + pairCount - 1} exceeds ${availablePairs} pairs`);
   }
+  return buildGhostEvalBatchForPairs(
+    fixture,
+    Array.from({ length: pairCount }, (_, index) => pairStart + index),
+    GHOST_EVAL_FIXED_SEEDS,
+    controllers,
+  );
+}
+
+export function buildGhostEvalBatchForPairs(
+  fixture,
+  pairIndices,
+  fixedSeeds = GHOST_EVAL_FIXED_SEEDS,
+  controllers = GHOST_EVAL_CONTROLLERS,
+) {
+  const availablePairs = fixture.teams.length / 2;
+  if (
+    !Array.isArray(pairIndices)
+    || pairIndices.length === 0
+    || pairIndices.some(pairIndex => !Number.isInteger(pairIndex) || pairIndex < 0 || pairIndex >= availablePairs)
+    || new Set(pairIndices).size !== pairIndices.length
+  ) {
+    throw new Error(`pair indices must be unique integers from 0 through ${availablePairs - 1}`);
+  }
+  if (
+    !Array.isArray(fixedSeeds)
+    || fixedSeeds.length === 0
+    || fixedSeeds.some(seed => !Number.isInteger(seed) || seed < 0)
+    || new Set(fixedSeeds).size !== fixedSeeds.length
+  ) {
+    throw new Error("fixed seeds must be unique non-negative integers");
+  }
   const playerControllers = validateControllers(controllers);
   const manifests = [];
   const episodes = [];
-  for (let pairIndex = pairStart; pairIndex < pairStart + pairCount; pairIndex++) {
-    for (const fixedSeed of GHOST_EVAL_FIXED_SEEDS) {
+  for (const pairIndex of pairIndices) {
+    for (const fixedSeed of fixedSeeds) {
       const pair = buildGhostPair(fixture, pairIndex, fixedSeed);
       assertInversePair(pair);
       const manifest = { ...pair.manifest, playerControllers };
