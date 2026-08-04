@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "manifest_id": "rust-kernel-baseline-v1",
+  "description": "Machine-readable PokéRogue Redux baseline inputs for the Rust-kernel migration.",
+  "measurement_policy": {
+    "provider": "github-hosted",
+    "shell": false,
+    "peak_rss": "GNU /usr/bin/time -f %M on Linux when available",
+    "unknown_values": "null with a reason; never zero-filled"
+  },
+  "scenarios": [
+    {
+      "id": "authority-v2-node-suite",
+      "name": "TypeScript pure Authority V2 node suite",
+      "execution_class": "node-pure",
+      "scenario_size": {
+        "unit": "test_files",
+        "value": null,
+        "descriptor": "test/node/authority-v2-*.test.ts excluding test/node/authority-v2-simulator.test.ts",
+        "reason": "The glob cardinality is runner-derived and is not guessed in metadata or dry-run mode."
+      },
+      "sample_count": 3,
+      "timeout_ms": 600000,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/node/vitest.config.ts",
+        "test/node/authority-v2-*.test.ts",
+        "--exclude",
+        "test/node/authority-v2-simulator.test.ts",
+        "--pool=forks",
+        "--isolate",
+        "--no-file-parallelism"
+      ],
+      "environment": {}
+    },
+    {
+      "id": "authority-v2-protocol-simulator",
+      "name": "Authority V2 protocol simulator",
+      "execution_class": "node-pure",
+      "scenario_size": {
+        "unit": "seeded_schedules",
+        "value": 260,
+        "breakdown": {
+          "randomized_fault_schedules": 200,
+          "branch_coverage_schedules": 60,
+          "directed_test_cases": 6,
+          "sentinel_test_cases": 9,
+          "total_test_cases": 17
+        },
+        "evidence": "test/node/authority-v2-simulator.test.ts"
+      },
+      "sample_count": 3,
+      "timeout_ms": 600000,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/node/vitest.config.ts",
+        "test/node/authority-v2-simulator.test.ts",
+        "--pool=forks",
+        "--isolate",
+        "--no-file-parallelism"
+      ],
+      "environment": {}
+    },
+    {
+      "id": "headless-single-wave",
+      "name": "One-wave headless scenario",
+      "execution_class": "headless-phaser",
+      "scenario_size": {
+        "unit": "waves",
+        "value": 1,
+        "evidence": "ER_RUN_WAVES=1"
+      },
+      "sample_count": 2,
+      "timeout_ms": 600000,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/tools/run-scenario.test.ts",
+        "--pool=forks",
+        "--isolate",
+        "--no-file-parallelism",
+        "--silent=false",
+        "--no-color"
+      ],
+      "environment": {
+        "ER_SCENARIO": "1",
+        "ER_RUN_SCENARIO": "{\"v\":1,\"name\":\"rust-kernel-baseline-one-wave\",\"run\":{\"level\":100,\"difficulty\":\"ace\"},\"party\":[{\"species\":\"MEWTWO\",\"moves\":[\"PSYCHIC\"]}],\"enemy\":{\"kind\":\"wild\",\"wild\":{\"species\":\"MAGIKARP\",\"level\":5,\"moves\":[\"SPLASH\"]}}}",
+        "ER_RUN_WAVES": "1",
+        "ER_RUN_MOVE": "PSYCHIC",
+        "ER_RUN_AUTO_FIRST": "1",
+        "ER_RUN_QUIET": "1",
+        "ER_RUN_NO_MISS": "1",
+        "ER_RUN_NO_CRIT": "1"
+      }
+    },
+    {
+      "id": "headless-ten-wave",
+      "name": "Ten-wave headless scenario",
+      "execution_class": "headless-phaser",
+      "scenario_size": {
+        "unit": "waves",
+        "value": 10,
+        "evidence": "ER_RUN_WAVES=10"
+      },
+      "sample_count": 1,
+      "timeout_ms": 900000,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/tools/run-scenario.test.ts",
+        "--pool=forks",
+        "--isolate",
+        "--no-file-parallelism",
+        "--silent=false",
+        "--no-color"
+      ],
+      "environment": {
+        "ER_SCENARIO": "1",
+        "ER_RUN_SCENARIO": "{\"v\":1,\"name\":\"rust-kernel-baseline-ten-wave\",\"run\":{\"level\":100,\"difficulty\":\"ace\"},\"party\":[{\"species\":\"MEWTWO\",\"moves\":[\"PSYCHIC\"]}],\"enemy\":{\"kind\":\"wild\",\"wild\":{\"species\":\"MAGIKARP\",\"level\":5,\"moves\":[\"SPLASH\"]}}}",
+        "ER_RUN_WAVES": "10",
+        "ER_RUN_MOVE": "PSYCHIC",
+        "ER_RUN_AUTO_FIRST": "1",
+        "ER_RUN_QUIET": "1",
+        "ER_RUN_NO_MISS": "1",
+        "ER_RUN_NO_CRIT": "1"
+      }
+    },
+    {
+      "id": "headless-two-engine",
+      "name": "Two-engine co-op three-wave journey",
+      "execution_class": "headless-two-engine-phaser",
+      "scenario_size": {
+        "unit": "waves",
+        "value": 3,
+        "evidence": "the selected DUO 3-wave test in test/tests/elite-redux/coop/coop-duo-multiwave.test.ts"
+      },
+      "sample_count": 1,
+      "timeout_ms": 900000,
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/tests/elite-redux/coop/coop-duo-multiwave.test.ts",
+        "--testNamePattern",
+        "DUO 3-wave: host plays each wave, guest replays + converges, host drives the reward shop each wave",
+        "--pool=forks",
+        "--isolate",
+        "--no-file-parallelism",
+        "--silent=false",
+        "--no-color"
+      ],
+      "environment": {
+        "ER_SCENARIO": "1",
+        "COOP_AUTHORITY_V2_TURN": "on",
+        "COOP_AUTHORITY_V2_REPLACEMENT": "on",
+        "COOP_AUTHORITY_V2_WAVE": "on",
+        "COOP_AUTHORITY_V2_INTERACTION": "on",
+        "COOP_AUTHORITY_V2_RECOVERY": "on"
+      }
+    },
+    {
+      "id": "browser-two-context-webrtc",
+      "name": "Browser-native two-context WebRTC journey",
+      "execution_class": "browser-native-webrtc",
+      "scenario_size": {
+        "unit": "browser_contexts",
+        "value": 2,
+        "evidence": "scripts/run-coop-browser-transport.mjs creates isolated host and guest contexts"
+      },
+      "sample_count": 1,
+      "timeout_ms": 900000,
+      "setup_commands": [
+        {
+          "command": ["pnpm", "exec", "puppeteer", "browsers", "install", "chrome"],
+          "timeout_ms": 600000,
+          "environment": {}
+        },
+        {
+          "command": [
+            "pnpm",
+            "exec",
+            "vite",
+            "build",
+            "--mode",
+            "production",
+            "--config",
+            "scripts/vite.coop-browser.config.mjs"
+          ],
+          "timeout_ms": 900000,
+          "environment": {
+            "COOP_BROWSER_OUT_DIR": "dist-coop-browser",
+            "VITE_COOP_SERVER_URL": "http://127.0.0.1:4174",
+            "VITE_COOP_AUTHORITY_V2_TURN": "on",
+            "VITE_COOP_AUTHORITY_V2_REPLACEMENT": "on",
+            "VITE_COOP_AUTHORITY_V2_WAVE": "on",
+            "VITE_COOP_AUTHORITY_V2_INTERACTION": "on",
+            "VITE_COOP_AUTHORITY_V2_RECOVERY": "on"
+          }
+        },
+        {
+          "command": ["node", "scripts/prepare-coop-browser-artifact.mjs"],
+          "timeout_ms": 600000,
+          "environment": {
+            "COOP_BROWSER_DIST": "dist-coop-browser"
+          }
+        }
+      ],
+      "command": ["node", "scripts/run-coop-browser-transport.mjs"],
+      "environment": {
+        "COOP_BROWSER_ASSET_DIR": "assets",
+        "COOP_BROWSER_DIST": "dist-coop-browser"
+      }
+    }
+  ]
+}
