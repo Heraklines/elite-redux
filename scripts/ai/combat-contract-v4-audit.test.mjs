@@ -317,7 +317,7 @@ test("identical duplicate records are diagnostic while conflicting records still
   assert.equal(conflictReport.findings.hard.conflicting_decision.count, 1);
 });
 
-test("action history compares turns only within the same wave", () => {
+test("action history quarantines in-session turn rewinds without misclassifying prior waves", () => {
   const priorWaveFixture = batch();
   priorWaveFixture.events[0].record.observation.wave = 2;
   priorWaveFixture.events[0].record.observation.turn = 1;
@@ -325,7 +325,7 @@ test("action history compares turns only within the same wave", () => {
     { jointActionId: `${SESSION_ID}:1:older-battle~instance:99`, turn: 99 },
   ];
   const priorWaveReport = auditCombatContractV4Batches([priorWaveFixture]);
-  assert.equal(priorWaveReport.findings.hard.future_action_history, undefined);
+  assert.equal(priorWaveReport.findings.hard.action_history_after_turn_rewind, undefined);
   assert.equal(priorWaveReport.corpus.actionHistoryRelations["decision:unknown:prior-wave"], 1);
 
   const futureFixture = batch();
@@ -333,7 +333,7 @@ test("action history compares turns only within the same wave", () => {
     { jointActionId: `${SESSION_ID}:1:battle-seed:2`, turn: 2 },
   ];
   const futureReport = auditCombatContractV4Batches([futureFixture]);
-  assert.equal(futureReport.findings.hard.future_action_history.count, 1);
+  assert.equal(futureReport.findings.hard.action_history_after_turn_rewind.count, 1);
   assert.equal(futureReport.corpus.actionHistoryRelations["decision:unknown:same-wave-future+1"], 1);
 });
 

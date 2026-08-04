@@ -240,8 +240,10 @@ function validateObservation(observation, episode, context, observationKind) {
     increment(episode.actionHistoryRelations, `${observationKind}:${action.phase ?? "unknown"}:${relation}`);
     if (relation === "invalid") {
       episodeFinding(episode, "invalid_action_history_anchor", true, context);
-    } else if (relation === "future-wave" || relation.startsWith("same-wave-future+")) {
-      episodeFinding(episode, "future_action_history", true, context);
+    } else if (relation === "future-wave") {
+      episodeFinding(episode, "action_history_after_wave_rewind", true, context);
+    } else if (relation.startsWith("same-wave-future+")) {
+      episodeFinding(episode, "action_history_after_turn_rewind", true, context);
     }
   }
 }
@@ -771,6 +773,8 @@ export function createCombatContractV4Audit({ onEpisodeFinished } = {}) {
           "not independently provable: batch seq is a monotonic timestamp without predecessor/count linkage",
         decisionCaptureCompleteness:
           "validated by committed-action harness tests; omitted decisions cannot be inferred from corpus rows alone",
+        futureInformationLeakage:
+          "live committed-action tests prove causal capture order; history numerically ahead of an observation is quarantined as an in-session battle/run rewind",
       },
       corpus: {
         ...extra,
