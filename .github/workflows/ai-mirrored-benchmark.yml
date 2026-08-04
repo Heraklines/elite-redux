@@ -104,6 +104,7 @@ jobs:
     if: >-
       github.repository == 'Heraklines/elite-redux'
       && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+      && !startsWith(inputs.tree_artifact_name, 'repair-')
     name: Seal benchmark model inputs
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -373,6 +374,7 @@ jobs:
     if: >-
       github.repository == 'Heraklines/elite-redux'
       && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+      && !startsWith(inputs.tree_artifact_name, 'repair-')
     name: Mirrored benchmark shard ${{ matrix.shard }}
     needs: models
     runs-on: ubuntu-latest
@@ -570,6 +572,7 @@ jobs:
       always()
       && github.repository == 'Heraklines/elite-redux'
       && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+      && !startsWith(inputs.tree_artifact_name, 'repair-')
     name: Difficulty-balanced benchmark report
     needs: benchmark
     runs-on: ubuntu-latest
@@ -598,5 +601,66 @@ jobs:
         with:
           name: ai-mirrored-benchmark-report
           path: ai-report
+          retention-days: 30
+          if-no-files-found: error
+
+  repair-engine-hardest-shard-5:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && inputs.tree_artifact_name == 'repair-engine-hardest-shard-5'
+    name: Repair hardest-AI shard 5
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Test combat-batch watchdog contract
+        run: node --test scripts/combat-batch-watchdog.test.mjs
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-mirrored-benchmark-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+          run-id: ${{ inputs.tree_run_id }}
+          github-token: ${{ github.token }}
+      - name: Rebuild exact shard batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ai/make-ghost-eval-batch.mjs \
+            ml/evaluation/ghost-winner-teams.v3.json \
+            84 16 \
+            ai-gauntlet \
+            shard-5 \
+            "selected-tree-v1,smart-default-v1,engine-hardest-v1"
+      - name: Resume hardest-engine checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run-combat-batch.mjs \
+            "@ai-gauntlet/shard-5-batch.json" \
+            --turns 80 --real-rng --resume \
+            --ai-policy engine-hardest \
+            --test-timeout-ms 3600000 \
+            --json-out ai-gauntlet/shard-5-engine-hardest-v1-results.json
+      - name: Summarize repaired benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/mirrored-benchmark.json \
+            ai-report/mirrored-benchmark.md
+          cat ai-report/mirrored-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-mirrored-benchmark-repaired-${{ inputs.tree_run_id }}
+          path: |
+            ai-report
+            ai-gauntlet/shard-5-engine-hardest-v1-results.json
           retention-days: 30
           if-no-files-found: error
