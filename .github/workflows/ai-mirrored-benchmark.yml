@@ -171,7 +171,7 @@ jobs:
               test "$report_count" -eq 1
               test -f "$(dirname "$candidate_report")/model.safetensors"
             fi
-          else
+          elif [[ "$TREE_ONLY" != "true" ]]; then
             test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
             test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
           fi
