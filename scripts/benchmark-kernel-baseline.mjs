@@ -19,6 +19,45 @@ const DEFAULT_MANIFEST = resolve(ROOT, "rust/fixtures/v1/baseline-manifest.json"
 const SOURCE_LOCK = resolve(ROOT, "rust/source-lock.toml");
 const RSS_MARKER = "__RUST_KERNEL_BASELINE_MAX_RSS_KIB__";
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
+const BASELINE_SCHEMA_VERSION = 1;
+const BASELINE_PROTOCOL_VERSION = "er-coop-47";
+const BASELINE_ORACLE_GAME_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const BASELINE_ORACLE_BRANCH = "ci/coop/v2-showdown-command-coordinate-20260720";
+const BASELINE_INPUT_REPEAT_DELAY_MS = 250;
+const BASELINE_INPUT_REPEAT_INTERVAL_MS = 250;
+const AUTHORITY_V2_FILE_COUNT = 28;
+const MEASURE_ATTESTATION_ENV = "RUST_KERNEL_BASELINE_ATTESTATION";
+const MEASURE_ATTESTATION_VALUE = "rust-kernel-baseline-v1:measure:github-hosted";
+const CHILD_ENV_ALLOWLIST = [
+  "APPDATA",
+  "CI",
+  "COMSPEC",
+  "COMMONPROGRAMFILES",
+  "COMMONPROGRAMFILES(X86)",
+  "COMMONPROGRAMW6432",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "HOMESHARE",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "PATH",
+  "PATHEXT",
+  "PROGRAMDATA",
+  "PROGRAMFILES",
+  "PROGRAMFILES(X86)",
+  "PROGRAMW6432",
+  "SYSTEMDRIVE",
+  "SYSTEMROOT",
+  "TEMP",
+  "TERM",
+  "TMP",
+  "USERPROFILE",
+  "WINDIR",
+];
+const FORBIDDEN_SCENARIO_ENV_KEYS = new Set(["NODE_OPTIONS", "NODE_PATH"]);
 const REQUIRED_SCENARIO_IDS = [
   "authority-v2-node-suite",
   "authority-v2-protocol-simulator",
@@ -39,9 +78,10 @@ function usage() {
     "",
     "Options:",
     "  --manifest FILE            Baseline manifest path (default: rust/fixtures/v1/baseline-manifest.json).",
-    "  --oracle-game-sha SHA      Explicit oracle SHA; otherwise rust/source-lock.toml or the manifest oracle SHA.",
+    "  --oracle-game-sha SHA      Explicit oracle SHA; it must exactly match rust/source-lock.toml and the manifest.",
     "  --sample-count N           Override every scenario's requested measurement sample count.",
     "  --scenario ID              Measure/describe one manifest scenario instead of all scenarios.",
+    "  RUST_KERNEL_BASELINE_ATTESTATION=rust-kernel-baseline-v1:measure:github-hosted is required for --mode measure.",
     "  --help                     Show this help.",
   ].join("\n");
 }
@@ -111,7 +151,11 @@ function stableValue(value) {
     return value.map(stableValue);
   }
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableValue(value[key])]));
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map(key => [key, stableValue(value[key])]),
+    );
   }
   return value;
 }
@@ -132,14 +176,27 @@ function readManifest(path) {
   } catch (error) {
     throw new Error(`manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (manifest.schema_version !== 1) {
-    throw new Error(`manifest schema_version must be 1; got ${manifest.schema_version ?? "<missing>"}`);
+  if (manifest.schema_version !== BASELINE_SCHEMA_VERSION) {
+    throw new Error(
+      `manifest schema_version must be ${BASELINE_SCHEMA_VERSION}; got ${manifest.schema_version ?? "<missing>"}`,
+    );
   }
-  if (!/^[0-9a-f]{40}$/u.test(manifest.oracle_game_sha ?? "")) {
-    throw new Error("manifest oracle_game_sha must be a 40-character lowercase SHA");
+  if (manifest.oracle_game_sha !== BASELINE_ORACLE_GAME_SHA) {
+    throw new Error("manifest oracle_game_sha must equal the frozen M0 oracle SHA");
   }
-  if (manifest.protocol_version !== "er-coop-47") {
-    throw new Error(`manifest protocol_version must be er-coop-47; got ${manifest.protocol_version ?? "<missing>"}`);
+  if (manifest.oracle_branch !== BASELINE_ORACLE_BRANCH) {
+    throw new Error("manifest oracle_branch must equal the frozen M0 oracle branch");
+  }
+  if (manifest.protocol_version !== BASELINE_PROTOCOL_VERSION) {
+    throw new Error(
+      `manifest protocol_version must be ${BASELINE_PROTOCOL_VERSION}; got ${manifest.protocol_version ?? "<missing>"}`,
+    );
+  }
+  if (manifest.input_repeat_delay_ms !== BASELINE_INPUT_REPEAT_DELAY_MS) {
+    throw new Error("manifest input_repeat_delay_ms must equal 250");
+  }
+  if (manifest.input_repeat_interval_ms !== BASELINE_INPUT_REPEAT_INTERVAL_MS) {
+    throw new Error("manifest input_repeat_interval_ms must equal 250");
   }
   if (!Array.isArray(manifest.scenarios) || manifest.scenarios.length === 0) {
     throw new Error("manifest scenarios must be a non-empty array");
@@ -151,11 +208,15 @@ function readManifest(path) {
       throw new Error(`manifest scenario ids must be non-empty and unique; got ${scenario.id ?? "<missing>"}`);
     }
     ids.add(scenario.id);
-    if (!Array.isArray(scenario.command) || scenario.command.length === 0 || !scenario.command.every(item => typeof item === "string")) {
+    if (
+      !Array.isArray(scenario.command)
+      || scenario.command.length === 0
+      || !scenario.command.every(item => typeof item === "string")
+    ) {
       throw new Error(`manifest scenario ${scenario.id} command must be a non-empty argv array`);
     }
-    if (scenario.environment !== undefined && (scenario.environment === null || typeof scenario.environment !== "object")) {
-      throw new Error(`manifest scenario ${scenario.id} environment must be an object`);
+    if (scenario.environment !== undefined) {
+      normalizeDeclaredEnvironment(scenario.environment, `scenario ${scenario.id}`);
     }
     if (!Number.isInteger(scenario.sample_count) || scenario.sample_count < 1) {
       throw new Error(`manifest scenario ${scenario.id} sample_count must be a positive integer`);
@@ -165,21 +226,108 @@ function readManifest(path) {
       throw new Error(`manifest scenario ${scenario.id} setup_commands must be an array`);
     }
     for (const setup of setupCommands) {
-      if (!Array.isArray(setup.command) || setup.command.length === 0 || !setup.command.every(item => typeof item === "string")) {
+      if (
+        !Array.isArray(setup.command)
+        || setup.command.length === 0
+        || !setup.command.every(item => typeof item === "string")
+      ) {
         throw new Error(`manifest setup command for ${scenario.id} must be a non-empty argv array`);
+      }
+      if (setup.environment !== undefined) {
+        normalizeDeclaredEnvironment(setup.environment, `setup command for ${scenario.id}`);
       }
     }
   }
 
-  const missing = REQUIRED_SCENARIO_IDS.filter(id => !ids.has(id));
-  if (missing.length > 0) {
-    throw new Error(`manifest is missing required scenarios: ${missing.join(", ")}`);
+  if (
+    manifest.scenarios.length !== REQUIRED_SCENARIO_IDS.length
+    || manifest.scenarios.some((scenario, index) => scenario.id !== REQUIRED_SCENARIO_IDS[index])
+  ) {
+    throw new Error(
+      `manifest must contain exactly the six required scenarios in order: ${REQUIRED_SCENARIO_IDS.join(", ")}`,
+    );
+  }
+
+  const authorityScenario = manifest.scenarios.find(scenario => scenario.id === "authority-v2-node-suite");
+  const authorityFiles = authorityScenario.command.filter(item =>
+    /^test\/node\/authority-v2-[^*]+\.test\.ts$/u.test(item),
+  );
+  if (
+    authorityFiles.length !== AUTHORITY_V2_FILE_COUNT
+    || new Set(authorityFiles).size !== AUTHORITY_V2_FILE_COUNT
+    || authorityFiles.some(file => file.endsWith("authority-v2-simulator.test.ts"))
+  ) {
+    throw new Error(
+      `authority-v2-node-suite must declare exactly ${AUTHORITY_V2_FILE_COUNT} explicit non-simulator test files`,
+    );
   }
   return { manifest, digest: sha256(contents) };
 }
 
 function isGithubHostedRunner() {
   return process.env.GITHUB_ACTIONS === "true" && process.env.RUNNER_ENVIRONMENT === "github-hosted";
+}
+
+function nonEmptyEnvironmentValue(name) {
+  const value = process.env[name];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function positiveEnvironmentInteger(name) {
+  const value = nonEmptyEnvironmentValue(name);
+  return value !== null && /^[1-9][0-9]*$/u.test(value) ? value : null;
+}
+
+function githubRunMetadata() {
+  return {
+    server_url: nonEmptyEnvironmentValue("GITHUB_SERVER_URL"),
+    repository: nonEmptyEnvironmentValue("GITHUB_REPOSITORY"),
+    workflow: nonEmptyEnvironmentValue("GITHUB_WORKFLOW"),
+    job: nonEmptyEnvironmentValue("GITHUB_JOB"),
+    ref: nonEmptyEnvironmentValue("GITHUB_REF"),
+    sha: nonEmptyEnvironmentValue("GITHUB_SHA"),
+    run_id: nonEmptyEnvironmentValue("GITHUB_RUN_ID"),
+    run_attempt: nonEmptyEnvironmentValue("GITHUB_RUN_ATTEMPT"),
+    run_number: nonEmptyEnvironmentValue("GITHUB_RUN_NUMBER"),
+  };
+}
+
+function measurementGate() {
+  const metadata = githubRunMetadata();
+  const reasons = [];
+  if (!isGithubHostedRunner()) {
+    reasons.push("measure mode requires GITHUB_ACTIONS=true and RUNNER_ENVIRONMENT=github-hosted");
+  }
+  if (process.env[MEASURE_ATTESTATION_ENV] !== MEASURE_ATTESTATION_VALUE) {
+    reasons.push("measure mode requires the exact script-specific " + MEASURE_ATTESTATION_ENV + " value");
+  }
+  if (metadata.server_url !== "https://github.com") {
+    reasons.push("GITHUB_SERVER_URL must be https://github.com");
+  }
+  if (metadata.repository === null || !/^[^/\s]+\/[^/\s]+$/u.test(metadata.repository)) {
+    reasons.push("GITHUB_REPOSITORY must identify owner/repository");
+  }
+  for (const name of ["workflow", "job", "ref"]) {
+    if (metadata[name] === null) {
+      reasons.push("GITHUB_" + name.toUpperCase() + " is required");
+    }
+  }
+  if (metadata.sha === null || !/^[0-9a-f]{40}$/u.test(metadata.sha)) {
+    reasons.push("GITHUB_SHA must be a 40-character lowercase SHA");
+  }
+  for (const name of ["run_id", "run_attempt", "run_number"]) {
+    if (positiveEnvironmentInteger("GITHUB_" + name.toUpperCase()) === null) {
+      reasons.push("GITHUB_" + name.toUpperCase() + " must be a positive integer");
+    }
+  }
+  return {
+    allowed: reasons.length === 0,
+    policy: "accidental-safety policy gate; not a cryptographic trust boundary",
+    attestation_env: MEASURE_ATTESTATION_ENV,
+    attestation_accepted: process.env[MEASURE_ATTESTATION_ENV] === MEASURE_ATTESTATION_VALUE,
+    reasons,
+    github_metadata: metadata,
+  };
 }
 
 function runnerMetadata() {
@@ -192,6 +340,7 @@ function runnerMetadata() {
     node_version: process.version,
     shell: false,
     peak_rss_method: rssMethod,
+    github_run: githubRunMetadata(),
   };
 }
 
@@ -209,27 +358,144 @@ function readGitHead() {
   return sha.length > 0 ? sha : null;
 }
 
-function readSourceLockOracleSha() {
-  if (!existsSync(SOURCE_LOCK)) {
-    return null;
+function stripTomlComment(line) {
+  let quoted = false;
+  let escaped = false;
+  for (let index = 0; index < line.length; index++) {
+    const character = line[index];
+    if (character === '"' && !escaped) {
+      quoted = !quoted;
+    }
+    if (character === "#" && !quoted) {
+      return line.slice(0, index);
+    }
+    escaped = quoted && character === "\\" && !escaped;
+    if (character !== "\\") {
+      escaped = false;
+    }
   }
-  const contents = readFileSync(SOURCE_LOCK, "utf8");
-  const match = contents.match(/^\s*oracle_game_sha\s*=\s*"([0-9a-f]{40})"\s*$/mu);
-  if (match === null) {
-    throw new Error("rust/source-lock.toml exists but has no valid oracle_game_sha entry");
-  }
-  return match[1];
+  return line;
 }
 
-function resolveOracleGameSha(explicit, manifest) {
+function parseSourceLockValue(raw, label) {
+  const value = raw.trim();
+  if (/^(0|[1-9][0-9]*)$/u.test(value)) {
+    const number = Number(value);
+    if (Number.isSafeInteger(number)) {
+      return number;
+    }
+  }
+  if (value.startsWith('"') && value.endsWith('"')) {
+    try {
+      const stringValue = JSON.parse(value);
+      if (typeof stringValue === "string") {
+        return stringValue;
+      }
+    } catch {
+      // The error below gives the source-lock field a stable diagnostic.
+    }
+  }
+  throw new Error("rust/source-lock.toml has an invalid " + label + " value");
+}
+
+function parseSourceLock(contents) {
+  const root = new Map();
+
+  for (const [lineNumber, sourceLine] of contents.split(/\r?\n/u).entries()) {
+    const line = stripTomlComment(sourceLine).trim();
+    if (line.length === 0) {
+      continue;
+    }
+    if (line.startsWith("[") || line.endsWith("]")) {
+      throw new Error("rust/source-lock.toml must be a flat file; table found at line " + (lineNumber + 1));
+    }
+
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex <= 0) {
+      throw new Error("rust/source-lock.toml has a malformed assignment at line " + (lineNumber + 1));
+    }
+    const key = line.slice(0, equalsIndex).trim();
+    if (!/^[A-Za-z0-9_-]+$/u.test(key)) {
+      throw new Error("rust/source-lock.toml has an invalid key at line " + (lineNumber + 1));
+    }
+    if (root.has(key)) {
+      throw new Error("rust/source-lock.toml repeats the key " + key);
+    }
+    root.set(key, parseSourceLockValue(line.slice(equalsIndex + 1), key));
+  }
+
+  const expectedRootKeys = [
+    "input_repeat_delay_ms",
+    "input_repeat_interval_ms",
+    "oracle_branch",
+    "oracle_game_sha",
+    "protocol_version",
+    "schema_version",
+  ];
+  const actualRootKeys = [...root.keys()].sort();
+  if (actualRootKeys.join("|") !== expectedRootKeys.sort().join("|")) {
+    throw new Error("rust/source-lock.toml must contain exactly the six frozen flat fields");
+  }
+  return {
+    input_repeat_delay_ms: root.get("input_repeat_delay_ms"),
+    input_repeat_interval_ms: root.get("input_repeat_interval_ms"),
+    oracle_branch: root.get("oracle_branch"),
+    oracle_game_sha: root.get("oracle_game_sha"),
+    protocol_version: root.get("protocol_version"),
+    schema_version: root.get("schema_version"),
+  };
+}
+
+function readSourceLock(manifest) {
+  let contents;
+  try {
+    contents = readFileSync(SOURCE_LOCK, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(
+        "required rust/source-lock.toml is missing; the oracle source lock must be supplied by the integration owner",
+      );
+    }
+    throw new Error(
+      "could not read required rust/source-lock.toml: " + (error instanceof Error ? error.message : String(error)),
+    );
+  }
+  const sourceLock = parseSourceLock(contents);
+  if (!/^[0-9a-f]{40}$/u.test(sourceLock.oracle_game_sha)) {
+    throw new Error("rust/source-lock.toml oracle_game_sha must be a 40-character lowercase SHA");
+  }
+  if (sourceLock.oracle_game_sha !== manifest.oracle_game_sha) {
+    throw new Error("rust/source-lock.toml oracle_game_sha does not exactly match the manifest");
+  }
+  if (sourceLock.oracle_branch !== manifest.oracle_branch) {
+    throw new Error("rust/source-lock.toml oracle_branch does not exactly match the manifest");
+  }
+  if (sourceLock.protocol_version !== manifest.protocol_version) {
+    throw new Error("rust/source-lock.toml protocol_version does not exactly match the manifest");
+  }
+  if (sourceLock.schema_version !== manifest.schema_version) {
+    throw new Error("rust/source-lock.toml schema_version does not exactly match the manifest");
+  }
+  if (sourceLock.input_repeat_delay_ms !== manifest.input_repeat_delay_ms) {
+    throw new Error("rust/source-lock.toml input_repeat_delay_ms does not exactly match the manifest");
+  }
+  if (sourceLock.input_repeat_interval_ms !== manifest.input_repeat_interval_ms) {
+    throw new Error("rust/source-lock.toml input_repeat_interval_ms does not exactly match the manifest");
+  }
+  return { sourceLock, digest: sha256(contents) };
+}
+
+function resolveOracleGameSha(explicit, manifest, sourceLock) {
   if (explicit !== null) {
-    return { value: explicit, source: "argument" };
+    if (!/^[0-9a-f]{40}$/u.test(explicit)) {
+      throw new Error("--oracle-game-sha must be a 40-character lowercase SHA");
+    }
+    if (explicit !== manifest.oracle_game_sha || explicit !== sourceLock.oracle_game_sha) {
+      throw new Error("--oracle-game-sha must exactly match both the manifest and rust/source-lock.toml");
+    }
+    return { value: explicit, source: "argument+rust/source-lock.toml" };
   }
-  const sourceLockSha = readSourceLockOracleSha();
-  if (sourceLockSha !== null) {
-    return { value: sourceLockSha, source: "rust/source-lock.toml" };
-  }
-  return { value: manifest.oracle_game_sha, source: "manifest.oracle_game_sha" };
+  return { value: sourceLock.oracle_game_sha, source: "rust/source-lock.toml" };
 }
 
 function resolveCandidateGameSha() {
@@ -252,9 +518,65 @@ function resolveExecutable(executable) {
   return executable;
 }
 
-function childEnvironment(extra) {
-  const merged = { ...process.env, ...(extra ?? {}) };
-  return Object.fromEntries(Object.entries(merged).filter(([, value]) => typeof value === "string"));
+function normalizeDeclaredEnvironment(environment, label) {
+  if (environment === undefined) {
+    return {};
+  }
+  if (environment === null || typeof environment !== "object" || Array.isArray(environment)) {
+    throw new Error(label + " environment must be an object");
+  }
+  const normalized = {};
+  for (const key of Object.keys(environment).sort()) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) {
+      throw new Error(label + " environment has an invalid variable name: " + key);
+    }
+    if (FORBIDDEN_SCENARIO_ENV_KEYS.has(key.toUpperCase())) {
+      throw new Error(label + " environment may not declare " + key);
+    }
+    if (typeof environment[key] !== "string") {
+      throw new Error(label + " environment value for " + key + " must be a string");
+    }
+    normalized[key] = environment[key].normalize("NFC");
+  }
+  return normalized;
+}
+
+function inheritedAllowlistedEnvironment() {
+  const inherited = {};
+  for (const name of CHILD_ENV_ALLOWLIST) {
+    if (typeof process.env[name] === "string") {
+      inherited[name] = process.env[name];
+    }
+  }
+  if (process.platform === "win32" && inherited.PATH === undefined && typeof process.env.Path === "string") {
+    inherited.PATH = process.env.Path;
+  }
+  return inherited;
+}
+
+function childEnvironment(declaredScenarioEnvironment, declaredSetupEnvironment = {}) {
+  const scenarioEnvironment = normalizeDeclaredEnvironment(declaredScenarioEnvironment, "scenario");
+  const setupEnvironment = normalizeDeclaredEnvironment(declaredSetupEnvironment, "setup");
+  return Object.fromEntries(
+    Object.entries({
+      ...inheritedAllowlistedEnvironment(),
+      ...scenarioEnvironment,
+      ...setupEnvironment,
+    }).sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function environmentDigest(environment) {
+  return sha256(JSON.stringify(stableValue(environment)));
+}
+
+function environmentPolicy() {
+  return {
+    inherited_allowlist: [...CHILD_ENV_ALLOWLIST],
+    scenario_variables: "only manifest-declared normalized variables",
+    never_inherited_names: ["NODE_OPTIONS", "NODE_PATH"],
+    never_inherited_prefixes: ["ER_", "COOP_", "VITE_"],
+  };
 }
 
 function appendTail(existing, chunk, limit = 256 * 1024) {
@@ -316,7 +638,10 @@ function runProcess(command, environment, timeoutMs) {
       } else if (status === "spawn_error") {
         reason = `process could not be started: ${error?.message ?? "unknown spawn error"}`;
       } else if (status === "failed") {
-        reason = exitCode !== null ? `process exited with code ${exitCode}` : `process exited with signal ${signal ?? "unknown"}`;
+        reason =
+          exitCode !== null
+            ? `process exited with code ${exitCode}`
+            : `process exited with signal ${signal ?? "unknown"}`;
       }
       resolveResult({
         status,
@@ -334,7 +659,7 @@ function runProcess(command, environment, timeoutMs) {
     try {
       child = spawn(processCommand.executable, processCommand.args, {
         cwd: ROOT,
-        env: childEnvironment(environment),
+        env: environment,
         shell: false,
         stdio: ["ignore", "ignore", "pipe"],
         windowsHide: true,
@@ -382,20 +707,30 @@ function median(values) {
 
 function baseRecord(scenario, requestedSampleCount, status, reason) {
   const setupCommands = scenario.setup_commands ?? [];
+  const declaredEnvironment = normalizeDeclaredEnvironment(scenario.environment ?? {}, "scenario " + scenario.id);
+  const effectiveEnvironment = childEnvironment(declaredEnvironment);
   const noMeasurementReason = reason;
   return {
     id: scenario.id,
     name: scenario.name ?? scenario.id,
     execution_class: scenario.execution_class ?? null,
-    scenario_size: scenario.scenario_size ?? { unit: null, value: null, reason: "manifest did not define a scenario size" },
+    scenario_size: scenario.scenario_size ?? {
+      unit: null,
+      value: null,
+      reason: "manifest did not define a scenario size",
+    },
     requested_sample_count: requestedSampleCount,
     sample_count: null,
     attempted_sample_count: null,
     command: scenario.command,
-    environment: scenario.environment ?? {},
+    environment: declaredEnvironment,
+    effective_environment: effectiveEnvironment,
+    effective_environment_sha256: environmentDigest(effectiveEnvironment),
     setup_commands: setupCommands.map(setup => ({
       command: setup.command,
-      environment: setup.environment ?? {},
+      environment: normalizeDeclaredEnvironment(setup.environment ?? {}, "setup command for " + scenario.id),
+      effective_environment: childEnvironment(declaredEnvironment, setup.environment ?? {}),
+      effective_environment_sha256: environmentDigest(childEnvironment(declaredEnvironment, setup.environment ?? {})),
       timeout_ms: setup.timeout_ms ?? null,
     })),
     setup_build_ms: null,
@@ -409,7 +744,8 @@ function baseRecord(scenario, requestedSampleCount, status, reason) {
     exit_code: null,
     signal: null,
     metric_reasons: {
-      setup_build_ms: setupCommands.length > 0 ? noMeasurementReason : "no setup/build command is defined for this scenario",
+      setup_build_ms:
+        setupCommands.length > 0 ? noMeasurementReason : "no setup/build command is defined for this scenario",
       cold_start_ms: noMeasurementReason,
       warm_start_ms: noMeasurementReason,
       spawn_latency_ms: noMeasurementReason,
@@ -420,22 +756,22 @@ function baseRecord(scenario, requestedSampleCount, status, reason) {
   };
 }
 
-function blockedRecord(scenario, requestedSampleCount, mode) {
+function blockedRecord(scenario, requestedSampleCount, mode, reason = null) {
   return baseRecord(
     scenario,
     requestedSampleCount,
     mode === "dry-run" ? "dry_run" : "not_measured",
-    `${mode} mode does not launch scenario processes`,
+    reason ?? mode + " mode does not launch scenario processes",
   );
 }
 
-async function measureRecord(scenario, requestedSampleCount) {
-  if (!isGithubHostedRunner()) {
+async function measureRecord(scenario, requestedSampleCount, gate) {
+  if (!gate.allowed) {
     return baseRecord(
       scenario,
       requestedSampleCount,
       "blocked",
-      "measure mode requires GITHUB_ACTIONS=true and RUNNER_ENVIRONMENT=github-hosted; no process was launched locally",
+      "measure mode blocked: " + gate.reasons.join("; ") + "; no process was launched",
     );
   }
 
@@ -443,7 +779,11 @@ async function measureRecord(scenario, requestedSampleCount) {
   const setupCommands = scenario.setup_commands ?? [];
   let setupMs = 0;
   for (const [index, setup] of setupCommands.entries()) {
-    const result = await runProcess(setup.command, { ...(scenario.environment ?? {}), ...(setup.environment ?? {}) }, setup.timeout_ms ?? DEFAULT_TIMEOUT_MS);
+    const result = await runProcess(
+      setup.command,
+      record.setup_commands[index].effective_environment,
+      setup.timeout_ms ?? DEFAULT_TIMEOUT_MS,
+    );
     if (result.execution_ms !== null) {
       setupMs += result.execution_ms;
     }
@@ -457,7 +797,8 @@ async function measureRecord(scenario, requestedSampleCount) {
       record.metric_reasons.warm_start_ms = "scenario command was not launched after setup/build failure";
       record.metric_reasons.spawn_latency_ms = "scenario command was not launched after setup/build failure";
       record.metric_reasons.execution_ms = "scenario command was not launched after setup/build failure";
-      record.metric_reasons.peak_rss_bytes = result.rss_reason ?? "scenario command was not launched after setup/build failure";
+      record.metric_reasons.peak_rss_bytes =
+        result.rss_reason ?? "scenario command was not launched after setup/build failure";
       return record;
     }
   }
@@ -473,7 +814,11 @@ async function measureRecord(scenario, requestedSampleCount) {
   let completed = 0;
   let failure = null;
   for (let sample = 0; sample < requestedSampleCount; sample++) {
-    const result = await runProcess(scenario.command, scenario.environment ?? {}, scenario.timeout_ms ?? DEFAULT_TIMEOUT_MS);
+    const result = await runProcess(
+      scenario.command,
+      record.effective_environment,
+      scenario.timeout_ms ?? DEFAULT_TIMEOUT_MS,
+    );
     if (result.attempted) {
       attempted++;
     }
@@ -500,11 +845,16 @@ async function measureRecord(scenario, requestedSampleCount) {
   record.spawn_latency_ms = spawnLatencies.length > 0 ? median(spawnLatencies) : null;
   record.execution_ms = completeExecutions.length > 0 ? median(completeExecutions) : null;
   record.peak_rss_bytes = completeRss.length > 0 ? Math.max(...completeRss) : null;
-  record.metric_reasons.cold_start_ms = record.cold_start_ms === null ? "no complete successful scenario execution was observed" : null;
-  record.metric_reasons.warm_start_ms = record.warm_start_ms === null ? "no later complete successful scenario execution was observed" : null;
-  record.metric_reasons.spawn_latency_ms = record.spawn_latency_ms === null ? "the child did not emit a spawn event" : null;
-  record.metric_reasons.execution_ms = record.execution_ms === null ? "no complete successful scenario execution was observed" : null;
-  record.metric_reasons.sample_count = record.sample_count === null ? "no complete successful scenario sample was observed" : null;
+  record.metric_reasons.cold_start_ms =
+    record.cold_start_ms === null ? "no complete successful scenario execution was observed" : null;
+  record.metric_reasons.warm_start_ms =
+    record.warm_start_ms === null ? "no later complete successful scenario execution was observed" : null;
+  record.metric_reasons.spawn_latency_ms =
+    record.spawn_latency_ms === null ? "the child did not emit a spawn event" : null;
+  record.metric_reasons.execution_ms =
+    record.execution_ms === null ? "no complete successful scenario execution was observed" : null;
+  record.metric_reasons.sample_count =
+    record.sample_count === null ? "no complete successful scenario sample was observed" : null;
   record.metric_reasons.peak_rss_bytes =
     record.peak_rss_bytes === null
       ? (failure?.rss_reason ?? "no complete successful scenario execution supplied a peak RSS value")
@@ -549,34 +899,43 @@ async function main() {
   }
 
   const { manifest, digest } = readManifest(options.manifest);
-  const scenarios = options.scenario === null ? manifest.scenarios : manifest.scenarios.filter(item => item.id === options.scenario);
+  const { sourceLock, digest: sourceLockDigest } = readSourceLock(manifest);
+  const scenarios =
+    options.scenario === null ? manifest.scenarios : manifest.scenarios.filter(item => item.id === options.scenario);
   if (scenarios.length === 0) {
     throw new Error(`scenario not found in manifest: ${options.scenario}`);
   }
   const requestedCounts = scenarios.map(scenario => options.sampleCount ?? scenario.sample_count);
-  const oracle = resolveOracleGameSha(options.oracleGameSha, manifest);
+  const oracle = resolveOracleGameSha(options.oracleGameSha, manifest, sourceLock);
   const candidate = resolveCandidateGameSha();
+  const gate = measurementGate();
   let records;
   if (options.mode === "measure") {
     records = [];
     for (const [index, scenario] of scenarios.entries()) {
-      records.push(await measureRecord(scenario, requestedCounts[index]));
+      records.push(await measureRecord(scenario, requestedCounts[index], gate));
     }
   } else {
     records = scenarios.map((scenario, index) => blockedRecord(scenario, requestedCounts[index], options.mode));
   }
 
   const result = {
-    schema_version: 1,
+    schema_version: BASELINE_SCHEMA_VERSION,
     status: topLevelStatus(options.mode, records),
     mode: options.mode,
     oracle_game_sha: oracle.value,
     oracle_game_sha_source: oracle.source,
+    oracle_branch: manifest.oracle_branch,
     protocol_version: manifest.protocol_version,
+    input_repeat_delay_ms: manifest.input_repeat_delay_ms,
+    input_repeat_interval_ms: manifest.input_repeat_interval_ms,
     candidate_game_sha: candidate.value,
     candidate_game_sha_source: candidate.source,
     manifest_id: manifest.manifest_id ?? "rust-kernel-baseline-v1",
     manifest_sha256: digest,
+    source_lock_sha256: sourceLockDigest,
+    measurement_gate: gate,
+    environment_policy: environmentPolicy(),
     runner: runnerMetadata(),
     scenario_filter: options.scenario,
     scenarios: records,

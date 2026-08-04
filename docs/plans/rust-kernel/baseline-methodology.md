@@ -2,8 +2,9 @@
 
 This baseline is an evidence ledger for the PokéRogue Redux game source at one
 exact oracle SHA. The v1 fixture binds that oracle to
-`3b534099919efae827019d4a3f3c4ab0ecd6d67b` and protocol `er-coop-47`. It is not
-a claim that the current engine is already isolated
+`3b534099919efae827019d4a3f3c4ab0ecd6d67b`, branch
+`ci/coop/v2-showdown-command-coordinate-20260720`, and protocol `er-coop-47`.
+It is not a claim that the current engine is already isolated
 from Phaser or that the measured paths are Rust-only. The manifest is
 `rust/fixtures/v1/baseline-manifest.json`; the coordinator is
 `scripts/benchmark-kernel-baseline.mjs`.
@@ -39,6 +40,19 @@ file list; it does not rely on shell glob expansion, and
 this coordinator's process execution shell-free and makes the command it
 records exact; it does not change the existing headless harness.
 
+The integration-owned `rust/source-lock.toml` must use this exact flat shape;
+the coordinator rejects tables, duplicate keys, extra fields, missing fields,
+and any value that differs from the manifest:
+
+```toml
+oracle_game_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+oracle_branch = "ci/coop/v2-showdown-command-coordinate-20260720"
+protocol_version = "er-coop-47"
+schema_version = 1
+input_repeat_delay_ms = 250
+input_repeat_interval_ms = 250
+```
+
 ## Execution modes
 
 ```text
@@ -53,10 +67,17 @@ Neither mode launches a scenario process. They are the only modes intended for
 local development and are safe to run twice for byte-identical comparison.
 
 `measure` requires both `GITHUB_ACTIONS=true` and
-`RUNNER_ENVIRONMENT=github-hosted`. On any other machine it emits blocked
-records with null measurements and exits nonzero without launching a benchmark.
-The external workflow should install dependencies, provide the checked-out
-assets, and invoke this mode on a dedicated GitHub-hosted runner. A local
+`RUNNER_ENVIRONMENT=github-hosted`, the exact
+`RUST_KERNEL_BASELINE_ATTESTATION=rust-kernel-baseline-v1:measure:github-hosted`
+value, and credible GitHub run metadata (`GITHUB_SERVER_URL`,
+`GITHUB_REPOSITORY`, `GITHUB_WORKFLOW`, `GITHUB_JOB`, `GITHUB_REF`,
+`GITHUB_SHA`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, and
+`GITHUB_RUN_NUMBER`). On any other machine or with incomplete metadata it emits
+blocked records with null measurements and exits nonzero without launching a
+benchmark. This is an accidental-safety policy gate, not a cryptographic trust
+boundary: it reduces accidental local execution but cannot prove who supplied
+the environment variables. The external workflow must pass these values
+explicitly and invoke this mode on a dedicated GitHub-hosted runner. A local
 `--mode measure` run is not a supported fallback.
 
 Every command is passed to `child_process.spawn` with an argv array and
@@ -65,15 +86,26 @@ they are never interpolated into a shell command. Exit codes, signals, spawn
 errors, and timeouts remain visible in the record. A nonzero scenario is not
 converted into a pass merely because it produced a duration.
 
-The default oracle SHA comes from `rust/source-lock.toml` when that immutable
-lock is present, otherwise from the manifest's pinned `oracle_game_sha`. It
-never defaults to `GITHUB_SHA`: that value identifies the later candidate or
-integration commit and is emitted separately as `candidate_game_sha`.
-`--oracle-game-sha` is an explicit override for a reviewed oracle input. An
-unavailable candidate SHA is `null` with its source marked `unavailable`; the
-oracle fixture itself is rejected if its pinned SHA is missing or malformed.
-Timestamps, hostnames, and random IDs are deliberately absent from the JSON so
-metadata/dry-run output remains deterministic.
+Measured children receive only the platform/process variables in the explicit
+allowlist emitted as `environment_policy.inherited_allowlist`, plus the
+scenario's normalized variables declared in the manifest. Arbitrary parent
+`NODE_OPTIONS`, `NODE_PATH`, `ER_*`, `COOP_*`, and `VITE_*` values are
+never inherited; the latter prefixes are present only when a scenario explicitly
+declares the exact variable. Each scenario and setup record emits its
+`effective_environment` and `effective_environment_sha256`, so the actual
+child input is auditable without relying on the ambient process environment.
+
+`rust/source-lock.toml` is mandatory for every mode. It is the only oracle
+source and must contain exactly the six flat fields shown above:
+`oracle_game_sha`, `oracle_branch`, `protocol_version`, `schema_version`,
+`input_repeat_delay_ms`, and `input_repeat_interval_ms`. Each value must
+exactly match the manifest; a missing, malformed, extra, table-shaped, or
+mismatched lock fails closed. `--oracle-game-sha` is accepted only when it is
+a 40-character lowercase SHA that exactly matches both the lock and manifest;
+it never selects a different source. `GITHUB_SHA` identifies the later
+candidate and is emitted separately as `candidate_game_sha`. Timestamps,
+hostnames, and random IDs are absent from the JSON, while the effective child
+environment is emitted and digested because it is runner-dependent.
 
 ## Measurement fields
 
@@ -104,6 +136,11 @@ Each scenario record contains these fields even when a value is unavailable:
 - `sample_count`: the number of complete, successful scenario samples. The separate
   `requested_sample_count` and `attempted_sample_count` fields prevent a
   failed/blocked run from being mistaken for a zero-sample success.
+- `environment`: the normalized variables declared by the manifest for the
+  scenario; setup records carry their own declared values.
+- `effective_environment` and `effective_environment_sha256`: the exact
+  allowlisted-plus-declared child environment and its stable digest. These are
+  emitted even for metadata and dry-run records.
 - `command`, `execution_class`, `status`, and `reason`: the exact argv input,
   classification, outcome, and causal explanation.
 
@@ -121,7 +158,7 @@ The status values are intentionally small and fail-closed:
 | --- | --- |
 | `not_measured` | Metadata mode; no scenario process was launched. |
 | `dry_run` | Dry-run mode; commands were described but not launched. |
-| `blocked` | Measurement was refused, currently because the runner was not GitHub-hosted. |
+| `blocked` | Measurement was refused because the hosted-runner, attestation, or credible GitHub metadata gate failed; no scenario process was launched. |
 | `passed` | All requested samples and setup commands exited successfully. |
 | `failed` | A setup or scenario process exited nonzero or could not be started. |
 | `timeout` | A bounded process timeout fired. |
@@ -134,12 +171,15 @@ an unisolatable setup, and a missing warm sample are not encoded as zero.
 
 1. Check out the exact candidate SHA with recursive assets and run the
    repository dependency setup used by the co-op workflow.
-2. Run the manifest in `--mode measure` on GitHub-hosted Linux. Keep the node
-   suite and simulator as node-pure records, and keep the Phaser/Vitest and
+2. Pass the exact script attestation and GitHub run metadata from the workflow,
+   then run the manifest in `--mode measure` on GitHub-hosted Linux. Keep the
+   node suite and simulator as node-pure records, and keep the Phaser/Vitest and
    browser records as their declared classes.
 3. Preserve the emitted JSON and the runner log as the baseline artifact. The
    JSON's immutable `oracle_game_sha`, separate `candidate_game_sha`, protocol
-   version, and `manifest_sha256` bind the result to its inputs.
+   version, `oracle_branch`, both input-repeat values,
+   `manifest_sha256`, `source_lock_sha256`, and effective environment
+   digests bind the result to its inputs.
 4. Compare like-for-like records only. A missing RSS value is an unavailable
    measurement, not a zero-memory claim; a changed scenario size or command is
    a methodology/input change and needs a new manifest review.
@@ -157,12 +197,16 @@ The safe local checks for this deliverable are:
 
 ```text
 node --check scripts/benchmark-kernel-baseline.mjs
-node scripts/benchmark-kernel-baseline.mjs --mode metadata
-node scripts/benchmark-kernel-baseline.mjs --mode dry-run
 node -e "JSON.parse(require('node:fs').readFileSync('rust/fixtures/v1/baseline-manifest.json','utf8'))"
-node -e "const fs=require('node:fs'); const needle=Buffer.from('PokéRogue Redux','utf8'); for (const file of ['rust/fixtures/v1/baseline-manifest.json','docs/plans/rust-kernel/baseline-methodology.md']) { if (!fs.readFileSync(file).includes(needle)) throw new Error(file+' is not UTF-8'); }"
+node -e "const m=require('./rust/fixtures/v1/baseline-manifest.json'); if (m.scenarios.length!==6 || m.input_repeat_delay_ms!==250 || m.input_repeat_interval_ms!==250) throw new Error('baseline binding mismatch');"
 git diff --check
 ```
+
+Because the integration-owned source lock is intentionally absent from an
+isolated benchmark worktree, metadata/dry-run behavior can be checked only from
+a throwaway staging copy that supplies the canonical lock shape above. Do not
+create or commit a substitute lock in this worktree. Those modes launch no
+scenario process; `--mode measure` remains forbidden on the workstation.
 
 Do not run a local co-op Vitest file, the headless scenario, Phaser, Vite, or
 Chromium as part of this baseline task. The calibrated co-op gate and browser
