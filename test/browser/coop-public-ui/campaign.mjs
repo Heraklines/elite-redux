@@ -951,7 +951,7 @@ function currentSharedCommandAddress(clients) {
  * prompt. Evolution specifically requires BattleEndPhase; FaintPhase alone cannot authorize it.
  * Arbitrary future-turn battle messages still cannot authorize input.
  */
-function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
+function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress, sharedCurrentAddress = null) {
   const observation = event.observation;
   const address = observation.address;
   const hasLiveBattleAddress =
@@ -968,6 +968,22 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
     return true;
   }
   const expectedParts = expectedAddress.split(":").map(Number);
+  // A completed turn can install the next COMMAND_FRONTIER before its local TurnInit narration becomes
+  // actionable. In that schedule the renderer is already the passive N+1 command watcher while the
+  // authority is visibly waiting on an ordinary N+1 MessagePhase. Both CURRENT semantic surfaces naming
+  // that exact immediate successor is stronger evidence than the old submitted-turn cursor: it proves the
+  // prompt is live, paired, and belongs to the committed successor (run 30927575552). One-sided or later
+  // future addresses remain excluded, and the caller's current-surface/readiness guards still apply.
+  const isPairedImmediateSuccessor =
+    sharedCurrentAddress === observedAddress
+    && expectedParts.length === 3
+    && expectedParts.every(part => Number.isSafeInteger(part))
+    && address?.epoch === expectedParts[0]
+    && address.wave === expectedParts[1]
+    && address.turn === expectedParts[2] + 1;
+  if (isPairedImmediateSuccessor) {
+    return true;
+  }
   const isSuccessorSettlementMessage =
     observation.surfaceId === "battle:message" && NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase);
   const isSuccessorEvolution =
@@ -1101,6 +1117,7 @@ export function createBattlePromptAdvancer(
         return false;
       }
     }
+    const sharedCurrentAddress = currentSharedCommandAddress(clients);
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
         if (event.kind !== "browser-surface2") {
@@ -1113,7 +1130,13 @@ export function createBattlePromptAdvancer(
         // authorizes the entire bounded settlement narration chain. Keep that proof's scan floor at
         // this driver's boundary; otherwise consuming TrainerVictory/MoneyReward hides BattleEnd from
         // the immediately following MoneyReward/ModifierReward prompt (run 30370796112).
-        const addressMatches = battlePromptMatchesAddress(client, from[client.label] ?? 0, event, expectedAddress);
+        const addressMatches = battlePromptMatchesAddress(
+          client,
+          from[client.label] ?? 0,
+          event,
+          expectedAddress,
+          sharedCurrentAddress,
+        );
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
           && addressMatches

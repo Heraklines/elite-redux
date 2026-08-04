@@ -1450,6 +1450,42 @@ test("successor-address faint narration advances only after the browser observes
   assert.equal(await advance(), false, "one faint prompt generation receives exactly one action");
 });
 
+test("paired immediate-successor command control authorizes its current turn-start message", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 2, turn: 1 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 2, turn: 1 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "post-turn-command-frontier", {
+    expectedCommandAddress: "7:2:1",
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 30, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 2,
+  });
+  assert.equal(await advance(), false, "one browser advancing early cannot authorize a future-turn prompt");
+
+  renderer.evidence.pushBattleReadiness("command:watcher", "CoopReplayTurnPhase", false, 31, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 2,
+  });
+  assert.equal(
+    await advance(),
+    true,
+    "the exact current N+1 message is actionable once its peer is the paired N+1 command watcher",
+  );
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.deepEqual(renderer.presses, [], "the passive command watcher never receives speculative input");
+  assert.equal(await advance(), false, "the successor prompt generation receives one action only");
+});
+
 test("successor-address trainer victory survives authority-first human input skew", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
