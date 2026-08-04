@@ -1,0 +1,216 @@
+name: AI Kaggle V4 Ensemble Monitor (Private)
+
+# Research-only lane. It reads one private Kaggle kernel and publishes only
+# sealed model artifacts plus sanitized metrics. It cannot deploy.
+on:
+  push:
+    branches:
+      - codex/combat-ai-baselines-20260728
+    paths:
+      - ".github/workflows/ai-kaggle-v4-ensemble-monitor.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-kaggle-v4-ensemble-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && contains(github.event.head_commit.message, '[v4-monitor]')
+    name: Validate three-seed private GPU ensemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==1.8.4
+      - name: Wait for private GPU kernel
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_KERNEL_NAME: er-ai-production-v4-human-ensemble-gpu-20260804
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import time
+
+          from kaggle.api.kaggle_api_extended import KaggleApi
+
+          api = KaggleApi()
+          api.authenticate()
+          slug = f"{os.environ['KAGGLE_USERNAME']}/{os.environ['KAGGLE_KERNEL_NAME']}"
+          deadline = time.monotonic() + 5.5 * 60 * 60
+          attempts = 0
+          while True:
+              attempts += 1
+              try:
+                  response = api.kernels_status(slug)
+                  status = str(response.status).rsplit(".", 1)[-1].upper()
+                  failure = response.failure_message or None
+              except Exception as error:
+                  status = "UNAVAILABLE"
+                  failure = type(error).__name__
+              if attempts == 1 or attempts % 5 == 0 or status in {"COMPLETE", "ERROR", "CANCELLED"}:
+                  print(json.dumps({"kernel": slug, "status": status, "detail": failure}), flush=True)
+              if status == "COMPLETE":
+                  break
+              if status in {"ERROR", "CANCELLED"}:
+                  raise SystemExit(f"private Kaggle kernel ended with {status}: {failure}")
+              if time.monotonic() >= deadline:
+                  raise SystemExit(f"private Kaggle kernel did not complete before the monitor deadline: {status}")
+              time.sleep(60 if status != "UNAVAILABLE" else 30)
+          PY
+      - name: Download private model output on the runner
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_KERNEL_NAME: er-ai-production-v4-human-ensemble-gpu-20260804
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kaggle-output"
+          kaggle kernels output \
+            "$KAGGLE_USERNAME/$KAGGLE_KERNEL_NAME" \
+            --path "$RUNNER_TEMP/kaggle-output" \
+            --force
+      - name: Seal ensemble provenance and sanitized report
+        env:
+          KAGGLE_OUTPUT: ${{ runner.temp }}/kaggle-output
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-ensemble-report ai-ensemble-model
+          python - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path(os.environ["KAGGLE_OUTPUT"])
+          forbidden = sorted(
+              path.relative_to(root).as_posix()
+              for path in root.rglob("*")
+              if path.is_file()
+              and (
+                  path.suffix in {".jsonl", ".gzpack", ".parquet"}
+                  or "telemetry" in path.name.lower()
+                  or "training-bundle" in path.name.lower()
+              )
+          )
+          if forbidden:
+              raise SystemExit(f"Kaggle output contains forbidden training data: {forbidden}")
+
+          ensemble_paths = list(root.rglob("ensemble.json"))
+          if len(ensemble_paths) != 1:
+              raise SystemExit(f"expected one ensemble manifest, found {ensemble_paths}")
+          ensemble_path = ensemble_paths[0]
+          ensemble_root = ensemble_path.parent
+          ensemble = json.loads(ensemble_path.read_text(encoding="utf-8"))
+          expected_members = ["seed-20260804", "seed-20260805", "seed-20260806"]
+          if ensemble.get("members") != expected_members:
+              raise SystemExit(f"unexpected ensemble members: {ensemble.get('members')}")
+          if (ensemble.get("contractSchemaVersion"), ensemble.get("featureSchemaVersion")) != (4, 4):
+              raise SystemExit("ensemble does not use combat contract/feature schema v4")
+
+          reports = []
+          identities = set()
+          for member in expected_members:
+              member_root = ensemble_root / member
+              report_path = member_root / "report.json"
+              config_path = member_root / "config.json"
+              weights_path = member_root / "model.safetensors"
+              if not all(path.is_file() for path in (report_path, config_path, weights_path)):
+                  raise SystemExit(f"incomplete ensemble member: {member}")
+              report = json.loads(report_path.read_text(encoding="utf-8"))
+              config = json.loads(config_path.read_text(encoding="utf-8"))
+              data = report["data"]
+              if set(data["sourcePolicies"]) != {"human-v1"}:
+                  raise SystemExit(f"{member} contains a non-human policy source")
+              if data["excludedPolicyDecisions"] != 0 or data["policyTargetDecisions"] <= 0:
+                  raise SystemExit(f"{member} has an invalid human policy-target inventory")
+              if data["transferDecisions"] != 0 or report["objective"]["transferPretrainEpochs"] != 0:
+                  raise SystemExit(f"{member} unexpectedly used transfer data")
+              if report.get("initializedFrom") is not None or report.get("tokenVocabularySource") != "derived":
+                  raise SystemExit(f"{member} is not a fresh human-data model")
+              if not str(report.get("device", "")).startswith("cuda"):
+                  raise SystemExit(f"{member} was not trained on CUDA")
+              if report.get("contractSchemaVersion") != 4 or report.get("featureSchemaVersion") != 4:
+                  raise SystemExit(f"{member} uses the wrong combat contract")
+              if data["dictionaryCoverage"]["features"] != 4324:
+                  raise SystemExit(f"{member} uses the wrong feature width")
+              if config.get("tokenVocabularySha256") != report.get("tokenVocabularySha256"):
+                  raise SystemExit(f"{member} config/report vocabulary mismatch")
+              identities.add(
+                  json.dumps(
+                      [
+                          data["identity"],
+                          data["dictionaryCoverage"]["sha256"],
+                          report["tokenVocabularySha256"],
+                          report["architecture"],
+                      ],
+                      sort_keys=True,
+                  )
+              )
+              reports.append(
+                  {
+                      "member": member,
+                      "seed": report["seed"],
+                      "device": report["device"],
+                      "parameters": report["parameters"],
+                      "decisions": data["decisions"],
+                      "policyTargets": data["policyTargetDecisions"],
+                      "terminals": sum(data["terminalOutcomes"].values()),
+                      "bestEpoch": report["bestEpoch"],
+                      "trainSeconds": report["trainSeconds"],
+                      "metrics": report["validation"],
+                  }
+              )
+          if len(identities) != 1:
+              raise SystemExit("ensemble members do not share one sealed training identity")
+
+          summary = {
+              "schemaVersion": 1,
+              "model": "er-domain-candidate-transformer-ensemble-v4",
+              "contractSchemaVersion": 4,
+              "featureSchemaVersion": 4,
+              "featureCount": 4324,
+              "members": reports,
+          }
+          report_root = Path("ai-ensemble-report")
+          (report_root / "ensemble-training-summary.json").write_text(
+              json.dumps(summary, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          lines = ["# Production V4 human ensemble", ""]
+          for report in reports:
+              metrics = report["metrics"]
+              lines.append(
+                  f"- {report['member']}: Top-1 {metrics['top1']:.4f}, "
+                  f"Top-3 {metrics['top3']:.4f}, NLL {metrics['candidateNll']:.4f}, "
+                  f"value Brier {metrics['valueBrier']:.4f}"
+              )
+          (report_root / "ensemble-training-summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          shutil.copytree(ensemble_root, Path("ai-ensemble-model"), dirs_exist_ok=True)
+          PY
+          cat ai-ensemble-report/ensemble-training-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-production-v4-human-ensemble-20260804
+          path: |
+            ai-ensemble-report
+            ai-ensemble-model
+          retention-days: 30
+          if-no-files-found: error
