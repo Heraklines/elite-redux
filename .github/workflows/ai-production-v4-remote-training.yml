@@ -35,6 +35,11 @@ on:
         required: false
         type: boolean
         default: false
+      max_policy_decisions:
+        description: Deterministic winner-only decision cap for the CPU tree
+        required: false
+        type: string
+        default: "4000"
 
 permissions:
   contents: read
@@ -364,9 +369,14 @@ jobs:
       - name: Train fresh battle-victory tree on the same remote cut
         env:
           TRAINER_TREE: ${{ inputs.trainer_tree || 'false' }}
+          MAX_POLICY_DECISIONS: ${{ inputs.max_policy_decisions || '4000' }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! "$MAX_POLICY_DECISIONS" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::max_policy_decisions must be a positive integer"
+            exit 1
+          fi
           battle_type_args=()
           if [[ "$TRAINER_TREE" == "true" ]]; then
             battle_type_args+=(--battle-type 1)
@@ -377,7 +387,7 @@ jobs:
             --dictionary-supplement "$RUNNER_TEMP/production-v4-training/runtime-item-dictionary-supplement.json" \
             --winner-only-policy \
             --winner-scope battle \
-            --max-policy-decisions 4000 \
+            --max-policy-decisions "$MAX_POLICY_DECISIONS" \
             "${battle_type_args[@]}" \
             --report-json "$RUNNER_TEMP/ai-tree/leaderboard.json" \
             --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md" \
@@ -393,6 +403,9 @@ jobs:
           cp "$RUNNER_TEMP/ai-tree/leaderboard.json" ai-report/tree/
           cp "$RUNNER_TEMP/ai-tree/leaderboard.md" ai-report/tree/
           cp "$RUNNER_TEMP/ai-tree/models/selected-model.json" ai-report/tree/
+          if [[ -f "$RUNNER_TEMP/ai-tree/models/stacked_tree_ensemble.json" ]]; then
+            cp "$RUNNER_TEMP/ai-tree/models/stacked_tree_ensemble.json" ai-report/tree/
+          fi
           cat "$RUNNER_TEMP/ai-tree/leaderboard.md" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
