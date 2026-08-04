@@ -3,6 +3,14 @@ name: AI Production V4 Semantic Audit (Read-Only)
 # One ephemeral runner streams production contract-v4 records directly into an
 # in-memory auditor. Only aggregate reports with salted example IDs are uploaded.
 on:
+  push:
+    branches:
+      - codex/combat-ai-v4-eval-20260803
+    paths:
+      - ".github/workflows/ai-production-v4-semantic-audit.yml"
+      - "scripts/ai/combat-contract-v4-audit.mjs"
+      - "scripts/ai/combat-contract-v4-audit.test.mjs"
+      - "scripts/ai/run-production-combat-v4-audit.mjs"
   workflow_dispatch:
 
 permissions:
