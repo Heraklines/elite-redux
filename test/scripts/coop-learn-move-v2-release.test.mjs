@@ -85,7 +85,7 @@ test("the authority closes the real phase, proves it, retains exact state, and o
   );
   assert.match(
     scheduler,
-    /const successorWasStarted = this\.startedPhases\.has\(selectedSuccessor\)[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*if \(!successorWasStarted\) \{[\s\S]*this\.startCurrentPhase\(\)/u,
+    /const selectedAfterClose = this\.currentPhase;[\s\S]*const successorWasStarted = this\.startedPhases\.has\(selectedAfterClose\)[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*if \(!successorWasStarted\) \{[\s\S]*this\.startCurrentPhase\(\)/u,
     "closing a projected modal starts a retained unstarted successor without restarting an ordinary predecessor",
   );
 });

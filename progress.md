@@ -7612,3 +7612,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   restore the old unrelated-phase advancement dependency. The entrypoint captures the owning phase manager as
   well as its current phase before asynchronous construction, so a later global-scene swap cannot redirect the
   completion into another browser/test scene.
+- Corrected exact-SHA full co-op gate `30879903358` is running on `de84fa69e`. The superseded gate
+  `30878504470` finished with every runtime red rooted before co-op construction in the detached-launcher
+  TitlePhase stall, plus the already-corrected import format and stale scheduler source assertion. Preserve the
+  focused registered-interactions browser run `30878110322` on gameplay SHA `087be79c2`; it remains the direct
+  product proof for the Wobbuffet single-controller rendezvous and must not be cancelled or replaced by the
+  headless gate.
+- Gate `30879903358`'s fast-contract job found one additional stale test spelling: the learn-move scheduler
+  assertion still searched for `successorWasStarted(selectedSuccessor)` after the modal-race fix deliberately
+  made `selectedAfterClose` the post-commit identity. The assertion now pins that actual stronger identity;
+  running runtime shards remain untouched and continue to qualify the launcher migration.
