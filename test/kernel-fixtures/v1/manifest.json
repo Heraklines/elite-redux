@@ -73,6 +73,7 @@
     ],
     "manifest_version": 1
   },
+  "project_name": "PokéRogue Redux",
   "protocol_version": "er-coop-47",
   "schema_version": 1,
   "source_file": "scripts/export-kernel-fixtures.mjs"

@@ -24,6 +24,7 @@
       "value": "er-coop-47"
     }
   },
+  "project_name": "PokéRogue Redux",
   "protocol_version": "er-coop-47",
   "schema_version": 1,
   "source_file": "src/data/elite-redux/coop/coop-transport.ts"

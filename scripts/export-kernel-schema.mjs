@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 export const SCHEMA_VERSION = 1;
+export const PROJECT_NAME = "PokéRogue Redux";
 export const ORACLE_GAME_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 export const EXPECTED_PROTOCOL_VERSION = "er-coop-47";
 export const FIXTURE_DIGEST_KIND = "fixture-content-sha256-v1";
@@ -605,6 +606,7 @@ export function fixtureContentDigest(payload) {
 export function makeEnvelope(payload, sourceFile, digestKind = FIXTURE_DIGEST_KIND) {
   return {
     schema_version: SCHEMA_VERSION,
+    project_name: PROJECT_NAME,
     oracle_game_sha: ORACLE_GAME_SHA,
     protocol_version: EXPECTED_PROTOCOL_VERSION,
     source_file: normalizeSourcePath(sourceFile),

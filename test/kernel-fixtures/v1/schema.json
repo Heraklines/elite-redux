@@ -4504,6 +4504,7 @@
       "xboxPadConfig": "src/configs/inputs/pad-xbox360.ts"
     }
   },
+  "project_name": "PokéRogue Redux",
   "protocol_version": "er-coop-47",
   "schema_version": 1,
   "source_file": "scripts/export-kernel-schema.mjs"

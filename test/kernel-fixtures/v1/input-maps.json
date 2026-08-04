@@ -4243,6 +4243,7 @@
     },
     "source_file": "src/inputs-controller.ts"
   },
+  "project_name": "PokéRogue Redux",
   "protocol_version": "er-coop-47",
   "schema_version": 1,
   "source_file": "src/inputs-controller.ts"
