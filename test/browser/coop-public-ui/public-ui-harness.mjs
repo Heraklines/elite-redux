@@ -852,10 +852,10 @@ function commandFrontierProjection(client, event) {
     return null;
   }
   const owner =
-    observation.surfaceId === "command:command"
+    ((observation.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+      || (observation.surfaceId === "command:fight" && observation.uiMode === "FIGHT"))
     && observation.operationClass === "command"
     && observation.phase === "CommandPhase"
-    && observation.uiMode === "COMMAND"
     && observation.seatsWithInput?.includes(client.publicSeat);
   const watcher =
     rendererWatcher
@@ -4732,9 +4732,11 @@ export class DuoPublicUiRig {
                 const address = observation?.address;
                 if (
                   event.kind !== "browser-surface2"
-                  || observation?.surfaceId !== "command:command"
+                  || !(
+                    (observation?.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+                    || (observation?.surfaceId === "command:fight" && observation.uiMode === "FIGHT")
+                  )
                   || observation.phase !== "CommandPhase"
-                  || observation.uiMode !== "COMMAND"
                   || observation.ready?.handlerActive !== true
                   || observation.localSeat !== client.publicSeat
                   || !observation.seatsWithInput?.includes(client.publicSeat)

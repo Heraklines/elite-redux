@@ -18,6 +18,7 @@ import {
   coopHostEngineDialogueMessageAdvanceAllowed,
   coopHostMeNarrationAwaitingGuestAck,
   coopHostStreamMeMessage,
+  coopMePostBattleContinuationActive,
   getCoopBattleStreamer,
   getCoopController,
   getCoopMePump,
@@ -421,6 +422,7 @@ export class UI extends Phaser.GameObjects.Container {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
       // Registered presentation prompts belong to each browser independently. They do not choose
@@ -567,6 +569,7 @@ export class UI extends Phaser.GameObjects.Container {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       })
       || !this.coopMeReady()
@@ -644,7 +647,11 @@ export class UI extends Phaser.GameObjects.Container {
       // CoopReplayMePhase renders it. Hard-gated (coopMeInProgress() false in solo / outside an ME;
       // coopHostStreamMeMessage no-ops off the live authoritative host), so solo / lockstep / guest
       // are byte-identical. Streamed at the terminal render (not the `$`-page-split recursion above).
-      if (globalScene.gameMode.isCoop && coopMeInProgress() && !coopMeHandoffBattleStarted()) {
+      if (
+        globalScene.gameMode.isCoop
+        && coopMeInProgress()
+        && (!coopMeHandoffBattleStarted() || coopMePostBattleContinuationActive())
+      ) {
         if (isCoopDebug()) {
           coopLog("me", "ui: host streams ME narration (showText)", { len: text.length, preview: text.slice(0, 40) });
         }
@@ -700,7 +707,11 @@ export class UI extends Phaser.GameObjects.Container {
       const handler = this.getHandler();
       // Co-op AUTHORITATIVE host (#633, ADD-3): stream the resolved ME dialogue line to the guest.
       // Same hard gate as showText - byte-identical in solo / lockstep / off the authoritative host.
-      if (globalScene.gameMode.isCoop && coopMeInProgress() && !coopMeHandoffBattleStarted()) {
+      if (
+        globalScene.gameMode.isCoop
+        && coopMeInProgress()
+        && (!coopMeHandoffBattleStarted() || coopMePostBattleContinuationActive())
+      ) {
         if (isCoopDebug()) {
           coopLog("me", "ui: host streams ME narration (showDialogue)", {
             len: text.length,

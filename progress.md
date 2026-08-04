@@ -7627,3 +7627,18 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   so identity-safe `end()` correctly refused to shift it and the test observed no faint at all. The test now uses
   its file's existing production-equivalent `replaceWithCoopAuthoritativePhase` replay driver. This is harness
   repair only; captured logs showed production replay queued move/HP/faint/finalize in the correct order.
+- Live staging report `2026-08-04T05-24-16-325Z` on `087be79c2` proves the forced Fun and Games battle now
+  enters and resolves all three turns, including Wobbuffet faint, Victory/EXP, TURN_COMMIT rev 6, and the
+  post-BattleEnd `ME_TERMINAL battle-settled` at rev 7. Both peers ACKed that terminal through
+  `controlInstalled`; the authority nevertheless remained in `MysteryEncounterRewardsPhase` with the guest
+  waiting for its final terminal. Root cause is the V2 physical-input freeze: the KO callback opens one
+  action-only loss narration after the battle handoff, while the existing host-engine narration carve-out
+  categorically rejected every handoff-era MESSAGE. The lease now reopens only after the retained active ME
+  control is `battle-settled` or `reward-settled`, and the same post-battle text is streamed cosmetically to
+  the renderer. Live battle narration still cannot borrow this lease.
+- Registered-interactions run `30878110322` independently proves the Wobbuffet spectator rendezvous itself is
+  fixed: host and guest converged at `cmd:2:1`, the guest installed its real watcher, and the host exposed an
+  actionable `command:fight`. The browser driver then mislabeled that skip-to-fight command as passive because
+  its shared-frontier matcher accepted only the root `command:command` surface. The command admission/frontier
+  and depleted-seat partition now treat readiness-proven `command:fight` as the same exact addressed command
+  owner, allowing the outer campaign loop to drive all three direct turns and reach the newly fixed KO tail.

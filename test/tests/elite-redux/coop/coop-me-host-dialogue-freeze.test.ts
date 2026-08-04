@@ -39,6 +39,7 @@ const HOST_ENGINE_DIALOGUE = {
   netcodeMode: "authoritative",
   meInProgress: true,
   meHandoffBattleStarted: false,
+  mePostBattleContinuationActive: false,
   meBespokeHostDrives: false,
 } as const;
 
@@ -81,6 +82,16 @@ describe("Authority-V2 host engine-dialogue carve-out (campaign 29933294323 myst
     expect(coopHostEngineDialogueMessageAdvanceAllowed({ ...HOST_ENGINE_DIALOGUE, meHandoffBattleStarted: true })).toBe(
       false,
     );
+  });
+
+  it("ALLOWS action-only Mystery continuation narration after a retained battle settlement", () => {
+    expect(
+      coopHostEngineDialogueMessageAdvanceAllowed({
+        ...HOST_ENGINE_DIALOGUE,
+        meHandoffBattleStarted: true,
+        mePostBattleContinuationActive: true,
+      }),
+    ).toBe(true);
   });
 
   it("BLOCKS a bespoke host-driven mini-game (the host must be able to PLAY it, #823)", () => {

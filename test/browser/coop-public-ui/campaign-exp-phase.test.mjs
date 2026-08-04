@@ -409,6 +409,50 @@ test("between-wave completion accepts both semantic command frontiers without le
   assert.equal(allClientsAtCurrentCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
 });
 
+test("between-wave completion accepts a skip-to-fight Mystery owner and its exact watcher", () => {
+  const address = { epoch: 73, wave: 2, turn: 1 };
+  const digest = "fun-and-games-command";
+  const owner = fakeClient("owner");
+  owner.publicSeat = 0;
+  owner.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:fight",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "FIGHT",
+      address,
+      stateDigest: digest,
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true },
+    },
+  });
+  const watcher = fakeClient("watcher");
+  watcher.publicSeat = 1;
+  watcher.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CoopReplayTurnPhase",
+      uiMode: "MESSAGE",
+      address,
+      stateDigest: digest,
+      localSeat: 1,
+      seatsWithInput: [],
+      ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  const clients = [owner, watcher];
+  const cursors = { owner: 0, watcher: 0 };
+  assert.equal(allClientsAtOwnedCommandFrontier([owner], { owner: 0 }), true);
+  assert.equal(allClientsAtCurrentCommandFrontier(clients, cursors), true);
+});
+
 test("between-wave completion accepts an exact partner-command wait after one half is wiped", () => {
   const waiting = fakeClient("waiting");
   waiting.publicSeat = 0;

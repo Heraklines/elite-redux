@@ -198,6 +198,36 @@ test("command frontier accepts an exact replay waiter as a non-actionable watche
   assert.equal(match?.address, "73:2:4");
 });
 
+test("command frontier accepts a skip-to-fight Mystery owner with an exact replay watcher", () => {
+  const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
+  const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };
+  const address = { epoch: 73, wave: 2, turn: 1 };
+  host.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...commandFrontierObservation(0, "owner", "same-state", address).observation,
+      surfaceId: "command:fight",
+      uiMode: "FIGHT",
+    },
+  });
+  guest.evidence.push({
+    kind: "browser-surface2",
+    observation: {
+      ...commandFrontierObservation(1, "watcher", "same-state", address).observation,
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CoopReplayTurnPhase",
+      seatsWithInput: [],
+      ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  const match = findSharedCommandFrontierMatch(host, guest, { host: 0, guest: 0 }, null);
+  assert.equal(match?.hostProjection.kind, "owner");
+  assert.equal(match?.guestProjection.kind, "watcher");
+  assert.equal(match?.address, "73:2:1");
+});
+
 test("command frontier accepts the authoritative engine waiting on a surviving partner", () => {
   const host = { label: "host", publicSeat: 0, evidence: new FakeEvidence("host") };
   const guest = { label: "guest", publicSeat: 1, evidence: new FakeEvidence("guest") };

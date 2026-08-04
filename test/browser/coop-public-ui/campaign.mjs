@@ -730,11 +730,15 @@ export function clientsAwaitingTurnProgress(rig, from, expectedCommandAddress = 
 
 export function findOwnedCommandFrontier(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from);
+  const ownedCommandSurface =
+    (semantic?.observation.surfaceId === "command:command"
+      && semantic.observation.uiMode === "COMMAND")
+    || (semantic?.observation.surfaceId === "command:fight"
+      && semantic.observation.uiMode === "FIGHT");
   if (
-    semantic?.observation.surfaceId === "command:command"
+    ownedCommandSurface
     && semantic.observation.ready?.handlerActive === true
     && semantic.observation.phase === "CommandPhase"
-    && semantic.observation.uiMode === "COMMAND"
     && semantic.observation.localSeat === client.publicSeat
     && semantic.observation.seatsWithInput?.includes(client.publicSeat)
   ) {
@@ -791,11 +795,13 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
     if (observation == null) {
       return findOwnedCommandFrontier(client, cursor) != null;
     }
+    const ownerSurface =
+      (observation.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+      || (observation.surfaceId === "command:fight" && observation.uiMode === "FIGHT");
     const owner =
-      observation.surfaceId === "command:command"
+      ownerSurface
       && observation.operationClass === "command"
       && observation.phase === "CommandPhase"
-      && observation.uiMode === "COMMAND"
       && observation.ready?.handlerActive === true
       && observation.localSeat === client.publicSeat
       && observation.seatsWithInput?.includes(client.publicSeat);
