@@ -269,7 +269,7 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount, priv
     }
     const reports = [];
     const writeEligiblePolicy = ({ split, decisions, result }) => {
-      if (privatePolicyDescriptor == null || split !== "train" || !result.policyDiagnosticEligible) {
+      if (privatePolicyDescriptor == null || split === "test" || !result.policyDiagnosticEligible) {
         return;
       }
       for (const decision of decisions) {

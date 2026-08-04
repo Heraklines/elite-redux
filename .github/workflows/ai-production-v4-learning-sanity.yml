@@ -1,0 +1,133 @@
+name: AI Production V4 Learning Sanity (Read-Only)
+
+# One manual, artifact-safe gate. Raw telemetry, selected decisions, and the
+# exact runtime dictionary stay under RUNNER_TEMP and are deleted. Only
+# aggregate audit and learning reports are uploaded.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-production-v4-learning-sanity
+  cancel-in-progress: false
+
+jobs:
+  sanity:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Audit and falsify contract-v4 learning remotely
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: ./.github/actions/setup-deps
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            ml/policy/requirements.txt
+            ml/baselines/requirements.txt
+
+      - name: Install bounded policy dependencies
+        run: python -m pip install --requirement ml/policy/requirements.txt
+
+      - name: Verify semantic-audit and learning-gate logic
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/ai/combat-contract-v4-audit.test.mjs
+          (
+            cd ml/policy
+            python -m unittest \
+              test_real_learning_sanity \
+              test_candidate_transformer \
+              test_train_candidate_transformer
+          )
+
+      - name: Audit production and retain eligible train-validation rows ephemerally
+        env:
+          TELEMETRY_EXPORT_TOKEN: ${{ secrets.ER_AI_TELEMETRY_EXPORT_TOKEN }}
+          TELEMETRY_EXPORT_URL: https://er-ai-telemetry-export.heraklines.workers.dev/v1/export
+        run: >-
+          node scripts/ai/run-production-combat-v4-audit.mjs
+          --max-invalid-objects 100
+          --shards 128
+          --private-policy-out "$RUNNER_TEMP/eligible-policy.jsonl"
+          --out ai-report/audit
+
+      - name: Select bounded source-disjoint real-data sample
+        run: >-
+          python ml/policy/run_real_learning_sanity.py
+          --data "$RUNNER_TEMP/eligible-policy.jsonl"
+          --report ai-report/sample-selection.json
+          --sample-out "$RUNNER_TEMP/learning-sample.jsonl"
+          --select-only
+          --decisions 512
+          --validation-decisions 256
+          --max-per-source 8
+
+      - name: Fetch exact production dictionary read-only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dictionary_hash=$(jq -r '.samples.training.dictionaryHash' ai-report/sample-selection.json)
+          [[ "$dictionary_hash" =~ ^[0-9a-f]{64}$ ]]
+          npx wrangler r2 object get \
+            "er-telemetry/dictionaries/${dictionary_hash}.json" \
+            --file "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            --remote
+          actual_hash=$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)
+          test "$actual_hash" = "$dictionary_hash"
+
+      - name: Run bounded real-data falsification suite
+        run: >-
+          python ml/policy/run_real_learning_sanity.py
+          --data "$RUNNER_TEMP/learning-sample.jsonl"
+          --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          --report ai-report/learning-sanity.json
+          --decisions 512
+          --validation-decisions 256
+          --max-per-source 8
+          --epochs 120
+          --shuffled-epochs 20
+          --batch-size 64
+          --target-top1 0.99
+          --chance-tolerance 0.10
+          --state-collapse-delta 0.15
+
+      - name: Publish sanitized gate summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f ai-report/learning-sanity.json ]]; then
+            jq '{passed, gates, samples, memorization: .memorization.final, shuffledLabels: {passed: .shuffledLabels.passed, final: .shuffledLabels.final, chanceTop1: .shuffledLabels.chanceTop1}, stateAblation: {passed: .stateAblation.passed, final: .stateAblation.final, top1Collapse: .stateAblation.top1Collapse}, inferenceContract, deterministicResume}' \
+              ai-report/learning-sanity.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Delete private runner-local inputs
+        if: always()
+        shell: bash
+        run: |
+          rm -f \
+            "$RUNNER_TEMP/eligible-policy.jsonl" \
+            "$RUNNER_TEMP/learning-sample.jsonl" \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-production-v4-learning-sanity
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
