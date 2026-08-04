@@ -833,7 +833,14 @@ jobs:
       - name: Run nextest CI profile
         if: steps.contract.outputs.ready == 'true'
         working-directory: rust
-        run: cargo nextest run --workspace --profile ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          nextest_args=(--workspace --profile ci)
+          if [[ ! -e contracts/m1-api.md ]]; then
+            nextest_args+=(--no-tests=pass)
+          fi
+          cargo nextest run "${nextest_args[@]}"
 
       - name: Run workspace doctests
         if: steps.contract.outputs.ready == 'true'
@@ -920,6 +927,12 @@ jobs:
         run: |
           set -euo pipefail
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          m1_contract=rust/contracts/m1-api.md
+          if [[ ! -f "$m1_contract" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: the M1 er-wasm interface is not frozen yet."
+            exit 0
+          fi
           present=0
           missing=()
           for path in "${core[@]}"; do
@@ -931,9 +944,7 @@ jobs:
           done
           wasm_manifest=rust/crates/er-wasm/Cargo.toml
           if [[ ! -f "$wasm_manifest" ]]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Rust kernel pre-contract: er-wasm milestone is not present yet."
-            exit 0
+            missing+=("$wasm_manifest")
           fi
           if ((${#missing[@]} > 0)); then
             printf '::error::er-wasm contract is partially present; missing: %s\n' "${missing[*]}"
