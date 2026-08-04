@@ -55,6 +55,7 @@ import {
 import {
   armReplacementOwnerWindowAfterControlProof as armReplacementOwnerWindowAfterControlProofOnContext,
   buildReplacementCommitEntry,
+  decodeReplacementCommitMaterial,
   type ReplacementAuthorityCarrier,
   type ReplacementProposal,
   type ReplacementResolutionMode,
@@ -1464,6 +1465,35 @@ export class CoopAuthorityV2Shadow {
       }
     }
     return completed;
+  }
+
+  /**
+   * Whether the ordered replica ledger is already holding the exact replacement whose post-summon
+   * presentation belongs to `turn`.
+   *
+   * This is deliberately a boolean address query, not an alternate material carrier. The V2 log remains the
+   * only ordering owner and the retained checkpoint remains the only thing allowed to apply the replacement.
+   * The renderer uses this proof solely to keep latency-hint `battleEvent` copies from overtaking the
+   * immutable REPLACEMENT_COMMIT that names and installs their actor.
+   */
+  hasPendingReplicaReplacementForTurn(epoch: number, wave: number, turn: number): boolean {
+    if (this.disposed) {
+      return false;
+    }
+    for (const entry of this.pendingReplicaEntries.values()) {
+      const image = decodeReplacementCommitMaterial(entry);
+      if (image == null || image.sourceAddress.epoch !== epoch || image.sourceAddress.wave !== wave) {
+        continue;
+      }
+      const carrier = image.authorityCarrier;
+      if (
+        image.sourceAddress.turn === turn
+        || (carrier?.epoch === epoch && carrier.wave === wave && carrier.turn === turn)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // -------------------------------------------------------------------------

@@ -1755,35 +1755,62 @@ export class EncounterPhase extends BattlePhase {
     const enemyField = globalScene.getEnemyField();
 
     if (globalScene.currentBattle.battleType === BattleType.WILD) {
-      for (const enemyPokemon of enemyField) {
-        enemyPokemon.untint(100, "Sine.easeOut");
-        enemyPokemon.cry();
-        enemyPokemon.showInfo();
-        if (enemyPokemon.isShiny()) {
-          globalScene.validateAchv(achvs.SEE_SHINY);
-          erRecordAchievementShinyEncounter();
+      const revealWildEncounter = (): void => {
+        if (!isCurrent()) {
+          return;
         }
-      }
-      globalScene.updateFieldScale();
-      if (showEncounterMessage) {
+        for (const enemyPokemon of enemyField) {
+          enemyPokemon.untint(100, "Sine.easeOut");
+          enemyPokemon.cry();
+          enemyPokemon.showInfo();
+          if (enemyPokemon.isShiny()) {
+            globalScene.validateAchv(achvs.SEE_SHINY);
+            erRecordAchievementShinyEncounter();
+          }
+        }
+        globalScene.updateFieldScale();
+        if (showEncounterMessage) {
+          beginInteractiveWait();
+          try {
+            globalScene.ui.showText(
+              this.getEncounterMessage(),
+              null,
+              () => {
+                if (finishInteractiveWait()) {
+                  this.end();
+                }
+              },
+              1500,
+            );
+          } catch (error) {
+            setInteractiveWaiting(false);
+            throw error;
+          }
+        } else {
+          this.end();
+        }
+      };
+      if (isCoopAuthoritativeGuest()) {
+        // The compatibility party carrier can arrive before the adopted Pokemon's atlas/sprite nodes. Calling
+        // showInfo first exposed health bars while the body remained absent, especially on the first wild
+        // battle after a biome transition. Reveal the already-authored enemy field atomically and only then
+        // run the ordinary cry/message sequence; no fieldSetup, abilities, hazards, AI, or RNG execute here.
         beginInteractiveWait();
-        try {
-          globalScene.ui.showText(
-            this.getEncounterMessage(),
-            null,
-            () => {
-              if (finishInteractiveWait()) {
-                this.end();
-              }
-            },
-            1500,
-          );
-        } catch (error) {
-          setInteractiveWaiting(false);
-          throw error;
-        }
+        void materializeCoopAdoptedEnemyFieldReady(isCurrent)
+          .then(() => {
+            if (finishInteractiveWait()) {
+              revealWildEncounter();
+            }
+          })
+          .catch(error => {
+            if (isCurrent()) {
+              setInteractiveWaiting(false);
+              coopWarn("runtime", "authoritative wild field presentation failed closed", error);
+              failCoopSharedSession("Authoritative wild battlers could not become actionable");
+            }
+          });
       } else {
-        this.end();
+        revealWildEncounter();
       }
     } else if (globalScene.currentBattle.battleType === BattleType.TRAINER) {
       const trainer = globalScene.currentBattle.trainer;

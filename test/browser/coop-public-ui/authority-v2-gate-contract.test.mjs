@@ -1840,6 +1840,37 @@ test("Fun and Games owns a complete direct-turn V2 lifecycle instead of opening 
   );
 });
 
+test("replacement entry presentation cannot overtake its admitted immutable actor material", () => {
+  assert.match(
+    shadow,
+    /hasPendingReplicaReplacementForTurn[\s\S]*decodeReplacementCommitMaterial[\s\S]*authorityCarrier/u,
+    "the ordered replica exposes only an address-exact pending replacement proof",
+  );
+  assert.match(
+    coopRuntime,
+    /hasPendingCoopV2ReplacementMaterialForReplay[\s\S]*hasPendingReplicaReplacementForTurn/u,
+    "the renderer reads pending replacement order through its captured runtime",
+  );
+  assert.match(
+    replayTurnPhase,
+    /holdLiveBehindReplacement = hasPendingCoopV2ReplacementMaterialForReplay[\s\S]*holdLiveBehindReplacement[\s\S]*consumeLiveEventsFrom[\s\S]*awaitTurnOrLiveEvent\([\s\S]*holdLiveBehindReplacement/u,
+    "generic live hints remain buffered until the exact replacement transaction installs their actor",
+  );
+  assert.match(
+    battleStream,
+    /holdLiveBehindReplacement = false[\s\S]*!holdLiveBehindReplacement && liveEntry[\s\S]*holdLiveBehindReplacement \|\| !matchesWait/u,
+    "both buffered and newly-arriving live hints lose the race while replacement material is pending",
+  );
+});
+
+test("an authoritative wild intro cannot expose its bars before the adopted sprite is actionable", () => {
+  assert.match(
+    encounterPhase,
+    /BattleType\.WILD[\s\S]*revealWildEncounter[\s\S]*isCoopAuthoritativeGuest\(\)[\s\S]*materializeCoopAdoptedEnemyFieldReady\(isCurrent\)[\s\S]*revealWildEncounter\(\)/u,
+    "the guest proves the complete adopted field before running the ordinary wild reveal",
+  );
+});
+
 test("Mystery projection construction cannot recursively attest an unopened handler", () => {
   const installerStart = replayMePhase.indexOf("public installCoopV2MePresentation(");
   const installerEnd = replayMePhase.indexOf("/**", installerStart + 1);

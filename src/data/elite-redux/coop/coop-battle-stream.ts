@@ -4754,6 +4754,7 @@ export class CoopBattleStreamer {
     turn: number,
     fromSeq: number,
     sourceWave?: number,
+    holdLiveBehindReplacement = false,
   ): Promise<
     | { kind: "turn"; res: CoopTurnResolution | null }
     | { kind: "live" }
@@ -4778,7 +4779,7 @@ export class CoopBattleStreamer {
       return this.awaitTurn(turn, sourceWave).then(res => ({ kind: "turn" as const, res }));
     }
     const liveEntry = this.liveTurnEntry(turn, sourceWave);
-    if (liveEntry != null && liveEntry[1].events.has(fromSeq)) {
+    if (!holdLiveBehindReplacement && liveEntry != null && liveEntry[1].events.has(fromSeq)) {
       return Promise.resolve({ kind: "live" as const });
     }
     const waitKey = this.turnWaitAddress(turn, sourceWave).key;
@@ -4798,7 +4799,7 @@ export class CoopBattleStreamer {
           waitedAddress == null
             ? this.authorityContext == null && liveAddress.turn === turn
             : sameTurnAddress(liveAddress, waitedAddress);
-        if (settled || !matchesWait || seq < fromSeq) {
+        if (settled || holdLiveBehindReplacement || !matchesWait || seq < fromSeq) {
           return;
         }
         settled = true;

@@ -7525,3 +7525,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   though the implementation deliberately captured that engine value before constructing the predicate. The
   contract now anchors the actual `mysteryTerminalAfterTurn` declaration and its `turnsRemaining <= 0`
   condition. This is a harness-only correction; the qualified product material remains unchanged.
+- Surface artifact `30867124011` proves a separate product ordering bug after a host-owned faint: V2
+  replacement revision 3 was already admitted at `materialDeferred`, but the guest drained its live Sticky
+  Web/stat prefix before the compatibility checkpoint installed Chikorita, so the stat renderer failed with
+  `stat-actor-not-displayed`. The renderer now consults the address-exact pending V2 replacement ledger and
+  holds both buffered and newly arriving live hints behind that immutable checkpoint. A failure-first stream
+  regression preserves the latency hints and proves only the checkpoint can win their parked race.
+- Ordinary guest wild intros had another presentation-only ordering seam: `showInfo()` exposed the bars before
+  the adopted object's atlas/sprite readiness was proven. The wild branch now uses the same bounded,
+  address-lifetime-fenced `materializeCoopAdoptedEnemyFieldReady` gate as trainers, then reveals the sprite,
+  cry, info, and encounter message. This is cosmetic projection only and executes no field setup or mechanics.

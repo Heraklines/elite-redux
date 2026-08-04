@@ -4812,6 +4812,27 @@ export function retryCoopV2PendingAuthorityAtSafeBoundary(runtime: CoopRuntime |
 }
 
 /**
+ * Read-only proof that the replica has admitted an exact replacement for this replay turn but has not yet
+ * installed its immutable carrier. Generic live presentation must stay behind that carrier because its
+ * entry-effect actors do not exist on the renderer until replacement material applies.
+ */
+export function hasPendingCoopV2ReplacementMaterialForReplay(wave: number, turn: number): boolean {
+  const runtime = active;
+  if (
+    runtime == null
+    || runtime.controller.authorityRole !== "replica"
+    || !isCoopV2ReplacementCutoverActive()
+  ) {
+    return false;
+  }
+  return (
+    coopV2ShadowHarnesses
+      .get(runtime)
+      ?.hasPendingReplicaReplacementForTurn(runtime.controller.sessionEpoch, wave, turn) === true
+  );
+}
+
+/**
  * Reconstruct the COMPLETE legacy `turnResolution` carrier from an enriched v2 TURN_COMMIT material image
  * (surface 1). Returns `null` when any cutover companion is missing/mistyped (a bare shadow-parity image or
  * an older host) - the caller then falls back to the checkpoint-only apply, byte-identical to the
