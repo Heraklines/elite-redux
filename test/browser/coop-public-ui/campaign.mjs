@@ -41,8 +41,7 @@ const TURN_PROGRESS =
 const REPLACEMENT_PHASE_START = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
-const ORDERED_TRAINER_VICTORY =
-  /\[coop:v2-control\] projected ordered trainer victory rev=\d+ wave=(\d+) turn=(\d+)/u;
+const ORDERED_TRAINER_VICTORY = /\[coop:v2-control\] projected ordered trainer victory rev=\d+ wave=(\d+) turn=(\d+)/u;
 const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set([
   "MessagePhase",
   "TrainerVictoryPhase",
