@@ -7595,3 +7595,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   product change. The predicate now admits exactly one known non-local active owner only when the live Mystery
   explicitly declares the direct-turn `NO_BATTLE` geometry; an ordinary capacity-two field with one missing
   slot still fails closed. The pure regression covers both identical shapes with the declaration toggled.
+- Full exact gate `30878504470` exposed one stale source contract in the fast-contract job: it still required
+  the old zero-argument `shiftPhase()` signature after the scheduler fix made the completing phase identity
+  explicit. The production implementation is correct and the focused scheduler regression is green; the
+  exhaustive assertion now proves the stronger invariant that a stale predecessor completion returns before
+  it can settle or shift the currently installed authoritative modal.

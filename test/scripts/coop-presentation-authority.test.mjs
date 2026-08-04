@@ -843,7 +843,11 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
     manager,
     /if \(this\.coopMutationLedgerRequired\) \{[\s\S]+authoritative co-op phase \$\{phase\.phaseName\} has no scene-bound mutation ledger/u,
   );
-  assert.match(manager, /shiftPhase\(\)[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u);
+  assert.match(
+    manager,
+    /shiftPhase\(completingPhase\?: Phase\)[\s\S]+if \(completingPhase != null && completingPhase !== this\.currentPhase\)[\s\S]+return;[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u,
+    "a stale asynchronous predecessor completion returns before it can settle or shift the authoritative modal",
+  );
   assert.match(runtime, /mutationLedger:\s*new CoopMutationLedger\(\)/u);
   assert.match(
     runtime,
