@@ -7538,3 +7538,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Candidate run `30872650241` stopped before Chromium on exactly two formatter-only diffs in the new runtime
   query/call site. Its owned TypeScript slice was clean (repository baseline 206 unrelated diagnostics). The
   formatter output was applied verbatim; no production behavior or test expectation changed.
+- The focused browser build had silently omitted `shadow.ts`, `coop-battle-stream.ts`, `encounter-phase.ts`,
+  and the stream regression from its owned static slice. The type diagnostic fence now owns every co-op data
+  module plus these encounter/test seams, Biome checks the four exact files, and faint-replacement builds run
+  the real battle-stream Vitest regression remotely before Chromium. Future changes to this call chain can no
+  longer reach the expensive browser job without first proving the exact race contract.
