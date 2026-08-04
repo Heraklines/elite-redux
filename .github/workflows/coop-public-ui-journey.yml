@@ -19,6 +19,7 @@ on:
       # production journey merely because it was not added to this list yet.
       - "src/field/**"
       - "src/phase-manager.ts"
+      - "src/phase.ts"
       - "src/phases/**"
       - "src/ui/**"
       - "test/browser/coop-public-ui/**"
@@ -174,7 +175,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/battle-scene|src/data/elite-redux/coop/[^()]+|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-turn-phase|src/phases/encounter-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui-inputs|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|src/ui/ui|test/tests/elite-redux/coop/coop-battle-stream.test|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/battle-scene|src/data/elite-redux/coop/[^()]+|src/data/moves/move|src/dev-tools/registry|src/phase-manager|src/phase|src/phases/command-phase|src/phases/coop-guest-faint-switch-phase|src/phases/coop-replay-learn-move-batch|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-phases|src/phases/coop-replay-turn-phase|src/phases/encounter-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui-inputs|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|src/ui/ui|test/tests/elite-redux/coop/coop-ability-picker-relay.test|test/tests/elite-redux/coop/coop-battle-stream.test|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -203,7 +204,12 @@ jobs:
             src/data/elite-redux/coop/coop-webrtc-transport.ts \
             src/data/moves/move.ts \
             src/dev-tools/registry.ts \
+            src/phase-manager.ts \
+            src/phase.ts \
             src/phases/command-phase.ts \
+            src/phases/coop-guest-faint-switch-phase.ts \
+            src/phases/coop-replay-learn-move-batch.ts \
+            src/phases/coop-replay-phases.ts \
             src/phases/coop-replay-turn-phase.ts \
             src/phases/encounter-phase.ts \
             src/phases/er-ability-capsule-phase.ts \
@@ -257,6 +263,7 @@ jobs:
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs \
             test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts \
+            test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts \
             test/tests/elite-redux/coop/coop-battle-stream.test.ts \
             test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
             test/tests/elite-redux/coop/coop-p33-client.test.ts \
@@ -353,6 +360,21 @@ jobs:
           COOP_AUTHORITY_V2_INTERACTION: "on"
           COOP_AUTHORITY_V2_RECOVERY: "on"
         run: npx vitest run test/tests/elite-redux/coop/coop-battle-stream.test.ts --reporter=dot
+
+      - name: Verify authoritative modal scheduler ownership regression
+        if: inputs.journey == 'registered-interactions'
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts
+          test/tests/elite-redux/coop/coop-evolution-authoritative.test.ts
+          --reporter=dot
 
       - name: Verify immutable trainer-victory material before browser launch
         env:

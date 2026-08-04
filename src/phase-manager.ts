@@ -370,6 +370,8 @@ export class PhaseManager {
   private currentPhase: Phase;
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
+  /** A suspended predecessor may finish asynchronously, but may not displace the modal above it. */
+  private completedStandbyPhase: Phase | null = null;
   /**
    * Exact phase objects that crossed the scheduler's one production/test start seam.
    *
@@ -510,6 +512,7 @@ export class PhaseManager {
       this.standbyPhase.retire();
     }
     this.standbyPhase = null;
+    this.completedStandbyPhase = null;
   }
 
   /** Freeze phase progression at the current surface while a co-op shared terminal is retained. */
@@ -617,7 +620,12 @@ export class PhaseManager {
     ) {
       return false;
     }
+    if (this.standbyPhase != null && this.standbyPhase !== predecessor) {
+      this.settleCoopMutationPhase(this.standbyPhase);
+      this.standbyPhase.retire();
+    }
     this.standbyPhase = predecessor;
+    this.completedStandbyPhase = null;
     this.currentPhase = successor;
     this.startCurrentPhase();
     return true;
@@ -648,6 +656,7 @@ export class PhaseManager {
 
     const predecessor = this.standbyPhase;
     this.standbyPhase = null;
+    this.completedStandbyPhase = null;
     this.settleCoopMutationPhase(phase);
     phase.retire();
     this.settleCoopMutationPhase(predecessor);
@@ -674,7 +683,16 @@ export class PhaseManager {
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
-  public shiftPhase(): void {
+  public shiftPhase(completingPhase?: Phase): void {
+    // An asynchronous presentation callback can resolve after Authority V2 has installed a modal over that
+    // exact phase. Its completion belongs to the suspended predecessor; it must be remembered for the modal's
+    // eventual return edge, but it may never shift the current modal or restore itself underneath the UI.
+    if (completingPhase != null && completingPhase !== this.currentPhase) {
+      if (completingPhase === this.standbyPhase) {
+        this.completedStandbyPhase = completingPhase;
+      }
+      return;
+    }
     if (this.coopTerminalProgressionFrozen) {
       return;
     }
@@ -686,9 +704,18 @@ export class PhaseManager {
     }
     this.settleCoopMutationPhase(this.currentPhase);
     if (this.standbyPhase) {
-      this.currentPhase = this.standbyPhase;
+      const standby = this.standbyPhase;
       this.standbyPhase = null;
-      return;
+      if (this.completedStandbyPhase !== standby) {
+        this.completedStandbyPhase = null;
+        this.currentPhase = standby;
+        return;
+      }
+      // The predecessor already reached its natural terminal while suspended. Consume that deferred shift
+      // now instead of resurrecting a dead replay with the modal's PARTY/menu handler still on screen.
+      this.completedStandbyPhase = null;
+      this.settleCoopMutationPhase(standby);
+      standby.retire();
     }
 
     let nextPhase = this.phaseQueue.getNextPhase();
@@ -726,11 +753,28 @@ export class PhaseManager {
     this.settleCoopMutationPhase(phase);
     if (this.standbyPhase) {
       const selectedSuccessor = this.standbyPhase;
-      const successorWasStarted = this.startedPhases.has(selectedSuccessor);
-      this.currentPhase = selectedSuccessor;
+      const standbyCompleted = this.completedStandbyPhase === selectedSuccessor;
       this.standbyPhase = null;
+      this.completedStandbyPhase = null;
+      if (standbyCompleted) {
+        this.settleCoopMutationPhase(selectedSuccessor);
+        selectedSuccessor.retire();
+        let nextPhase = this.phaseQueue.getNextPhase();
+        if (nextPhase?.is("DynamicPhaseMarker")) {
+          nextPhase = this.dynamicQueueManager.popNextPhase(nextPhase.phaseType);
+        }
+        if (nextPhase == null) {
+          this.turnStart();
+        } else {
+          this.currentPhase = nextPhase;
+        }
+      } else {
+        this.currentPhase = selectedSuccessor;
+      }
+      const selectedAfterClose = this.currentPhase;
+      const successorWasStarted = this.startedPhases.has(selectedAfterClose);
       const startSelectedSuccessor = commitAfterClose();
-      if (this.currentPhase !== selectedSuccessor) {
+      if (this.currentPhase !== selectedAfterClose) {
         return true;
       }
       if (!startSelectedSuccessor) {
@@ -827,6 +871,7 @@ export class PhaseManager {
     }
 
     this.standbyPhase = this.currentPhase;
+    this.completedStandbyPhase = null;
     this.currentPhase = phase;
     this.startCurrentPhase();
 

@@ -392,7 +392,7 @@ export class CoopReplayTurnPhase extends Phase {
       return;
     }
     this.settleOwnedResources();
-    (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase();
+    (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase(this);
   }
 
   /** Whether this renderer has installed the exact-address turn/live-event continuation wait. */

@@ -228,12 +228,12 @@ export class CoopReplayLearnMoveBatchPhase extends Phase {
     scene.ui.setMode(UiMode.MESSAGE).then(
       () => {
         if (scene.phaseManager.getCurrentPhase() === this) {
-          scene.phaseManager.shiftPhase();
+          scene.phaseManager.shiftPhase(this);
         }
       },
       () => {
         if (scene.phaseManager.getCurrentPhase() === this) {
-          scene.phaseManager.shiftPhase();
+          scene.phaseManager.shiftPhase(this);
         }
       },
     );

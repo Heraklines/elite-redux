@@ -7543,3 +7543,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   module plus these encounter/test seams, Biome checks the four exact files, and faint-replacement builds run
   the real battle-stream Vitest regression remotely before Chromium. Future changes to this call chain can no
   longer reach the expensive browser job without first proving the exact race contract.
+- Exact staged registered-interactions run `30871894932` reached the real Revival Blessing interaction before
+  the forced Wobbuffet event and exposed a different product scheduler race. The guest admitted and projected
+  the exact `REVIVAL` commit at global revision 4 from `CoopMoveAnimReplayPhase`; the PARTY watcher visibly
+  opened, but the move animation's later completion shifted the newly installed modal out and restored the
+  completed replay beneath it. The result was a real PARTY UI with no phase/control owner and a permanent
+  `controlDeferred` wait. This is not an ambient address defect: the exact address, payload, and projector all
+  succeeded before phase ownership was clobbered.
+- The scheduler now identifies the phase requesting a shift. A suspended predecessor's asynchronous terminal
+  is recorded without displacing the authoritative modal; when that modal closes, the completed predecessor
+  is retired instead of resurrected and the ordered queue advances. Co-op replay phases that previously called
+  the manager directly now carry their identity through the same seam. The focused registered-interactions
+  build owns the scheduler/replay files and runs the failure-first modal regression remotely before Chromium.
+- Navigation-depth run `30865215640` finished red on the older `f4362888a` build after 2h34m. Its already
+  preserved predecessor artifact had shown the driver exhausting one party-mutating reward, returning to the
+  reward row, then suppressing the new nested target because the second item reused the same V2 address and
+  phase identity. The retry path now clears only both reward-related handled appearances (`reward:*` and
+  `reward-target:*`), retaining unrelated Mystery/navigation ledgers; a focused node regression guards it.
+- Faint-replacement animations-on run `30872915830` remains active on exact SHA `9a1bfd9df` and must not be
+  cancelled. It independently qualifies the replacement/live-event ordering and ordinary wild atomic reveal
+  fixes while the combined modal/reward-retry candidate is prepared. Production remains untouched.

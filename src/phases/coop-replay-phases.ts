@@ -617,9 +617,7 @@ export class CoopFormChangeReplayPhase extends Phase {
     }
     this.ended = true;
     this.clearOwnedResources();
-    if (this.ownerPhaseManager.getCurrentPhase() === this) {
-      this.ownerPhaseManager.shiftPhase();
-    }
+    this.ownerPhaseManager.shiftPhase(this);
   }
 
   private fail(outcome: CoopPresentationOutcome): void {
@@ -883,9 +881,7 @@ export class CoopAppearanceReplayPhase extends Phase {
     this.ended = true;
     this.clearOwnedResources();
     settleCoopPresentationOutcome(this.outcomeToken, outcome);
-    if (this.ownerPhaseManager.getCurrentPhase() === this) {
-      this.ownerPhaseManager.shiftPhase();
-    }
+    this.ownerPhaseManager.shiftPhase(this);
   }
 
   public override retire(): void {
@@ -1046,9 +1042,7 @@ export class CoopTransformReplayPhase extends Phase {
     this.ended = true;
     this.clearOwnedResources();
     settleCoopPresentationOutcome(this.outcomeToken, outcome);
-    if (this.ownerPhaseManager.getCurrentPhase() === this) {
-      this.ownerPhaseManager.shiftPhase();
-    }
+    this.ownerPhaseManager.shiftPhase(this);
   }
 
   public override retire(): void {

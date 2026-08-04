@@ -265,7 +265,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       // Do not hold the replay tree in front of CoopFinalizeTurnPhase: that phase is what applies the
       // settled TURN_COMMIT whose successor releases the reconstruction callback above.
       this.opened = true;
-      scene.phaseManager.shiftPhase();
+      scene.phaseManager.shiftPhase(this);
       return;
     }
     this.opened = true;
@@ -335,7 +335,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
             return;
           }
           markPickerMaterialized();
-          scene.phaseManager.shiftPhase();
+          scene.phaseManager.shiftPhase(this);
         }),
       );
     };
@@ -378,7 +378,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         failCoopSharedSession("The replacement picker failed after losing its exact phase boundary.");
         return;
       }
-      scene.phaseManager.shiftPhase();
+      scene.phaseManager.shiftPhase(this);
       markPickerMaterialized();
     };
     try {

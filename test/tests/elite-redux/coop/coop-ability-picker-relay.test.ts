@@ -155,6 +155,28 @@ describe("co-op ER ability-picker outcome relay (#633 B9c) - wire round-trip", (
     expect(orderedSuccessor.starts).toBe(1);
   });
 
+  it("a suspended async predecessor cannot displace its authoritative modal when its callback finishes", () => {
+    const phaseManager = new PhaseManager();
+    const replay = new RecordingMessagePhase();
+    const revivalModal = new RecordingMessagePhase();
+    const orderedSuccessor = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = replay;
+    phaseManager.pushPhase(orderedSuccessor);
+
+    expect(phaseManager.replaceWithCoopAuthoritativeModal(replay, revivalModal)).toBe(true);
+    phaseManager.shiftPhase(replay);
+
+    expect(phaseManager.getCurrentPhase(), "the late replay callback cannot steal current control").toBe(revivalModal);
+    expect(phaseManager.getStandbyPhase(), "the completed replay remains parked until the modal closes").toBe(replay);
+
+    phaseManager.shiftPhase(revivalModal);
+
+    expect(replay.wasRetired, "the naturally completed standby is never resurrected").toBe(true);
+    expect(phaseManager.getStandbyPhase()).toBeNull();
+    expect(phaseManager.getCurrentPhase()).toBe(orderedSuccessor);
+    expect(orderedSuccessor.starts).toBe(1);
+  });
+
   it("rides a DEDICATED seq the shop loop never reads (channel isolation - the BLOCKING fix)", async () => {
     // The derived seq must differ from the raw shop seq the reward-shop watch loop awaits...
     expect(SEQ).not.toBe(SHOP_SEQ);

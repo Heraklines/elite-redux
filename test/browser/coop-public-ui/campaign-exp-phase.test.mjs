@@ -26,6 +26,7 @@ import {
   hasProvisionalCommandWatcherSurface,
   hasProvisionalMysteryNarrationSurface,
   isExplicitEmptyRewardShop,
+  resetRewardRetrySurfaceLedger,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -1098,6 +1099,21 @@ test("an explicit empty reward pool is a real Continue surface, not an exhausted
   assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "cursor:0", optionIds: [], optionCount: 0 }), true);
   assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "cursor:0", optionIds: null, optionCount: null }), false);
   assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "REVIVE", optionIds: ["REVIVE"], optionCount: 1 }), false);
+});
+
+test("an exhausted party reward releases both nested appearances before selecting a second item", () => {
+  const clients = [{ label: "authority" }, { label: "renderer" }];
+  const handled = new Map([
+    ["reward:authority", "reward-one"],
+    ["reward:renderer", "reward-one-watcher"],
+    ["reward-target:authority", "party-one"],
+    ["reward-target:renderer", "party-one-watcher"],
+    ["mystery-encounter:authority", "unrelated-surface"],
+  ]);
+
+  resetRewardRetrySurfaceLedger(handled, clients);
+
+  assert.deepEqual([...handled], [["mystery-encounter:authority", "unrelated-surface"]]);
 });
 
 test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {

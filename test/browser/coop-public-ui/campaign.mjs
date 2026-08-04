@@ -3948,6 +3948,22 @@ export function isExplicitEmptyRewardShop(authority) {
   return Array.isArray(authority?.optionIds) && authority.optionIds.length === 0 && authority.optionCount === 0;
 }
 
+/**
+ * Release only the two semantic appearances that participate in an exhausted party-reward retry.
+ *
+ * The reward shop can reopen PARTY for a different item without changing the Authority V2 address,
+ * SelectModifierPhase instance, or PARTY surface generation. Keeping the first picker's handled
+ * identity therefore makes the driver ignore the second picker's real actionable UI forever. A
+ * human has explicitly returned to the reward row at this point, so both the row and its nested
+ * picker are new work; unrelated between-wave surfaces must remain suppressed.
+ */
+export function resetRewardRetrySurfaceLedger(handledIndex, clients) {
+  for (const client of clients) {
+    handledIndex.delete(`reward:${client.label}`);
+    handledIndex.delete(`reward-target:${client.label}`);
+  }
+}
+
 async function moveRewardPartyCursor(rig, owner, event, targetSlot) {
   const match = /^party-slot:(\d+)$/u.exec(event.observation.selectedOptionId ?? "");
   if (match == null) {
@@ -4636,9 +4652,7 @@ async function driveOnePendingSurface(
         }
         rewardRetryState.rejectedByAddress.set(result.addressKey, rejected);
         rewardRetryState.pendingTarget = null;
-        for (const candidate of Object.values(rig.clients)) {
-          handledIndex.delete(`reward:${candidate.label}`);
-        }
+        resetRewardRetrySurfaceLedger(handledIndex, Object.values(rig.clients));
         client.evidence.record("campaign-reward-target-exhausted", {
           address: result.address,
           rewardId: result.rewardId,
