@@ -587,10 +587,14 @@ function settleCoopFieldPresentationInternal(
   request: CoopFieldPresentationRequest,
   assetsAlreadyLoaded: boolean,
 ): number {
-  const wanted = new Set(request.seats.map(seat => seat.pokemon.id));
+  // Match the exact retained actor objects, not their serialized ids. Recovery can reconstruct a fresh
+  // Pokemon carrying the same authoritative id while an interrupted presentation leaves the predecessor
+  // in Phaser's field container. Treating that predecessor as wanted produces two visible copies of one
+  // battler and makes later slot/presentation proofs ambiguous.
+  const wanted = new Set(request.seats.map(seat => seat.pokemon));
   if (request.hideStale) {
     for (const stale of getActuallyFieldedCoopPokemon(request.side)) {
-      if (!wanted.has(stale.id)) {
+      if (!wanted.has(stale)) {
         hidePokemonPresentation(stale);
       }
     }
