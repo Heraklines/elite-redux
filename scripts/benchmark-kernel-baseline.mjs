@@ -16,6 +16,7 @@ import { performance } from "node:perf_hooks";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DEFAULT_MANIFEST = resolve(ROOT, "rust/fixtures/v1/baseline-manifest.json");
+const SOURCE_LOCK = resolve(ROOT, "rust/source-lock.toml");
 const RSS_MARKER = "__RUST_KERNEL_BASELINE_MAX_RSS_KIB__";
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const REQUIRED_SCENARIO_IDS = [
@@ -38,7 +39,7 @@ function usage() {
     "",
     "Options:",
     "  --manifest FILE            Baseline manifest path (default: rust/fixtures/v1/baseline-manifest.json).",
-    "  --oracle-game-sha SHA      Explicit game-source SHA; otherwise GITHUB_SHA, ORACLE_GAME_SHA, or git HEAD.",
+    "  --oracle-game-sha SHA      Explicit oracle SHA; otherwise rust/source-lock.toml or the manifest oracle SHA.",
     "  --sample-count N           Override every scenario's requested measurement sample count.",
     "  --scenario ID              Measure/describe one manifest scenario instead of all scenarios.",
     "  --help                     Show this help.",
@@ -134,6 +135,12 @@ function readManifest(path) {
   if (manifest.schema_version !== 1) {
     throw new Error(`manifest schema_version must be 1; got ${manifest.schema_version ?? "<missing>"}`);
   }
+  if (!/^[0-9a-f]{40}$/u.test(manifest.oracle_game_sha ?? "")) {
+    throw new Error("manifest oracle_game_sha must be a 40-character lowercase SHA");
+  }
+  if (manifest.protocol_version !== "er-coop-47") {
+    throw new Error(`manifest protocol_version must be er-coop-47; got ${manifest.protocol_version ?? "<missing>"}`);
+  }
   if (!Array.isArray(manifest.scenarios) || manifest.scenarios.length === 0) {
     throw new Error("manifest scenarios must be a non-empty array");
   }
@@ -188,15 +195,7 @@ function runnerMetadata() {
   };
 }
 
-function resolveOracleGameSha(explicit) {
-  if (explicit !== null) {
-    return { value: explicit, source: "argument" };
-  }
-  const environmentSha = process.env.GITHUB_SHA?.trim() || process.env.ORACLE_GAME_SHA?.trim();
-  if (environmentSha) {
-    return { value: environmentSha, source: process.env.GITHUB_SHA?.trim() ? "GITHUB_SHA" : "ORACLE_GAME_SHA" };
-  }
-
+function readGitHead() {
   const result = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: ROOT,
     encoding: "utf8",
@@ -204,10 +203,42 @@ function resolveOracleGameSha(explicit) {
     windowsHide: true,
   });
   if (result.error || result.status !== 0) {
-    return { value: null, source: "unavailable" };
+    return null;
   }
   const sha = result.stdout.trim();
-  return sha.length > 0 ? { value: sha, source: "git HEAD" } : { value: null, source: "unavailable" };
+  return sha.length > 0 ? sha : null;
+}
+
+function readSourceLockOracleSha() {
+  if (!existsSync(SOURCE_LOCK)) {
+    return null;
+  }
+  const contents = readFileSync(SOURCE_LOCK, "utf8");
+  const match = contents.match(/^\s*oracle_game_sha\s*=\s*"([0-9a-f]{40})"\s*$/mu);
+  if (match === null) {
+    throw new Error("rust/source-lock.toml exists but has no valid oracle_game_sha entry");
+  }
+  return match[1];
+}
+
+function resolveOracleGameSha(explicit, manifest) {
+  if (explicit !== null) {
+    return { value: explicit, source: "argument" };
+  }
+  const sourceLockSha = readSourceLockOracleSha();
+  if (sourceLockSha !== null) {
+    return { value: sourceLockSha, source: "rust/source-lock.toml" };
+  }
+  return { value: manifest.oracle_game_sha, source: "manifest.oracle_game_sha" };
+}
+
+function resolveCandidateGameSha() {
+  const githubSha = process.env.GITHUB_SHA?.trim();
+  if (githubSha) {
+    return { value: githubSha, source: "GITHUB_SHA" };
+  }
+  const gitHead = readGitHead();
+  return gitHead === null ? { value: null, source: "unavailable" } : { value: gitHead, source: "git HEAD" };
 }
 
 function resolveExecutable(executable) {
@@ -278,7 +309,7 @@ function runProcess(command, environment, timeoutMs) {
       clearTimeout(killHandle);
       const endedAt = performance.now();
       const executionMs = spawnAt === null ? null : Math.max(0, Math.round(endedAt - spawnAt));
-      const startMs = spawnAt === null ? null : Math.max(0, Math.round(spawnAt - startedAt));
+      const spawnLatencyMs = spawnAt === null ? null : Math.max(0, Math.round(spawnAt - startedAt));
       let reason = null;
       if (status === "timeout") {
         reason = `process exceeded timeout of ${timeoutMs} ms`;
@@ -292,7 +323,7 @@ function runProcess(command, environment, timeoutMs) {
         reason,
         exit_code: exitCode,
         signal,
-        start_ms: startMs,
+        spawn_latency_ms: spawnLatencyMs,
         execution_ms: executionMs,
         peak_rss_bytes: parsePeakRssBytes(stderr),
         rss_reason: processCommand.rssReason,
@@ -370,6 +401,7 @@ function baseRecord(scenario, requestedSampleCount, status, reason) {
     setup_build_ms: null,
     cold_start_ms: null,
     warm_start_ms: null,
+    spawn_latency_ms: null,
     execution_ms: null,
     peak_rss_bytes: null,
     status,
@@ -380,6 +412,7 @@ function baseRecord(scenario, requestedSampleCount, status, reason) {
       setup_build_ms: setupCommands.length > 0 ? noMeasurementReason : "no setup/build command is defined for this scenario",
       cold_start_ms: noMeasurementReason,
       warm_start_ms: noMeasurementReason,
+      spawn_latency_ms: noMeasurementReason,
       execution_ms: noMeasurementReason,
       peak_rss_bytes: noMeasurementReason,
       sample_count: noMeasurementReason,
@@ -422,6 +455,7 @@ async function measureRecord(scenario, requestedSampleCount) {
       record.metric_reasons.setup_build_ms = "setup/build did not complete successfully";
       record.metric_reasons.cold_start_ms = "scenario command was not launched after setup/build failure";
       record.metric_reasons.warm_start_ms = "scenario command was not launched after setup/build failure";
+      record.metric_reasons.spawn_latency_ms = "scenario command was not launched after setup/build failure";
       record.metric_reasons.execution_ms = "scenario command was not launched after setup/build failure";
       record.metric_reasons.peak_rss_bytes = result.rss_reason ?? "scenario command was not launched after setup/build failure";
       return record;
@@ -432,9 +466,9 @@ async function measureRecord(scenario, requestedSampleCount) {
     record.metric_reasons.setup_build_ms = null;
   }
 
-  const starts = [];
-  const executions = [];
-  const rss = [];
+  const completeExecutions = [];
+  const spawnLatencies = [];
+  const completeRss = [];
   let attempted = 0;
   let completed = 0;
   let failure = null;
@@ -443,16 +477,14 @@ async function measureRecord(scenario, requestedSampleCount) {
     if (result.attempted) {
       attempted++;
     }
-    if (result.start_ms !== null) {
-      starts.push(result.start_ms);
+    if (result.spawn_latency_ms !== null) {
+      spawnLatencies.push(result.spawn_latency_ms);
     }
-    if (result.execution_ms !== null) {
-      executions.push(result.execution_ms);
-    }
-    if (result.peak_rss_bytes !== null) {
-      rss.push(result.peak_rss_bytes);
-    }
-    if (result.status === "passed" || result.status === "failed") {
+    if (result.status === "passed" && result.execution_ms !== null) {
+      completeExecutions.push(result.execution_ms);
+      if (result.peak_rss_bytes !== null) {
+        completeRss.push(result.peak_rss_bytes);
+      }
       completed++;
     }
     if (result.status !== "passed") {
@@ -463,17 +495,19 @@ async function measureRecord(scenario, requestedSampleCount) {
 
   record.attempted_sample_count = attempted > 0 ? attempted : null;
   record.sample_count = completed > 0 ? completed : null;
-  record.cold_start_ms = starts.length > 0 ? starts[0] : null;
-  record.warm_start_ms = starts.length > 1 ? median(starts.slice(1)) : null;
-  record.execution_ms = executions.length > 0 ? median(executions) : null;
-  record.peak_rss_bytes = rss.length > 0 ? Math.max(...rss) : null;
-  record.metric_reasons.cold_start_ms = record.cold_start_ms === null ? "the child did not emit a spawn event" : null;
-  record.metric_reasons.warm_start_ms = record.warm_start_ms === null ? "no second completed launch was requested or observed" : null;
-  record.metric_reasons.execution_ms = record.execution_ms === null ? "no child execution interval was observed" : null;
-  record.metric_reasons.sample_count = record.sample_count === null ? "no completed child sample was observed" : null;
+  record.cold_start_ms = completeExecutions.length > 0 ? completeExecutions[0] : null;
+  record.warm_start_ms = completeExecutions.length > 1 ? median(completeExecutions.slice(1)) : null;
+  record.spawn_latency_ms = spawnLatencies.length > 0 ? median(spawnLatencies) : null;
+  record.execution_ms = completeExecutions.length > 0 ? median(completeExecutions) : null;
+  record.peak_rss_bytes = completeRss.length > 0 ? Math.max(...completeRss) : null;
+  record.metric_reasons.cold_start_ms = record.cold_start_ms === null ? "no complete successful scenario execution was observed" : null;
+  record.metric_reasons.warm_start_ms = record.warm_start_ms === null ? "no later complete successful scenario execution was observed" : null;
+  record.metric_reasons.spawn_latency_ms = record.spawn_latency_ms === null ? "the child did not emit a spawn event" : null;
+  record.metric_reasons.execution_ms = record.execution_ms === null ? "no complete successful scenario execution was observed" : null;
+  record.metric_reasons.sample_count = record.sample_count === null ? "no complete successful scenario sample was observed" : null;
   record.metric_reasons.peak_rss_bytes =
     record.peak_rss_bytes === null
-      ? (failure?.rss_reason ?? "GNU time did not report a peak RSS value")
+      ? (failure?.rss_reason ?? "no complete successful scenario execution supplied a peak RSS value")
       : null;
 
   if (failure !== null) {
@@ -520,7 +554,8 @@ async function main() {
     throw new Error(`scenario not found in manifest: ${options.scenario}`);
   }
   const requestedCounts = scenarios.map(scenario => options.sampleCount ?? scenario.sample_count);
-  const oracle = resolveOracleGameSha(options.oracleGameSha);
+  const oracle = resolveOracleGameSha(options.oracleGameSha, manifest);
+  const candidate = resolveCandidateGameSha();
   let records;
   if (options.mode === "measure") {
     records = [];
@@ -537,6 +572,9 @@ async function main() {
     mode: options.mode,
     oracle_game_sha: oracle.value,
     oracle_game_sha_source: oracle.source,
+    protocol_version: manifest.protocol_version,
+    candidate_game_sha: candidate.value,
+    candidate_game_sha_source: candidate.source,
     manifest_id: manifest.manifest_id ?? "rust-kernel-baseline-v1",
     manifest_sha256: digest,
     runner: runnerMetadata(),
