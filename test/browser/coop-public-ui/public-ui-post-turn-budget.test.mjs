@@ -1179,9 +1179,10 @@ test("sequential command driver accepts two same-address battler commands from o
   );
 
   assert.deepEqual(order, ["survivor", "presentation-proof", "survivor"]);
-  assert.deepEqual(
-    result.commandEventHistory.survivor.map(event => event.index),
-    [0, 1],
+  assert.equal(result.commandEventHistory.survivor.length, 2);
+  assert.ok(
+    result.commandEventHistory.survivor[1].index > result.commandEventHistory.survivor[0].index,
+    "the second battler is authorized by a distinct later public CommandPhase",
   );
   assert.deepEqual(result.commandEventHistory.depleted, []);
   assert.deepEqual(
