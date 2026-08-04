@@ -139,7 +139,11 @@ class CandidateSetTransformer(nn.Module):
         current_mask = candidate_mask.unsqueeze(-1).to(encoded.dtype)
         current_context = (encoded * current_mask).sum(dim=1) / current_mask.sum(dim=1).clamp_min(1)
 
-        if history_features is None:
+        if history_features is not None and (
+            history_features.ndim != 4 or history_features.shape[0] != candidate_features.shape[0]
+        ):
+            raise ValueError("history_features must have shape [batch, history, candidates, features]")
+        if history_features is None or history_features.shape[1] == 0:
             history_encoded = encoded.new_zeros((encoded.shape[0], 0, encoded.shape[-1]))
             history_step_mask = candidate_mask.new_zeros((encoded.shape[0], 0))
         else:
@@ -152,8 +156,6 @@ class CandidateSetTransformer(nn.Module):
             )
             if any(value is None for value in required):
                 raise ValueError("all history tensors are required when history_features is provided")
-            if history_features.ndim != 4 or history_features.shape[0] != candidate_features.shape[0]:
-                raise ValueError("history_features must have shape [batch, history, candidates, features]")
             batch_size, history_steps, history_candidates, feature_count = history_features.shape
             if feature_count != self.config.feature_count:
                 raise ValueError(f"history feature width must be {self.config.feature_count}")
