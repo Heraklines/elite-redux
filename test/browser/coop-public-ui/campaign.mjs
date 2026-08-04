@@ -2433,8 +2433,7 @@ export function selectLatestMysteryAuthorityEvent(events) {
     const isActionableOwner = event => {
       const observation = event?.observation;
       return (
-        observation?.localSeat === observation?.ownerSeat
-        && observation.seatsWithInput?.includes(observation.ownerSeat)
+        observation?.localSeat === observation?.ownerSeat && observation.seatsWithInput?.includes(observation.ownerSeat)
       );
     };
     const selectedIsOwner = isActionableOwner(selected);
