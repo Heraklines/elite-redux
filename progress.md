@@ -7498,3 +7498,21 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   difficulty but its sealed bundle omitted `VITE_DEV_TOOLS=1`. This is a harness build-parity defect, not a
   product or Authority V2 failure. The scoped correction enables that flag only for `registered-interactions`
   and adds a source contract preventing either omission or broad enablement.
+- Harness-parity fix `30e962786` is pushed. Replacement exact-SHA registered-interactions run
+  `30866998703` is active; preserve it and require its compact artifact to prove the real `mystery` picker,
+  Stormglass `ME_PRESENT:w2:t0`, and a later completed Mystery terminal before calling this surface green.
+- Full exact-SHA browser matrix `30867124011` is active on `30e962786`: animations-enabled surface, normal
+  depth, ten-wave Mystery, and dirty-account profiles. This is the final broad browser qualification candidate;
+  do not substitute the older `93ec1f5de` matrix for its verdict.
+- Live staging logs `2026-08-04T00-59-15-360Z` (guest) and `00-59-27-025Z` (host), epoch
+  `1828663779855824`, proved a product defect in Fun and Games at wave 16: both clients adopted the same
+  `ME_PRESENT`/state, but the inline Wobbuffet minigame bypassed `initBattleWithEnemyConfig`, emitted no
+  mechanical `ME_TERMINAL("battle")`, and the first `command-open` was correctly rejected behind the stale
+  `SHARED_INTERACTION` predecessor. The fix now gives every battle terminal a typed `boot`, commits this
+  exceptional surface as `direct-turn`, states the third turn's exact `AWAIT_SUCCESSOR(ME_TERMINAL)`, and
+  admits its step-1 `reward-settled` result only from the parked finalizer. ME_PICK remains non-mechanical.
+- The same report's guest-only blank battlers maps to an independent presentation readiness gap: ordinary
+  NewBiome and Mystery renderer paths could initialize sprite nodes after their earlier asset join and then
+  release control while the real atlas was still loading. Those continuations now await
+  `settleCoopFieldPresentationReady`; ordinary trainer adoption also conceals premature enemy info panels and
+  cannot end its intro until every adopted enemy seat is visually actionable.

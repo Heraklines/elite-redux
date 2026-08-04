@@ -24,6 +24,7 @@ import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
+  preloadCoopFieldPresentationReady,
   settleCoopFieldPresentation,
   settleCoopFieldPresentationReady,
   settleCoopTrainerIntroTrays,
@@ -197,6 +198,41 @@ export function materializeCoopAdoptedEnemyField(): number {
     hideStale: true,
     trainerDisposition: "hide-enemy",
   });
+}
+
+/**
+ * Actionable variant of {@linkcode materializeCoopAdoptedEnemyField}. The guest may not expose Command
+ * merely because reconstructed Pokemon containers exist: every active enemy seat must have completed its
+ * atlas load and own live sprite/info nodes first.
+ */
+export async function materializeCoopAdoptedEnemyFieldReady(
+  remainsCurrent: () => boolean = () => true,
+): Promise<number> {
+  if (!isCoopAuthoritativeGuest()) {
+    return 0;
+  }
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return 0;
+  }
+  const capacity = battle.arrangement.enemyCapacity;
+  const seats = globalScene
+    .getEnemyParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  settleCoopTrainerIntroTrays();
+  return settleCoopFieldPresentationReady(
+    {
+      side: "enemy",
+      seats,
+      capacity,
+      boundary: "encounter-summon",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "hide-enemy",
+    },
+    remainsCurrent,
+  );
 }
 
 /**
@@ -677,6 +713,20 @@ export class EncounterPhase extends BattlePhase {
       if (!this.isCoopEnemyAdoptionBoundaryLive()) {
         return;
       }
+      // The complete state projector can restore the whole enemy surface before the authored encounter
+      // intro. Conceal it atomically until the wild reveal or trainer send-out callback; hiding only the info
+      // panel still leaked either bars-first or battler-before-trainer order depending on atlas timing.
+      settleCoopFieldPresentation({
+        side: "enemy",
+        seats: boundary.battle.enemyParty
+          .slice(0, boundary.battle.arrangement.enemyCapacity)
+          .map((pokemon, slot) => ({ pokemon, slot })),
+        capacity: boundary.battle.arrangement.enemyCapacity,
+        boundary: "wave-start-pre-intro",
+        desired: "hidden",
+        hideStale: true,
+        trainerDisposition: "hide-enemy",
+      });
       try {
         this.runEncounter();
         this.coopEnemyAdoptionComplete = true;
@@ -825,7 +875,16 @@ export class EncounterPhase extends BattlePhase {
       throw new Error("Authoritative encounter assets arrived after boundary replacement");
     }
     await materializeCoopLoadedPlayerFieldReady(stillCurrent);
-    materializeCoopAdoptedEnemyField();
+    await preloadCoopFieldPresentationReady(
+      {
+        side: "enemy",
+        seats: battle.enemyParty
+          .slice(0, battle.arrangement.enemyCapacity)
+          .map((pokemon, slot) => ({ pokemon, slot })),
+        boundary: "wave-start-pre-intro",
+      },
+      stillCurrent,
+    );
     globalScene.updateGameInfo();
     if (!stillCurrent()) {
       throw new Error("Authoritative encounter presentation was superseded");
@@ -1755,8 +1814,18 @@ export class EncounterPhase extends BattlePhase {
             // no fieldSetup/on-summon/RNG is run locally. The current presenter can still change field
             // membership, so replace this local seat derivation with an explicit host field manifest before
             // calling launch authority complete.
-            materializeCoopAdoptedEnemyField();
-            this.end();
+            void materializeCoopAdoptedEnemyFieldReady(isCurrent)
+              .then(() => {
+                if (isCurrent()) {
+                  this.end();
+                }
+              })
+              .catch(error => {
+                if (isCurrent()) {
+                  coopWarn("runtime", "authoritative trainer field presentation failed closed", error);
+                  failCoopSharedSession("Authoritative trainer battlers could not become actionable");
+                }
+              });
             return;
           }
           const availablePartyMembers = globalScene.getEnemyParty().filter(p => !p.isFainted()).length;

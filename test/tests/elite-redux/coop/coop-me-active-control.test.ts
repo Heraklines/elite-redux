@@ -93,6 +93,25 @@ describe("co-op Mystery active-control snapshot/rejoin", () => {
     expect(captureCoopActiveMysteryControl()?.terminal, "an old handoff cannot rewind the true leave").toBe("leave");
   });
 
+  it("admits the exact direct-turn battle to reward-settled transition used by Fun and Games", () => {
+    setCoopMeInteractionStart(45);
+    setCoopMeTerminalControl("battle", 1, {
+      operationId: terminalOp(45, 0),
+      step: 0,
+      choice: -1000,
+    });
+    setCoopMeTerminalControl("reward-settled", 4, {
+      operationId: terminalOp(45, 1),
+      step: 1,
+      choice: COOP_ME_REWARD_SETTLED_CHOICE,
+    });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      terminal: "reward-settled",
+      terminalStep: 1,
+      hostTurn: 4,
+    });
+  });
+
   it("retains sequential Colosseum battle steps and admits only the exact next rejoin/final-leave address", () => {
     setCoopMeInteractionStart(47);
     expect(setCoopMeColosseumControl(47, { expectedRound: 1, boardRound: 1 })).toBe(true);

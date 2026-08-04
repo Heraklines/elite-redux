@@ -538,6 +538,7 @@ import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { UiMode } from "#enums/ui-mode";
 // biome-ignore lint/suspicious/noImportCycles: Runtime ghost-pool synchronization serializes live Pokemon data.
 import { PokemonData } from "#system/pokemon-data";
@@ -13327,17 +13328,23 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
   }
   const pinned = coopMeInteractionStartValue();
   const prior = captureCoopActiveMysteryControl();
+  const directTurnSettlement =
+    prior?.terminal === "battle"
+    && Number.isSafeInteger(prior.terminalStep)
+    && (prior.terminalStep ?? -1) >= 0
+    && coopMeHandoffBattleStarted()
+    && battle.mysteryEncounter.encounterType === MysteryEncounterType.FUN_AND_GAMES;
   if (
     pinned < 0
     || prior?.interactionCounter !== pinned
-    || prior.terminal !== "pending"
+    || (prior.terminal !== "pending" && !directTurnSettlement)
     || plan.continuation !== "rewards"
     || plan.trainerVictory
   ) {
-    failCoopSharedSession("Mystery no-battle reward settlement had no retained pending encounter");
+    failCoopSharedSession("Mystery no-battle reward settlement had no retained pending or direct-turn encounter");
     return true;
   }
-  const step = 0;
+  const step = directTurnSettlement ? Number(prior.terminalStep) + 1 : 0;
   const payload = {
     terminal: "reward-settled",
     outcome: captureCoopMeOutcome(),
@@ -13423,6 +13430,7 @@ export function holdForCoopMeBattleSettlementAtBattleEnd(): boolean {
 export async function coopMeOwnerRelayBattleHandoff(options?: {
   readonly encounterMode?: number | undefined;
   readonly disableSwitch?: boolean;
+  readonly boot?: "encounter-phase" | "direct-turn";
 }): Promise<boolean> {
   if (active == null) {
     // Format/unit probes may flip the GameMode to co-op without assembling a network session. No pinned
@@ -13488,6 +13496,7 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
       outcome: captureCoopMeOutcome(),
       destination: {
         kind: "battle",
+        boot: options?.boot ?? "encounter-phase",
         hostTurn,
         encounterMode,
         trainer,

@@ -683,6 +683,64 @@ export async function settleCoopFieldPresentationReady(
   return changed;
 }
 
+/**
+ * Load and initialize an authoritative field surface while keeping it completely concealed. New-biome and
+ * authored encounter intros use this to overlap atlas work with the transition without flashing health bars
+ * or battlers before the actual reveal callback.
+ */
+export async function preloadCoopFieldPresentationReady(
+  request: Pick<CoopFieldPresentationRequest, "side" | "seats" | "boundary">,
+  remainsCurrent: () => boolean = () => true,
+): Promise<void> {
+  const scene = globalScene;
+  const battle = scene.currentBattle;
+  const seats = request.seats.map(seat => ({ pokemon: seat.pokemon, pokemonId: seat.pokemon.id }));
+  const lifetimeIsLive = (): boolean => {
+    if (globalScene !== scene || scene.currentBattle !== battle || !remainsCurrent()) {
+      return false;
+    }
+    const party = request.side === "player" ? scene.getPlayerParty() : scene.getEnemyParty();
+    return seats.every(
+      ({ pokemon, pokemonId }) => pokemon.id === pokemonId && party.some(candidate => candidate === pokemon),
+    );
+  };
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} presentation lifetime was stale before hidden preload`);
+  }
+
+  for (const { pokemon } of seats) {
+    ensureCoopPokemonPresentationNodes(pokemon);
+    hidePokemonPresentation(pokemon);
+  }
+  const loads = await Promise.allSettled(seats.map(({ pokemon }) => pokemon.loadAssets(false)));
+  if (loads.some(result => result.status === "rejected")) {
+    throw new Error(`Co-op ${request.boundary} presentation could not preload every requested battler atlas`);
+  }
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} hidden presentation preload outlived its boundary`);
+  }
+  for (const { pokemon } of seats) {
+    try {
+      pokemon.playAnim();
+    } catch {
+      /* readiness inspection below reports an incomplete live key */
+    }
+    hidePokemonPresentation(pokemon);
+    const readiness = inspectCoopPokemonPresentationReadiness(pokemon);
+    if (
+      !readiness.spritePresent
+      || !readiness.infoPresent
+      || !readiness.textureCached
+      || !readiness.animationCached
+      || !readiness.exactLiveKey
+    ) {
+      throw new Error(
+        `Co-op ${request.boundary} hidden preload exposed an incomplete battler asset: ${JSON.stringify(readiness)}`,
+      );
+    }
+  }
+}
+
 function settlePokeballTrayHidden(tray: PokeballTray): boolean {
   const repaired = tray.shown || tray.visible;
   if (tray.shown) {

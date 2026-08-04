@@ -713,7 +713,14 @@ describe("Authority V2 interaction cutover", () => {
         payload: {
           terminal: "battle",
           outcome: { ...RESYNC, authoritativeState: battleState },
-          destination: { kind: "battle", hostTurn: 1, encounterMode: 0, trainer: null, disableSwitch: false },
+          destination: {
+            kind: "battle",
+            boot: "encounter-phase",
+            hostTurn: 1,
+            encounterMode: 0,
+            trainer: null,
+            disableSwitch: false,
+          },
         },
       },
       authoritativeState: battleState,

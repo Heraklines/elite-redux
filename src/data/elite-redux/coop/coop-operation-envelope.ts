@@ -589,6 +589,12 @@ export interface CoopMeRewardDestination {
 export type CoopMeTerminalDestination =
   | {
       readonly kind: "battle";
+      /**
+       * Exact renderer boot owned by this transaction. Ordinary Mystery battles run their presentation-only
+       * encounter phase; Fun and Games has already built both battlers inside the option and enters TurnInit
+       * directly. A receiver must never infer this distinction from `encounterMode` or local encounter code.
+       */
+      readonly boot: "encounter-phase" | "direct-turn";
       /** Host turn-space at the instant the spawned battle becomes executable. */
       readonly hostTurn: number;
       /** Exact {@linkcode MysteryEncounterMode}; the guest must never infer it from its reconstructed party. */

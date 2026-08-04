@@ -8,7 +8,10 @@ import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate"
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
+import {
+  settleCoopFieldPresentation,
+  settleCoopFieldPresentationReady,
+} from "#data/elite-redux/coop/coop-field-presentation";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   COOP_ME_AUTHORITY_TURN,
@@ -1183,41 +1186,81 @@ export class MysteryEncounterBattlePhase extends Phase {
    * the empty phase queue enter the ordinary TurnInit -> local-command/replay loop.
    */
   private materializeAuthoritativeGuestBattle(): void {
+    const scene = globalScene;
     const battle = globalScene.currentBattle;
+    const runtime = getCoopRuntime();
+    const generation = coopSessionGeneration();
+    if (runtime == null) {
+      failCoopSharedSession("Authoritative Mystery presentation lost its owning runtime");
+      return;
+    }
+    const remainsCurrent = (): boolean =>
+      globalScene === scene
+      && globalScene.currentBattle === battle
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && getCoopRuntime() === runtime
+      && coopSessionGeneration() === generation;
     const playerCapacity = battle.arrangement.playerCapacity;
     const enemyCapacity = battle.arrangement.enemyCapacity;
     const enemySeats = globalScene
       .getEnemyParty()
       .slice(0, enemyCapacity)
       .map((pokemon, slot) => ({ pokemon, slot }));
-    settleCoopFieldPresentation({
-      side: "player",
-      seats: globalScene
-        .getPlayerParty()
-        .slice(0, playerCapacity)
-        .map((pokemon, slot) => ({ pokemon, slot })),
-      capacity: playerCapacity,
-      boundary: "me-battle-summon",
-      desired: "visible",
-      hideStale: true,
-      trainerDisposition: "hide-player",
-    });
-    const revealEnemyField = (): void => {
-      settleCoopFieldPresentation({
-        side: "enemy",
-        seats: enemySeats,
-        capacity: enemyCapacity,
+    const playerReady = settleCoopFieldPresentationReady(
+      {
+        side: "player",
+        seats: globalScene
+          .getPlayerParty()
+          .slice(0, playerCapacity)
+          .map((pokemon, slot) => ({ pokemon, slot })),
+        capacity: playerCapacity,
         boundary: "me-battle-summon",
         desired: "visible",
         hideStale: true,
-        trainerDisposition: "hide-enemy",
+        trainerDisposition: "hide-player",
+      },
+      remainsCurrent,
+    );
+    // Attach containment immediately; callbacks below still await the original promise and receive the
+    // rejection, while a long human trainer dialogue cannot make it an interim unhandled rejection.
+    void playerReady.catch(() => undefined);
+    // Begin the immutable enemy atlas work while trainer dialogue is playing. The final reveal below still
+    // revalidates nodes/lifetime through settleCoopFieldPresentationReady before it can release Command.
+    const enemyAssetPreload = Promise.allSettled(enemySeats.map(({ pokemon }) => pokemon.loadAssets(false)));
+    const revealEnemyField = (): void => {
+      void (async () => {
+        await playerReady;
+        const preload = await enemyAssetPreload;
+        if (preload.some(result => result.status === "rejected")) {
+          throw new Error("one or more Mystery battler atlases failed their preload");
+        }
+        await settleCoopFieldPresentationReady(
+          {
+            side: "enemy",
+            seats: enemySeats,
+            capacity: enemyCapacity,
+            boundary: "me-battle-summon",
+            desired: "visible",
+            hideStale: true,
+            trainerDisposition: "hide-enemy",
+          },
+          remainsCurrent,
+        );
+        if (!remainsCurrent()) {
+          return;
+        }
+        coopLog(
+          "me",
+          `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
+            + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)} mode=${battle.mysteryEncounter?.encounterMode}`,
+        );
+        this.end();
+      })().catch(error => {
+        if (remainsCurrent()) {
+          coopWarn("me", "authoritative Mystery battler presentation failed closed", error);
+          failCoopSharedSession("Authoritative Mystery battlers could not become actionable");
+        }
       });
-      coopLog(
-        "me",
-        `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
-          + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)} mode=${battle.mysteryEncounter?.encounterMode}`,
-      );
-      this.end();
     };
     const beginBattle = (onReady: () => void): void => {
       battle.started = true;
@@ -1237,11 +1280,6 @@ export class MysteryEncounterBattlePhase extends Phase {
     }
 
     const trainer = battle.trainer;
-    const runtime = getCoopRuntime();
-    if (runtime == null) {
-      failCoopSharedSession("Authoritative Mystery trainer presentation lost its owning runtime");
-      return;
-    }
     // The host awaited this trainer's dynamic sprite load before opening its own battle phase. The
     // replica received the descriptor earlier with the retained terminal, so hold this presentation phase
     // until its equivalent local asset is initialized instead of flashing a blank trainer for one browser.

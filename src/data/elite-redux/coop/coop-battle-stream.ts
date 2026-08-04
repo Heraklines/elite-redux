@@ -125,6 +125,12 @@ export interface CoopTurnBoundaryIdentity {
   /** True only for a battle spawned inside a retained Mystery encounter transaction. */
   readonly mysteryBattle: boolean;
   /**
+   * The authority has finished the last executable turn of Fun and Games and its next TurnInit will close
+   * the minigame through ME_TERMINAL. The enemy intentionally survives, so party state alone would wrongly
+   * advertise another command frontier.
+   */
+  readonly mysteryTerminalAfterTurn?: boolean;
+  /**
    * A normal wave transition already staged by the runtime while this material turn was still recording.
    *
    * This is stronger evidence than the captured party/field image: a double battle can transiently retain
@@ -2863,7 +2869,10 @@ export class CoopBattleStreamer {
     }
     // The runtime's already-staged transition owns this choice. The state image remains the complete
     // material payload, but it must not overrule a VictoryPhase decision by re-guessing COMMAND here.
-    const hasImmediateCommand = !hasDeferredWaveAdvance && hasCoopV2ImmediateCommandSuccessor(authoritativeState);
+    const hasImmediateCommand =
+      !hasDeferredWaveAdvance
+      && boundary.mysteryTerminalAfterTurn !== true
+      && hasCoopV2ImmediateCommandSuccessor(authoritativeState);
     const commandFrontier = hasImmediateCommand
       ? resolveCoopV2CommandFrontier(authoritativeState)
       : { commands: [], unresolved: [] };
@@ -2914,8 +2923,9 @@ export class CoopBattleStreamer {
         ? (deferredWaveWait
           ?? (!hasImmediateCommand
           && boundary.mysteryBattle
-          && authoritativePartyIsDefeated(authoritativeState.enemyParty)
-          && !authoritativePartyIsDefeated(authoritativeState.playerParty)
+          && (boundary.mysteryTerminalAfterTurn === true
+            || (authoritativePartyIsDefeated(authoritativeState.enemyParty)
+              && !authoritativePartyIsDefeated(authoritativeState.playerParty)))
             ? {
                 kind: "AWAIT_SUCCESSOR",
                 afterOperationId: operationId,

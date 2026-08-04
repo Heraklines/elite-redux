@@ -337,7 +337,8 @@ export function canRestoreCoopActiveMysteryControl(
   const nextStep = snapshot.terminalStep === (coopMeActiveControl.terminalStep ?? -1) + 1;
   return (
     nextStep
-    && ((coopMeActiveControl.terminal === "battle" && snapshot.terminal === "battle-settled")
+    && ((coopMeActiveControl.terminal === "battle"
+      && (snapshot.terminal === "battle-settled" || snapshot.terminal === "reward-settled"))
       || (coopMeActiveControl.terminal === "battle-settled"
         && (snapshot.terminal === "battle" || snapshot.terminal === "leave"))
       || (coopMeActiveControl.terminal === "reward-settled" && snapshot.terminal === "leave"))
@@ -541,7 +542,7 @@ export function setCoopMeTerminalControl(
       return;
     }
     const validTransition =
-      (prior.terminal === "battle" && terminal === "battle-settled")
+      (prior.terminal === "battle" && (terminal === "battle-settled" || terminal === "reward-settled"))
       || (prior.terminal === "battle-settled" && (terminal === "battle" || terminal === "leave"))
       || (prior.terminal === "reward-settled" && terminal === "leave");
     if (!validTransition || identity.step !== (prior.terminalStep ?? -1) + 1) {

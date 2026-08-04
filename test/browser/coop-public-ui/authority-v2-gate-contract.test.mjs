@@ -87,6 +87,11 @@ const controlOpenAdapter = readFileSync(
   "utf8",
 );
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
+const coopTurnCommitPhase = readFileSync(new URL("src/phases/coop-turn-commit-phase.ts", root), "utf8");
+const funAndGamesEncounter = readFileSync(
+  new URL("src/data/mystery-encounters/encounters/fun-and-games-encounter.ts", root),
+  "utf8",
+);
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", root), "utf8");
@@ -1791,6 +1796,47 @@ test("an embedded Mystery battle retires its selector handler before the replica
     handoff,
     /else \{\s*currentPhase\.end\(\);\s*\}/u,
     "the V2 battle handoff cannot synchronously inherit the retired Mystery selector",
+  );
+});
+
+test("Fun and Games owns a complete direct-turn V2 lifecycle instead of opening combat from ME_PICK", () => {
+  assert.match(
+    operationEnvelope,
+    /readonly boot: "encounter-phase" \| "direct-turn";/u,
+    "the terminal declares its renderer boot instead of inferring it from NO_BATTLE",
+  );
+  assert.match(
+    meTerminalValidator,
+    /destination\.boot === "encounter-phase" \|\| destination\.boot === "direct-turn"/u,
+    "an untyped battle boot cannot enter the mechanical log",
+  );
+  const wobbuffetReady = funAndGamesEncounter.indexOf("await showWobbuffetHealthBar()");
+  const terminal = funAndGamesEncounter.indexOf("await coopMeOwnerRelayBattleHandoff", wobbuffetReady);
+  assert.ok(wobbuffetReady >= 0 && terminal > wobbuffetReady, "the complete battlers precede the retained terminal");
+  assert.match(
+    funAndGamesEncounter.slice(wobbuffetReady, terminal + 400),
+    /coopHostStreamMeBattleParty\(\)[\s\S]*boot: "direct-turn"/u,
+    "the exceptional inline combat path publishes its own typed handoff",
+  );
+  assert.match(
+    coopTurnCommitPhase,
+    /MysteryEncounterType\.FUN_AND_GAMES[\s\S]*turnsRemaining[\s\S]*mysteryTerminalAfterTurn/u,
+    "the authority states the minigame's finite last turn from engine-owned state",
+  );
+  assert.match(
+    battleStream,
+    /boundary\.mysteryTerminalAfterTurn !== true[\s\S]*boundary\.mysteryTerminalAfterTurn === true[\s\S]*operationKind: "ME_TERMINAL"/u,
+    "the last direct turn parks for the exact terminal instead of fabricating turn four",
+  );
+  assert.match(
+    replayMePhase,
+    /committedDestination\.boot === "direct-turn"[\s\S]*pushNew\("TurnInitPhase"\)[\s\S]*settleCoopFieldPresentationReady/u,
+    "the renderer boots the already-authored battlers directly and proves their visual readiness before input",
+  );
+  assert.match(
+    coopRuntime,
+    /directTurnSettlement[\s\S]*prior\.terminal !== "pending" && !directTurnSettlement[\s\S]*terminal: "reward-settled"/u,
+    "the direct battle's result advances through the normal retained reward terminal",
   );
 });
 
