@@ -152,10 +152,21 @@ jobs:
           printf '%s\n' "$dataset_status"
           printf '%s\n' "$dataset_files"
           python - <<'PY'
+          import hashlib
           import json
           import os
           from kaggle.api.kaggle_api_extended import KaggleApi
 
+          username = os.environ["KAGGLE_USERNAME"]
+          key = os.environ["KAGGLE_KEY"]
+          print(json.dumps({
+              "credentialShape": {
+                  "usernameLength": len(username),
+                  "keyLength": len(key),
+                  "usernameSha256Prefix": hashlib.sha256(username.encode()).hexdigest()[:12],
+                  "keySha256Prefix": hashlib.sha256(key.encode()).hexdigest()[:12],
+              }
+          }))
           api = KaggleApi()
           api.authenticate()
           try:
