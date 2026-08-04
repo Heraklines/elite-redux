@@ -7723,3 +7723,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   had already proven the deferred import was runtime-safe, but the dependency graph is now structurally clean as
   well: a type-only one-way party-reorder presentation registry separates UI callers from Pokemon presentation
   classes, and the ordinary field-presentation module installs the concrete projector before reward handling.
+- Parallel exact-SHA requalification at `f9e0c697d` (`30921736586` gate, `30921739860` journey) proved the cycle
+  diagnostics were gone. Both static jobs stopped only on Biome's safe import-order assist in the two registry
+  callers; Chromium again did not launch. The imports are now canonically ordered. The already-running gate
+  shards remain valid behavioral evidence because this final correction changes import order only.

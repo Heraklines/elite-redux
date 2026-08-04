@@ -3,8 +3,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
+import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import {
   coopGiveToPartner,
   coopOwnerOfFieldSlot,
