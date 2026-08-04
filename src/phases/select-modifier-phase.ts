@@ -10,6 +10,7 @@ import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-field-presentation";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
@@ -1802,6 +1803,10 @@ export class SelectModifierPhase extends BattlePhase {
         // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
         // after this real public shop handler has committed, never when a phase object is constructed.
         this.notifyCoopContinuationSurfaceReady();
+        // Relative cursor replay cannot repair a different account-local shopCursorTarget, nor the
+        // owner-only CHECK_TEAM child that leaves the watcher parked on the old top-level cursor.
+        // Once the real handler is actionable, publish its absolute cosmetic state in the same FIFO.
+        getCoopUiMirror()?.relayOwnerState(UiMode.MODIFIER_SELECT);
       });
   }
 
@@ -3359,7 +3364,13 @@ export class SelectModifierPhase extends BattlePhase {
       case COOP_CHECK_OP_REORDER: {
         const [src, dst] = rest;
         if (src < party.length && dst < party.length) {
+          const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
           [party[src], party[dst]] = [party[dst], party[src]];
+          if (src < fieldSize || dst < fieldSize) {
+            void settleCoopPartyReorderPresentationReady(globalScene, fieldSize).catch(error => {
+              coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
+            });
+          }
         }
         return;
       }

@@ -40,6 +40,30 @@ function valid(overrides = {}) {
       enemyTrainerVisible: true,
       enemyTrainerAlpha: 0,
       enemyTrainerPresented: false,
+      expectedPlayerFieldIds: [101, 102],
+      playerField: [
+        {
+          pokemonId: 101,
+          partySlot: 0,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+        {
+          pokemonId: 102,
+          partySlot: 1,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+      ],
+      playerFieldReady: true,
     },
     uiMode: "MODIFIER_SELECT",
     ...overrides,
@@ -56,6 +80,9 @@ test("semantic evidence ignores unrelated console lines and freezes a valid proo
   assert.ok(Object.isFrozen(parsed.seatsWithInput));
   assert.ok(Object.isFrozen(parsed.connectionGenerations));
   assert.ok(Object.isFrozen(parsed.presentation));
+  assert.ok(Object.isFrozen(parsed.presentation.expectedPlayerFieldIds));
+  assert.ok(Object.isFrozen(parsed.presentation.playerField));
+  assert.ok(Object.isFrozen(parsed.presentation.playerField[0]));
 });
 
 test("semantic evidence rejects a dishonest defeated-trainer presentation verdict", () => {
@@ -65,6 +92,7 @@ test("semantic evidence rejects a dishonest defeated-trainer presentation verdic
         `${PREFIX}${JSON.stringify(
           valid({
             presentation: {
+              ...valid().presentation,
               trainerVisible: false,
               enemyTrainerVisible: true,
               enemyTrainerAlpha: 1,

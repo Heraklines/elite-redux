@@ -3516,6 +3516,239 @@ async function selectRewardOptionWithMirroredCursor(rig, owner, boundary, target
   return { ...navigation, authorityEvent, peerEvents };
 }
 
+/** Exact field proof for a Check Team reorder: party material and the visible battlers agree. */
+export function partyReorderPresentationMatches(observation, expectedPartyIds) {
+  const partyIds = observation?.partySlots?.map(slot => slot.pokemonId);
+  const expectedFieldIds = observation?.presentation?.expectedPlayerFieldIds;
+  const readyFieldIds = observation?.presentation?.playerField
+    ?.filter(
+      pokemon =>
+        pokemon.visible === true
+        && pokemon.alpha > 0
+        && pokemon.spriteVisible === true
+        && pokemon.spriteAlpha > 0
+        && pokemon.infoVisible === true
+        && pokemon.infoAlpha > 0,
+    )
+    .map(pokemon => pokemon.pokemonId);
+  return (
+    JSON.stringify(partyIds ?? null) === JSON.stringify(expectedPartyIds)
+    && observation?.presentation?.playerFieldReady === true
+    && Array.isArray(expectedFieldIds)
+    && expectedFieldIds.length > 0
+    && JSON.stringify(expectedFieldIds) === JSON.stringify(expectedPartyIds.slice(0, expectedFieldIds.length))
+    && JSON.stringify(readyFieldIds ?? null) === JSON.stringify(expectedFieldIds)
+  );
+}
+
+/**
+ * Exercise the player-reported nested reward path exclusively through public keyboard input:
+ * reward row -> Check Team -> Move active slot 0 -> swap with reserve slot 2 -> return.
+ * The watcher deliberately remains on the reward surface, so this asserts asymmetric UI plus
+ * identical party material and atomic visible-field readiness before accepting the return.
+ */
+async function driveRewardCheckTeamReorder(rig, owner, boundary) {
+  const clients = Object.values(rig.clients);
+  const peers = clients.filter(client => client !== owner);
+  const address = boundary.authority.address;
+  const addressJson = JSON.stringify(address);
+  const beforePartyIds = boundary.authority.partySlots?.map(slot => slot.pokemonId) ?? [];
+  if (beforePartyIds.length < 3) {
+    throw new Error(
+      `[campaign-check-team] requires an active lead and slot-2 reserve: ${JSON.stringify(boundary.authority.partySlots ?? null)}`,
+    );
+  }
+
+  // Account-local shopCursorTarget can start on rewards, actions, or a paid shop row. Walk
+  // downward by observed semantic state until the stable Check Team action row is visible.
+  let actionEvent = boundary.ownerEvent;
+  for (let step = 0; step < 6 && !actionEvent.observation.optionIds?.includes("reward-action:check-team"); step++) {
+    const beforeIndex = actionEvent.index;
+    await owner.press("ArrowDown", `campaign-check-team-action-row-${step}`);
+    actionEvent = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(beforeIndex, "reward-shop");
+        return candidate != null
+          && JSON.stringify(candidate.observation.address) === addressJson
+          && candidate.observation.selectedOptionId !== actionEvent.observation.selectedOptionId
+          && isActionableSemanticObservation(candidate.observation)
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: "Check Team reward action row navigation" },
+    );
+  }
+  if (!actionEvent.observation.optionIds?.includes("reward-action:check-team")) {
+    throw new Error(
+      `[campaign-check-team] reward surface exposed no Check Team action: ${JSON.stringify(actionEvent.observation)}`,
+    );
+  }
+
+  const peerCursorBeforeAction = fromEach(peers, peer => peer.evidence.cursor());
+  const selectedAction = await selectOptionById(owner, {
+    surfaceId: "reward-shop",
+    targetId: "reward-action:check-team",
+    navKeys: ["ArrowRight", "ArrowLeft"],
+    submit: false,
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: actionEvent.index,
+  });
+  const ownerActionEvent = owner.evidence.events[selectedAction.surfaceEventIndex];
+  const ownerAction = ownerActionEvent?.observation;
+  if (ownerAction?.selectedOptionId !== "reward-action:check-team") {
+    throw new Error(`[campaign-check-team] owner never selected Check Team: ${JSON.stringify(ownerAction ?? null)}`);
+  }
+  await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(peerCursorBeforeAction[peer.label], "reward-shop");
+          return rewardCursorProjectionMatches(ownerAction, candidate?.observation) ? candidate : null;
+        },
+        { timeoutMs: rig.config.timeoutMs, description: `mirrored Check Team cursor on ${peer.label}` },
+      ),
+    ),
+  );
+
+  const partyOpenCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-check-team-open");
+  let partyEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(partyOpenCursor, "party:reward-target");
+      return candidate != null
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && candidate.observation.optionIds?.includes("party-slot:2")
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team party list" },
+  );
+
+  const sourceMenuCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-slot:0",
+    navKeys: ["ArrowUp", "ArrowDown"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: partyEvent.index,
+  });
+  let moveEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(sourceMenuCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-option:move")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team source Move action" },
+  );
+  const targetListCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:move",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: moveEvent.index,
+  });
+  partyEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(targetListCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-slot:2")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team reorder target list" },
+  );
+
+  const targetMenuCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-slot:2",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: partyEvent.index,
+  });
+  moveEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(targetMenuCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-option:move")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team target Move action" },
+  );
+
+  const convergenceCursors = fromEach(clients, client => client.evidence.cursor());
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:move",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: moveEvent.index,
+  });
+  const expectedPartyIds = [...beforePartyIds];
+  [expectedPartyIds[0], expectedPartyIds[2]] = [expectedPartyIds[2], expectedPartyIds[0]];
+  const converged = await Promise.all(
+    clients.map(client =>
+      client.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(convergenceCursors[client.label]);
+          return candidate != null && partyReorderPresentationMatches(candidate.observation, expectedPartyIds)
+            ? candidate
+            : null;
+        },
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: `Check Team party/visible-field convergence on ${client.label}`,
+        },
+      ),
+    ),
+  );
+  const proof = {
+    address,
+    ownerSeat: owner.publicSeat,
+    beforePartyIds,
+    expectedPartyIds,
+    fieldIds: converged.map(event => event.observation.presentation.expectedPlayerFieldIds),
+  };
+  for (const client of clients) {
+    client.evidence.record("campaign-check-team-reorder", proof);
+  }
+
+  const returnCursors = fromEach(clients, client => client.evidence.cursor());
+  await owner.press("Backspace", "campaign-check-team-return-to-reward");
+  const restored = await checkpointPairedMechanicalSurface(rig, "reward-shop", returnCursors, owner);
+  const restoredPeerEvents = await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(returnCursors[peer.label], "reward-shop");
+          return rewardCursorProjectionMatches(restored.authority, candidate?.observation) ? candidate : null;
+        },
+        { timeoutMs: rig.config.timeoutMs, description: `absolute reward cursor restored on ${peer.label}` },
+      ),
+    ),
+  );
+  for (const client of clients) {
+    client.evidence.record("campaign-check-team-return", {
+      address: restored.authority.address,
+      selectedOptionId: restored.authority.selectedOptionId,
+      watcherSeats: restoredPeerEvents.map(event => event.observation.localSeat),
+    });
+  }
+  return restored;
+}
+
 /**
  * A party-target reward is intentionally asymmetric while the owner chooses: the owner
  * opens PARTY and the watcher stays parked on its read-only reward replica. Prove that
@@ -4586,6 +4819,15 @@ async function driveOnePendingSurface(
           ? await driveTargetedMarket(rig, cursors, driver.market)
           : await driveMarketLeave(rig, cursors);
     } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
+      if (
+        policy.partyMutatingReward.checkTeamReorder
+        && mechanicalBoundary.authority.optionIds?.includes(policy.partyMutatingReward.rewardId)
+        && !Object.values(rig.clients).some(client =>
+          client.evidence.events.some(event => event.kind === "campaign-check-team-reorder"),
+        )
+      ) {
+        mechanicalBoundary = await driveRewardCheckTeamReorder(rig, client, mechanicalBoundary);
+      }
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
       const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
       const capsuleTarget =
@@ -5867,6 +6109,24 @@ export async function runCampaign(rig) {
         event => event.kind === "campaign-learn-move-accepted" && event.rewardId === configuredId,
       );
       const abilityChoices = allEvents.filter(event => event.kind === "campaign-ability-choice");
+      if (policy.partyMutatingReward.checkTeamReorder) {
+        const reorderProofs = allEvents.filter(event => event.kind === "campaign-check-team-reorder");
+        const returnProofs = allEvents.filter(event => event.kind === "campaign-check-team-return");
+        if (
+          reorderProofs.length !== clients.length
+          || returnProofs.length !== clients.length
+          || JSON.stringify(reorderProofs[0]?.expectedPartyIds ?? null)
+            !== JSON.stringify(reorderProofs.at(-1)?.expectedPartyIds ?? null)
+          || reorderProofs.some(event =>
+            event.fieldIds?.some(fieldIds => JSON.stringify(fieldIds) !== JSON.stringify(event.expectedPartyIds.slice(0, fieldIds.length))),
+          )
+        ) {
+          throw new Error(
+            `[campaign-check-team] ${configuredId} did not prove reorder, visible field, and cursor return on both browsers: `
+              + JSON.stringify({ reorderProofs, returnProofs }),
+          );
+        }
+      }
       if (policy.partyMutatingReward.direct) {
         const directActions = allEvents.filter(
           event => event.kind === "campaign-direct-party-reward-action" && event.rewardId === configuredId,

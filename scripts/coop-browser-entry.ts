@@ -113,11 +113,57 @@ function coopBrowserPresentationSnapshot() {
   const enemyTrainer = globalScene.currentBattle?.trainer;
   const enemyTrainerVisible = enemyTrainer?.visible === true;
   const enemyTrainerAlpha = enemyTrainer?.alpha ?? 0;
+  const expectedPlayerFieldIds = globalScene
+    .getPlayerParty()
+    .slice(0, globalScene.currentBattle?.arrangement.playerCapacity ?? 0)
+    .filter(pokemon => !pokemon.isFainted())
+    .map(pokemon => pokemon.id);
+  const playerField = globalScene.field
+    .getAll()
+    .flatMap(candidate => {
+      const pokemon = candidate as Pokemon;
+      try {
+        if (!pokemon.isPlayer()) {
+          return [];
+        }
+        const sprite = pokemon.getSprite();
+        const info = pokemon.getBattleInfo();
+        return [
+          {
+            pokemonId: pokemon.id,
+            partySlot: globalScene.getPlayerParty().indexOf(pokemon),
+            visible: pokemon.visible === true,
+            alpha: pokemon.alpha,
+            spriteVisible: sprite?.visible === true,
+            spriteAlpha: sprite?.alpha ?? null,
+            infoVisible: info?.visible === true,
+            infoAlpha: info?.alpha ?? null,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => left.partySlot - right.partySlot || left.pokemonId - right.pokemonId);
+  const readyPlayerFieldIds = playerField
+    .filter(
+      pokemon =>
+        pokemon.visible
+        && pokemon.alpha > 0
+        && pokemon.spriteVisible
+        && (pokemon.spriteAlpha ?? 0) > 0
+        && pokemon.infoVisible
+        && (pokemon.infoAlpha ?? 0) > 0,
+    )
+    .map(pokemon => pokemon.pokemonId);
   return {
     trainerVisible: playerTrainer?.visible === true,
     enemyTrainerVisible,
     enemyTrainerAlpha,
     enemyTrainerPresented: enemyTrainerVisible && enemyTrainerAlpha > 0.001,
+    expectedPlayerFieldIds,
+    playerField,
+    playerFieldReady: JSON.stringify(readyPlayerFieldIds) === JSON.stringify(expectedPlayerFieldIds),
   } as const;
 }
 
@@ -1224,8 +1270,34 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
     }
   }
   if (uiMode === "MODIFIER_SELECT") {
-    const modOptions = (handler as unknown as { options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }> })
-      .options;
+    const modifierHandler = handler as unknown as {
+      rowCursor?: number;
+      options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }>;
+      rerollButtonContainer?: { visible?: boolean };
+      transferButtonContainer?: { visible?: boolean };
+      checkButtonContainer?: { visible?: boolean };
+      lockRarityButtonContainer?: { visible?: boolean };
+    };
+    if (modifierHandler.rowCursor === 0) {
+      const actionByCursor = new Map<number, string>([
+        [0, "reward-action:reroll"],
+        [1, "reward-action:manage-items"],
+        [2, "reward-action:check-team"],
+        [3, "reward-action:lock-rarities"],
+      ]);
+      const optionIds = [
+        ...(modifierHandler.rerollButtonContainer?.visible === true ? ["reward-action:reroll"] : []),
+        ...(modifierHandler.transferButtonContainer?.visible === true ? ["reward-action:manage-items"] : []),
+        ...(modifierHandler.checkButtonContainer?.visible === true ? ["reward-action:check-team"] : []),
+        ...(modifierHandler.lockRarityButtonContainer?.visible === true ? ["reward-action:lock-rarities"] : []),
+      ];
+      return {
+        selectedOptionId: selectedIndex == null ? null : (actionByCursor.get(selectedIndex) ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+    const modOptions = modifierHandler.options;
     if (Array.isArray(modOptions)) {
       const optionIds = modOptions.map((option, index) => option?.modifierTypeOption?.type?.id ?? `slot:${index}`);
       return {
@@ -2161,12 +2233,14 @@ function observeSemanticSurface(): void {
     ].join("|");
     const stateDigest = coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
 
+    const presentation = coopBrowserPresentationSnapshot();
     const probeKey = [
       semanticDigestKey,
       teamSpeciesIds?.join(",") ?? "",
       moveSlots == null ? "" : JSON.stringify(moveSlots),
       starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
       partySlots == null ? "" : JSON.stringify(partySlots),
+      JSON.stringify(presentation),
       stateDigest,
     ].join("|");
     const now = Date.now();
@@ -2214,7 +2288,7 @@ function observeSemanticSurface(): void {
         weather: globalScene.arena?.weather?.weatherType ?? 0,
         terrain: globalScene.arena?.terrain?.terrainType ?? 0,
       },
-      presentation: coopBrowserPresentationSnapshot(),
+      presentation,
       // Every co-op UI-to-relay surface carries the same broad mechanical fingerprint used at
       // battle continuation boundaries. A Mystery/shop/prompt desync can no longer heal before
       // the next command and disappear from the two-browser evidence.

@@ -246,6 +246,10 @@ export function loadCampaignPolicy() {
     partyMutatingReward: {
       required: partyRewardId != null,
       rewardId: partyRewardId,
+      // The Greater Ability Randomizer live report entered Check Team from this exact reward
+      // and reordered an active mon. Make that UI -> relay -> party -> field-presentation path
+      // mandatory in its real two-browser journey instead of proving only the reward itself.
+      checkTeamReorder: partyRewardId === "ER_GREATER_ABILITY_RANDOMIZER",
       acceptLearnMove: partyRewardId != null && partyRewardLearnMoveIds.has(partyRewardId),
       direct:
         partyRewardId != null && (directPartyRewardIds.has(partyRewardId) || nestedDirectRewardIds.has(partyRewardId)),

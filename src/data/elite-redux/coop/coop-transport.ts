@@ -2070,8 +2070,10 @@ export type CoopMessage =
    *  - `button` the Button enum value the owner pressed
    *  - `mode`   the owner's UiMode BEFORE processing it (resync barrier; the watcher
    *             stops mirroring if its mode no longer matches, then the commit drives)
+   *  - `state`  optional absolute cosmetic cursor checkpoint after a handler (re)opens;
+   *             present only with the reserved negative button value
    */
-  | { t: "uiInput"; seq: number; n: number; button: number; mode: number }
+  | { t: "uiInput"; seq: number; n: number; button: number; mode: number; state?: readonly number[] }
   /** Session lifecycle signal (P5). */
   | { t: "lifecycle"; event: CoopLifecycleEvent }
   /**
@@ -2432,7 +2434,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "requestRewardOptions":
       return `seq=${msg.seq} reroll=${msg.reroll}`;
     case "uiInput":
-      return `seq=${msg.seq} n=${msg.n} button=${msg.button} mode=${msg.mode}`;
+      return `seq=${msg.seq} n=${msg.n} button=${msg.button} mode=${msg.mode}${msg.state == null ? "" : ` state=[${msg.state.join(",")}]`}`;
     case "lifecycle":
       return `event=${msg.event}`;
     case "hello":

@@ -175,7 +175,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/battle-scene|src/data/elite-redux/coop/[^()]+|src/data/moves/move|src/dev-tools/registry|src/phase-manager|src/phase|src/phases/command-phase|src/phases/coop-guest-faint-switch-phase|src/phases/coop-replay-learn-move-batch|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-phases|src/phases/coop-replay-turn-phase|src/phases/encounter-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui-inputs|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|src/ui/ui|test/tests/elite-redux/coop/coop-ability-picker-relay.test|test/tests/elite-redux/coop/coop-battle-stream.test|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/battle-scene|src/data/elite-redux/coop/[^()]+|src/data/moves/move|src/dev-tools/registry|src/phase-manager|src/phase|src/phases/command-phase|src/phases/coop-guest-faint-switch-phase|src/phases/coop-replay-learn-move-batch|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-phases|src/phases/coop-replay-turn-phase|src/phases/encounter-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui-inputs|src/ui/handlers/modifier-select-ui-handler|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|src/ui/ui|test/tests/elite-redux/coop/coop-ability-picker-relay.test|test/tests/elite-redux/coop/coop-battle-stream.test|test/tests/elite-redux/coop/coop-shop-check-ops.test|test/tests/elite-redux/coop/coop-ui-mirror.test|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -195,10 +195,12 @@ jobs:
             src/data/elite-redux/coop/authority-v2/cutover-interaction.ts \
             src/data/elite-redux/coop/coop-battle-stream.ts \
             src/data/elite-redux/coop/coop-durability.ts \
+            src/data/elite-redux/coop/coop-field-presentation.ts \
             src/data/elite-redux/coop/coop-operation-envelope.ts \
             src/data/elite-redux/coop/coop-reward-operation.ts \
             src/data/elite-redux/coop/coop-runtime.ts \
             src/data/elite-redux/coop/coop-transport.ts \
+            src/data/elite-redux/coop/coop-ui-mirror.ts \
             src/data/elite-redux/coop/coop-ui-registry.ts \
             src/data/elite-redux/coop/coop-wave-resolution-bridge.ts \
             src/data/elite-redux/coop/coop-webrtc-transport.ts \
@@ -222,6 +224,7 @@ jobs:
             src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \
             src/ui-inputs.ts \
+            src/ui/handlers/modifier-select-ui-handler.ts \
             src/ui/handlers/party-ui-handler.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
@@ -268,8 +271,18 @@ jobs:
             test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
             test/tests/elite-redux/coop/coop-p33-client.test.ts \
             test/tests/elite-redux/coop/coop-session-controller.test.ts \
+            test/tests/elite-redux/coop/coop-shop-check-ops.test.ts \
+            test/tests/elite-redux/coop/coop-ui-mirror.test.ts \
             test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts \
             test/tools/coop-soak-driver.ts
+
+      - name: Verify party-reorder presentation and reward cursor mirroring
+        if: inputs.journey == 'party-mutating-rewards'
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-shop-check-ops.test.ts
+          test/tests/elite-redux/coop/coop-ui-mirror.test.ts
+          --reporter=dot
 
       - name: Verify retained GameOver two-engine operation regression
         if: inputs.journey == 'game-over'

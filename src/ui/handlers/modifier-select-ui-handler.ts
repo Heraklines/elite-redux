@@ -762,6 +762,36 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     return false;
   }
 
+  /** Absolute cosmetic cursor checkpoint for the co-op reward-screen projector. */
+  getCoopMirrorCursorState(): readonly [rowCursor: number, cursor: number] | null {
+    return this.awaitingActionInput ? [this.rowCursor, this.cursor] : null;
+  }
+
+  /**
+   * Apply the owner's absolute cosmetic cursor checkpoint. Mechanics remain owned by the
+   * interaction commit; this only prevents account-local cursor preferences and nested-screen
+   * returns from giving the watcher a different visible starting point for later button replay.
+   */
+  applyCoopMirrorCursorState(state: readonly number[]): boolean {
+    if (!this.awaitingActionInput) {
+      return false;
+    }
+    const [rowCursor, cursor] = state;
+    const maxRow = this.shopOptionsRows.length + 1;
+    if (!Number.isSafeInteger(rowCursor) || !Number.isSafeInteger(cursor) || rowCursor < 0 || rowCursor > maxRow) {
+      return true;
+    }
+    const rowItems = rowCursor === 0 ? 4 : this.getRowItems(rowCursor);
+    if (cursor < 0 || cursor >= rowItems) {
+      return true;
+    }
+    if (this.rowCursor !== rowCursor) {
+      this.setRowCursor(rowCursor);
+    }
+    this.setCursor(cursor);
+    return true;
+  }
+
   private getRowItems(rowCursor: number): number {
     switch (rowCursor) {
       case 0:

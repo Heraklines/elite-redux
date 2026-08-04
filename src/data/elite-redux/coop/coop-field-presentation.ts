@@ -18,6 +18,7 @@ export type CoopPresentationBoundary =
   | "launch-ready"
   | "encounter-summon"
   | "me-battle-summon"
+  | "party-reorder"
   | "replacement-applied"
   | "turn-finalize"
   | "resync-stable"
@@ -681,6 +682,44 @@ export async function settleCoopFieldPresentationReady(
     }
   }
   return changed;
+}
+
+/**
+ * Reconcile the player field after an out-of-battle Check Team reorder.
+ *
+ * The party permutation is already authoritative when this begins. Keep the previous visual field intact
+ * while every newly promoted battler materializes, then replace the complete field in one projection. This
+ * prevents a slow atlas load from exposing a blank player side and gives the owner and watcher the same
+ * presentation path without replaying summon mechanics, abilities, tags, forms, or RNG.
+ */
+export async function settleCoopPartyReorderPresentationReady(
+  scene: BattleScene,
+  capacity: number,
+): Promise<number> {
+  const battle = scene.currentBattle;
+  if (globalScene !== scene || battle == null || !Number.isSafeInteger(capacity) || capacity < 1) {
+    throw new Error("Co-op party-reorder presentation has no live battle field");
+  }
+  const seats = scene
+    .getPlayerParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  const expectedIds = seats.map(({ pokemon }) => pokemon.id);
+
+  return settleCoopFieldPresentationReady(
+    {
+      side: "player",
+      seats,
+      capacity,
+      boundary: "party-reorder",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "unchanged",
+    },
+    () =>
+      scene.currentBattle === battle
+      && expectedIds.every((pokemonId, slot) => scene.getPlayerParty()[slot]?.id === pokemonId),
+  );
 }
 
 /**

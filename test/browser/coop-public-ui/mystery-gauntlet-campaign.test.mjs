@@ -27,6 +27,7 @@ import {
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
+  partyReorderPresentationMatches,
   resolveSurfaceOwner,
   retainedPartyEvolutionNeedsProgressBudget,
   rewardCursorProjectionMatches,
@@ -778,6 +779,67 @@ test("reward cursor projection requires the watcher's exact addressed visual sel
     false,
     "a second actionable cursor is not a cosmetic watcher projection",
   );
+});
+
+test("Check Team reorder proof requires both party order and an atomically ready visible field", () => {
+  const expectedPartyIds = [303, 202, 101, 404];
+  const ready = {
+    partySlots: expectedPartyIds.map(pokemonId => ({ pokemonId })),
+    presentation: {
+      expectedPlayerFieldIds: [303, 202],
+      playerFieldReady: true,
+      playerField: [
+        {
+          pokemonId: 303,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+        {
+          pokemonId: 202,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+      ],
+    },
+  };
+  assert.equal(partyReorderPresentationMatches(ready, expectedPartyIds), true);
+  assert.equal(
+    partyReorderPresentationMatches(
+      {
+        ...ready,
+        presentation: {
+          ...ready.presentation,
+          playerFieldReady: false,
+          playerField: ready.presentation.playerField.map(field => ({ ...field, visible: false })),
+        },
+      },
+      expectedPartyIds,
+    ),
+    false,
+    "mechanical party convergence cannot hide a blank active field",
+  );
+  assert.equal(
+    partyReorderPresentationMatches({ ...ready, partySlots: [{ pokemonId: 101 }, ...ready.partySlots.slice(1)] }, expectedPartyIds),
+    false,
+    "visible field convergence cannot hide a stale party order",
+  );
+});
+
+test("Greater Ability Randomizer policy mandates the public Check Team reorder journey", () => {
+  withEnvironment({ COOP_UI_PARTY_REWARD_ID: "ER_GREATER_ABILITY_RANDOMIZER" }, () => {
+    assert.equal(loadCampaignPolicy().partyMutatingReward.checkTeamReorder, true);
+  });
+  withEnvironment({ COOP_UI_PARTY_REWARD_ID: "ER_ABILITY_CAPSULE" }, () => {
+    assert.equal(loadCampaignPolicy().partyMutatingReward.checkTeamReorder, false);
+  });
 });
 
 test("ordinary campaign turns keep the strongest visible move instead of weakening by turn number", async () => {

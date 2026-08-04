@@ -7697,3 +7697,23 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   rejection is contained. The same transaction catch now uses the retained shared terminal for authoritative
   sessions instead of ever abandoning a peer through a host-only reset. Focused data and wiring regressions pin
   both halves; the exact SHA still requires remote gate and animations-enabled browser requalification.
+- Full exact-SHA gate `30913821192` is green on `2bbe3c3b1` across all 32 jobs. Its animations-enabled
+  registered-interactions requalification `30913823828` was cancelled externally at 14:05 while both clients
+  were healthy in the wave-2 Wobbuffet battle (heartbeats 200, wave 1 already complete). Its build/static stage
+  was green and both diagnostic artifacts are preserved under `.artifacts-registered-30913823828-cancelled`;
+  the cancellation is infrastructure/process evidence, not a product verdict.
+- Paired staging logs `2026-08-04T13-38-57-460Z` / `13-38-59-075Z` show Greater Ability Randomizer itself
+  committed identically and advanced both parties. The reported blank player side followed a Check Team
+  `REORDER [2,0]`: the owner removed the old lead before the promoted battler's atlas completed, while the
+  watcher changed only its party array and never reconciled the field. The shared presentation projector now
+  loads every promoted active battler behind the still-visible old field, then atomically hides stale objects
+  and exposes the exact party-front field on both clients without replaying summon mechanics.
+- The same nested return exposed a broader cursor weakness: relative `uiInput` replay cannot converge accounts
+  with different `shopCursorTarget` preferences and cannot repair a watcher left on the top reward screen while
+  the owner visits Check Team. The cosmetic FIFO now carries an absolute ModifierSelect cursor checkpoint after
+  every real handler (re)install, retrying until both owner capture and watcher application are actionable. It
+  remains presentation-only; authoritative choices and mutations still use retained interaction commits.
+- The Greater Ability Randomizer two-browser profile now must drive the exact public path through ordinary keys:
+  reward action row -> Check Team -> Move slot 0 -> swap with slot 2 -> prove identical party order and fully
+  visible active sprites/info bars on both clients -> return -> prove the watcher received the owner's absolute
+  reward cursor. The previous journey selected only the reward and therefore could not catch either live defect.

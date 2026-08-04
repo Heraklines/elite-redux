@@ -1088,6 +1088,39 @@ export function semanticSurfaceView(text) {
   const nullableStateDigest = digest =>
     digest === null || (typeof digest === "string" && /^[0-9a-f]{16}$/iu.test(digest) && digest !== CHECKSUM_SENTINEL);
   const presentation = value?.presentation;
+  const playerField = presentation?.playerField;
+  const expectedPlayerFieldIds = presentation?.expectedPlayerFieldIds;
+  const validPlayerFieldEntry = entry =>
+    entry
+    && typeof entry === "object"
+    && Number.isSafeInteger(entry.pokemonId)
+    && entry.pokemonId >= 0
+    && Number.isSafeInteger(entry.partySlot)
+    && entry.partySlot >= 0
+    && typeof entry.visible === "boolean"
+    && typeof entry.alpha === "number"
+    && Number.isFinite(entry.alpha)
+    && typeof entry.spriteVisible === "boolean"
+    && (entry.spriteAlpha === null || (typeof entry.spriteAlpha === "number" && Number.isFinite(entry.spriteAlpha)))
+    && typeof entry.infoVisible === "boolean"
+    && (entry.infoAlpha === null || (typeof entry.infoAlpha === "number" && Number.isFinite(entry.infoAlpha)));
+  const derivedPlayerFieldReady =
+    Array.isArray(playerField)
+    && Array.isArray(expectedPlayerFieldIds)
+    && JSON.stringify(
+      playerField
+        .filter(
+          entry =>
+            validPlayerFieldEntry(entry)
+            && entry.visible
+            && entry.alpha > 0
+            && entry.spriteVisible
+            && (entry.spriteAlpha ?? 0) > 0
+            && entry.infoVisible
+            && (entry.infoAlpha ?? 0) > 0,
+        )
+        .map(entry => entry.pokemonId),
+    ) === JSON.stringify(expectedPlayerFieldIds);
   if (
     !value
     || typeof value !== "object"
@@ -1135,7 +1168,13 @@ export function semanticSurfaceView(text) {
         || !Number.isFinite(presentation.enemyTrainerAlpha)
         || typeof presentation.enemyTrainerPresented !== "boolean"
         || presentation.enemyTrainerPresented
-          !== (presentation.enemyTrainerVisible && presentation.enemyTrainerAlpha > 0.001)))
+          !== (presentation.enemyTrainerVisible && presentation.enemyTrainerAlpha > 0.001)
+        || !Array.isArray(expectedPlayerFieldIds)
+        || expectedPlayerFieldIds.some(pokemonId => !Number.isSafeInteger(pokemonId) || pokemonId < 0)
+        || !Array.isArray(playerField)
+        || playerField.some(entry => !validPlayerFieldEntry(entry))
+        || typeof presentation.playerFieldReady !== "boolean"
+        || presentation.playerFieldReady !== derivedPlayerFieldReady))
     || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop
       && (value.localSeat === null
@@ -1151,7 +1190,15 @@ export function semanticSurfaceView(text) {
     address: Object.freeze({ ...value.address }),
     seatsWithInput: Object.freeze([...value.seatsWithInput]),
     ready: Object.freeze({ ...value.ready }),
-    ...(value.presentation == null ? {} : { presentation: Object.freeze({ ...value.presentation }) }),
+    ...(value.presentation == null
+      ? {}
+      : {
+          presentation: Object.freeze({
+            ...value.presentation,
+            expectedPlayerFieldIds: Object.freeze([...value.presentation.expectedPlayerFieldIds]),
+            playerField: Object.freeze(value.presentation.playerField.map(entry => Object.freeze({ ...entry }))),
+          }),
+        }),
     ...(Array.isArray(value.connectionGenerations)
       ? { connectionGenerations: Object.freeze([...value.connectionGenerations]) }
       : {}),

@@ -511,7 +511,11 @@ export class UI extends Phaser.GameObjects.Container {
         // arg is the watcher's resync barrier and must be the PRE-press mode.
         const modeBefore = this.mode;
         const result = this.processInputInner(button); // OWNER: drive locally...
-        mirror.relayOwnerButton(button, modeBefore); // ...then relay the cursor for the partner
+        // A button rejected while the owner's handler is still animating changed no local cursor.
+        // Relaying it anyway would make the watcher apply an action the owner never consumed.
+        if (result) {
+          mirror.relayOwnerButton(button, modeBefore); // ...then relay the consumed cursor for the partner
+        }
         return result;
       }
     }
@@ -603,6 +607,14 @@ export class UI extends Phaser.GameObjects.Container {
         // the reward animation after the owner becomes actionable; the mirror retains and retries
         // that exact cosmetic FIFO input instead of permanently losing the cursor edge.
         applyButton: (b: Button) => this.processInputInner(b),
+        captureState: () => {
+          const handler = this.getHandler();
+          return handler instanceof ModifierSelectUiHandler ? handler.getCoopMirrorCursorState() : null;
+        },
+        applyState: state => {
+          const handler = this.getHandler();
+          return handler instanceof ModifierSelectUiHandler ? handler.applyCoopMirrorCursorState(state) : true;
+        },
       };
     }
     return this._coopMirrorEngine;

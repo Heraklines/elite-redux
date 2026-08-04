@@ -30,6 +30,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { modifierTypes } from "#data/data-lists";
+import { getActuallyFieldedCoopPokemon } from "#data/elite-redux/coop/coop-field-presentation";
 import {
   COOP_ACT_CHECK,
   COOP_CHECK_KIND,
@@ -47,9 +48,10 @@ import { SpeciesId } from "#enums/species-id";
 import type { PlayerPokemon } from "#field/pokemon";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
+import { installHeadlessPlayerAtlasCompletionModel } from "#test/tools/coop-duo-harness";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The reward-shop action codes the watch loop's applyRelayedRewardAction dispatches on (data[0]) are
 // 0..3 (REWARD/SHOP/TRANSFER/LOCK), so a CHECK op (action code COOP_ACT_CHECK = 4) can never alias one.
@@ -161,6 +163,43 @@ describe.skipIf(!RUN)("co-op shop Check-Team op convergence (#633 B9b) - watcher
     [owner[0], owner[2]] = [owner[2], owner[0]];
     seam().applyRelayedCheckOp(COOP_CHECK_OP_REORDER, [0, 2]);
     expect(game.scene.getPlayerParty().map(m => m.species.speciesId)).toEqual(owner);
+  });
+
+  it("REORDER keeps the old field visible until the promoted battler is ready, then projects the watcher", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    installHeadlessPlayerAtlasCompletionModel(game.scene);
+
+    const party = game.scene.getPlayerParty();
+    const outgoing = party[0];
+    const incoming = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.GENGAR), 50);
+    incoming.coopOwner = "guest";
+    party.push(incoming);
+    const modeledLoadAssets = incoming.loadAssets.bind(incoming);
+    let releaseAssets!: () => void;
+    const assetsBlocked = new Promise<void>(resolve => {
+      releaseAssets = resolve;
+    });
+    vi.spyOn(incoming, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await assetsBlocked;
+      await modeledLoadAssets(ignoreOverride, useIllusion);
+    });
+
+    expect(outgoing.isOnField(), "the pre-reorder lead must be visibly fielded").toBe(true);
+    seam().applyRelayedCheckOp(COOP_CHECK_OP_REORDER, [0, 1]);
+
+    expect(party[0]).toBe(incoming);
+    expect(outgoing.isOnField(), "the old lead stays visible while the new atlas is pending").toBe(true);
+    expect(incoming.isOnField(), "the promoted bench mon must not be exposed half-materialized").toBe(false);
+
+    releaseAssets();
+    await vi.waitFor(() => {
+      expect(getActuallyFieldedCoopPokemon("player").map(pokemon => pokemon.id)).toEqual([incoming.id]);
+    });
+    expect(outgoing.visible).toBe(false);
+    expect(incoming.visible).toBe(true);
+    expect(incoming.getSprite()?.visible).toBe(true);
+    expect(incoming.getBattleInfo()?.visible).toBe(true);
   });
 
   it("GIVE converges: coopOwner flips + the party re-interleaves identically", async () => {
