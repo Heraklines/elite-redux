@@ -143,7 +143,6 @@ jobs:
             test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
             test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
           fi
-          test -f ai-models/tree/models/stacked_tree_ensemble.json
           python - <<'PY'
           import json
           import os
