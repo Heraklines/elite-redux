@@ -36,7 +36,7 @@ on:
         type: boolean
         default: false
       max_policy_decisions:
-        description: Deterministic winner-only decision cap for the CPU tree (maximum 8000 on hosted runners)
+        description: Deterministic winner-only decision cap for the CPU tree (maximum 20000 on hosted runners)
         required: false
         type: string
         default: "4000"
@@ -386,8 +386,8 @@ jobs:
             echo "::error::max_policy_decisions must be a positive integer"
             exit 1
           fi
-          if (( MAX_POLICY_DECISIONS > 8000 )); then
-            echo "::error::max_policy_decisions exceeds the 8000-decision hosted-runner memory budget"
+          if (( MAX_POLICY_DECISIONS > 20000 )); then
+            echo "::error::max_policy_decisions exceeds the 20000-decision hosted-runner memory budget"
             exit 1
           fi
           battle_type_args=()
