@@ -93,6 +93,7 @@ env:
   AI_BENCHMARK_TREE_RUN_ID: ${{ github.event_name == 'push' && '30866627818' || inputs.tree_run_id }}
   AI_BENCHMARK_TREE_ARTIFACT: ${{ github.event_name == 'push' && 'ai-production-v4-remote-training-report' || inputs.tree_artifact_name }}
   AI_BENCHMARK_TREE_ONLY: ${{ github.event_name == 'push' && 'false' || inputs.tree_only }}
+  AI_BENCHMARK_CANDIDATE_ONLY: ${{ github.event_name != 'push' && inputs.control_kernel == 'candidate-only' }}
   ER_COMBAT_EPISODE_TIMEOUT_MS: 300000
 
 concurrency:
@@ -149,6 +150,21 @@ jobs:
           test -n "$KAGGLE_KEY"
           mkdir -p ai-models/candidate
           kaggle kernels output "$CANDIDATE_KERNEL" --path ai-models/candidate --force
+      - name: Seal complete unmanifested candidate seeds
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ensemble_count=$(find ai-models/candidate -name ensemble.json -type f | wc -l)
+          if [[ "$ensemble_count" -gt 0 ]]; then
+            test "$ensemble_count" -eq 1
+            exit 0
+          fi
+          seed_roots=$(find ai-models/candidate -type d -name 'seed-*' -printf '%h\n' | sort -u)
+          test "$(printf '%s\n' "$seed_roots" | sed '/^$/d' | wc -l)" -eq 1
+          test "$(find "$seed_roots" -mindepth 2 -maxdepth 2 -name report.json -type f | wc -l)" -ge 2
+          python -m pip install --requirement ml/policy/requirements.txt
+          python ml/policy/build_candidate_ensemble.py --root "$seed_roots"
       - uses: actions/download-artifact@v6
         with:
           name: ${{ env.AI_BENCHMARK_TREE_ARTIFACT }}
@@ -463,12 +479,16 @@ jobs:
       - name: Build difficulty-balanced mirrored batch
         env:
           CANDIDATE_MODE: ${{ env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+          CANDIDATE_ONLY: ${{ env.AI_BENCHMARK_CANDIDATE_ONLY || 'false' }}
           TREE_ONLY: ${{ env.AI_BENCHMARK_TREE_ONLY || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
           controllers=""
-          if [[ "$CANDIDATE_MODE" == "true" || "$TREE_ONLY" == "true" ]]; then
+          if [[ "$CANDIDATE_ONLY" == "true" ]]; then
+            test "$CANDIDATE_MODE" == "true"
+            controllers="$CANDIDATE_CONTROLLER"
+          elif [[ "$CANDIDATE_MODE" == "true" || "$TREE_ONLY" == "true" ]]; then
             if [[ "$CANDIDATE_MODE" == "true" ]]; then
               controllers="$CANDIDATE_CONTROLLER,"
             fi
@@ -521,7 +541,9 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-${CANDIDATE_CONTROLLER}-results.json"
       - name: Play selected winner-only tree
-        if: ${{ env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        if: >-
+          (env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '')
+          && env.AI_BENCHMARK_CANDIDATE_ONLY != 'true'
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -530,7 +552,9 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-selected-tree-v1-results.json"
       - name: Play stacked winner-only tree
-        if: ${{ env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        if: >-
+          (env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '')
+          && env.AI_BENCHMARK_CANDIDATE_ONLY != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -544,6 +568,7 @@ jobs:
             --test-timeout-ms 3600000 \
             --json-out "ai-gauntlet/shard-${{ matrix.shard }}-stacked-tree-v1-results.json"
       - name: Play smart-default baseline
+        if: ${{ env.AI_BENCHMARK_CANDIDATE_ONLY != 'true' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -552,6 +577,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-smart-default-v1-results.json"
       - name: Play hardest-engine baseline
+        if: ${{ env.AI_BENCHMARK_CANDIDATE_ONLY != 'true' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
