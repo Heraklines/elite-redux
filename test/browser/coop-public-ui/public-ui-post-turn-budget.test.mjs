@@ -1255,12 +1255,19 @@ test("sequential command driver retires the same CommandPhase fight submenu with
     },
   };
   let injectCollectionClose = false;
+  let fightSurfaceReads = 0;
   const findLastSemanticSurface = authorityEvidence.findLastSemanticSurface.bind(authorityEvidence);
   authorityEvidence.findLastSemanticSurface = (...args) => {
     const event = findLastSemanticSurface(...args);
     if (injectCollectionClose && event?.observation?.surfaceId === "command:fight") {
-      injectCollectionClose = false;
-      authorityEvidence.push(movePhase);
+      fightSurfaceReads++;
+      // The first generic read is target-picker discovery. Publish the authority's
+      // collection-close only while the following command scan holds the stale Fight
+      // observation, matching the ordering captured with animations enabled.
+      if (fightSurfaceReads >= 2) {
+        injectCollectionClose = false;
+        authorityEvidence.push(movePhase);
+      }
     }
     return event;
   };
@@ -1275,6 +1282,7 @@ test("sequential command driver retires the same CommandPhase fight submenu with
     sequence: async () => {
       order.push("authority");
       authorityEvidence.push(ownedFight(0, address, 53));
+      fightSurfaceReads = 0;
       injectCollectionClose = true;
     },
   };
