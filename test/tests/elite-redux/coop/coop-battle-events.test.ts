@@ -2099,35 +2099,10 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     await new Promise(r => setTimeout(r, 0));
 
-    // Drive the guest replay turn, then drain the queued presentation + finalize phases in order.
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
-    // Drain the unshifted phases (MoveAnim -> HpDrain -> Faint -> Finalize) deterministically.
-    // MessagePhase is included: the moveUsed event now queues a guest-language narration line
-    // (#691 coopNarrateMoveUsed), so a MessagePhase sits amongst the presentation phases - drain
-    // past it (like coop-guest-renderer's REPLAY_DRAIN_PHASES) so the loop reaches the Faint phase.
-    for (let i = 0; i < 12 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
-      const cur = game.scene.phaseManager.getCurrentPhase();
-      // `end()` normally starts the next queued phase synchronously. On a slower runner the mocked Faint
-      // phase can therefore have already started Finalize before this manual drain observes it; invoking
-      // that same live phase again manufactures a second finalization that production never performs.
-      if (cur.is("CoopFinalizeTurnPhase") && finalizeSpy.mock.calls.length > 0) {
-        break;
-      }
-      if (
-        cur.is("MessagePhase")
-        || cur.is("CoopMoveAnimReplayPhase")
-        || cur.is("CoopHpDrainReplayPhase")
-        || cur.is("CoopFaintReplayPhase")
-        || cur.is("CoopFinalizeTurnPhase")
-      ) {
-        cur.start();
-        await new Promise(r => setTimeout(r, 0));
-      } else {
-        break;
-      }
-    }
+    // Enter and drain through the shared production-equivalent V2 projector path. Starting a detached replay
+    // object cannot advance the live CommandPhase under the identity-safe scheduler and therefore proves no
+    // renderer behavior; this helper replaces that predecessor with the exact queue-owned replay first.
+    await driveReplayTurn(turn);
 
     moveSpy.mockRestore();
     hpSpy.mockRestore();

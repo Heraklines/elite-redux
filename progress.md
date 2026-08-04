@@ -7622,3 +7622,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   assertion still searched for `successorWasStarted(selectedSuccessor)` after the modal-race fix deliberately
   made `selectedAfterClose` the post-commit identity. The assertion now pins that actual stronger identity;
   running runtime shards remain untouched and continue to qualify the launcher migration.
+- The corrected B13 shard then reached its first real replay test and exposed one remaining detached fixture:
+  the host-KO presentation test called `CoopReplayTurnPhase.start()` while live `CommandPhase` remained current,
+  so identity-safe `end()` correctly refused to shift it and the test observed no faint at all. The test now uses
+  its file's existing production-equivalent `replaceWithCoopAuthoritativePhase` replay driver. This is harness
+  repair only; captured logs showed production replay queued move/HP/faint/finalize in the correct order.
