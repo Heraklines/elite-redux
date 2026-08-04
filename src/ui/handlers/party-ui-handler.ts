@@ -1151,14 +1151,29 @@ export class PartyUiHandler extends MessageUiHandler {
         this.clearTransfer(); // un-highlight the source slot BEFORE rebuilding slots
         const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
         [party[src], party[dst]] = [party[dst], party[src]];
+        let presentationReady: Promise<number> | undefined;
         if (src < fieldSize || dst < fieldSize) {
-          void settleCoopPartyReorderPresentationReady(globalScene, fieldSize).catch(error => {
-            coopLog("party", `OWNER party-reorder presentation retained old field: ${String(error)}`);
-          });
+          // The authoritative CHECK result captures the live field immediately when it is relayed. Do not
+          // publish that result while the promoted bench battler is still loading: `isOnField()` would be
+          // false in the immutable carrier and the watcher would correctly hide the new lead forever. Keep
+          // PARTY input blocked until the exact visual field is ready, and give the owning reward phase the
+          // same promise so it can publish under its captured runtime rather than this async UI callback's
+          // ambient global context.
+          this.blockInput = true;
+          presentationReady = settleCoopPartyReorderPresentationReady(globalScene, fieldSize);
+          void presentationReady.then(
+            () => {
+              this.blockInput = false;
+            },
+            error => {
+              this.blockInput = false;
+              coopLog("party", `OWNER party-reorder presentation retained old field: ${String(error)}`);
+            },
+          );
         }
         this.populatePartySlots(); // re-render the list in the new order
         // Co-op (#633 B9b): relay the resolved swap so the watcher mirrors it on its identical party.
-        this.coopReportCheckToPhase(COOP_CHECK_OP_REORDER, [src, dst]);
+        this.coopReportCheckToPhase(COOP_CHECK_OP_REORDER, [src, dst], presentationReady);
       } else {
         this.startTransfer();
       }
@@ -2260,7 +2275,7 @@ export class PartyUiHandler extends MessageUiHandler {
    * - SelectModifierPhase.coopReportCheckMutation then no-ops off the pinned owner / outside co-op.
    * Solo / lockstep: isCoop is false, so this returns immediately and the screen is byte-identical.
    */
-  private coopReportCheckToPhase(op: number, data: number[]): void {
+  private coopReportCheckToPhase(op: number, data: number[], presentationReady?: Promise<unknown>): void {
     if (!globalScene.gameMode.isCoop || this.partyUiMode !== PartyUiMode.CHECK) {
       return;
     }
@@ -2276,10 +2291,11 @@ export class PartyUiHandler extends MessageUiHandler {
     if (phase.is("SelectModifierPhase")) {
       // Structural reach-through, mirroring this file's existing `as CommandPhase` precedent
       // (line ~1057, the PASS_BATON/SEND_OUT handleCommand call). No `as any` / `@ts-expect-error`.
-      (phase as unknown as { coopReportCheckMutation(op: number, data: number[]): void }).coopReportCheckMutation(
-        op,
-        data,
-      );
+      (
+        phase as unknown as {
+          coopReportCheckMutation(op: number, data: number[], presentationReady?: Promise<unknown>): void;
+        }
+      ).coopReportCheckMutation(op, data, presentationReady);
     }
   }
 

@@ -7727,3 +7727,14 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   diagnostics were gone. Both static jobs stopped only on Biome's safe import-order assist in the two registry
   callers; Chromium again did not launch. The imports are now canonically ordered. The already-running gate
   shards remain valid behavioral evidence because this final correction changes import order only.
+- Exact-SHA animations-on run `30922386512` reached the newly representative Greater Randomizer Check Team
+  reorder and failed on the original blank-field symptom rather than passing a party-array proxy. Both clients
+  mechanically adopted `[bench, guest lead, old lead, bench]`, but the watcher carrier marked only the unchanged
+  guest lead as presented. The owner had started the asynchronous promoted-atlas settle and immediately
+  published the V2 CHECK result; capture therefore observed the promoted lead as not yet on field. The watcher
+  correctly applied that immutable presentation bit, skipped mechanical replay in projection-only mode, and
+  retained one visible battler indefinitely. The owner now blocks further PARTY input and defers publishing the
+  CHECK result until the promoted field is actually ready under the phase-owned runtime. The watcher also runs
+  the same readiness projector after DATA application and withholds `controlInstalled` until the exact active
+  sprites and info bars exist. A failure-first projection-only regression models DATA-first party permutation,
+  delayed atlas completion, old-field retention, and final exact field replacement.

@@ -126,6 +126,11 @@ const RUN = process.env.ER_SCENARIO === "1";
  *  the running phase uses). Mirrors er-biome-shop-economy.test.ts's `as unknown as {...}` seam. */
 type CheckOpSeam = {
   applyRelayedCheckOp(op: number, rest: number[]): void;
+  applyRelayedRewardAction(
+    action: { choice: number; data: number[] },
+    decision?: { authoritativeProjection?: boolean; operationId?: string },
+  ): boolean;
+  coopWatcher: boolean;
 };
 
 describe.skipIf(!RUN)("co-op shop Check-Team op convergence (#633 B9b) - watcher applier", () => {
@@ -198,6 +203,48 @@ describe.skipIf(!RUN)("co-op shop Check-Team op convergence (#633 B9b) - watcher
     });
     expect(outgoing.visible).toBe(false);
     expect(incoming.visible).toBe(true);
+    expect(incoming.getSprite()?.visible).toBe(true);
+    expect(incoming.getBattleInfo()?.visible).toBe(true);
+  });
+
+  it("V2 projection-only REORDER repairs the field after authoritative DATA already changed party order", async () => {
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    installHeadlessPlayerAtlasCompletionModel(game.scene);
+
+    const party = game.scene.getPlayerParty();
+    const outgoing = party[0];
+    const incoming = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.GENGAR), 50);
+    incoming.coopOwner = "guest";
+    party.push(incoming);
+    const modeledLoadAssets = incoming.loadAssets.bind(incoming);
+    let releaseAssets!: () => void;
+    const assetsBlocked = new Promise<void>(resolve => {
+      releaseAssets = resolve;
+    });
+    vi.spyOn(incoming, "loadAssets").mockImplementation(async (ignoreOverride = true, useIllusion = false) => {
+      await assetsBlocked;
+      await modeledLoadAssets(ignoreOverride, useIllusion);
+    });
+
+    // This is the real V2 ordering: the immutable DATA plane has already installed [incoming, ...], but
+    // its action projector has not replayed mechanics and must still make the exact active field visible.
+    [party[0], party[1]] = [party[1], party[0]];
+    const phase = seam();
+    phase.coopWatcher = true;
+    expect(
+      phase.applyRelayedRewardAction(
+        { choice: 0, data: [COOP_ACT_CHECK, COOP_CHECK_OP_REORDER, 0, 1] },
+        { authoritativeProjection: true },
+      ),
+    ).toBe(false);
+
+    expect(outgoing.isOnField(), "the previous visual field remains until the promoted atlas is ready").toBe(true);
+    expect(incoming.isOnField()).toBe(false);
+    releaseAssets();
+    await vi.waitFor(() => {
+      expect(getActuallyFieldedCoopPokemon("player").map(pokemon => pokemon.id)).toEqual([incoming.id]);
+    });
     expect(incoming.getSprite()?.visible).toBe(true);
     expect(incoming.getBattleInfo()?.visible).toBe(true);
   });

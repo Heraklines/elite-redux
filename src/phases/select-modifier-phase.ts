@@ -1109,12 +1109,26 @@ export class SelectModifierPhase extends BattlePhase {
    * Hard no-op off the pinned owner / outside co-op (coopRelaySend gates on isLocalOwnerAtCounter).
    * `op` is a COOP_CHECK_OP_*; `data` is its payload (slots / codepoints / form index).
    */
-  public coopReportCheckMutation(op: number, data: number[]): void {
-    if (!this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check")) {
+  public coopReportCheckMutation(op: number, data: number[], presentationReady?: Promise<unknown>): void {
+    const publish = (): void => {
+      if (this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check")) {
+        return;
+      }
       const operationId = this.coopPendingAuthorityOperationId;
       this.coopProveV2RewardOperationComplete(operationId);
       this.coopCommitPendingAuthorityResult(operationId);
+    };
+    if (presentationReady == null) {
+      publish();
+      return;
     }
+    void presentationReady.then(
+      () => this.coopResumeOnOwningRuntime(publish),
+      error =>
+        this.coopResumeOnOwningRuntime(() =>
+          failCoopSharedSession(`Check Team reorder could not install its authoritative field: ${String(error)}`),
+        ),
+    );
   }
 
   // Transfer modifiers among party pokemon
@@ -3305,7 +3319,23 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRelayedMoney = -1;
       if (projectionOnly) {
         this.coopResumeOwnerShopAfterProjection();
-        this.coopProveV2RewardOperationComplete(decision?.operationId);
+        const presentationReady = this.settleRelayedCheckPresentation(data[1], data.slice(2));
+        if (presentationReady == null) {
+          this.coopProveV2RewardOperationComplete(decision?.operationId);
+        } else {
+          // The immutable state has already installed the authoritative party permutation. The CHECK op
+          // still owns its visual projection: await the real battle atlas/info surface before acknowledging
+          // controlInstalled, otherwise the next action can retire this entry while one seat is blank.
+          void presentationReady.then(
+            () => this.coopResumeOnOwningRuntime(() => this.coopProveV2RewardOperationComplete(decision?.operationId)),
+            error =>
+              this.coopResumeOnOwningRuntime(() =>
+                failCoopSharedSession(
+                  `Check Team reorder could not project the authoritative watcher field: ${String(error)}`,
+                ),
+              ),
+          );
+        }
       } else {
         this.applyRelayedCheckOp(data[1], data.slice(2));
         this.coopProveV2RewardOperationComplete(decision?.operationId);
@@ -3366,11 +3396,9 @@ export class SelectModifierPhase extends BattlePhase {
         if (src < party.length && dst < party.length) {
           const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
           [party[src], party[dst]] = [party[dst], party[src]];
-          if (src < fieldSize || dst < fieldSize) {
-            void settleCoopPartyReorderPresentationReady(globalScene, fieldSize).catch(error => {
-              coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
-            });
-          }
+          void this.settleRelayedCheckPresentation(op, rest)?.catch(error => {
+            coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
+          });
         }
         return;
       }
@@ -3441,5 +3469,27 @@ export class SelectModifierPhase extends BattlePhase {
         return;
       }
     }
+  }
+
+  /** Project a relayed CHECK mutation whose authoritative DATA was already applied. */
+  private settleRelayedCheckPresentation(op: number, rest: number[]): Promise<number> | null {
+    if (op !== COOP_CHECK_OP_REORDER) {
+      return null;
+    }
+    const [src, dst] = rest;
+    const party = globalScene.getPlayerParty();
+    const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
+    if (
+      !Number.isSafeInteger(src)
+      || !Number.isSafeInteger(dst)
+      || src < 0
+      || dst < 0
+      || src >= party.length
+      || dst >= party.length
+      || (src >= fieldSize && dst >= fieldSize)
+    ) {
+      return null;
+    }
+    return settleCoopPartyReorderPresentationReady(globalScene, fieldSize);
   }
 }
