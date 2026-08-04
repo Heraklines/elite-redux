@@ -3394,7 +3394,6 @@ export class SelectModifierPhase extends BattlePhase {
       case COOP_CHECK_OP_REORDER: {
         const [src, dst] = rest;
         if (src < party.length && dst < party.length) {
-          const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
           [party[src], party[dst]] = [party[dst], party[src]];
           void this.settleRelayedCheckPresentation(op, rest)?.catch(error => {
             coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
