@@ -2124,6 +2124,23 @@
     },
     {
       "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
+      "source_line": 119,
+      "test_title": "states a non-null typed successor for %s",
+      "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:119:it",
+      "subject": "Authority V2 interaction cutover and typed successors",
+      "invariant": "The named assertion remains true: states a non-null typed successor for %s",
+      "dependencies": [
+        "src/data/elite-redux/coop/authority-v2/contract.ts",
+        "vitest"
+      ],
+      "current_execution_class": "external-only: node-pure Authority V2 fast-contract runner",
+      "future_rust_equivalent_target": "rust::authority_v2::interaction",
+      "parity_fixture_need": "required: canonical Authority V2 entry/control/receipt JSON fixture",
+      "status": "covered-current; Rust port pending",
+      "implementation_kind": "production-implementation"
+    },
+    {
+      "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
       "source_line": 226,
       "test_title": "admits a taken free reward as a terminal result through its exact JSON wire image",
       "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:226:it",
@@ -2197,6 +2214,23 @@
       "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:313:it",
       "subject": "Authority V2 interaction cutover and typed successors",
       "invariant": "The named assertion remains true: states UI proof and mechanical successor as independent axes for Mystery catch-full",
+      "dependencies": [
+        "src/data/elite-redux/coop/authority-v2/contract.ts",
+        "vitest"
+      ],
+      "current_execution_class": "external-only: node-pure Authority V2 fast-contract runner",
+      "future_rust_equivalent_target": "rust::authority_v2::interaction",
+      "parity_fixture_need": "required: canonical Authority V2 entry/control/receipt JSON fixture",
+      "status": "covered-current; Rust port pending",
+      "implementation_kind": "production-implementation"
+    },
+    {
+      "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
+      "source_line": 342,
+      "test_title": "keeps %s proposal telemetry out of the mechanical log",
+      "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:342:it",
+      "subject": "Authority V2 interaction cutover and typed successors",
+      "invariant": "The named assertion remains true: keeps %s proposal telemetry out of the mechanical log",
       "dependencies": [
         "src/data/elite-redux/coop/authority-v2/contract.ts",
         "vitest"
@@ -2328,11 +2362,45 @@
     },
     {
       "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
+      "source_line": 629,
+      "test_title": "lets a settled TURN_RESOLVE %s decision return to the exact turn log",
+      "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:629:it",
+      "subject": "Authority V2 interaction cutover and typed successors",
+      "invariant": "The named assertion remains true: lets a settled TURN_RESOLVE %s decision return to the exact turn log",
+      "dependencies": [
+        "src/data/elite-redux/coop/authority-v2/contract.ts",
+        "vitest"
+      ],
+      "current_execution_class": "external-only: node-pure Authority V2 fast-contract runner",
+      "future_rust_equivalent_target": "rust::authority_v2::interaction",
+      "parity_fixture_need": "required: canonical Authority V2 entry/control/receipt JSON fixture",
+      "status": "covered-current; Rust port pending",
+      "implementation_kind": "production-implementation"
+    },
+    {
+      "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
       "source_line": 646,
       "test_title": "freezes terminal reward material to its exact JSON wire image before digesting it",
       "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:646:it",
       "subject": "Authority V2 interaction cutover and typed successors",
       "invariant": "The named assertion remains true: freezes terminal reward material to its exact JSON wire image before digesting it",
+      "dependencies": [
+        "src/data/elite-redux/coop/authority-v2/contract.ts",
+        "vitest"
+      ],
+      "current_execution_class": "external-only: node-pure Authority V2 fast-contract runner",
+      "future_rust_equivalent_target": "rust::authority_v2::interaction",
+      "parity_fixture_need": "required: canonical Authority V2 entry/control/receipt JSON fixture",
+      "status": "covered-current; Rust port pending",
+      "implementation_kind": "production-implementation"
+    },
+    {
+      "source_file": "test/node/authority-v2-cutover-interaction.test.ts",
+      "source_line": 668,
+      "test_title": "parks ME terminal destinations until their next ordered presentation",
+      "stable_identifier": "test/node/authority-v2-cutover-interaction.test.ts:668:it",
+      "subject": "Authority V2 interaction cutover and typed successors",
+      "invariant": "The named assertion remains true: parks ME terminal destinations until their next ordered presentation",
       "dependencies": [
         "src/data/elite-redux/coop/authority-v2/contract.ts",
         "vitest"
@@ -3727,6 +3795,23 @@
       "stable_identifier": "test/node/authority-v2-interaction-control-ledger.test.ts:367:it",
       "subject": "interaction control ledger, leases, and successor admission",
       "invariant": "The named assertion remains true: reopens a superseded command address as a new lease generation after an ordered modal",
+      "dependencies": [
+        "src/data/elite-redux/coop/authority-v2/contract.ts",
+        "vitest"
+      ],
+      "current_execution_class": "external-only: node-pure Authority V2 fast-contract runner",
+      "future_rust_equivalent_target": "rust::authority_v2::interaction",
+      "parity_fixture_need": "required: canonical Authority V2 entry/control/receipt JSON fixture",
+      "status": "covered-current; Rust port pending",
+      "implementation_kind": "production-implementation"
+    },
+    {
+      "source_file": "test/node/authority-v2-interaction-projection.test.ts",
+      "source_line": 94,
+      "test_title": "decodes every executable %s frontier from immutable entry material",
+      "stable_identifier": "test/node/authority-v2-interaction-projection.test.ts:94:it",
+      "subject": "typed interaction result projection and continuation identity",
+      "invariant": "The named assertion remains true: decodes every executable %s frontier from immutable entry material",
       "dependencies": [
         "src/data/elite-redux/coop/authority-v2/contract.ts",
         "vitest"
@@ -9637,7 +9722,7 @@
       "status": "covered-current; input/menu suite statically inventoried",
       "test_count": 1,
       "test_titles": [
-        "send"
+        "ordinary battle -> $name -> next battle stays fully converged"
       ],
       "test_lines": [
         474
@@ -10274,11 +10359,10 @@
       "future_rust_equivalent_target": "rust::ui_input::button_menu_dispatch",
       "parity_fixture_need": "required: deterministic button event, cursor/menu state, and handler outcome fixture",
       "status": "covered-current; input/menu suite statically inventoried",
-      "test_count": 10,
+      "test_count": 9,
       "test_titles": [
         "(a) single KO of the guest's lead: the picker OPENS, the host summons THE GUEST'S pick, match continues",
         "(g) guest faint -> replacement -> NEXT FULL COMMAND TURN: the guest OPENS its command + ships it, the host consumes it (no auto-pick), converged",
-        "stable-line:359",
         "(b) DOUBLE KO with bench on both sides (the live case): both replacements resolve, no stall, converged",
         "(c) the guest never materializes its picker: replacement remains unacknowledged without false convergence",
         "(c2) an idle real guest picker closes exactly once before replacement material is applied",
@@ -10289,7 +10373,6 @@
       ],
       "test_lines": [
         293,
-        359,
         359,
         505,
         600,
@@ -10368,7 +10451,7 @@
         "A on a NON-your browsed match is inert (only YOUR fight enters the lobby)",
         "B backs out of the board",
         "MENU offers the entrant's server-backed dropout action",
-        "registration panel and entrant rows were rendered",
+        "shows the registration roster before a %i-entrant bracket exists",
         "deep-link: initialBrowse opens the board ON the target match (challenge-notification realpath)",
         "d-pad browse moves the cursor to another match (its pairing card follows)"
       ],
@@ -10477,8 +10560,9 @@
       "future_rust_equivalent_target": "rust::ui_input::button_menu_dispatch",
       "parity_fixture_need": "required: deterministic button event, cursor/menu state, and handler outcome fixture",
       "status": "covered-current; input/menu suite statically inventoried",
-      "test_count": 13,
+      "test_count": 14,
       "test_titles": [
+        "$name should show message and strike 2 turns after use, ignoring player/enemy switches",
         "should fail (preserving prior instances) when used against the same target",
         "should still be delayed when called by other moves",
         "should work when used against different targets in doubles",
@@ -10494,6 +10578,7 @@
         "should activate ally's power spot when switched in during single battles"
       ],
       "test_lines": [
+        66,
         100,
         117,
         134,
@@ -10727,17 +10812,19 @@
       "future_rust_equivalent_target": "rust::ui_input::button_menu_dispatch",
       "parity_fixture_need": "required: deterministic button event, cursor/menu state, and handler outcome fixture",
       "status": "covered-current; input/menu suite statically inventoried",
-      "test_count": 4,
+      "test_count": 5,
       "test_titles": [
         "should wrap and pass along original function arguments from setModeInternal",
         "should call PhaseInterceptor.checkMode if current phase is in `endBySetMode`",
         "should check and remove the first prompt matching criteria",
+        "should skip callback and keep in queue if $reason",
         "should remove expired prompts without blocking"
       ],
       "test_lines": [
         69,
         77,
         87,
+        97,
         130
       ],
       "implementation_kind": "production-test"
@@ -11136,8 +11223,8 @@
       "status": "covered-current; input/menu suite statically inventoried",
       "test_count": 2,
       "test_titles": [
-        "template-expression:`no render recipe for page \"${PAGE}\" (have: ${Object.keys(RECIPES).join(\", \")})`",
-        "all"
+        "template-expression:`renders the \"%s\" page to a PNG`",
+        "summary gift-cycle (R) redraws the black-shiny gift row in place (#349)"
       ],
       "test_lines": [
         2544,
@@ -11242,10 +11329,10 @@
         "Healer cures both the natural holder and its ally",
         "Klutz keeps the foe's Sitrus Berry disabled",
         "Powder Burst grants powder immunity",
-        "wild",
+        "%s heals the damaged party when the bench holder first enters",
         "Steadfast blocks paralysis and self stat drops through Limber",
-        "SONIC_BOOM",
-        "party",
+        "%s halves fixed sound damage",
+        "%s halves overlapping Dark sound damage only once",
         "Perish Body damages the attacker through ER Aftermath when the holder faints",
         "Dazzling's 1.2x accuracy makes Fire Blast connect under max-roll RNG",
         "Gulp Missile reduces level-based fixed damage by 20%",
@@ -11253,13 +11340,13 @@
         "Parroting is immune to sound moves",
         "Antarctic Bird boosts Water damage by 1.3x",
         "Moon Spirit halves Water damage",
-        "party",
+        "%s heals its holder and adjacent ally",
         "Neutralizing Fog blocks weather-based enemy attacks",
         "Color Spectrum grants STAB to an off-type move",
         "Higher Rank applies the new 1.3x priority boost",
-        "wild",
-        "PSYCHIC",
-        "party",
+        "%s heals one eighth in its terrain",
+        "%s doubles direct special damage only on turn one",
+        "%s doubles direct fixed damage only on turn one",
         "Eclipse Wing uses Sturdy timing, counters, and boosts low-HP Dark damage",
         "Final Season only arms on a voluntary switch and sets owned Eerie Fog at turn end",
         "Foul Harvest drains the last used PP, stores charges, and refunds only its draining move",
@@ -11977,11 +12064,65 @@
     },
     {
       "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3445,
+      "test_title": "%s heals the damaged party when the bench holder first enters",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3445:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s heals the damaged party when the bench holder first enters",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
       "source_line": 3486,
       "test_title": "Steadfast blocks paralysis and self stat drops through Limber",
       "stable_identifier": "test/tools/run-scenario.test.ts:3486:it",
       "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
       "invariant": "The named scenario-runner assertion remains true: Steadfast blocks paralysis and self stat drops through Limber",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3505,
+      "test_title": "%s halves fixed sound damage",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3505:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s halves fixed sound damage",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3532,
+      "test_title": "%s halves overlapping Dark sound damage only once",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3532:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s halves overlapping Dark sound damage only once",
       "dependencies": [
         "scripts/run-scenario.mjs",
         "test/framework/game-manager.ts",
@@ -12121,6 +12262,24 @@
     },
     {
       "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3755,
+      "test_title": "%s heals its holder and adjacent ally",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3755:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s heals its holder and adjacent ally",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
       "source_line": 3800,
       "test_title": "Neutralizing Fog blocks weather-based enemy attacks",
       "stable_identifier": "test/tools/run-scenario.test.ts:3800:it",
@@ -12162,6 +12321,60 @@
       "stable_identifier": "test/tools/run-scenario.test.ts:3864:it",
       "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
       "invariant": "The named scenario-runner assertion remains true: Higher Rank applies the new 1.3x priority boost",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3903,
+      "test_title": "%s heals one eighth in its terrain",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3903:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s heals one eighth in its terrain",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3950,
+      "test_title": "%s doubles direct special damage only on turn one",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3950:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s doubles direct special damage only on turn one",
+      "dependencies": [
+        "scripts/run-scenario.mjs",
+        "test/framework/game-manager.ts",
+        "Phaser"
+      ],
+      "current_execution_class": "external-only: Phaser scenario runner",
+      "future_rust_equivalent_target": "rust::scenario::combat_replay",
+      "parity_fixture_need": "required: ScenarioSpec/share-code plus state transcript fixture",
+      "status": "covered-current; headless engine runner",
+      "implementation_kind": "production-test-runner"
+    },
+    {
+      "source_file": "test/tools/run-scenario.test.ts",
+      "source_line": 3985,
+      "test_title": "%s doubles direct fixed damage only on turn one",
+      "stable_identifier": "test/tools/run-scenario.test.ts:3985:it",
+      "subject": "headless ScenarioSpec combat runner and deterministic state transcript",
+      "invariant": "The named scenario-runner assertion remains true: %s doubles direct fixed damage only on turn one",
       "dependencies": [
         "scripts/run-scenario.mjs",
         "test/framework/game-manager.ts",
@@ -12825,14 +13038,12 @@
       "future_rust_equivalent_target": "rust::integration::two_engine_convergence",
       "parity_fixture_need": "required: deterministic host/guest command trace, transport events, scene snapshot, and convergence receipt",
       "status": "covered-current; two-engine external-only",
-      "test_count": 2,
+      "test_count": 1,
       "test_titles": [
-        "cancels the premature turn-commit request at the replay->command pivot (no turnCommitPending softlock loop)",
-        "stable-line:258"
+        "cancels the premature turn-commit request at the replay->command pivot (no turnCommitPending softlock loop)"
       ],
       "test_lines": [
-        121,
-        258
+        121
       ],
       "implementation_kind": "production-two-engine-test"
     },
@@ -13035,7 +13246,7 @@
       "status": "covered-current; two-engine external-only",
       "test_count": 2,
       "test_titles": [
-        "host",
+        "$ownerRole-owned Commander source crosses the exact barrier without exposing local command UI",
         "adopts a guest-owned Commander skip before its ordered V2 command control opens"
       ],
       "test_lines": [
@@ -13258,7 +13469,7 @@
         "CONTROL (faults OFF): a 3-wave run converges byte-identically with zero injected faults",
         "FAULTS ON (drop 35% / reorder 15% / delay 10% of cues): converges byte-identically, bounded resyncs",
         "BURST then RECOVER: a wave-1 cue blackout heals; the run stays converged after recovery",
-        "silent-divergence"
+        "AUTHORITATIVE DROP [%s / %s]: converges OR loud-timeouts, never a silent divergence"
       ],
       "test_lines": [
         333,
@@ -13923,11 +14134,10 @@
       "future_rust_equivalent_target": "rust::integration::two_engine_convergence",
       "parity_fixture_need": "required: deterministic host/guest command trace, transport events, scene snapshot, and convergence receipt",
       "status": "covered-current; two-engine external-only",
-      "test_count": 7,
+      "test_count": 6,
       "test_titles": [
         "cheap refresh is UNCONDITIONAL: on a NO-CHANGE apply the guest still refreshes both item bars + every on-field battle-info (fails-before)",
         "enemy item CHANGE: after the host enemy loses a held item the guest DROPS it (data) AND its item bar refreshes (render)",
-        "\", async () => {\r\n      const rig = await setup();\r\n      await applyOnce(rig);\r\n\r\n      const heldBefore = await withClient(rig.guestCtx, () => enemyHeldIds(rig.guestScene));\r\n      expect(heldBefore, \"",
         "repairs hidden-but-correct field objects absolutely without changing authoritative state",
         "loads the atlas when authority seats an object that had no pre-apply presentation key",
         "does not reveal logical active slots when the host carrier says they are pre-intro/off-field",
@@ -13935,7 +14145,6 @@
       ],
       "test_lines": [
         128,
-        162,
         162,
         185,
         223,
@@ -14167,13 +14376,11 @@
       "future_rust_equivalent_target": "rust::integration::two_engine_convergence",
       "parity_fixture_need": "required: deterministic host/guest command trace, transport events, scene snapshot, and convergence receipt",
       "status": "covered-current; two-engine external-only",
-      "test_count": 2,
+      "test_count": 1,
       "test_titles": [
-        "\",\r\n  () => {\r\n    let phaserGame: Phaser.Game;\r\n    let game: GameManager;\r\n    let logs: ReturnType<typeof installDuoLogCapture>;\r\n\r\n    beforeAll(() => {\r\n      phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });\r\n    });\r\n\r\n    beforeEach(() => {\r\n      game = new GameManager(phaserGame);\r\n      logs = installDuoLogCapture(`revive-dropped-relay-${Date.now()}`);\r\n      game.override\r\n        .battleStyle(\"",
         "a dropped revive relay is DETECTED by the per-turn checksum + HEALED by the resync backstop"
       ],
       "test_lines": [
-        76,
         131
       ],
       "implementation_kind": "production-two-engine-test"
@@ -14257,7 +14464,7 @@
         "ADVERSARIAL a: a STALE buffered pick from a strictly-EARLIER interaction is REJECTED (#861 shape)",
         "ADVERSARIAL b: a LATE choice for an interaction the watcher already LEFT is REJECTED",
         "ADVERSARIAL P36: leaving surface A does not reject surface B at the same Mystery pin",
-        "reward",
+        "ADVERSARIAL stream parity: $ownerRole owner and $watcherRole watcher agree for same-pin $order",
         "ADVERSARIAL c: a CONTINUATION action on the SAME pinned interaction KEEPS its operation identity (#866)"
       ],
       "test_lines": [
@@ -14570,7 +14777,7 @@
       "test_count": 2,
       "test_titles": [
         "suppresses the won-wave phantom command and drains the held replay into the wave-advance victory tail",
-        "guest"
+        "dissolves a command-open for an already-advance-signaled wave instead of parking a doomed 1:2 phantom"
       ],
       "test_lines": [
         134,
@@ -15083,7 +15290,7 @@
       "status": "covered-current; two-engine external-only",
       "test_count": 1,
       "test_titles": [
-        "send"
+        "ordinary battle -> $name -> next battle stays fully converged"
       ],
       "test_lines": [
         474
@@ -15301,11 +15508,10 @@
       "future_rust_equivalent_target": "rust::integration::two_engine_convergence",
       "parity_fixture_need": "required: deterministic host/guest command trace, transport events, scene snapshot, and convergence receipt",
       "status": "covered-current; two-engine external-only",
-      "test_count": 10,
+      "test_count": 9,
       "test_titles": [
         "(a) single KO of the guest's lead: the picker OPENS, the host summons THE GUEST'S pick, match continues",
         "(g) guest faint -> replacement -> NEXT FULL COMMAND TURN: the guest OPENS its command + ships it, the host consumes it (no auto-pick), converged",
-        "stable-line:359",
         "(b) DOUBLE KO with bench on both sides (the live case): both replacements resolve, no stall, converged",
         "(c) the guest never materializes its picker: replacement remains unacknowledged without false convergence",
         "(c2) an idle real guest picker closes exactly once before replacement material is applied",
@@ -15316,7 +15522,6 @@
       ],
       "test_lines": [
         293,
-        359,
         359,
         505,
         600,
