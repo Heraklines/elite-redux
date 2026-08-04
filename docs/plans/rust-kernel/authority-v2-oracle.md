@@ -87,7 +87,7 @@ mapped exhaustively in the JSON:
   unpresented, and known-fainted actors and reports missing ownership as an
   unresolved issue rather than assigning a seat. Showdown enemy-side
   coordinates are normalized by `resolveCoopV2ShowdownCommandProof`
-  (`command-frontier.ts:230-258`).
+  (`command-frontier.ts:230-255`).
 - `REPLACEMENT` exposes one executable head plus an immutable `remaining` tail.
   Its address is epoch/wave/turn/occurrence/field plus owner and operation ID
   (`contract.ts:260-270`). The tail is checked for same-boundary coordinates,
