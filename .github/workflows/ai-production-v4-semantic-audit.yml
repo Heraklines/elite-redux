@@ -1,0 +1,66 @@
+name: AI Production V4 Semantic Audit (Read-Only)
+
+# One ephemeral runner streams production contract-v4 records directly into an
+# in-memory auditor. Only aggregate reports with salted example IDs are uploaded.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-production-v4-semantic-audit
+  cancel-in-progress: false
+
+jobs:
+  semantic-audit:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: Audit production contract-v4 semantics remotely
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - name: Verify audit logic with synthetic records
+        run: node --test scripts/ai/combat-contract-v4-audit.test.mjs
+      - name: Verify live committed-action and solo-isolation semantics
+        env:
+          ER_SCENARIO: "1"
+        run: >-
+          pnpm exec vitest run
+          test/tests/elite-redux/telemetry/combat-contract-harness.test.ts
+          test/tests/elite-redux/telemetry/telemetry-recorder.test.ts
+      - name: Stream and audit production v4 in runner memory
+        env:
+          TELEMETRY_EXPORT_TOKEN: ${{ secrets.ER_AI_TELEMETRY_EXPORT_TOKEN }}
+          TELEMETRY_EXPORT_URL: https://er-ai-telemetry-export.heraklines.workers.dev/v1/export
+        run: >-
+          node scripts/ai/run-production-combat-v4-audit.mjs
+          --max-invalid-objects 100
+          --out ai-report
+      - name: Publish sanitized audit summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ai-report/production-v4-semantic-audit.json
+          test -f ai-report/production-v4-semantic-audit.md
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync("ai-report/production-v4-semantic-audit.json", "utf8"));
+          if (report.privacy?.rawCorpusUploaded !== false || report.privacy?.rawIdentifiersIncluded !== false) {
+            throw new Error("semantic audit privacy contract was not attested");
+          }
+          if (report.corpus?.environment !== "production" || report.contractVersion !== 4) {
+            throw new Error("semantic audit source/version identity mismatch");
+          }
+          NODE
+          cat ai-report/production-v4-semantic-audit.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-production-v4-semantic-audit
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
