@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 
 const GHOST_DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
+const EVALUATION_LEVEL = 100;
+const EVALUATION_TRAINER_TYPE = 1;
 
 export function readGhostFixture(path) {
   const fixture = JSON.parse(readFileSync(path, "utf8"));
@@ -73,9 +75,10 @@ function scenarioMember(member, enemy) {
     shiny: member.shiny,
     variant: member.variant,
     passive: member.passive,
+    teraType: member.teraType,
     ...(member.heldItems?.length > 0 ? { heldItems: member.heldItems.map(([name, count]) => ({ name, count })) } : {}),
     ...(member.gender < 0 ? {} : { female: member.gender === 1 }),
-    ...(enemy ? { level: 200 } : {}),
+    ...(enemy ? { level: EVALUATION_LEVEL } : {}),
   };
 }
 
@@ -100,9 +103,14 @@ export function buildGhostPair(fixture, pairIndex, fixedSeed = 0) {
     v: 1,
     name: `Ghost gauntlet ${pairId} leg ${leg.toUpperCase()}: ${player.id} vs ${enemy.id}`,
     notes: `Sanitized winning ${difficulty} rosters with per-Pokemon held items. Strict mirrored leg required; no player identity.`,
-    run: { wave: 199, level: 200, seed, difficulty: "hell", enemyAi: "hardest", double: true },
+    run: { wave: 199, level: EVALUATION_LEVEL, seed, difficulty: "hell", enemyAi: "hardest", double: true },
     party: player.members.map(member => scenarioMember(member, false)),
-    enemy: { kind: "party", party: enemy.members.map(member => scenarioMember(member, true)) },
+    enemy: {
+      kind: "party",
+      trainerType: EVALUATION_TRAINER_TYPE,
+      neutralEvaluator: true,
+      party: enemy.members.map(member => scenarioMember(member, true)),
+    },
     eggs: "skip",
   });
   return {
@@ -174,7 +182,7 @@ export function buildGhostSelfPlayScenario(fixture, episodeIndex) {
     notes: `Combat-only training episode from source-disjoint sanitized winning ghosts. Roster difficulty stratum: ${difficulty}. Saved movesets and reconstructable per-Pokemon held items are preserved.`,
     run: {
       wave: 199,
-      level: 200,
+      level: EVALUATION_LEVEL,
       seed,
       difficulty: "hell",
       enemyAi: "hardest",
@@ -183,7 +191,12 @@ export function buildGhostSelfPlayScenario(fixture, episodeIndex) {
       ...(format === "triple" ? { triple: true } : {}),
     },
     party: player.members.map(member => scenarioMember(member, false)),
-    enemy: { kind: "party", party: enemy.members.map(member => scenarioMember(member, true)) },
+    enemy: {
+      kind: "party",
+      trainerType: EVALUATION_TRAINER_TYPE,
+      neutralEvaluator: true,
+      party: enemy.members.map(member => scenarioMember(member, true)),
+    },
   };
 }
 

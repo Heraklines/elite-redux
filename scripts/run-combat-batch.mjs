@@ -67,8 +67,8 @@ for (let index = 1; index < argv.length; index++) {
     aiNeuralModel = argv[++index];
   } else if (arg === "--ai-policy") {
     aiPolicy = argv[++index];
-    if (!["first-usable", "smart-default", "engine-hardest"].includes(aiPolicy)) {
-      console.error("--ai-policy must be first-usable, smart-default, or engine-hardest");
+    if (!["first-usable", "smart-default", "engine-hardest", "random"].includes(aiPolicy)) {
+      console.error("--ai-policy must be first-usable, smart-default, engine-hardest, or random");
       process.exit(1);
     }
   } else if (arg === "--ai-epsilon") {
@@ -92,8 +92,8 @@ for (let index = 1; index < argv.length; index++) {
     opponentAiNeuralModel = argv[++index];
   } else if (arg === "--opponent-ai-policy") {
     opponentAiPolicy = argv[++index];
-    if (!["engine-hardest", "first-usable"].includes(opponentAiPolicy)) {
-      console.error("--opponent-ai-policy must be engine-hardest or first-usable");
+    if (!["engine-hardest", "first-usable", "random"].includes(opponentAiPolicy)) {
+      console.error("--opponent-ai-policy must be engine-hardest, first-usable, or random");
       process.exit(1);
     }
   } else if (arg === "--opponent-ai-epsilon") {

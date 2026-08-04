@@ -60,6 +60,7 @@ describe("ER combat AI contract", () => {
 
   it("keeps diagnostic tree actions outside policy training", () => {
     expect(ER_NON_POLICY_TARGET_SOURCES.has("diagnostic-tree-v1")).toBe(true);
+    expect(ER_NON_POLICY_TARGET_SOURCES.has("random-v1")).toBe(true);
   });
 
   it("reads resolved interactive targets before move-default targets", () => {

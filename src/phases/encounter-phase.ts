@@ -70,6 +70,7 @@ import {
   maybeBeginSinglePlayerReplayRecording,
   maybeCaptureReplayCheckpoint,
 } from "#data/elite-redux/replay-single-recording";
+import { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -216,8 +217,8 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
     trainerBattle ? TrainerSlot.TRAINER : TrainerSlot.NONE,
     !!spec.isBoss,
   );
-  if (spec.formIndex) {
-    enemy.formIndex = spec.formIndex;
+  if (spec.formIndex !== undefined || spec.neutralEvaluator) {
+    enemy.formIndex = spec.formIndex ?? 0;
     enemy.calculateStats();
     enemy.generateName();
   }
@@ -229,9 +230,24 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
   if (spec.abilitySlot !== undefined) {
     enemy.abilityIndex = Math.max(0, Math.min(2, spec.abilitySlot));
   }
+  if (spec.passive !== undefined) {
+    enemy.passive = spec.passive;
+  }
   if (spec.nature !== undefined) {
     enemy.nature = spec.nature as Nature;
     enemy.calculateStats();
+  }
+  if (spec.female !== undefined) {
+    enemy.gender = enemy.species.malePercent === null ? Gender.GENDERLESS : spec.female ? Gender.FEMALE : Gender.MALE;
+  }
+  if (spec.variant !== undefined) {
+    enemy.variant = Math.max(0, Math.min(2, spec.variant));
+  }
+  enemy.teraType = spec.teraType ?? enemy.species.type1;
+  if (Array.isArray(spec.ivs) && spec.ivs.length === 6) {
+    enemy.ivs = spec.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
+    enemy.calculateStats();
+    enemy.hp = enemy.getMaxHp();
   }
   if (spec.shiny) {
     enemy.shiny = true;
@@ -1152,6 +1168,15 @@ export class EncounterPhase extends BattlePhase {
     // Dev scenario builder (staging only): a fully custom enemy party staged
     // for this wave. Consumed ONCE; null in production builds.
     const devEnemyParty = this.loaded ? null : consumePendingDevEnemyParty();
+    const neutralEvaluator = devEnemyParty?.some(member => member.neutralEvaluator === true) ?? false;
+
+    // A neutral evaluator fixture supplies the complete roster. The ordinary
+    // trainer template's enemyLevels length otherwise truncates it or appends
+    // generated members, making mirrored matchups start from different teams.
+    if (neutralEvaluator && devEnemyParty && devEnemyParty.length > 0) {
+      const fallback = battle.enemyLevels?.[0] ?? battle.getLevelForWave();
+      battle.enemyLevels = devEnemyParty.map(member => Math.max(1, Math.floor(member.level ?? fallback)));
+    }
 
     // Multi-format (triple+): the enemy-gen loop below is bounded by enemyLevels.length, which
     // can come up short of the side's capacity (a small trainer party, or new-battle-phase
@@ -1159,7 +1184,7 @@ export class EncounterPhase extends BattlePhase {
     // it to enemyCapacity here, AFTER all prior resizes, so the field always fills. Binary
     // (cap <= 2) is a no-op.
     const enemyCapacity = battle.arrangement.enemyCapacity;
-    if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
+    if (!neutralEvaluator && !this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
       const fill = battle.enemyLevels.at(-1) ?? battle.enemyLevels[0] ?? 1;
       while (battle.enemyLevels.length < enemyCapacity) {
         battle.enemyLevels.push(fill);
@@ -1399,7 +1424,12 @@ export class EncounterPhase extends BattlePhase {
           // were already reconstructed from the host's stream (buildCoopEnemy). Rolling our own
           // here would DOUBLE / diverge them (a fresh seeded modifier roll on top of the adopted
           // set), so skip the whole generation block. Solo / host / non-adopt runs are unchanged.
-          if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER && !this.coopAdoptedEnemyParty) {
+          if (
+            !this.loaded
+            && battle.battleType !== BattleType.MYSTERY_ENCOUNTER
+            && !this.coopAdoptedEnemyParty
+            && !neutralEvaluator
+          ) {
             // generate modifiers for MEs, overriding prior ones as applicable
             regenerateModifierPoolThresholds(
               globalScene.getEnemyField(),

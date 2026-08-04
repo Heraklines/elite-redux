@@ -15,6 +15,7 @@ import {
 } from "#app/dev-tools/test-suite/scenario-spec";
 import Overrides from "#app/overrides";
 import { resetErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { BattleType } from "#enums/battle-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { WeatherType } from "#enums/weather-type";
@@ -97,5 +98,36 @@ describe("ER scenario builder spec", () => {
     const spec: ScenarioSpec = { ...SPEC, enemy: { kind: "trainer", trainerType: 5 } };
     buildDevScenario(spec).scenario.setup();
     expect(Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType).toBe(5);
+  });
+
+  it("a custom party can retain its roster while using native trainer switching", () => {
+    const spec: ScenarioSpec = {
+      ...SPEC,
+      enemy: {
+        kind: "party",
+        trainerType: 1,
+        neutralEvaluator: true,
+        party: [
+          {
+            species: SpeciesId.SNORLAX,
+            level: 100,
+            moves: [MoveId.BODY_SLAM],
+            passive: true,
+            ivs: [1, 2, 3, 4, 5, 6],
+          },
+          { species: SpeciesId.GENGAR, level: 100, moves: [MoveId.SHADOW_BALL] },
+        ],
+      },
+    };
+    buildDevScenario(spec).scenario.setup();
+    expect(Overrides.BATTLE_TYPE_OVERRIDE).toBe(BattleType.TRAINER);
+    expect(Overrides.RANDOM_TRAINER_OVERRIDE?.trainerType).toBe(1);
+    const staged = consumePendingDevEnemyParty();
+    expect(staged?.map(member => member.speciesId)).toEqual([SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    expect(staged?.[0]).toMatchObject({
+      passive: true,
+      ivs: [1, 2, 3, 4, 5, 6],
+      neutralEvaluator: true,
+    });
   });
 });

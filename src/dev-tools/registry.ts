@@ -725,10 +725,20 @@ export interface DevEnemyMonSpec {
   moveIds?: number[];
   /** 0 = ability1, 1 = ability2, 2 = hidden. */
   abilitySlot?: number;
+  passive?: boolean;
+  ivs?: number[];
   nature?: number;
   formIndex?: number;
+  female?: boolean;
+  variant?: number;
+  teraType?: number;
   isBoss?: boolean;
   shiny?: boolean;
+  /**
+   * Headless evaluator fixture: this staged party is the complete trainer roster
+   * and must not receive wave-generated members or automatic enemy modifiers.
+   */
+  neutralEvaluator?: boolean;
 }
 
 let pendingDevEnemyParty: DevEnemyMonSpec[] | null = null;

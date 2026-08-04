@@ -30,6 +30,7 @@ import { BiomeId } from "#enums/biome-id";
 import type { Challenges } from "#enums/challenges";
 import type { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import type { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import type { StatusEffect } from "#enums/status-effect";
@@ -55,6 +56,10 @@ export interface SpecMon {
   formIndex?: number | undefined;
   /** Ability slot 0/1/2 (the species' natural abilities). */
   abilitySlot?: number | undefined;
+  /** Whether the saved passive/innate unlock is active for this Pokemon. */
+  passive?: boolean | undefined;
+  /** Exact six-value IV vector used by ghost/evaluator rosters. */
+  ivs?: number[] | undefined;
   /**
    * Force an arbitrary active ability by numeric AbilityId (vanilla OR ER custom
    * id, incl. ids >= 5000). Takes precedence over `abilitySlot` and lets a
@@ -73,6 +78,8 @@ export interface SpecMon {
   /** Shiny tier: 0 normal/1 rare/2 epic. */
   variant?: number | undefined;
   female?: boolean | undefined;
+  /** Exact Tera type used by evaluator/ghost rosters. Defaults to type 1. */
+  teraType?: number | undefined;
   /** Held items / modifiers assigned to this exact player party member. */
   heldItems?: SpecItemRow[] | undefined;
 }
@@ -187,8 +194,18 @@ export interface ScenarioSpec {
         kind: "wild" | "trainer" | "party";
         /** kind=wild: the single wild mon. */
         wild?: SpecEnemyMon | undefined;
-        /** kind=trainer: force this trainer class (roster from difficulty + seed). */
+        /**
+         * kind=trainer: force this trainer class (roster from difficulty + seed).
+         * kind=party: optionally wrap the supplied party in a real trainer battle so
+         * native switching/replacement logic remains available to evaluator fixtures.
+         */
         trainerType?: number | undefined;
+        /**
+         * Headless evaluator only: use the supplied roster exactly, suppress all
+         * automatically rolled enemy modifiers/boss promotion, and activate all
+         * three player innate slots run-locally to mirror native enemy semantics.
+         */
+        neutralEvaluator?: boolean | undefined;
         /** kind=party: fully custom enemy mons (slot-by-slot). */
         party?: SpecEnemyMon[] | undefined;
       }
@@ -332,11 +349,15 @@ function toStarter(mon: SpecMon): Starter {
     formIndex: mon.formIndex ?? 0,
     female: mon.female,
     abilityIndex: mon.abilitySlot ?? 0,
-    passive: false,
+    passive: mon.passive ?? false,
     nature: (mon.nature ?? Nature.HARDY) as Nature,
     moveset: (mon.moves?.length ?? 0) > 0 ? (mon.moves?.slice(0, 4) as unknown as StarterMoveset) : undefined,
     pokerus: false,
-    ivs: new Array(6).fill(31),
+    teraType: (mon.teraType ?? undefined) as PokemonType | undefined,
+    ivs:
+      Array.isArray(mon.ivs) && mon.ivs.length === 6
+        ? mon.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)))
+        : new Array(6).fill(31),
   };
 }
 
@@ -585,6 +606,12 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       O.BATTLE_TYPE_OVERRIDE = BattleType.TRAINER;
       O.RANDOM_TRAINER_OVERRIDE = { trainerType: enemy.trainerType as Exclude<TrainerType, TrainerType.UNKNOWN> };
     } else if (enemy?.kind === "party" && enemy.party && enemy.party.length > 0) {
+      if (enemy.trainerType) {
+        O.BATTLE_TYPE_OVERRIDE = BattleType.TRAINER;
+        O.RANDOM_TRAINER_OVERRIDE = {
+          trainerType: enemy.trainerType as Exclude<TrainerType, TrainerType.UNKNOWN>,
+        };
+      }
       const devParty: DevEnemyMonSpec[] = enemy.party.slice(0, 6).map(p => {
         const m: DevEnemyMonSpec = { speciesId: p.species };
         if (p.level !== undefined) {
@@ -596,17 +623,35 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         if (p.abilitySlot !== undefined) {
           m.abilitySlot = p.abilitySlot;
         }
+        if (p.passive !== undefined) {
+          m.passive = p.passive;
+        }
+        if (p.ivs !== undefined) {
+          m.ivs = p.ivs.slice(0, 6);
+        }
         if (p.nature !== undefined) {
           m.nature = p.nature;
         }
         if (p.formIndex !== undefined) {
           m.formIndex = p.formIndex;
         }
+        if (p.female !== undefined) {
+          m.female = p.female;
+        }
+        if (p.variant !== undefined) {
+          m.variant = p.variant;
+        }
+        if (p.teraType !== undefined) {
+          m.teraType = p.teraType;
+        }
         if (p.isBoss !== undefined) {
           m.isBoss = p.isBoss;
         }
         if (p.shiny !== undefined) {
           m.shiny = p.shiny;
+        }
+        if (enemy.neutralEvaluator) {
+          m.neutralEvaluator = true;
         }
         return m;
       });
@@ -672,6 +717,7 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     // - the uniform ENEMY_*_OVERRIDEs can only express a single side-wide value.
     if (spec.enemy?.kind === "party" && spec.enemy.party) {
       const enemyParty = globalScene.getEnemyParty();
+      let enemyItemsApplied = false;
       spec.enemy.party.slice(0, 6).forEach((p, i) => {
         const mon = enemyParty[i];
         if (!mon) {
@@ -685,7 +731,11 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
           mon.initBattleInfo();
         }
         applyHeldItemsToMon(mon, p.heldItems, false);
+        enemyItemsApplied ||= (p.heldItems?.length ?? 0) > 0;
       });
+      if (enemyItemsApplied) {
+        globalScene.updateModifiers(false);
+      }
     }
   };
 
@@ -694,6 +744,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     spec.party.slice(0, 6).forEach((p, i) => {
       const mon = playerParty[i];
       if (mon) {
+        if (spec.enemy?.kind === "party" && spec.enemy.neutralEvaluator) {
+          mon.customPokemonData.erRunUnlockedAbilitySlots = [1, 2, 3];
+        }
         applyHeldItemsToMon(mon, p.heldItems, true);
       }
     });
@@ -706,7 +759,10 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     spec.enemy?.kind === "party"
     && (spec.enemy.party ?? []).some(p => p.status || p.bossSegments || (p.heldItems?.length ?? 0) > 0);
   const scenario: DevScenario = { label, description, setup: setupFn };
-  if (spec.party.some(p => (p.heldItems?.length ?? 0) > 0)) {
+  if (
+    spec.party.some(p => (p.heldItems?.length ?? 0) > 0)
+    || (spec.enemy?.kind === "party" && spec.enemy.neutralEvaluator)
+  ) {
     scenario.onPartyReady = onPartyReadyFn;
   }
   if (spec.start || spec.enemy?.kind === "wild" || hasPerMonEnemyFields) {

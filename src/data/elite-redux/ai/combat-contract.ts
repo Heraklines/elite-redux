@@ -294,6 +294,7 @@ export type ErCombatPolicySource =
   | "scripted"
   | "forced-move"
   | "first-usable"
+  | "random-v1"
   | "tree-model-v1"
   | "epsilon-tree-v1"
   | "diagnostic-tree-v1"
@@ -313,6 +314,7 @@ export const ER_NON_POLICY_TARGET_SOURCES: ReadonlySet<ErCombatPolicySource> = n
   "scripted",
   "forced-move",
   "first-usable",
+  "random-v1",
   "tree-model-v1",
   "epsilon-tree-v1",
   "diagnostic-tree-v1",
