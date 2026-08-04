@@ -44,6 +44,13 @@ on:
 permissions:
   contents: read
 
+env:
+  AI_V4_DATASET_NAME: er-ai-production-v4-human-ensemble-20260804
+  AI_V4_KERNEL_NAME: er-ai-production-v4-human-ensemble-gpu-20260804
+  AI_V4_TRAINING_PROFILE: baseline
+  AI_V4_TRAINING_SEEDS: 20260804,20260805,20260806
+  AI_V4_PUSH_TREE_MAX_DECISIONS: "20000"
+
 concurrency:
   group: ${{ inputs.diagnose_existing_kernel && 'ai-kaggle-diagnostics' || inputs.cpu_tree_only && 'ai-production-v4-tree' || 'ai-production-v4-remote-training' }}
   cancel-in-progress: false
@@ -75,6 +82,8 @@ jobs:
           python scripts/ai/build_private_kaggle_manifests.py
           "$RUNNER_TEMP"
           "$KAGGLE_USERNAME"
+          "$AI_V4_DATASET_NAME"
+          "$AI_V4_KERNEL_NAME"
       - name: Verify existing private dataset matches checked-out trainer
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -82,7 +91,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          dataset_slug="$KAGGLE_USERNAME/$AI_V4_DATASET_NAME"
           verify_dir="$RUNNER_TEMP/kaggle-dataset-verification"
           rm -rf "$verify_dir"
           mkdir -p "$verify_dir"
@@ -99,7 +108,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          dataset_slug="$KAGGLE_USERNAME/$AI_V4_DATASET_NAME"
           dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
           if [[ "$dataset_status" != "ready" ]]; then
             echo "::error::Existing private Kaggle dataset is not ready (status: ${dataset_status:-unavailable})"
@@ -125,10 +134,11 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_KERNEL_NAME: ${{ env.AI_V4_KERNEL_NAME }}
         shell: bash
         run: |
           set -euo pipefail
-          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-gpu-20260803"
+          kernel_slug="$KAGGLE_USERNAME/$KAGGLE_KERNEL_NAME"
           python - <<'PY'
           import json
           import os
@@ -137,7 +147,7 @@ jobs:
           api = KaggleApi()
           api.authenticate()
           status = api.kernels_status(
-              f"{os.environ['KAGGLE_USERNAME']}/er-ai-production-v4-human-baseline-gpu-20260803"
+              f"{os.environ['KAGGLE_USERNAME']}/{os.environ['KAGGLE_KERNEL_NAME']}"
           )
           print(json.dumps({"status": str(status.status), "failureMessage": status.failure_message or None}))
           PY
@@ -270,7 +280,7 @@ jobs:
           "$RUNNER_TEMP/production-v4-training"
           "$RUNNER_TEMP/er-combat-data-dictionary.json"
           "$RUNNER_TEMP/ai-kaggle-dataset/er-ai-training-bundle.zip"
-          baseline 20260803
+          "$AI_V4_TRAINING_PROFILE" "$AI_V4_TRAINING_SEEDS"
       - name: Preserve sanitized census before model fitting
         shell: bash
         run: |
@@ -293,6 +303,8 @@ jobs:
           python scripts/ai/build_private_kaggle_manifests.py
           "$RUNNER_TEMP"
           "$KAGGLE_USERNAME"
+          "$AI_V4_DATASET_NAME"
+          "$AI_V4_KERNEL_NAME"
       - name: Publish private dataset and launch private GPU kernel
         if: ${{ !inputs.cpu_tree_only }}
         env:
@@ -304,8 +316,8 @@ jobs:
           set -euo pipefail
           test -n "$KAGGLE_USERNAME"
           test -n "$KAGGLE_KEY"
-          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
-          kernel_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-baseline-gpu-20260803"
+          dataset_slug="$KAGGLE_USERNAME/$AI_V4_DATASET_NAME"
+          kernel_slug="$KAGGLE_USERNAME/$AI_V4_KERNEL_NAME"
           dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
           if [[ "$REUSE_EXISTING_DATASET" == "true" ]]; then
             test -n "$dataset_status"
@@ -368,8 +380,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Train fresh battle-victory tree on the same remote cut
         env:
-          TRAINER_TREE: ${{ inputs.trainer_tree || 'false' }}
-          MAX_POLICY_DECISIONS: ${{ inputs.max_policy_decisions || '4000' }}
+          TRAINER_TREE: ${{ github.event_name == 'push' && 'true' || inputs.trainer_tree || 'false' }}
+          MAX_POLICY_DECISIONS: ${{ github.event_name == 'push' && env.AI_V4_PUSH_TREE_MAX_DECISIONS || inputs.max_policy_decisions || '4000' }}
         shell: bash
         run: |
           set -euo pipefail
