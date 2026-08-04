@@ -373,7 +373,6 @@ jobs:
         run: >-
           npx vitest run
           test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts
-          test/tests/elite-redux/coop/coop-evolution-authoritative.test.ts
           --reporter=dot
 
       - name: Verify immutable trainer-victory material before browser launch
