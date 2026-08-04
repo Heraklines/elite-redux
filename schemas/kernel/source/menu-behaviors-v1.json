@@ -1,5 +1,9 @@
 {
   "schema_version": 1,
+  "project_name": "PokéRogue Redux",
+  "project": "PokéRogue Redux",
+  "task_id": "M0-0B",
+  "task_name": "Rust kernel menu oracle",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "protocol_version": "er-coop-47",
   "source_files": {
@@ -159,7 +163,7 @@
       },
       {
         "source": "src/ui/handlers/login-register-info-container-ui-handler.ts",
-        "reason": "non-UiHandler render helper"
+        "reason": "abstract indirect FormModalUiHandler/UiHandler helper; shared auth info-container behavior is inherited by concrete form handlers"
       },
       {
         "source": "src/ui/handlers/llm-director-debug-overlay.ts",
@@ -175,7 +179,7 @@
       },
       {
         "source": "src/ui/handlers/oauth-providers-ui-handler.ts",
-        "reason": "non-UiHandler OAuth render helper"
+        "reason": "abstract indirect FormModalUiHandler/UiHandler helper via LoginRegisterInfoContainerUiHandler; shared OAuth/provider rendering is inherited by concrete form handlers"
       },
       {
         "source": "src/ui/handlers/showdown-editor-text-input.ts",
@@ -294,7 +298,7 @@
       "cancel_back_behavior": "CANCEL reverts the UI mode.",
       "transitions": ["grid/navigation focus changes", "revertMode"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.ACHIEVEMENTS; normal input is dispatched by UiManager to the active handler.",
-      "actionability_source": "Inherits MessageUiHandler actionability (active and awaiting prompt action), even though processInput implements the achievement grid.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Local processInput independently handles achievement-grid/navigation input; no additional co-op readiness override is present.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "achievement unlock data", "ScrollableGrid-style layout"],
       "source_evidence": ["AchvsUiHandler.show", "AchvsUiHandler.processInput", "AchvsUiHandler.setCursor"]
     },
@@ -339,7 +343,7 @@
       "cancel_back_behavior": "CANCEL and the cancel row revert the mode without committing.",
       "transitions": ["saveSystem callback", "revertMode"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.AUTO_EGG_RESTOCK.",
-      "actionability_source": "Message-derived active state; processInput additionally checks the handler's custom readiness/animation state.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies the handler's custom readiness/animation state guard.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "egg restock settings", "save system"],
       "source_evidence": ["AutoEggRestockUiHandler.show", "AutoEggRestockUiHandler.processInput"]
     },
@@ -369,7 +373,7 @@
       "cancel_back_behavior": "CANCEL invokes the same awaiting callback; otherwise it is unhandled.",
       "transitions": ["prompt callback", "level-up/IV prompt re-arm with generation"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.MESSAGE.",
-      "actionability_source": "MessageUiHandler.isCoopV2InputActionable: active && isAwaitingPromptAction().",
+      "actionability_source": "MessageUiHandler.isCoopV2InputActionable: active && isAwaitingPromptAction(). Local processInput consumes ACTION/CANCEL only when the prompt callback is armed.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "battle phase callbacks", "prompt generation/timers"],
       "source_evidence": ["BattleMessageUiHandler.show", "BattleMessageUiHandler.processInput"]
     },
@@ -414,7 +418,7 @@
       "cancel_back_behavior": "CANCEL backs out of header/start/list according to current focus and eventually reverts.",
       "transitions": ["apply challenge setup", "start challenge callback", "revert/back"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.CHALLENGE_SELECT.",
-      "actionability_source": "Message-derived active state plus custom list/readiness checks.",
+      "actionability_source": "Inherited UiHandler actionability: active. Local processInput independently applies the challenge header/list/start and readiness checks; this plain UiHandler does not inherit MessageUiHandler prompt actionability.",
       "dependencies": ["challenge definitions", "game mode/challenge state", "saved last setup"],
       "source_evidence": ["GameChallengesUiHandler.show", "GameChallengesUiHandler.processInput", "GameChallengesUiHandler.setCursor"]
     },
@@ -519,7 +523,7 @@
       "cancel_back_behavior": "CANCEL cancels/fast-forwards animation, exits editing, dismisses summary, or reverts from the gacha screen according to state.",
       "transitions": ["egg roll animation", "egg summary", "revertMode", "voucher state update"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.EGG_GACHA.",
-      "actionability_source": "Message-derived active state plus animation/editing state guards.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies animation/editing state guards.",
       "dependencies": ["egg gacha data", "timers/tween state", "MessageUiHandler"],
       "source_evidence": ["EggGachaUiHandler.show", "EggGachaUiHandler.processInput", "EggGachaUiHandler.setCursor"]
     },
@@ -529,12 +533,12 @@
       "menu_kind": "Waiting",
       "cursor_model": "No cursor; scene phase skip state and Message prompt state.",
       "wrapping": "Not applicable.",
-      "disabled_option_handling": "During an EggHatchPhase ACTION/CANCEL first attempts phase.trySkip; otherwise Message prompt handling decides.",
-      "submit_action_behavior": "ACTION attempts to skip the hatch phase, then delegates to Message behavior.",
-      "cancel_back_behavior": "CANCEL follows the same skip-then-message delegation; no independent back cursor.",
+      "disabled_option_handling": "For ACTION/CANCEL, the current EggHatchPhase.trySkip result gates the scene skip; otherwise the delegated Message handler applies its own prompt readiness.",
+      "submit_action_behavior": "There is no local SUBMIT branch: ACTION/CANCEL first try EggHatchPhase.trySkip(), then all buttons delegate to globalScene.ui.getMessageHandler().processInput(button).",
+      "cancel_back_behavior": "CANCEL follows the same EggHatchPhase.trySkip()-then-message-handler delegation; there is no independent cursor/back branch.",
       "transitions": ["EggHatchPhase.trySkip", "Message prompt callback"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.EGG_HATCH_SCENE.",
-      "actionability_source": "MessageUiHandler prompt actionability; scene skip ownership is phase-dependent.",
+      "actionability_source": "Inherited UiHandler actionability: active. Local processInput separately tries EggHatchPhase.trySkip() for ACTION/CANCEL, then delegates to globalScene.ui.getMessageHandler().processInput(button); it does not inherit MessageUiHandler prompt actionability.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "EggHatchPhase", "animation timing"],
       "source_evidence": ["EggHatchSceneUiHandler.show", "EggHatchSceneUiHandler.processInput"]
     },
@@ -549,7 +553,7 @@
       "cancel_back_behavior": "CANCEL reverts the mode.",
       "transitions": ["grid selection/detail callback", "revertMode"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.EGG_LIST.",
-      "actionability_source": "UiHandler active state; grid helper owns cell readiness.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput delegates cell readiness and navigation to ScrollableGridHelper.",
       "dependencies": ["ScrollableGridHelper", "egg list data", "revertMode"],
       "source_evidence": ["EggListUiHandler.show", "EggListUiHandler.processInput"]
     },
@@ -564,7 +568,7 @@
       "cancel_back_behavior": "After blockExit, CANCEL ends EggSummaryPhase; during the guard it is consumed/rejected.",
       "transitions": ["EggSummaryPhase end", "ScrollableGridHelper"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.EGG_HATCH_SUMMARY.",
-      "actionability_source": "UiHandler active plus blockExit timer.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies the EggSummary blockExit timer guard.",
       "dependencies": ["ScrollableGridHelper", "EggSummaryPhase", "blockExit timer"],
       "source_evidence": ["EggSummaryUiHandler.show", "EggSummaryUiHandler.processInput"]
     },
@@ -669,7 +673,7 @@
       "cancel_back_behavior": "CANCEL delegates to the prompt and marks the evolution cancelled only when canCancel is true.",
       "transitions": ["evolution callback", "cancelled state"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.EVOLUTION_SCENE.",
-      "actionability_source": "MessageUiHandler prompt actionability.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies the canCancel guard for CANCEL.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "evolution phase", "canCancel"],
       "source_evidence": ["EvolutionSceneUiHandler.show", "EvolutionSceneUiHandler.processInput"]
     },
@@ -744,9 +748,9 @@
       "cancel_back_behavior": "CANCEL invokes onCancel when present and reverts.",
       "transitions": ["onAccept(seed)", "onCancel", "revertMode"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.LLM_DIRECTOR_THEME_PICKER.",
-      "actionability_source": "UiHandler active state.",
-      "dependencies": ["theme seed generator", "picker callbacks", "globalScene.ui"],
-      "source_evidence": ["LlmDirectorThemePickerUiHandler.show", "LlmDirectorThemePickerUiHandler.processInput"]
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Local processInput independently handles the cursor rows and ACTION/CANCEL branches; the picker does not arm a Message prompt.",
+      "dependencies": ["THEME_SEEDS + Math.random reroll", "picker callbacks", "globalScene.ui"],
+      "source_evidence": ["LlmDirectorThemePickerUiHandler.show", "LlmDirectorThemePickerUiHandler.processInput", "LlmDirectorThemePickerUiHandler.rollNew"]
     },
     {
       "source": "src/ui/handlers/loading-modal-ui-handler.ts",
@@ -781,17 +785,17 @@
     {
       "source": "src/ui/handlers/login-or-register-ui-handler.ts",
       "class": "LoginOrRegisterUiHandler",
-      "menu_kind": "ChoiceList-like",
-      "cursor_model": "Modal choice controls supplied by the login/register screen; no independent directional grid.",
-      "wrapping": "No handler-owned cursor wrapping.",
-      "disabled_option_handling": "Availability of login/register actions is supplied by the form/auth state.",
-      "submit_action_behavior": "Button callbacks route to login or registration forms; ordinary processInput follows modal behavior.",
-      "cancel_back_behavior": "Modal cancel/clear returns to the opener.",
+      "menu_kind": "Confirm",
+      "cursor_model": "FormModal buttons labelled Login/Register; no handler-owned directional cursor or DOM text fields.",
+      "wrapping": "Not applicable; no directional cursor.",
+      "disabled_option_handling": "Modal tween/interactivity and configured button callbacks determine availability; this form-modal equivalent has no option-list skip state.",
+      "submit_action_behavior": "Inherited FormModalUiHandler.processInput handles SUBMIT only through submitAction (the first configured button callback); the visible Login and Register buttons invoke their configured pointer callbacks.",
+      "cancel_back_behavior": "The visible Register control is the second configured button callback, not a keyboard CANCEL branch; modal callbacks/clear/revert own dismissal.",
       "transitions": ["LOGIN_FORM", "REGISTRATION_FORM", "modal close/revert"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.LOGIN_OR_REGISTER.",
-      "actionability_source": "Modal active state; actual button ownership is callback/DOM dependent.",
-      "dependencies": ["src/ui/handlers/modal-ui-handler.ts", "auth mode callbacks", "DOM controls"],
-      "source_evidence": ["LoginOrRegisterUiHandler.show", "ModalUiHandler.processInput"]
+      "actionability_source": "Inherited UiHandler actionability: active. FormModal button callbacks, modal tween state, and auth transition state are separate readiness gates.",
+      "dependencies": ["src/ui/handlers/login-register-info-container-ui-handler.ts", "src/ui/handlers/form-modal-ui-handler.ts", "auth mode callbacks", "modal buttons/info-container"],
+      "source_evidence": ["LoginOrRegisterUiHandler.getButtonLabels", "LoginOrRegisterUiHandler.getInputFieldConfigs", "LoginOrRegisterUiHandler.show", "FormModalUiHandler.processInput"]
     },
     {
       "source": "src/ui/handlers/menu-ui-handler.ts",
@@ -804,7 +808,7 @@
       "cancel_back_behavior": "CANCEL reverts to the previous mode, or MESSAGE if no prior mode; inbox detail/focus has its own return path.",
       "transitions": ["setMode/setOverlayMode for menu destinations", "revertMode", "inbox/tournament deep link", "forfeit/save callbacks"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.MENU; ui-inputs Button.MENU opens/reverts it.",
-      "actionability_source": "Message-derived active state; normal menu cursor actionability is source behavior but co-op probe inherits Message prompt rule.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput handles normal menu cursor/detail actions and their source-specific guards.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "src/ui-inputs.ts", "conditional menu options", "inbox/tournament callbacks"],
       "source_evidence": ["MenuUiHandler.show", "MenuUiHandler.processInput", "MenuUiHandler.setCursor"]
     },
@@ -864,24 +868,24 @@
       "cancel_back_behavior": "CANCEL closes stats/overlays, pops previous species, or reverts and invokes exitCallback.",
       "transitions": ["OPTION_SELECT move/ability lists", "base stats/info overlays", "POKEDEX_PAGE refresh/force transition", "revertMode/exit callback"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.POKEDEX_PAGE.",
-      "actionability_source": "UiHandler active plus blockInput/blockInputOverlay; nested option handlers own their own readiness.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies blockInput/blockInputOverlay; nested option handlers own their own readiness.",
       "dependencies": ["src/ui/handlers/abstract-option-select-ui-handler.ts", "pokedex/species/move/ability data", "starter save data", "overlay helpers"],
       "source_evidence": ["PokedexPageUiHandler.show", "PokedexPageUiHandler.processInput", "PokedexPageUiHandler.setCursor"]
     },
     {
       "source": "src/ui/handlers/pokedex-scan-ui-handler.ts",
       "class": "PokedexScanUiHandler",
-      "menu_kind": "Terminal",
-      "cursor_model": "Scan/detail presentation with source-specific scan cursor/state; no generic option-list contract.",
-      "wrapping": "Source processInput uses its scan-specific bounded/navigation behavior; no generic wrapping is inferred.",
-      "disabled_option_handling": "Scan availability/data determines visible actions; handler leaves missing scan targets unavailable.",
-      "submit_action_behavior": "ACTION/SUBMIT follow the scan callback/detail path supplied by the opener.",
-      "cancel_back_behavior": "CANCEL follows the scan screen's close/revert callback.",
-      "transitions": ["scan/detail callback", "revert/close"],
+      "menu_kind": "Confirm",
+      "cursor_model": "FormModal DOM text input fields (inputs/inputContainers/formLabels) with an AUTO_COMPLETE overlay; no handler-owned directional cursor.",
+      "wrapping": "Not applicable to the DOM/form; autocomplete options use AbstractOptionSelect navigation.",
+      "disabled_option_handling": "DOM text-entry and reduced-key state determine completion: NAME/MOVE/ABILITY rows require a matching suggestion, while ABILITY_TEXT accepts free text; autocomplete availability is separate.",
+      "submit_action_behavior": "Inherited FormModalUiHandler.processInput handles SUBMIT only through submitAction; show installs submitAction to sanitize, validate/encode the input, and invoke config.buttonActions[0] in POKEDEX_SCAN.",
+      "cancel_back_behavior": "Modal button/pointer callbacks and the opener own cancel/close; the local DOM key handler reverts AUTO_COMPLETE on Escape/Space. No local processInput branch.",
+      "transitions": ["AUTO_COMPLETE overlay", "scan callback with base64 input", "modal close/revert"],
       "owner_source": "src/ui/ui.ts registry slot UiMode.POKEDEX_SCAN, constructed with UiMode.TEST_DIALOGUE; this constructor/mode mismatch is retained as source observation.",
-      "actionability_source": "UiHandler active/source scan state; registry constructor mismatch makes mode-level actionability mapping unresolved.",
-      "dependencies": ["pokedex scan data", "src/ui/ui.ts registry", "scan opener callbacks"],
-      "source_evidence": ["PokedexScanUiHandler.show", "PokedexScanUiHandler.processInput", "src/ui/ui.ts handler construction"]
+      "actionability_source": "Inherited UiHandler actionability: active. DOM focus/validation, autocomplete state, and FormModal tween/button callbacks are separate readiness/input guards; the registry constructor mismatch remains a mode-ownership observation.",
+      "dependencies": ["src/ui/handlers/form-modal-ui-handler.ts", "src/ui/handlers/autocomplete-ui-handler.ts", "DOM text input/autocomplete", "pokedex scan field data", "src/ui/ui.ts registry"],
+      "source_evidence": ["PokedexScanUiHandler.setup", "PokedexScanUiHandler.getInputFieldConfigs", "PokedexScanUiHandler.show", "FormModalUiHandler.processInput", "src/ui/ui.ts handler construction"]
     },
     {
       "source": "src/ui/handlers/pokedex-ui-handler.ts",
@@ -894,7 +898,7 @@
       "cancel_back_behavior": "CANCEL exits filter/search mode or reverts the Pokedex screen according to current cursor surface.",
       "transitions": ["POKEDEX_PAGE", "filter/search UI", "revertMode", "stats/info overlays"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.POKEDEX.",
-      "actionability_source": "UiHandler active plus filter/search block state; data filtering changes the cursor domain.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies filter/search block state; data filtering changes the cursor domain.",
       "dependencies": ["pokedex data/filter bars", "PokedexPageUiHandler", "src/ui-inputs.ts stats/cycle whitelist", "globalScene game data"],
       "source_evidence": ["PokedexUiHandler.show", "PokedexUiHandler.processInput", "PokedexUiHandler.setCursor"]
     },
@@ -969,7 +973,7 @@
       "cancel_back_behavior": "CANCEL reverts the mode.",
       "transitions": ["RUN_INFO", "revertMode"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.RUN_HISTORY.",
-      "actionability_source": "UiHandler active plus async history/load state.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies async history/load state and occupied-row checks.",
       "dependencies": ["run history persistence/async load", "RunInfoUiHandler", "scroll window"],
       "source_evidence": ["RunHistoryUiHandler.show", "RunHistoryUiHandler.processInput"]
     },
@@ -999,7 +1003,7 @@
       "cancel_back_behavior": "CANCEL invokes callback(-1) and returns/reverts according to load/save mode.",
       "transitions": ["load/save callback", "RUN_INFO preview", "rename/delete confirmation", "revert/back"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.SAVE_SLOT.",
-      "actionability_source": "UiHandler active plus async slot-loading state.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies async slot-loading/data state and occupied-row checks.",
       "dependencies": ["save slot storage/validation", "ConfirmUiHandler", "RunInfoUiHandler", "scroll window"],
       "source_evidence": ["SaveSlotSelectUiHandler.show", "SaveSlotSelectUiHandler.processInput"]
     },
@@ -1074,7 +1078,7 @@
       "cancel_back_behavior": "CANCEL closes filter/dropdown, resets selection/stats/roster state, pops party, or invokes tryExit; nested overlays handle their own cancel.",
       "transitions": ["OPTION_SELECT add/remove/edit", "SHOWDOWN_SET_EDITOR/build bag", "filter/stats panels", "start/exit callback"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.STARTER_SELECT; caller supplies start/roster/build callbacks.",
-      "actionability_source": "Message-derived prompt actionability plus custom blockInput/roster readiness; CYCLE buttons are whitelisted by src/ui-inputs.ts.",
+      "actionability_source": "Inherited MessageUiHandler actionability: active && isAwaitingPromptAction(). Independently, local processInput applies custom blockInput/roster readiness; CYCLE buttons are whitelisted by src/ui-inputs.ts.",
       "dependencies": ["src/ui/handlers/message-ui-handler.ts", "src/ui/handlers/abstract-option-select-ui-handler.ts", "starter/cost/challenge data", "src/ui-inputs.ts"],
       "source_evidence": ["StarterSelectUiHandler.show", "StarterSelectUiHandler.processInput", "StarterSelectUiHandler.setCursor"]
     },
@@ -1111,17 +1115,17 @@
     {
       "source": "src/ui/handlers/test-dialogue-ui-handler.ts",
       "class": "TestDialogueUiHandler",
-      "menu_kind": "Message",
-      "cursor_model": "No general cursor; dialogue/test prompt callback state.",
-      "wrapping": "Not applicable.",
-      "disabled_option_handling": "Message prompt and test dialogue callback decide readiness.",
-      "submit_action_behavior": "ACTION follows the supplied dialogue callback.",
-      "cancel_back_behavior": "CANCEL follows the source dialogue cancel/callback path.",
-      "transitions": ["dialogue callback", "MESSAGE/test transition"],
+      "menu_kind": "Confirm",
+      "cursor_model": "FormModal DOM Dialogue input (inputs[0]) with an AUTO_COMPLETE overlay; no handler-owned directional cursor.",
+      "wrapping": "Not applicable to the DOM/form; autocomplete options use AbstractOptionSelect navigation.",
+      "disabled_option_handling": "The Dialogue DOM field and locale-key autocomplete determine text-entry state; no generic option-list cursor is owned by this handler.",
+      "submit_action_behavior": "Inherited FormModalUiHandler.processInput handles SUBMIT only through submitAction; show installs submitAction to sanitize/base64-encode the Dialogue input and invoke config.buttonActions[0] in TEST_DIALOGUE.",
+      "cancel_back_behavior": "The actual Check/Cancel modal buttons use configured callbacks; keyboard CANCEL is not handled by FormModalUiHandler.processInput, while the DOM key handler only reverts AUTO_COMPLETE on Escape/Space.",
+      "transitions": ["AUTO_COMPLETE overlay", "dialogue callback with base64 input", "modal close/revert"],
       "owner_source": "src/ui/ui.ts registry entry for UiMode.TEST_DIALOGUE.",
-      "actionability_source": "Message-derived prompt actionability.",
-      "dependencies": ["src/ui/handlers/message-ui-handler.ts", "test dialogue callbacks"],
-      "source_evidence": ["TestDialogueUiHandler.show", "TestDialogueUiHandler.processInput"]
+      "actionability_source": "Inherited UiHandler actionability: active. DOM focus/validation, autocomplete state, and FormModal tween/button callbacks are separate readiness/input guards; this is not MessageUiHandler prompt actionability.",
+      "dependencies": ["src/ui/handlers/form-modal-ui-handler.ts", "src/ui/handlers/autocomplete-ui-handler.ts", "DOM Dialogue input/autocomplete", "test dialogue callbacks"],
+      "source_evidence": ["TestDialogueUiHandler.getButtonLabels", "TestDialogueUiHandler.getInputFieldConfigs", "TestDialogueUiHandler.show", "FormModalUiHandler.processInput"]
     },
     {
       "source": "src/ui/handlers/title-ui-handler.ts",
@@ -1306,7 +1310,7 @@
     },
     {
       "status": "source_ambiguity",
-      "behavior": "Message-derived grid screens such as Menu, Achvs, Settings, and AutoEggRestock inherit prompt-only Message co-op actionability while their processInput accepts normal cursor actions.",
+      "behavior": "Message-derived screens such as Menu, Achvs, AutoEggRestock, EggGacha, Pokedex, and StarterSelect inherit the exact prompt-only predicate active && isAwaitingPromptAction() while their local processInput accepts ordinary cursor/actions; plain UiHandler screens such as GameChallenges and EggHatch are separate.",
       "evidence": ["src/ui/handlers/message-ui-handler.ts", "per-handler extends/processInput implementations"],
       "impact": "The oracle records both processInput acceptance and the inherited actionability predicate; it does not flatten them."
     },
@@ -1321,6 +1325,12 @@
       "behavior": "Async save slots, run history, community feeds, bookmarks, tournaments, rank cards, texture previews, and browser storage can change the option domain after show().",
       "evidence": ["SaveSlotSelectUiHandler", "RunHistoryUiHandler", "CommunityChallengesUiHandler", "TournamentListUiHandler", "ShowdownWagerUiHandler", "ErShinyLabUiHandler"],
       "impact": "A deterministic adapter must snapshot or explicitly model loading/empty/occupied/failed states."
+    },
+    {
+      "status": "dynamic",
+      "behavior": "LlmDirectorThemePickerUiHandler reroll uses Math.random() to choose a different THEME_SEEDS entry, so repeated rerolls are nondeterministic even with the same visible picker state.",
+      "evidence": ["src/ui/handlers/llm-director-theme-picker-ui-handler.ts rollNew", "src/data/llm-director/theme-seeds.ts"],
+      "impact": "A deterministic replay/oracle must inject or record the reroll choice; the source does not expose a seed/state contract for Math.random()."
     },
     {
       "status": "dynamic",

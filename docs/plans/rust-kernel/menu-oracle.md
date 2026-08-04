@@ -1,8 +1,9 @@
 # Rust kernel menu oracle
 
-This is a pinned source inventory for task `M0-0B`. It records gameplay UI/menu
-behavior from game SHA `3b534099919efae827019d4a3f3c4ab0ecd6d67b` under protocol
-`er-coop-47`. The JSON companion is
+This is a pinned source inventory for project `PokéRogue Redux`, task `M0-0B`
+(`Rust kernel menu oracle`). It records gameplay UI/menu behavior from game SHA
+`3b534099919efae827019d4a3f3c4ab0ecd6d67b` under protocol `er-coop-47`. The
+JSON companion is
 [`schemas/kernel/source/menu-behaviors-v1.json`](../../../schemas/kernel/source/menu-behaviors-v1.json).
 
 The record is an observation of the TypeScript source. It does not design Rust
@@ -34,14 +35,17 @@ Command, Replacement, Interaction, Waiting, or Terminal. These labels are
 descriptive groupings only; they are not Rust proposals. The important source
 distinctions are:
 
-- Message prompt acceptance is separate from ordinary cursor input. Message
-  actionability is prompt-only, while several Message-derived screens implement
-  their own cursor grids.
+- Message prompt acceptance is separate from ordinary cursor input. The
+  inherited Message predicate is exactly `active && isAwaitingPromptAction()`,
+  while several Message-derived screens implement their own local cursor-grid
+  `processInput` paths.
 - Abstract option lists skip options, optionally delay input, wrap among
   unskipped choices, and use the final unskipped option for CANCEL unless
   `noCancel` is set.
 - Command and replacement screens delegate accepted actions to phase callbacks;
   their button meanings are not global.
+- Egg hatch is a plain UiHandler: ACTION/CANCEL first try the current
+  `EggHatchPhase.trySkip()` and then delegate to the active Message handler.
 - ER map picker selects only revealed nodes and has no cancel branch. ER bargain
   and Mystery Encounter have explicit timer/block/phase ownership gates.
 - Modal/form and Showdown editor screens may route input through DOM focus,
@@ -63,10 +67,13 @@ Two registry constructor mismatches are retained exactly as source observations:
    `UiMode.TEST_DIALOGUE`.
 
 The JSON also preserves the ModifierSelect readiness/actionability mismatch,
-Message-derived grid actionability, async state, timer guards, DOM capture,
-and co-op/transport ownership as unresolved dynamic behavior. No contradictory
-global serialized-button meaning was observed; differing meanings are scoped to
-the active source handler/mode.
+the exact MessageUiHandler predicate (`active && isAwaitingPromptAction()`)
+separately from each subclass's local `processInput` guard, async state, timer
+guards, DOM capture, and co-op/transport ownership as unresolved dynamic
+behavior. Plain UiHandler delegation (including EggHatch's phase/message path)
+is not classified as Message actionability. No contradictory global
+serialized-button meaning was observed; differing meanings are scoped to the
+active source handler/mode.
 
 ## Verification scope
 
