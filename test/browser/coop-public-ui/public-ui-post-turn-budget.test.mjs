@@ -56,6 +56,13 @@ class FakeEvidence {
       );
   }
 
+  findLastSurface(surface, from = 0) {
+    return this.events
+      .slice(from)
+      .toReversed()
+      .find(event => event.kind === "browser-surface" && event.observation.surface === surface);
+  }
+
   async waitFor(pattern, { from = 0, description = String(pattern) } = {}) {
     const event = this.find(pattern, from);
     if (event == null) {
