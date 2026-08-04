@@ -85,7 +85,7 @@ jobs:
             --path "$verify_dir" \
             --force --quiet --unzip
           python scripts/ai/verify_kaggle_training_bundle.py \
-            "$verify_dir/er-ai-training-bundle.zip" \
+            "$verify_dir" \
             "$GITHUB_WORKSPACE"
       - name: Launch private GPU kernel
         env:
@@ -337,7 +337,7 @@ jobs:
               --path "$verify_dir" \
               --force --quiet --unzip \
               && python scripts/ai/verify_kaggle_training_bundle.py \
-                "$verify_dir/er-ai-training-bundle.zip" \
+                "$verify_dir" \
                 "$GITHUB_WORKSPACE"; then
               bundle_verified=true
               break

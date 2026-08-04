@@ -42,6 +42,12 @@ class VerifyKaggleTrainingBundleTest(unittest.TestCase):
             self.assertEqual(report["sourceFiles"], 1)
             self.assertEqual(report["featureSchemaVersion"], 4)
 
+            extracted = root / "extracted"
+            with ZipFile(bundle) as archive:
+                archive.extractall(extracted)
+            extracted_report = MODULE.verify_bundle(extracted, repository)
+            self.assertEqual(extracted_report["sourceFiles"], 1)
+
             source_path.write_text("stale = True\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "stale training source"):
                 MODULE.verify_bundle(bundle, repository)
