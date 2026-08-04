@@ -3,6 +3,12 @@
   "project": "PokéRogue Redux",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "protocol_version": "er-coop-47",
+  "protocol_source": {
+    "path": "src/data/elite-redux/coop/coop-transport.ts",
+    "line": 138,
+    "constant": "COOP_PROTOCOL_VERSION",
+    "value": "er-coop-47"
+  },
   "legacy_source_paths": [
     "src/enums/buttons.ts",
     "src/inputs-controller.ts",
@@ -53,7 +59,8 @@
     "index.html",
     "package.json",
     "pnpm-lock.yaml",
-    "phaser@3.90.0/src/input/keyboard/keys/KeyCodes.js"
+    "phaser@3.90.0/src/input/keyboard/keys/KeyCodes.js",
+    "src/data/elite-redux/coop/coop-transport.ts"
   ],
   "physical_inputs": {
     "keyboard": {
@@ -65,7 +72,9 @@
       "profile": "CFG_KEYBOARD_QWERTY",
       "profile_id": "default",
       "declared_key_count": 77,
-      "code_source": "Phaser.Input.Keyboard.KeyCodes from phaser@3.90.0"
+      "code_source": "Phaser.Input.Keyboard.KeyCodes from phaser@3.90.0",
+      "subscription_guard": "keyboard listener registration is nested inside if (typeof globalScene.input.gamepad !== \"undefined\")",
+      "subscription_guard_source": "src/inputs-controller.ts:151-184"
     },
     "gamepad": {
       "event_channel": "globalScene.input.gamepad",
@@ -110,7 +119,16 @@
       "synthetic_controller_type": "keyboard",
       "synthetic_marker": "isTouch=true",
       "dom_source": "index.html#touchControls",
-      "declared_element_count": 21
+      "declared_element_count": 21,
+      "touchcancel_behavior": {
+        "release_emitted": false,
+        "lock_removed": false,
+        "repeat_cleared": false,
+        "active_class_removed": false,
+        "conditional_effect": "if currentTarget is an HTMLElement and its dataset contains skipPointerDown, delete dataset.skipPointerEvent",
+        "condition_mismatch": "touchstart writes skipPointerEvent, while touchcancel checks skipPointerDown",
+        "source": "src/touch-controls.ts:64-87"
+      }
     }
   },
   "logical_buttons": [
@@ -466,6 +484,66 @@
       "touch": "TouchControl checks Button enum ownership of data-key and emits that enum value directly"
     }
   },
+  "runtime_custom_mapping": {
+    "declared_defaults": {
+      "keyboard": "mappings.keyboard_default is CFG_KEYBOARD_QWERTY.default, including every declared physical key and its -1/unbound entries",
+      "gamepad": "mappings.gamepad_defaults is each selected PAD_*.default table, including declared-but-unmapped entries"
+    },
+    "runtime_custom_state": {
+      "shape": "config.custom[device_mapping_key] is a setting name alias or -1",
+      "initialization": "InputsController uses an existing custom table or a shallow copy of config.default for keyboard and gamepad setup",
+      "persistence": "setupKeyboard and setupGamepad save the resulting mapping configuration through gameData.saveMappingConfigs",
+      "injection": "injectConfig replaces config.custom after migrating BUTTON_CYCLE_VARIANT to BUTTON_CYCLE_TERA",
+      "oracle_boundary": "No user-persisted or injected custom table is asserted here; mappings.* remains the complete declared-default layer"
+    },
+    "setting_alias_tables": {
+      "keyboard": {
+        "alias_to_canonical": {
+          "ALT_BUTTON_UP": "BUTTON_UP",
+          "ALT_BUTTON_DOWN": "BUTTON_DOWN",
+          "ALT_BUTTON_LEFT": "BUTTON_LEFT",
+          "ALT_BUTTON_RIGHT": "BUTTON_RIGHT",
+          "ALT_BUTTON_ACTION": "BUTTON_ACTION",
+          "ALT_BUTTON_CANCEL": "BUTTON_CANCEL",
+          "ALT_BUTTON_MENU": "BUTTON_MENU",
+          "ALT_BUTTON_STATS": "BUTTON_STATS",
+          "ALT_BUTTON_CYCLE_FORM": "BUTTON_CYCLE_FORM",
+          "ALT_BUTTON_CYCLE_SHINY": "BUTTON_CYCLE_SHINY",
+          "ALT_BUTTON_CYCLE_GENDER": "BUTTON_CYCLE_GENDER",
+          "ALT_BUTTON_CYCLE_ABILITY": "BUTTON_CYCLE_ABILITY",
+          "ALT_BUTTON_CYCLE_NATURE": "BUTTON_CYCLE_NATURE",
+          "ALT_BUTTON_CYCLE_TERA": "BUTTON_CYCLE_TERA",
+          "ALT_BUTTON_SPEED_UP": "BUTTON_SPEED_UP",
+          "ALT_BUTTON_SLOW_DOWN": "BUTTON_SLOW_DOWN",
+          "ALT_BUTTON_SUBMIT": "BUTTON_SUBMIT"
+        },
+        "resolution": "config.settings contains both canonical and ALT setting names, and both names index the same logical Button"
+      },
+      "gamepad": {
+        "alias_to_canonical": {},
+        "resolution": "gamepad settings expose no ALT alias family; custom values use the canonical BUTTON_* names"
+      },
+      "source": "src/configs/inputs/cfg-keyboard-qwerty.ts:187-222; src/configs/inputs/pad-dualshock.ts:49-66; src/configs/inputs/pad-generic.ts:47-63; src/configs/inputs/pad-procon.ts:48-64; src/configs/inputs/pad-unlicensed-snes.ts:39-55; src/configs/inputs/pad-xbox360.ts:47-63"
+    },
+    "blacklist_constraints": {
+      "keyboard": {
+        "config_physical_keys": ["KEY_ENTER", "KEY_ESC", "KEY_SPACE", "KEY_BACKSPACE", "KEY_ARROW_UP", "KEY_ARROW_DOWN", "KEY_ARROW_LEFT", "KEY_ARROW_RIGHT", "KEY_DEL", "KEY_HOME"],
+        "settings_ui": ["BUTTON_SUBMIT", "BUTTON_MENU", "BUTTON_ACTION", "BUTTON_CANCEL", "BUTTON_UP", "BUTTON_DOWN", "BUTTON_LEFT", "BUTTON_RIGHT"]
+      },
+      "gamepad": {
+        "config_physical_keys_by_profile": {
+          "PAD_DUALSHOCK": [],
+          "PAD_GENERIC": ["LC_N", "LC_S", "LC_W", "LC_E"],
+          "PAD_PROCON": [],
+          "PAD_UNLICENSED_SNES": [],
+          "PAD_XBOX360": []
+        },
+        "settings_ui": ["BUTTON_UP", "BUTTON_DOWN", "BUTTON_LEFT", "BUTTON_RIGHT"]
+      },
+      "enforcement": "assign checks the physical-key and target-setting constraints; deleteBind, canIAssignThisKey, and canIOverrideThisSetting reject blacklisted physical keys",
+      "source": "src/configs/inputs/config-handler.ts:195-203,255-287; src/configs/inputs/cfg-keyboard-qwerty.ts:303-314; src/configs/inputs/pad-generic.ts:83; src/system/settings/settings-keyboard.ts:128-137; src/system/settings/settings-gamepad.ts:80-85"
+    }
+  },
   "repeat_policy": {
     "delay_ms": 250,
     "keyboard": {
@@ -492,6 +570,23 @@
       "buttons": ["MENU", "STATS"],
       "declaration": "InputsController.interactions is not initialized for MENU or STATS",
       "observed_runtime": "keyboardKeyDown and gamepadButtonDown do not consult interactions, so mapped MENU and STATS still arm repeat intervals"
+    }
+  },
+  "keyup_edge_cases": {
+    "oracle_bug_risk": "Both keyboard and gamepad keyup handlers splice without checking whether the logical button is currently locked; this records production behavior only and does not prescribe a fix",
+    "keyboard": {
+      "condition": "getButtonWithKeycode returns a mapped button but buttonLock.indexOf(buttonUp) is -1",
+      "actual_operation": "const index = buttonLock.indexOf(buttonUp); buttonLock.splice(index, 1)",
+      "unmatched_index": -1,
+      "effect": "Array.splice(-1, 1) removes the last unrelated lock when buttonLock is non-empty, is a no-op when empty, and clearInterval(inputInterval[buttonUp]) still runs",
+      "source": "src/inputs-controller.ts:419-427"
+    },
+    "gamepad": {
+      "condition": "getButtonWithKeycode returns a mapped button but buttonLock.indexOf(buttonUp) is -1",
+      "actual_operation": "const index = buttonLock.indexOf(buttonUp); buttonLock.splice(index, 1)",
+      "unmatched_index": -1,
+      "effect": "Array.splice(-1, 1) removes the last unrelated lock when buttonLock is non-empty, is a no-op when empty, and clearInterval(inputInterval[buttonUp]) still runs",
+      "source": "src/inputs-controller.ts:501-509"
     }
   },
   "focus_policy": {
@@ -521,7 +616,7 @@
       "name": "Phaser",
       "kind": "external runtime and keycode table",
       "uses": ["Core.Events.BLUR", "Input.Keyboard.KeyCodes", "Input.Gamepad events and types", "Events.EventEmitter", "Math.Clamp"],
-      "evidence": "src/inputs-controller.ts:27,147-183; src/configs/inputs/cfg-keyboard-qwerty.ts:9-96; src/ui-inputs.ts:24,319-321; package.json:86; pnpm-lock.yaml:1885-1886"
+      "evidence": "src/inputs-controller.ts:27,147-183; src/configs/inputs/cfg-keyboard-qwerty.ts:9-97; src/ui-inputs.ts:24,319-321; package.json:86; pnpm-lock.yaml:1885-1886"
     },
     {
       "name": "document",
@@ -546,6 +641,12 @@
       "kind": "timer globals",
       "uses": ["keyboard, gamepad, and touch repeat plus cleanup"],
       "evidence": "src/inputs-controller.ts:383-397,468-479,557-565; src/touch-controls.ts:116-122,137,212-213"
+    },
+    {
+      "name": "setTimeout",
+      "kind": "timer global",
+      "uses": ["500 ms delayed installation of move-touch-controls-handler pointer listeners"],
+      "evidence": "src/ui/settings/move-touch-controls-handler.ts:360-364"
     },
     {
       "name": "import.meta.env.MODE",
@@ -600,7 +701,7 @@
     {
       "claim": "per-screen processInput semantics",
       "status": "delegated to concrete UI handlers and not expanded into this physical-input inventory",
-      "evidence": "src/ui/handlers/ui-handler.ts:20-27 declares abstract processInput; src/ui-inputs.ts:166-297 selects or forwards handlers"
+      "evidence": "src/ui/handlers/ui-handler.ts:20-28 declares abstract processInput; src/ui-inputs.ts:166-297 selects or forwards handlers"
     }
   ]
 }
