@@ -23,7 +23,10 @@ import {
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { ensureCoopAuthoritativeCommandPresentation } from "#data/elite-redux/coop/coop-presentation";
-import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import {
+  getCoopRendezvousWaitMs,
+  shouldAnnounceCoopSpectatorCommandArrival,
+} from "#data/elite-redux/coop/coop-rendezvous";
 import {
   cancelCoopV2DeferredCommandStart,
   coopHasPendingWaveAdvance,
@@ -1004,8 +1007,11 @@ export class CommandPhase extends FieldPhase {
 
     // An authoritative guest must classify the host-owned slot as renderer-only BEFORE consulting the
     // checkpoint-carried move queue. Otherwise a host recharge sentinel can execute on the guest engine.
-    if (isAuthoritativeGuestPartnerSlot && this.tryCoopAutoResolve()) {
-      return;
+    if (isAuthoritativeGuestPartnerSlot) {
+      this.announceCoopSpectatorCommandArrival();
+      if (this.tryCoopAutoResolve()) {
+        return;
+      }
     }
 
     // Forced/queued commands on THIS client's owned slot still represent arrival at the reciprocal command
@@ -1091,6 +1097,28 @@ export class CommandPhase extends FieldPhase {
     if (!this.tryExecuteQueuedMove()) {
       this.openOwnCommandUi();
     }
+  }
+
+  /**
+   * A replica-only single-controller battle has no locally-owned CommandPhase from which to announce the
+   * reciprocal command point. Announce from the renderer-only partner slot after its presentation replay has
+   * reached the real phase. An incomplete multi-slot field is intentionally excluded: its absent slot may be
+   * waiting for a faint replacement and must keep the authority's command boundary closed.
+   */
+  private announceCoopSpectatorCommandArrival(): void {
+    const controller = getCoopController();
+    const rendezvous = getCoopRendezvous();
+    if (controller?.role !== "guest" || rendezvous == null || !isCoopV2ControlCutoverActive()) {
+      return;
+    }
+    const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
+    const activeFieldOwners = globalScene.getPlayerField().map(pokemon => pokemon?.coopOwner ?? null);
+    if (!shouldAnnounceCoopSpectatorCommandArrival(controller.role, playerCapacity, activeFieldOwners)) {
+      return;
+    }
+    const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
+    coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (Authority V2 spectator renderer)`);
+    rendezvous.arrive(point);
   }
 
   /**

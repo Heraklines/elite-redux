@@ -7580,3 +7580,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   was deliberately strengthened to `shiftPhase(this)`. The assertion now names the identity-bearing call while
   preserving its original materialize-before-yield ordering check; this is test maintenance, not a new product
   behavior change.
+- Exact registered-interactions run `30874955240` proved the modal fix: Revival Blessing completed, replacement
+  applied, Stormglass completed, and both clients entered Fun and Games with identical wave-2 state. It then
+  exposed a separate single-controller command seam. The host-owned Seel was the only active player battler;
+  the guest replayed the full Wobbuffet presentation and installed `COMMAND_FRONTIER`, but its renderer-only
+  partner-slot auto-resolve skipped the reciprocal `cmd:2:1` arrival. The host therefore exhausted seven
+  retries despite a healthy transport. The scoped fix announces readiness from that replica path only when
+  every expected field slot is materialized and none belongs to the local role; an incomplete double field
+  remains closed for replacement. Engine-free and source-order regressions cover both sides of that distinction.

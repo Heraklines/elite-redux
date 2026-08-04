@@ -1243,6 +1243,22 @@ test("an exact Authority V2 guest command control arrives without waiting on a l
   );
 });
 
+test("a fully materialized single-controller replica announces command readiness before partner auto-resolve", () => {
+  const partnerBranch = commandPhase.indexOf("if (isAuthoritativeGuestPartnerSlot) {");
+  const spectatorArrival = commandPhase.indexOf("this.announceCoopSpectatorCommandArrival();", partnerBranch);
+  const partnerAutoResolve = commandPhase.indexOf("if (this.tryCoopAutoResolve())", partnerBranch);
+  assert.ok(partnerBranch >= 0, "the authoritative replica partner-slot branch is present");
+  assert.ok(
+    spectatorArrival > partnerBranch && spectatorArrival < partnerAutoResolve,
+    "the spectator renderer arrives before its host-owned slot is auto-resolved",
+  );
+  assert.match(
+    commandPhase,
+    /activeFieldOwners = globalScene\.getPlayerField\(\)\.map[\s\S]*?shouldAnnounceCoopSpectatorCommandArrival\(controller\.role, playerCapacity, activeFieldOwners\)[\s\S]*?rendezvous\.arrive\(point\)/u,
+    "spectator arrival requires a complete, ownership-proven field and emits the exact command point",
+  );
+});
+
 test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {
   const materialStart = coopRuntime.indexOf("function materializeCoopMeOperationFromOp(");
   const materialEnd = coopRuntime.indexOf("\ntype CoopV2InteractionLiveMaterializer", materialStart);

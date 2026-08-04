@@ -36,7 +36,7 @@
 import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { beginCoopMachineWait } from "#data/elite-redux/coop/coop-stall-probe";
-import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type { CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 const RENDEZVOUS_CAUSAL_POINT_LIMIT = 192;
 const DEFAULT_RENDEZVOUS_RECOVERY_MAX_ATTEMPTS = 3;
@@ -127,6 +127,30 @@ export interface CoopRendezvousResult {
   crossPoint?: string;
   /** Host-stated point that wins a cross-branch mismatch. Absent for an exact rendezvous. */
   authoritativePoint?: string;
+}
+
+/**
+ * Whether this client is a real spectator at a fully materialized command field.
+ *
+ * A one-controller battle (for example Fun & Games' embedded Wobbuffet fight) still needs both renderers
+ * to announce that they reached the command frontier. The replica has no locally-owned CommandPhase in that
+ * geometry, so its partner-slot auto-resolve path must provide the arrival. Requiring every expected field
+ * slot to be materialized keeps an ordinary double battle with a missing/replacing ally fail-closed.
+ */
+export function shouldAnnounceCoopSpectatorCommandArrival(
+  localRole: CoopRole,
+  playerCapacity: number,
+  activeFieldOwners: readonly (CoopRole | null | undefined)[],
+): boolean {
+  if (
+    !Number.isSafeInteger(playerCapacity)
+    || playerCapacity <= 0
+    || activeFieldOwners.length !== playerCapacity
+    || activeFieldOwners.some(owner => owner !== "host" && owner !== "guest")
+  ) {
+    return false;
+  }
+  return !activeFieldOwners.includes(localRole);
 }
 
 /** Options for {@linkcode CoopRendezvous} (timer injection for tests). */
