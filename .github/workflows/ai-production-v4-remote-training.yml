@@ -82,9 +82,8 @@ jobs:
           rm -rf "$verify_dir"
           mkdir -p "$verify_dir"
           kaggle datasets download "$dataset_slug" \
-            --file er-ai-training-bundle.zip \
             --path "$verify_dir" \
-            --force --quiet
+            --force --quiet --unzip
           python scripts/ai/verify_kaggle_training_bundle.py \
             "$verify_dir/er-ai-training-bundle.zip" \
             "$GITHUB_WORKSPACE"
@@ -165,6 +164,7 @@ jobs:
     if: >-
       github.repository == 'Heraklines/elite-redux'
       && !inputs.diagnose_existing_kernel
+      && !inputs.reuse_existing_dataset
       && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[v4-train]'))
     name: Prepare private v4 GPU run and fresh winner tree
     runs-on: ubuntu-latest
@@ -334,9 +334,8 @@ jobs:
             rm -rf "$verify_dir"
             mkdir -p "$verify_dir"
             if kaggle datasets download "$dataset_slug" \
-              --file er-ai-training-bundle.zip \
               --path "$verify_dir" \
-              --force --quiet \
+              --force --quiet --unzip \
               && python scripts/ai/verify_kaggle_training_bundle.py \
                 "$verify_dir/er-ai-training-bundle.zip" \
                 "$GITHUB_WORKSPACE"; then
