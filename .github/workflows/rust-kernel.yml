@@ -48,6 +48,35 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.nvmrc
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+            /scripts/export-kernel-fixtures.mjs
+            /scripts/export-kernel-schema.mjs
+            /src/enums/buttons.ts
+            /src/enums/game-modes.ts
+            /src/constants/app-constants.ts
+            /src/inputs-controller.ts
+            /src/ui-inputs.ts
+            /src/data/elite-redux/coop/coop-transport.ts
+            /src/data/elite-redux/coop/authority-v2/contract.ts
+            /src/data/elite-redux/coop/authority-v2/authority-entry.ts
+            /src/data/elite-redux/coop/authority-v2/next-control.ts
+            /src/data/elite-redux/coop/authority-v2/frame-codec.ts
+            /src/data/elite-redux/coop/authority-v2/protocol-validator.ts
+            /src/data/elite-redux/coop/authority-v2/frame-context.ts
+            /src/data/elite-redux/coop/coop-battle-checkpoint.ts
+            /src/data/elite-redux/replay-trace.ts
+            /src/configs/inputs/cfg-keyboard-qwerty.ts
+            /src/configs/inputs/pad-generic.ts
+            /src/configs/inputs/pad-dualshock.ts
+            /src/configs/inputs/pad-procon.ts
+            /src/configs/inputs/pad-unlicensed-snes.ts
+            /src/configs/inputs/pad-xbox360.ts
           submodules: false
 
       - name: Detect source-lock and fixture contract
