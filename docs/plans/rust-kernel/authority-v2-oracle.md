@@ -1,5 +1,7 @@
 # Authority V2 oracle map
 
+Project: **PokéRogue Redux**.
+
 This is the Wave 0 M0-0C inventory for the pinned production checkout.
 
 | item | value |

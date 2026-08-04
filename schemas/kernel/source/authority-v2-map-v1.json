@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "project_name": "PokéRogue Redux",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "protocol_version": "er-coop-47",
   "frame_protocol_version": 2,
