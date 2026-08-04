@@ -7563,3 +7563,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Faint-replacement animations-on run `30872915830` remains active on exact SHA `9a1bfd9df` and must not be
   cancelled. It independently qualifies the replacement/live-event ordering and ordinary wild atomic reveal
   fixes while the combined modal/reward-retry candidate is prepared. Production remains untouched.
+- Protected navigation run `30865215640` ultimately completed waves 1-29 in one real two-browser session,
+  including wave-10/wave-20 Wide Lens purchases under opposite owners, three Crossroads choices, two World
+  Maps and new-biome entries, three Mystery encounters, three replacement picks, and the wave-30 boss command
+  frontier with identical digest `234058c9cc4713bb`. Its final red is harness-only: four members of the
+  opposite seat's party were depleted, leaving both active battlers owned by one surviving seat; the public
+  game correctly opened two consecutive CommandPhases for that browser, while the driver permanently removed
+  a browser after its first command and waited for an impossible command from the depleted peer.
+- The sequential public driver now consumes distinct same-address command surfaces rather than assuming one
+  command per browser. It can drive two battlers from one surviving seat, still rejects replaying an append-only
+  surface, and requires the ordinary authenticated collection-close proof before marking the depleted browser
+  omitted. A failure-first node regression reproduces the exact wave-30 owner partition. No product code was
+  changed for this red.

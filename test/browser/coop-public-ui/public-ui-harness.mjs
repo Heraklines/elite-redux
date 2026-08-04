@@ -4431,14 +4431,16 @@ export class DuoPublicUiRig {
   }
 
   /**
-   * Submit one reciprocal co-op command round in the order the real UIs become actionable.
+   * Submit one co-op command round in the order the real owned battler slots become actionable.
    *
    * The second player's CommandPhase is intentionally gated by the first player's public choice.
    * Waiting for both clients before sending either choice therefore deadlocks a healthy game. This
-   * driver observes one owned semantic command surface, submits only that client's configured public
-   * key sequence, then observes and submits the partner's surface. No scene/runtime state is read or
-   * mutated; the returned cursors exclude these command surfaces so the post-turn outcome cannot
-   * mistake the just-submitted round for the next one.
+   * driver observes one owned semantic command surface and submits only that client's configured public
+   * key sequence. A depleted partner can leave two active battlers assigned to the same remaining seat, so
+   * that same browser may legitimately receive another CommandPhase at the same address before collection
+   * closes. Consume each distinct public surface exactly once; do not assume one command per browser. No
+   * scene/runtime state is read or mutated, and the returned cursors exclude these command surfaces so the
+   * post-turn outcome cannot mistake the just-submitted round for the next one.
    */
   async driveSequentialCommandRound(initialFrom, keys, purpose, { driveCommand = null } = {}) {
     const clients = Object.values(this.clients);
@@ -4457,6 +4459,8 @@ export class DuoPublicUiRig {
     const pending = new Set(clients.map(client => client.label));
     const outcomeCursors = {};
     const commandEvents = {};
+    const commandEventHistory = Object.fromEntries(clients.map(client => [client.label, []]));
+    const consumedCommandEvents = new Set();
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     let advanceBattlePrompt = null;
     let promptCommandAddress = null;
@@ -4583,15 +4587,26 @@ export class DuoPublicUiRig {
 
       let droveCommand = false;
       for (const client of clients) {
-        if (!pending.has(client.label)) {
-          continue;
-        }
         const event = findOwnedCommandOrTerminal(client, from[client.label] ?? 0);
         if (event == null) {
           continue;
         }
         if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
           throw new Error(`${client.label}: shared session terminated before ${purpose}: ${event.text}`);
+        }
+        const commandEventKey = `${client.label}:${event.index}`;
+        if (consumedCommandEvents.has(commandEventKey)) {
+          continue;
+        }
+        const commandAddress = event.observation?.address;
+        if (
+          submittedCommandAddress != null
+          && commandAddress != null
+          && !sameAddress(commandAddress, submittedCommandAddress)
+        ) {
+          // This belongs to the caller's next round. The exact-address battle-progress event that closed the
+          // current collection remains in postSubmissionCursors and is consumed by the closure proof below.
+          continue;
         }
         if (pending.size === 1 && submittedCommandAddress != null) {
           await this.assertPresentationLedgerAtSharedCommand(
@@ -4601,6 +4616,8 @@ export class DuoPublicUiRig {
           );
         }
         commandEvents[client.label] = event;
+        commandEventHistory[client.label].push(event);
+        consumedCommandEvents.add(commandEventKey);
         outcomeCursors[client.label] = client.evidence.cursor();
         await client.checkpoint(`${purpose}-${client.label}-command`);
         const beforeSubmissionCursors = Object.fromEntries(
@@ -4617,7 +4634,9 @@ export class DuoPublicUiRig {
           await driveCommand(client, `${purpose}-${client.label}`, event);
         }
         pending.delete(client.label);
-        const commandAddress = event.observation?.address;
+        // Re-scan strictly after this consumed surface. The same browser can own the next live battler,
+        // while an unchanged append-only observation must never be driven twice.
+        from[client.label] = event.index + 1;
         if (
           pending.size > 0
           && Number.isSafeInteger(commandAddress?.epoch)
@@ -4687,6 +4706,7 @@ export class DuoPublicUiRig {
       client.evidence.record("sequential-command-proof", {
         purpose,
         commandEventIndex: commandEvents[client.label]?.index ?? null,
+        commandEventIndexes: commandEventHistory[client.label].map(event => event.index),
         skippedAfterCollectionClosed:
           commandEvents[client.label] == null && (commandCollectionClosed != null || supersedingOutcome != null),
         collectionClosedEventIndex: commandCollectionClosed?.event.index ?? null,
@@ -4747,6 +4767,7 @@ export class DuoPublicUiRig {
     }
     return {
       commandEvents,
+      commandEventHistory,
       outcomeCursors,
       presentationCursors:
         presentationCursors ?? Object.fromEntries(clients.map(client => [client.label, from[client.label] ?? 0])),

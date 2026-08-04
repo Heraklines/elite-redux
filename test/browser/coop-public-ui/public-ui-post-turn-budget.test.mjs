@@ -1125,6 +1125,70 @@ test("sequential command driver accepts an exact-address collection close when t
   assert.equal(secondEvidence.events.at(-1).projection, "omitted");
 });
 
+test("sequential command driver accepts two same-address battler commands from one surviving seat", async () => {
+  const order = [];
+  const address = { epoch: 73, wave: 30, turn: 1 };
+  const survivorEvidence = new FakeEvidence("survivor");
+  const depletedEvidence = new FakeEvidence("depleted");
+  survivorEvidence.push(ownedCommand(0, address));
+  const survivor = {
+    label: "survivor",
+    publicRole: "host",
+    publicSeat: 0,
+    evidence: survivorEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("survivor");
+      if (order.length === 1) {
+        survivorEvidence.push(ownedCommand(0, address));
+      } else {
+        survivorEvidence.push({
+          kind: "browser-surface2",
+          observation: {
+            operationClass: "battle-progress",
+            surfaceId: "battle:message",
+            phase: "MovePhase",
+            localRole: "host",
+            address,
+          },
+        });
+      }
+    },
+  };
+  const depleted = {
+    label: "depleted",
+    publicSeat: 1,
+    evidence: depletedEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      throw new Error("a depleted partner cannot receive a command key");
+    },
+  };
+  const rig = {
+    clients: { survivor, depleted },
+    lastSharedSurfaceAddress: new Map(),
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async () => order.push("presentation-proof"),
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { survivor: 0, depleted: 0 },
+    ["Space"],
+    "wave-30-turn-1",
+  );
+
+  assert.deepEqual(order, ["survivor", "presentation-proof", "survivor"]);
+  assert.deepEqual(
+    result.commandEventHistory.survivor.map(event => event.index),
+    [0, 1],
+  );
+  assert.deepEqual(result.commandEventHistory.depleted, []);
+  assert.deepEqual(result.commandPartition.owners.map(owner => owner.label), ["survivor"]);
+  assert.deepEqual(result.commandPartition.omitted, [{ label: "depleted", seat: 1 }]);
+  assert.equal(result.commandPartition.collectionClosed.phase, "MovePhase");
+});
+
 test("a passive command watcher starts at the current tail instead of resurrecting an old reward", async () => {
   const order = [];
   const address = { epoch: 73, wave: 4, turn: 1 };
