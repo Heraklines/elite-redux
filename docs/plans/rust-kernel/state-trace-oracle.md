@@ -1,11 +1,13 @@
 # Rust kernel state and trace oracle
 
-This is the Wave 0 state inventory for task M0-0D. It maps the current Redux/Phaser
+This is the PokéRogue Redux Wave 0 state inventory for task M0-0D. It maps the current Redux/Phaser
 boundaries to a future deterministic Rust kernel; it does not introduce a production
 wire contract or change runtime code.
 
 | item | value |
 | --- | --- |
+| project | PokéRogue Redux |
+| legacy identifier policy | Elite Redux is a legacy source/path/protocol identifier only |
 | schema | `schemas/kernel/source/state-fields-v1.json` |
 | inventory schema version | `1` |
 | oracle game SHA | `3b534099919efae827019d4a3f3c4ab0ecd6d67b` |
@@ -45,7 +47,9 @@ explicit in `src/data/elite-redux/coop/coop-replication-contract.ts#L8-L31` and
 `version`, `seed`, `gameModeId`, `difficulty`, `challenges`, `roster`, and `events`;
 `coop`, `endState`, and `checkpoint` are optional
 (`src/data/elite-redux/replay-trace.ts#L214-L244`). The exact field records are in
-`replay_trace.types` in the JSON.
+`replay_trace.types` in the JSON. `gameModeId` is the numeric `GameModes` enum,
+`difficulty` is a string, and `challenges` is `CoopChallengeConfig[]`
+(`src/data/elite-redux/replay-trace.ts#L219-L224`).
 
 The event log covers two kinds of input:
 
@@ -173,21 +177,25 @@ explicitly excluded where they are not serialized structures.
 optional (`src/system/arena-data.ts#L11-L26`). The JSON keeps both records instead of
 using the runtime class declaration to erase the serialized presence distinction.
 
-The declaration and observed producer do not agree in three material places:
+The remaining declaration/producer presence gap in `SessionSaveData` is:
 
-- `trainer` is declared required/non-nullable, but `getSessionSaveData` emits `null`
-  for non-trainer runs (`src/@types/save-data.ts#L107-L112`,
-  `src/system/game-data.ts#L1848-L1850`).
 - `mysteryEncounterSaveData` is declared required/non-nullable, while its source comment
-  and producer permit absent/undefined outside an active encounter
-  (`src/@types/save-data.ts#L117-L122`, `src/system/game-data.ts#L1853-L1855`).
-- `name` is declared required, but is absent from the observed `getSessionSaveData`
-  return object (`src/@types/save-data.ts#L114-L114`,
-  `src/system/game-data.ts#L1834-L1933`).
+  and producer value permit JSON omission when the runtime value is undefined
+  (`src/@types/save-data.ts#L119-L120`, `src/system/game-data.ts#L1888-L1888`).
 
 `ModifierData.typePregenArgs` has a similar declared-array versus observed-undefined
-edge (`src/system/modifier-data.ts#L35-L58`). The JSON preserves these distinctions
+edge (`src/system/modifier-data.ts#L38-L56`). The JSON preserves these distinctions
 and marks them as unresolved; it does not choose a Rust absent/null/empty meaning.
+
+`PokemonData.status` is a required, nullable serialized `Status` object rather than a
+numeric status id (`src/system/pokemon-data.ts#L39-L39`,
+`src/system/pokemon-data.ts#L123-L125`). The observed-optional JSON fields are
+`nickname`, `fusionSpecies`, `fusionFormIndex`, `fusionAbilityIndex`, `fusionVariant`,
+`fusionGender`, `coopOwner`, `summonDataSpeciesFormIndex`, and `natureOverride`; each
+can receive `undefined` from the live producer and is therefore omitted by
+`JSON.stringify` (`src/system/pokemon-data.ts#L95-L172`). Fusion shiny/luck/tera fields
+remain required because the constructor supplies concrete defaults
+(`src/system/pokemon-data.ts#L151-L157`).
 
 ### Save digest
 
@@ -206,6 +214,9 @@ The exact reasons and field-level treatment are in
 `src/data/elite-redux/coop/coop-battle-engine.ts#L1915-L2251`. New SessionSaveData
 fields are included by default unless added to this denylist. This is a projection for
 cross-client integrity, not a claim that excluded data is unimportant to persistence.
+`name` and `trainer` are not ambiguous in this projection: they are explicit denylist
+entries (`src/data/elite-redux/coop/coop-battle-engine.ts#L1936-L1936`,
+`src/data/elite-redux/coop/coop-battle-engine.ts#L1974-L1974`).
 
 ## Canonicalization and integrity
 
@@ -272,17 +283,16 @@ The JSON classifies fields into:
 - `adapter.persistence.metadata`: wall-clock and cosmetic metadata.
 
 The layer assignment is intentionally a migration map. It does not freeze a new public
-contract, and it does not resolve source contradictions.
+contract, and it does not resolve the remaining source presence gaps.
 
 ## Known gaps and stop-condition evidence
 
 The required stop-condition evidence is preserved in
 `layer_classification.stop_condition_evidence` in the JSON:
 
-- absent/null ambiguity is present for `trainer`, `mysteryEncounterSaveData`, `name`,
-  and `typePregenArgs`;
-- persisted meaning differs between the full `SessionSaveData`, its digest projection,
-  and authoritative snapshot replacements;
+- absent/null ambiguity remains for `mysteryEncounterSaveData` and `typePregenArgs`;
+- `name` and `trainer` are definitively excluded from the save digest, so their
+  persistence declarations do not create a checksum-projection conflict;
 - Phaser state is involved in capture/apply, but the cited replication registry gives
   direct mechanical projections and identifies presentation calls as adapter work.
 
