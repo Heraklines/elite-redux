@@ -5810,10 +5810,10 @@ export async function runCampaign(rig) {
         || registeredInteractionCoverage.stormglass.length !== 1
         || stormglassMysterySuccessor == null
         || completedMysterySuccessor == null
-        // The exact-build picker forces Fun and Games (enum value 27). Completing its wave-2 event proves
+        || // The exact-build picker forces Fun and Games (enum value 27). Completing its wave-2 event proves
         // the public driver crossed party selection, three direct combat turns, reward settlement, and the
         // next-wave successor instead of merely completing an arbitrary no-battle Mystery surface.
-        || completedMysterySuccessor.mysteryEncounterType !== 27
+        completedMysterySuccessor.mysteryEncounterType !== 27
       ) {
         throw new Error(
           "[campaign-registered-interactions] exact fixture did not complete Revival -> Stormglass -> ME_PRESENT(t0) -> Mystery terminal: "
