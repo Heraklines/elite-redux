@@ -1,0 +1,372 @@
+{
+  "invariant": "no-park",
+  "seed": 20260804,
+  "wave": 9,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 9 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260804",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 9,
+    "guestInteractionCounter": 9,
+    "hostWave": 9,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 3886095886,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 299,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 4045314643,
+        "battlerIndex": 1,
+        "speciesId": 445,
+        "speciesName": "Garchomp",
+        "hp": 233,
+        "maxHp": 235,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 3645291641,
+        "battlerIndex": 2,
+        "speciesId": 915,
+        "speciesName": "Lechonk",
+        "hp": 0,
+        "maxHp": 24,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 0
+          },
+          {
+            "id": 541,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 642173526,
+        "battlerIndex": 3,
+        "speciesId": 399,
+        "speciesName": "Bidoof",
+        "hp": 0,
+        "maxHp": 28,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 70,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 3886095886,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 299,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 4045314643,
+        "battlerIndex": -1,
+        "speciesId": 445,
+        "speciesName": "Garchomp",
+        "hp": 233,
+        "maxHp": 235,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 3645291641,
+        "battlerIndex": -1,
+        "speciesId": 915,
+        "speciesName": "Lechonk",
+        "hp": 0,
+        "maxHp": 24,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 0
+          },
+          {
+            "id": 541,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 642173526,
+        "battlerIndex": -1,
+        "speciesId": 399,
+        "speciesName": "Bidoof",
+        "hp": 0,
+        "maxHp": 28,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 70,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260804 preseeded=false",
+    "wave 1 turn 1: replay guest crossed cmd:1:1 through real public COMMAND=opened",
+    "wave 1: host slot move=85 guest slot move=85",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:0/14] playerHp=[143:303/303,94:179/179]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[415:0/16,265:16/16] playerHp=[143:301/303,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=53 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[191:0/17,504:0/16] playerHp=[143:301/303,248:225/225]",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=53 guest slot move=53",
+    "wave 4 turn 1: guest SWITCH -> party[5]",
+    "wave 4 turn 1: progress enemyHp=[519:0/20,399:20/20] playerHp=[143:299/303,445:233/235]",
+    "wave 4 turn 2: replay guest crossed cmd:4:2 through real public COMMAND=opened",
+    "wave 4: reward shop owner=guest leave",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=247 guest slot move=85",
+    "wave 5 turn 1: progress enemyHp=[13:0/18,161:0/18] playerHp=[143:299/303,445:233/235]",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1828683859192154:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=53 guest slot move=85",
+    "wave 6 turn 1: progress enemyHp=[161:0/18,261:0/20] playerHp=[143:299/303,445:233/235]",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest crossed cmd:7:1 through real public COMMAND=opened",
+    "wave 7: host slot move=85 guest slot move=85",
+    "wave 7 turn 1: progress enemyHp=[819:0/23,399:0/23] playerHp=[143:299/303,445:233/235]",
+    "wave 7: reward shop owner=guest take-nonparty",
+    "wave 8 turn 1: replay guest crossed cmd:8:1 through real public COMMAND=opened",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=53 guest slot move=53",
+    "wave 8 turn 1: progress enemyHp=[158:0/26,519:0/26] playerHp=[143:299/303,445:233/235]",
+    "wave 8: reward shop owner=host leave",
+    "wave 9 turn 1: replay guest crossed cmd:9:1 through real public COMMAND=opened",
+    "wave 9: host slot move=85 guest slot move=85",
+    "wave 9 turn 1: progress enemyHp=[915:0/24,399:0/28] playerHp=[143:299/303,445:233/235]"
+  ]
+}
