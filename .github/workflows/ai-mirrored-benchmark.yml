@@ -28,6 +28,10 @@ on:
         required: false
         default: checkpoint
         type: string
+      tree_only:
+        required: false
+        default: false
+        type: boolean
     secrets:
       KAGGLE_USERNAME:
         required: true
@@ -68,6 +72,11 @@ on:
         options:
           - checkpoint
           - human-baseline
+      tree_only:
+        description: Benchmark only the policy-target tree artifact and fixed engine controls
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -95,7 +104,7 @@ jobs:
       - name: Install Kaggle client
         run: python -m pip install kaggle==1.8.4
       - name: Download private matched transformer outputs
-        if: inputs.candidate_kernel == ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel == '' }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
@@ -110,7 +119,7 @@ jobs:
           kaggle kernels output "$CONTROL_KERNEL" --path ai-models/control --force
           kaggle kernels output "$TRANSFER_KERNEL" --path ai-models/transfer --force
       - name: Download private checkpoint transformer output
-        if: inputs.candidate_kernel != ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel != '' }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
@@ -132,6 +141,7 @@ jobs:
         env:
           CANDIDATE_MODE: ${{ inputs.candidate_kernel != '' }}
           CANDIDATE_KIND: ${{ inputs.candidate_kind }}
+          TREE_ONLY: ${{ inputs.tree_only || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -150,6 +160,9 @@ jobs:
 
           candidate_mode = os.environ["CANDIDATE_MODE"] == "true"
           candidate_kind = os.environ["CANDIDATE_KIND"]
+          tree_only = os.environ["TREE_ONLY"] == "true"
+          if tree_only and candidate_mode:
+              raise SystemExit("tree-only mode cannot also specify a transformer candidate")
           candidate = None
           if candidate_mode:
               paths = list(Path("ai-models/candidate").rglob("report.json"))
@@ -193,7 +206,7 @@ jobs:
                   raise SystemExit("candidate has no sealed vocabulary hash")
               if not str(candidate.get("device", "")).startswith("cuda"):
                   raise SystemExit("candidate was not trained on CUDA")
-          else:
+          elif not tree_only:
               reports = {}
               for arm in ("control", "transfer"):
                   paths = list(Path("ai-models", arm).rglob("report.json"))
@@ -242,16 +255,23 @@ jobs:
           )
           if tree_model_dir is None:
               raise SystemExit(f"tree artifact contains no model in {tree_model_dirs}")
-          expected_role = "policy-target" if candidate_mode else "diagnostic-imitation"
+          expected_role = "policy-target" if candidate_mode or tree_only else "diagnostic-imitation"
           if tree_report.get("trainingRole") != expected_role:
               raise SystemExit(f"tree report has the wrong training role: {tree_report.get('trainingRole')}")
-          tree_names = ["selected-model.json"] if candidate_mode else []
+          tree_names = ["selected-model.json"] if candidate_mode or tree_only else []
           if (tree_model_dir / "stacked_tree_ensemble.json").is_file():
               tree_names.append("stacked_tree_ensemble.json")
-          if not candidate_mode and "stacked_tree_ensemble.json" not in tree_names:
+          if not candidate_mode and not tree_only and "stacked_tree_ensemble.json" not in tree_names:
               raise SystemExit("matched baseline mode requires a stacked tree ensemble")
-          expected_feature_schema = candidate["featureSchemaVersion"] if candidate_mode else 2
-          expected_feature_count = candidate["data"]["dictionaryCoverage"]["features"] if candidate_mode else 4326
+          if candidate_mode:
+              expected_feature_schema = candidate["featureSchemaVersion"]
+              expected_feature_count = candidate["data"]["dictionaryCoverage"]["features"]
+          elif tree_only:
+              expected_feature_schema = tree_report["schemaVersion"]
+              expected_feature_count = tree_report["data"]["dictionaryCoverage"]["features"]
+          else:
+              expected_feature_schema = 2
+              expected_feature_count = 4326
           for tree_name in tree_names:
               tree_model = json.loads((tree_model_dir / tree_name).read_text(encoding="utf-8"))
               if (
@@ -314,6 +334,7 @@ jobs:
         env:
           CANDIDATE_MODE: ${{ inputs.candidate_kernel != '' }}
           CANDIDATE_KIND: ${{ inputs.candidate_kind }}
+          TREE_ONLY: ${{ inputs.tree_only || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -332,7 +353,7 @@ jobs:
           else
             echo "STACKED_TREE_AVAILABLE=false" >> "$GITHUB_ENV"
           fi
-          if [[ "$CANDIDATE_MODE" == "true" ]]; then
+          if [[ "$TREE_ONLY" != "true" && "$CANDIDATE_MODE" == "true" ]]; then
             candidate_report=$(find ai-models/candidate -name report.json -type f)
             test "$(printf '%s\n' "$candidate_report" | wc -l)" -eq 1
             candidate_model=$(dirname "$candidate_report")
@@ -354,12 +375,16 @@ jobs:
       - name: Build difficulty-balanced mirrored batch
         env:
           CANDIDATE_MODE: ${{ inputs.candidate_kernel != '' }}
+          TREE_ONLY: ${{ inputs.tree_only || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
           controllers=""
-          if [[ "$CANDIDATE_MODE" == "true" ]]; then
-            controllers="$CANDIDATE_CONTROLLER,selected-tree-v1"
+          if [[ "$CANDIDATE_MODE" == "true" || "$TREE_ONLY" == "true" ]]; then
+            if [[ "$CANDIDATE_MODE" == "true" ]]; then
+              controllers="$CANDIDATE_CONTROLLER,"
+            fi
+            controllers="${controllers}selected-tree-v1"
             if [[ "$STACKED_TREE_AVAILABLE" == "true" ]]; then
               controllers="$controllers,stacked-tree-v1"
             fi
@@ -372,7 +397,7 @@ jobs:
             "shard-${{ matrix.shard }}" \
             "$controllers"
       - name: Play random-init transformer
-        if: inputs.candidate_kernel == ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel == '' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -381,7 +406,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-random-init-transformer-v4-results.json"
       - name: Play Showdown-transfer transformer
-        if: inputs.candidate_kernel == ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel == '' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -390,7 +415,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-showdown-transfer-transformer-v4-results.json"
       - name: Play diagnostic tree ensemble
-        if: inputs.candidate_kernel == ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel == '' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -399,7 +424,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-tree-ensemble-v1-results.json"
       - name: Play candidate transformer
-        if: inputs.candidate_kernel != ''
+        if: ${{ !inputs.tree_only && inputs.candidate_kernel != '' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -408,7 +433,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-${CANDIDATE_CONTROLLER}-results.json"
       - name: Play selected winner-only tree
-        if: inputs.candidate_kernel != ''
+        if: ${{ inputs.tree_only || inputs.candidate_kernel != '' }}
         run: >-
           node scripts/run-combat-batch.mjs
           "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
@@ -417,7 +442,7 @@ jobs:
           --test-timeout-ms 3600000
           --json-out "ai-gauntlet/shard-${{ matrix.shard }}-selected-tree-v1-results.json"
       - name: Play stacked winner-only tree
-        if: inputs.candidate_kernel != ''
+        if: ${{ inputs.tree_only || inputs.candidate_kernel != '' }}
         shell: bash
         run: |
           set -euo pipefail
