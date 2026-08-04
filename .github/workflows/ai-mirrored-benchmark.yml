@@ -93,6 +93,7 @@ env:
   AI_BENCHMARK_TREE_RUN_ID: ${{ github.event_name == 'push' && '30866627818' || inputs.tree_run_id }}
   AI_BENCHMARK_TREE_ARTIFACT: ${{ github.event_name == 'push' && 'ai-production-v4-remote-training-report' || inputs.tree_artifact_name }}
   AI_BENCHMARK_TREE_ONLY: ${{ github.event_name == 'push' && 'false' || inputs.tree_only }}
+  ER_COMBAT_EPISODE_TIMEOUT_MS: 300000
 
 concurrency:
   group: ai-mirrored-ghost-benchmark-${{ github.ref }}
@@ -111,6 +112,8 @@ jobs:
         with:
           fetch-depth: 1
           submodules: false
+      - name: Test combat-batch watchdog contract
+        run: node --test scripts/combat-batch-watchdog.test.mjs
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

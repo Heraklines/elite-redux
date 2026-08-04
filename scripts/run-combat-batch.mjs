@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import {
+  appendCombatTimeout,
+  initializeCombatCheckpoint,
+  readMatchingCombatCheckpoint,
+} from "./combat-batch-watchdog.mjs";
 
 const argv = process.argv.slice(2);
 if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
@@ -12,7 +17,8 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
       + "[--opponent-ai-model FILE] [--opponent-ai-neural-model DIR] "
       + "[--opponent-ai-policy MODE] [--opponent-ai-epsilon P] "
       + "[--opponent-ai-source SOURCE] [--opponent-ai-policy-target 0|1] "
-      + "[--record-engine-baseline] [--real-rng] [--resume] [--test-timeout-ms N]",
+      + "[--record-engine-baseline] [--real-rng] [--resume] [--test-timeout-ms N] "
+      + "[--episode-timeout-ms N]",
   );
   process.exit(argv.length === 0 ? 1 : 0);
 }
@@ -44,6 +50,9 @@ let recordEngineBaseline = false;
 let realRng = false;
 let resume = false;
 let testTimeoutMs;
+let episodeTimeoutMs = process.env.ER_COMBAT_EPISODE_TIMEOUT_MS
+  ? Number(process.env.ER_COMBAT_EPISODE_TIMEOUT_MS)
+  : undefined;
 for (let index = 1; index < argv.length; index++) {
   const arg = argv[index];
   if (arg === "--turns") {
@@ -114,6 +123,12 @@ for (let index = 1; index < argv.length; index++) {
       console.error("--test-timeout-ms must be a positive integer");
       process.exit(1);
     }
+  } else if (arg === "--episode-timeout-ms") {
+    episodeTimeoutMs = Number(argv[++index]);
+    if (!Number.isInteger(episodeTimeoutMs) || episodeTimeoutMs < 1) {
+      console.error("--episode-timeout-ms must be a positive integer");
+      process.exit(1);
+    }
   } else {
     console.error(`unknown arg: ${arg}`);
     process.exit(1);
@@ -124,8 +139,20 @@ if (!Number.isInteger(Number(turns)) || Number(turns) < 1) {
   console.error("--turns must be a positive integer");
   process.exit(1);
 }
+if (episodeTimeoutMs !== undefined && (!Number.isInteger(episodeTimeoutMs) || episodeTimeoutMs < 1)) {
+  console.error("ER_COMBAT_EPISODE_TIMEOUT_MS must be a positive integer");
+  process.exit(1);
+}
 if (resume && !jsonOut) {
   console.error("--resume requires --json-out");
+  process.exit(1);
+}
+if (episodeTimeoutMs && !jsonOut) {
+  console.error("--episode-timeout-ms requires --json-out");
+  process.exit(1);
+}
+if (episodeTimeoutMs && aiDataOut) {
+  console.error("--episode-timeout-ms is not supported while recording policy data");
   process.exit(1);
 }
 
@@ -193,13 +220,110 @@ if (testTimeoutMs) {
   env.ER_RUN_TEST_TIMEOUT_MS = testTimeoutMs;
 }
 
-const result = spawnSync(
-  "npx",
-  ["vitest", "run", "test/tools/run-scenario.test.ts", "--pool=threads", "--silent=true", "--no-color"],
-  {
+const vitestArgs = [
+  "vitest",
+  "run",
+  "test/tools/run-scenario.test.ts",
+  "--pool=threads",
+  "--silent=true",
+  "--no-color",
+];
+
+if (!episodeTimeoutMs) {
+  const result = spawnSync("npx", vitestArgs, {
     stdio: "inherit",
     env,
     shell: process.platform === "win32",
-  },
-);
-process.exit(result.status ?? 1);
+  });
+  process.exit(result.status ?? 1);
+}
+
+const hasCustomOpponent = !!(opponentAiModel || opponentAiNeuralModel || opponentAiPolicy);
+if (!resume) {
+  initializeCombatCheckpoint(jsonOut, parsed, hasCustomOpponent);
+}
+
+function delay(ms) {
+  return new Promise(resolveDelay => setTimeout(resolveDelay, ms));
+}
+
+async function killChildTree(child) {
+  if (!child.pid) {
+    return;
+  }
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
+  }
+}
+
+async function runWatchedChild(childEnv) {
+  const child = spawn("npx", vitestArgs, {
+    stdio: "inherit",
+    env: childEnv,
+    detached: process.platform !== "win32",
+    shell: process.platform === "win32",
+  });
+  const exit = new Promise((resolveExit, rejectExit) => {
+    child.once("error", rejectExit);
+    child.once("exit", (code, signal) => resolveExit({ code, signal }));
+  });
+  let observedCount = readMatchingCombatCheckpoint(jsonOut, parsed, hasCustomOpponent)?.episodeCount ?? 0;
+  let lastProgressAt = Date.now();
+  while (true) {
+    const event = await Promise.race([
+      exit.then(value => ({ type: "exit", value })),
+      delay(5_000).then(() => ({ type: "poll" })),
+    ]);
+    if (event.type === "exit") {
+      return { type: "exit", ...event.value };
+    }
+    const checkpoint = readMatchingCombatCheckpoint(jsonOut, parsed, hasCustomOpponent);
+    if (checkpoint && checkpoint.episodeCount > observedCount) {
+      observedCount = checkpoint.episodeCount;
+      lastProgressAt = Date.now();
+      continue;
+    }
+    const stalledMs = Date.now() - lastProgressAt;
+    if (stalledMs < episodeTimeoutMs) {
+      continue;
+    }
+    console.error(
+      `combat batch watchdog: no completed episode for ${stalledMs}ms after ${observedCount}/${parsed.episodes.length}; terminating child`,
+    );
+    await killChildTree(child);
+    await exit;
+    const latest = readMatchingCombatCheckpoint(jsonOut, parsed, hasCustomOpponent);
+    if (latest && latest.episodeCount > observedCount) {
+      return { type: "progress-race" };
+    }
+    return { type: "timeout", stalledMs };
+  }
+}
+
+let shouldResume = resume;
+while (true) {
+  const checkpoint = readMatchingCombatCheckpoint(jsonOut, parsed, hasCustomOpponent);
+  if (checkpoint?.complete) {
+    process.exit(0);
+  }
+  const childEnv = shouldResume
+    ? { ...env, ER_RUN_RESUME_COMBAT_BATCH: "1" }
+    : Object.fromEntries(Object.entries(env).filter(([key]) => key !== "ER_RUN_RESUME_COMBAT_BATCH"));
+  const result = await runWatchedChild(childEnv);
+  if (result.type === "exit") {
+    process.exit(result.code ?? 1);
+  }
+  if (result.type === "timeout") {
+    const updated = appendCombatTimeout(jsonOut, parsed, hasCustomOpponent, result.stalledMs, episodeTimeoutMs);
+    console.error(`combat batch watchdog: recorded timeout for ${updated.results.at(-1).id}`);
+  }
+  shouldResume = true;
+}
