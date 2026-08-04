@@ -3590,6 +3590,24 @@ export function partyReorderPresentationMatches(observation, expectedPartyIds) {
 }
 
 /**
+ * Returning from an owner-only party screen does not change the watcher UI. Keep the owner's fresh
+ * return cursor, but let each watcher reuse the exact post-reorder reward projection that already
+ * proved the new party digest. Requiring a later watcher emission turns a correct stable renderer
+ * into a timeout on slower clients.
+ */
+export function retainStableWatcherSurfaceCursors(returnCursors, stableCursors, watcherLabels) {
+  const cursors = { ...returnCursors };
+  for (const label of watcherLabels) {
+    const stableCursor = stableCursors[label];
+    if (!Number.isSafeInteger(stableCursor) || stableCursor < 0) {
+      throw new Error(`[campaign-convergence] ${label} has no stable watcher cursor`);
+    }
+    cursors[label] = stableCursor;
+  }
+  return cursors;
+}
+
+/**
  * Exercise the player-reported nested reward path exclusively through public keyboard input:
  * reward row -> Check Team -> Move active slot 0 -> swap with reserve slot 2 -> return.
  * The watcher deliberately remains on the reward surface, so this asserts asymmetric UI plus
@@ -3774,13 +3792,20 @@ async function driveRewardCheckTeamReorder(rig, owner, boundary) {
   }
 
   const returnCursors = fromEach(clients, client => client.evidence.cursor());
+  // The watcher never left reward-shop. Its post-reorder surface is already the exact stable projection
+  // we need, and it is not required to emit a duplicate merely because the owner closes PARTY.
+  const restoredSurfaceCursors = retainStableWatcherSurfaceCursors(
+    returnCursors,
+    convergenceCursors,
+    peers.map(peer => peer.label),
+  );
   await owner.press("Backspace", "campaign-check-team-return-to-reward");
-  const restored = await checkpointPairedMechanicalSurface(rig, "reward-shop", returnCursors, owner);
+  const restored = await checkpointPairedMechanicalSurface(rig, "reward-shop", restoredSurfaceCursors, owner);
   const restoredPeerEvents = await Promise.all(
     peers.map(peer =>
       peer.evidence.waitForCondition(
         sink => {
-          const candidate = sink.findLastSemanticSurface(returnCursors[peer.label], "reward-shop");
+          const candidate = sink.findLastSemanticSurface(restoredSurfaceCursors[peer.label], "reward-shop");
           return rewardCursorProjectionMatches(restored.authority, candidate?.observation) ? candidate : null;
         },
         { timeoutMs: rig.config.timeoutMs, description: `absolute reward cursor restored on ${peer.label}` },

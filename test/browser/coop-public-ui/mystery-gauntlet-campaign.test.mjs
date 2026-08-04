@@ -29,6 +29,7 @@ import {
   pairedMysteryProjectionMatches,
   partyReorderPresentationMatches,
   resolveSurfaceOwner,
+  retainStableWatcherSurfaceCursors,
   retainedPartyEvolutionNeedsProgressBudget,
   rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
@@ -833,6 +834,19 @@ test("Check Team reorder proof requires both party order and an atomically ready
     ),
     false,
     "visible field convergence cannot hide a stale party order",
+  );
+});
+
+test("Check Team return reuses only the watcher's proven stable post-reorder surface", () => {
+  const returnCursors = { owner: 40, watcher: 50 };
+  const postReorderCursors = { owner: 20, watcher: 30 };
+  assert.deepEqual(retainStableWatcherSurfaceCursors(returnCursors, postReorderCursors, ["watcher"]), {
+    owner: 40,
+    watcher: 30,
+  });
+  assert.throws(
+    () => retainStableWatcherSurfaceCursors(returnCursors, {}, ["watcher"]),
+    /watcher has no stable watcher cursor/u,
   );
 });
 
