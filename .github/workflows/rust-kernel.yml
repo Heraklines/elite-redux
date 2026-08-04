@@ -1,0 +1,1043 @@
+name: Rust Kernel Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel/**"
+    paths:
+      - "rust/**"
+      - "schemas/kernel/**"
+      - "test/kernel-fixtures/**"
+      - "scripts/export-kernel-*.mjs"
+      - "scripts/benchmark-kernel-*.mjs"
+      - ".github/workflows/rust-kernel.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+      - "schemas/kernel/**"
+      - "test/kernel-fixtures/**"
+      - "scripts/export-kernel-*.mjs"
+      - "scripts/benchmark-kernel-*.mjs"
+      - ".github/workflows/rust-kernel.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  source-lock-and-fixtures:
+    name: Source lock and deterministic fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect source-lock and fixture contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          shopt -s nullglob
+          exporters=(scripts/export-kernel-*.mjs)
+          fixtures=(test/kernel-fixtures/*)
+          feature_present=0
+          if [[ -e rust/source-lock.toml ]]; then
+            feature_present=1
+          fi
+          if ((${#exporters[@]} > 0)); then
+            feature_present=1
+          fi
+          if ((${#fixtures[@]} > 0)); then
+            feature_present=1
+          fi
+          if ((feature_present == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: source-lock/exporter/fixture milestone is not present yet."
+            exit 0
+          fi
+          missing=()
+          for path in "${core[@]}" rust/source-lock.toml; do
+            [[ -e "$path" ]] || missing+=("$path")
+          done
+          ((${#exporters[@]} > 0)) || missing+=("scripts/export-kernel-*.mjs")
+          ((${#fixtures[@]} > 0)) || missing+=("test/kernel-fixtures/*")
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Rust kernel source-lock contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Verify locked workspace metadata
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        run: cargo metadata --locked --format-version 1 --no-deps
+
+      - name: Verify source lock and regenerate oracle fixtures
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        env:
+          LC_ALL: C
+          TZ: UTC
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          exporters=(scripts/export-kernel-*.mjs)
+          for exporter in "${exporters[@]}"; do
+            echo "Running deterministic kernel exporter: $exporter"
+            node "$exporter"
+          done
+          if ! git diff --no-ext-diff --exit-code -- rust/source-lock.toml test/kernel-fixtures; then
+            echo "::error::Source lock or oracle fixtures are not reproducible; exporter output differs from the checked-in contract."
+            git diff --no-ext-diff -- rust/source-lock.toml test/kernel-fixtures
+            exit 1
+          fi
+          changed="$(git status --porcelain --untracked-files=all -- rust/source-lock.toml test/kernel-fixtures)"
+          if [[ -n "$changed" ]]; then
+            echo "::error::Source-lock or fixture regeneration produced untracked files:"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  rust-format:
+    name: Rust format
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect Rust workspace contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          present=0
+          missing=()
+          for path in "${core[@]}"; do
+            if [[ -e "$path" ]]; then
+              present=1
+            else
+              missing+=("$path")
+            fi
+          done
+          if ((present == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: rust workspace milestone is not present yet."
+            exit 0
+          fi
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Rust workspace contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Check Rust formatting
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        run: cargo fmt --all -- --check
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  rust-clippy:
+    name: Rust clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect Rust workspace contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          present=0
+          missing=()
+          for path in "${core[@]}"; do
+            if [[ -e "$path" ]]; then
+              present=1
+            else
+              missing+=("$path")
+            fi
+          done
+          if ((present == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: rust workspace milestone is not present yet."
+            exit 0
+          fi
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Rust workspace contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Run workspace clippy with warnings denied
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  rust-native-tests:
+    name: Rust native nextest and doctests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect Rust workspace contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          present=0
+          missing=()
+          for path in "${core[@]}"; do
+            if [[ -e "$path" ]]; then
+              present=1
+            else
+              missing+=("$path")
+            fi
+          done
+          if ((present == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: rust workspace milestone is not present yet."
+            exit 0
+          fi
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Rust workspace contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Install cargo-nextest
+        if: steps.contract.outputs.ready == 'true'
+        uses: taiki-e/install-action@nextest
+
+      - name: Run nextest CI profile
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        run: cargo nextest run --workspace --profile ci
+
+      - name: Run workspace doctests
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        run: cargo test --workspace --doc --locked
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  rust-wasm-node-parity:
+    name: Rust wasm32 er-wasm Node parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect er-wasm contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          present=0
+          missing=()
+          for path in "${core[@]}"; do
+            if [[ -e "$path" ]]; then
+              present=1
+            else
+              missing+=("$path")
+            fi
+          done
+          wasm_manifest_present=0
+          while IFS= read -r -d '' manifest; do
+            if [[ "$manifest" == *er-wasm* ]] || grep -Eq '^[[:space:]]*name[[:space:]]*=[[:space:]]*["'"']er-wasm["'"'][[:space:]]*$' "$manifest"; then
+              wasm_manifest_present=1
+              break
+            fi
+          done < <(find rust -type f -name Cargo.toml -print0 2>/dev/null)
+          if ((wasm_manifest_present == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: er-wasm milestone is not present yet."
+            exit 0
+          fi
+          if ((${#missing[@]} > 0)); then
+            printf '::error::er-wasm contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Locate er-wasm crate
+        id: er-wasm
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=""
+          while IFS= read -r -d '' candidate; do
+            if grep -Eq '^[[:space:]]*name[[:space:]]*=[[:space:]]*["'"']er-wasm["'"'][[:space:]]*$' "$candidate"; then
+              manifest="$candidate"
+              break
+            fi
+          done < <(find rust -type f -name Cargo.toml -print0)
+          if [[ -z "$manifest" ]]; then
+            echo "::error::An er-wasm Cargo manifest is present but does not declare package name er-wasm."
+            exit 1
+          fi
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "directory=$(dirname "$manifest")" >> "$GITHUB_OUTPUT"
+
+      - name: Install wasm-pack
+        if: steps.contract.outputs.ready == 'true'
+        run: cargo install wasm-pack --locked
+
+      - name: Run wasm32 er-wasm tests through Node
+        if: steps.contract.outputs.ready == 'true'
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: |
+          set -euo pipefail
+          rustup target list --installed | grep -Fx wasm32-unknown-unknown
+          wasm-pack test --node "${{ steps.er-wasm.outputs.directory }}"
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  rust-benchmarks:
+    name: Rust kernel benchmark JSON
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Detect benchmark contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
+          shopt -s nullglob
+          benchmarks=(scripts/benchmark-kernel-*.mjs)
+          present=0
+          missing=()
+          if ((${#benchmarks[@]} > 0)); then
+            present=1
+          fi
+          for path in "${core[@]}"; do
+            if [[ -e "$path" ]]; then
+              present=1
+            else
+              missing+=("$path")
+            fi
+          done
+          if ((${#benchmarks[@]} == 0)); then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rust kernel pre-contract: benchmark script milestone is not present yet."
+            exit 0
+          fi
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Benchmark contract is partially present; missing: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pinned Rust toolchain
+        id: rust-toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
+          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
+          if match is None:
+              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
+          print(match.group(1))
+          PY
+          )"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+
+      - name: Install the pinned Rust toolchain
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --target wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies and targets
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+
+      - name: Run kernel benchmarks and capture JSON
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        env:
+          LC_ALL: C
+          TZ: UTC
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-benchmarks
+          shopt -s nullglob
+          benchmarks=(scripts/benchmark-kernel-*.mjs)
+          for benchmark in "${benchmarks[@]}"; do
+            output="rust-ci-benchmarks/$(basename "${benchmark%.mjs}").json"
+            echo "Running kernel benchmark: $benchmark"
+            node "$benchmark" > "$output"
+          done
+
+      - name: Validate benchmark JSON
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          reports=(rust-ci-benchmarks/*.json)
+          ((${#reports[@]} > 0))
+          node --input-type=module - "${reports[@]}" <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          for (const file of process.argv.slice(2)) {
+            const value = JSON.parse(readFileSync(file, "utf8"));
+            if (value === null || typeof value !== "object") {
+              throw new Error(`${file} must contain a JSON object or array`);
+            }
+          }
+          NODE
+
+      - name: Write compact job summary and schema hash
+        if: always()
+        shell: bash
+        env:
+          CONTRACT_STATUS: ${{ steps.contract.outputs.ready }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          {
+            echo "job=$GITHUB_JOB"
+            echo "sha=$GITHUB_SHA"
+            echo "contract_status=${CONTRACT_STATUS:-unknown}"
+            echo "status=${JOB_STATUS:-unknown}"
+          } > rust-ci-summary/summary.txt
+          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
+          if [[ -n "$schema_file" ]]; then
+            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
+          else
+            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          fi
+          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-success
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*benchmark*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ github.job }}-failure
+          path: |
+            rust-ci-summary/**
+            rust-ci-benchmarks/**/*.json
+            **/*trace*
+            **/*seed*
+            **/*divergence*
+            **/*digest*
+            **/*live-resource*
+            **/*live_resource*
+            **/trace/**
+            **/traces/**
+            **/seed/**
+            **/seeds/**
+            **/divergence/**
+            **/divergences/**
+            **/digest/**
+            **/digests/**
+            **/live-resources/**
+            **/live_resources/**
+            **/resources/**
+          retention-days: 14
+          if-no-files-found: warn
