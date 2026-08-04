@@ -794,10 +794,7 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
     "export function queueCoopProjectedEncounterPresentationTail(",
   );
   const projectedPresentationTailEnd = newBattlePhase.indexOf("\n}\n", projectedPresentationTailStart) + 2;
-  const projectedPresentationTail = newBattlePhase.slice(
-    projectedPresentationTailStart,
-    projectedPresentationTailEnd,
-  );
+  const projectedPresentationTail = newBattlePhase.slice(projectedPresentationTailStart, projectedPresentationTailEnd);
   assert.match(
     projectedPresentationTail,
     /if \(params\.showPlayerTrainer\)[\s\S]*?pushNew\("ShowTrainerPhase", true\)[\s\S]*?pushNew\(params\.entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)/u,

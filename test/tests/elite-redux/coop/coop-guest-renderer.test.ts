@@ -67,8 +67,8 @@ import { EnemyPokemon, type Pokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
 import { EncounterPhase } from "#phases/encounter-phase";
 import {
-  queueCoopProjectedEncounterPresentationTail,
   type CoopProjectedEncounterPresentationQueue,
+  queueCoopProjectedEncounterPresentationTail,
 } from "#phases/new-battle-phase";
 import { NextEncounterPhase } from "#phases/next-encounter-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
@@ -368,9 +368,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
         expect(pokemon.getSprite().visible, `player ${pokemon.id} sprite is hidden behind the trainer transition`).toBe(
           false,
         );
-        expect(pokemon.getBattleInfo().visible, `player ${pokemon.id} info is hidden behind the trainer transition`).toBe(
-          false,
-        );
+        expect(
+          pokemon.getBattleInfo().visible,
+          `player ${pokemon.id} info is hidden behind the trainer transition`,
+        ).toBe(false);
       }
       expect(coopEngine.captureCoopChecksum(), "the positive trainer cue is mechanically checksum-neutral").toBe(
         checksumBefore,

@@ -705,11 +705,7 @@ async function assertRenderProfileExecution(rig, policy, progress) {
  */
 function assertTrainerPresentationCoverage(rig, battleKinds) {
   const trainerWaves = [
-    ...new Set(
-      battleKinds
-        .filter(kind => kind.wave > 1 && kind.battleType === "TRAINER")
-        .map(kind => kind.wave),
-    ),
+    ...new Set(battleKinds.filter(kind => kind.wave > 1 && kind.battleType === "TRAINER").map(kind => kind.wave)),
   ];
   if (trainerWaves.length === 0) {
     return null;
