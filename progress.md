@@ -7520,3 +7520,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   Games at wave 2 and supplies its paid option through initial-save fixture money. Its terminal assertion
   requires Mystery type 27 to reach wave 3, so the same public keyboard/DOM lane proves party selection, all
   three direct Wobbuffet turns, retained reward settlement, and the successor without adding another runner.
+- Focused run `30871406758` never launched Chromium: all owned type/format checks passed, but the new
+  release-cutover source contract expected `turnsRemaining` text after the `FUN_AND_GAMES` predicate even
+  though the implementation deliberately captured that engine value before constructing the predicate. The
+  contract now anchors the actual `mysteryTerminalAfterTurn` declaration and its `turnsRemaining <= 0`
+  condition. This is a harness-only correction; the qualified product material remains unchanged.

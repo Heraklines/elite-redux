@@ -1820,7 +1820,7 @@ test("Fun and Games owns a complete direct-turn V2 lifecycle instead of opening 
   );
   assert.match(
     coopTurnCommitPhase,
-    /MysteryEncounterType\.FUN_AND_GAMES[\s\S]*turnsRemaining[\s\S]*mysteryTerminalAfterTurn/u,
+    /const mysteryTerminalAfterTurn =[\s\S]*MysteryEncounterType\.FUN_AND_GAMES[\s\S]*mysteryTurnsRemaining <= 0/u,
     "the authority states the minigame's finite last turn from engine-owned state",
   );
   assert.match(
