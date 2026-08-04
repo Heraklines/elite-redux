@@ -8,6 +8,12 @@ from typing import Any
 from zipfile import ZipFile
 
 
+REQUIRED_PACKAGING_SOURCES = {
+    "ml/policy/build_candidate_ensemble.py",
+    "ml/policy/serve_candidate_transformer.py",
+}
+
+
 def sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
@@ -30,6 +36,12 @@ def verify_contents(
     source_paths = sorted(path for path in manifest_files if is_training_source(path))
     if not source_paths:
         raise ValueError("training bundle manifest contains no model sources")
+    missing_packaging_sources = sorted(REQUIRED_PACKAGING_SOURCES.difference(source_paths))
+    if missing_packaging_sources:
+        raise ValueError(
+            "training bundle is missing ensemble packaging sources: "
+            + ", ".join(missing_packaging_sources)
+        )
     for source_path in source_paths:
         local_path = repository_root / source_path
         if not local_path.is_file():

@@ -58,6 +58,7 @@ if (basename(outputPath) !== "er-ai-training-bundle.zip") {
 const sourcePaths = [
   "ml/policy/candidate_transformer.py",
   "ml/policy/train_candidate_transformer.py",
+  "ml/policy/serve_candidate_transformer.py",
   "ml/policy/build_candidate_ensemble.py",
   "ml/policy/convert_metamon_transfer.py",
   "ml/policy/kaggle_train_entrypoint.py",
