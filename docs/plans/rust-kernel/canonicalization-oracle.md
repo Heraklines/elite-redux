@@ -1,5 +1,9 @@
 # Canonicalization oracle v1
 
+Project: **PokéRogue Redux**. “Elite Redux” is a legacy source/path/protocol
+identifier only; its appearance in paths such as `src/data/elite-redux/` and in
+protocol `er-coop-47` does not name the current project.
+
 Status: Wave 0 inventory for Milestones 0–2. This document records the behavior at
 game SHA `3b534099919efae827019d4a3f3c4ab0ecd6d67b` and protocol `er-coop-47`.
 The requested oracle branch is `ci/coop/v2-showdown-command-coordinate-20260720`.
@@ -9,8 +13,8 @@ The machine-readable contract is
 This is a compatibility inventory, not a protocol redesign. Every algorithm marked
 `wire_exact` is an existing identity, digest, or ordering rule. Rust must reproduce
 its observable output; it must not replace FNV-1a, FNV-1a-32, SHA-256, or the
-existing JSON representation. BLAKE3 is permissible only for a new, explicitly
-non-wire bundle-content hash; no current wire algorithm in this inventory uses it.
+existing JSON representation. No BLAKE3 implementation or BLAKE3 policy was
+observed in the audited source, so none is part of this oracle.
 
 ## Scope and evidence
 
@@ -53,7 +57,7 @@ plain object                 -> keys sorted with JS default UTF-16 order,
 undefined/function/symbol    -> "null" (state types forbid these values)
 non-finite number            -> "0"
 -0 or 0                      -> "0"
-safe/integer-shaped number   -> number.toString()
+Number.isInteger(number)     -> number.toString()
 other finite number          -> number.toPrecision(12)
 ```
 
@@ -79,8 +83,8 @@ algorithm; retain the per-surface output format.
 
 | Symbol and source | Input and normalization/order | Output and consumers | Rust rule |
 | --- | --- | --- | --- |
-| `canonicalize` in `authority-v2/adapters/turn-command.ts#L735-L760` | Null/undefined become `null`; non-finite and signed zero become `0`; integer uses `toString`; fractional uses `toPrecision(12)`; strings use JSON.stringify; arrays preserve order; object keys use default `.sort()` | Canonical text; `computeTurnCommitDigest` hashes it | `wire_exact` |
-| `canonicalize` in `authority-v2/adapters/interactions-learn.ts#L845-L870` | Same number/string/array/key rules as turn-command; undefined also becomes `null` | Canonical text; `interactionMaterialDigest` hashes it | `wire_exact` |
+| `canonicalize` / `canonNumber` in `authority-v2/adapters/turn-command.ts#L740-L772` | Null/undefined become `null`; non-finite and signed zero become `0`; `Number.isInteger` selects `toString`; fractions use `toPrecision(12)`; strings use JSON.stringify; arrays preserve order; object keys use default `.sort()` | Canonical text; `computeTurnCommitDigest` hashes it | `wire_exact` |
+| `canonicalize` / `canonNumber` in `authority-v2/adapters/interactions-learn.ts#L850-L882` | Same number/string/array/key rules as turn-command; undefined also becomes `null` | Canonical text; `interactionMaterialDigest` hashes it | `wire_exact` |
 | `canonicalJson` in `authority-v2/adapters/faint-replacement.ts#L300-L315` | Primitive uses JSON.stringify with `"null"` fallback; object keys are sorted and recursively emitted. There is no explicit array branch in this helper; replacement input is an object image | Canonical text; `replacementImageDigest` hashes it | `wire_exact` |
 | `canonicalJson` in `authority-v2/adapters/interactions-mystery.ts#L304-L318` | Primitive JSON.stringify/null fallback; arrays preserve order; object keys sorted | Canonical text; `interactionMaterialDigest` hashes it | `wire_exact` |
 | `canonicalJson` in `authority-v2/adapters/interactions-reward.ts#L105-L119` | Primitive JSON.stringify/null fallback; arrays preserve order; object keys sorted | Canonical text; `digestOfInteractionMaterial` hashes it | `wire_exact` |
@@ -90,6 +94,14 @@ algorithm; retain the per-surface output format.
 | `canonicalJson` in `coop-me-pin-state.ts#L169-L182` | Primitive JSON.stringify may return undefined; arrays preserve order; object keys sorted | Local active-control equality only | `local_only` |
 | `canonicalMeOutcomeWithoutAuthority` in `coop-me-operation.ts#L480-L495` | Removes authoritative state and the publication-order `base.tick`, then calls core `canonicalize` | Local/operation outcome equivalence | `wire_exact` for the core canonical comparison |
 | `canonicalize` use in `coop-wave-operation.ts#L726-L780` | Canonicalizes the staged envelope/payload after the operation-specific projection | Staged same-operation conflict/equality | `wire_exact` |
+| `canonicalOperationValue` in `coop-operation-runtime.ts#L139-L170` | Undefined emits the literal unquoted text `undefined`; null and other primitives use `JSON.stringify(value) ?? "undefined"`; arrays preserve order; object keys default-sort and retain undefined-valued keys | Deterministic re-ack boundary comparison text. It is not necessarily valid JSON: `{a: undefined}` becomes `{"a":undefined}` | static source evidence only; `wire_exact` |
+
+`canonicalOperationValue` is deliberately different from both core canonical JSON
+and native `JSON.stringify`: an undefined object member is retained as
+`"key":undefined`, and an undefined array member is emitted as the same literal
+token. Native number serialization applies on this path, so finite fractions use
+ECMAScript JSON number spelling, `-0` becomes `0`, and non-finite numbers become
+`null`.
 
 `freezeInteractionWireMaterial` in
 `authority-v2/cutover-interaction.ts#L521-L544` first performs
@@ -100,14 +112,15 @@ intentional authority/replica compatibility boundary.
 ## Wire digests
 
 The following are existing wire or authority identities. Their algorithms must be
-matched exactly by a Rust implementation. `BLAKE3` is not an acceptable
-replacement for any row in this section.
+matched exactly by a Rust implementation; no digest replacement is part of this
+inventory.
 
 ### Legacy battle and persistence digests
 
 | Symbol and source | Input shape and normalization/order | Output encoding; consumers | Tests; Rust |
 | --- | --- | --- | --- |
-| `checksumState` in `coop-battle-checksum.ts#L284-L286` | `CoopChecksumState`; object keys are core-sorted. Engine projects field mons sorted by `bi`, weather/terrain type only, arena tags by `(tagType, side)` with counters excluded, modifiers/held items/ball counts by their documented keys; party, bench, moves, and tags retain slot/list order | Raw lowercase 16-hex FNV-1a-64; battle checksum comparisons and fault convergence | checksum tests above; `wire_exact` |
+| `checksumState` in `coop-battle-checksum.ts#L284-L286` | `CoopChecksumState`; object keys are core-sorted. Engine projects field mons sorted by `bi`, weather/terrain type only, arena tags by `(tagType, side)` with counters excluded, modifiers/held items/ball counts by their documented keys; party, bench, moves, and tags retain slot/list order | Always the raw lowercase 16-hex FNV-1a-64 result; this helper has no catch path and does not emit the error sentinel | checksum tests above; `wire_exact` |
+| `captureCoopChecksum` in `coop-battle-engine.ts#L2492-L2526` | Captures `CoopChecksumState`, then calls `checksumState`; the wrapper catches any capture/hash error | Raw checksum on success; reserved wrapper error sentinel `0000000000000000` on failure so comparison is skipped | engine checksum/fault tests; `wire_exact` |
 | `fnv1a64` in `coop-battle-checksum.ts#L275-L282` | UTF-16 code units of canonical text; BigInt mask after each multiply | Lowercase 16-hex string | checksum tests above; `wire_exact` |
 | `captureCoopSaveDataDigest` in `coop-battle-engine.ts#L1915-L2249` | `getSessionSaveData`; excludes `playTime`, `timestamp`, `name`, `coopParticipants`, `coopRun`, `arena`, `party`, `enemyParty`, `enemyModifiers`, `mysteryEncounterSaveData`, `mysteryEncounterType`, `erAchievementRunState`, `trainer`, `score`, `playerFaints`, `erUsedTrainerKeys`, `waveIndex`, `battleType`, `coopControlPlane`. Map/relic/modifier/mon-keyed fields receive special projections; final core canonicalization sorts object keys and preserves arrays | Raw 16-hex FNV-1a-64; `CoopChecksumState.saveDataDigest` | determinism and fault tests; `wire_exact` |
 | `hashMonMoveset` / `readBenchMovesDigest` in `coop-battle-engine.ts#L2285-L2339` | Moveset maps to `[moveId, ppUsed]` in move-slot order; bench entries retain party slot order | Each moveset is core FNV-1a-64 text; bench digest is the existing projected field digest | engine checksum tests; `wire_exact` |
@@ -115,7 +128,7 @@ replacement for any row in this section.
 | `coopSnapshotControlDigest` in `coop-runtime.ts#L600-L617` | Builds `{checksum, sessionEpoch, membership, activeControl, journalHighWater: ?? {}}`, JSON round-trips to drop undefined exactly as transport does, then core-canonicalizes | Raw 16-hex FNV-1a-64; snapshot-control comparison | runtime/authority tests; `wire_exact` |
 | `coopV2RecoveryMaterialDigest` in `coop-runtime.ts#L1385-L1395` | Core-canonicalizes the recovery payload as supplied by the V2 recovery path | Raw 16-hex FNV-1a-64 | authority recovery tests; `wire_exact` |
 | Legacy battle-stream tombstone digest in `coop-battle-stream.ts#L1302-L1332`, `#L1881-L1936` | Core-canonicalizes normalized authority envelopes; canonical text is retained for equality/conflict checks | Raw 16-hex FNV-1a-64 in retired tombstones | battle-stream tests; `wire_exact` |
-| Shadow wave/terminal `legacyDigest` in `coop-runtime.ts#L8362-L8420` | Core-canonicalizes the transition image before the adapter-specific digest is computed | Raw 16-hex FNV-1a-64 legacy parity digest | runtime/co-op boundary tests; `wire_exact` |
+| Shadow wave/terminal `legacyDigest` in `coop-runtime.ts#L8362-L8414`, `authority-v2/shadow.ts#L811-L844` | Computes `fnv1a64(canonicalize(transition))` exactly. It is the fallback raw legacy token; when `legacyImage` is present, the shadow comparator instead computes `digestOfMaterial(legacyImage)` for like-for-like adapter parity | Raw lowercase 16-hex FNV-1a-64 fallback passed to the shadow tap | static source evidence only; `wire_exact` |
 
 `captureCoopChecksumState` at
 `coop-battle-engine.ts#L2343-L2412` is the authority-oriented projection, while
@@ -144,23 +157,21 @@ are all wire data.
 ## Content hashes and bundle fingerprints
 
 These are content or dataset identities rather than battle-step checksums. Existing
-wire/content identities remain exact. A future Rust-only bundle file may choose
-BLAKE3, but that choice must not leak into any existing frame, digest, proposal,
-seat-map, or replay identity.
+wire/content identities remain exact. This section inventories only algorithms
+implemented in the audited source.
 
 | Symbol and source | Input shape and normalization/order | Output encoding; consumers | Tests; Rust |
 | --- | --- | --- | --- |
-| `canonicalCoopSeatMapPayload` / `sha256Hex` in `coop-session-binding.ts#L94-L151` | Validated account IDs are sorted by default JS UTF-16 lexical order, assigned dense seat IDs, then object literal `{version:1, revision:1, seats:[...]}` is JSON-stringified in insertion order. SHA-256 hashes UTF-8 `TextEncoder` bytes | Lowercase 64-hex SHA-256 becomes `seatMapId`; validation recomputes exact payload/hash | `coop-membership-v2.test.ts#L15-L33`, `coop-p33-client.test.ts#L264-L265`; `wire_exact` |
+| `canonicalCoopSeatMapPayload` / `sha256Hex` in `coop-session-binding.ts#L84-L151` | Account IDs are validated for exact nonempty bounded/control-free strings, not normalized; exact originals default-sort by JS UTF-16 order and receive dense seat IDs. The object literal `{version:1, revision:1, seats:[...]}` is JSON-stringified in insertion order; SHA-256 hashes UTF-8 `TextEncoder` bytes | Lowercase 64-hex SHA-256 becomes `seatMapId`; validation recomputes the exact payload/hash | `coop-membership-v2.test.ts#L15-L33`, `coop-p33-client.test.ts#L264-L265`; `wire_exact` |
+| `digestCoopResumeSession` in `coop-resume-marker.ts#L185-L188`, consumed at `#L257-L266` | Hashes the exact supplied `sessionJson` string without parse/re-serialization; `TextEncoder` supplies UTF-8 bytes | Lowercase 64-hex SHA-256 resume commitment | `coop-resume-fencing-adversarial.test.ts#L118-L132`, `#L251-L276`; `wire_exact` |
+| `bundleFingerprint` in `authority-v2/recovery-channel.ts#L142-L160`, consumed at `#L627-L650` | Native `JSON.stringify` of a fixed insertion-order object `{requestId, frontier, frontierOperationId, material, nextControl, tail}`; `tail` maps `requiredTail` through `withoutEntryContext`, deliberately excluding each entry's envelope/membership context | Insertion-order JSON comparison string, not a cryptographic hash; correlates delayed/completed recovery responses across re-addressing | static source evidence plus `authority-v2-recovery.test.ts#L509-L525`; `wire_exact` |
 | `computeErDataFingerprint` in `coop-data-fingerprint.ts#L83-L199` | Each section uses numeric ID sorting: move map, move data (name excluded), move names, movesets (species keys numeric; value arrays preserve order), ability data/name; absent section contributes FNV-1a-64 of empty text | `ErDataFingerprint` object with six `{n, hash}` sections; data negotiation/compatibility consumers | `test/tests/elite-redux/coop/coop-data-fingerprint.test.ts`; `wire_exact` |
 | `hashOf` in `coop-data-fingerprint.ts#L83-L85` | Core-canonicalizes each already-normalized section and applies shared FNV-1a-64 | Lowercase 16-hex section hash consumed by all six data sections | `test/tests/elite-redux/coop/coop-data-fingerprint.test.ts`; `wire_exact` |
 | `dexEntryFingerprint` in `coop-battle-engine.ts#L5024-L5033` | Entry fields in fixed order: `seenAttr|caughtAttr|natureAttr|seenCount|caughtCount|hatchedCount`; BigInt attributes use their decimal string form | Non-cryptographic comparison string used for dex baseline equality | No dedicated direct dex fingerprint test found by `rg`; static source evidence only; `wire_exact` |
-| `captureCoopDexBaseline` / delta JSON in `coop-battle-engine.ts#L5038-L5048`, `#L5000-L5010` | `Object.entries` data order is retained; starter entries use native `JSON.stringify`; dex BigInt attributes are converted to decimal strings for JSON/compression and restored with `BigInt` | Existing JSON/compressed delta wire payload; not a canonical digest | No dedicated direct dex delta test found by `rg`; static source evidence only; `wire_exact` |
+| `captureCoopDexBaseline` / `captureCoopDexDelta` in `coop-battle-engine.ts#L5035-L5102`, apply at `#L5109-L5164` | `Object.entries` follows JS own-property enumeration; numeric species keys are integer-index keys and therefore enumerate ascending numerically. The numeric-key `dex`/`starter` records retain that JS integer-index order when `JSON.stringify({dex, starter})` runs. Starter values use native `JSON.stringify`; dex BigInt attributes become decimal strings and restore with `BigInt` | Existing JSON compressed with `compressToBase64`; not core canonical JSON or a digest | No dedicated direct dex delta test found by `rg`; static source evidence only; `wire_exact` |
 | `captureCoopMeOutcome` in `coop-battle-engine.ts#L5470-L5475` | Party entries map in party order with native JSON.stringify; ME save data uses native JSON.stringify | Outcome object carrying insertion-order JSON strings | `test/tests/elite-redux/coop/coop-duo-me-operation.test.ts`; `wire_exact` |
 | `snapshotMarksCanonical` in `coop-durability.ts#L874-L895` | Snapshot mark object keys are sorted first; records are safe nonnegative sequences; JSON.stringify then has deterministic constructed insertion order | Existing durability/snapshot comparison string | durability tests; `wire_exact` |
-
-There is no observed BLAKE3 implementation in the audited paths. “BLAKE3 allowed”
-therefore describes only a future non-wire content-bundle layer, not an optimization
-for any row above.
+| Modifier reconciliation `instanceKey` in `coop-battle-engine.ts#L4411-L4426` | `className` becomes itself only when it is a string, otherwise null; `args` uses `?? []`; core-canonicalize `[classNameOrNull, argsOrEmpty]` in that fixed array order and apply shared FNV-1a-64 | `${typeId} ${16-hex FNV-1a-64}`; matches host and live player-wide non-held/non-form modifier instances | `coop-player-modifier-instance-reconcile.test.ts#L149-L227`; `wire_exact` |
 
 ## Operation IDs and identity strings
 
@@ -174,6 +185,19 @@ exact separators, percent encoding, normalization, and numeric formatting.
 | `controlIdOf` in `authority-v2/next-control.ts#L46-L107` | Kind-specific address; numeric wave/turn/seat/index/occurrence segments are decimal; opaque IDs/surface/kind/terminal are `encodeURIComponent`-encoded. Command targets and allowed address lists are canonicalized before encoding | Complete control address string used as `activeControl`, next-control, and receipt identity | `authority-v2-control.test.ts#L279-L344`; `wire_exact` |
 | `canonicalCommandTargets` in `authority-v2/next-control.ts#L552-L558` | Clone then numeric sort by `fieldIndex`, `ownerSeatId`, `pokemonId` | Canonical command target list embedded in control ID | control tests; `wire_exact` |
 | `replacementOperationId` in `authority-v2/adapters/faint-replacement.ts#L347-L365` | Stable operation-window address plus owner; selected result/resolution is deliberately excluded | Replacement proposal/operation ID | `authority-v2-replacement.test.ts#L255-L320`; `wire_exact` |
+| `coopBiomeOperationId` / interactive branch of `commitBiomeOwnerIntent` in `coop-biome-operation.ts#L365-L371`, `#L1028-L1056`; bands in `coop-seq-registry.ts#L90-L114` | Interactive caller first proves `seq = 9_700_000 + pinned` for `BIOME_PICK` or `seq = 9_600_000 + pinned` for `CROSSROADS_PICK`; owner is `coopInteractionOwnerSeat(pinned)` | `makeCoopOperationId(epoch, owner, seq, kind)` → `${epoch}:${owner}:${kind}:${seq}` | biome choice/operation tests; `wire_exact` |
+| `coopAuthoritativeBiomeTransitionOperationId` / `commitAuthoritativeBiomeTransition` in `coop-biome-operation.ts#L375-L382`, `#L1260-L1305` | Validate safe nonnegative `sourceWave < COOP_MAX_REACHABLE_COUNTER`; set `seq = 9_800_001 + sourceWave`, host owner `0`, kind `BIOME_PICK` | `${epoch}:0:BIOME_PICK:${9800001 + sourceWave}` | `coop-transition-t2-biome.test.ts#L583-L684`, `#L817-L951`; `wire_exact` |
+| `coopRewardOperationActionSlot` in `coop-reward-operation.ts#L173-L177`, `#L194-L236`; base stride in `coop-operation-address.ts#L22` | Validate safe nonnegative pin/action and reward surface; `surfaceOffset = rewardSurface == null ? 0 : (ordinal + 1) * 5000`; slot is `pinned * 100000 + surfaceOffset + actionOrdinal`, with action and total-band bounds | Safe numeric operation address or null | `coop-reward-surface-identity.test.ts#L22-L40`; `wire_exact` |
+| Reward/market action producers `commitRewardOwnerIntent` / `adoptRewardWatcherChoice` in `coop-reward-operation.ts#L750-L770`, `#L1235-L1282` | Compute the action slot above; owner is `coopInteractionOwnerSeat(pinned)`; kind is `REWARD` for reward and `SHOP_BUY` for market. A retained terminal reuses its prior ID | `${epoch}:${owner}:REWARD|SHOP_BUY:${actionSlot}` | reward surface and biome-market continuation tests; `wire_exact` |
+| Reward/market presentation producer `commitCoopRewardOptionsPresentation` in `coop-reward-operation.ts#L1046-L1100` | Uses `reroll` as the action ordinal in the same slot formula; owner is `coopInteractionOwnerSeat(pinned)`; kind is `REWARD_PRESENT` or `SHOP_PRESENT` | `${epoch}:${owner}:REWARD_PRESENT|SHOP_PRESENT:${actionSlot}` | reward presentation/surface tests; `wire_exact` |
+| Mystery address helpers `ME_KIND_TAG`, `meOpAddr`, `ownerSeatFor` in `coop-me-operation.ts#L728-L750`, `#L917-L927` | Tags are `ME_PRESENT=0`, `ME_PICK=1`, `ME_SUB=2`, `ME_BUTTON=3`, `ME_TERMINAL=4`, `QUIZ_ANSWER=5`; address is `seq * 8000 + tag * 1000 + (((step % 1000) + 1000) % 1000)`. Presentation/terminal owner is `0`; other kinds use `coopInteractionOwnerSeat(pinned)`. The helper itself performs no integer/safe-integer validation; producer preconditions below are authoritative | Numeric address embedded as `pinnedSeq` in the generic four-component ID | Mystery operation tests; `wire_exact` |
+| Mystery producer 1, `isCoopMeQuizAnswerOperationId` in `coop-me-operation.ts#L758-L785` | `makeCoopOperationId(epoch, ownerSeatFor("QUIZ_ANSWER", pinned), meOpAddr("QUIZ_ANSWER", seq, questionIndex), "QUIZ_ANSWER")` after safe/band checks | Exact quiz-answer operation ID equality predicate | `coop-duo-mystery.test.ts#L1083-L1091`; `wire_exact` |
+| Mystery producer 2, `coopMeGuestAppliedPickContinuationAddress` in `coop-me-operation.ts#L852-L863` | `makeCoopOperationId(state.epoch, ownerSeatFor("ME_PICK", pinned), meOpAddr("ME_PICK", seq, step), "ME_PICK")` | Exact ID used to test whether the guest applied the pick before returning a continuation address | static source evidence only; `wire_exact` |
+| Mystery producer 3, `commitMeOwnerIntent` in `coop-me-operation.ts#L961-L1037` | `step = params.step ?? 0`; owner is `ownerSeatFor(kind, pinned)`; address is `meOpAddr(kind, seq, step)` | `makeCoopOperationId(state.epoch, owner, address, kind)` | ME operation/terminal tests; `wire_exact` |
+| Mystery producer 4, `commitMeAuthorityGuestIntent` in `coop-me-operation.ts#L1153-L1166` | Recomputes `makeCoopOperationId(state.epoch, ownerSeatFor(kind, pinned), meOpAddr(kind, seq, step), kind)` | Exact expected ID for guest proposal admission | ME guest-intent tests; `wire_exact` |
+| Mystery producer 5, `adoptMeWatcherChoice` in `coop-me-operation.ts#L1263-L1303` | `step = params.step ?? 0`; recomputes owner and tagged address using the same helper formula | Derived exact operation ID for watcher adoption/range checks | ME watcher tests; `wire_exact` |
+| Shadow terminal producer in `tapCoopV2ShadowWaveBoundary`, `coop-runtime.ts#L8346-L8375` | Uses the decimal `wave` directly; terminal material separately uses terminal ID `coop-v2-shadow-terminal:w${wave}` | Operation ID `WSHADOW/TERM/w${wave}` | static source evidence only; `wire_exact` |
+| Shadow wave producer in `tapCoopV2ShadowWaveBoundary`, `coop-runtime.ts#L8378-L8414` | Uses the decimal `wave` directly and installs the same string as `afterOperationId` | Operation ID `WSHADOW/ADV/w${wave}` | static source evidence only; `wire_exact` |
 | `canonicalCoopParticipantPair` / `normalizeCoopIdentity` in `coop-run-identity.ts#L13-L33` | Compare NFKC-normalized, lowercased identities with JS relational UTF-16 ordering, but return original strings in ordered pair | Pair identity for participant/run consumers | session-controller/resume-marker tests; `wire_exact` |
 | `runtimeId` construction in `authority-v2/session-identity.ts#L35-L90` | Authenticated binding uses `${sessionId}:seat${localSeatId}`; unbound loopback uses `${runId}:seat${localSeatId}` and shadow seat-map ID | Runtime identity plus session/run/seat-map binding | `authority-v2-session-identity.test.ts#L58-L132`; `wire_exact` |
 | `operationCausalId` in `coop-durability.ts#L848-L862` | Ordinary IDs matching the bounded format are preserved; anomalous IDs are represented with epoch/sequence plus an FNV-1a-32 UTF-16 digest and source length | Durable causal/log diagnostic identity | durability tests; `wire_exact` |
@@ -191,20 +215,21 @@ the compatibility rule; see risk `operation-id-comment` below.
 
 Proposal admission stores an opaque fingerprint and proves only that one operation
 ID is consistently paired with one fingerprint. It does not canonicalize or hash
-the producer's string.
+the producer's string. There is no single cross-surface fingerprint algorithm:
+the choice and Bargain producers below are separate source-exact formulas.
 
 | Symbol and source | Input shape and normalization/order | Output encoding; consumers | Tests; Rust |
 | --- | --- | --- | --- |
-| Guest interaction fingerprint in `coop-interaction-relay.ts#L1991-L2005` | Fixed array `[msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null]`; array order is fixed, nested data order follows native JSON.stringify | Native insertion/order-sensitive `JSON.stringify` text passed to `authorityProposalAdmissions.admit` | `test/tests/elite-redux/coop/coop-interaction-relay.test.ts#L333-L407`, `test/node/authority-v2-proposal-admission.test.ts#L11-L36`; `wire_exact` |
-| Bargain outcome fingerprint in `coop-interaction-relay.ts#L2141-L2148` | Fixed array `[msg.seq, msg.kind, msg.outcome]` | Native JSON.stringify text passed to proposal admission | relay tests above; `wire_exact` |
+| Guest interaction fingerprint in `coop-interaction-relay.ts#L1991-L2005` | Exact expression `JSON.stringify([msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null])`; array order is fixed, nested data order follows native JSON.stringify | Native insertion/order-sensitive text passed to `authorityProposalAdmissions.admit`; no hash | `test/tests/elite-redux/coop/coop-interaction-relay.test.ts#L333-L407`, `test/node/authority-v2-proposal-admission.test.ts#L11-L36`; `wire_exact` |
+| Bargain outcome fingerprint in `coop-interaction-relay.ts#L2141-L2148` | Exact expression `JSON.stringify([msg.seq, msg.kind, msg.outcome])` | Native JSON.stringify text passed to proposal admission; no hash | relay tests above; `wire_exact` |
 | `CoopV2ProposalAdmissionLedger.admit` in `authority-v2/proposal-admission.ts#L15-L62` | Operation ID and nonempty opaque fingerprint; same pair is duplicate, same operation with different fingerprint is conflict; capacity is a safe positive integer | No new encoding; stores caller-provided fingerprint exactly | `authority-v2-proposal-admission.test.ts#L11-L36`; `wire_exact` |
 | `ProposalLeaseManager` fingerprint handling in `authority-v2/proposal-lease.ts#L36-L92` | Nonempty stable caller-provided fingerprint; same ID/fingerprint retains lease, different fingerprint conflicts | No new encoding; opaque equality | `test/node/authority-v2-proposal-lease.test.ts`; `wire_exact` |
 | `stageCoopWaveAdvanceEnvelope` / `isExactStagedWavePayload` in `coop-wave-operation.ts#L726-L780` | Operation ID's staged envelope/payload is core-canonicalized; same operation with changed canonical payload conflicts | Canonical text retained for proposal/retry equality | wave operation tests; `wire_exact` |
 | ME `identity` in `coop-me-operation.ts#L192-L215` | Core-canonicalizes `{pinned, step, payload}` for same-operation identity; outcome comparison separately strips authority/tick at `#L480-L495` | Canonical text, not a new digest | `test/tests/elite-redux/coop/coop-duo-me-operation.test.ts`; `wire_exact` |
 
-Do not “improve” the legacy proposal arrays by sorting object keys or replacing
-their JSON text with a digest: the admission ledger intentionally treats the
-producer's existing fingerprint as opaque wire identity.
+Do not “improve” either producer array by sorting object keys or replacing its JSON
+text with a digest: admission and leasing intentionally treat each producer's
+existing fingerprint as opaque identity and do not unify the two formulas.
 
 ## Ordering rules
 
@@ -219,18 +244,20 @@ The following distinctions are essential to a Rust port.
 | Arena/modifier/item order | Arena tags sort `(tagType, side)` and omit counters; weather/terrain keep type identity only; modifiers sort type ID; held items sort `(bi, typeId, stackCount)`; ball counts sort numeric ball type; same engine ranges. |
 | Save-data maps | The session projection iterates entries, applies special normalizers, and final core canonicalization sorts object keys; arrays remain ordered. Keyed mon entries sort by their canonicalized entry text; modifier blobs sort type ID then canonicalized args; `coop-battle-engine.ts#L2020-L2175`. |
 | Control command targets | Numeric `(fieldIndex, ownerSeatId, pokemonId)` ascending; `next-control.ts#L552-L558`. |
-| Control kinds/addresses | Successor kinds use the declared `AUTHORITY_ENTRY_KIND_ORDER`; interaction kinds and opaque IDs use default lexical `.sort()`; allowed addresses use default lexical sort; `next-control.ts#L827-L871`. |
+| Control kinds/addresses | Successor kinds deduplicate then use `AUTHORITY_ENTRY_KIND_ORDER`; interaction kinds and opaque IDs deduplicate then default-sort. Allowed interaction/control address helpers map, default-sort, and join without deduplicating; accepted controls separately reject duplicate addresses during validation; `next-control.ts#L827-L871`, `#L874-L965`. |
 | Control `remaining` | The supplied sequence is preserved and validated for strictly increasing occurrence; it is not sorted by control ID; `next-control.ts#L650-L720`. |
-| Membership seats | Account IDs are normalized for validation and sorted default UTF-16 lexical before dense seat assignment; seat array order is then preserved in the payload; `coop-session-binding.ts#L94-L110`. |
+| Membership seats | Account IDs are validated but never trimmed, case-folded, or Unicode-normalized. Exact original strings default-sort by JS UTF-16 order before dense seat assignment; seat array order is preserved; `coop-session-binding.ts#L84-L110`. |
 | Identity pair | NFKC+lowercase is used for comparison only; original identity strings are returned in normalized order; `coop-run-identity.ts#L13-L33`. |
 | Replay | Events are ordered; roster/party arrays are ordered; owner derives from sequence parity; `replay-trace.ts#L158-L243`, `#L268-L336`. |
 | Checkpoint | `mons`, moves, tags, and event-like arrays preserve caller order; sanitization truncates/clamps values but does not sort; `coop-battle-checkpoint.ts#L155-L277`. |
-| Ordinary JSON.stringify | Frame encoding, session-map payload, proposal fingerprints, report correlation, durability messages, dex/starter data, and `modifierInstanceKey` use native JavaScript property-enumeration/array-order semantics (including integer-index key behavior); `frame-codec.ts#L142`, `coop-session-binding.ts#L105-L117`, relay/durability/engine citations above. They are not interchangeable with core canonical JSON. |
+| Ordinary JSON.stringify | Frame encoding, session-map payload, proposal fingerprints, recovery `bundleFingerprint`, report correlation, durability messages, dex/starter data, and `modifierInstanceKey` use native JavaScript property-enumeration/array-order semantics. Numeric dex/starter record keys are integer-index properties and enumerate ascending numerically; `frame-codec.ts#L142`, `coop-session-binding.ts#L105-L117`, `recovery-channel.ts#L142-L160`, `coop-battle-engine.ts#L5035-L5102`. These are not interchangeable with core canonical JSON. |
 | Control owners | `controlOwnerSeatIds` deduplicates and numerically sorts command owners; terminal/await controls have no owners; `next-control.ts#L511-L520`. |
 | Modifier identity | `modifierInstanceKey` concatenates `typeId`, `className`, and two insertion-order JSON arrays with `|`; `coop-battle-engine.ts#L3211-L3212`. |
+| FNV modifier instance identity | Player-wide reconciliation uses `${typeId} ${fnv1a64(canonicalize([classNameOrNull, args ?? []]))}`; fixed array order feeds core key sorting recursively; `coop-battle-engine.ts#L4411-L4426`. This is a different identity from `modifierInstanceKey`. |
+| Operation re-ack comparison | `canonicalOperationValue` preserves array order, default-sorts object keys, and retains undefined-valued keys using literal `undefined`; `coop-operation-runtime.ts#L139-L170`. |
 | Authority pending identity | `authority-log.ts#L1078-L1080` compares the material digest and native JSON.stringify of `nextControl`/`subsumes`; it does not apply core key sorting. |
 | Diagnostic labels | `CoopMutationLedger.snapshot` sorts active labels with default lexical order; `coop-mutation-ledger.ts#L64-L72`. |
-| Hash text encoding | FNV rows consume UTF-16 code units; the seat-map SHA-256 row consumes UTF-8 TextEncoder bytes. |
+| Hash text encoding | FNV rows consume UTF-16 code units; seat-map and resume SHA-256 consume UTF-8 `TextEncoder` bytes. The recovery bundle fingerprint is unhashed native JSON text. |
 
 ## Absent and null rules
 
@@ -250,25 +277,38 @@ The following distinctions are essential to a Rust port.
    supplied `arenaTags: []` remains present, while absent `arenaTags` is omitted;
    optional form, ability, tera, owner, status substate, and tags follow the same
    omission rules (`coop-battle-checkpoint.ts#L155-L277`).
-5. Replay `coop`, `endState`, `checkpoint`, and optional checkpoint target are
-   absent when not supplied; target is only accepted as undefined or an integer
-   (`replay-trace.ts#L214-L243`, `#L268-L336`).
+5. Replay `coop`, `endState`, and `checkpoint` are absent when not supplied. The
+   optional `target` belongs only to a `ReplayCommandKind` move and is a
+   `BattlerIndex`, not a checkpoint target; validation accepts only undefined or
+   an integer (`replay-trace.ts#L58-L75`, `#L318-L330`).
 6. Relay proposal arrays deliberately normalize absent `data` and
    `rewardSurface` with `?? null`; this is distinct from the omitted optional
    fields in checkpoint/replay (`coop-interaction-relay.ts#L1991-L2005`).
-7. Authority V2 control fields use explicit null as a wildcard: null
-   `operationIds`, allowed kinds, or allowed addresses encode as `*`; a missing
-   field is not a wildcard (`authority-v2/contract.ts#L317-L377`,
-   `next-control.ts#L827-L871`).
-8. `coopSnapshotControlDigest` JSON-round-trips `journalHighWater: ?? {}` so
-   undefined properties are removed exactly as on the wire; explicit null is
-   retained (`coop-runtime.ts#L600-L617`).
+7. `AWAIT_SUCCESSOR.allowedKinds` is required, nonempty, and not nullable; it has
+   no `*` encoding. `SHARED_INTERACTION.successor.operationIds` and
+   `AWAIT_SUCCESSOR.expectedOperationId` are required nullable fields whose null
+   value encodes `*`. The two allowed-address lists are optional: the encoder's
+   `addresses == null` check makes omission/undefined and a directly supplied
+   null both encode `*`, although the validator rejects explicit null because the
+   contract permits only an omitted field or an array. A nullable operation ID
+   inside an allowed control address also encodes `*`
+   (`authority-v2/contract.ts#L311-L369`, `next-control.ts#L86-L101`,
+   `#L841-L871`, `#L874-L965`).
+8. `coopSnapshotControlDigest` applies `snapshot.journalHighWater ?? {}` before
+   the JSON round trip, so both null and undefined become `{}` for that field.
+   Other undefined object properties are dropped by the round trip while their
+   explicit null values survive (`coop-runtime.ts#L600-L617`).
+9. `canonicalOperationValue` does not collapse absence to null: undefined is the
+   literal unquoted token `undefined`, including in arrays and object properties
+   (`coop-operation-runtime.ts#L139-L154`).
 
 ## Integer assumptions and observed floats
 
-The code does not compare against a literal `Number.MAX_SAFE_INTEGER`; it uses
-`Number.isSafeInteger` at the authoritative boundaries. A Rust port must still use
-the JS-safe range `[-(2^53-1), 2^53-1]` where the source says safe integer.
+The code does not compare against a literal `Number.MAX_SAFE_INTEGER`; authoritative
+wire boundaries use `Number.isSafeInteger`. Canonical number-formatting helpers use
+the weaker `Number.isInteger` only to choose an output spelling, not to validate a
+wire integer. A Rust port must preserve both distinctions and use the JS-safe range
+`[-(2^53-1), 2^53-1]` only where the source says safe integer.
 
 | Source rule | Evidence and consequence |
 | --- | --- |
@@ -278,10 +318,10 @@ the JS-safe range `[-(2^53-1), 2^53-1]` where the source says safe integer.
 | Replay | Uses `Number.isInteger`, not `Number.isSafeInteger`, for wave/turn/slot/sequence/choice/indices; `replay-trace.ts#L268-L336`. This weaker legacy boundary is intentional compatibility behavior. |
 | Operation ID parser | `parseCoopOperationId` uses `Number.isInteger`, not `Number.isSafeInteger`; `coop-operation-envelope.ts#L606-L635`. Callers may add safe checks, but the parser itself is weaker. |
 | Checkpoint coercion | HP/max HP, money, move PP, stage values, status counters, arena turns/layers, and weather/terrain counters are finite/truncated/floored/clamped as specified; `coop-battle-checkpoint.ts#L95-L218`, `#L222-L277`. |
-| Core canonical float path | Finite fractional values use `toPrecision(12)`; `-0` becomes `0`; NaN/Infinity become text `0`; `coop-battle-checksum.ts#L249-L263`. |
-| V2 canonical float paths | Turn/learn private canonicalizers use the same `toPrecision(12)`/nonfinite-to-zero rule. Other adapter canonicalJson helpers defer primitive behavior to JSON.stringify, where non-finite primitives become `null`; validators reject non-finite committed material first. |
-| BigInt | FNV-64 uses BigInt internally but emits a string. Dex `seenAttr`/`caughtAttr` are BigInt and use decimal strings in JSON/delta transport; `coop-battle-engine.ts#L5000-L5033`. |
-| Relevant observed float use | The canonical state paths allow/observe fractional-number normalization only in `canonNumber` and private turn/learn copies. Checkpoint inputs may be fractional before truncation. Other gameplay floats/backoff calculations are outside canonical state and must not be inferred as wire fields. |
+| Core canonical number path | `canonNumber` uses `Number.isInteger`, not `Number.isSafeInteger`; any finite value for which that predicate is true uses `toString`. Finite fractions use `toPrecision(12)`; `-0` becomes `0`; NaN/Infinity become text `0`; `coop-battle-checksum.ts#L249-L263`. This is formatting, not admission. |
+| V2 canonical number paths | Turn and learn copies also use `Number.isInteger` only for formatting, then `toPrecision(12)` for finite fractions and `0` for non-finite/zero (`turn-command.ts#L740-L772`, `interactions-learn.ts#L850-L882`). Other adapter `canonicalJson` helpers and `canonicalOperationValue` defer primitives to native JSON.stringify: finite fractions use native JSON spelling, `-0` becomes `0`, and non-finite primitives become `null`; authoritative wire validation rejects non-finite material first. |
+| BigInt | FNV-64 uses BigInt internally but emits a string. Dex `seenAttr`/`caughtAttr` are BigInt and use decimal strings in JSON/delta transport; `coop-battle-engine.ts#L5024-L5032`, `#L5061-L5102`. |
+| Relevant observed float-capable paths | Audited canonical behavior has three explicit fractional paths: core/turn/learn `toPrecision(12)`, native JSON number emission in insertion-order/canonicalOperationValue records, and checkpoint inputs that are truncated/floored/clamped before emission. Replay/operation-address/authority coordinate paths require integer predicates. Gameplay timing/backoff floats are outside canonical state and are not inferred as wire fields. |
 
 ## Compatibility risks and stop-condition evidence
 
@@ -292,15 +332,17 @@ carried forward verbatim:
 | ID | Evidence | Impact and required action |
 | --- | --- | --- |
 | `duplicate-canonicalizers` | Core, turn/learn, and six other V2 adapters each implement a private canonicalizer; citations in the canonical JSON table | Small semantic differences exist (undefined handling, primitive non-finite handling, and faint replacement's lack of an array branch). Keep one explicit implementation per wire surface and test against its source behavior. |
-| `json-order-is-not-canonical` | `frame-codec.encodeFrameV2`, seat-map payload, relay proposals, durability messages, report correlation, dex/starter data, and `modifierKey` call native JSON.stringify | Do not route insertion-order wire identities through core key sorting. Rust must reproduce JS property/array emission for those existing payloads. |
+| `json-order-is-not-canonical` | `frame-codec.encodeFrameV2`, seat-map payload, relay proposals, recovery bundle fingerprint, durability messages, report correlation, dex/starter data, and `modifierKey` call native JSON.stringify | Do not route insertion-order wire identities through core key sorting. Rust must reproduce JS property/array emission, including integer-index key enumeration, for those existing payloads. |
 | `absent-vs-null` | Core undefined fallback is null; JSON.stringify omits object undefined; Authority V2 rejects undefined; cutover freezes by stringify/parse | Raw core canonicalization cannot preserve absence. Apply the source-layer validator/round trip first and preserve explicit null. |
 | `unsafe-operation-parser` | `parseCoopOperationId` checks `Number.isInteger`, while authority entries and engine validation check `Number.isSafeInteger` | A mathematically valid but JS-unsafe operation ID can parse; do not silently strengthen the parser in a compatibility path. Validate at the same caller boundary as the source. |
 | `operation-id-comment` | `makeCoopOperationId` emits four components although its comment describes three; parser requires four (`coop-operation-envelope.ts#L596-L635`) | Use emitted four-component form as oracle. |
 | `mixed-hash-encodings` | Core/V2 FNV hashes consume UTF-16; seat-map SHA-256 consumes UTF-8; V2 prefixes/lengths differ | Do not replace existing wire digests or normalize all hashes to one Rust primitive. |
-| `wildcard-null` | V2 contract has nullable `operationIds`/allowed domains and `next-control` encodes null as `*` | Preserve null wildcard versus omitted field. |
+| `wildcard-null` | Required nullable `operationIds`/`expectedOperationId` encode null as `*`; optional allowed-address encoders use `== null`, so omission and null both encode `*`, while validation rejects explicit null; `allowedKinds` is required/nonnullable | Reproduce the encoder and validator as separate boundaries; do not invent a nullable `allowedKinds` or distinguish null from omission in optional address encoding. |
+| `address-sort-without-dedup` | Allowed-address canonicalizers map, sort, and join without a Set; validation rejects duplicates before accepted wire use | Do not add deduplication inside the identity helper or infer that it changes duplicate multiplicity. |
 | `remaining-order` | `next-control` validates increasing occurrence in supplied `remaining` sequence instead of sorting it | Preserve sequence order; sorting changes control IDs. |
-| `legacy-fingerprint-opacity` | Proposal admission/lease compares producer fingerprint strings for equality and never re-canonicalizes them | Keep relay `JSON.stringify` fingerprints exactly; do not replace with a new digest. |
-| `seat-map-sha` | Membership binds `seatMapId` to SHA-256 of a specific UTF-8 JSON payload | BLAKE3 is not permitted for this identity. |
+| `legacy-fingerprint-opacity` | Choice and Bargain producers use two distinct exact `JSON.stringify` arrays; proposal admission/lease compares each caller string opaquely and never hashes or re-canonicalizes it | Keep both source formulas exactly; do not invent one cross-surface algorithm or replace either with a digest. |
+| `account-id-exactness` | Seat-map account IDs are validated and exact-sorted; no trim, case fold, or Unicode normalization occurs | Preserve original account strings in seat assignment and payload hashing. |
+| `seat-map-sha` | Membership binds `seatMapId` to SHA-256 of a specific UTF-8 JSON payload | Preserve SHA-256 and the exact insertion-order payload. |
 | `source-branch-availability` | The requested oracle branch name was supplied by the task, but is not a local ref in the worker checkout; inventory is anchored to the explicit base SHA | Any branch-only delta must be audited separately before changing this oracle. |
 
 No contradictory identity formatting was found in the audited rules beyond the
@@ -312,9 +354,8 @@ the remaining risk is implementation drift between duplicated helpers.
 
 | Layer | Symbols | Classification and Rust requirement |
 | --- | --- | --- |
-| Legacy battle wire | `canonicalize`, `fnv1a64`, `checksumState`, engine checksum/save/bench projections, runtime snapshot and battle-stream tombstone digests | Existing cross-peer/checkpoint identity; `wire_exact`. |
-| Authority V2 wire | Adapter material digests, `controlIdOf`, control frontier ordering, `isWireStableJsonValue`, frame JSON encoding, proposal admission/lease | Existing authority/replica/control identity; `wire_exact`. |
-| Membership/run identity | Seat-map SHA-256, seat assignment, session runtime ID, normalized participant pair | Existing authenticated/session identity; `wire_exact`. |
+| Legacy battle wire | `canonicalize`, `fnv1a64`, `checksumState`, `captureCoopChecksum`, engine checksum/save/bench projections, modifier FNV identity, runtime snapshot/shadow IDs/shadow legacy digest, operation re-ack comparison, and battle-stream tombstone digests | Existing cross-peer/checkpoint identity; `wire_exact`. |
+| Authority V2 wire | Adapter material digests, recovery `bundleFingerprint`, `controlIdOf`, control frontier/address ordering, `isWireStableJsonValue`, frame JSON encoding, proposal admission/lease | Existing authority/replica/control identity; `wire_exact`. |
+| Membership/run identity | Seat-map SHA-256, exact account-ID seat assignment, resume SHA-256, session runtime ID, normalized participant pair | Existing authenticated/session identity; `wire_exact`. |
 | Persistence/replay | Checkpoint serializer, replay validation/ordering, durability canonical comparisons, dex delta/fingerprint, data fingerprint | Existing save/replay/data compatibility; `wire_exact` for current payloads and comparisons. |
 | Local/diagnostic | `coop-me-pin-state.canonicalJson`, mutation-ledger sorted labels, rendezvous fallback FNV address, report formatting outside its pair-key identity | Local equality or diagnostic presentation; not a new gameplay digest. Keep exact where externally compared, otherwise `local_only`. |
-| Future bundle content | No current source symbol | `bundle_content_blake3_allowed` only for a newly specified non-wire bundle hash; never use it to replace a row above. |

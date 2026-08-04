@@ -1,7 +1,15 @@
 {
   "schema_version": 1,
+  "project_name": "PokéRogue Redux",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
   "protocol_version": "er-coop-47",
+  "legacy_identifier_metadata": {
+    "identifier": "Elite Redux",
+    "status": "legacy source/path/protocol identifier only",
+    "legacy_source_root": "src/data/elite-redux/coop",
+    "legacy_protocol_identifier": "er-coop-47"
+  },
   "source_files": [
     {
       "path": "src/data/elite-redux/coop/coop-battle-checksum.ts",
@@ -11,9 +19,9 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-battle-engine.ts",
-      "role": "engine-to-checksum projection, normalized save digest, bench/move/dex identities",
-      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L1690-L1910", "src/data/elite-redux/coop/coop-battle-engine.ts#L1915-L2339", "src/data/elite-redux/coop/coop-battle-engine.ts#L2343-L2526", "src/data/elite-redux/coop/coop-battle-engine.ts#L5000-L5081"],
-      "tests": ["test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts#L126-L184", "test/tests/elite-redux/coop/coop-determinism-contract.test.ts#L150-L177", "test/tests/elite-redux/coop/coop-duo-fault.test.ts#L286-L307"]
+      "role": "engine-to-checksum projection, checksum sentinel wrapper, modifier identities, and dex producer",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L1690-L1910", "src/data/elite-redux/coop/coop-battle-engine.ts#L1915-L2339", "src/data/elite-redux/coop/coop-battle-engine.ts#L2343-L2526", "src/data/elite-redux/coop/coop-battle-engine.ts#L3211-L3212", "src/data/elite-redux/coop/coop-battle-engine.ts#L4411-L4426", "src/data/elite-redux/coop/coop-battle-engine.ts#L5035-L5164"],
+      "tests": ["test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts#L126-L184", "test/tests/elite-redux/coop/coop-determinism-contract.test.ts#L150-L177", "test/tests/elite-redux/coop/coop-duo-fault.test.ts#L286-L307", "test/tests/elite-redux/coop/coop-player-modifier-instance-reconcile.test.ts#L149-L227"]
     },
     {
       "path": "src/data/elite-redux/coop/coop-battle-checkpoint.ts",
@@ -23,8 +31,8 @@
     },
     {
       "path": "src/data/elite-redux/replay-trace.ts",
-      "role": "ordered replay schema and integer validation",
-      "source_citations": ["src/data/elite-redux/replay-trace.ts#L41-L61", "src/data/elite-redux/replay-trace.ts#L158-L243", "src/data/elite-redux/replay-trace.ts#L268-L336"],
+      "role": "ordered replay schema, optional move target, and integer validation",
+      "source_citations": ["src/data/elite-redux/replay-trace.ts#L58-L75", "src/data/elite-redux/replay-trace.ts#L158-L243", "src/data/elite-redux/replay-trace.ts#L268-L330"],
       "tests": ["test/tools/replay-recorder-checkpoint.test.ts", "test/tests/elite-redux/coop/coop-duo-replay.test.ts"]
     },
     {
@@ -40,6 +48,12 @@
       "tests": ["test/node/authority-v2-cutover-interaction.test.ts", "test/tests/elite-redux/coop/coop-duo-mystery.test.ts"]
     },
     {
+      "path": "src/data/elite-redux/coop/coop-operation-runtime.ts",
+      "role": "operation re-ack canonical value comparison with literal undefined semantics",
+      "source_citations": ["src/data/elite-redux/coop/coop-operation-runtime.ts#L139-L170", "src/data/elite-redux/coop/coop-operation-runtime.ts#L626-L626"],
+      "tests": ["No direct pure test found by rg; static source evidence only."]
+    },
+    {
       "path": "src/data/elite-redux/coop/coop-interaction-relay.ts",
       "role": "legacy proposal fingerprints",
       "source_citations": ["src/data/elite-redux/coop/coop-interaction-relay.ts#L1991-L2005", "src/data/elite-redux/coop/coop-interaction-relay.ts#L2141-L2148"],
@@ -47,9 +61,15 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-session-binding.ts",
-      "role": "seat sorting, canonical seat-map JSON, and SHA-256 seat-map identity",
-      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L94-L151"],
+      "role": "exact account-ID validation/sorting, insertion-order seat-map JSON, and SHA-256 identity",
+      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L84-L151"],
       "tests": ["test/tests/elite-redux/coop/coop-membership-v2.test.ts#L15-L33", "test/tests/elite-redux/coop/coop-p33-client.test.ts#L264-L265"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-resume-marker.ts",
+      "role": "byte-exact UTF-8 SHA-256 cold-resume commitment",
+      "source_citations": ["src/data/elite-redux/coop/coop-resume-marker.ts#L185-L188", "src/data/elite-redux/coop/coop-resume-marker.ts#L257-L266"],
+      "tests": ["test/tests/elite-redux/coop/coop-resume-fencing-adversarial.test.ts#L118-L132", "test/tests/elite-redux/coop/coop-resume-fencing-adversarial.test.ts#L251-L276"]
     },
     {
       "path": "src/data/elite-redux/coop/coop-run-identity.ts",
@@ -77,8 +97,8 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-runtime.ts",
-      "role": "snapshot/recovery digests and legacy shadow parity digest",
-      "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L600-L617", "src/data/elite-redux/coop/coop-runtime.ts#L1385-L1395", "src/data/elite-redux/coop/coop-runtime.ts#L8362-L8420"],
+      "role": "snapshot/recovery digests plus shadow operation IDs and legacy parity fallback",
+      "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L600-L617", "src/data/elite-redux/coop/coop-runtime.ts#L1385-L1395", "src/data/elite-redux/coop/coop-runtime.ts#L8346-L8414"],
       "tests": ["test/node/authority-v2-recovery.test.ts", "test/tests/elite-redux/coop/coop-duo-fault.test.ts"]
     },
     {
@@ -89,9 +109,27 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-me-operation.ts",
-      "role": "core-canonical ME proposal and outcome identity",
-      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L192-L215", "src/data/elite-redux/coop/coop-me-operation.ts#L480-L495"],
+      "role": "core-canonical ME identity plus five Mystery operation-ID producers",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L192-L215", "src/data/elite-redux/coop/coop-me-operation.ts#L480-L495", "src/data/elite-redux/coop/coop-me-operation.ts#L728-L785", "src/data/elite-redux/coop/coop-me-operation.ts#L852-L863", "src/data/elite-redux/coop/coop-me-operation.ts#L917-L927", "src/data/elite-redux/coop/coop-me-operation.ts#L961-L1037", "src/data/elite-redux/coop/coop-me-operation.ts#L1153-L1166", "src/data/elite-redux/coop/coop-me-operation.ts#L1263-L1303"],
       "tests": ["test/tests/elite-redux/coop/coop-duo-me-operation.test.ts"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-biome-operation.ts",
+      "role": "interactive and deterministic biome operation-ID producers",
+      "source_citations": ["src/data/elite-redux/coop/coop-biome-operation.ts#L365-L382", "src/data/elite-redux/coop/coop-biome-operation.ts#L1028-L1056", "src/data/elite-redux/coop/coop-biome-operation.ts#L1260-L1305"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts#L537-L600", "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts#L583-L684"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-reward-operation.ts",
+      "role": "reward/market numeric operation address and operation-ID producers",
+      "source_citations": ["src/data/elite-redux/coop/coop-reward-operation.ts#L173-L236", "src/data/elite-redux/coop/coop-reward-operation.ts#L544-L545", "src/data/elite-redux/coop/coop-reward-operation.ts#L750-L770", "src/data/elite-redux/coop/coop-reward-operation.ts#L1046-L1100", "src/data/elite-redux/coop/coop-reward-operation.ts#L1235-L1282"],
+      "tests": ["test/tests/elite-redux/coop/coop-reward-surface-identity.test.ts#L22-L40", "test/tests/elite-redux/coop/coop-duo-biome-market-continuation.test.ts#L273-L273"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-seq-registry.ts",
+      "role": "biome/crossroads deterministic operation sequence bands",
+      "source_citations": ["src/data/elite-redux/coop/coop-seq-registry.ts#L90-L114"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts", "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts"]
     },
     {
       "path": "src/data/elite-redux/coop/coop-me-pin-state.ts",
@@ -120,8 +158,20 @@
     {
       "path": "src/data/elite-redux/coop/authority-v2/next-control.ts",
       "role": "control IDs and explicit canonical frontier/address ordering",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/next-control.ts#L46-L107", "src/data/elite-redux/coop/authority-v2/next-control.ts#L552-L606", "src/data/elite-redux/coop/authority-v2/next-control.ts#L650-L720", "src/data/elite-redux/coop/authority-v2/next-control.ts#L827-L871"],
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/next-control.ts#L46-L107", "src/data/elite-redux/coop/authority-v2/next-control.ts#L552-L606", "src/data/elite-redux/coop/authority-v2/next-control.ts#L650-L720", "src/data/elite-redux/coop/authority-v2/next-control.ts#L827-L965"],
       "tests": ["test/node/authority-v2-control.test.ts#L279-L344", "test/node/authority-v2-control-open.test.ts#L167-L258"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/recovery-channel.ts",
+      "role": "insertion-order recovery bundle fingerprint with entry context removed",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L142-L160", "src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L627-L650"],
+      "tests": ["test/node/authority-v2-recovery.test.ts#L509-L525"]
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/shadow.ts",
+      "role": "shadow wave/terminal fallback legacy digest comparison",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/shadow.ts#L811-L844"],
+      "tests": ["Static source evidence only."]
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/command-frontier.ts",
@@ -150,13 +200,13 @@
     {
       "path": "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts",
       "role": "Authority V2 turn canonical JSON and FNV-1a-64 material digest",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L294-L312", "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L760"],
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L294-L312", "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L772"],
       "tests": ["test/node/authority-v2-turn.test.ts#L171-L180", "test/node/authority-v2-turn.test.ts#L337-L373"]
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts",
       "role": "Authority V2 learn canonical JSON and FNV-1a-64 material digest",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L392-L400", "src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L870"],
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L392-L400", "src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L882"],
       "tests": ["test/node/authority-v2-interactions-learn.test.ts#L206-L221", "test/node/authority-v2-interactions-learn.test.ts#L369-L370"]
     },
     {
@@ -238,15 +288,26 @@
       "source_citations": ["src/data/elite-redux/coop/coop-battle-checksum.ts#L223-L263"],
       "input_shape": "JSON-like value; state types are expected to exclude undefined, functions, symbols, cycles, and non-finite values",
       "normalization_order": "null/bool/string primitive handling; numbers through canonNumber; arrays recurse in supplied order; object own keys sort by JS UTF-16 lexical order before recursive emission; unsupported values fall back to null text",
-      "output_encoding": "Canonical JSON text; number zero and non-finite values emit 0, integers use toString, other finite numbers use toPrecision(12)",
+      "output_encoding": "Canonical JSON text; number zero and non-finite values emit 0, Number.isInteger values use toString, other finite numbers use toPrecision(12)",
       "consumers": ["checksumState", "captureCoopSaveDataDigest", "hashMonMoveset", "coop-data-fingerprint.ts", "coop-wave-operation.ts", "coop-me-operation.ts", "coop-runtime.ts", "coop-battle-stream.ts"],
       "tests": ["test/tests/elite-redux/coop/coop-battle-checksum.test.ts#L72-L151", "test/node/coop-battle-checksum.test.ts#L61-L94"],
       "rust_requirement": "wire_exact",
-      "notes": "Undefined/function/symbol are rendered as null rather than preserved as absence; wire validators reject them before authoritative commit. Arrays are never sorted by this function."
+      "notes": "Number.isInteger is a formatting branch, not Number.isSafeInteger admission. Undefined/function/symbol are rendered as null rather than preserved as absence; wire validators reject them before authoritative commit. Arrays are never sorted by this function."
+    },
+    {
+      "source_symbol": "coop-operation-runtime.ts::canonicalOperationValue",
+      "source_citations": ["src/data/elite-redux/coop/coop-operation-runtime.ts#L139-L170"],
+      "input_shape": "Pending-operation, commit-context, and envelope authoritativeState values used for re-ack equality",
+      "normalization_order": "Undefined first; null and non-object primitives through JSON.stringify(value) with undefined fallback; arrays recurse in supplied order; object own keys default-sort and recurse without dropping undefined-valued properties",
+      "output_encoding": "Deterministic comparison text that is not necessarily valid JSON: undefined emits the unquoted literal token undefined, including array members and object values",
+      "consumers": ["coop-operation-runtime.ts::reackBoundaryMatches"],
+      "tests": ["No direct pure test found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact",
+      "notes": "Native primitive JSON number semantics apply: finite fractions use JSON.stringify spelling, -0 emits 0, and NaN/Infinity emit null. An undefined object key is retained as \"key\":undefined."
     },
     {
       "source_symbol": "authority-v2/adapters/turn-command.ts::canonicalize",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L760"],
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L772"],
       "input_shape": "Turn commit material image",
       "normalization_order": "Undefined/null to null; non-finite and signed zero to 0; integer toString; fractional toPrecision(12); arrays preserve order; object keys default-sort",
       "output_encoding": "Canonical JSON text consumed by turn commit FNV-1a-64",
@@ -256,7 +317,7 @@
     },
     {
       "source_symbol": "authority-v2/adapters/interactions-learn.ts::canonicalize",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L870"],
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L882"],
       "input_shape": "Learn interaction material image",
       "normalization_order": "Undefined/null to null; non-finite and signed zero to 0; integer toString; fractional toPrecision(12); arrays preserve order; object keys default-sort",
       "output_encoding": "Canonical JSON text consumed by learn interaction FNV-1a-64",
@@ -362,10 +423,21 @@
       "source_citations": ["src/data/elite-redux/coop/coop-battle-checksum.ts#L284-L286", "src/data/elite-redux/coop/coop-battle-checksum.ts#L117-L246"],
       "input_shape": "CoopChecksumState projected at the stable command-phase boundary",
       "normalization_order": "Engine pre-sorts field/arena/modifier/item/ball semantic sets; weather/terrain contribute type identities only and arena tag counters are excluded; core canonicalize sorts object keys and preserves arrays; then FNV-1a-64",
-      "output_encoding": "Raw lowercase 16-hex digest; error paths use sentinel 0000000000000000 in engine adapters",
+      "output_encoding": "Raw lowercase 16-hex FNV-1a-64; checksumState itself has no catch path and never substitutes the wrapper error sentinel",
       "consumers": ["battle checksum comparisons", "fault convergence", "snapshot control material"],
       "tests": ["test/tests/elite-redux/coop/coop-battle-checksum.test.ts#L72-L151", "test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts#L126-L184"],
       "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-battle-engine.ts::captureCoopChecksum",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L2492-L2526", "src/data/elite-redux/coop/coop-battle-checksum.ts#L214-L215"],
+      "input_shape": "Live authoritative battle state captured through captureCoopChecksumState",
+      "normalization_order": "Capture state, call checksumState, return its digest; catch any capture/hash exception at the wrapper boundary",
+      "output_encoding": "Raw checksumState digest on success; reserved wrapper error sentinel 0000000000000000 on failure",
+      "consumers": ["host/guest checksum publication and comparison skip logic"],
+      "tests": ["test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts#L126-L184", "test/tests/elite-redux/coop/coop-duo-fault.test.ts#L286-L307"],
+      "rust_requirement": "wire_exact",
+      "notes": "The sentinel is wrapper control flow, not a checksumState hash encoding."
     },
     {
       "source_symbol": "coop-battle-engine.ts::captureCoopSaveDataDigest",
@@ -498,6 +570,17 @@
       "rust_requirement": "wire_exact"
     },
     {
+      "source_symbol": "coop-runtime.ts::tapCoopV2ShadowWaveBoundary legacyDigest",
+      "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L8346-L8414", "src/data/elite-redux/coop/authority-v2/shadow.ts#L811-L844"],
+      "input_shape": "Legacy CoopWaveAdvancePayload transition for win/capture/flee/gameOver shadow observation",
+      "normalization_order": "Core canonicalize the transition exactly, then shared UTF-16 FNV-1a-64; pass the result as legacyDigest to the shadow wave/terminal tap",
+      "output_encoding": "Raw lowercase 16-hex FNV-1a-64 fallback legacyDigest",
+      "consumers": ["CoopV2ShadowHarness.tapWaveAdvance", "CoopV2ShadowHarness.tapTerminal"],
+      "tests": ["No direct digest assertion found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact",
+      "notes": "When legacyImage is present, shadow.ts compares digestOfMaterial(legacyImage) instead; legacyDigest remains the explicit fallback and log token."
+    },
+    {
       "source_symbol": "coop-battle-stream.ts::retired authority tombstone digest",
       "source_citations": ["src/data/elite-redux/coop/coop-battle-stream.ts#L1302-L1332", "src/data/elite-redux/coop/coop-battle-stream.ts#L1881-L1936"],
       "input_shape": "Normalized authority envelope retained in stream state",
@@ -511,14 +594,36 @@
   "content_hashes": [
     {
       "source_symbol": "coop-session-binding.ts::canonicalCoopSeatMapPayload / sha256Hex",
-      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L94-L151"],
+      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L84-L151"],
       "input_shape": "Validated dense seat bindings derived from account IDs",
-      "normalization_order": "Account IDs default-sort by JS UTF-16 order; object literal fields are emitted in insertion order; SHA-256 hashes UTF-8 TextEncoder bytes",
+      "normalization_order": "Validate exact nonempty bounded/control-free account IDs without normalization; default-sort original strings by JS UTF-16 order; emit object literal fields in insertion order; SHA-256 hashes UTF-8 TextEncoder bytes",
       "output_encoding": "Lowercase 64-hex SHA-256 seatMapId",
       "consumers": ["authenticated session binding", "seat-map validation"],
       "tests": ["test/tests/elite-redux/coop/coop-membership-v2.test.ts#L15-L33", "test/tests/elite-redux/coop/coop-p33-client.test.ts#L264-L265"],
       "rust_requirement": "wire_exact",
-      "notes": "Do not replace this identity with BLAKE3."
+      "notes": "Account IDs are not trimmed, case-folded, or Unicode-normalized; validation recomputes SHA-256 over the exact insertion-order payload."
+    },
+    {
+      "source_symbol": "coop-resume-marker.ts::digestCoopResumeSession",
+      "source_citations": ["src/data/elite-redux/coop/coop-resume-marker.ts#L185-L188", "src/data/elite-redux/coop/coop-resume-marker.ts#L257-L266"],
+      "input_shape": "Exact serialized sessionJson string carried through cold-resume selection",
+      "normalization_order": "Do not parse or re-serialize; TextEncoder converts the supplied JavaScript string to UTF-8 bytes; Web Crypto computes SHA-256",
+      "output_encoding": "Lowercase 64-character hexadecimal SHA-256",
+      "consumers": ["deriveCoopResumeCommitment", "coopResumeCommitmentMatches", "cold-resume candidate validation"],
+      "tests": ["test/tests/elite-redux/coop/coop-resume-fencing-adversarial.test.ts#L118-L132", "test/tests/elite-redux/coop/coop-resume-fencing-adversarial.test.ts#L251-L276", "test/tests/elite-redux/coop/coop-webrtc-transport.test.ts#L1353-L1390"],
+      "rust_requirement": "wire_exact",
+      "notes": "Whitespace and object key insertion order change the digest because the exact transmitted bytes, not logical JSON equivalence, are bound."
+    },
+    {
+      "source_symbol": "authority-v2/recovery-channel.ts::bundleFingerprint",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L142-L160", "src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L627-L650"],
+      "input_shape": "CoopRecoveryBundle request/frontier/material/nextControl/requiredTail",
+      "normalization_order": "Build the fixed insertion-order object requestId, frontier, frontierOperationId, material, nextControl, tail; map requiredTail through withoutEntryContext so each entry context is excluded; native JSON.stringify recursively follows JS property/array order",
+      "output_encoding": "Native insertion-order JSON comparison string; no cryptographic hash",
+      "consumers": ["resolvedBundleFingerprints", "completed recovery duplicate/replay correlation"],
+      "tests": ["No direct pure fingerprint test found by rg; recovery behavior evidence: test/node/authority-v2-recovery.test.ts#L509-L525"],
+      "rust_requirement": "wire_exact",
+      "notes": "Envelope/membership context is intentionally excluded so the same retained response can be re-addressed under a newer authenticated membership."
     },
     {
       "source_symbol": "coop-data-fingerprint.ts::computeErDataFingerprint",
@@ -542,14 +647,25 @@
     },
     {
       "source_symbol": "coop-battle-engine.ts::captureCoopDexBaseline / captureCoopDexDelta",
-      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L5000-L5010", "src/data/elite-redux/coop/coop-battle-engine.ts#L5038-L5048"],
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L5035-L5102", "src/data/elite-redux/coop/coop-battle-engine.ts#L5109-L5164"],
       "input_shape": "Dex map and starter baseline entries",
-      "normalization_order": "Object.entries order is retained; starter entries use native JSON.stringify; BigInt attrs encode as decimal strings before JSON/compression",
+      "normalization_order": "Object.entries follows JS own-property enumeration; numeric species keys are integer-index keys and enumerate ascending numerically; numeric-key dex/starter records retain integer-index order in JSON.stringify({dex, starter}); starter values use native JSON.stringify; BigInt attrs encode as decimal strings before compression",
       "output_encoding": "Existing JSON object compressed with compressToBase64; apply path JSON.parse and BigInt restoration",
       "consumers": ["dex synchronization and outcome application"],
       "tests": ["No dedicated direct dex delta test found by rg; static source evidence only."],
       "rust_requirement": "wire_exact",
       "notes": "This is insertion-order JSON, not core canonical JSON."
+    },
+    {
+      "source_symbol": "coop-battle-engine.ts::reconcileCoopPlayerModifiers instanceKey",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L4411-L4426"],
+      "input_shape": "Modifier typeId, serialized className, and serialized args for host/live player-wide non-held/non-form modifiers",
+      "normalization_order": "className is retained only when a string, otherwise null; args uses nullish default []; core-canonicalize the fixed array [classNameOrNull, argsOrEmpty], then shared UTF-16 FNV-1a-64",
+      "output_encoding": "${typeId} ${lowercase 16-hex FNV-1a-64}",
+      "consumers": ["host wanted-instance queues", "live modifier matching/removal/reconstruction"],
+      "tests": ["test/tests/elite-redux/coop/coop-player-modifier-instance-reconcile.test.ts#L149-L227"],
+      "rust_requirement": "wire_exact",
+      "notes": "This FNV identity is distinct from modifierInstanceKey at coop-battle-engine.ts#L3211-L3212, which concatenates two native JSON.stringify results with pipes."
     },
     {
       "source_symbol": "coop-durability.ts::snapshotMarksCanonical",
@@ -594,6 +710,136 @@
       "tests": ["test/node/authority-v2-cutover-interaction.test.ts", "test/tests/elite-redux/coop/coop-duo-mystery.test.ts"],
       "rust_requirement": "wire_exact",
       "notes": "Implementation is four-component despite a stale three-component comment; parser behavior is authoritative."
+    },
+    {
+      "source_symbol": "coop-biome-operation.ts::coopBiomeOperationId / commitBiomeOwnerIntent interactive branch",
+      "source_citations": ["src/data/elite-redux/coop/coop-biome-operation.ts#L365-L371", "src/data/elite-redux/coop/coop-biome-operation.ts#L1028-L1056", "src/data/elite-redux/coop/coop-seq-registry.ts#L90-L114"],
+      "input_shape": "Interactive BIOME_PICK or CROSSROADS_PICK epoch, sequence, and interaction pin",
+      "normalization_order": "Require seq = 9700000 + pinned for BIOME_PICK or 9600000 + pinned for CROSSROADS_PICK; owner = coopInteractionOwnerSeat(pinned); pass epoch, owner, seq, kind to makeCoopOperationId",
+      "output_encoding": "${epoch}:${owner}:${kind}:${seq}",
+      "consumers": ["biome relay/journal intent identity", "interactive biome commit receipt"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts#L537-L600", "test/tests/elite-redux/coop/coop-duo-biome-operation.test.ts#L368-L368"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-biome-operation.ts::coopAuthoritativeBiomeTransitionOperationId / commitAuthoritativeBiomeTransition",
+      "source_citations": ["src/data/elite-redux/coop/coop-biome-operation.ts#L375-L382", "src/data/elite-redux/coop/coop-biome-operation.ts#L1260-L1305", "src/data/elite-redux/coop/coop-seq-registry.ts#L109-L114"],
+      "input_shape": "Host-authoritative deterministic biome transition sourceWave and current epoch",
+      "normalization_order": "Require Number.isSafeInteger(sourceWave), 0 <= sourceWave < COOP_MAX_REACHABLE_COUNTER; seq = 9800001 + sourceWave; owner = 0; kind = BIOME_PICK",
+      "output_encoding": "${epoch}:0:BIOME_PICK:${9800001 + sourceWave}",
+      "consumers": ["deterministic biome transition commit", "transition receipt lookup"],
+      "tests": ["test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts#L583-L684", "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts#L817-L951"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-reward-operation.ts::coopRewardOperationActionSlot",
+      "source_citations": ["src/data/elite-redux/coop/coop-reward-operation.ts#L173-L236", "src/data/elite-redux/coop/coop-operation-address.ts#L22-L22"],
+      "input_shape": "pinned interaction counter, actionOrdinal, optional rewardSurface {surfaceId, ordinal}",
+      "normalization_order": "Validate safe nonnegative pin/action and reward-surface bounds; surfaceOffset = rewardSurface == null ? 0 : (rewardSurface.ordinal + 1) * 5000; slot = pinned * 100000 + surfaceOffset + actionOrdinal; require actionOrdinal < 5000, total band < 100000, and safe slot",
+      "output_encoding": "Safe numeric action slot or null",
+      "consumers": ["reward/market action operation IDs", "reward/market presentation operation IDs"],
+      "tests": ["test/tests/elite-redux/coop/coop-reward-surface-identity.test.ts#L22-L40"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-reward-operation.ts::commitRewardOwnerIntent / adoptRewardWatcherChoice",
+      "source_citations": ["src/data/elite-redux/coop/coop-reward-operation.ts#L544-L545", "src/data/elite-redux/coop/coop-reward-operation.ts#L750-L770", "src/data/elite-redux/coop/coop-reward-operation.ts#L1235-L1282"],
+      "input_shape": "Reward or market pinned counter, action ordinal, optional reward surface, and epoch",
+      "normalization_order": "Compute coopRewardOperationActionSlot; owner = coopInteractionOwnerSeat(pinned); kindFor(reward) = REWARD and kindFor(market) = SHOP_BUY; a retained terminal reuses its stored operationId",
+      "output_encoding": "${epoch}:${owner}:REWARD:${actionSlot} or ${epoch}:${owner}:SHOP_BUY:${actionSlot}",
+      "consumers": ["reward/market owner commit", "reward/market watcher adoption"],
+      "tests": ["test/tests/elite-redux/coop/coop-reward-surface-identity.test.ts", "test/tests/elite-redux/coop/coop-duo-biome-market-continuation.test.ts#L273-L273"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-reward-operation.ts::commitCoopRewardOptionsPresentation",
+      "source_citations": ["src/data/elite-redux/coop/coop-reward-operation.ts#L1046-L1100"],
+      "input_shape": "Reward or market options presentation pin, reroll ordinal, optional reward surface, and epoch",
+      "normalization_order": "Use reroll as actionOrdinal in coopRewardOperationActionSlot; owner = coopInteractionOwnerSeat(pinned); kind = REWARD_PRESENT for reward or SHOP_PRESENT for market",
+      "output_encoding": "${epoch}:${owner}:REWARD_PRESENT:${actionSlot} or ${epoch}:${owner}:SHOP_PRESENT:${actionSlot}",
+      "consumers": ["immutable reward/market options presentation"],
+      "tests": ["test/tests/elite-redux/coop/coop-reward-surface-identity.test.ts", "test/node/authority-v2-cutover-interaction.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::ME_KIND_TAG / meOpAddr / ownerSeatFor",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L728-L750", "src/data/elite-redux/coop/coop-me-operation.ts#L917-L927"],
+      "input_shape": "Mystery operation kind, wire seq, step, and pinned interaction counter",
+      "normalization_order": "Tags: ME_PRESENT=0, ME_PICK=1, ME_SUB=2, ME_BUTTON=3, ME_TERMINAL=4, QUIZ_ANSWER=5; address = seq * 8000 + tag * 1000 + (((step % 1000) + 1000) % 1000); owner is 0 for ME_PRESENT/ME_TERMINAL, otherwise coopInteractionOwnerSeat(pinned)",
+      "output_encoding": "Numeric Mystery pinnedSeq address plus deterministic owner seat for generic operation ID construction",
+      "consumers": ["all five Mystery operation-ID producers below"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-mystery.test.ts#L1083-L1091", "test/tests/elite-redux/coop/coop-duo-me-operation.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::isCoopMeQuizAnswerOperationId",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L758-L785"],
+      "input_shape": "epoch, operationId, pinned, quiz seq, and questionIndex",
+      "normalization_order": "After safe/band checks compute makeCoopOperationId(epoch, ownerSeatFor(QUIZ_ANSWER, pinned), meOpAddr(QUIZ_ANSWER, seq, questionIndex), QUIZ_ANSWER)",
+      "output_encoding": "Boolean equality against ${epoch}:${owner}:QUIZ_ANSWER:${meOpAddr}",
+      "consumers": ["quiz answer carrier identity validation"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-mystery.test.ts#L1083-L1091"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::coopMeGuestAppliedPickContinuationAddress",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L852-L863"],
+      "input_shape": "ME pick seq, step, pinned counter, wave, and current operation epoch",
+      "normalization_order": "Compute makeCoopOperationId(epoch, ownerSeatFor(ME_PICK, pinned), meOpAddr(ME_PICK, seq, step), ME_PICK) after enabled/wave/step checks",
+      "output_encoding": "Exact ME_PICK operation ID used for applied lookup; continuation address is returned only when present",
+      "consumers": ["guest-applied pick continuation lookup"],
+      "tests": ["No direct ID assertion found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::commitMeOwnerIntent",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L961-L1037"],
+      "input_shape": "Mystery kind, seq, pinned counter, optional step, payload, role, and authority state",
+      "normalization_order": "step = params.step ?? 0; owner = ownerSeatFor(kind, pinned); address = meOpAddr(kind, seq, step); pass epoch, owner, address, kind to makeCoopOperationId",
+      "output_encoding": "${epoch}:${owner}:${kind}:${meOpAddr(kind, seq, step)}",
+      "consumers": ["Mystery owner proposal/commit and retained terminal identity"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-me-operation.test.ts", "test/tests/elite-redux/coop/coop-me-terminal-transaction.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::commitMeAuthorityGuestIntent",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L1153-L1166"],
+      "input_shape": "Guest Mystery kind, proposed operationId, seq, pinned counter, and exact step",
+      "normalization_order": "Recompute makeCoopOperationId(epoch, ownerSeatFor(kind, pinned), meOpAddr(kind, seq, step), kind) before admission",
+      "output_encoding": "Exact expected ${epoch}:${owner}:${kind}:${meOpAddr} string",
+      "consumers": ["authority guest-intent identity rejection/admission"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-me-operation.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-me-operation.ts::adoptMeWatcherChoice",
+      "source_citations": ["src/data/elite-redux/coop/coop-me-operation.ts#L1263-L1303"],
+      "input_shape": "Watcher Mystery kind, seq, pinned counter, optional step, and relayed result",
+      "normalization_order": "step = params.step ?? 0; owner = ownerSeatFor(kind, pinned); address = meOpAddr(kind, seq, step); derive generic operation ID and validate any relayed ID inside the same 1000-step band",
+      "output_encoding": "Derived ${epoch}:${owner}:${kind}:${meOpAddr} string",
+      "consumers": ["Mystery watcher adoption and relayed-ID range checks"],
+      "tests": ["test/tests/elite-redux/coop/coop-duo-me-operation.test.ts", "test/tests/elite-redux/coop/coop-duo-mystery.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-runtime.ts::tapCoopV2ShadowWaveBoundary terminal operation ID",
+      "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L8346-L8375"],
+      "input_shape": "Shadow-observed gameOver wave number",
+      "normalization_order": "Interpolate the source wave directly; separately set terminal material terminalId = coop-v2-shadow-terminal:w${wave}",
+      "output_encoding": "WSHADOW/TERM/w${wave}",
+      "consumers": ["CoopV2ShadowHarness.tapTerminal", "shadow terminal authority log"],
+      "tests": ["No direct literal assertion found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-runtime.ts::tapCoopV2ShadowWaveBoundary wave operation ID",
+      "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L8378-L8414"],
+      "input_shape": "Shadow-observed win/capture/flee wave number",
+      "normalization_order": "Interpolate the source wave directly and reuse the same operation ID as destination.afterOperationId",
+      "output_encoding": "WSHADOW/ADV/w${wave}",
+      "consumers": ["CoopV2ShadowHarness.tapWaveAdvance", "shadow wave destination identity"],
+      "tests": ["No direct literal assertion found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
     },
     {
       "source_symbol": "authority-v2/authority-entry.ts::isValidOperationId / hasValidDigest",
@@ -722,21 +968,23 @@
       "source_symbol": "coop-interaction-relay.ts::guest proposal fingerprint",
       "source_citations": ["src/data/elite-redux/coop/coop-interaction-relay.ts#L1991-L2005"],
       "input_shape": "Guest relay message seq/kind/choice/data/rewardSurface",
-      "normalization_order": "Fixed array order; data and rewardSurface use nullish-coalescing to explicit null; nested object order follows native JSON.stringify",
-      "output_encoding": "Native JSON.stringify([seq, kind, choice, data ?? null, rewardSurface ?? null])",
+      "normalization_order": "Exact fixed array [msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null]; nested object order follows native JSON.stringify",
+      "output_encoding": "JSON.stringify([msg.seq, msg.kind, msg.choice, msg.data ?? null, msg.rewardSurface ?? null]); opaque text, no hash",
       "consumers": ["authorityProposalAdmissions.admit"],
       "tests": ["test/tests/elite-redux/coop/coop-interaction-relay.test.ts#L333-L407", "test/node/authority-v2-proposal-admission.test.ts#L11-L36"],
-      "rust_requirement": "wire_exact"
+      "rust_requirement": "wire_exact",
+      "notes": "Producer-specific formula; it is not shared with the Bargain outcome producer."
     },
     {
       "source_symbol": "coop-interaction-relay.ts::Bargain outcome proposal fingerprint",
       "source_citations": ["src/data/elite-redux/coop/coop-interaction-relay.ts#L2141-L2148"],
       "input_shape": "Bargain message seq/kind/outcome",
-      "normalization_order": "Fixed array order; nested outcome order follows native JSON.stringify",
-      "output_encoding": "Native JSON.stringify([seq, kind, outcome])",
+      "normalization_order": "Exact fixed array [msg.seq, msg.kind, msg.outcome]; nested outcome order follows native JSON.stringify",
+      "output_encoding": "JSON.stringify([msg.seq, msg.kind, msg.outcome]); opaque text, no hash",
       "consumers": ["authorityProposalAdmissions.admit"],
       "tests": ["test/tests/elite-redux/coop/coop-interaction-relay.test.ts#L333-L407"],
-      "rust_requirement": "wire_exact"
+      "rust_requirement": "wire_exact",
+      "notes": "Distinct producer-specific formula; there is no single cross-surface fingerprint algorithm."
     },
     {
       "source_symbol": "authority-v2/proposal-admission.ts::CoopV2ProposalAdmissionLedger.admit",
@@ -746,7 +994,8 @@
       "output_encoding": "Opaque fingerprint retained exactly",
       "consumers": ["relay proposal admission"],
       "tests": ["test/node/authority-v2-proposal-admission.test.ts#L11-L36"],
-      "rust_requirement": "wire_exact"
+      "rust_requirement": "wire_exact",
+      "notes": "No hash or cross-surface canonicalizer is applied; the ledger compares whichever producer string it receives."
     },
     {
       "source_symbol": "authority-v2/proposal-lease.ts::ProposalLeaseManager fingerprint handling",
@@ -816,9 +1065,9 @@
       "rust_requirement": "wire_exact"
     },
     {
-      "source_symbol": "authority-v2/next-control.ts::canonicalSuccessorKinds / canonicalInteractionKinds / canonicalAllowedInteractionAddresses",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/next-control.ts#L827-L871"],
-      "rule": "Successor kinds use declared authority-kind domain order; interaction kinds and opaque/address strings use default lexical sorting after deduplication.",
+      "source_symbol": "authority-v2/next-control.ts::canonicalSuccessorKinds / canonicalInteractionKinds / canonicalOpaqueIds / canonicalAllowed*Addresses",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/next-control.ts#L827-L871", "src/data/elite-redux/coop/authority-v2/next-control.ts#L874-L965"],
+      "rule": "Successor kinds deduplicate then use declared authority-kind order; interaction kinds and opaque IDs deduplicate then default-sort. Allowed interaction/control address helpers map, default-sort, and join without deduplication; accepted controls separately reject duplicate address keys during validation.",
       "tests": ["test/node/authority-v2-control.test.ts#L279-L344"],
       "rust_requirement": "wire_exact"
     },
@@ -831,8 +1080,8 @@
     },
     {
       "source_symbol": "coop-session-binding.ts::canonicalSeatBindings",
-      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L94-L110"],
-      "rule": "Account IDs sort by default JS lexical order before dense seat assignment; seat array order then remains fixed.",
+      "source_citations": ["src/data/elite-redux/coop/coop-session-binding.ts#L84-L110"],
+      "rule": "Account IDs are validated but not normalized; exact original strings sort by default JS UTF-16 lexical order before dense seat assignment, and seat array order then remains fixed.",
       "tests": ["test/tests/elite-redux/coop/coop-membership-v2.test.ts#L15-L33"],
       "rust_requirement": "wire_exact"
     },
@@ -865,6 +1114,20 @@
       "rust_requirement": "wire_exact"
     },
     {
+      "source_symbol": "authority-v2/recovery-channel.ts::bundleFingerprint",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L142-L160"],
+      "rule": "A fixed outer object insertion order is native-JSON-stringified; nested material/nextControl/tail preserve source property and array order, while tail entry context is removed. No key sorting or hash is applied.",
+      "tests": ["No direct pure fingerprint test found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-battle-engine.ts::captureCoopDexDelta",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L5061-L5102"],
+      "rule": "Dex/starter source and output records have numeric species keys. Under JS own-property enumeration these integer-index keys enumerate ascending numerically, including during JSON.stringify({dex, starter}); this is native enumeration, not explicit core key sorting.",
+      "tests": ["No dedicated direct dex ordering test found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
+    },
+    {
       "source_symbol": "coop-durability.ts::CoopJournal.commit / operationAckCanonical",
       "source_citations": ["src/data/elite-redux/coop/coop-durability.ts#L317-L352", "src/data/elite-redux/coop/coop-durability.ts#L865-L895"],
       "rule": "Journal message comparisons use insertion-order JSON.stringify; snapshot mark keys are sorted before JSON.stringify.",
@@ -890,6 +1153,20 @@
       "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L3211-L3212"],
       "rule": "Modifier identity concatenates typeId, className, JSON.stringify(args ?? []), and JSON.stringify(typePregenArgs ?? []) with literal pipes; nested JSON is insertion-order, not core-sorted.",
       "tests": ["test/tests/elite-redux/coop/coop-battle-checksum-engine.test.ts#L126-L184"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-battle-engine.ts::reconcileCoopPlayerModifiers instanceKey",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L4411-L4426"],
+      "rule": "FNV modifier identity preserves fixed outer array order [classNameOrNull, argsOrEmpty], then core canonicalize recursively sorts object keys and preserves nested arrays; output joins typeId and the hash with one literal space.",
+      "tests": ["test/tests/elite-redux/coop/coop-player-modifier-instance-reconcile.test.ts#L149-L227"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-operation-runtime.ts::canonicalOperationValue",
+      "source_citations": ["src/data/elite-redux/coop/coop-operation-runtime.ts#L139-L170"],
+      "rule": "Arrays preserve supplied order; object own keys default-sort by JS UTF-16 lexical order; undefined-valued keys remain present with the literal value token undefined.",
+      "tests": ["No direct pure test found by rg; static source evidence only."],
       "rust_requirement": "wire_exact"
     },
     {
@@ -938,8 +1215,8 @@
     },
     {
       "source_symbol": "replay-trace.ts::validateReplayTrace",
-      "source_citations": ["src/data/elite-redux/replay-trace.ts#L214-L243", "src/data/elite-redux/replay-trace.ts#L268-L336"],
-      "rule": "Optional coop/endState/checkpoint/target remain absent when not supplied; target accepts undefined or integer, not an implicit null wildcard.",
+      "source_citations": ["src/data/elite-redux/replay-trace.ts#L58-L75", "src/data/elite-redux/replay-trace.ts#L268-L330"],
+      "rule": "Optional coop/endState/checkpoint remain absent when not supplied. Optional target belongs to a move command and is a BattlerIndex, not a checkpoint target; it accepts undefined or Number.isInteger, not an implicit null wildcard.",
       "tests": ["test/tools/replay-recorder-checkpoint.test.ts"],
       "rust_requirement": "wire_exact"
     },
@@ -951,17 +1228,24 @@
       "rust_requirement": "wire_exact"
     },
     {
-      "source_symbol": "authority-v2/next-control.ts::canonicalAllowedInteractionAddresses / canonicalAllowedControlAddresses",
-      "source_citations": ["src/data/elite-redux/coop/authority-v2/next-control.ts#L841-L871"],
-      "rule": "Explicit null domain values encode as * wildcard; omission is a different structural state.",
+      "source_symbol": "authority-v2/contract.ts::CoopNextControl / next-control.ts::controlIdOf and canonicalAllowed*Addresses",
+      "source_citations": ["src/data/elite-redux/coop/authority-v2/contract.ts#L311-L369", "src/data/elite-redux/coop/authority-v2/next-control.ts#L86-L101", "src/data/elite-redux/coop/authority-v2/next-control.ts#L841-L871", "src/data/elite-redux/coop/authority-v2/next-control.ts#L874-L965"],
+      "rule": "AWAIT_SUCCESSOR.allowedKinds is required, nonempty, and nonnullable. SHARED_INTERACTION.successor.operationIds and AWAIT_SUCCESSOR.expectedOperationId are required nullable fields whose null encodes *. Optional allowed-address helpers use addresses == null, so omission/undefined and directly supplied null both encode *; validation separately rejects explicit null because the contract permits only omission or an array. A null operationId inside an allowed control address also encodes *.",
       "tests": ["test/node/authority-v2-control.test.ts#L341-L344"],
       "rust_requirement": "wire_exact"
     },
     {
       "source_symbol": "coop-runtime.ts::coopSnapshotControlDigest",
       "source_citations": ["src/data/elite-redux/coop/coop-runtime.ts#L600-L617"],
-      "rule": "journalHighWater uses nullish default {} before JSON transport round trip; undefined fields are dropped, explicit null is retained.",
+      "rule": "journalHighWater uses snapshot.journalHighWater ?? {} before the JSON transport round trip, so both null and undefined become {} for that field. Other undefined object properties are dropped by the round trip while explicit null survives.",
       "tests": ["test/node/authority-v2-recovery.test.ts"],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-operation-runtime.ts::canonicalOperationValue",
+      "source_citations": ["src/data/elite-redux/coop/coop-operation-runtime.ts#L139-L154"],
+      "rule": "Undefined is distinguished from null as the unquoted literal token undefined. Undefined array members and object values are retained rather than omitted or converted to null.",
+      "tests": ["No direct pure test found by rg; static source evidence only."],
       "rust_requirement": "wire_exact"
     }
   ],
@@ -1017,16 +1301,30 @@
     },
     {
       "source_symbol": "coop-battle-checksum.ts::canonNumber and V2 turn/learn canonicalizers",
-      "source_citations": ["src/data/elite-redux/coop/coop-battle-checksum.ts#L249-L263", "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L760", "src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L870"],
-      "rule": "Zero and -0 emit 0; non-finite emits 0 in these helpers; finite fractional values emit toPrecision(12); integer values emit toString.",
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-checksum.ts#L249-L263", "src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts#L740-L772", "src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts#L850-L882"],
+      "rule": "These canonicalizers use Number.isInteger, not Number.isSafeInteger, only to select formatting: integer-predicate values emit toString, finite fractions emit toPrecision(12), zero/-0 and non-finite emit 0. This is not wire admission.",
       "tests": ["test/tests/elite-redux/coop/coop-battle-checksum.test.ts#L72-L112", "test/node/authority-v2-turn.test.ts#L337-L373"],
       "rust_requirement": "wire_exact"
     },
     {
       "source_symbol": "coop-battle-engine.ts::captureCoopDexDelta / dexEntryFingerprint",
-      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L5000-L5033"],
+      "source_citations": ["src/data/elite-redux/coop/coop-battle-engine.ts#L5024-L5032", "src/data/elite-redux/coop/coop-battle-engine.ts#L5061-L5102"],
       "rule": "FNV BigInt is internal only; dex BigInt attributes encode as exact decimal strings in JSON and restore with BigInt.",
       "tests": ["No dedicated direct dex delta test found by rg; static source evidence only."],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-operation-runtime.ts::canonicalOperationValue and native JSON canonical/fingerprint paths",
+      "source_citations": ["src/data/elite-redux/coop/coop-operation-runtime.ts#L139-L154", "src/data/elite-redux/coop/authority-v2/recovery-channel.ts#L147-L160", "src/data/elite-redux/coop/coop-interaction-relay.ts#L1991-L1995", "src/data/elite-redux/coop/coop-interaction-relay.ts#L2141-L2144"],
+      "rule": "No integer or safe-integer predicate is applied by these serializers. Finite fractions use native JSON.stringify number spelling, -0 emits 0, and non-finite primitive numbers emit null; upstream Authority V2 validation is the separate non-finite boundary where present.",
+      "tests": ["Static source evidence; no Vitest executed."],
+      "rust_requirement": "wire_exact"
+    },
+    {
+      "source_symbol": "coop-biome-operation.ts / coop-reward-operation.ts / coop-me-operation.ts operation-address boundaries",
+      "source_citations": ["src/data/elite-redux/coop/coop-biome-operation.ts#L375-L382", "src/data/elite-redux/coop/coop-reward-operation.ts#L194-L236", "src/data/elite-redux/coop/coop-me-operation.ts#L758-L785", "src/data/elite-redux/coop/coop-me-operation.ts#L852-L863"],
+      "rule": "Biome sourceWave and reward pin/action/surface/slot use Number.isSafeInteger. Quiz identity validates epoch, pinned, and questionIndex as safe integers and derives seq exactly. The guest-pick continuation validates only step as a safe integer and checks wave >= 0; seq/pinned are trusted inputs there. meOpAddr itself has no predicate. All are distinct from the generic operation-ID parser, which only uses Number.isInteger.",
+      "tests": ["test/tests/elite-redux/coop/coop-reward-surface-identity.test.ts#L22-L40", "test/tests/elite-redux/coop/coop-transition-t2-biome.test.ts#L583-L684", "test/tests/elite-redux/coop/coop-duo-mystery.test.ts#L1083-L1091"],
       "rust_requirement": "wire_exact"
     }
   ],
@@ -1039,7 +1337,7 @@
     },
     {
       "id": "json-order-is-not-canonical",
-      "evidence": ["frame-codec encodeFrameV2, seat-map payload, relay fingerprints, durability messages, report correlation, dex/starter data, and modifierKey use native JSON.stringify."],
+      "evidence": ["frame-codec encodeFrameV2, seat-map payload, relay fingerprints, recovery bundleFingerprint, durability messages, report correlation, dex/starter data, and modifierKey use native JSON.stringify.", "Dex/starter numeric record keys follow JavaScript integer-index enumeration, which is ascending numeric order rather than ordinary insertion order."],
       "impact": "Sorting object keys globally changes existing transport or proposal identity.",
       "required_action": "Reproduce insertion-order JSON for those rows; use core sorting only where source calls canonicalize."
     },
@@ -1069,9 +1367,15 @@
     },
     {
       "id": "wildcard-null",
-      "evidence": ["V2 nullable operation/domain fields encode explicit null as * in next-control; omitted fields are structurally different."],
-      "impact": "Conflating missing and null changes control IDs and admission behavior.",
-      "required_action": "Model absent and null separately at the wire boundary."
+      "evidence": ["Required nullable successor.operationIds and expectedOperationId encode null as *.", "Optional address helpers use == null, so omission/undefined and direct null both encode *; validation rejects direct null because the contract permits only omission or array.", "allowedKinds is required, nonempty, and nonnullable."],
+      "impact": "Applying one global null/absence rule changes control IDs or validation.",
+      "required_action": "Reproduce encoder and validator boundaries separately; never make allowedKinds a wildcard."
+    },
+    {
+      "id": "address-sort-without-dedup",
+      "evidence": ["canonicalAllowedInteractionAddresses and canonicalAllowedControlAddresses map, default-sort, and join without Set deduplication.", "successorWaitIssues separately rejects duplicate accepted address keys."],
+      "impact": "Adding deduplication to the canonicalizer changes direct helper output and masks multiplicity before validation.",
+      "required_action": "Sort address strings without deduplicating; retain duplicate rejection in validation."
     },
     {
       "id": "remaining-order",
@@ -1081,15 +1385,27 @@
     },
     {
       "id": "legacy-fingerprint-opacity",
-      "evidence": ["Proposal admission and lease compare caller-provided fingerprint strings for equality and do not re-canonicalize."],
+      "evidence": ["Choice fingerprint is JSON.stringify([seq, kind, choice, data ?? null, rewardSurface ?? null]).", "Bargain outcome fingerprint is JSON.stringify([seq, kind, outcome]).", "Proposal admission and lease compare caller-provided strings opaquely and do not hash or re-canonicalize."],
       "impact": "Replacing relay JSON fingerprints with a digest breaks duplicate/conflict identity.",
-      "required_action": "Treat existing proposal fingerprints as opaque wire text."
+      "required_action": "Keep both producer-specific formulas; do not invent one cross-surface algorithm."
+    },
+    {
+      "id": "account-id-exactness",
+      "evidence": ["canonicalSeatBindings validates account IDs and default-sorts the exact originals; no trimming, case folding, or Unicode normalization occurs."],
+      "impact": "Normalizing an account string changes seat assignment and the SHA-256 seat-map payload.",
+      "required_action": "Validate and sort the original account IDs exactly as JavaScript does."
+    },
+    {
+      "id": "checksum-sentinel-layer",
+      "evidence": ["checksumState always returns fnv1a64(canonicalize(state)).", "captureCoopChecksum alone catches errors and substitutes 0000000000000000."],
+      "impact": "Treating the sentinel as a checksumState hash result conflates data identity with wrapper control flow.",
+      "required_action": "Keep raw hashing and wrapper failure signaling as separate algorithms."
     },
     {
       "id": "seat-map-sha",
       "evidence": ["seatMapId is SHA-256 over a specified UTF-8 insertion-order JSON payload."],
-      "impact": "BLAKE3 or sorted-key JSON changes authenticated membership identity.",
-      "required_action": "Keep SHA-256 and the exact payload; BLAKE3 is only for future non-wire bundles."
+      "impact": "A different digest or sorted-key JSON changes authenticated membership identity.",
+      "required_action": "Keep SHA-256 and the exact insertion-order payload."
     },
     {
       "id": "oracle-branch-not-local",
@@ -1101,19 +1417,19 @@
   "layer_classification": [
     {
       "layer": "legacy_battle_wire",
-      "symbols": ["coop-battle-checksum.ts::canonicalize", "fnv1a64", "checksumState", "captureCoopSaveDataDigest", "coopSnapshotControlDigest", "battle-stream tombstone digest"],
+      "symbols": ["coop-battle-checksum.ts::canonicalize", "fnv1a64", "checksumState", "captureCoopChecksum", "captureCoopSaveDataDigest", "reconcileCoopPlayerModifiers instanceKey", "coopSnapshotControlDigest", "tapCoopV2ShadowWaveBoundary IDs/legacyDigest", "canonicalOperationValue", "battle-stream tombstone digest"],
       "classification": "Existing cross-peer/checkpoint state identity; no digest replacement permitted.",
       "rust_requirement": "wire_exact"
     },
     {
       "layer": "authority_v2_wire",
-      "symbols": ["authority-v2 adapter material digests", "controlIdOf", "canonicalCommandTargets", "isWireStableJsonValue", "encodeFrameV2", "proposal admission/lease"],
+      "symbols": ["authority-v2 adapter material digests", "recovery-channel bundleFingerprint", "controlIdOf", "canonicalCommandTargets", "canonicalAllowed*Addresses", "isWireStableJsonValue", "encodeFrameV2", "proposal admission/lease"],
       "classification": "Existing authority, replica, control, and receipt identity.",
       "rust_requirement": "wire_exact"
     },
     {
       "layer": "membership_and_run_identity",
-      "symbols": ["canonicalCoopSeatMapPayload", "sha256Hex", "canonicalSeatBindings", "runtimeId", "canonicalCoopParticipantPair"],
+      "symbols": ["canonicalCoopSeatMapPayload", "sha256Hex", "canonicalSeatBindings", "digestCoopResumeSession", "runtimeId", "canonicalCoopParticipantPair"],
       "classification": "Authenticated session, seat-map, and participant identity.",
       "rust_requirement": "wire_exact"
     },
@@ -1128,12 +1444,6 @@
       "symbols": ["coop-me-pin-state.ts::canonicalJson", "coop-mutation-ledger activeLabels", "coop-rendezvous boundedRendezvousPoint", "report diagnostic formatting"],
       "classification": "Local equality or diagnostic presentation; preserve exact output when externally compared, otherwise not a gameplay digest.",
       "rust_requirement": "local_only"
-    },
-    {
-      "layer": "future_non_wire_bundle_content",
-      "symbols": [],
-      "classification": "No current source symbol. A new explicitly non-wire bundle-content hash may use BLAKE3 without changing any existing row.",
-      "rust_requirement": "bundle_content_blake3_allowed"
     }
   ]
 }
