@@ -7535,3 +7535,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the adopted object's atlas/sprite readiness was proven. The wild branch now uses the same bounded,
   address-lifetime-fenced `materializeCoopAdoptedEnemyFieldReady` gate as trainers, then reveals the sprite,
   cry, info, and encounter message. This is cosmetic projection only and executes no field setup or mechanics.
+- Candidate run `30872650241` stopped before Chromium on exactly two formatter-only diffs in the new runtime
+  query/call site. Its owned TypeScript slice was clean (repository baseline 206 unrelated diagnostics). The
+  formatter output was applied verbatim; no production behavior or test expectation changed.

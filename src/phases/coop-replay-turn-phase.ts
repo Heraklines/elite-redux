@@ -539,10 +539,7 @@ export class CoopReplayTurnPhase extends Phase {
         // those hints first makes actor-addressed events (Sticky Web/stat changes/abilities) target a mon
         // that has not been installed yet. The ordered V2 entry is exact proof that these events must remain
         // behind its immutable switch/material/presentation transaction.
-        const holdLiveBehindReplacement = hasPendingCoopV2ReplacementMaterialForReplay(
-          this.sourceWave,
-          this.turn,
-        );
+        const holdLiveBehindReplacement = hasPendingCoopV2ReplacementMaterialForReplay(this.sourceWave, this.turn);
         const increment = holdLiveBehindReplacement
           ? []
           : streamer.consumeLiveEventsFrom(this.turn, this.rendered, this.sourceWave);

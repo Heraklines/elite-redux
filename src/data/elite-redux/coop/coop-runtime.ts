@@ -4818,17 +4818,12 @@ export function retryCoopV2PendingAuthorityAtSafeBoundary(runtime: CoopRuntime |
  */
 export function hasPendingCoopV2ReplacementMaterialForReplay(wave: number, turn: number): boolean {
   const runtime = active;
-  if (
-    runtime == null
-    || runtime.controller.authorityRole !== "replica"
-    || !isCoopV2ReplacementCutoverActive()
-  ) {
+  if (runtime == null || runtime.controller.authorityRole !== "replica" || !isCoopV2ReplacementCutoverActive()) {
     return false;
   }
   return (
-    coopV2ShadowHarnesses
-      .get(runtime)
-      ?.hasPendingReplicaReplacementForTurn(runtime.controller.sessionEpoch, wave, turn) === true
+    coopV2ShadowHarnesses.get(runtime)?.hasPendingReplicaReplacementForTurn(runtime.controller.sessionEpoch, wave, turn)
+    === true
   );
 }
 
