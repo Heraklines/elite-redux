@@ -153,12 +153,16 @@ function abilitySourceOverridden(mon: Pokemon, source: { passive: boolean; passi
   );
 }
 
-function snapshotAbilities(mon: Pokemon, knowledge: ErCombatMonObservation["knowledge"]): ErCombatAbilityObservation[] {
+function snapshotAbilities(
+  mon: Pokemon,
+  knowledge: ErCombatMonObservation["knowledge"],
+  completeBattleInfo = false,
+): ErCombatAbilityObservation[] {
   const sources = safe(() => mon.getAbilitySources(), []);
   const activeKeys = new Set(safe(() => mon.getActiveAbilitySources().map(abilitySourceKey), []));
   if (knowledge === "battle-info") {
     const revealedKeys = new Set(mon.waveData.revealedAbilityKeys);
-    if (mon.waveData.seenInBattle) {
+    if (completeBattleInfo || mon.waveData.seenInBattle) {
       sources.forEach(source => revealedKeys.add(abilitySourceKey(source)));
     }
     if (revealedKeys.size === 0 && mon.waveData.abilityRevealed) {
@@ -235,11 +239,18 @@ function snapshotItem(mon: Pokemon, item: PokemonHeldItemModifier): ErCombatItem
   };
 }
 
-function snapshotItems(mon: Pokemon, knowledge: ErCombatMonObservation["knowledge"]): ErCombatItemObservation[] | null {
+function snapshotItems(
+  mon: Pokemon,
+  knowledge: ErCombatMonObservation["knowledge"],
+  completeBattleInfo = false,
+): ErCombatItemObservation[] | null {
   const items = safe(() => mon.getHeldItems().map(item => snapshotItem(mon, item)), []).sort((a, b) =>
     `${a.itemId}:${a.className}`.localeCompare(`${b.itemId}:${b.className}`),
   );
   if (knowledge === "battle-info") {
+    if (completeBattleInfo) {
+      return items;
+    }
     const revealed = mon.waveData.revealedHeldItemIds;
     if (!mon.waveData.seenInBattle && !mon.waveData.heldItemKnowledgeComplete && revealed.size === 0) {
       return null;
@@ -487,6 +498,7 @@ function snapshotMon(
   const currentSpecies = safe(() => mon.getSpeciesForm(), mon.species);
   const selfKnowledge = knowledge === "self";
   const knownOpponentBench = knowledge === "battle-info" && activeSlot == null;
+  const completeBattleInfo = knowledge === "battle-info" && activeSlot != null;
   const maxHp = safe(() => mon.getMaxHp(), 0);
   const stats = selfKnowledge
     ? safe(
@@ -513,11 +525,13 @@ function snapshotMon(
         }
       : null;
   const boss = mon as Pokemon & { bossSegments?: number; bossSegmentIndex?: number };
-  const abilities = snapshotAbilities(mon, knowledge);
+  const abilities = snapshotAbilities(mon, knowledge, completeBattleInfo);
   const allAbilitySourceKeys = safe(() => mon.getAbilitySources().map(abilitySourceKey), []);
   const abilityKnowledgeComplete =
-    mon.waveData.seenInBattle || allAbilitySourceKeys.every(key => mon.waveData.revealedAbilityKeys.has(key));
-  const heldItems = snapshotItems(mon, knowledge);
+    completeBattleInfo
+    || mon.waveData.seenInBattle
+    || allAbilitySourceKeys.every(key => mon.waveData.revealedAbilityKeys.has(key));
+  const heldItems = snapshotItems(mon, knowledge, completeBattleInfo);
   const moves = selfKnowledge
     ? safe(() => mon.getMoveset().map((move, slot) => snapshotMove(mon, move, slot)), [])
     : snapshotPublicOpponentMoves(mon);
@@ -546,7 +560,7 @@ function snapshotMon(
       abilities: selfKnowledge || abilityKnowledgeComplete ? "complete" : abilities.length > 0 ? "partial" : "unknown",
       items: selfKnowledge
         ? "complete"
-        : mon.waveData.seenInBattle || mon.waveData.heldItemKnowledgeComplete
+        : completeBattleInfo || mon.waveData.seenInBattle || mon.waveData.heldItemKnowledgeComplete
           ? "complete"
           : mon.waveData.revealedHeldItemIds.size > 0
             ? "partial"
@@ -557,7 +571,7 @@ function snapshotMon(
         : [...new Set(abilities.map(ability => ability.abilityId))].sort((a, b) => a - b),
       revealedItemIds: selfKnowledge
         ? (heldItems ?? []).map(item => item.itemId)
-        : mon.waveData.seenInBattle || mon.waveData.heldItemKnowledgeComplete
+        : completeBattleInfo || mon.waveData.seenInBattle || mon.waveData.heldItemKnowledgeComplete
           ? (heldItems ?? []).map(item => item.itemId).sort()
           : [...mon.waveData.revealedHeldItemIds].sort(),
       revealedMoveIds: selfKnowledge

@@ -259,6 +259,11 @@ describe.skipIf(!RUN)("combat contract live harness", () => {
     }
     enemyLeftovers.stackCount = 3;
     await game.scene.addEnemyModifier(enemyLeftovers, true, true);
+    enemy.waveData.seenInBattle = false;
+    enemy.waveData.abilityRevealed = false;
+    enemy.waveData.revealedAbilityKeys.clear();
+    enemy.waveData.heldItemKnowledgeComplete = false;
+    enemy.waveData.revealedHeldItemIds.clear();
     const relic = modifierTypes.ER_RELIC_STORMGLASS().withIdFromFunc(modifierTypes.ER_RELIC_STORMGLASS).newModifier();
     await game.scene.addModifier(relic, true);
 

@@ -248,6 +248,10 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertFalse(is_policy_target({"policySource": "engine-hardest-v1", "policyTarget": False}))
         self.assertFalse(is_policy_target({"policySource": "diagnostic-tree-v1", "policyTarget": True}))
         self.assertFalse(is_policy_target({"policySource": "smart-default-v1", "policyTarget": True}))
+
+    def test_battle_instance_suffix_preserves_decision_terminal_join(self) -> None:
+        battle_id = "episode:12:battle-seed~instance"
+        self.assertEqual(record_battle_id({"jointActionId": f"{battle_id}:3"}), battle_id)
         self.assertTrue(is_policy_target({"policySource": "human-v1", "policyTarget": True}))
         self.assertTrue(is_policy_target({"policySource": "search-relabel-v1", "policyTarget": True}))
 

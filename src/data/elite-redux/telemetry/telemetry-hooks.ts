@@ -46,6 +46,7 @@ import {
 import { isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { isTournamentMatch } from "#data/elite-redux/showdown/tournament-match-context";
+import { TelemetryBattleIdentity } from "#data/elite-redux/telemetry/telemetry-battle-identity";
 import {
   DEFAULT_TELEMETRY_QUEUE_CONFIG,
   TelemetryQueue,
@@ -106,6 +107,7 @@ const combatKnownOpponentEntityIds = new Set<number>();
 const combatRecordedBattleTerminals = new Set<string>();
 const combatRecordedActionIds = new Set<string>();
 const combatActionHistory: ErCombatPreviousActionObservation[] = [];
+const combatBattleIdentity = new TelemetryBattleIdentity(() => randomString(8));
 const combatPreparedDecisions = new Map<
   number,
   { jointActionId: string; observation: ErCombatObservation; candidates: ErCombatCandidate[] }
@@ -237,6 +239,7 @@ function ensureSession(): boolean {
   combatRecordedBattleTerminals.clear();
   combatRecordedActionIds.clear();
   combatActionHistory.length = 0;
+  combatBattleIdentity.reset();
   combatPreparedDecisions.clear();
   const env = makeEnvelope(randomString(24), mode, seed);
   const q = new TelemetryQueue(store, env, upload, DEFAULT_TELEMETRY_QUEUE_CONFIG);
@@ -246,8 +249,7 @@ function ensureSession(): boolean {
 }
 
 function currentJointActionId(sessionId: string): string {
-  const battle = globalScene.currentBattle;
-  return `${sessionId}:${battle.waveIndex}:${battle.battleSeed}:${battle.turn}`;
+  return combatBattleIdentity.jointActionId(sessionId, globalScene.currentBattle);
 }
 
 function enterCombatJointAction(jointActionId: string): void {
@@ -584,7 +586,7 @@ export function recordTelemetryBattleTerminal(outcome: ErCombatBattleTerminal): 
       return;
     }
     const wave = globalScene.currentBattle.waveIndex;
-    const battleId = `${session.sessionId}:${wave}:${globalScene.currentBattle.battleSeed}`;
+    const battleId = combatBattleIdentity.battleId(session.sessionId, globalScene.currentBattle);
     if (combatRecordedBattleTerminals.has(battleId)) {
       return;
     }
