@@ -1063,15 +1063,16 @@ export function successorOfCoopV2InteractionEnvelope(
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], true);
     case "STORMGLASS":
       // Stormglass settles before the encounter's first actionable surface is authored. A normal battle
-      // opens its command picker at this exact wave/turn; Mystery difficulty instead opens ME_PRESENT at
-      // the same exact address. Keep both alternatives explicit so an unrelated interaction, control kind,
-      // wave, or turn still fails closed.
+      // opens its command picker at this exact wave/turn. Mystery difficulty instead opens ME_PRESENT in
+      // the protocol's pre-turn transaction domain (turn 0), even after NewBattlePhase has advanced the
+      // local battle shell to turn 1. Keep both alternatives explicit so an unrelated interaction, control
+      // kind, wave, or turn still fails closed.
       return successorWait(
         envelope,
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         false,
         envelope,
-        [{ surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: envelope.wave, turn: envelope.turn }],
+        [{ surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: envelope.wave, turn: 0 }],
         [{ materialKind: "command-open", wave: envelope.wave, turn: envelope.turn, operationId: null }],
       );
     case "FAINT_SWITCH":

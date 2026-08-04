@@ -340,7 +340,7 @@ describe("Authority V2 interaction cutover", () => {
     ).toBeNull();
   });
 
-  it("authorizes only the exact same-turn command or Mystery frontier after Stormglass settles", () => {
+  it("authorizes only the exact command or pre-turn Mystery frontier after Stormglass settles", () => {
     const value = envelope("STORMGLASS", { weatherIndex: 0, weather: 1 }, "INTERACTION", 0, 9_800_000);
     const operationId = value.pendingOperation?.id;
     const successor = successorOfCoopV2InteractionEnvelope("op:stormglass", value);
@@ -352,7 +352,7 @@ describe("Authority V2 interaction cutover", () => {
       { materialKind: "command-open", wave: 1, turn: 1, operationId: null },
     ]);
     expect(successor.allowedInteractionAddresses).toEqual([
-      { surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: 1, turn: 1 },
+      { surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: 1, turn: 0 },
     ]);
     expect(
       successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "command-1", 1, {
@@ -390,9 +390,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_PRESENT-1",
+        "mystery-ME_PRESENT-0",
         1,
-        mysteryMaterial("ME_PRESENT", 1),
+        mysteryMaterial("ME_PRESENT", 0),
       ),
     ).toBe(true);
     expect(
@@ -400,9 +400,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_BUTTON-1",
+        "mystery-ME_BUTTON-0",
         1,
-        mysteryMaterial("ME_BUTTON", 1),
+        mysteryMaterial("ME_BUTTON", 0),
       ),
     ).toBe(false);
     expect(
@@ -410,9 +410,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_PRESENT-0",
+        "mystery-ME_PRESENT-1",
         1,
-        mysteryMaterial("ME_PRESENT", 0),
+        mysteryMaterial("ME_PRESENT", 1),
       ),
     ).toBe(false);
   });
