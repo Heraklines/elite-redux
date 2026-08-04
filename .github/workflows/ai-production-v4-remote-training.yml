@@ -36,7 +36,7 @@ on:
         type: boolean
         default: false
       max_policy_decisions:
-        description: Deterministic winner-only decision cap for the CPU tree
+        description: Deterministic winner-only decision cap for the CPU tree (maximum 8000 on hosted runners)
         required: false
         type: string
         default: "4000"
@@ -49,7 +49,7 @@ env:
   AI_V4_KERNEL_NAME: er-ai-production-v4-human-ensemble-gpu-20260804
   AI_V4_TRAINING_PROFILE: baseline
   AI_V4_TRAINING_SEEDS: 20260804,20260805,20260806
-  AI_V4_PUSH_TREE_MAX_DECISIONS: "20000"
+  AI_V4_PUSH_TREE_MAX_DECISIONS: "8000"
 
 concurrency:
   group: ${{ inputs.diagnose_existing_kernel && 'ai-kaggle-diagnostics' || inputs.cpu_tree_only && 'ai-production-v4-tree' || 'ai-production-v4-remote-training' }}
@@ -219,7 +219,7 @@ jobs:
       && !inputs.diagnose_existing_kernel
       && !inputs.reuse_existing_dataset
       && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[v4-train]'))
-    name: Prepare private v4 GPU run and fresh winner tree
+    name: Prepare private v4 GPU run or fresh winner tree
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -375,6 +375,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
       - name: Train fresh battle-victory tree on the same remote cut
+        if: ${{ inputs.cpu_tree_only || github.event_name == 'push' }}
         env:
           TRAINER_TREE: ${{ github.event_name == 'push' && 'true' || inputs.trainer_tree || 'false' }}
           MAX_POLICY_DECISIONS: ${{ github.event_name == 'push' && env.AI_V4_PUSH_TREE_MAX_DECISIONS || inputs.max_policy_decisions || '4000' }}
@@ -383,6 +384,10 @@ jobs:
           set -euo pipefail
           if [[ ! "$MAX_POLICY_DECISIONS" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::max_policy_decisions must be a positive integer"
+            exit 1
+          fi
+          if (( MAX_POLICY_DECISIONS > 8000 )); then
+            echo "::error::max_policy_decisions exceeds the 8000-decision hosted-runner memory budget"
             exit 1
           fi
           battle_type_args=()
@@ -401,6 +406,7 @@ jobs:
             --report-md "$RUNNER_TEMP/ai-tree/leaderboard.md" \
             --models-dir "$RUNNER_TEMP/ai-tree/models"
       - name: Publish only sanitized reports and selected tree
+        if: ${{ inputs.cpu_tree_only || github.event_name == 'push' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -416,6 +422,7 @@ jobs:
           fi
           cat "$RUNNER_TEMP/ai-tree/leaderboard.md" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: ${{ inputs.cpu_tree_only || github.event_name == 'push' }}
         with:
           name: ai-production-v4-remote-training-report
           path: ai-report
