@@ -146,9 +146,17 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$CANDIDATE_MODE" == "true" ]]; then
+            candidate_ensemble=$(find ai-models/candidate -name ensemble.json -type f)
             candidate_report=$(find ai-models/candidate -name report.json -type f)
-            test "$(printf '%s\n' "$candidate_report" | wc -l)" -eq 1
-            test -f "$(dirname "$candidate_report")/model.safetensors"
+            ensemble_count=$(printf '%s\n' "$candidate_ensemble" | sed '/^$/d' | wc -l)
+            report_count=$(printf '%s\n' "$candidate_report" | sed '/^$/d' | wc -l)
+            if [[ "$ensemble_count" -eq 1 ]]; then
+              test "$report_count" -ge 2
+            else
+              test "$ensemble_count" -eq 0
+              test "$report_count" -eq 1
+              test -f "$(dirname "$candidate_report")/model.safetensors"
+            fi
           else
             test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
             test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
@@ -165,47 +173,97 @@ jobs:
               raise SystemExit("tree-only mode cannot also specify a transformer candidate")
           candidate = None
           if candidate_mode:
-              paths = list(Path("ai-models/candidate").rglob("report.json"))
-              if len(paths) != 1:
-                  raise SystemExit(f"expected one checkpoint candidate report, found {paths}")
-              candidate = json.loads(paths[0].read_text(encoding="utf-8"))
-              data = candidate["data"]
-              sources = data["sourcePolicies"]
-              if candidate_kind == "human-baseline":
-                  if set(sources) != {"human-v1"}:
-                      raise SystemExit(f"human baseline contains an unexpected policy source: {sources}")
-                  if data["excludedPolicyDecisions"] != 0:
-                      raise SystemExit("human baseline excluded an unexpected policy decision")
-                  if candidate.get("initializedFrom") is not None:
-                      raise SystemExit("fresh human baseline unexpectedly resumed a checkpoint")
-                  if candidate.get("tokenVocabularySource") != "derived":
-                      raise SystemExit("fresh human baseline did not seal its corpus-derived vocabulary")
-              elif candidate_kind == "checkpoint":
-                  allowed_sources = {
-                      "checkpoint-tree-v1",
-                      "checkpoint-neural-v4",
-                      "diagnostic-tree-v1",
-                      "engine-hardest-v1",
-                  }
-                  if set(sources) - allowed_sources:
-                      raise SystemExit(f"checkpoint candidate contains an unexpected policy source: {sources}")
-                  expected_excluded = sources.get("engine-hardest-v1", 0) + sources.get("diagnostic-tree-v1", 0)
-                  if data["excludedPolicyDecisions"] != expected_excluded:
-                      raise SystemExit("value-only sparring actions were not excluded exactly from policy training")
-                  if not candidate.get("initializedFrom"):
-                      raise SystemExit("checkpoint candidate did not strictly resume the sealed transformer")
-                  if candidate.get("tokenVocabularySource") != "fixed":
-                      raise SystemExit("checkpoint candidate does not preserve its fixed vocabulary")
+              candidate_root = Path("ai-models/candidate")
+              ensemble_paths = list(candidate_root.rglob("ensemble.json"))
+              if len(ensemble_paths) > 1:
+                  raise SystemExit(f"expected at most one candidate ensemble, found {ensemble_paths}")
+              if ensemble_paths:
+                  ensemble_root = ensemble_paths[0].parent
+                  ensemble = json.loads(ensemble_paths[0].read_text(encoding="utf-8"))
+                  members = ensemble.get("members")
+                  if not isinstance(members, list) or len(members) < 2 or len(set(members)) != len(members):
+                      raise SystemExit("candidate ensemble has an invalid member inventory")
+                  report_paths = [ensemble_root / member / "report.json" for member in members]
+                  for member in members:
+                      member_root = ensemble_root / member
+                      if not (member_root / "config.json").is_file() or not (member_root / "model.safetensors").is_file():
+                          raise SystemExit(f"candidate ensemble member is incomplete: {member}")
               else:
-                  raise SystemExit(f"unsupported candidate kind: {candidate_kind}")
-              if data["policyTargetDecisions"] <= 0 or candidate["checkpointSelection"]["metric"] != "candidateNll":
-                  raise SystemExit("candidate was not selected on held-out policy targets")
-              if data["transferDecisions"] != 0 or candidate["objective"]["transferPretrainEpochs"] != 0:
-                  raise SystemExit("candidate unexpectedly performed Showdown transfer training")
-              if not candidate.get("tokenVocabularySha256"):
-                  raise SystemExit("candidate has no sealed vocabulary hash")
-              if not str(candidate.get("device", "")).startswith("cuda"):
-                  raise SystemExit("candidate was not trained on CUDA")
+                  report_paths = list(candidate_root.rglob("report.json"))
+                  if len(report_paths) != 1:
+                      raise SystemExit(f"expected one checkpoint candidate report, found {report_paths}")
+
+              all_report_paths = set(candidate_root.rglob("report.json"))
+              if set(report_paths) != all_report_paths:
+                  raise SystemExit("candidate output contains reports outside the sealed ensemble inventory")
+
+              reports = [json.loads(path.read_text(encoding="utf-8")) for path in report_paths]
+              for report in reports:
+                  data = report["data"]
+                  sources = data["sourcePolicies"]
+                  if candidate_kind == "human-baseline":
+                      if set(sources) != {"human-v1"}:
+                          raise SystemExit(f"human baseline contains an unexpected policy source: {sources}")
+                      if data["excludedPolicyDecisions"] != 0:
+                          raise SystemExit("human baseline excluded an unexpected policy decision")
+                      if report.get("initializedFrom") is not None:
+                          raise SystemExit("fresh human baseline unexpectedly resumed a checkpoint")
+                      if report.get("tokenVocabularySource") != "derived":
+                          raise SystemExit("fresh human baseline did not seal its corpus-derived vocabulary")
+                  elif candidate_kind == "checkpoint":
+                      allowed_sources = {
+                          "checkpoint-tree-v1",
+                          "checkpoint-neural-v4",
+                          "diagnostic-tree-v1",
+                          "engine-hardest-v1",
+                      }
+                      if set(sources) - allowed_sources:
+                          raise SystemExit(f"checkpoint candidate contains an unexpected policy source: {sources}")
+                      expected_excluded = sources.get("engine-hardest-v1", 0) + sources.get("diagnostic-tree-v1", 0)
+                      if data["excludedPolicyDecisions"] != expected_excluded:
+                          raise SystemExit("value-only sparring actions were not excluded exactly from policy training")
+                      if not report.get("initializedFrom"):
+                          raise SystemExit("checkpoint candidate did not strictly resume the sealed transformer")
+                      if report.get("tokenVocabularySource") != "fixed":
+                          raise SystemExit("checkpoint candidate does not preserve its fixed vocabulary")
+                  else:
+                      raise SystemExit(f"unsupported candidate kind: {candidate_kind}")
+                  if data["policyTargetDecisions"] <= 0 or report["checkpointSelection"]["metric"] != "candidateNll":
+                      raise SystemExit("candidate was not selected on held-out policy targets")
+                  if data["transferDecisions"] != 0 or report["objective"]["transferPretrainEpochs"] != 0:
+                      raise SystemExit("candidate unexpectedly performed Showdown transfer training")
+                  if not report.get("tokenVocabularySha256"):
+                      raise SystemExit("candidate has no sealed vocabulary hash")
+                  if not str(report.get("device", "")).startswith("cuda"):
+                      raise SystemExit("candidate was not trained on CUDA")
+
+              candidate = reports[0]
+              candidate_identity = (
+                  candidate["contractSchemaVersion"],
+                  candidate["featureSchemaVersion"],
+                  candidate["tokenVocabularySha256"],
+                  candidate["data"]["dictionaryCoverage"]["sha256"],
+                  candidate["data"]["dictionaryCoverage"]["features"],
+                  candidate["data"]["identity"],
+                  candidate["architecture"],
+              )
+              for report in reports[1:]:
+                  identity = (
+                      report["contractSchemaVersion"],
+                      report["featureSchemaVersion"],
+                      report["tokenVocabularySha256"],
+                      report["data"]["dictionaryCoverage"]["sha256"],
+                      report["data"]["dictionaryCoverage"]["features"],
+                      report["data"]["identity"],
+                      report["architecture"],
+                  )
+                  if identity != candidate_identity:
+                      raise SystemExit("candidate ensemble members do not share one sealed model contract")
+              if ensemble_paths and (
+                  ensemble.get("contractSchemaVersion") != candidate["contractSchemaVersion"]
+                  or ensemble.get("featureSchemaVersion") != candidate["featureSchemaVersion"]
+              ):
+                  raise SystemExit("candidate ensemble manifest does not match its member contract")
           elif not tree_only:
               reports = {}
               for arm in ("control", "transfer"):
@@ -354,10 +412,17 @@ jobs:
             echo "STACKED_TREE_AVAILABLE=false" >> "$GITHUB_ENV"
           fi
           if [[ "$TREE_ONLY" != "true" && "$CANDIDATE_MODE" == "true" ]]; then
-            candidate_report=$(find ai-models/candidate -name report.json -type f)
-            test "$(printf '%s\n' "$candidate_report" | wc -l)" -eq 1
-            candidate_model=$(dirname "$candidate_report")
-            test -f "$candidate_model/model.safetensors"
+            candidate_ensemble=$(find ai-models/candidate -name ensemble.json -type f)
+            ensemble_count=$(printf '%s\n' "$candidate_ensemble" | sed '/^$/d' | wc -l)
+            if [[ "$ensemble_count" -eq 1 ]]; then
+              candidate_model=$(dirname "$candidate_ensemble")
+            else
+              test "$ensemble_count" -eq 0
+              candidate_report=$(find ai-models/candidate -name report.json -type f)
+              test "$(printf '%s\n' "$candidate_report" | sed '/^$/d' | wc -l)" -eq 1
+              candidate_model=$(dirname "$candidate_report")
+              test -f "$candidate_model/model.safetensors"
+            fi
             echo "CANDIDATE_MODEL=$candidate_model" >> "$GITHUB_ENV"
             if [[ "$CANDIDATE_KIND" == "human-baseline" ]]; then
               echo "CANDIDATE_CONTROLLER=human-bc-transformer-v4" >> "$GITHUB_ENV"
