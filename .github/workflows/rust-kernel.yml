@@ -231,6 +231,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
@@ -439,6 +440,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
@@ -619,6 +621,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
@@ -799,6 +802,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
@@ -925,14 +929,8 @@ jobs:
               missing+=("$path")
             fi
           done
-          wasm_manifest_present=0
-          while IFS= read -r -d '' manifest; do
-            if [[ "$manifest" == *er-wasm* ]] || grep -Eq '^[[:space:]]*name[[:space:]]*=[[:space:]]*["'"']er-wasm["'"'][[:space:]]*$' "$manifest"; then
-              wasm_manifest_present=1
-              break
-            fi
-          done < <(find rust -type f -name Cargo.toml -print0 2>/dev/null)
-          if ((wasm_manifest_present == 0)); then
+          wasm_manifest=rust/crates/er-wasm/Cargo.toml
+          if [[ ! -f "$wasm_manifest" ]]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Rust kernel pre-contract: er-wasm milestone is not present yet."
             exit 0
@@ -1001,6 +999,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
@@ -1030,17 +1029,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          manifest=""
-          while IFS= read -r -d '' candidate; do
-            if grep -Eq '^[[:space:]]*name[[:space:]]*=[[:space:]]*["'"']er-wasm["'"'][[:space:]]*$' "$candidate"; then
-              manifest="$candidate"
-              break
-            fi
-          done < <(find rust -type f -name Cargo.toml -print0)
-          if [[ -z "$manifest" ]]; then
-            echo "::error::An er-wasm Cargo manifest is present but does not declare package name er-wasm."
-            exit 1
-          fi
+          manifest=rust/crates/er-wasm/Cargo.toml
+          python3 - "$manifest" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          manifest = Path(sys.argv[1])
+          with manifest.open("rb") as stream:
+              document = tomllib.load(stream)
+          if document.get("package", {}).get("name") != "er-wasm":
+              raise SystemExit(f"{manifest} must declare package.name = 'er-wasm'")
+          PY
           echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
           echo "directory=$(dirname "$manifest")" >> "$GITHUB_OUTPUT"
 
@@ -1224,6 +1224,7 @@ jobs:
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
           rustup toolchain install "$channel" "${rustup_args[@]}"
           active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
           [[ "$active" == "$channel"* ]]
