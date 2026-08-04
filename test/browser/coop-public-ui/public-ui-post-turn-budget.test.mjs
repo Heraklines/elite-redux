@@ -1184,7 +1184,10 @@ test("sequential command driver accepts two same-address battler commands from o
     [0, 1],
   );
   assert.deepEqual(result.commandEventHistory.depleted, []);
-  assert.deepEqual(result.commandPartition.owners.map(owner => owner.label), ["survivor"]);
+  assert.deepEqual(
+    result.commandPartition.owners.map(owner => owner.label),
+    ["survivor"],
+  );
   assert.deepEqual(result.commandPartition.omitted, [{ label: "depleted", seat: 1 }]);
   assert.equal(result.commandPartition.collectionClosed.phase, "MovePhase");
 });
