@@ -3,12 +3,20 @@
 import { createHash } from "node:crypto";
 
 const CONTRACT_VERSION = 4;
+const FEATURE_SCHEMA_VERSION = 4;
 const TELEMETRY_SCHEMA_VERSION = 2;
 const TOKEN_GROUPS = ["actor", "targets", "destination", "field", "action"];
 const BATTLE_TERMINALS = new Set(["victory", "defeat", "capture", "flee", "abort", "invalid"]);
 const RUN_TERMINALS = new Set(["victory", "player-wiped", "abandonment"]);
 const POLICY_SOURCE = "human-v1";
 const SPLIT_SEED = "er-human-telemetry-split-v1";
+const CONTRACT_EVENT_RECORD_KINDS = new Map([
+  ["combat_contract_decision", "combat_decision"],
+  ["combat_auxiliary_decision", "combat_auxiliary_decision"],
+  ["combat_contract_transition", "combat_transition"],
+  ["battle_terminal", "battle_terminal"],
+  ["run_outcome", "run_terminal"],
+]);
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -103,6 +111,17 @@ function recordIdentity(record) {
   return [record?.schemaVersion, record?.buildSha, record?.dexHash, record?.dictionaryHash].join(":");
 }
 
+function validateRecordIdentity(record, episode, context) {
+  if (
+    record?.schemaVersion !== CONTRACT_VERSION
+    || ![record?.buildSha, record?.dexHash, record?.dictionaryHash].every(
+      value => typeof value === "string" && value.length > 0,
+    )
+  ) {
+    episodeFinding(episode, "invalid_contract_identity", true, context);
+  }
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Independent schema invariants stay visible in one validator.
 function validateObservation(observation, episode, context) {
   if (observation?.version !== CONTRACT_VERSION || observation?.perspective !== "self") {
@@ -194,6 +213,9 @@ function validateDecision(record, envelope, episode) {
   const context = record?.decisionId ?? episode.id;
   if (record?.schemaVersion !== CONTRACT_VERSION || record?.candidateScope !== "combat-command") {
     episodeFinding(episode, "invalid_decision_header", true, context);
+  }
+  if (record?.featureSchemaVersion !== FEATURE_SCHEMA_VERSION) {
+    episodeFinding(episode, "unsupported_feature_schema", true, context);
   }
   if (record?.episodeId !== envelope.sessionId || record?.sourcePartitionId !== envelope.playerIdHash) {
     episodeFinding(episode, "decision_ownership_mismatch", true, context);
@@ -549,7 +571,13 @@ export function createCombatContractV4Audit() {
         episodeFinding(episode, "invalid_event_anchor", true, `${envelope.sessionId}:${batch.seq}:${eventIndex}`);
       }
       const record = event?.record;
+      const expectedRecordKind = CONTRACT_EVENT_RECORD_KINDS.get(event?.kind);
+      if (expectedRecordKind != null && record?.kind !== expectedRecordKind) {
+        episodeFinding(episode, "malformed_contract_event", true, `${envelope.sessionId}:${batch.seq}:${eventIndex}`);
+        continue;
+      }
       if (record?.schemaVersion === CONTRACT_VERSION) {
+        validateRecordIdentity(record, episode, record?.decisionId ?? record?.transitionId ?? record?.terminalId);
         episode.contractIdentities.add(recordIdentity(record));
         increment(counts.buildShas, String(record.buildSha ?? "unknown"));
         increment(counts.dictionaryHashes, String(record.dictionaryHash ?? "unknown"));
@@ -654,6 +682,12 @@ export function createCombatContractV4Audit() {
         rawCorpusUploaded: false,
         rawIdentifiersIncluded: false,
         exampleIds: "salted SHA-256 prefixes only",
+      },
+      coverageLimitations: {
+        uploadSequenceCompleteness:
+          "not independently provable: batch seq is a monotonic timestamp without predecessor/count linkage",
+        decisionCaptureCompleteness:
+          "validated by committed-action harness tests; omitted decisions cannot be inferred from corpus rows alone",
       },
       corpus: {
         ...extra,

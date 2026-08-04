@@ -174,7 +174,7 @@ function batch() {
     earlierCandidateIds: [],
     observation: observation(),
     candidates: [move],
-    featureSchemaVersion: 1,
+    featureSchemaVersion: 4,
     candidateFeatures: [{ candidateId: move.id, values: [1, 2, 3] }],
     candidateTokenGroups: [
       {
@@ -288,6 +288,25 @@ test("invalid labels and broken joins quarantine the episode without exposing ra
   const encoded = JSON.stringify(report);
   assert.equal(encoded.includes(SESSION_ID), false);
   assert.equal(encoded.includes(SOURCE_ID), false);
+});
+
+test("malformed contract events are quarantined instead of counted as ignored telemetry", () => {
+  const fixture = batch();
+  fixture.events[0].record.kind = "wrong_record_kind";
+  const report = auditCombatContractV4Batches([fixture]);
+  assert.equal(report.eligibility.hardQuarantinedEpisodes, 1);
+  assert.ok(report.findings.hard.malformed_contract_event);
+  assert.equal(report.corpus.ignoredEvents, 0);
+});
+
+test("unsupported feature schemas and empty build identities fail closed", () => {
+  const fixture = batch();
+  fixture.events[0].record.featureSchemaVersion = 3;
+  fixture.events[0].record.buildSha = "";
+  const report = auditCombatContractV4Batches([fixture]);
+  assert.equal(report.eligibility.hardQuarantinedEpisodes, 1);
+  assert.ok(report.findings.hard.unsupported_feature_schema);
+  assert.ok(report.findings.hard.invalid_contract_identity);
 });
 
 test("source-account splitting is stable and disjoint by construction", () => {

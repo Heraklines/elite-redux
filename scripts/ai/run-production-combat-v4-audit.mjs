@@ -206,6 +206,11 @@ function markdownReport(report) {
       ? ["None."]
       : incompleteFindings.map(([code, finding]) => `- \`${code}\`: ${finding.count.toLocaleString()}`)),
     "",
+    "## Audit limits",
+    "",
+    `- Upload sequence completeness: ${report.coverageLimitations.uploadSequenceCompleteness}`,
+    `- Decision capture completeness: ${report.coverageLimitations.decisionCaptureCompleteness}`,
+    "",
     "## Stratification",
     "",
     "```json",
