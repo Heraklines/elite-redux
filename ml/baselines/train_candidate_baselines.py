@@ -12,6 +12,7 @@ import math
 import pickle
 import re
 import time
+from array import array
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -294,6 +295,7 @@ def load_winner_policy_records(
                     continue
                 winning_policy_target_decisions += 1
                 validate_decision(record, file, line_number)
+                record = compact_baseline_decision(record)
                 if max_policy_decisions is None:
                     decisions.append(record)
                     continue
@@ -405,6 +407,115 @@ def validate_decision(record: dict[str, Any], file: Path, line_number: int) -> N
             raise ValueError(f"{prefix}: unrevealed opponent bench ability crossed the Battle Info visibility boundary")
     if any(modifier.get("side") == "opponent" for modifier in record.get("observation", {}).get("modifiers", [])):
         raise ValueError(f"{prefix}: hidden opponent modifiers crossed the Battle Info visibility boundary")
+
+
+def compact_baseline_decision(record: dict[str, Any]) -> dict[str, Any]:
+    """Keep the validated fields used by tree training and dictionary checks."""
+
+    def compact_pokemon(pokemon: dict[str, Any]) -> dict[str, Any]:
+        compact = {
+            key: pokemon[key]
+            for key in ("activeSlot", "species", "form")
+            if key in pokemon
+        }
+        compact["abilities"] = [
+            {"abilityId": ability["abilityId"]}
+            for ability in pokemon.get("abilities", [])
+        ]
+        compact["moves"] = [
+            {
+                key: move[key]
+                for key in ("moveId", "slot", "category")
+                if key in move
+            }
+            for move in pokemon.get("moves", [])
+        ]
+        held_items = pokemon.get("heldItems")
+        compact["heldItems"] = (
+            [{"itemId": item["itemId"]} for item in held_items]
+            if isinstance(held_items, list)
+            else held_items
+        )
+        compact["tags"] = [
+            {"effectId": tag["effectId"]}
+            for tag in pokemon.get("tags", [])
+        ]
+        compact["mechanics"] = [
+            {"effectId": mechanic["effectId"]}
+            for mechanic in pokemon.get("mechanics", [])
+        ]
+        return compact
+
+    observation = record.get("observation", {})
+    compact_observation: dict[str, Any] = {
+        "selfParty": [compact_pokemon(pokemon) for pokemon in observation.get("selfParty", [])],
+        "opponentActive": [
+            compact_pokemon(pokemon) for pokemon in observation.get("opponentActive", [])
+        ],
+        "opponentKnownParty": [
+            compact_pokemon(pokemon) for pokemon in observation.get("opponentKnownParty", [])
+        ],
+        "fieldEffects": [
+            {"effectId": effect["effectId"]}
+            for effect in observation.get("fieldEffects", [])
+        ],
+        "positionalEffects": [
+            {"effectId": effect["effectId"]}
+            for effect in observation.get("positionalEffects", [])
+        ],
+        "mechanics": [
+            {"effectId": mechanic["effectId"]}
+            for mechanic in observation.get("mechanics", [])
+        ],
+        "modifiers": [
+            {
+                "modifierId": modifier["modifierId"],
+                "state": [
+                    {"key": field.get("key"), "value": field.get("value")}
+                    for field in modifier.get("state", [])
+                    if field.get("key") == "kind"
+                ],
+            }
+            for modifier in observation.get("modifiers", [])
+        ],
+    }
+    for key in ("format", "battleType"):
+        if key in observation:
+            compact_observation[key] = observation[key]
+
+    compact = {
+        key: record[key]
+        for key in (
+            "schemaVersion",
+            "featureSchemaVersion",
+            "kind",
+            "episodeId",
+            "decisionId",
+            "jointActionId",
+            "battleId",
+            "buildSha",
+            "dexHash",
+            "dictionaryHash",
+            "splitGroupId",
+            "sourcePartitionId",
+            "policySource",
+            "sourcePolicy",
+            "policyTarget",
+            "actorSlot",
+            "chosenCandidateId",
+        )
+        if key in record
+    }
+    compact["candidates"] = [dict(candidate) for candidate in record["candidates"]]
+    compact["candidateFeatures"] = [
+        {
+            "candidateId": feature_row["candidateId"],
+            "values": array("f", feature_row["values"]),
+        }
+        for feature_row in record["candidateFeatures"]
+    ]
+    compact["observation"] = compact_observation
+    return compact
 
 
 def validate_dataset(

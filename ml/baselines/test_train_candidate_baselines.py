@@ -2,15 +2,20 @@ import hashlib
 import json
 import tempfile
 import unittest
+from array import array
 from pathlib import Path
 
 import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from train_candidate_baselines import (
+    accumulate_dictionary_references,
     artifact_scores,
+    compact_baseline_decision,
     dataset_schema_versions,
+    empty_dictionary_references,
     fit_stacked_tree_ensemble,
+    heuristic_scores,
     is_policy_target,
     load_policy_trajectory_records,
     load_records,
@@ -28,6 +33,84 @@ from train_candidate_baselines import (
 
 
 class CandidateBaselineContractTest(unittest.TestCase):
+    def test_compact_tree_projection_preserves_rows_heuristics_and_dictionary_ids(self) -> None:
+        decision = {
+            "schemaVersion": 4,
+            "featureSchemaVersion": 4,
+            "kind": "combat_decision",
+            "episodeId": "episode",
+            "decisionId": "decision",
+            "buildSha": "build",
+            "dexHash": "dex",
+            "dictionaryHash": "dictionary",
+            "sourcePartitionId": "account",
+            "policySource": "human-v1",
+            "policyTarget": True,
+            "actorSlot": 0,
+            "chosenCandidateId": "move:1",
+            "candidates": [
+                {
+                    "id": "move:1",
+                    "kind": "move",
+                    "moveId": 10,
+                    "moveSlot": 0,
+                    "baseTypeMultiplier": 2,
+                },
+                {"id": "switch:1", "kind": "switch"},
+            ],
+            "candidateFeatures": [
+                {"candidateId": "move:1", "values": [1.25, -2.5]},
+                {"candidateId": "switch:1", "values": [3.5, 4.75]},
+            ],
+            "candidateTokenGroups": [],
+            "observation": {
+                "format": 1,
+                "selfParty": [
+                    {
+                        "activeSlot": 0,
+                        "species": 1,
+                        "form": 0,
+                        "abilities": [{"abilityId": 2, "revealed": True}],
+                        "moves": [{"moveId": 10, "slot": 0, "category": 0, "pp": 8}],
+                        "heldItems": [{"itemId": "LEFTOVERS", "stackCount": 2}],
+                        "tags": [{"effectId": "taunt", "turns": 2}],
+                        "mechanics": [{"effectId": "custom:charge", "value": 3}],
+                        "history": ["discard"],
+                    }
+                ],
+                "opponentActive": [],
+                "opponentKnownParty": [],
+                "fieldEffects": [{"effectId": "rain", "turns": 4}],
+                "positionalEffects": [{"effectId": "screen", "turns": 3}],
+                "mechanics": [{"effectId": "boss:phase", "value": 1}],
+                "modifiers": [
+                    {
+                        "modifierId": "RELIC",
+                        "state": [
+                            {"key": "kind", "value": "RELIC_KIND"},
+                            {"key": "stacks", "value": 2},
+                        ],
+                    }
+                ],
+                "history": ["discard"],
+            },
+        }
+        compact = compact_baseline_decision(decision)
+
+        expected_rows, expected_labels, *_ = make_rows([decision])
+        actual_rows, actual_labels, *_ = make_rows([compact])
+        np.testing.assert_array_equal(actual_rows, expected_rows)
+        np.testing.assert_array_equal(actual_labels, expected_labels)
+        self.assertEqual(heuristic_scores([compact]), heuristic_scores([decision]))
+
+        expected_references = empty_dictionary_references()
+        actual_references = empty_dictionary_references()
+        accumulate_dictionary_references(decision, expected_references)
+        accumulate_dictionary_references(compact, actual_references)
+        self.assertEqual(actual_references, expected_references)
+        self.assertNotIn("history", compact["observation"])
+        self.assertNotIn("history", compact["observation"]["selfParty"][0])
+
     def test_contract_v4_behavior_cloning_loads_incomplete_human_runs(self) -> None:
         candidate_id = "move:v4"
         decision = {
@@ -110,7 +193,12 @@ class CandidateBaselineContractTest(unittest.TestCase):
                         "action": [candidate_id],
                     },
                 }],
-                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+                "observation": {
+                    "opponentActive": [],
+                    "opponentKnownParty": [],
+                    "modifiers": [],
+                    "neuralOnlyHistory": [{"payload": "discard after validation"}],
+                },
             }
 
         first_battle = "run-a:17:first"
@@ -246,7 +334,12 @@ class CandidateBaselineContractTest(unittest.TestCase):
                         "action": [candidate_id],
                     },
                 }],
-                "observation": {"opponentActive": [], "opponentKnownParty": [], "modifiers": []},
+                "observation": {
+                    "opponentActive": [],
+                    "opponentKnownParty": [],
+                    "modifiers": [],
+                    "neuralOnlyHistory": [{"payload": "discard after validation"}],
+                },
             }
 
         rows = [
@@ -287,6 +380,9 @@ class CandidateBaselineContractTest(unittest.TestCase):
         self.assertEqual(len(capped), 1)
         self.assertEqual(capped_terminals[0]["episodeId"], capped[0]["episodeId"])
         self.assertEqual(capped_report["maxPolicyDecisions"], 1)
+        self.assertNotIn("candidateTokenGroups", selected[0])
+        self.assertNotIn("neuralOnlyHistory", selected[0]["observation"])
+        self.assertIsInstance(selected[0]["candidateFeatures"][0]["values"], array)
         feature_rows, *_ = make_rows(selected)
         self.assertEqual(feature_rows.dtype, np.float32)
 
