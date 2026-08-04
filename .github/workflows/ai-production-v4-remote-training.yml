@@ -70,6 +70,24 @@ jobs:
           python scripts/ai/build_private_kaggle_manifests.py
           "$RUNNER_TEMP"
           "$KAGGLE_USERNAME"
+      - name: Verify existing private dataset matches checked-out trainer
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_slug="$KAGGLE_USERNAME/er-ai-production-v4-human-20260803"
+          verify_dir="$RUNNER_TEMP/kaggle-dataset-verification"
+          rm -rf "$verify_dir"
+          mkdir -p "$verify_dir"
+          kaggle datasets download "$dataset_slug" \
+            --file er-ai-training-bundle.zip \
+            --path "$verify_dir" \
+            --force --quiet
+          python scripts/ai/verify_kaggle_training_bundle.py \
+            "$verify_dir/er-ai-training-bundle.zip" \
+            "$GITHUB_WORKSPACE"
       - name: Launch private GPU kernel
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -308,6 +326,28 @@ jobs:
           done
           if [[ "$dataset_status" != "ready" ]]; then
             echo "::error::Private Kaggle dataset did not become ready within 60 minutes (status: ${dataset_status:-unavailable})"
+            exit 1
+          fi
+          verify_dir="$RUNNER_TEMP/kaggle-dataset-verification"
+          bundle_verified=false
+          for attempt in $(seq 1 30); do
+            rm -rf "$verify_dir"
+            mkdir -p "$verify_dir"
+            if kaggle datasets download "$dataset_slug" \
+              --file er-ai-training-bundle.zip \
+              --path "$verify_dir" \
+              --force --quiet \
+              && python scripts/ai/verify_kaggle_training_bundle.py \
+                "$verify_dir/er-ai-training-bundle.zip" \
+                "$GITHUB_WORKSPACE"; then
+              bundle_verified=true
+              break
+            fi
+            echo "Private Kaggle dataset has not exposed the uploaded source hashes after $((attempt * 20))s"
+            sleep 20
+          done
+          if [[ "$bundle_verified" != "true" ]]; then
+            echo "::error::Private Kaggle dataset did not converge to the uploaded trainer sources"
             exit 1
           fi
           if [[ "$REUSE_EXISTING_DATASET" != "true" ]]; then
