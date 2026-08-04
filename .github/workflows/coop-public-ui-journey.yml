@@ -195,8 +195,9 @@ jobs:
             src/data/elite-redux/coop/authority-v2/cutover-interaction.ts \
             src/data/elite-redux/coop/coop-battle-stream.ts \
             src/data/elite-redux/coop/coop-durability.ts \
-            src/data/elite-redux/coop/coop-field-presentation.ts \
-            src/data/elite-redux/coop/coop-operation-envelope.ts \
+          src/data/elite-redux/coop/coop-field-presentation.ts \
+          src/data/elite-redux/coop/coop-trainer-transition-observer.ts \
+          src/data/elite-redux/coop/coop-operation-envelope.ts \
             src/data/elite-redux/coop/coop-party-reorder-presentation.ts \
             src/data/elite-redux/coop/coop-reward-operation.ts \
             src/data/elite-redux/coop/coop-runtime.ts \
@@ -326,6 +327,20 @@ jobs:
 
       - name: Verify human-skew trainer settlement contracts
         run: node --test test/browser/coop-public-ui/campaign-exp-phase.test.mjs
+
+      - name: Verify signed guest trainer-transition contracts
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-guest-renderer.test.ts
+          -t "guest's player-trainer transition|projected trainer cue"
+          --reporter=dot
 
       - name: Verify progressing Mystery battle contracts
         run: node --test test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs

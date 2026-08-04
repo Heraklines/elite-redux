@@ -787,8 +787,21 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     release,
-    /pushNew\(entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u,
-    "ordinary waves retain NextEncounter while a complete biome permit cannot skip NewBiome presentation",
+    /queueCoopProjectedEncounterPresentationTail\(globalScene\.phaseManager,[\s\S]*?entersCommittedBiome,[\s\S]*?showPlayerTrainer:[\s\S]*?this\.end\(\)/u,
+    "the signed destination installs its complete encounter presentation tail before ending",
+  );
+  const projectedPresentationTailStart = newBattlePhase.indexOf(
+    "export function queueCoopProjectedEncounterPresentationTail(",
+  );
+  const projectedPresentationTailEnd = newBattlePhase.indexOf("\n}\n", projectedPresentationTailStart) + 2;
+  const projectedPresentationTail = newBattlePhase.slice(
+    projectedPresentationTailStart,
+    projectedPresentationTailEnd,
+  );
+  assert.match(
+    projectedPresentationTail,
+    /if \(params\.showPlayerTrainer\)[\s\S]*?pushNew\("ShowTrainerPhase", true\)[\s\S]*?pushNew\(params\.entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)/u,
+    "the guest's player-trainer cue precedes both ordinary and committed-biome encounter tails",
   );
   assert.match(
     replayTurnPhase,

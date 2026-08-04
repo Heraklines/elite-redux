@@ -102,6 +102,7 @@ const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
+const TRAINER_TRANSITION_PREFIX = "[coop-browser:trainer-transition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 
@@ -959,6 +960,51 @@ export function trainerPostconditionView(text) {
   return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
 }
 
+/** Parse the exact positive player-trainer cue emitted by the signed guest encounter tail. */
+export function trainerTransitionView(text) {
+  if (!text.startsWith(TRAINER_TRANSITION_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(TRAINER_TRANSITION_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed trainer-transition JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || value.role !== "guest"
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 1
+    || typeof value.trainerVisible !== "boolean"
+    || typeof value.trainerAlpha !== "number"
+    || !Number.isFinite(value.trainerAlpha)
+    || value.trainerPresented !== (value.trainerVisible && value.trainerAlpha > 0.001)
+    || value.trainerPresented !== true
+    || !Array.isArray(value.playerField)
+    || value.playerField.length === 0
+    || value.playerField.some(
+      pokemon =>
+        !Number.isSafeInteger(pokemon?.pokemonId)
+        || pokemon.pokemonId < 0
+        || pokemon.onField !== true
+        || pokemon.pokemonVisible !== false
+        || pokemon.spriteVisible !== false
+        || pokemon.infoVisible !== false,
+    )
+  ) {
+    throw new Error("built browser emitted an invalid trainer-transition observation");
+  }
+  return Object.freeze({
+    ...value,
+    playerField: Object.freeze(value.playerField.map(pokemon => Object.freeze({ ...pokemon }))),
+  });
+}
+
 /** Parse one exact retained wave-progression authority/renderer receipt. */
 export function progressionEventView(text) {
   if (!text.startsWith(PROGRESSION_EVENT_PREFIX)) {
@@ -1000,6 +1046,10 @@ function recordBrowserObservations(sink, text) {
   const trainerPostcondition = trainerPostconditionView(text);
   if (trainerPostcondition != null) {
     sink.record("browser-trainer-postcondition", { observation: trainerPostcondition });
+  }
+  const trainerTransition = trainerTransitionView(text);
+  if (trainerTransition != null) {
+    sink.record("browser-trainer-transition", { observation: trainerTransition });
   }
   const progressionEvent = progressionEventView(text);
   if (progressionEvent != null) {
@@ -1560,6 +1610,16 @@ export class EvidenceSink {
         && (turn == null || event.observation.turn === turn)
         && (seq == null || event.observation.seq === seq)
         && (canonicalEvent == null || JSON.stringify(event.observation.event) === JSON.stringify(canonicalEvent)),
+    );
+  }
+
+  /** Find the signed guest's positive player-trainer cue at one destination wave. */
+  findTrainerTransition({ epoch = null, wave = null } = {}) {
+    return this.events.find(
+      event =>
+        event.kind === "browser-trainer-transition"
+        && (epoch == null || event.observation.epoch === epoch)
+        && (wave == null || event.observation.wave === wave),
     );
   }
 

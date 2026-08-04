@@ -698,6 +698,58 @@ async function assertRenderProfileExecution(rig, policy, progress) {
   await progress.note("render profile governed real battle execution", proof);
 }
 
+/**
+ * A hidden final trainer state is not proof that the transition ever rendered. For every trainer battle
+ * entered after wave 1, require the signed guest player-trainer cue plus positive enemy-trainer intro and
+ * victory samples on both real browsers.
+ */
+function assertTrainerPresentationCoverage(rig, battleKinds) {
+  const trainerWaves = [
+    ...new Set(
+      battleKinds
+        .filter(kind => kind.wave > 1 && kind.battleType === "TRAINER")
+        .map(kind => kind.wave),
+    ),
+  ];
+  if (trainerWaves.length === 0) {
+    return null;
+  }
+  const proof = trainerWaves.map(wave => {
+    const playerTransition = rig.guest.evidence.findTrainerTransition({ wave });
+    if (playerTransition == null) {
+      throw new Error(`[campaign-trainer-presentation] guest omitted the signed player-trainer cue at wave ${wave}`);
+    }
+    const clients = Object.values(rig.clients).map(client => {
+      const intro = client.evidence.events.find(
+        event =>
+          event.kind === "browser-surface2"
+          && event.observation.address?.wave === wave
+          && event.observation.phase === "NextEncounterPhase"
+          && event.observation.presentation?.enemyTrainerPresented === true,
+      );
+      const victory = client.evidence.events.find(
+        event =>
+          event.kind === "browser-surface2"
+          && event.observation.address?.wave === wave
+          && event.observation.phase === "TrainerVictoryPhase"
+          && event.observation.presentation?.enemyTrainerPresented === true,
+      );
+      if (intro == null || victory == null) {
+        throw new Error(
+          `[campaign-trainer-presentation] ${client.label} omitted ${intro == null ? "intro" : "victory"} `
+            + `trainer presentation at wave ${wave}`,
+        );
+      }
+      return { label: client.label, introEventIndex: intro.index, victoryEventIndex: victory.index };
+    });
+    return { wave, playerTransitionEventIndex: playerTransition.index, clients };
+  });
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-trainer-presentation-coverage", { proof });
+  }
+  return proof;
+}
+
 function isExactNextTurnCommand(observation, expectedCommandAddress) {
   if (observation == null || expectedCommandAddress == null) {
     return false;
@@ -5943,6 +5995,12 @@ export async function runCampaign(rig) {
     }
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await assertRenderProfileExecution(rig, policy, progress);
+      const trainerPresentationProof = assertTrainerPresentationCoverage(rig, mysteryCoverage.battleKinds);
+      if (trainerPresentationProof != null) {
+        await progress.note("trainer presentation lifecycle proven on both browsers", {
+          proof: trainerPresentationProof,
+        });
+      }
     }
     assertMarketCoverage(marketCoverage, policy.market);
     if (policy.navigation.required) {

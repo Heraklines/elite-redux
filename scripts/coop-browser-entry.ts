@@ -29,6 +29,7 @@ const [
   { coopLocalOverlayInputAllowed },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
+  { setCoopPlayerTrainerTransitionObserver },
   { setCoopWaveProgressionPresentationObserver },
   { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
@@ -50,6 +51,7 @@ const [
   import("../src/data/elite-redux/coop/coop-ui-registry"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
+  import("../src/data/elite-redux/coop/coop-trainer-transition-observer"),
   import("../src/data/elite-redux/coop/coop-wave-progression-observer"),
   import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
@@ -105,6 +107,7 @@ const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
+const TRAINER_TRANSITION_PREFIX = "[coop-browser:trainer-transition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 
 /** Pixel-adjacent trainer state carried on every semantic UI observation in the sealed CI bundle. */
@@ -226,6 +229,21 @@ setCoopPresentationObserver(observation => {
       }),
     );
   }
+});
+
+setCoopPlayerTrainerTransitionObserver(observation => {
+  const runtime = getCoopRuntime();
+  if (runtime == null || runtime.controller.role !== "guest") {
+    return;
+  }
+  console.info(
+    `${TRAINER_TRANSITION_PREFIX}${JSON.stringify({
+      version: 1,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      ...observation,
+    })}`,
+  );
 });
 
 // Post-battle EXP, level, and evolution cues live in the retained WAVE_ADVANCE transaction rather than

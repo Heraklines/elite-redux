@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { semanticSurfaceView, trainerPostconditionView } from "./evidence.mjs";
+import { semanticSurfaceView, trainerPostconditionView, trainerTransitionView } from "./evidence.mjs";
 
 const PREFIX = "[coop-browser:surface2] ";
 
@@ -127,6 +127,43 @@ test("trainer postcondition evidence is exact, frozen, and rejects a dishonest d
   assert.throws(
     () => trainerPostconditionView(`${prefix}${JSON.stringify({ ...valid, trainerAlpha: 1 })}`),
     /invalid trainer-postcondition/u,
+  );
+});
+
+test("trainer transition evidence requires a visible trainer over mechanically retained hidden field seats", () => {
+  const prefix = "[coop-browser:trainer-transition] ";
+  const valid = {
+    version: 1,
+    role: "guest",
+    epoch: 17,
+    wave: 7,
+    trainerVisible: true,
+    trainerAlpha: 1,
+    trainerPresented: true,
+    playerField: [
+      {
+        pokemonId: 101,
+        onField: true,
+        pokemonVisible: false,
+        spriteVisible: false,
+        infoVisible: false,
+      },
+    ],
+  };
+  assert.deepEqual(trainerTransitionView(`${prefix}${JSON.stringify(valid)}`), valid);
+  assert.throws(
+    () => trainerTransitionView(`${prefix}${JSON.stringify({ ...valid, trainerPresented: false })}`),
+    /invalid trainer-transition/u,
+  );
+  assert.throws(
+    () =>
+      trainerTransitionView(
+        `${prefix}${JSON.stringify({
+          ...valid,
+          playerField: [{ ...valid.playerField[0], pokemonVisible: true }],
+        })}`,
+      ),
+    /invalid trainer-transition/u,
   );
 });
 

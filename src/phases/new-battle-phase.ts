@@ -47,6 +47,29 @@ export interface CoopCommittedBiomeEncounterQueue {
   pushNew(name: "NewBiomeEncounterPhase"): unknown;
 }
 
+export interface CoopProjectedEncounterPresentationQueue {
+  pushNew(
+    name: "ShowTrainerPhase" | "NextEncounterPhase" | "NewBiomeEncounterPhase",
+    coopProjectedPresentation?: true,
+  ): unknown;
+}
+
+/**
+ * Install the guest's immutable destination presentation in the same visible order as the authority.
+ * ShowTrainerPhase is presentation-only on the renderer; the following encounter phase still owns all
+ * enemy adoption and field readiness. Keeping the ordering in one helper makes the positive trainer cue
+ * independently testable without granting the guest any mechanical ReturnPhase authority.
+ */
+export function queueCoopProjectedEncounterPresentationTail(
+  queue: CoopProjectedEncounterPresentationQueue,
+  params: { readonly entersCommittedBiome: boolean; readonly showPlayerTrainer: boolean },
+): void {
+  if (params.showPlayerTrainer) {
+    queue.pushNew("ShowTrainerPhase", true);
+  }
+  queue.pushNew(params.entersCommittedBiome ? "NewBiomeEncounterPhase" : "NextEncounterPhase");
+}
+
 interface CoopCommittedBiomeEncounterPermit {
   readonly sessionEpoch: number;
   readonly wave: number;
@@ -486,7 +509,19 @@ export class NewBattlePhase extends BattlePhase {
       && !biomePermit.encounterAdopted
       && biomePermit.nextWave === command.wave
       && biomePermit.destinationBiomeId === globalScene.arena.biomeId;
-    globalScene.phaseManager.pushNew(entersCommittedBiome ? "NewBiomeEncounterPhase" : "NextEncounterPhase");
+    const destinationBattle = globalScene.currentBattle;
+    if (destinationBattle == null) {
+      return false;
+    }
+    const resetsArenaPresentation =
+      entersCommittedBiome
+      || destinationBattle.isClassicFinalBoss
+      || destinationBattle.battleType === BattleType.TRAINER
+      || destinationBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
+    queueCoopProjectedEncounterPresentationTail(globalScene.phaseManager, {
+      entersCommittedBiome,
+      showPlayerTrainer: resetsArenaPresentation && !globalScene.trainer.visible,
+    });
     this.end();
     return globalScene.phaseManager.getCurrentPhase() !== this;
   }

@@ -7738,3 +7738,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   the same readiness projector after DATA application and withholds `controlInstalled` until the exact active
   sprites and info bars exist. A failure-first projection-only regression models DATA-first party permutation,
   delayed atlas completion, old-field retention, and final exact field replacement.
+- The first exact rerun at `eb1718da0` stopped before Chromium on one unused local caught by the owned-file
+  formatter. Corrected SHA `ba30d35f6` passed the full bundle/static and focused reorder preflight; real-browser
+  run `30926493613` is the authoritative animations-on Check Team proof and must not be replaced by the earlier
+  matrix-dispatch failure `30925644568`, whose build was green but whose journey job was never created.
+- Paired browser artifacts and the latest staging logs expose a separate guest-only trainer asymmetry: the host
+  executes `ReturnPhase -> ShowTrainerPhase -> NextEncounterPhase`, while the signed V2 renderer went directly
+  to `NextEncounterPhase` and the guest branch of `ShowTrainerPhase` explicitly hid the trainer. The signed
+  destination tail now queues a presentation-authorized trainer phase before trainer/ME/new-biome encounters.
+  That phase hides only Pokemon sprite/info layers (mechanical field membership and checksum stay intact),
+  renders the normal trainer tween, and leaves the authoritative encounter projector to reveal the destination
+  field. Unsigned/stale guest trainer phases remain fail-closed. New CI-only positive evidence requires this cue
+  plus enemy-trainer intro and victory presentation on both real browsers; final-hidden cleanup alone no longer
+  qualifies the lifecycle.
