@@ -326,6 +326,7 @@ test("action history compares turns only within the same wave", () => {
   ];
   const priorWaveReport = auditCombatContractV4Batches([priorWaveFixture]);
   assert.equal(priorWaveReport.findings.hard.future_action_history, undefined);
+  assert.equal(priorWaveReport.corpus.actionHistoryRelations["decision:unknown:prior-wave"], 1);
 
   const futureFixture = batch();
   futureFixture.events[0].record.observation.previousActions = [
@@ -333,6 +334,7 @@ test("action history compares turns only within the same wave", () => {
   ];
   const futureReport = auditCombatContractV4Batches([futureFixture]);
   assert.equal(futureReport.findings.hard.future_action_history.count, 1);
+  assert.equal(futureReport.corpus.actionHistoryRelations["decision:unknown:same-wave-future+1"], 1);
 });
 
 test("invalid labels and broken joins quarantine the episode without exposing raw ids", () => {

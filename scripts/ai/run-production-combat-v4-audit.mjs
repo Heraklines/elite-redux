@@ -30,6 +30,7 @@ function parseArgs(argv) {
   const args = {
     output: resolve("ai-report/production-v4-semantic-audit"),
     maxInvalidObjects: 100,
+    maxSelectedObjects: null,
     shards: DEFAULT_AUDIT_SHARDS,
     privatePolicyOutput: null,
   };
@@ -41,6 +42,8 @@ function parseArgs(argv) {
       args.output = resolve(value);
     } else if (name === "--max-invalid-objects" && /^\d+$/u.test(value ?? "")) {
       args.maxInvalidObjects = Number.parseInt(value, 10);
+    } else if (name === "--max-selected-objects" && /^\d+$/u.test(value ?? "") && Number.parseInt(value, 10) > 0) {
+      args.maxSelectedObjects = Number.parseInt(value, 10);
     } else if (name === "--shards" && /^\d+$/u.test(value ?? "") && Number.parseInt(value, 10) > 0) {
       args.shards = Number.parseInt(value, 10);
     } else if (name === "--private-policy-out" && value) {
@@ -182,7 +185,7 @@ async function auditShard(path, crossShardRepeatedSessions, onEpisodeFinished) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, ephemeral sharding, and bounded error accounting share one lifecycle.
-async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount, privatePolicyOutput) {
+async function streamAudit(exportUrl, token, maxInvalidObjects, maxSelectedObjects, shardCount, privatePolicyOutput) {
   const scratch = scratchDirectory();
   const spool = openShardSpool(scratch, shardCount);
   let privatePolicyDescriptor = null;
@@ -252,6 +255,10 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount, priv
         }
         state.cursor =
           response.headers.get("x-er-truncated") === "true" ? (response.headers.get("x-er-next-cursor") ?? "") : "";
+        if (maxSelectedObjects != null && state.selectedObjects >= maxSelectedObjects) {
+          state.cursor = "";
+          state.truncatedByObjectLimit = true;
+        }
         if (state.listedObjects % 1_000 < PAGE_SIZE || !state.cursor) {
           console.error(
             JSON.stringify({
@@ -300,6 +307,7 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount, priv
       invalidObjects: state.invalidObjects,
       invalidObjectReasons: state.invalidObjectReasons,
       policyDiagnosticDecisionsWritten,
+      truncatedByObjectLimit: state.truncatedByObjectLimit === true,
     });
     report.corpus.repeatedPayloads += crossShardRepeatedPayloads;
     return report;
@@ -378,6 +386,7 @@ function markdownReport(report) {
         dictionaryHashes: corpus.dictionaryHashes,
         battleOutcomes: corpus.battleOutcomes,
         runOutcomes: corpus.runOutcomes,
+        actionHistoryRelations: corpus.actionHistoryRelations,
         sourceSplits: eligibility.sourceSplits,
       },
       null,
@@ -404,7 +413,14 @@ async function main() {
       throw new Error("private policy output must remain under RUNNER_TEMP");
     }
   }
-  const report = await streamAudit(exportUrl, token, args.maxInvalidObjects, args.shards, args.privatePolicyOutput);
+  const report = await streamAudit(
+    exportUrl,
+    token,
+    args.maxInvalidObjects,
+    args.maxSelectedObjects,
+    args.shards,
+    args.privatePolicyOutput,
+  );
   mkdirSync(args.output, { recursive: true });
   writeFileSync(`${args.output}/production-v4-semantic-audit.json`, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(`${args.output}/production-v4-semantic-audit.md`, markdownReport(report));

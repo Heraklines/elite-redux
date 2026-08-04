@@ -365,5 +365,7 @@ describe.skipIf(!RUN)("combat contract live harness", () => {
     );
     const observation = snapshotErCombatObservation(game.scene, { previousActions: [...committed, ...resolved] });
     expect(observation.previousActions).toHaveLength(committed.length + resolved.length);
+    expect(observation.previousActions.every(action => action.turn <= observation.turn)).toBe(true);
+    expect(new Set(observation.previousActions.map(action => action.turn))).toEqual(new Set([observation.turn]));
   });
 });

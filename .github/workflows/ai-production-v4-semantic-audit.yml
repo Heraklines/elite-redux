@@ -5,6 +5,11 @@ name: AI Production V4 Semantic Audit (Read-Only)
 # corpus. Only aggregate reports with salted example IDs are uploaded.
 on:
   workflow_dispatch:
+    inputs:
+      max_selected_objects:
+        description: Optional bounded object sample for fast aggregate diagnostics (0 audits all)
+        required: false
+        default: "0"
 
 permissions:
   contents: read
@@ -38,11 +43,14 @@ jobs:
         env:
           TELEMETRY_EXPORT_TOKEN: ${{ secrets.ER_AI_TELEMETRY_EXPORT_TOKEN }}
           TELEMETRY_EXPORT_URL: https://er-ai-telemetry-export.heraklines.workers.dev/v1/export
-        run: >-
-          node scripts/ai/run-production-combat-v4-audit.mjs
-          --max-invalid-objects 100
-          --shards 128
-          --out ai-report
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--max-invalid-objects 100 --shards 128 --out ai-report)
+          if [[ "${{ inputs.max_selected_objects }}" =~ ^[1-9][0-9]*$ ]]; then
+            args+=(--max-selected-objects "${{ inputs.max_selected_objects }}")
+          fi
+          node scripts/ai/run-production-combat-v4-audit.mjs "${args[@]}"
       - name: Publish sanitized audit summary
         shell: bash
         run: |

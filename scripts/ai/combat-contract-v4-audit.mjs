@@ -120,6 +120,7 @@ function makeEpisode(envelope) {
     hardFindings: makeFindingStore(),
     incompleteFindings: makeFindingStore(),
     diagnosticFindings: makeFindingStore(),
+    actionHistoryRelations: {},
   };
 }
 
@@ -155,8 +156,28 @@ function validateRecordIdentity(record, episode, context) {
   }
 }
 
+function temporalRelation(action, observation, historyWave) {
+  if (!Number.isInteger(action?.turn) || historyWave == null) {
+    return "invalid";
+  }
+  if (historyWave < observation.wave) {
+    return "prior-wave";
+  }
+  if (historyWave > observation.wave) {
+    return "future-wave";
+  }
+  const delta = action.turn - observation.turn;
+  if (delta < 0) {
+    return "same-wave-past";
+  }
+  if (delta === 0) {
+    return "same-wave-current";
+  }
+  return `same-wave-future+${Math.min(delta, 4)}${delta > 4 ? "+" : ""}`;
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Independent schema invariants stay visible in one validator.
-function validateObservation(observation, episode, context) {
+function validateObservation(observation, episode, context, observationKind) {
   if (observation?.version !== CONTRACT_VERSION || observation?.perspective !== "self") {
     episodeFinding(episode, "invalid_observation_header", true, context);
     return;
@@ -215,9 +236,11 @@ function validateObservation(observation, episode, context) {
   }
   for (const action of observation.previousActions ?? []) {
     const historyWave = jointActionWave(action.jointActionId, episode.id);
-    if (!Number.isInteger(action.turn) || historyWave == null) {
+    const relation = temporalRelation(action, observation, historyWave);
+    increment(episode.actionHistoryRelations, `${observationKind}:${action.phase ?? "unknown"}:${relation}`);
+    if (relation === "invalid") {
       episodeFinding(episode, "invalid_action_history_anchor", true, context);
-    } else if (historyWave > observation.wave || (historyWave === observation.wave && action.turn > observation.turn)) {
+    } else if (relation === "future-wave" || relation.startsWith("same-wave-future+")) {
       episodeFinding(episode, "future_action_history", true, context);
     }
   }
@@ -268,7 +291,7 @@ function validateDecision(record, envelope, episode) {
   if (typeof record?.jointActionId !== "string" || !record.jointActionId.startsWith(`${record.episodeId}:`)) {
     episodeFinding(episode, "unstable_joint_action_id", true, context);
   }
-  validateObservation(record?.observation, episode, context);
+  validateObservation(record?.observation, episode, context, "decision");
   const candidates = Array.isArray(record?.candidates) ? record.candidates : [];
   const candidateIds = candidates.map(candidate => candidate?.id);
   const candidateSet = new Set(candidateIds);
@@ -341,7 +364,7 @@ function validateAuxiliaryDecision(record, envelope, episode) {
   if (!new Set(["ball", "run"]).has(record?.action?.kind)) {
     episodeFinding(episode, "invalid_auxiliary_action", true, context);
   }
-  validateObservation(record?.observation, episode, context);
+  validateObservation(record?.observation, episode, context, "auxiliary");
 }
 
 function validateTransition(record, envelope, episode) {
@@ -385,7 +408,7 @@ function validateTransition(record, envelope, episode) {
   if (rewards.terminal !== expectedTerminalReward) {
     episodeFinding(episode, "terminal_reward_mismatch", true, context);
   }
-  validateObservation(record?.resolvedObservation, episode, context);
+  validateObservation(record?.resolvedObservation, episode, context, "transition");
 }
 
 function validateBattleTerminal(record, event, envelope, episode) {
@@ -537,6 +560,7 @@ export function createCombatContractV4Audit({ onEpisodeFinished } = {}) {
     formats: {},
     battleOutcomes: {},
     runOutcomes: {},
+    actionHistoryRelations: {},
     exactDuplicateBatches: 0,
     conflictingBatchSequences: 0,
     repeatedPayloads: 0,
@@ -715,6 +739,7 @@ export function createCombatContractV4Audit({ onEpisodeFinished } = {}) {
     }
     for (const episode of episodes.values()) {
       const result = finishEpisode(episode, globalFindings);
+      mergeNumericMap(counts.actionHistoryRelations, episode.actionHistoryRelations);
       eligibility.hardQuarantinedEpisodes += Number(result.hardQuarantined);
       eligibility.incompleteEpisodes += Number(result.incomplete);
       eligibility.policyDiagnosticEligibleEpisodes += Number(result.policyDiagnosticEligible);
@@ -807,6 +832,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     formats: {},
     battleOutcomes: {},
     runOutcomes: {},
+    actionHistoryRelations: {},
     exactDuplicateBatches: 0,
     conflictingBatchSequences: 0,
     repeatedPayloads: 0,
@@ -839,6 +865,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     "formats",
     "battleOutcomes",
     "runOutcomes",
+    "actionHistoryRelations",
   ];
   const eligibility = {
     hardQuarantinedEpisodes: 0,
