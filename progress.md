@@ -7609,4 +7609,6 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The migration covers the shared classic/challenge/GameManager launchers, developer scenarios, replay tools,
   the ER player regression, and all detached Showdown test fixtures. The Showdown/tournament production modes
   were not changed. A fast source contract pins the captured-phase entrypoint so future fixtures cannot silently
-  restore the old unrelated-phase advancement dependency.
+  restore the old unrelated-phase advancement dependency. The entrypoint captures the owning phase manager as
+  well as its current phase before asynchronous construction, so a later global-scene swap cannot redirect the
+  completion into another browser/test scene.

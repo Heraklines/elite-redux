@@ -723,7 +723,8 @@ export class SelectStarterPhase extends Phase {
     startingLevels?: readonly number[],
     pauseEvolutions = false,
   ) {
-    const completingPhase = globalScene.phaseManager.getCurrentPhase();
+    const completingPhaseManager = globalScene.phaseManager;
+    const completingPhase = completingPhaseManager.getCurrentPhase();
     return this.initBattle(
       starters,
       ignoreMovesetValidation,
@@ -732,6 +733,7 @@ export class SelectStarterPhase extends Phase {
       startingLevels,
       pauseEvolutions,
       completingPhase,
+      completingPhaseManager,
     );
   }
 
@@ -746,6 +748,7 @@ export class SelectStarterPhase extends Phase {
    * @param pauseEvolutions - Test/dev launch only: persistently pause evolution on the constructed party.
    * @param completingPhase - Exact phase authorized to advance after asynchronous construction. Defaults to
    *   this live SelectStarterPhase; detached test/dev launchers must capture the current phase explicitly.
+   * @param completingPhaseManager - Exact manager which owned `completingPhase` when construction began.
    */
   initBattle(
     starters: Starter[],
@@ -755,6 +758,7 @@ export class SelectStarterPhase extends Phase {
     startingLevels?: readonly number[],
     pauseEvolutions = false,
     completingPhase: Phase = this,
+    completingPhaseManager = globalScene.phaseManager,
   ) {
     const cappedStarters = enforceErBlackShinyStarterLimit(starters);
     if (cappedStarters.some((starter, index) => starter !== starters[index])) {
@@ -1046,7 +1050,7 @@ export class SelectStarterPhase extends Phase {
       if (completingPhase === this) {
         this.end();
       } else {
-        globalScene.phaseManager.shiftPhase(completingPhase);
+        completingPhaseManager.shiftPhase(completingPhase);
       }
     });
   }

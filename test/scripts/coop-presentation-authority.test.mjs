@@ -875,12 +875,13 @@ test("detached battle launchers advance only the phase captured before asynchron
 
   assert.match(
     starter,
-    /initBattleFromCurrentPhase\([\s\S]+const completingPhase = globalScene\.phaseManager\.getCurrentPhase\(\)[\s\S]+this\.initBattle\([\s\S]+completingPhase/u,
+    /initBattleFromCurrentPhase\([\s\S]+const completingPhaseManager = globalScene\.phaseManager[\s\S]+const completingPhase = completingPhaseManager\.getCurrentPhase\(\)[\s\S]+this\.initBattle\([\s\S]+completingPhase,[\s\S]+completingPhaseManager/u,
   );
   assert.match(starter, /completingPhase: Phase = this/u);
+  assert.match(starter, /completingPhaseManager = globalScene\.phaseManager/u);
   assert.match(
     starter,
-    /if \(completingPhase === this\) \{[\s\S]+this\.end\(\)[\s\S]+\} else \{[\s\S]+shiftPhase\(completingPhase\)/u,
+    /if \(completingPhase === this\) \{[\s\S]+this\.end\(\)[\s\S]+\} else \{[\s\S]+completingPhaseManager\.shiftPhase\(completingPhase\)/u,
   );
   for (const [name, launcher] of [
     ["classic helper", classic],
