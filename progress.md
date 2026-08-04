@@ -7678,3 +7678,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   could resolve. The regression now waits for the actual `TurnInitPhase` actionability boundary and retains all
   field/container/sprite/info-bar assertions. The other red was the already-corrected static import/unused-arg
   pair; neither red demonstrates a production defect.
+- Corrected gate `30884814489` is green on exact SHA `1d1ec0adb`: all 33 jobs passed, including every
+  deterministic Authority V2 shard, mutation assurance, browser-native WebRTC/rejoin, and static contracts.
+- The final animations-enabled registered-interactions run `30885322016` reached the wave-2 Fun and Games
+  battle with both sprites present and both engines progressing through turn 2, but the browser driver waited
+  for an impossible second turn-1 command owner. The authority's one `CommandPhase` emitted `command:command`
+  and then `command:fight` with the same exact address and `phaseInstance=53`; the append-only scanner counted
+  those two views of one menu as two battler commands. The driver now identities a decision by browser, exact
+  address, and runtime phase instance, retires same-instance submenu aliases, and preserves two real same-seat
+  battler commands because their phase instances differ. A failure-first pure regression reproduces the exact
+  animation-on ordering and requires the alias to be retired before the final-owner presentation proof.

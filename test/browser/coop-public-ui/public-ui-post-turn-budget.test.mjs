@@ -65,7 +65,7 @@ class FakeEvidence {
   }
 }
 
-function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }, phaseInstance = null) {
   return {
     kind: "browser-surface2",
     observation: {
@@ -78,11 +78,12 @@ function ownedCommand(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
       localSeat,
       seatsWithInput: [localSeat],
       ready: { handlerActive: true },
+      ...(phaseInstance == null ? {} : { phaseInstance }),
     },
   };
 }
 
-function ownedFight(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
+function ownedFight(localSeat, address = { epoch: 73, wave: 1, turn: 2 }, phaseInstance = null) {
   return {
     kind: "browser-surface2",
     observation: {
@@ -96,6 +97,7 @@ function ownedFight(localSeat, address = { epoch: 73, wave: 1, turn: 2 }) {
       localSeat,
       seatsWithInput: [localSeat],
       ready: { handlerActive: true },
+      ...(phaseInstance == null ? {} : { phaseInstance }),
     },
   };
 }
@@ -1221,6 +1223,99 @@ test("sequential command driver accepts two same-address battler commands from o
   );
   assert.deepEqual(result.commandPartition.omitted, [{ label: "depleted", seat: 1 }]);
   assert.equal(result.commandPartition.collectionClosed.phase, "MovePhase");
+});
+
+test("sequential command driver retires the same CommandPhase fight submenu without inventing a second owner", async () => {
+  const address = { epoch: 73, wave: 2, turn: 1 };
+  const authorityEvidence = new FakeEvidence("authority");
+  const watcherEvidence = new FakeEvidence("watcher");
+  authorityEvidence.push(ownedCommand(0, address, 53));
+  watcherEvidence.push({
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "command",
+      surfaceId: "command:watcher",
+      phase: "CoopReplayTurnPhase",
+      uiMode: "MESSAGE",
+      address,
+      localSeat: 1,
+      seatsWithInput: [],
+      ready: { handlerActive: false },
+    },
+  });
+
+  const movePhase = {
+    kind: "browser-surface2",
+    observation: {
+      operationClass: "battle-progress",
+      surfaceId: "battle:message",
+      phase: "MovePhase",
+      localRole: "host",
+      address,
+    },
+  };
+  let injectCollectionClose = false;
+  const findLastSemanticSurface = authorityEvidence.findLastSemanticSurface.bind(authorityEvidence);
+  authorityEvidence.findLastSemanticSurface = (...args) => {
+    const event = findLastSemanticSurface(...args);
+    if (injectCollectionClose && event?.observation?.surfaceId === "command:fight") {
+      injectCollectionClose = false;
+      authorityEvidence.push(movePhase);
+    }
+    return event;
+  };
+
+  const order = [];
+  const authority = {
+    label: "authority",
+    publicRole: "host",
+    publicSeat: 0,
+    evidence: authorityEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      order.push("authority");
+      authorityEvidence.push(ownedFight(0, address, 53));
+      injectCollectionClose = true;
+    },
+  };
+  const watcher = {
+    label: "watcher",
+    publicRole: "guest",
+    publicSeat: 1,
+    evidence: watcherEvidence,
+    checkpoint: async () => {},
+    sequence: async () => {
+      throw new Error("a passive watcher must not receive a command key");
+    },
+  };
+  const rig = {
+    clients: { authority, watcher },
+    lastSharedSurfaceAddress: new Map(),
+    config: { timeoutMs: 1_000 },
+    assertPresentationLedgerAtSharedCommand: async () => {
+      throw new Error("the same CommandPhase submenu must not be treated as a final command owner");
+    },
+  };
+
+  const result = await DuoPublicUiRig.prototype.driveSequentialCommandRound.call(
+    rig,
+    { authority: 0, watcher: 0 },
+    ["Space"],
+    "wave-2-turn-1",
+  );
+
+  assert.deepEqual(order, ["authority"]);
+  assert.equal(result.commandEventHistory.authority.length, 1);
+  assert.deepEqual(
+    result.commandPartition.owners.map(owner => owner.label),
+    ["authority"],
+  );
+  assert.deepEqual(result.commandPartition.omitted, [{ label: "watcher", seat: 1 }]);
+  assert.equal(result.commandPartition.collectionClosed.phase, "MovePhase");
+  assert.ok(
+    authorityEvidence.events.some(event => event.kind === "sequential-command-submenu-superseded"),
+    "the append-only command:fight alias is explicitly retired",
+  );
 });
 
 test("a passive command watcher starts at the current tail instead of resurrecting an old reward", async () => {

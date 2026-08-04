@@ -378,6 +378,37 @@ function findOwnedCommandOrTerminal(client, from) {
 }
 
 /**
+ * Stable identity for one actionable CommandPhase instance.
+ *
+ * Opening FIGHT replaces the top-level COMMAND surface without creating another
+ * battler command. Conversely, a surviving seat can legitimately receive two
+ * CommandPhase instances at the same turn address when it owns both active
+ * battlers. The runtime-owned phase instance is therefore the discriminator;
+ * surfaceId/uiMode is deliberately excluded from the returned identity.
+ */
+function commandPhaseIdentity(client, event) {
+  const observation = event?.kind === "browser-surface2" ? event.observation : null;
+  const address = observation?.address;
+  const actionableCommand =
+    (observation?.surfaceId === "command:command"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "COMMAND")
+    || (observation?.surfaceId === "command:fight"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "FIGHT");
+  if (
+    !actionableCommand
+    || !Number.isSafeInteger(address?.epoch)
+    || !Number.isSafeInteger(address?.wave)
+    || !Number.isSafeInteger(address?.turn)
+    || !Number.isSafeInteger(observation?.phaseInstance)
+  ) {
+    return null;
+  }
+  return `${client.label}:${address.epoch}:${address.wave}:${address.turn}:${observation.phaseInstance}`;
+}
+
+/**
  * Anchor a new command round at the newest public command admission, regardless of whether
  * that path emitted the legacy console marker. Same-tab resume publishes the semantic V2
  * command surface without repeating `CommandPhase -> LOCAL UI`; falling back to zero there
@@ -4461,6 +4492,7 @@ export class DuoPublicUiRig {
     const commandEvents = {};
     const commandEventHistory = Object.fromEntries(clients.map(client => [client.label, []]));
     const consumedCommandEvents = new Set();
+    const consumedCommandPhases = new Set();
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     let advanceBattlePrompt = null;
     let promptCommandAddress = null;
@@ -4598,6 +4630,25 @@ export class DuoPublicUiRig {
         if (consumedCommandEvents.has(commandEventKey)) {
           continue;
         }
+        const phaseIdentity = commandPhaseIdentity(client, event);
+        if (phaseIdentity != null && consumedCommandPhases.has(phaseIdentity)) {
+          // Animations-on Fun & Games run 30885322016: navigating the first owner's top-level
+          // COMMAND surface emitted a later command:fight observation for the SAME CommandPhase.
+          // The append-only scanner mistook that submenu for a second battler owner and waited for
+          // an impossible reciprocal frontier even though both engines had already advanced to the
+          // next turn. Retire only this alias observation. A genuine second battler has a distinct
+          // runtime phaseInstance and remains actionable at the same authority address.
+          consumedCommandEvents.add(commandEventKey);
+          from[client.label] = event.index + 1;
+          client.evidence.record("sequential-command-submenu-superseded", {
+            purpose,
+            commandEventIndex: event.index,
+            phaseIdentity,
+            surfaceId: event.observation.surfaceId,
+          });
+          droveCommand = true;
+          break;
+        }
         const commandAddress = event.observation?.address;
         if (
           submittedCommandAddress != null
@@ -4618,6 +4669,9 @@ export class DuoPublicUiRig {
         commandEvents[client.label] = event;
         commandEventHistory[client.label].push(event);
         consumedCommandEvents.add(commandEventKey);
+        if (phaseIdentity != null) {
+          consumedCommandPhases.add(phaseIdentity);
+        }
         outcomeCursors[client.label] = client.evidence.cursor();
         await client.checkpoint(`${purpose}-${client.label}-command`);
         const beforeSubmissionCursors = Object.fromEntries(
