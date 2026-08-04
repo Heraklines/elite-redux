@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install pinned Kaggle client
-        run: python -m pip install kaggle==1.8.4
+        run: python -m pip install kaggle==2.2.4
       - name: Wait for private GPU kernel
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}

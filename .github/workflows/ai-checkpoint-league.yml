@@ -75,7 +75,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install pinned Kaggle client
-        run: python -m pip install kaggle==1.8.4
+        run: python -m pip install kaggle==2.2.4
       - name: Download private starting checkpoint
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -429,7 +429,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install pinned Kaggle client
-        run: python -m pip install kaggle==1.8.4
+        run: python -m pip install kaggle==2.2.4
       - name: Build private Kaggle dataset and kernel manifests
         env:
           DATASET_SLUG: ${{ inputs.kaggle_dataset_slug }}
