@@ -92,8 +92,12 @@ describe("co-op live-cursor mirror (#633)", () => {
     };
     const watcherEngine: CoopUiMirrorEngine = {
       getMode: () => MODE,
-      applyButton: button => applied.push(`button:${button}`),
-      applyState: state => applied.push(`state:${state.join(",")}`),
+      applyButton: button => {
+        applied.push(`button:${button}`);
+      },
+      applyState: state => {
+        applied.push(`state:${state.join(",")}`);
+      },
     };
     owner.attach(ownerEngine);
     watcher.attach(watcherEngine);
@@ -161,7 +165,9 @@ describe("co-op live-cursor mirror (#633)", () => {
     watcher.attach({
       getMode: () => MODE,
       applyButton: () => undefined,
-      applyState: state => applied.push([...state]),
+      applyState: state => {
+        applied.push([...state]);
+      },
     });
     owner.beginSession("owner", MODE, SEQ);
     watcher.beginSession("watcher", MODE, SEQ);
