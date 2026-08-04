@@ -2519,17 +2519,10 @@ function partySlotCanSendOut(handler: PartyUiHandler, pokemon: Pokemon): boolean
 
 function partySlotCanReplace(game: GameManager, handler: PartyUiHandler, pokemon: Pokemon, index: number): boolean {
   const battlerCount = game.scene.currentBattle.getBattlerCount();
-  const isNormalBench = index >= battlerCount;
-  const handlerState = handler as unknown as { fieldIndex?: number; partyUiMode?: PartyUiMode };
-  const isOrphanedSoloPrefix =
-    handlerState.partyUiMode === PartyUiMode.FAINT_SWITCH
-    && !game.scene.gameMode.isCoop
-    && !game.scene.gameMode.isShowdown
-    && index !== handlerState.fieldIndex
-    && !pokemon.isOnField();
-  return (
-    (isNormalBench || isOrphanedSoloPrefix) && pokemon.isAllowedInBattle() && partySlotCanSendOut(handler, pokemon)
-  );
+  // PartyUiHandler only exposes SEND_OUT/PASS_BATON for indices at or beyond
+  // battlerCount. A former field Pokemon can be off-field in the active prefix,
+  // but selecting it opens only the common options and strands the public-UI driver.
+  return index >= battlerCount && pokemon.isAllowedInBattle() && partySlotCanSendOut(handler, pokemon);
 }
 
 function driveParty(game: GameManager, st: RunState, phaseName: string): boolean {
