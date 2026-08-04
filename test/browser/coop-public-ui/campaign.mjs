@@ -41,6 +41,8 @@ const TURN_PROGRESS =
 const REPLACEMENT_PHASE_START = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
+const ORDERED_TRAINER_VICTORY =
+  /\[coop:v2-control\] projected ordered trainer victory rev=\d+ wave=(\d+) turn=(\d+)/u;
 const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set([
   "MessagePhase",
   "TrainerVictoryPhase",
@@ -935,8 +937,21 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   if (isSuccessorEvolution) {
     return boundaryEvents.some(candidate => BATTLE_END_PHASE.test(candidate.text ?? ""));
   }
-  return boundaryEvents.some(
-    candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""),
+  // The Authority V2 renderer does not execute BattleEndPhase for a trainer win. Its signed
+  // trainer-victory-open entry projects TrainerVictoryPhase directly, and that finite presentation can
+  // legitimately queue account-local voucher ModifierRewardPhase prompts. Require the exact projection's
+  // authenticated wave/turn marker before admitting those successor-address prompts. A bare phase name (or
+  // a marker from another battle) remains insufficient, so this cannot turn an arbitrary future-turn message
+  // into input authority. Run 30862517427 otherwise left the guest's real voucher popup untouched while the
+  // host waited at shop:5:4 until rendezvous recovery exhausted.
+  const hasExactOrderedTrainerVictory = boundaryEvents.some(candidate => {
+    const match = ORDERED_TRAINER_VICTORY.exec(candidate.text ?? "");
+    return match != null && Number(match[1]) === address.wave && Number(match[2]) === address.turn;
+  });
+  return (
+    boundaryEvents.some(
+      candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""),
+    ) || hasExactOrderedTrainerVictory
   );
 }
 

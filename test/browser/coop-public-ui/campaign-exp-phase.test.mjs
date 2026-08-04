@@ -1485,6 +1485,47 @@ test("successor-address trainer settlement drains money and modifier reward prom
   assert.equal(await advance(), false, "each trainer-settlement prompt generation receives exactly one action");
 });
 
+test("the retained renderer drains account-local trainer rewards only after its exact V2 projection", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "retained-renderer-trainer-settlement", {
+    expectedCommandAddress: "7:5:5",
+  });
+
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 50, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "a renderer-local successor prompt has no authority from its phase name alone");
+
+  renderer.evidence.pushConsole("[coop:v2-control] projected ordered trainer victory rev=25 wave=4 turn=6");
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 51, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "a trainer-victory projection from another wave remains fail-closed");
+
+  renderer.evidence.pushConsole("[coop:v2-control] projected ordered trainer victory rev=25 wave=5 turn=6");
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 52, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the exact retained trainer-victory projection authorizes its voucher popup");
+  assert.deepEqual(authority.presses, [], "the authority has no prompt and receives no speculative input");
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(await advance(), false, "the exact renderer prompt generation receives one action only");
+});
+
 test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
