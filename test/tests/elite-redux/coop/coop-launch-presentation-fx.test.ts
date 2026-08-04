@@ -22,8 +22,8 @@
 // =============================================================================
 
 import { settleCoopFieldPresentationReady } from "#data/elite-redux/coop/coop-field-presentation";
-import { TrainerSlot } from "#enums/trainer-slot";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import { installHeadlessPlayerAtlasCompletionModel } from "#test/tools/coop-duo-harness";

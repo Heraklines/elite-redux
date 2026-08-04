@@ -1420,7 +1420,6 @@ const headlessWrappedPokemon = new WeakMap<BattleScene, WeakSet<object>>();
 const headlessCreationHooksInstalled = new WeakSet<BattleScene>();
 
 function modelHeadlessPokemonAtlasCompletion(
-  scene: BattleScene,
   pokemon: Pokemon,
   releasedTextureKeys: Set<string>,
   releasedAnimationKeys: Set<string>,
@@ -1488,7 +1487,6 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     scene.addPlayerPokemon = (...args: Parameters<BattleScene["addPlayerPokemon"]>) => {
       const pokemon = originalAddPlayerPokemon(...args);
       modelHeadlessPokemonAtlasCompletion(
-        scene,
         pokemon,
         releasedTextureKeys,
         releasedAnimationKeys,
@@ -1500,7 +1498,6 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     scene.addEnemyPokemon = (...args: Parameters<BattleScene["addEnemyPokemon"]>) => {
       const pokemon = originalAddEnemyPokemon(...args);
       modelHeadlessPokemonAtlasCompletion(
-        scene,
         pokemon,
         releasedTextureKeys,
         releasedAnimationKeys,
@@ -1516,7 +1513,6 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
   // inside one Authority V2 continuation, before a phase-boundary rescan could ever observe the new object.
   for (const pokemon of [...scene.getPlayerParty(), ...scene.getEnemyParty()]) {
     modelHeadlessPokemonAtlasCompletion(
-      scene,
       pokemon,
       releasedTextureKeys,
       releasedAnimationKeys,
