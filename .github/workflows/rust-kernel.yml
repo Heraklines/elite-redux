@@ -109,83 +109,40 @@ jobs:
         env:
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
           ORACLE_BRANCH: ci/coop/v2-showdown-command-coordinate-20260720
-          EXPECTED_PROTOCOL: er-coop-47
-          EXPECTED_SCHEMA: "1"
-          EXPECTED_REPEAT: "250"
-          EXPECTED_REPEAT_RESULT: "250/250"
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import os
           import tomllib
           from pathlib import Path
 
           with Path("rust/source-lock.toml").open("rb") as stream:
               document = tomllib.load(stream)
 
-          def lookup(*paths):
-              for path in paths:
-                  value = document
-                  for key in path:
-                      if not isinstance(value, dict) or key not in value:
-                          break
-                      value = value[key]
-                  else:
-                      return value
-              raise SystemExit(f"source-lock.toml is missing one of: {paths!r}")
-
-          oracle_sha = lookup(("oracle_game_sha",), ("oracle_sha",), ("oracle", "game_sha"))
-          oracle_branch = lookup(("oracle_branch",), ("oracle", "branch"), ("branch",))
-          protocol = lookup(("protocol_version",), ("protocol", "version"), ("protocol",))
-          schema = lookup(("schema_version",), ("schema", "version"), ("schema",))
-          repeat_literal = document.get("repeat")
-          if isinstance(repeat_literal, str):
-              try:
-                  repeat_total, repeat_passed = (int(value) for value in repeat_literal.split("/", 1))
-              except (TypeError, ValueError):
-                  raise SystemExit(f"source-lock repeat must be N/N, got {repeat_literal!r}")
-          else:
-              repeat_total = lookup(
-                  ("repeat_count",),
-                  ("repeat_total",),
-                  ("repeat_expected",),
-                  ("export_repeat_count",),
-                  ("repeat", "total"),
-                  ("repeat", "expected"),
-              )
-              repeat_passed = lookup(
-                  ("repeat_passed",),
-                  ("repeat_passed_count",),
-                  ("repeat_matches",),
-                  ("repeat_completed",),
-                  ("export_repeat_passed",),
-                  ("export_repeat_matches",),
-                  ("repeat", "passed"),
-                  ("repeat", "matches"),
-                  ("repeat", "completed"),
-              )
-
           expected = {
-              "oracle_game_sha": os.environ["ORACLE_SHA"],
-              "oracle_branch": os.environ["ORACLE_BRANCH"],
-              "protocol": os.environ["EXPECTED_PROTOCOL"],
-              "schema": int(os.environ["EXPECTED_SCHEMA"]),
-              "repeat_total": int(os.environ["EXPECTED_REPEAT"]),
-              "repeat_passed": int(os.environ["EXPECTED_REPEAT"]),
+              "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+              "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+              "protocol_version": "er-coop-47",
+              "schema_version": 1,
+              "input_repeat_delay_ms": 250,
+              "input_repeat_interval_ms": 250,
           }
-          actual = {
-              "oracle_game_sha": oracle_sha,
-              "oracle_branch": oracle_branch,
-              "protocol": protocol,
-              "schema": schema,
-              "repeat_total": repeat_total,
-              "repeat_passed": repeat_passed,
-          }
-          if actual != expected:
-              raise SystemExit(f"source-lock metadata mismatch: expected {expected!r}, got {actual!r}")
-          if f"{repeat_total}/{repeat_passed}" != os.environ["EXPECTED_REPEAT_RESULT"]:
-              raise SystemExit("source-lock repeat is not exactly 250/250")
-          print("source-lock metadata: oracle SHA, branch, protocol, schema, and repeat are exact")
+          actual_keys = set(document)
+          expected_keys = set(expected)
+          if actual_keys != expected_keys:
+              missing = sorted(expected_keys - actual_keys)
+              unknown = sorted(actual_keys - expected_keys)
+              raise SystemExit(
+                  f"source-lock.toml fields must be exact; missing={missing!r}, unknown={unknown!r}"
+              )
+          for key, expected_value in expected.items():
+              actual_value = document[key]
+              if type(actual_value) is not type(expected_value) or actual_value != expected_value:
+                  raise SystemExit(
+                      f"source-lock.toml {key} must be {expected_value!r} "
+                      f"({type(expected_value).__name__}), got {actual_value!r} "
+                      f"({type(actual_value).__name__})"
+                  )
+          print("source-lock metadata matches the exact six-field contract")
           PY
 
           git fetch --no-tags origin \
@@ -302,7 +259,7 @@ jobs:
         working-directory: rust
         run: cargo metadata --locked --format-version 1 --no-deps
 
-      - name: Verify source lock and regenerate oracle fixtures
+      - name: Verify two-run exporter determinism
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         env:
@@ -312,21 +269,23 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           exporters=(scripts/export-kernel-*.mjs)
-          for exporter in "${exporters[@]}"; do
-            echo "Running deterministic kernel exporter: $exporter"
-            node "$exporter"
+          for pass in 1 2; do
+            echo "Running kernel exporters, determinism pass $pass/2"
+            for exporter in "${exporters[@]}"; do
+              node "$exporter"
+            done
+            if ! git diff --no-ext-diff --exit-code -- rust/source-lock.toml test/kernel-fixtures; then
+              echo "::error::Exporter determinism pass $pass/2 differs from the checked-in contract."
+              git diff --no-ext-diff -- rust/source-lock.toml test/kernel-fixtures
+              exit 1
+            fi
+            changed="$(git status --porcelain --untracked-files=all -- rust/source-lock.toml test/kernel-fixtures)"
+            if [[ -n "$changed" ]]; then
+              echo "::error::Exporter determinism pass $pass/2 produced untracked files:"
+              printf '%s\n' "$changed"
+              exit 1
+            fi
           done
-          if ! git diff --no-ext-diff --exit-code -- rust/source-lock.toml test/kernel-fixtures; then
-            echo "::error::Source lock or oracle fixtures are not reproducible; exporter output differs from the checked-in contract."
-            git diff --no-ext-diff -- rust/source-lock.toml test/kernel-fixtures
-            exit 1
-          fi
-          changed="$(git status --porcelain --untracked-files=all -- rust/source-lock.toml test/kernel-fixtures)"
-          if [[ -n "$changed" ]]; then
-            echo "::error::Source-lock or fixture regeneration produced untracked files:"
-            printf '%s\n' "$changed"
-            exit 1
-          fi
 
       - name: Write compact job summary and schema hash
         if: always()
