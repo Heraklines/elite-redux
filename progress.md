@@ -7655,3 +7655,16 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   to Biome relocating the long Wobbuffet authority comment through the boolean chain. The same predicate is now
   expressed as a named `hasNarrationLease` boolean with the authority explanation above it, eliminating the
   formatter ambiguity without changing the admitted states.
+- Exact build `1a60ad618` passed the complete journey build/seal static and contract stage, then deployed green
+  to staging in run `30882709713`; the canonical staging `version.json` reports that exact SHA. Production was
+  not touched. Its registered-interactions two-browser proof is run `30882551464` and remains protected while
+  the Wobbuffet KO/loss-narration continuation is exercised through the public UI.
+- The old full gate `30879903358` did not reveal another product-authority defect in its between-wave reds. Its
+  guest traces show Authority V2 reconstructing the correct wave/field, followed by the HEADLESS-only atlas
+  model leaving every newly constructed battler on `pkmn__sub` with no cache or animation entry. The unchanged
+  production presentation wall then correctly failed closed. The model previously scanned only Pokemon that
+  existed at a phase boundary; an authoritative state transaction can construct and call `loadAssets()` inside
+  one continuation, before another scan is possible. The harness now hooks both BattleScene Pokemon-creation
+  chokepoints synchronously and refreshes direct abbreviated re-mirrors, while still running the real loader
+  before modeling only Phaser's missing HEADLESS cache/live-key effects. A regression creates and loads a fresh
+  post-install enemy and requires the exact texture, animation, and live sprite key.
