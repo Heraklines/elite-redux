@@ -343,79 +343,37 @@ jobs:
           "$KAGGLE_USERNAME"
           "$AI_V4_DATASET_NAME"
           "$AI_V4_KERNEL_NAME"
-      - name: Publish private dataset and launch private GPU kernel
+      - name: Upload private dataset blob and seal finalization handoff
         if: ${{ !inputs.cpu_tree_only }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-          REUSE_EXISTING_DATASET: ${{ inputs.reuse_existing_dataset || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "$KAGGLE_USERNAME"
           test -n "$KAGGLE_KEY"
-          dataset_slug="$KAGGLE_USERNAME/$AI_V4_DATASET_NAME"
-          kernel_slug="$KAGGLE_USERNAME/$AI_V4_KERNEL_NAME"
-          dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
-          if [[ "$REUSE_EXISTING_DATASET" == "true" ]]; then
-            test -n "$dataset_status"
-            echo "Reusing existing private Kaggle dataset with status: $dataset_status"
-          elif [[ -n "$dataset_status" ]]; then
-            kaggle datasets version \
-              --path "$RUNNER_TEMP/ai-kaggle-dataset" \
-              --message "production v4 cut from $GITHUB_SHA"
-          else
-            kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
-          fi
-          for attempt in $(seq 1 360); do
-            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
-            [[ "$dataset_status" == "ready" ]] && break
-            if [[ "$dataset_status" == "error" || "$dataset_status" == "failed" ]]; then
-              echo "::error::Private Kaggle dataset entered terminal status: $dataset_status"
-              exit 1
-            fi
-            if (( attempt == 1 || attempt % 30 == 0 )); then
-              echo "Private Kaggle dataset status after $((attempt * 10))s: ${dataset_status:-unavailable}"
-            fi
-            sleep 10
-          done
-          if [[ "$dataset_status" != "ready" ]]; then
-            echo "::error::Private Kaggle dataset did not become ready within 60 minutes (status: ${dataset_status:-unavailable})"
-            exit 1
-          fi
-          verify_dir="$RUNNER_TEMP/kaggle-dataset-verification"
-          bundle_verified=false
-          for attempt in $(seq 1 30); do
-            rm -rf "$verify_dir"
-            mkdir -p "$verify_dir"
-            if kaggle datasets download "$dataset_slug" \
-              --path "$verify_dir" \
-              --force --quiet --unzip \
-              && python scripts/ai/verify_kaggle_training_bundle.py \
-                "$verify_dir" \
-                "$GITHUB_WORKSPACE"; then
-              bundle_verified=true
-              break
-            fi
-            echo "Private Kaggle dataset has not exposed the uploaded source hashes after $((attempt * 20))s"
-            sleep 20
-          done
-          if [[ "$bundle_verified" != "true" ]]; then
-            echo "::error::Private Kaggle dataset did not converge to the uploaded trainer sources"
-            exit 1
-          fi
-          if [[ "$REUSE_EXISTING_DATASET" != "true" ]]; then
-            kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
-          fi
+          mkdir -p "$RUNNER_TEMP/ai-kaggle-handoff"
+          python scripts/ai/stage_kaggle_dataset_handoff.py \
+            "$RUNNER_TEMP/ai-kaggle-dataset" \
+            "$RUNNER_TEMP/ai-kaggle-handoff/dataset-handoff.json"
           {
-            echo "### Private production-v4 GPU training"
-            echo "- Dataset: \`$dataset_slug\` (private)"
-            echo "- Kernel: \`$kernel_slug\` (private GPU)"
+            echo "### Private production-v4 GPU handoff"
+            echo "- Dataset: \`$KAGGLE_USERNAME/$AI_V4_DATASET_NAME\` (private)"
+            echo "- Raw bundle: uploaded directly from the ephemeral runner to Kaggle"
+            echo "- Finalization: pending trusted-client handoff"
             echo "- Source commit: \`$GITHUB_SHA\`"
             echo "- Production data build: \`$PRODUCTION_TRAINING_BUILD_SHA\`"
             echo "- Policy labels: victorious human battles only"
             echo "- Value labels: all completed battle wins and defeats"
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.cpu_tree_only }}
+        with:
+          name: ai-kaggle-dataset-handoff-${{ github.run_id }}
+          path: ${{ runner.temp }}/ai-kaggle-handoff/dataset-handoff.json
+          retention-days: 1
+          if-no-files-found: error
       - name: Train fresh battle-victory tree on the same remote cut
         env:
           TRAINER_TREE: ${{ github.event_name == 'push' && 'true' || inputs.trainer_tree || 'false' }}
