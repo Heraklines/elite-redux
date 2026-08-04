@@ -343,7 +343,7 @@ jobs:
           "$KAGGLE_USERNAME"
           "$AI_V4_DATASET_NAME"
           "$AI_V4_KERNEL_NAME"
-      - name: Upload private dataset blob and seal finalization handoff
+      - name: Publish private dataset directly and launch GPU kernel
         if: ${{ !inputs.cpu_tree_only }}
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -353,27 +353,37 @@ jobs:
           set -euo pipefail
           test -n "$KAGGLE_USERNAME"
           test -n "$KAGGLE_KEY"
-          mkdir -p "$RUNNER_TEMP/ai-kaggle-handoff"
-          python scripts/ai/stage_kaggle_dataset_handoff.py \
-            "$RUNNER_TEMP/ai-kaggle-dataset" \
-            "$RUNNER_TEMP/ai-kaggle-handoff/dataset-handoff.json"
+          dataset_slug="$KAGGLE_USERNAME/$AI_V4_DATASET_NAME"
+          if kaggle datasets status "$dataset_slug" >/dev/null 2>&1; then
+            kaggle datasets version \
+              --path "$RUNNER_TEMP/ai-kaggle-dataset" \
+              --message "production v4 refresh $GITHUB_SHA"
+          else
+            kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
+          fi
+          dataset_status=""
+          for _ in $(seq 1 60); do
+            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
+            if [[ "$dataset_status" == "ready" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$dataset_status" != "ready" ]]; then
+            echo "::error::Private Kaggle dataset did not become ready (status: ${dataset_status:-unavailable})"
+            exit 1
+          fi
+          kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
           {
             echo "### Private production-v4 GPU handoff"
             echo "- Dataset: \`$KAGGLE_USERNAME/$AI_V4_DATASET_NAME\` (private)"
-            echo "- Raw bundle: uploaded directly from the ephemeral runner to Kaggle"
-            echo "- Finalization: pending trusted-client handoff"
+            echo "- Raw bundle: transferred directly from the ephemeral runner to Kaggle"
+            echo "- GPU kernel: launched from the same runner after the dataset became ready"
             echo "- Source commit: \`$GITHUB_SHA\`"
             echo "- Production data build: \`$PRODUCTION_TRAINING_BUILD_SHA\`"
             echo "- Policy labels: victorious human battles only"
             echo "- Value labels: all completed battle wins and defeats"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: ${{ !inputs.cpu_tree_only }}
-        with:
-          name: ai-kaggle-dataset-handoff-${{ github.run_id }}
-          path: ${{ runner.temp }}/ai-kaggle-handoff/dataset-handoff.json
-          retention-days: 1
-          if-no-files-found: error
       - name: Train fresh battle-victory tree on the same remote cut
         if: ${{ inputs.cpu_tree_only || github.event_name == 'push' }}
         env:
