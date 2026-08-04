@@ -859,6 +859,11 @@ test("registered-interaction journey reaches Revival, Stormglass, and its Myster
   );
   assert.match(
     workflow,
+    /VITE_DEV_TOOLS:.*inputs\.journey == 'registered-interactions'.*'1'.*'0'/u,
+    "the focused journey's sealed bundle exposes staging's dev-gated Mystery picker and no other journey does",
+  );
+  assert.match(
+    workflow,
     /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=2/u,
     "the focused occurrence journey remains alive through a same-wave embedded battle and the completed Mystery terminal",
   );

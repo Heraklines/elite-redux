@@ -357,6 +357,10 @@ jobs:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
+          # Mystery difficulty is intentionally staging/dev-only. The focused registered-interactions
+          # journey must expose the same fifth public picker option as staging; every other journey keeps
+          # the ordinary four-difficulty production surface.
+          VITE_DEV_TOOLS: ${{ inputs.journey == 'registered-interactions' && '1' || '0' }}
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
           VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || (inputs.journey == 'party-mutating-rewards' && 'party-mutating-rewards') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}

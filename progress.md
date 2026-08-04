@@ -7471,5 +7471,30 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   battles cannot end the test early, receives only bounded extensions from proven public surface actions,
   and must observe the replica's exact Stormglass `ME_PRESENT:w2:t0` successor plus a completed paired
   Mystery terminal at a later wave. Remote-only qualification is still required.
-- Staging deployment `30865970812` was dispatched at exact SHA `f4362888a` so testers can exercise the
+- Staging deployment `30865970812` completed at exact SHA `f4362888a`; public `version.json` verifies
+  `github:f4362888a35ee483439b57c3dfa6ffb7cc9ad00a:run-30865970812.1`. Testers can exercise the
   product fixes while closure continues. Production remains untouched.
+
+## 2026-08-04 - final-candidate remote qualification in flight
+
+- Harness-only commit `de729b901` makes `registered-interactions` publicly select Mystery difficulty,
+  continue through wave 2, and fail closed unless the replica records the exact Stormglass successor
+  `ME_PRESENT:w2:t0` followed by a completed paired Mystery terminal on a later wave.
+- Full co-op gate `30866276318` is running on exact SHA `de729b901`; 30 of 32 jobs were already green with
+  no reds at the latest inspection, leaving only B11 and browser-native WebRTC active.
+- Strengthened two-browser journey `30866144196` is running on the same exact SHA. Live heartbeats prove
+  fresh-account onboarding, public Settings selection of 10x speed, public lobby pairing, and entry into
+  the real Mystery-difficulty setup; it has not yet reached the asserted Stormglass successor.
+- Continuous navigation journey `30865215640` remains active on product SHA `f4362888a` and must not be
+  cancelled. Live heartbeats show four completed waves and entry into the real wave-5 trainer battle after
+  alternating reward ownership; no park, desync, or product error has appeared.
+- Exact-candidate animations-enabled surface campaign `30866783630` was dispatched on `de729b901` so final
+  presentation qualification runs in parallel without exceeding the 32-runner co-op ceiling.
+- TODO: preserve all three browser runs; inspect compact/full artifacts rather than classifying from the
+  workflow badge alone; repair only a demonstrated mechanism; then freeze, fast-forward the feature branch,
+  and deploy the qualified exact tip to staging only. Production remains forbidden without explicit approval.
+- Registered run `30866144196` failed before gameplay with
+  `target not in options [youngster,ace,elite,hell]`: the journey requested the staging-only Mystery
+  difficulty but its sealed bundle omitted `VITE_DEV_TOOLS=1`. This is a harness build-parity defect, not a
+  product or Authority V2 failure. The scoped correction enables that flag only for `registered-interactions`
+  and adds a source contract preventing either omission or broad enablement.
