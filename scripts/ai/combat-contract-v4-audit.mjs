@@ -84,6 +84,25 @@ function serializeFindings(store) {
   return Object.fromEntries([...store.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
+function mergeNumericMap(target, source = {}) {
+  for (const [key, value] of Object.entries(source)) {
+    increment(target, key, value);
+  }
+}
+
+function mergeSerializedFindings(target, source = {}) {
+  for (const [code, finding] of Object.entries(source)) {
+    const merged = target[code] ?? { count: 0, examples: [] };
+    merged.count += finding.count;
+    for (const example of finding.examples ?? []) {
+      if (merged.examples.length < 5 && !merged.examples.includes(example)) {
+        merged.examples.push(example);
+      }
+    }
+    target[code] = merged;
+  }
+}
+
 function makeEpisode(envelope) {
   return {
     id: envelope.sessionId,
@@ -704,7 +723,16 @@ export function createCombatContractV4Audit() {
     return report;
   }
 
-  return { ingestBatch, finish };
+  function markEpisodeFinding(sessionId, code, hard = true) {
+    const episode = episodes.get(sessionId);
+    if (episode == null) {
+      return false;
+    }
+    episodeFinding(episode, code, hard, sessionId);
+    return true;
+  }
+
+  return { ingestBatch, markEpisodeFinding, finish };
 }
 
 export function auditCombatContractV4Batches(batches, extra = {}) {
@@ -713,4 +741,112 @@ export function auditCombatContractV4Batches(batches, extra = {}) {
     audit.ingestBatch(batch);
   }
   return audit.finish(extra);
+}
+
+export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, extra = {}) {
+  if (!Array.isArray(reports) || reports.length === 0) {
+    throw new Error("at least one shard audit report is required");
+  }
+  const corpus = {
+    batches: 0,
+    events: 0,
+    ignoredEvents: 0,
+    records: {},
+    modes: {},
+    difficulties: {},
+    gameModes: {},
+    envelopeSchemas: {},
+    contractVersions: {},
+    builds: {},
+    buildShas: {},
+    dictionaryHashes: {},
+    dexHashes: {},
+    featureSchemaVersions: {},
+    policySources: {},
+    battleTypes: {},
+    formats: {},
+    battleOutcomes: {},
+    runOutcomes: {},
+    exactDuplicateBatches: 0,
+    conflictingBatchSequences: 0,
+    repeatedPayloads: 0,
+    episodes: 0,
+    sourcePartitions: 0,
+  };
+  const corpusScalars = [
+    "batches",
+    "events",
+    "ignoredEvents",
+    "exactDuplicateBatches",
+    "conflictingBatchSequences",
+    "repeatedPayloads",
+    "episodes",
+  ];
+  const corpusMaps = [
+    "records",
+    "modes",
+    "difficulties",
+    "gameModes",
+    "envelopeSchemas",
+    "contractVersions",
+    "builds",
+    "buildShas",
+    "dictionaryHashes",
+    "dexHashes",
+    "featureSchemaVersions",
+    "policySources",
+    "battleTypes",
+    "formats",
+    "battleOutcomes",
+    "runOutcomes",
+  ];
+  const eligibility = {
+    hardQuarantinedEpisodes: 0,
+    incompleteEpisodes: 0,
+    policyDiagnosticEligibleEpisodes: 0,
+    completedOutcomeEligibleEpisodes: 0,
+    winningPolicyEligibleEpisodes: 0,
+    completedOutcomes: {},
+    sourceSplits: { train: 0, validation: 0, test: 0 },
+  };
+  const eligibilityScalars = [
+    "hardQuarantinedEpisodes",
+    "incompleteEpisodes",
+    "policyDiagnosticEligibleEpisodes",
+    "completedOutcomeEligibleEpisodes",
+    "winningPolicyEligibleEpisodes",
+  ];
+  const findings = { hard: {}, incomplete: {} };
+  for (const report of reports) {
+    if (report?.contractVersion !== CONTRACT_VERSION) {
+      throw new Error("cannot merge an audit report with a different contract version");
+    }
+    for (const key of corpusScalars) {
+      corpus[key] += report.corpus[key] ?? 0;
+    }
+    for (const key of corpusMaps) {
+      mergeNumericMap(corpus[key], report.corpus[key]);
+    }
+    for (const key of eligibilityScalars) {
+      eligibility[key] += report.eligibility[key] ?? 0;
+    }
+    mergeNumericMap(eligibility.completedOutcomes, report.eligibility.completedOutcomes);
+    mergeSerializedFindings(findings.hard, report.findings.hard);
+    mergeSerializedFindings(findings.incomplete, report.findings.incomplete);
+  }
+  const uniqueSources = new Set(sourcePartitionIds);
+  corpus.sourcePartitions = uniqueSources.size;
+  for (const sourcePartitionId of uniqueSources) {
+    eligibility.sourceSplits[sourceSplit(sourcePartitionId)]++;
+  }
+  return {
+    reportVersion: 1,
+    contractVersion: CONTRACT_VERSION,
+    generatedAt: new Date().toISOString(),
+    privacy: reports[0].privacy,
+    coverageLimitations: reports[0].coverageLimitations,
+    corpus: { ...extra, ...corpus },
+    eligibility,
+    findings,
+  };
 }

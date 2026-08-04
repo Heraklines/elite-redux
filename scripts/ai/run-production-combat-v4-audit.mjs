@@ -1,19 +1,36 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import {
+  closeSync,
+  createReadStream,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  rmSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { gunzipSync } from "node:zlib";
 import lzString from "lz-string";
-import { createCombatContractV4Audit } from "./combat-contract-v4-audit.mjs";
+import { createCombatContractV4Audit, mergeCombatContractV4AuditReports } from "./combat-contract-v4-audit.mjs";
 
 const { decompressFromBase64 } = lzString;
 const DEFAULT_EXPORT_URL = "https://er-ai-telemetry-export.heraklines.workers.dev/v1/export";
 const PAGE_SIZE = 100;
 const PAGE_TIMEOUT_MS = 120_000;
 const MAX_PAGE_ATTEMPTS = 4;
+const DEFAULT_AUDIT_SHARDS = 128;
 
 function parseArgs(argv) {
-  const args = { output: resolve("ai-report/production-v4-semantic-audit"), maxInvalidObjects: 100 };
+  const args = {
+    output: resolve("ai-report/production-v4-semantic-audit"),
+    maxInvalidObjects: 100,
+    shards: DEFAULT_AUDIT_SHARDS,
+  };
   const remaining = [...argv];
   while (remaining.length > 0) {
     const name = remaining.shift();
@@ -22,6 +39,8 @@ function parseArgs(argv) {
       args.output = resolve(value);
     } else if (name === "--max-invalid-objects" && /^\d+$/u.test(value ?? "")) {
       args.maxInvalidObjects = Number.parseInt(value, 10);
+    } else if (name === "--shards" && /^\d+$/u.test(value ?? "") && Number.parseInt(value, 10) > 0) {
+      args.shards = Number.parseInt(value, 10);
     } else {
       throw new Error(`invalid argument: ${name ?? "<missing>"}`);
     }
@@ -108,61 +127,147 @@ function buildPageUrl(exportUrl, cursor) {
   return url;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, decoding, and bounded error accounting share one stream lifecycle.
-async function streamAudit(exportUrl, token, maxInvalidObjects) {
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function shardIndex(sessionId, shardCount) {
+  return Number.parseInt(sha256(sessionId).slice(0, 8), 16) % shardCount;
+}
+
+function scratchDirectory() {
+  const root = process.env.RUNNER_TEMP ? resolve(process.env.RUNNER_TEMP) : tmpdir();
+  mkdirSync(root, { recursive: true });
+  return mkdtempSync(join(root, "er-v4-semantic-audit-"));
+}
+
+function openShardSpool(scratch, shardCount) {
+  const paths = Array.from({ length: shardCount }, (_, index) => join(scratch, `shard-${index}.jsonl`));
+  return { paths, descriptors: paths.map(path => openSync(path, "w")) };
+}
+
+async function auditShard(path, crossShardRepeatedSessions) {
   const audit = createCombatContractV4Audit();
+  const lines = createInterface({
+    input: createReadStream(path, { encoding: "utf8" }),
+    crlfDelay: Number.POSITIVE_INFINITY,
+  });
+  for await (const line of lines) {
+    if (line.trim()) {
+      audit.ingestBatch(JSON.parse(line));
+    }
+  }
+  for (const sessionId of crossShardRepeatedSessions) {
+    if (!audit.markEpisodeFinding(sessionId, "payload_repeated_across_shards")) {
+      throw new Error("cross-shard repeated payload lost its owning episode");
+    }
+  }
+  return audit.finish();
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, ephemeral sharding, and bounded error accounting share one lifecycle.
+async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
+  const scratch = scratchDirectory();
+  const spool = openShardSpool(scratch, shardCount);
   const state = {
     cursor: "",
     listedObjects: 0,
     selectedObjects: 0,
     compressedBytes: 0,
+    expandedBytes: 0,
+    spooledBatches: 0,
     invalidObjects: 0,
     invalidObjectReasons: {},
   };
-  do {
-    const { response, rows } = await fetchPage(buildPageUrl(exportUrl, state.cursor), token);
-    const selected = numericHeader(response, "x-er-selected-objects");
-    if (rows.length !== selected) {
-      throw new Error(`telemetry export selected ${selected} objects but returned ${rows.length}`);
-    }
-    state.listedObjects += numericHeader(response, "x-er-listed-objects");
-    state.selectedObjects += selected;
-    state.compressedBytes += numericHeader(response, "x-er-selected-bytes");
-    for (const row of rows) {
-      const decoded = decodeRow(row);
-      if (decoded.batch == null) {
-        state.invalidObjects++;
-        state.invalidObjectReasons[decoded.reason] = (state.invalidObjectReasons[decoded.reason] ?? 0) + 1;
-        if (state.invalidObjects > maxInvalidObjects) {
-          throw new Error(`invalid telemetry objects exceeded ${maxInvalidObjects}`);
+  const sourcePartitionIds = new Set();
+  const payloadIdentities = new Map();
+  const crossShardRepeatedSessions = Array.from({ length: shardCount }, () => []);
+  let crossShardRepeatedPayloads = 0;
+  try {
+    try {
+      do {
+        const { response, rows } = await fetchPage(buildPageUrl(exportUrl, state.cursor), token);
+        const selected = numericHeader(response, "x-er-selected-objects");
+        if (rows.length !== selected) {
+          throw new Error(`telemetry export selected ${selected} objects but returned ${rows.length}`);
         }
-      } else {
-        audit.ingestBatch(decoded.batch);
+        state.listedObjects += numericHeader(response, "x-er-listed-objects");
+        state.selectedObjects += selected;
+        state.compressedBytes += numericHeader(response, "x-er-selected-bytes");
+        for (const row of rows) {
+          const decoded = decodeRow(row);
+          if (decoded.batch == null) {
+            state.invalidObjects++;
+            state.invalidObjectReasons[decoded.reason] = (state.invalidObjectReasons[decoded.reason] ?? 0) + 1;
+            if (state.invalidObjects > maxInvalidObjects) {
+              throw new Error(`invalid telemetry objects exceeded ${maxInvalidObjects}`);
+            }
+            continue;
+          }
+          const batch = decoded.batch;
+          const sessionId = String(batch?.envelope?.sessionId ?? `invalid-batch-${state.spooledBatches}`);
+          const sourcePartitionId = batch?.envelope?.playerIdHash;
+          if (typeof sourcePartitionId === "string" && sourcePartitionId) {
+            sourcePartitionIds.add(sourcePartitionId);
+          }
+          const index = shardIndex(sessionId, shardCount);
+          const json = JSON.stringify(batch);
+          const digest = sha256(json);
+          const identity = `${sessionId}:${batch?.seq}`;
+          const prior = payloadIdentities.get(digest);
+          if (prior == null) {
+            payloadIdentities.set(digest, { identity, shard: index });
+          } else if (prior.identity !== identity && prior.shard !== index) {
+            crossShardRepeatedPayloads++;
+            crossShardRepeatedSessions[index].push(sessionId);
+          }
+          state.expandedBytes += Buffer.byteLength(json) + 1;
+          state.spooledBatches++;
+          writeSync(spool.descriptors[index], `${json}\n`);
+        }
+        state.cursor =
+          response.headers.get("x-er-truncated") === "true" ? (response.headers.get("x-er-next-cursor") ?? "") : "";
+        if (state.listedObjects % 1_000 < PAGE_SIZE || !state.cursor) {
+          console.error(
+            JSON.stringify({
+              event: "production-v4-audit-progress",
+              stage: "spool",
+              listedObjects: state.listedObjects,
+              selectedObjects: state.selectedObjects,
+              invalidObjects: state.invalidObjects,
+            }),
+          );
+        }
+      } while (state.cursor);
+    } finally {
+      spool.descriptors.forEach(closeSync);
+    }
+    const reports = [];
+    for (let index = 0; index < spool.paths.length; index++) {
+      reports.push(await auditShard(spool.paths[index], crossShardRepeatedSessions[index]));
+      if ((index + 1) % 16 === 0 || index + 1 === spool.paths.length) {
+        console.error(
+          JSON.stringify({ event: "production-v4-audit-progress", stage: "audit", completedShards: index + 1 }),
+        );
       }
     }
-    state.cursor =
-      response.headers.get("x-er-truncated") === "true" ? (response.headers.get("x-er-next-cursor") ?? "") : "";
-    if (state.listedObjects % 1_000 < PAGE_SIZE || !state.cursor) {
-      console.error(
-        JSON.stringify({
-          event: "production-v4-audit-progress",
-          listedObjects: state.listedObjects,
-          selectedObjects: state.selectedObjects,
-          invalidObjects: state.invalidObjects,
-        }),
-      );
-    }
-  } while (state.cursor);
-  return audit.finish({
-    environment: "production",
-    bucket: "er-telemetry",
-    readTransport: "authenticated-r2-worker-v1",
-    listedObjects: state.listedObjects,
-    selectedObjects: state.selectedObjects,
-    compressedBytes: state.compressedBytes,
-    invalidObjects: state.invalidObjects,
-    invalidObjectReasons: state.invalidObjectReasons,
-  });
+    const report = mergeCombatContractV4AuditReports(reports, sourcePartitionIds, {
+      environment: "production",
+      bucket: "er-telemetry",
+      readTransport: "authenticated-r2-worker-v1",
+      listedObjects: state.listedObjects,
+      selectedObjects: state.selectedObjects,
+      compressedBytes: state.compressedBytes,
+      expandedBytes: state.expandedBytes,
+      auditShards: shardCount,
+      invalidObjects: state.invalidObjects,
+      invalidObjectReasons: state.invalidObjectReasons,
+    });
+    report.corpus.repeatedPayloads += crossShardRepeatedPayloads;
+    return report;
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 function markdownReport(report) {
@@ -174,7 +279,7 @@ function markdownReport(report) {
     "# Production combat contract v4 semantic audit",
     "",
     `Measured at \`${report.generatedAt}\` through the read-only production export Worker.`,
-    "Raw telemetry remained inside ephemeral runner memory and was not uploaded.",
+    "Raw telemetry remained on ephemeral runner storage, was deleted after reduction, and was not uploaded.",
     "",
     "## Corpus",
     "",
@@ -242,7 +347,7 @@ async function main() {
   if (!token) {
     throw new Error("TELEMETRY_EXPORT_TOKEN is required");
   }
-  const report = await streamAudit(exportUrl, token, args.maxInvalidObjects);
+  const report = await streamAudit(exportUrl, token, args.maxInvalidObjects, args.shards);
   mkdirSync(args.output, { recursive: true });
   writeFileSync(`${args.output}/production-v4-semantic-audit.json`, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(`${args.output}/production-v4-semantic-audit.md`, markdownReport(report));

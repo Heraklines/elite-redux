@@ -1,7 +1,8 @@
 name: AI Production V4 Semantic Audit (Read-Only)
 
-# One ephemeral runner streams production contract-v4 records directly into an
-# in-memory auditor. Only aggregate reports with salted example IDs are uploaded.
+# One ephemeral runner hash-shards production contract-v4 records onto its
+# temporary disk, audits one bounded shard at a time, and deletes the scratch
+# corpus. Only aggregate reports with salted example IDs are uploaded.
 on:
   push:
     branches:
@@ -41,13 +42,14 @@ jobs:
           pnpm exec vitest run
           test/tests/elite-redux/telemetry/combat-contract-harness.test.ts
           test/tests/elite-redux/telemetry/telemetry-recorder.test.ts
-      - name: Stream and audit production v4 in runner memory
+      - name: Stream and audit production v4 on bounded ephemeral storage
         env:
           TELEMETRY_EXPORT_TOKEN: ${{ secrets.ER_AI_TELEMETRY_EXPORT_TOKEN }}
           TELEMETRY_EXPORT_URL: https://er-ai-telemetry-export.heraklines.workers.dev/v1/export
         run: >-
           node scripts/ai/run-production-combat-v4-audit.mjs
           --max-invalid-objects 100
+          --shards 128
           --out ai-report
       - name: Publish sanitized audit summary
         shell: bash

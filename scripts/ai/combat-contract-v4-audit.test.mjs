@@ -2,7 +2,13 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auditCombatContractV4Batches, canonicalCandidateId, sourceSplit } from "./combat-contract-v4-audit.mjs";
+import {
+  auditCombatContractV4Batches,
+  canonicalCandidateId,
+  createCombatContractV4Audit,
+  mergeCombatContractV4AuditReports,
+  sourceSplit,
+} from "./combat-contract-v4-audit.mjs";
 
 const SESSION_ID = "session-sensitive-value";
 const SOURCE_ID = "source-sensitive-value";
@@ -312,4 +318,29 @@ test("unsupported feature schemas and empty build identities fail closed", () =>
 test("source-account splitting is stable and disjoint by construction", () => {
   assert.equal(sourceSplit(SOURCE_ID), sourceSplit(SOURCE_ID));
   assert.ok(new Set(["train", "validation", "test"]).has(sourceSplit(SOURCE_ID)));
+});
+
+test("disk-sharded reports merge without double-counting source partitions", () => {
+  const left = auditCombatContractV4Batches([batch()]);
+  const right = auditCombatContractV4Batches([batch()]);
+  const report = mergeCombatContractV4AuditReports([left, right], [SOURCE_ID, SOURCE_ID], {
+    environment: "production",
+  });
+  assert.equal(report.corpus.batches, 2);
+  assert.equal(report.corpus.episodes, 2);
+  assert.equal(report.corpus.sourcePartitions, 1);
+  assert.equal(
+    Object.values(report.eligibility.sourceSplits).reduce((sum, count) => sum + count, 0),
+    1,
+  );
+  assert.equal(report.corpus.environment, "production");
+});
+
+test("a cross-shard finding can quarantine its owning episode before reduction", () => {
+  const audit = createCombatContractV4Audit();
+  audit.ingestBatch(batch());
+  assert.equal(audit.markEpisodeFinding(SESSION_ID, "cross_shard_repeated_payload"), true);
+  const report = audit.finish();
+  assert.equal(report.eligibility.hardQuarantinedEpisodes, 1);
+  assert.ok(report.findings.hard.cross_shard_repeated_payload);
 });
