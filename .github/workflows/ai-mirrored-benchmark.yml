@@ -1,0 +1,597 @@
+name: AI Mirrored Ghost Benchmark (Non-Production)
+
+# Artifact-only research lane. It cannot deploy or reach a game environment.
+on:
+  push:
+    branches:
+      - codex/combat-ai-v4-eval-20260803
+    paths:
+      - ".github/workflows/ai-mirrored-benchmark.yml"
+  workflow_call:
+    inputs:
+      control_kernel:
+        required: false
+        default: michaelferjani/er-ai-fw-v5-matched-control-gpu-20260731
+        type: string
+      transfer_kernel:
+        required: false
+        default: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
+        type: string
+      tree_run_id:
+        required: false
+        default: ""
+        type: string
+      tree_artifact_name:
+        required: false
+        default: ai-baseline-leaderboard
+        type: string
+      candidate_kernel:
+        required: false
+        default: ""
+        type: string
+      candidate_kind:
+        required: false
+        default: checkpoint
+        type: string
+      tree_only:
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      KAGGLE_USERNAME:
+        required: true
+      KAGGLE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      control_kernel:
+        description: Private Kaggle kernel containing the random-init control output
+        required: true
+        default: michaelferjani/er-ai-fw-v5-matched-control-gpu-20260731
+        type: string
+      transfer_kernel:
+        description: Private Kaggle kernel containing the Showdown-transfer output
+        required: true
+        default: michaelferjani/er-ai-policy-firewall-v5-transfer-gpu-20260731
+        type: string
+      tree_run_id:
+        description: Actions run containing the requested tree-policy artifact
+        required: true
+        default: ""
+        type: string
+      tree_artifact_name:
+        description: Artifact containing leaderboard.json and tree model files
+        required: true
+        default: ai-baseline-leaderboard
+        type: string
+      candidate_kernel:
+        description: Optional private trained transformer; switches to candidate benchmark mode
+        required: false
+        default: ""
+        type: string
+      candidate_kind:
+        description: Validation contract for the optional candidate transformer
+        required: true
+        default: checkpoint
+        type: choice
+        options:
+          - checkpoint
+          - human-baseline
+      tree_only:
+        description: Benchmark only the policy-target tree artifact and fixed engine controls
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  AI_BENCHMARK_CANDIDATE_KERNEL: ${{ github.event_name == 'push' && 'michaelferjani/er-ai-production-v4-human-baseline-gpu-20260803' || inputs.candidate_kernel }}
+  AI_BENCHMARK_CANDIDATE_KIND: ${{ github.event_name == 'push' && 'human-baseline' || inputs.candidate_kind }}
+  AI_BENCHMARK_TREE_RUN_ID: ${{ github.event_name == 'push' && '30866627818' || inputs.tree_run_id }}
+  AI_BENCHMARK_TREE_ARTIFACT: ${{ github.event_name == 'push' && 'ai-production-v4-remote-training-report' || inputs.tree_artifact_name }}
+  AI_BENCHMARK_TREE_ONLY: ${{ github.event_name == 'push' && 'false' || inputs.tree_only }}
+
+concurrency:
+  group: ai-mirrored-ghost-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  models:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+    name: Seal benchmark model inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Kaggle client
+        run: python -m pip install kaggle==1.8.4
+      - name: Download private matched transformer outputs
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL == '' }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          CONTROL_KERNEL: ${{ inputs.control_kernel }}
+          TRANSFER_KERNEL: ${{ inputs.transfer_kernel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          mkdir -p ai-models/control ai-models/transfer
+          kaggle kernels output "$CONTROL_KERNEL" --path ai-models/control --force
+          kaggle kernels output "$TRANSFER_KERNEL" --path ai-models/transfer --force
+      - name: Download private checkpoint transformer output
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          CANDIDATE_KERNEL: ${{ env.AI_BENCHMARK_CANDIDATE_KERNEL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          mkdir -p ai-models/candidate
+          kaggle kernels output "$CANDIDATE_KERNEL" --path ai-models/candidate --force
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ env.AI_BENCHMARK_TREE_ARTIFACT }}
+          path: ai-models/tree
+          run-id: ${{ env.AI_BENCHMARK_TREE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Validate exact model inventory and policy firewall
+        env:
+          CANDIDATE_MODE: ${{ env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+          CANDIDATE_KIND: ${{ env.AI_BENCHMARK_CANDIDATE_KIND }}
+          TREE_ONLY: ${{ env.AI_BENCHMARK_TREE_ONLY || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CANDIDATE_MODE" == "true" ]]; then
+            candidate_ensemble=$(find ai-models/candidate -name ensemble.json -type f)
+            candidate_report=$(find ai-models/candidate -name report.json -type f)
+            ensemble_count=$(printf '%s\n' "$candidate_ensemble" | sed '/^$/d' | wc -l)
+            report_count=$(printf '%s\n' "$candidate_report" | sed '/^$/d' | wc -l)
+            if [[ "$ensemble_count" -eq 1 ]]; then
+              test "$report_count" -ge 2
+            else
+              test "$ensemble_count" -eq 0
+              test "$report_count" -eq 1
+              test -f "$(dirname "$candidate_report")/model.safetensors"
+            fi
+          else
+            test "$(find ai-models/control -name model.safetensors -type f | wc -l)" -eq 1
+            test "$(find ai-models/transfer -name model.safetensors -type f | wc -l)" -eq 1
+          fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          candidate_mode = os.environ["CANDIDATE_MODE"] == "true"
+          candidate_kind = os.environ["CANDIDATE_KIND"]
+          tree_only = os.environ["TREE_ONLY"] == "true"
+          if tree_only and candidate_mode:
+              raise SystemExit("tree-only mode cannot also specify a transformer candidate")
+          candidate = None
+          if candidate_mode:
+              candidate_root = Path("ai-models/candidate")
+              ensemble_paths = list(candidate_root.rglob("ensemble.json"))
+              if len(ensemble_paths) > 1:
+                  raise SystemExit(f"expected at most one candidate ensemble, found {ensemble_paths}")
+              if ensemble_paths:
+                  ensemble_root = ensemble_paths[0].parent
+                  ensemble = json.loads(ensemble_paths[0].read_text(encoding="utf-8"))
+                  members = ensemble.get("members")
+                  if not isinstance(members, list) or len(members) < 2 or len(set(members)) != len(members):
+                      raise SystemExit("candidate ensemble has an invalid member inventory")
+                  report_paths = [ensemble_root / member / "report.json" for member in members]
+                  for member in members:
+                      member_root = ensemble_root / member
+                      if not (member_root / "config.json").is_file() or not (member_root / "model.safetensors").is_file():
+                          raise SystemExit(f"candidate ensemble member is incomplete: {member}")
+              else:
+                  report_paths = list(candidate_root.rglob("report.json"))
+                  if len(report_paths) != 1:
+                      raise SystemExit(f"expected one checkpoint candidate report, found {report_paths}")
+
+              all_report_paths = set(candidate_root.rglob("report.json"))
+              if set(report_paths) != all_report_paths:
+                  raise SystemExit("candidate output contains reports outside the sealed ensemble inventory")
+
+              reports = [json.loads(path.read_text(encoding="utf-8")) for path in report_paths]
+              for report in reports:
+                  data = report["data"]
+                  sources = data["sourcePolicies"]
+                  if candidate_kind == "human-baseline":
+                      if set(sources) != {"human-v1"}:
+                          raise SystemExit(f"human baseline contains an unexpected policy source: {sources}")
+                      if data["excludedPolicyDecisions"] != 0:
+                          raise SystemExit("human baseline excluded an unexpected policy decision")
+                      if report.get("initializedFrom") is not None:
+                          raise SystemExit("fresh human baseline unexpectedly resumed a checkpoint")
+                      if report.get("tokenVocabularySource") != "derived":
+                          raise SystemExit("fresh human baseline did not seal its corpus-derived vocabulary")
+                  elif candidate_kind == "checkpoint":
+                      allowed_sources = {
+                          "checkpoint-tree-v1",
+                          "checkpoint-neural-v4",
+                          "diagnostic-tree-v1",
+                          "engine-hardest-v1",
+                      }
+                      if set(sources) - allowed_sources:
+                          raise SystemExit(f"checkpoint candidate contains an unexpected policy source: {sources}")
+                      expected_excluded = sources.get("engine-hardest-v1", 0) + sources.get("diagnostic-tree-v1", 0)
+                      if data["excludedPolicyDecisions"] != expected_excluded:
+                          raise SystemExit("value-only sparring actions were not excluded exactly from policy training")
+                      if not report.get("initializedFrom"):
+                          raise SystemExit("checkpoint candidate did not strictly resume the sealed transformer")
+                      if report.get("tokenVocabularySource") != "fixed":
+                          raise SystemExit("checkpoint candidate does not preserve its fixed vocabulary")
+                  else:
+                      raise SystemExit(f"unsupported candidate kind: {candidate_kind}")
+                  if data["policyTargetDecisions"] <= 0 or report["checkpointSelection"]["metric"] != "candidateNll":
+                      raise SystemExit("candidate was not selected on held-out policy targets")
+                  if data["transferDecisions"] != 0 or report["objective"]["transferPretrainEpochs"] != 0:
+                      raise SystemExit("candidate unexpectedly performed Showdown transfer training")
+                  if not report.get("tokenVocabularySha256"):
+                      raise SystemExit("candidate has no sealed vocabulary hash")
+                  if not str(report.get("device", "")).startswith("cuda"):
+                      raise SystemExit("candidate was not trained on CUDA")
+
+              candidate = reports[0]
+              candidate_identity = (
+                  candidate["contractSchemaVersion"],
+                  candidate["featureSchemaVersion"],
+                  candidate["tokenVocabularySha256"],
+                  candidate["data"]["dictionaryCoverage"]["sha256"],
+                  candidate["data"]["dictionaryCoverage"]["features"],
+                  candidate["data"]["identity"],
+                  candidate["architecture"],
+              )
+              for report in reports[1:]:
+                  identity = (
+                      report["contractSchemaVersion"],
+                      report["featureSchemaVersion"],
+                      report["tokenVocabularySha256"],
+                      report["data"]["dictionaryCoverage"]["sha256"],
+                      report["data"]["dictionaryCoverage"]["features"],
+                      report["data"]["identity"],
+                      report["architecture"],
+                  )
+                  if identity != candidate_identity:
+                      raise SystemExit("candidate ensemble members do not share one sealed model contract")
+              if ensemble_paths and (
+                  ensemble.get("contractSchemaVersion") != candidate["contractSchemaVersion"]
+                  or ensemble.get("featureSchemaVersion") != candidate["featureSchemaVersion"]
+              ):
+                  raise SystemExit("candidate ensemble manifest does not match its member contract")
+          elif not tree_only:
+              reports = {}
+              for arm in ("control", "transfer"):
+                  paths = list(Path("ai-models", arm).rglob("report.json"))
+                  if len(paths) != 1:
+                      raise SystemExit(f"expected one {arm} report, found {paths}")
+                  report = json.loads(paths[0].read_text(encoding="utf-8"))
+                  if report["checkpointSelection"]["metric"] != "valueBrier":
+                      raise SystemExit(f"{arm} did not use value-only ER checkpoint selection")
+                  reports[arm] = report
+              control = reports["control"]
+              transfer = reports["transfer"]
+              if control["architecture"] != transfer["architecture"] or control["seed"] != transfer["seed"]:
+                  raise SystemExit("matched transformer arms differ in architecture or seed")
+              if control["tokenVocabularySha256"] != transfer["tokenVocabularySha256"]:
+                  raise SystemExit("matched transformer arms differ in token vocabulary")
+              if control["data"]["erJsonlSha256"] != transfer["data"]["erJsonlSha256"]:
+                  raise SystemExit("matched transformer arms differ in ER data")
+              if control["data"]["identity"] != transfer["data"]["identity"]:
+                  raise SystemExit("matched transformer arms differ in runtime identity")
+              if control["data"]["transferDecisions"] != 0 or transfer["data"]["transferDecisions"] <= 0:
+                  raise SystemExit("matched transfer assignment is invalid")
+              if control["data"]["policyTargetDecisions"] != 0:
+                  raise SystemExit("control ER data contains forbidden policy targets")
+              if transfer["data"]["policyTargetDecisions"] != transfer["data"]["transferDecisions"]:
+                  raise SystemExit("transfer arm policy targets are not confined to transfer decisions")
+              if control["data"]["excludedPolicyDecisions"] != transfer["data"]["excludedPolicyDecisions"]:
+                  raise SystemExit("matched arms disagree on excluded ER policy decisions")
+              if control["objective"]["transferPretrainEpochs"] != 0:
+                  raise SystemExit("random-init control unexpectedly performed transfer pretraining")
+              if transfer["objective"]["transferPretrainEpochs"] <= 0:
+                  raise SystemExit("Showdown-transfer arm did not perform transfer pretraining")
+
+          tree_reports = list(Path("ai-models/tree").rglob("leaderboard.json"))
+          if len(tree_reports) != 1:
+              raise SystemExit(f"expected one tree leaderboard, found {tree_reports}")
+          tree_report = json.loads(tree_reports[0].read_text(encoding="utf-8"))
+          tree_model_dirs = [tree_reports[0].parent / "models", tree_reports[0].parent]
+          tree_model_dir = next(
+              (
+                  path
+                  for path in tree_model_dirs
+                  if (path / "selected-model.json").is_file()
+                  or (path / "stacked_tree_ensemble.json").is_file()
+              ),
+              None,
+          )
+          if tree_model_dir is None:
+              raise SystemExit(f"tree artifact contains no model in {tree_model_dirs}")
+          expected_role = "policy-target" if candidate_mode or tree_only else "diagnostic-imitation"
+          if tree_report.get("trainingRole") != expected_role:
+              raise SystemExit(f"tree report has the wrong training role: {tree_report.get('trainingRole')}")
+          tree_names = ["selected-model.json"] if candidate_mode or tree_only else []
+          if (tree_model_dir / "stacked_tree_ensemble.json").is_file():
+              tree_names.append("stacked_tree_ensemble.json")
+          if not candidate_mode and not tree_only and "stacked_tree_ensemble.json" not in tree_names:
+              raise SystemExit("matched baseline mode requires a stacked tree ensemble")
+          if candidate_mode:
+              expected_feature_schema = candidate["featureSchemaVersion"]
+              expected_feature_count = candidate["data"]["dictionaryCoverage"]["features"]
+          elif tree_only:
+              expected_feature_schema = tree_report["schemaVersion"]
+              expected_feature_count = tree_report["data"]["dictionaryCoverage"]["features"]
+          else:
+              expected_feature_schema = 2
+              expected_feature_count = 4326
+          for tree_name in tree_names:
+              tree_model = json.loads((tree_model_dir / tree_name).read_text(encoding="utf-8"))
+              if (
+                  tree_model.get("featureSchemaVersion") != expected_feature_schema
+                  or tree_model.get("featureCount") != expected_feature_count
+              ):
+                  raise SystemExit(
+                      f"{tree_name} does not match runtime feature schema "
+                      f"{expected_feature_schema} / {expected_feature_count}"
+                  )
+              if tree_model.get("trainingRole") != expected_role:
+                  raise SystemExit(f"{tree_name} has the wrong training role")
+              if any(member.get("trainingRole") != expected_role for member in tree_model.get("members", [])):
+                  raise SystemExit(f"{tree_name} contains a member with the wrong training role")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-mirrored-benchmark-models
+          path: ai-models
+          retention-days: 7
+          if-no-files-found: error
+
+  benchmark:
+    if: >-
+      github.repository == 'Heraklines/elite-redux'
+      && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+    name: Mirrored benchmark shard ${{ matrix.shard }}
+    needs: models
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - { shard: 0, start: 0, count: 17 }
+          - { shard: 1, start: 17, count: 17 }
+          - { shard: 2, start: 34, count: 17 }
+          - { shard: 3, start: 51, count: 17 }
+          - { shard: 4, start: 68, count: 16 }
+          - { shard: 5, start: 84, count: 16 }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            ml/policy/requirements.txt
+            ml/baselines/requirements.txt
+      - name: Install neural-policy inference dependencies
+        run: python -m pip install --requirement ml/policy/requirements.txt
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-mirrored-benchmark-models
+          path: ai-models
+      - name: Resolve sealed model directories
+        env:
+          CANDIDATE_MODE: ${{ env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+          CANDIDATE_KIND: ${{ env.AI_BENCHMARK_CANDIDATE_KIND }}
+          TREE_ONLY: ${{ env.AI_BENCHMARK_TREE_ONLY || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree_report=$(find ai-models/tree -name leaderboard.json -type f)
+          test "$(printf '%s\n' "$tree_report" | wc -l)" -eq 1
+          tree_root=$(dirname "$tree_report")
+          if [[ -f "$tree_root/models/selected-model.json" || -f "$tree_root/models/stacked_tree_ensemble.json" ]]; then
+            tree_model_dir="$tree_root/models"
+          else
+            tree_model_dir="$tree_root"
+          fi
+          test -f "$tree_model_dir/selected-model.json" || test -f "$tree_model_dir/stacked_tree_ensemble.json"
+          echo "TREE_MODEL_DIR=$tree_model_dir" >> "$GITHUB_ENV"
+          if [[ -f "$tree_model_dir/stacked_tree_ensemble.json" ]]; then
+            echo "STACKED_TREE_AVAILABLE=true" >> "$GITHUB_ENV"
+          else
+            echo "STACKED_TREE_AVAILABLE=false" >> "$GITHUB_ENV"
+          fi
+          if [[ "$TREE_ONLY" != "true" && "$CANDIDATE_MODE" == "true" ]]; then
+            candidate_ensemble=$(find ai-models/candidate -name ensemble.json -type f)
+            ensemble_count=$(printf '%s\n' "$candidate_ensemble" | sed '/^$/d' | wc -l)
+            if [[ "$ensemble_count" -eq 1 ]]; then
+              candidate_model=$(dirname "$candidate_ensemble")
+            else
+              test "$ensemble_count" -eq 0
+              candidate_report=$(find ai-models/candidate -name report.json -type f)
+              test "$(printf '%s\n' "$candidate_report" | sed '/^$/d' | wc -l)" -eq 1
+              candidate_model=$(dirname "$candidate_report")
+              test -f "$candidate_model/model.safetensors"
+            fi
+            echo "CANDIDATE_MODEL=$candidate_model" >> "$GITHUB_ENV"
+            if [[ "$CANDIDATE_KIND" == "human-baseline" ]]; then
+              echo "CANDIDATE_CONTROLLER=human-bc-transformer-v4" >> "$GITHUB_ENV"
+            else
+              echo "CANDIDATE_CONTROLLER=checkpoint-transformer-v4" >> "$GITHUB_ENV"
+            fi
+          else
+            control_weights=$(find ai-models/control -name model.safetensors -type f)
+            transfer_weights=$(find ai-models/transfer -name model.safetensors -type f)
+            test "$(printf '%s\n' "$control_weights" | wc -l)" -eq 1
+            test "$(printf '%s\n' "$transfer_weights" | wc -l)" -eq 1
+            echo "CONTROL_MODEL=$(dirname "$control_weights")" >> "$GITHUB_ENV"
+            echo "TRANSFER_MODEL=$(dirname "$transfer_weights")" >> "$GITHUB_ENV"
+          fi
+      - name: Build difficulty-balanced mirrored batch
+        env:
+          CANDIDATE_MODE: ${{ env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+          TREE_ONLY: ${{ env.AI_BENCHMARK_TREE_ONLY || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          controllers=""
+          if [[ "$CANDIDATE_MODE" == "true" || "$TREE_ONLY" == "true" ]]; then
+            if [[ "$CANDIDATE_MODE" == "true" ]]; then
+              controllers="$CANDIDATE_CONTROLLER,"
+            fi
+            controllers="${controllers}selected-tree-v1"
+            if [[ "$STACKED_TREE_AVAILABLE" == "true" ]]; then
+              controllers="$controllers,stacked-tree-v1"
+            fi
+            controllers="$controllers,smart-default-v1,engine-hardest-v1"
+          fi
+          node scripts/ai/make-ghost-eval-batch.mjs \
+            ml/evaluation/ghost-winner-teams.v3.json \
+            "${{ matrix.start }}" "${{ matrix.count }}" \
+            ai-gauntlet \
+            "shard-${{ matrix.shard }}" \
+            "$controllers"
+      - name: Play random-init transformer
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL == '' }}
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-neural-model "$CONTROL_MODEL"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-random-init-transformer-v4-results.json"
+      - name: Play Showdown-transfer transformer
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL == '' }}
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-neural-model "$TRANSFER_MODEL"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-showdown-transfer-transformer-v4-results.json"
+      - name: Play diagnostic tree ensemble
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL == '' }}
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model "$TREE_MODEL_DIR/stacked_tree_ensemble.json"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-tree-ensemble-v1-results.json"
+      - name: Play candidate transformer
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY != 'true' && env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-neural-model "$CANDIDATE_MODEL"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-${CANDIDATE_CONTROLLER}-results.json"
+      - name: Play selected winner-only tree
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-model "$TREE_MODEL_DIR/selected-model.json"
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-selected-tree-v1-results.json"
+      - name: Play stacked winner-only tree
+        if: ${{ env.AI_BENCHMARK_TREE_ONLY == 'true' || env.AI_BENCHMARK_CANDIDATE_KERNEL != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$STACKED_TREE_AVAILABLE" != "true" ]]; then
+            exit 0
+          fi
+          node scripts/run-combat-batch.mjs \
+            "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json" \
+            --turns 80 --real-rng \
+            --ai-model "$TREE_MODEL_DIR/stacked_tree_ensemble.json" \
+            --test-timeout-ms 3600000 \
+            --json-out "ai-gauntlet/shard-${{ matrix.shard }}-stacked-tree-v1-results.json"
+      - name: Play smart-default baseline
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy smart-default
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-smart-default-v1-results.json"
+      - name: Play hardest-engine baseline
+        run: >-
+          node scripts/run-combat-batch.mjs
+          "@ai-gauntlet/shard-${{ matrix.shard }}-batch.json"
+          --turns 80 --real-rng
+          --ai-policy engine-hardest
+          --test-timeout-ms 3600000
+          --json-out "ai-gauntlet/shard-${{ matrix.shard }}-engine-hardest-v1-results.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-mirrored-benchmark-shard-${{ matrix.shard }}
+          path: ai-gauntlet
+          retention-days: 14
+          if-no-files-found: warn
+
+  report:
+    if: >-
+      always()
+      && github.repository == 'Heraklines/elite-redux'
+      && (github.event_name != 'push' || contains(github.event.head_commit.message, '[ai-benchmark]'))
+    name: Difficulty-balanced benchmark report
+    needs: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: ai-mirrored-benchmark-shard-*
+          path: ai-gauntlet
+          merge-multiple: true
+      - name: Summarize per-tier and macro win rates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ai-report
+          node scripts/ai/summarize-ghost-batch-eval.mjs \
+            ai-gauntlet \
+            ai-report/mirrored-benchmark.json \
+            ai-report/mirrored-benchmark.md
+          cat ai-report/mirrored-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-mirrored-benchmark-report
+          path: ai-report
+          retention-days: 30
+          if-no-files-found: error
