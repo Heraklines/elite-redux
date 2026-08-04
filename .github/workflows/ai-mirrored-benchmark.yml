@@ -423,7 +423,8 @@ jobs:
           fi
           test -f "$tree_model_dir/selected-model.json" || test -f "$tree_model_dir/stacked_tree_ensemble.json"
           echo "TREE_MODEL_DIR=$tree_model_dir" >> "$GITHUB_ENV"
-          if [[ -f "$tree_model_dir/stacked_tree_ensemble.json" ]]; then
+          if [[ -f "$tree_model_dir/stacked_tree_ensemble.json" ]] \
+            && ! cmp --silent "$tree_model_dir/selected-model.json" "$tree_model_dir/stacked_tree_ensemble.json"; then
             echo "STACKED_TREE_AVAILABLE=true" >> "$GITHUB_ENV"
           else
             echo "STACKED_TREE_AVAILABLE=false" >> "$GITHUB_ENV"
