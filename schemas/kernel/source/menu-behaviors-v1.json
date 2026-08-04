@@ -1305,7 +1305,7 @@
     {
       "status": "source_observed_mismatch",
       "behavior": "ModifierSelectUiHandler is registered at UiMode.MODIFIER_SELECT but its constructor calls super(UiMode.CONFIRM); PokedexScanUiHandler is registered at POKEDEX_SCAN but ui.ts constructs it with UiMode.TEST_DIALOGUE.",
-      "evidence": ["src/ui/ui.ts handler array", "src/ui/handlers/modifier-select-ui-handler.ts constructor", "src/ui/handlers/pokedex-scan-ui-handler.ts constructor"],
+      "evidence": ["src/ui/ui.ts handler array", "src/ui/handlers/modifier-select-ui-handler.ts constructor", "src/ui/ui.ts:253 new PokedexScanUiHandler(UiMode.TEST_DIALOGUE)"],
       "impact": "Do not infer a normalized Rust mode/owner from the constructor value; registry slot is the observed dispatch owner."
     },
     {
