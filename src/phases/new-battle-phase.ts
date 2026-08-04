@@ -48,10 +48,8 @@ export interface CoopCommittedBiomeEncounterQueue {
 }
 
 export interface CoopProjectedEncounterPresentationQueue {
-  pushNew(
-    name: "ShowTrainerPhase" | "NextEncounterPhase" | "NewBiomeEncounterPhase",
-    coopProjectedPresentation?: true,
-  ): unknown;
+  pushNew(name: "ShowTrainerPhase", coopProjectedPresentation: true): unknown;
+  pushNew(name: "NextEncounterPhase" | "NewBiomeEncounterPhase"): unknown;
 }
 
 /**
