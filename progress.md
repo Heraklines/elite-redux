@@ -7575,3 +7575,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   surface, and requires the ordinary authenticated collection-close proof before marking the depleted browser
   omitted. A failure-first node regression reproduces the exact wave-30 owner partition. No product code was
   changed for this red.
+- Combined build `30874099531` passed its owned TypeScript/format slice and stopped before Chromium on one
+  source-contract literal: the replacement test still searched for `shiftPhase()` after the production seam
+  was deliberately strengthened to `shiftPhase(this)`. The assertion now names the identity-bearing call while
+  preserving its original materialize-before-yield ordering check; this is test maintenance, not a new product
+  behavior change.

@@ -3395,7 +3395,7 @@ test("a committed guest picker settles and buffers its V2 carrier before yieldin
   assert.ok(closeEnd > closeStart, "the committed close boundary has a bounded source block");
   const close = guestFaintSwitchPhase.slice(closeStart, closeEnd);
   const materialized = close.indexOf("markPickerMaterialized()");
-  const yielded = close.indexOf("scene.phaseManager.shiftPhase()");
+  const yielded = close.indexOf("scene.phaseManager.shiftPhase(this)");
   assert.ok(
     materialized >= 0 && yielded > materialized,
     "the exact picker terminal becomes materially settled before local phase progression can resume",
