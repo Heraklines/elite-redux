@@ -6,7 +6,7 @@ import { pokemonEvolutions, pokemonPrevolutions } from "#balance/pokemon-evoluti
 import { NIGHT_TIME } from "#constants/game-constants";
 import type { ArenaTag, ArenaTagTypeMap } from "#data/arena-tag";
 import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
-import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
+import { getBiomeBgmLoopPoint } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
 import {
@@ -256,7 +256,7 @@ export class Arena {
 
   /** A float representing the loop point of the current biome's bgm in seconds */
   public get bgmLoopPoint(): number {
-    return biomeBgmLoopPoints[getBiomeKey(this.biomeId)];
+    return getBiomeBgmLoopPoint(getBiomeKey(this.biomeId));
   }
 
   public get bgTerrainColorRatioForBiome(): number {

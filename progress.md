@@ -7688,3 +7688,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   address, and runtime phase instance, retires same-instance submenu aliases, and preserves two real same-seat
   battler commands because their phase instances differ. A failure-first pure regression reproduces the exact
   animation-on ordering and requires the alias to be retired before the final-owner presentation proof.
+- Corrected animations-enabled run `30888258354` proves the command alias repair: both browsers completed the
+  animated wave-1 turns, faint replacement, Revival, and reward. At the wave-2 Fun and Games encounter both
+  clients had aborted their boot request for `biome-bgm-loop-points.json`; the host later changed music and
+  dereferenced the still-uninitialized `town` entry, throwing from encounter presentation. The enclosing host
+  transaction then reset only that browser to Title while its guest remained in `NewBattlePhase`. Biome music
+  metadata is now initialized to an empty map, resolved through a finite zero fallback, and its optional fetch
+  rejection is contained. The same transaction catch now uses the retained shared terminal for authoritative
+  sessions instead of ever abandoning a peer through a host-only reset. Focused data and wiring regressions pin
+  both halves; the exact SHA still requires remote gate and animations-enabled browser requalification.

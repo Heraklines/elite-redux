@@ -1584,12 +1584,23 @@ export class EncounterPhase extends BattlePhase {
                           );
                           return;
                         }
-                        // Last-resort terminal path: saveAll itself emits the retained launch abort while its
-                        // exact claim is still available. Never leave the guest waiting if an unexpected
-                        // serializer/storage/API exception escapes the transaction.
-                        coopWarn("launch", "first-save transaction threw before launch release", error);
+                        // This promise owns persistence, launch publication, and encounter presentation. An
+                        // exception in any of them must close an authoritative session through its retained
+                        // shared terminal; resetting only the host strands the guest at NewBattlePhase.
+                        coopWarn("launch", "encounter persistence/presentation transaction threw", error);
                         globalScene.gameData.cancelPendingFreshCoopSessionSlot();
                         globalScene.disableMenu = false;
+                        if (encounterRuntime != null && encounterController?.netcodeMode === "authoritative") {
+                          failCoopSharedSession(
+                            `Could not finish the authoritative encounter launch at wave ${battle.waveIndex}.`,
+                            {
+                              boundary: "surface",
+                              reasonCode: "continuation-failed",
+                              wave: battle.waveIndex,
+                            },
+                          );
+                          return;
+                        }
                         globalScene.reset(true);
                       }),
                     );
