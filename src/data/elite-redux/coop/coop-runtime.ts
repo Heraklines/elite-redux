@@ -6378,19 +6378,20 @@ export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
   mePostBattleContinuationActive: boolean;
   meBespokeHostDrives: boolean;
 }): boolean {
+  // The battle handoff owns ordinary Move/Faint/Victory narration through TURN_COMMIT. Once the
+  // retained `battle-settled` / `reward-settled` ME_TERMINAL has applied, however, the sole host engine
+  // can legitimately enter an action-only Mystery continuation before it can author the final terminal.
+  // Fun and Games does exactly this after Wobbuffet is KO'd: its MysteryEncounterRewardsPhase displays
+  // the loss narration, then applies the revive cost and opens the declared healing surface. Freezing that
+  // one prompt leaves both peers at an already-ACKed terminal forever. The retained terminal discriminator
+  // is the closed authority proof; a live battle message can never borrow this continuation lease.
+  const hasNarrationLease = !ctx.meHandoffBattleStarted || ctx.mePostBattleContinuationActive;
   return (
     ctx.localRole === "host"
     && ctx.isMessageMode
     && ctx.netcodeMode === "authoritative"
     && ctx.meInProgress
-    && // The battle handoff owns ordinary Move/Faint/Victory narration through TURN_COMMIT. Once the
-    // retained `battle-settled` / `reward-settled` ME_TERMINAL has applied, however, the sole host engine
-    // can legitimately enter an action-only Mystery continuation before it can author the final terminal.
-    // Fun and Games does exactly this after Wobbuffet is KO'd: its MysteryEncounterRewardsPhase displays
-    // the loss narration, then applies the revive cost and opens the declared healing surface. Freezing that
-    // one prompt leaves both peers at an already-ACKed terminal forever. The retained terminal discriminator
-    // is the closed authority proof; a live battle message can never borrow this continuation lease.
-    (!ctx.meHandoffBattleStarted || ctx.mePostBattleContinuationActive)
+    && hasNarrationLease
     && !ctx.meBespokeHostDrives
   );
 }

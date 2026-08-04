@@ -7651,3 +7651,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   baseline diagnostics) and stopped only on two deterministic Biome formatting deltas in the new predicate and
   skip-to-fight frontier expression. The source now matches the remote formatter's printed output exactly; no
   gameplay or test mechanism changed in this follow-up.
+- Exact-SHA journey `30882318510` again proved the owned TypeScript slice clean and reduced the style-only red
+  to Biome relocating the long Wobbuffet authority comment through the boolean chain. The same predicate is now
+  expressed as a named `hasNarrationLease` boolean with the authority explanation above it, eliminating the
+  formatter ambiguity without changing the admitted states.
