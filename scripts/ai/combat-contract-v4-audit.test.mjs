@@ -275,12 +275,64 @@ test("a complete source-owned v4 episode passes every hard gate", () => {
   assert.equal(report.corpus.records.combat_decision, 1);
 });
 
+test("the opt-in episode sink receives policy rows only after episode joins are classified", () => {
+  const finished = [];
+  const audit = createCombatContractV4Audit({ onEpisodeFinished: episode => finished.push(episode) });
+  audit.ingestBatch(batch());
+  const report = audit.finish();
+  assert.equal(report.eligibility.policyDiagnosticEligibleEpisodes, 1);
+  assert.equal(finished.length, 1);
+  assert.equal(finished[0].episodeId, SESSION_ID);
+  assert.equal(finished[0].sourcePartitionId, SOURCE_ID);
+  assert.equal(finished[0].split, sourceSplit(SOURCE_ID));
+  assert.equal(finished[0].decisions.length, 1);
+  assert.equal(finished[0].decisions[0].decisionId, DECISION_ID);
+  assert.equal(finished[0].result.policyDiagnosticEligible, true);
+  assert.equal(finished[0].result.completedOutcomeEligible, true);
+});
+
 test("an identical duplicate batch is counted without double-counting records", () => {
   const fixture = batch();
   const report = auditCombatContractV4Batches([fixture, structuredClone(fixture)]);
   assert.equal(report.corpus.exactDuplicateBatches, 1);
   assert.equal(report.corpus.records.combat_decision, 1);
   assert.equal(report.eligibility.hardQuarantinedEpisodes, 0);
+});
+
+test("identical duplicate records are diagnostic while conflicting records still quarantine", () => {
+  const duplicateFixture = batch();
+  duplicateFixture.events.splice(1, 0, structuredClone(duplicateFixture.events[0]));
+  duplicateFixture.events[1].t = 1.5;
+  const duplicateReport = auditCombatContractV4Batches([duplicateFixture]);
+  assert.equal(duplicateReport.eligibility.hardQuarantinedEpisodes, 0);
+  assert.equal(duplicateReport.findings.diagnostic.duplicate_decision.count, 1);
+
+  const conflictFixture = batch();
+  const conflict = structuredClone(conflictFixture.events[0]);
+  conflict.t = 1.5;
+  conflict.record.candidateFeatures[0].values[0] = 99;
+  conflictFixture.events.splice(1, 0, conflict);
+  const conflictReport = auditCombatContractV4Batches([conflictFixture]);
+  assert.equal(conflictReport.eligibility.hardQuarantinedEpisodes, 1);
+  assert.equal(conflictReport.findings.hard.conflicting_decision.count, 1);
+});
+
+test("action history compares turns only within the same wave", () => {
+  const priorWaveFixture = batch();
+  priorWaveFixture.events[0].record.observation.wave = 2;
+  priorWaveFixture.events[0].record.observation.turn = 1;
+  priorWaveFixture.events[0].record.observation.previousActions = [
+    { jointActionId: `${SESSION_ID}:1:older-battle~instance:99`, turn: 99 },
+  ];
+  const priorWaveReport = auditCombatContractV4Batches([priorWaveFixture]);
+  assert.equal(priorWaveReport.findings.hard.future_action_history, undefined);
+
+  const futureFixture = batch();
+  futureFixture.events[0].record.observation.previousActions = [
+    { jointActionId: `${SESSION_ID}:1:battle-seed:2`, turn: 2 },
+  ];
+  const futureReport = auditCombatContractV4Batches([futureFixture]);
+  assert.equal(futureReport.findings.hard.future_action_history.count, 1);
 });
 
 test("invalid labels and broken joins quarantine the episode without exposing raw ids", () => {

@@ -12,7 +12,7 @@ import {
   writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { gunzipSync } from "node:zlib";
 import lzString from "lz-string";
@@ -25,11 +25,13 @@ const PAGE_TIMEOUT_MS = 120_000;
 const MAX_PAGE_ATTEMPTS = 4;
 const DEFAULT_AUDIT_SHARDS = 128;
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Audit CLI validation keeps privacy-sensitive outputs explicit.
 function parseArgs(argv) {
   const args = {
     output: resolve("ai-report/production-v4-semantic-audit"),
     maxInvalidObjects: 100,
     shards: DEFAULT_AUDIT_SHARDS,
+    privatePolicyOutput: null,
   };
   const remaining = [...argv];
   while (remaining.length > 0) {
@@ -41,11 +43,21 @@ function parseArgs(argv) {
       args.maxInvalidObjects = Number.parseInt(value, 10);
     } else if (name === "--shards" && /^\d+$/u.test(value ?? "") && Number.parseInt(value, 10) > 0) {
       args.shards = Number.parseInt(value, 10);
+    } else if (name === "--private-policy-out" && value) {
+      args.privatePolicyOutput = resolve(value);
     } else {
       throw new Error(`invalid argument: ${name ?? "<missing>"}`);
     }
   }
   return args;
+}
+
+function pathWithin(child, parent) {
+  const path = relative(parent, child);
+  return (
+    path === ""
+    || (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`))
+  );
 }
 
 function parseRows(payload) {
@@ -146,8 +158,8 @@ function openShardSpool(scratch, shardCount) {
   return { paths, descriptors: paths.map(path => openSync(path, "w")) };
 }
 
-async function auditShard(path, crossShardRepeatedSessions) {
-  const audit = createCombatContractV4Audit();
+async function auditShard(path, crossShardRepeatedSessions, onEpisodeFinished) {
+  const audit = createCombatContractV4Audit({ onEpisodeFinished });
   const lines = createInterface({
     input: createReadStream(path, { encoding: "utf8" }),
     crlfDelay: Number.POSITIVE_INFINITY,
@@ -170,9 +182,15 @@ async function auditShard(path, crossShardRepeatedSessions) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, ephemeral sharding, and bounded error accounting share one lifecycle.
-async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
+async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount, privatePolicyOutput) {
   const scratch = scratchDirectory();
   const spool = openShardSpool(scratch, shardCount);
+  let privatePolicyDescriptor = null;
+  let policyDiagnosticDecisionsWritten = 0;
+  if (privatePolicyOutput != null) {
+    mkdirSync(dirname(privatePolicyOutput), { recursive: true });
+    privatePolicyDescriptor = openSync(privatePolicyOutput, "w");
+  }
   const state = {
     cursor: "",
     listedObjects: 0,
@@ -250,8 +268,19 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
       spool.descriptors.forEach(closeSync);
     }
     const reports = [];
+    const writeEligiblePolicy = ({ split, decisions, result }) => {
+      if (privatePolicyDescriptor == null || split !== "train" || !result.policyDiagnosticEligible) {
+        return;
+      }
+      for (const decision of decisions) {
+        if (decision.policySource === "human-v1" && decision.policyTarget === true && decision.candidates.length > 1) {
+          writeSync(privatePolicyDescriptor, `${JSON.stringify(decision)}\n`);
+          policyDiagnosticDecisionsWritten++;
+        }
+      }
+    };
     for (let index = 0; index < spool.paths.length; index++) {
-      reports.push(await auditShard(spool.paths[index], crossShardRepeatedSessions[index]));
+      reports.push(await auditShard(spool.paths[index], crossShardRepeatedSessions[index], writeEligiblePolicy));
       if ((index + 1) % 16 === 0 || index + 1 === spool.paths.length) {
         console.error(
           JSON.stringify({ event: "production-v4-audit-progress", stage: "audit", completedShards: index + 1 }),
@@ -270,10 +299,14 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
       auditShards: shardCount,
       invalidObjects: state.invalidObjects,
       invalidObjectReasons: state.invalidObjectReasons,
+      policyDiagnosticDecisionsWritten,
     });
     report.corpus.repeatedPayloads += crossShardRepeatedPayloads;
     return report;
   } finally {
+    if (privatePolicyDescriptor != null) {
+      closeSync(privatePolicyDescriptor);
+    }
     rmSync(scratch, { recursive: true, force: true });
   }
 }
@@ -283,6 +316,7 @@ function markdownReport(report) {
   const eligibility = report.eligibility;
   const hardFindings = Object.entries(report.findings.hard);
   const incompleteFindings = Object.entries(report.findings.incomplete);
+  const diagnosticFindings = Object.entries(report.findings.diagnostic);
   const lines = [
     "# Production combat contract v4 semantic audit",
     "",
@@ -320,6 +354,12 @@ function markdownReport(report) {
       ? ["None."]
       : incompleteFindings.map(([code, finding]) => `- \`${code}\`: ${finding.count.toLocaleString()}`)),
     "",
+    "## Diagnostic Findings",
+    "",
+    ...(diagnosticFindings.length === 0
+      ? ["None."]
+      : diagnosticFindings.map(([code, finding]) => `- \`${code}\`: ${finding.count.toLocaleString()}`)),
+    "",
     "## Audit limits",
     "",
     `- Upload sequence completeness: ${report.coverageLimitations.uploadSequenceCompleteness}`,
@@ -356,7 +396,15 @@ async function main() {
   if (!token) {
     throw new Error("TELEMETRY_EXPORT_TOKEN is required");
   }
-  const report = await streamAudit(exportUrl, token, args.maxInvalidObjects, args.shards);
+  if (args.privatePolicyOutput != null) {
+    if (pathWithin(args.privatePolicyOutput, args.output)) {
+      throw new Error("private policy output must be outside the sanitized report directory");
+    }
+    if (process.env.RUNNER_TEMP && !pathWithin(args.privatePolicyOutput, resolve(process.env.RUNNER_TEMP))) {
+      throw new Error("private policy output must remain under RUNNER_TEMP");
+    }
+  }
+  const report = await streamAudit(exportUrl, token, args.maxInvalidObjects, args.shards, args.privatePolicyOutput);
   mkdirSync(args.output, { recursive: true });
   writeFileSync(`${args.output}/production-v4-semantic-audit.json`, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(`${args.output}/production-v4-semantic-audit.md`, markdownReport(report));

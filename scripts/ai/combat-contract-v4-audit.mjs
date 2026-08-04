@@ -119,11 +119,25 @@ function makeEpisode(envelope) {
     runTerminals: new Map(),
     hardFindings: makeFindingStore(),
     incompleteFindings: makeFindingStore(),
+    diagnosticFindings: makeFindingStore(),
   };
 }
 
 function episodeFinding(episode, code, hard = true, example = episode.id) {
   addFinding(hard ? episode.hardFindings : episode.incompleteFindings, code, example);
+}
+
+function episodeDiagnostic(episode, code, example = episode.id) {
+  addFinding(episode.diagnosticFindings, code, example);
+}
+
+function jointActionWave(jointActionId, episodeId) {
+  const prefix = `${episodeId}:`;
+  if (typeof jointActionId !== "string" || !jointActionId.startsWith(prefix)) {
+    return null;
+  }
+  const wave = Number(jointActionId.slice(prefix.length).split(":", 1)[0]);
+  return Number.isInteger(wave) ? wave : null;
 }
 
 function recordIdentity(record) {
@@ -200,7 +214,10 @@ function validateObservation(observation, episode, context) {
     episodeFinding(episode, "opponent_modifier_leak", true, context);
   }
   for (const action of observation.previousActions ?? []) {
-    if (!Number.isInteger(action.turn) || action.turn > observation.turn) {
+    const historyWave = jointActionWave(action.jointActionId, episode.id);
+    if (!Number.isInteger(action.turn) || historyWave == null) {
+      episodeFinding(episode, "invalid_action_history_anchor", true, context);
+    } else if (historyWave > observation.wave || (historyWave === observation.wave && action.turn > observation.turn)) {
       episodeFinding(episode, "future_action_history", true, context);
     }
   }
@@ -408,7 +425,11 @@ function addUniqueRecord(map, key, record, episode, duplicateCode, conflictCode)
     map.set(key, { record, digest, references: 0 });
     return true;
   }
-  episodeFinding(episode, previous.digest === digest ? duplicateCode : conflictCode, true, key);
+  if (previous.digest === digest) {
+    episodeDiagnostic(episode, duplicateCode, key);
+  } else {
+    episodeFinding(episode, conflictCode, true, key);
+  }
   return false;
 }
 
@@ -469,6 +490,9 @@ function finishEpisode(episode, globalFindings) {
   for (const [code, finding] of episode.incompleteFindings) {
     addFinding(globalFindings.incomplete, code, episode.id, finding.count);
   }
+  for (const [code, finding] of episode.diagnosticFindings) {
+    addFinding(globalFindings.diagnostic, code, episode.id, finding.count);
+  }
   const hardQuarantined = episode.hardFindings.size > 0;
   const incomplete = episode.incompleteFindings.size > 0;
   const terminalComplete = episode.runTerminals.size === 1;
@@ -485,11 +509,14 @@ function finishEpisode(episode, globalFindings) {
   };
 }
 
-export function createCombatContractV4Audit() {
+export function createCombatContractV4Audit({ onEpisodeFinished } = {}) {
+  if (onEpisodeFinished != null && typeof onEpisodeFinished !== "function") {
+    throw new TypeError("onEpisodeFinished must be a function");
+  }
   const episodes = new Map();
   const sourcePartitions = new Map();
   const globalPayloads = new Map();
-  const globalFindings = { hard: makeFindingStore(), incomplete: makeFindingStore() };
+  const globalFindings = { hard: makeFindingStore(), incomplete: makeFindingStore(), diagnostic: makeFindingStore() };
   const counts = {
     batches: 0,
     events: 0,
@@ -697,6 +724,13 @@ export function createCombatContractV4Audit() {
       if (result.runOutcome != null) {
         increment(eligibility.completedOutcomes, result.runOutcome);
       }
+      onEpisodeFinished?.({
+        episodeId: episode.id,
+        sourcePartitionId: episode.sourcePartitionId,
+        split: episode.split,
+        decisions: [...episode.decisions.values()].map(entry => entry.record),
+        result,
+      });
     }
     const report = {
       reportVersion: 1,
@@ -723,6 +757,7 @@ export function createCombatContractV4Audit() {
       findings: {
         hard: serializeFindings(globalFindings.hard),
         incomplete: serializeFindings(globalFindings.incomplete),
+        diagnostic: serializeFindings(globalFindings.diagnostic),
       },
     };
     return report;
@@ -823,7 +858,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     "completedOutcomeEligibleEpisodes",
     "winningPolicyEligibleEpisodes",
   ];
-  const findings = { hard: {}, incomplete: {} };
+  const findings = { hard: {}, incomplete: {}, diagnostic: {} };
   for (const report of reports) {
     if (report?.contractVersion !== CONTRACT_VERSION) {
       throw new Error("cannot merge an audit report with a different contract version");
@@ -840,6 +875,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     mergeNumericMap(eligibility.completedOutcomes, report.eligibility.completedOutcomes);
     mergeSerializedFindings(findings.hard, report.findings.hard);
     mergeSerializedFindings(findings.incomplete, report.findings.incomplete);
+    mergeSerializedFindings(findings.diagnostic, report.findings.diagnostic);
   }
   const uniqueSources = new Set(sourcePartitionIds);
   corpus.sourcePartitions = uniqueSources.size;
