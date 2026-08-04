@@ -3,9 +3,13 @@ name: Rust Kernel Gate
 on:
   push:
     branches:
+      - "arch/rust-kernel-v0"
       - "arch/rust-kernel/**"
     paths:
+      - ".nvmrc"
       - "rust/**"
+      - "rust/rust-toolchain.toml"
+      - "rust/fixtures/**"
       - "schemas/kernel/**"
       - "test/kernel-fixtures/**"
       - "scripts/export-kernel-*.mjs"
@@ -13,7 +17,10 @@ on:
       - ".github/workflows/rust-kernel.yml"
   pull_request:
     paths:
+      - ".nvmrc"
       - "rust/**"
+      - "rust/rust-toolchain.toml"
+      - "rust/fixtures/**"
       - "schemas/kernel/**"
       - "test/kernel-fixtures/**"
       - "scripts/export-kernel-*.mjs"
@@ -40,7 +47,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           submodules: false
 
       - name: Detect source-lock and fixture contract
@@ -51,7 +58,18 @@ jobs:
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
           shopt -s nullglob
           exporters=(scripts/export-kernel-*.mjs)
-          fixtures=(test/kernel-fixtures/*)
+          fixture_dir_present=0
+          fixture_files=()
+          if [[ -d test/kernel-fixtures ]]; then
+            fixture_dir_present=1
+            while IFS= read -r -d '' fixture; do
+              fixture_files+=("$fixture")
+            done < <(find test/kernel-fixtures -type f -not -path '*/.*' -print0)
+            if ((${#fixture_files[@]} == 0)); then
+              echo "::error::test/kernel-fixtures exists but is empty or contains only hidden files; refusing a false pre-contract pass."
+              exit 1
+            fi
+          fi
           feature_present=0
           if [[ -e rust/source-lock.toml ]]; then
             feature_present=1
@@ -59,7 +77,7 @@ jobs:
           if ((${#exporters[@]} > 0)); then
             feature_present=1
           fi
-          if ((${#fixtures[@]} > 0)); then
+          if ((fixture_dir_present == 1)); then
             feature_present=1
           fi
           if ((feature_present == 0)); then
@@ -72,44 +90,200 @@ jobs:
             [[ -e "$path" ]] || missing+=("$path")
           done
           ((${#exporters[@]} > 0)) || missing+=("scripts/export-kernel-*.mjs")
-          ((${#fixtures[@]} > 0)) || missing+=("test/kernel-fixtures/*")
+          ((${#fixture_files[@]} > 0)) || missing+=("test/kernel-fixtures/*")
           if ((${#missing[@]} > 0)); then
             printf '::error::Rust kernel source-lock contract is partially present; missing: %s\n' "${missing[*]}"
             exit 1
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Install repository-pinned Node.js
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Verify source-lock metadata and oracle tree identity
+        if: steps.contract.outputs.ready == 'true'
+        shell: bash
+        env:
+          ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
+          ORACLE_BRANCH: ci/coop/v2-showdown-command-coordinate-20260720
+          EXPECTED_PROTOCOL: er-coop-47
+          EXPECTED_SCHEMA: "1"
+          EXPECTED_REPEAT: "250"
+          EXPECTED_REPEAT_RESULT: "250/250"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          with Path("rust/source-lock.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+
+          def lookup(*paths):
+              for path in paths:
+                  value = document
+                  for key in path:
+                      if not isinstance(value, dict) or key not in value:
+                          break
+                      value = value[key]
+                  else:
+                      return value
+              raise SystemExit(f"source-lock.toml is missing one of: {paths!r}")
+
+          oracle_sha = lookup(("oracle_game_sha",), ("oracle_sha",), ("oracle", "game_sha"))
+          oracle_branch = lookup(("oracle_branch",), ("oracle", "branch"), ("branch",))
+          protocol = lookup(("protocol_version",), ("protocol", "version"), ("protocol",))
+          schema = lookup(("schema_version",), ("schema", "version"), ("schema",))
+          repeat_literal = document.get("repeat")
+          if isinstance(repeat_literal, str):
+              try:
+                  repeat_total, repeat_passed = (int(value) for value in repeat_literal.split("/", 1))
+              except (TypeError, ValueError):
+                  raise SystemExit(f"source-lock repeat must be N/N, got {repeat_literal!r}")
+          else:
+              repeat_total = lookup(
+                  ("repeat_count",),
+                  ("repeat_total",),
+                  ("repeat_expected",),
+                  ("export_repeat_count",),
+                  ("repeat", "total"),
+                  ("repeat", "expected"),
+              )
+              repeat_passed = lookup(
+                  ("repeat_passed",),
+                  ("repeat_passed_count",),
+                  ("repeat_matches",),
+                  ("repeat_completed",),
+                  ("export_repeat_passed",),
+                  ("export_repeat_matches",),
+                  ("repeat", "passed"),
+                  ("repeat", "matches"),
+                  ("repeat", "completed"),
+              )
+
+          expected = {
+              "oracle_game_sha": os.environ["ORACLE_SHA"],
+              "oracle_branch": os.environ["ORACLE_BRANCH"],
+              "protocol": os.environ["EXPECTED_PROTOCOL"],
+              "schema": int(os.environ["EXPECTED_SCHEMA"]),
+              "repeat_total": int(os.environ["EXPECTED_REPEAT"]),
+              "repeat_passed": int(os.environ["EXPECTED_REPEAT"]),
+          }
+          actual = {
+              "oracle_game_sha": oracle_sha,
+              "oracle_branch": oracle_branch,
+              "protocol": protocol,
+              "schema": schema,
+              "repeat_total": repeat_total,
+              "repeat_passed": repeat_passed,
+          }
+          if actual != expected:
+              raise SystemExit(f"source-lock metadata mismatch: expected {expected!r}, got {actual!r}")
+          if f"{repeat_total}/{repeat_passed}" != os.environ["EXPECTED_REPEAT_RESULT"]:
+              raise SystemExit("source-lock repeat is not exactly 250/250")
+          print("source-lock metadata: oracle SHA, branch, protocol, schema, and repeat are exact")
+          PY
+
+          git fetch --no-tags origin \
+            "refs/heads/${ORACLE_BRANCH}:refs/remotes/origin/${ORACLE_BRANCH}"
+          oracle_ref="refs/remotes/origin/${ORACLE_BRANCH}"
+          test "$(git rev-parse "$oracle_ref")" = "$ORACLE_SHA"
+          git cat-file -e "${ORACLE_SHA}^{commit}"
+          git merge-base --is-ancestor "$ORACLE_SHA" HEAD
+
+          consumed_sources=(
+            src/enums/buttons.ts
+            src/enums/game-modes.ts
+            src/constants/app-constants.ts
+            src/inputs-controller.ts
+            src/ui-inputs.ts
+            src/data/elite-redux/coop/coop-transport.ts
+            src/data/elite-redux/coop/authority-v2/contract.ts
+            src/data/elite-redux/coop/authority-v2/authority-entry.ts
+            src/data/elite-redux/coop/authority-v2/next-control.ts
+            src/data/elite-redux/coop/authority-v2/frame-codec.ts
+            src/data/elite-redux/coop/authority-v2/protocol-validator.ts
+            src/data/elite-redux/coop/authority-v2/frame-context.ts
+            src/data/elite-redux/coop/coop-battle-checkpoint.ts
+            src/data/elite-redux/replay-trace.ts
+            src/configs/inputs/cfg-keyboard-qwerty.ts
+            src/configs/inputs/pad-generic.ts
+            src/configs/inputs/pad-dualshock.ts
+            src/configs/inputs/pad-procon.ts
+            src/configs/inputs/pad-unlicensed-snes.ts
+            src/configs/inputs/pad-xbox360.ts
+          )
+          for path in "${consumed_sources[@]}"; do
+            git cat-file -e "${ORACLE_SHA}:${path}"
+            git diff --quiet --no-ext-diff "$ORACLE_SHA" -- "$path"
+          done
+
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -119,9 +293,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
       - name: Verify locked workspace metadata
         if: steps.contract.outputs.ready == 'true'
@@ -254,37 +428,68 @@ jobs:
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -294,9 +499,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
       - name: Check Rust formatting
         if: steps.contract.outputs.ready == 'true'
@@ -403,37 +608,68 @@ jobs:
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -443,9 +679,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
       - name: Run workspace clippy with warnings denied
         if: steps.contract.outputs.ready == 'true'
@@ -552,37 +788,68 @@ jobs:
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -592,9 +859,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
       - name: Install cargo-nextest
         if: steps.contract.outputs.ready == 'true'
@@ -717,37 +984,74 @@ jobs:
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Install repository-pinned Node.js
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -757,9 +1061,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
       - name: Locate er-wasm crate
         id: er-wasm
@@ -858,7 +1162,7 @@ jobs:
           if-no-files-found: warn
 
   rust-benchmarks:
-    name: Rust kernel benchmark JSON
+    name: Rust kernel benchmark contract (not measured)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -876,60 +1180,101 @@ jobs:
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
           shopt -s nullglob
           benchmarks=(scripts/benchmark-kernel-*.mjs)
-          present=0
+          manifest=rust/fixtures/v1/baseline-manifest.json
+          baseline=scripts/benchmark-kernel-baseline.mjs
+          feature_present=0
           missing=()
-          if ((${#benchmarks[@]} > 0)); then
-            present=1
+          if ((${#benchmarks[@]} > 0)) || [[ -e "$manifest" ]]; then
+            feature_present=1
           fi
-          for path in "${core[@]}"; do
-            if [[ -e "$path" ]]; then
-              present=1
-            else
-              missing+=("$path")
-            fi
-          done
-          if ((${#benchmarks[@]} == 0)); then
+          if ((feature_present == 0)); then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Rust kernel pre-contract: benchmark script milestone is not present yet."
             exit 0
           fi
+          for path in "${core[@]}"; do
+            [[ -e "$path" ]] || missing+=("$path")
+          done
+          ((${#benchmarks[@]} > 0)) || missing+=("scripts/benchmark-kernel-*.mjs")
+          [[ -e "$manifest" ]] || missing+=("$manifest")
+          [[ -f "$baseline" ]] || missing+=("$baseline")
+          for benchmark in "${benchmarks[@]}"; do
+            [[ "$benchmark" == "$baseline" ]] || missing+=("unsupported benchmark script: $benchmark")
+          done
           if ((${#missing[@]} > 0)); then
             printf '::error::Benchmark contract is partially present; missing: %s\n' "${missing[*]}"
             exit 1
           fi
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve the pinned Rust toolchain
+      - name: Install repository-pinned Node.js
+        if: steps.contract.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve the repository Rust toolchain semantics
         id: rust-toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          channel="$(python3 - <<'PY'
-          import re
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          text = Path("rust/rust-toolchain.toml").read_text(encoding="utf-8")
-          match = re.search(r'''(?m)^\s*channel\s*=\s*["']([^"']+)["']\s*$''', text)
-          if match is None:
-              raise SystemExit("rust/rust-toolchain.toml does not declare a channel")
-          print(match.group(1))
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
           PY
-          )"
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target)
+                rustup_args+=("--${kind}" "$value")
+                ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
           test -n "$channel"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
 
-      - name: Install the pinned Rust toolchain
+      - name: Confirm the repository Rust toolchain
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install "${{ steps.rust-toolchain.outputs.channel }}" \
-            --profile minimal \
-            --component rustfmt \
-            --component clippy \
-            --target wasm32-unknown-unknown
+          rustup show active-toolchain
 
       - name: Cache Rust dependencies and targets
         if: steps.contract.outputs.ready == 'true'
@@ -939,42 +1284,73 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
           restore-keys: |
-            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
-      - name: Run kernel benchmarks and capture JSON
+      - name: Validate benchmark contract and scenario inventory (metadata only)
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         env:
           LC_ALL: C
           TZ: UTC
+          ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
         run: |
           set -euo pipefail
           mkdir -p rust-ci-benchmarks
-          shopt -s nullglob
-          benchmarks=(scripts/benchmark-kernel-*.mjs)
-          for benchmark in "${benchmarks[@]}"; do
-            output="rust-ci-benchmarks/$(basename "${benchmark%.mjs}").json"
-            echo "Running kernel benchmark: $benchmark"
-            node "$benchmark" > "$output"
-          done
-
-      - name: Validate benchmark JSON
-        if: steps.contract.outputs.ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          reports=(rust-ci-benchmarks/*.json)
-          ((${#reports[@]} > 0))
-          node --input-type=module - "${reports[@]}" <<'NODE'
+          node scripts/benchmark-kernel-baseline.mjs \
+            --mode metadata \
+            --oracle-game-sha "$ORACLE_SHA" \
+            > rust-ci-benchmarks/benchmark-kernel-baseline-metadata.json
+          node --input-type=module - rust-ci-benchmarks/benchmark-kernel-baseline-metadata.json <<'NODE'
           import { readFileSync } from "node:fs";
 
-          for (const file of process.argv.slice(2)) {
-            const value = JSON.parse(readFileSync(file, "utf8"));
-            if (value === null || typeof value !== "object") {
-              throw new Error(`${file} must contain a JSON object or array`);
+          const file = process.argv[2];
+          const value = JSON.parse(readFileSync(file, "utf8"));
+          const expectedIds = [
+            "authority-v2-node-suite",
+            "authority-v2-protocol-simulator",
+            "headless-single-wave",
+            "headless-ten-wave",
+            "headless-two-engine",
+            "browser-two-context-webrtc",
+          ];
+          if (value.schema_version !== 1) {
+            throw new Error(`${file} schema_version must be 1`);
+          }
+          if (value.mode !== "metadata" || value.status !== "not_measured") {
+            throw new Error(`${file} must report metadata/not_measured; measured or passed output is invalid`);
+          }
+          if (value.oracle_game_sha !== "3b534099919efae827019d4a3f3c4ab0ecd6d67b") {
+            throw new Error(`${file} oracle_game_sha does not match the pinned oracle`);
+          }
+          if (value.protocol_version !== "er-coop-47") {
+            throw new Error(`${file} protocol_version must be er-coop-47`);
+          }
+          if (!Array.isArray(value.scenarios)) {
+            throw new Error(`${file} scenarios must be an array`);
+          }
+          const actualIds = value.scenarios.map(scenario => scenario.id);
+          if (actualIds.length !== expectedIds.length || expectedIds.some(id => !actualIds.includes(id))) {
+            throw new Error(`${file} scenario inventory mismatch: ${actualIds.join(", ")}`);
+          }
+          for (const scenario of value.scenarios) {
+            if (scenario.status !== "not_measured") {
+              throw new Error(`${file} scenario ${scenario.id} is not marked not_measured`);
+            }
+            for (const field of [
+              "sample_count",
+              "attempted_sample_count",
+              "setup_build_ms",
+              "cold_start_ms",
+              "warm_start_ms",
+              "spawn_latency_ms",
+              "execution_ms",
+              "peak_rss_bytes",
+            ]) {
+              if (scenario[field] !== null) {
+                throw new Error(`${file} scenario ${scenario.id} has measured field ${field}`);
+              }
             }
           }
           NODE
@@ -992,7 +1368,8 @@ jobs:
             echo "job=$GITHUB_JOB"
             echo "sha=$GITHUB_SHA"
             echo "contract_status=${CONTRACT_STATUS:-unknown}"
-            echo "status=${JOB_STATUS:-unknown}"
+            echo "job_status=${JOB_STATUS:-unknown}"
+            echo "benchmark_status=not_measured"
           } > rust-ci-summary/summary.txt
           schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
           if [[ -n "$schema_file" ]]; then
@@ -1002,11 +1379,11 @@ jobs:
           fi
           find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
 
-      - name: Upload compact success evidence
+      - name: Upload compact metadata evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: rust-kernel-${{ github.job }}-success
+          name: rust-kernel-${{ github.job }}-metadata
           path: |
             rust-ci-summary/**
             rust-ci-benchmarks/**/*.json
