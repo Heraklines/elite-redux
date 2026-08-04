@@ -731,10 +731,8 @@ export function clientsAwaitingTurnProgress(rig, from, expectedCommandAddress = 
 export function findOwnedCommandFrontier(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from);
   const ownedCommandSurface =
-    (semantic?.observation.surfaceId === "command:command"
-      && semantic.observation.uiMode === "COMMAND")
-    || (semantic?.observation.surfaceId === "command:fight"
-      && semantic.observation.uiMode === "FIGHT");
+    (semantic?.observation.surfaceId === "command:command" && semantic.observation.uiMode === "COMMAND")
+    || (semantic?.observation.surfaceId === "command:fight" && semantic.observation.uiMode === "FIGHT");
   if (
     ownedCommandSurface
     && semantic.observation.ready?.handlerActive === true

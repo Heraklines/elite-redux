@@ -7647,3 +7647,7 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now imports and supplies the same `coopMePostBattleContinuationActive()` proof as production UI/runtime, so
   the observer cannot disagree with the input gate about the retained Wobbuffet continuation. This is observer
   wiring only; the journey stopped at remote typecheck before building or exercising gameplay.
+- Follow-up exact-SHA journey `30882089205` proved the complete owned TypeScript slice clean (206 unrelated
+  baseline diagnostics) and stopped only on two deterministic Biome formatting deltas in the new predicate and
+  skip-to-fight frontier expression. The source now matches the remote formatter's printed output exactly; no
+  gameplay or test mechanism changed in this follow-up.
