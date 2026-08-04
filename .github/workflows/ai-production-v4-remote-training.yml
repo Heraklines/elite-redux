@@ -121,8 +121,12 @@ jobs:
       github.repository == 'Heraklines/elite-redux'
       && github.event_name == 'workflow_dispatch'
       && inputs.diagnose_existing_kernel
-    name: Inspect private Kaggle training failure
-    runs-on: ubuntu-latest
+    name: Inspect private Kaggle training failure (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/setup-python@v6
