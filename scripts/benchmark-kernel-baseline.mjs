@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /*
  * Rust-kernel baseline harness.
  *
@@ -8,8 +9,8 @@
  * accidentally consume the developer workstation's process-global Phaser state.
  */
 
-import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -95,21 +96,22 @@ function parseArgs(argv) {
     scenario: null,
   };
 
-  for (let index = 0; index < argv.length; index++) {
-    const arg = argv[index];
+  let index = 0;
+  while (index < argv.length) {
+    const arg = argv[index++];
     if (arg === "--help" || arg === "-h") {
       options.help = true;
       continue;
     }
     if (arg === "--mode") {
-      options.mode = argv[++index];
+      options.mode = argv[index++];
       if (!["metadata", "dry-run", "measure"].includes(options.mode)) {
         throw new Error(`--mode must be metadata, dry-run, or measure; got ${options.mode ?? "<missing>"}`);
       }
       continue;
     }
     if (arg === "--manifest") {
-      const value = argv[++index];
+      const value = argv[index++];
       if (!value) {
         throw new Error("--manifest requires a file path");
       }
@@ -117,7 +119,7 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--oracle-game-sha") {
-      const value = argv[++index]?.trim();
+      const value = argv[index++]?.trim();
       if (!value) {
         throw new Error("--oracle-game-sha requires a non-empty SHA");
       }
@@ -125,15 +127,16 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--sample-count") {
-      const value = Number(argv[++index]);
+      const rawValue = argv[index++];
+      const value = Number(rawValue);
       if (!Number.isInteger(value) || value < 1) {
-        throw new Error(`--sample-count must be a positive integer; got ${argv[index] ?? "<missing>"}`);
+        throw new Error(`--sample-count must be a positive integer; got ${rawValue ?? "<missing>"}`);
       }
       options.sampleCount = value;
       continue;
     }
     if (arg === "--scenario") {
-      const value = argv[++index]?.trim();
+      const value = argv[index++]?.trim();
       if (!value) {
         throw new Error("--scenario requires a scenario id");
       }
@@ -639,9 +642,9 @@ function runProcess(command, environment, timeoutMs) {
         reason = `process could not be started: ${error?.message ?? "unknown spawn error"}`;
       } else if (status === "failed") {
         reason =
-          exitCode !== null
-            ? `process exited with code ${exitCode}`
-            : `process exited with signal ${signal ?? "unknown"}`;
+          exitCode === null
+            ? `process exited with signal ${signal ?? "unknown"}`
+            : `process exited with code ${exitCode}`;
       }
       resolveResult({
         status,

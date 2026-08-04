@@ -1,13 +1,12 @@
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
-
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  EXPECTED_PROTOCOL_VERSION,
-  FIXTURE_DIRECTORY,
-  FIXTURE_DIGEST_KIND,
-  ORACLE_GAME_SHA,
   buildSchema,
+  EXPECTED_PROTOCOL_VERSION,
+  FIXTURE_DIGEST_KIND,
+  FIXTURE_DIRECTORY,
   makeEnvelope,
+  ORACLE_GAME_SHA,
   verifyOracleSha,
   writeJson,
 } from "./export-kernel-schema.mjs";
@@ -225,9 +224,7 @@ function buildNextControlPayload(schema) {
         turn: 1,
       },
     ],
-    allowedControlAddresses: [
-      { materialKind: "command-open", wave: 2, turn: 2, operationId: null },
-    ],
+    allowedControlAddresses: [{ materialKind: "command-open", wave: 2, turn: 2, operationId: null }],
     allowNextWaveStart: false,
     expectedOperationId: null,
   };
@@ -421,8 +418,14 @@ function buildCheckpointPayload(schema) {
       fainted: false,
       formIndex: 2.2,
       abilityId: 7.8,
-      erTags: [{ type: "bleed", turns: 2.8 }, { type: 7, turns: 3 }],
-      moves: [{ id: -2.2, ppUsed: 5.8 }, { id: 10, ppUsed: -1 }],
+      erTags: [
+        { type: "bleed", turns: 2.8 },
+        { type: 7, turns: 3 },
+      ],
+      moves: [
+        { id: -2.2, ppUsed: 5.8 },
+        { id: 10, ppUsed: -1 },
+      ],
       isTerastallized: true,
       teraType: 3.9,
       coopOwner: "guest",
@@ -567,9 +570,7 @@ function validCommandKind(command) {
 function validateReplayTrace(trace, supportedVersions) {
   const errors = [];
   if (!supportedVersions.includes(trace.version)) {
-    errors.push(
-      `unsupported trace version ${trace.version} (loader supports ${supportedVersions.join("/")})`,
-    );
+    errors.push(`unsupported trace version ${trace.version} (loader supports ${supportedVersions.join("/")})`);
   }
   if (typeof trace.seed !== "string" || trace.seed.length === 0) {
     errors.push("missing run seed (a replay needs the seed to pin RNG)");
@@ -613,8 +614,14 @@ function validateReplayTrace(trace, supportedVersions) {
 }
 
 function buildReplayPayload(schema) {
-  const coopMode = must(schema.game_modes.members.find(member => member.name === "COOP"), "GameModes.COOP").value;
-  const classicMode = must(schema.game_modes.members.find(member => member.name === "CLASSIC"), "GameModes.CLASSIC").value;
+  const coopMode = must(
+    schema.game_modes.members.find(member => member.name === "COOP"),
+    "GameModes.COOP",
+  ).value;
+  const classicMode = must(
+    schema.game_modes.members.find(member => member.name === "CLASSIC"),
+    "GameModes.CLASSIC",
+  ).value;
   const coopConfig = {
     difficulty: "elite",
     challenges: [{ id: 7, value: 2, severity: 1 }],
@@ -622,38 +629,44 @@ function buildReplayPayload(schema) {
     netcodeMode: "authoritative",
     kind: "coop",
   };
-  const validCoop = makeReplayTrace({
-    seed: "fixture-coop-seed",
-    gameModeId: coopMode,
-    roster: [
-      { species: 1, level: 5, hp: 20, maxHp: 20, coopOwner: "host" },
-      { species: 4, level: 5, hp: 20, maxHp: 20, coopOwner: "guest" },
-    ],
-    events: [
-      { type: "command", wave: 1, turn: 0, slotFieldIndex: 0, command: { kind: "move", moveIndex: 0, target: 2 } },
-      { type: "interaction", seq: 0, kind: "reward", choice: 1, data: [0, 0] },
-    ],
-    coopRunConfig: coopConfig,
-  }, schema);
-  const validSingle = makeReplayTrace({
-    seed: "fixture-solo-seed",
-    gameModeId: classicMode,
-    roster: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
-    events: [{ type: "command", wave: 2, turn: 1, slotFieldIndex: 0, command: { kind: "run" } }],
-    endState: {
-      waveIndex: 2,
-      money: 321,
-      party: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
+  const validCoop = makeReplayTrace(
+    {
+      seed: "fixture-coop-seed",
+      gameModeId: coopMode,
+      roster: [
+        { species: 1, level: 5, hp: 20, maxHp: 20, coopOwner: "host" },
+        { species: 4, level: 5, hp: 20, maxHp: 20, coopOwner: "guest" },
+      ],
+      events: [
+        { type: "command", wave: 1, turn: 0, slotFieldIndex: 0, command: { kind: "move", moveIndex: 0, target: 2 } },
+        { type: "interaction", seq: 0, kind: "reward", choice: 1, data: [0, 0] },
+      ],
+      coopRunConfig: coopConfig,
     },
-    checkpoint: {
-      wave: 2,
+    schema,
+  );
+  const validSingle = makeReplayTrace(
+    {
       seed: "fixture-solo-seed",
-      party: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
-      modifiers: [],
-      money: 321,
-      pokeballCounts: { POKEBALL: 2 },
+      gameModeId: classicMode,
+      roster: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
+      events: [{ type: "command", wave: 2, turn: 1, slotFieldIndex: 0, command: { kind: "run" } }],
+      endState: {
+        waveIndex: 2,
+        money: 321,
+        party: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
+      },
+      checkpoint: {
+        wave: 2,
+        seed: "fixture-solo-seed",
+        party: [{ species: 25, level: 10, hp: 30, maxHp: 30 }],
+        modifiers: [],
+        money: 321,
+        pokeballCounts: { POKEBALL: 2 },
+      },
     },
-  }, schema);
+    schema,
+  );
   const legacyV1 = {
     version: schema.replay_trace.supported_versions[0],
     seed: "fixture-v1-seed",
@@ -722,8 +735,14 @@ function buildInputMapPayload(schema) {
 
 function buildButtonPayload(schema) {
   const members = schema.buttons.members;
-  assertUnique(members.map(member => member.name), "Button names");
-  assertUnique(members.map(member => member.value), "Button numeric values");
+  assertUnique(
+    members.map(member => member.name),
+    "Button names",
+  );
+  assertUnique(
+    members.map(member => member.value),
+    "Button numeric values",
+  );
   return {
     source_file: schema.source_files.buttons,
     enum: schema.buttons.enum,
@@ -839,13 +858,22 @@ function assertCompleteness(schema, files) {
   assert(schema.authority_v2.next_control_kinds.length === 5, "next-control fixture is incomplete");
   assert(schema.authority_v2.ack_stages.length === 4, "receipt fixture is incomplete");
   const nextControls = files.find(file => file.file === "next-controls.json").payload.fixtures;
-  assert(new Set(nextControls.map(fixture => fixture.control.kind)).size === 5, "next-control fixtures miss a control kind");
+  assert(
+    new Set(nextControls.map(fixture => fixture.control.kind)).size === 5,
+    "next-control fixtures miss a control kind",
+  );
   const checkpointFixtures = files.find(file => file.file === "checkpoints.json").payload.fixtures;
   assert(checkpointFixtures.length === 3, "checkpoint fixture set is incomplete");
   const replayFixtures = files.find(file => file.file === "replay-traces.json").payload.fixtures;
   assert(replayFixtures.length === 4, "ReplayTrace fixture set is incomplete");
-  assert(replayFixtures.filter(fixture => fixture.validation.ok).length === 3, "ReplayTrace valid fixtures are incomplete");
-  assert(replayFixtures.some(fixture => !fixture.validation.ok), "ReplayTrace invalid fixture is missing");
+  assert(
+    replayFixtures.filter(fixture => fixture.validation.ok).length === 3,
+    "ReplayTrace valid fixtures are incomplete",
+  );
+  assert(
+    replayFixtures.some(fixture => !fixture.validation.ok),
+    "ReplayTrace invalid fixture is missing",
+  );
 }
 
 function buildManifest(files) {

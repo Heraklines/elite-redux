@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const SCHEMA_VERSION = 1;
 export const PROJECT_NAME = "PokéRogue Redux";
@@ -88,14 +88,18 @@ export function verifyOracleSha(root = ROOT) {
       stdio: ["ignore", "ignore", "pipe"],
     });
   } catch (error) {
-    fail(`oracle commit ${ORACLE_GAME_SHA} is not available: ${error instanceof Error ? error.message : String(error)}`);
+    fail(
+      `oracle commit ${ORACLE_GAME_SHA} is not available: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   try {
     execFileSync("git", ["-C", root, "merge-base", "--is-ancestor", ORACLE_GAME_SHA, actual], {
       stdio: ["ignore", "ignore", "pipe"],
     });
   } catch (error) {
-    fail(`HEAD ${actual} is not a descendant of oracle ${ORACLE_GAME_SHA}: ${error instanceof Error ? error.message : String(error)}`);
+    fail(
+      `HEAD ${actual} is not a descendant of oracle ${ORACLE_GAME_SHA}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   for (const relativePath of Object.values(SOURCE_FILES)) {
@@ -106,8 +110,10 @@ export function verifyOracleSha(root = ROOT) {
       execFileSync("git", ["-C", root, "diff", "--quiet", "--no-ext-diff", ORACLE_GAME_SHA, "--", relativePath], {
         stdio: ["ignore", "ignore", "pipe"],
       });
-    } catch (error) {
-      fail(`consumed source drifted from oracle ${ORACLE_GAME_SHA}: ${relativePath} (git diff against oracle tree is non-empty or unavailable)`);
+    } catch {
+      fail(
+        `consumed source drifted from oracle ${ORACLE_GAME_SHA}: ${relativePath} (git diff against oracle tree is non-empty or unavailable)`,
+      );
     }
   }
   return actual;
@@ -128,7 +134,6 @@ function balancedContents(source, marker, open, close) {
 }
 
 function balancedContentsAt(source, openIndex, open, close, label = "source") {
-
   let depth = 0;
   let quote = null;
   let escaped = false;
@@ -217,7 +222,7 @@ function parseQuotedString(value, context) {
   if (!match) {
     fail(`expected a quoted string for ${context}, got ${JSON.stringify(value.trim())}`);
   }
-  return JSON.parse(match[1] !== undefined ? `"${match[1]}"` : `"${match[2]}"`);
+  return JSON.parse(match[1] === undefined ? `"${match[2]}"` : `"${match[1]}"`);
 }
 
 function parseConstString(source, name) {
@@ -250,7 +255,7 @@ function parseConstNumber(source, name) {
 function parseStringArray(source, name) {
   const body = arrayContents(source, `export const ${name}`);
   return [...body.matchAll(/(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')/gu)].map(match =>
-    JSON.parse(match[1] !== undefined ? `"${match[1]}"` : `"${match[2]}"`),
+    JSON.parse(match[1] === undefined ? `"${match[2]}"` : `"${match[1]}"`),
   );
 }
 
@@ -309,9 +314,9 @@ function parseNextControlKinds(contractSource) {
   if (typeStart < 0 || typeEnd < 0) {
     fail("could not bound CoopNextControl union");
   }
-  return [
-    ...contractSource.slice(typeStart, typeEnd).matchAll(/readonly kind:\s*"([A-Z_]+)"/gu),
-  ].map(match => match[1]);
+  return [...contractSource.slice(typeStart, typeEnd).matchAll(/readonly kind:\s*"([A-Z_]+)"/gu)].map(
+    match => match[1],
+  );
 }
 
 function parseNextControlAuthorityKinds(nextControlSource) {
@@ -338,9 +343,11 @@ function parseObjectEntries(source, marker) {
 
 function parseComputedSettings(source, marker) {
   const body = stripLineComments(objectContents(source, marker));
-  return [...body.matchAll(/\[\s*(?:SettingKeyboard|SettingGamepad)\.([A-Z][A-Z0-9_]*)\s*\]\s*:\s*Button\.([A-Z][A-Z0-9_]*)/gu)].map(
-    match => ({ setting: match[1], button: match[2] }),
-  );
+  return [
+    ...body.matchAll(
+      /\[\s*(?:SettingKeyboard|SettingGamepad)\.([A-Z][A-Z0-9_]*)\s*\]\s*:\s*Button\.([A-Z][A-Z0-9_]*)/gu,
+    ),
+  ].map(match => ({ setting: match[1], button: match[2] }));
 }
 
 function parseBlacklist(source) {
@@ -349,7 +356,7 @@ function parseBlacklist(source) {
   }
   const body = stripLineComments(arrayContents(source, "blacklist:"));
   return [...body.matchAll(/(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')/gu)].map(match =>
-    JSON.parse(match[1] !== undefined ? `"${match[1]}"` : `"${match[2]}"`),
+    JSON.parse(match[1] === undefined ? `"${match[2]}"` : `"${match[1]}"`),
   );
 }
 
@@ -429,7 +436,7 @@ function parseInputConfig(root, id, relativePath, exportName, buttonMembers) {
       if (entry.setting === "BUTTON_DEV_CUSTOM" && mode !== "development") {
         continue;
       }
-      const resolved = settingButton(entry.setting, buttonMembers, `${sourceFile}:settings`);
+      settingButton(entry.setting, buttonMembers, `${sourceFile}:settings`);
       settings[entry.setting] = {
         button_name: entry.button,
         button_value: buttonMembers.find(member => member.name === entry.button)?.value,
@@ -451,7 +458,7 @@ function parseInputConfig(root, id, relativePath, exportName, buttonMembers) {
         /^isDev\s*\?\s*(?:SettingKeyboard|SettingGamepad)\.([A-Z][A-Z0-9_]*)\s*:\s*(-?\d+)$/u,
       );
       let setting;
-      let sourceExpression = entry.valueExpression;
+      const sourceExpression = entry.valueExpression;
       if (conditional) {
         setting = mode === "development" ? conditional[1] : "UNBOUND";
       } else {
@@ -495,7 +502,9 @@ function assertEqualArrays(label, left, right) {
 
 export function buildSchema(root = ROOT) {
   verifyOracleSha(root);
-  const source = Object.fromEntries(Object.entries(SOURCE_FILES).map(([key, relativePath]) => [key, readSource(root, relativePath)]));
+  const source = Object.fromEntries(
+    Object.entries(SOURCE_FILES).map(([key, relativePath]) => [key, readSource(root, relativePath)]),
+  );
 
   const buttons = parseStringEnum(source.buttons, "Button");
   const gameModes = parseStringEnum(source.gameModes, "GameModes");
