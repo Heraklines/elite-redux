@@ -197,6 +197,7 @@ jobs:
             src/data/elite-redux/coop/coop-durability.ts \
             src/data/elite-redux/coop/coop-field-presentation.ts \
             src/data/elite-redux/coop/coop-operation-envelope.ts \
+            src/data/elite-redux/coop/coop-party-reorder-presentation.ts \
             src/data/elite-redux/coop/coop-reward-operation.ts \
             src/data/elite-redux/coop/coop-runtime.ts \
             src/data/elite-redux/coop/coop-transport.ts \

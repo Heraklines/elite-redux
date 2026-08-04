@@ -8,6 +8,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { installCoopPartyReorderPresentationProjector } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import { FieldPosition } from "#enums/field-position";
 // biome-ignore lint/suspicious/noImportCycles: Presentation projection needs runtime class identity for field-child and enemy checks.
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
@@ -692,10 +693,7 @@ export async function settleCoopFieldPresentationReady(
  * prevents a slow atlas load from exposing a blank player side and gives the owner and watcher the same
  * presentation path without replaying summon mechanics, abilities, tags, forms, or RNG.
  */
-export async function settleCoopPartyReorderPresentationReady(
-  scene: BattleScene,
-  capacity: number,
-): Promise<number> {
+export async function settleCoopPartyReorderPresentationReady(scene: BattleScene, capacity: number): Promise<number> {
   const battle = scene.currentBattle;
   if (globalScene !== scene || battle == null || !Number.isSafeInteger(capacity) || capacity < 1) {
     throw new Error("Co-op party-reorder presentation has no live battle field");
@@ -721,6 +719,8 @@ export async function settleCoopPartyReorderPresentationReady(
       && expectedIds.every((pokemonId, slot) => scene.getPlayerParty()[slot]?.id === pokemonId),
   );
 }
+
+installCoopPartyReorderPresentationProjector(settleCoopPartyReorderPresentationReady);
 
 /**
  * Load and initialize an authoritative field surface while keeping it completely concealed. New-biome and

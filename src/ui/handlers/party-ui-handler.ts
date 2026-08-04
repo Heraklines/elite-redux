@@ -3,6 +3,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import {
   coopGiveToPartner,
@@ -1151,15 +1152,9 @@ export class PartyUiHandler extends MessageUiHandler {
         const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
         [party[src], party[dst]] = [party[dst], party[src]];
         if (src < fieldSize || dst < fieldSize) {
-          // This projector imports Pokemon at runtime. Keep it behind the leaf action so importing the
-          // UI handler cannot close abilities -> UI -> presentation -> Pokemon during module evaluation.
-          void import("#data/elite-redux/coop/coop-field-presentation")
-            .then(({ settleCoopPartyReorderPresentationReady }) =>
-              settleCoopPartyReorderPresentationReady(globalScene, fieldSize),
-            )
-            .catch(error => {
-              coopLog("party", `OWNER party-reorder presentation retained old field: ${String(error)}`);
-            });
+          void settleCoopPartyReorderPresentationReady(globalScene, fieldSize).catch(error => {
+            coopLog("party", `OWNER party-reorder presentation retained old field: ${String(error)}`);
+          });
         }
         this.populatePartySlots(); // re-render the list in the new order
         // Co-op (#633 B9b): relay the resolved swap so the watcher mirrors it on its identical party.

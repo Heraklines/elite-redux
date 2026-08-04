@@ -827,7 +827,10 @@ test("Check Team reorder proof requires both party order and an atomically ready
     "mechanical party convergence cannot hide a blank active field",
   );
   assert.equal(
-    partyReorderPresentationMatches({ ...ready, partySlots: [{ pokemonId: 101 }, ...ready.partySlots.slice(1)] }, expectedPartyIds),
+    partyReorderPresentationMatches(
+      { ...ready, partySlots: [{ pokemonId: 101 }, ...ready.partySlots.slice(1)] },
+      expectedPartyIds,
+    ),
     false,
     "visible field convergence cannot hide a stale party order",
   );

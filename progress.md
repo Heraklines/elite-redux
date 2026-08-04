@@ -7717,3 +7717,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   reward action row -> Check Team -> Move slot 0 -> swap with slot 2 -> prove identical party order and fully
   visible active sprites/info bars on both clients -> return -> prove the watcher received the owner's absolute
   reward cursor. The previous journey selected only the reward and therefore could not catch either live defect.
+- Exact-SHA co-op gate `30920221918` is green across all 32 jobs at `46242a915`. The first animations-on
+  Greater Randomizer journey `30921224449` never launched Chromium: its stricter owned-file check found format
+  drift plus Biome's static cycle detector retaining the deferred UI -> field-projector edge. The behavior gate
+  had already proven the deferred import was runtime-safe, but the dependency graph is now structurally clean as
+  well: a type-only one-way party-reorder presentation registry separates UI callers from Pokemon presentation
+  classes, and the ordinary field-presentation module installs the concrete projector before reward handling.

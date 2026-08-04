@@ -1292,7 +1292,8 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
         ...(modifierHandler.lockRarityButtonContainer?.visible === true ? ["reward-action:lock-rarities"] : []),
       ];
       return {
-        selectedOptionId: selectedIndex == null ? null : (actionByCursor.get(selectedIndex) ?? `cursor:${selectedIndex}`),
+        selectedOptionId:
+          selectedIndex == null ? null : (actionByCursor.get(selectedIndex) ?? `cursor:${selectedIndex}`),
         optionIds,
         optionCount: optionIds.length,
       };

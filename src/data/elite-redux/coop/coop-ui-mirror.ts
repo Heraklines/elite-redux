@@ -215,7 +215,10 @@ export class CoopUiMirror {
     }
     this.clearOwnerStateRetryTimer();
     if (isCoopDebug()) {
-      coopLog("interaction", `uiMirror OWNER state seq=${s.seq} n=${s.n} mode=${modeBefore} state=[${state.join(",")}]`);
+      coopLog(
+        "interaction",
+        `uiMirror OWNER state seq=${s.seq} n=${s.n} mode=${modeBefore} state=[${state.join(",")}]`,
+      );
     }
     this.transport.send({
       t: "uiInput",

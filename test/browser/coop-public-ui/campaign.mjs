@@ -6118,7 +6118,9 @@ export async function runCampaign(rig) {
           || JSON.stringify(reorderProofs[0]?.expectedPartyIds ?? null)
             !== JSON.stringify(reorderProofs.at(-1)?.expectedPartyIds ?? null)
           || reorderProofs.some(event =>
-            event.fieldIds?.some(fieldIds => JSON.stringify(fieldIds) !== JSON.stringify(event.expectedPartyIds.slice(0, fieldIds.length))),
+            event.fieldIds?.some(
+              fieldIds => JSON.stringify(fieldIds) !== JSON.stringify(event.expectedPartyIds.slice(0, fieldIds.length)),
+            ),
           )
         ) {
           throw new Error(
