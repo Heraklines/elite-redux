@@ -3646,6 +3646,74 @@ export function retainStableWatcherSurfaceCursors(returnCursors, stableCursors, 
   return cursors;
 }
 
+/** The Check Team return initially restores the action row; require the original reward-card row again. */
+export function restoredRewardRowMatches(observation, expectedOptionIds, expectedAddress) {
+  return (
+    observation?.surfaceId === "reward-shop"
+    && JSON.stringify(observation.address) === JSON.stringify(expectedAddress)
+    && JSON.stringify(observation.optionIds ?? null) === JSON.stringify(expectedOptionIds ?? null)
+    && isActionableSemanticObservation(observation)
+  );
+}
+
+async function restoreRewardRowAfterCheckTeam(rig, owner, boundary, restored) {
+  const expectedOptionIds = boundary.authority.optionIds;
+  const expectedAddress = boundary.authority.address;
+  if (!Array.isArray(expectedOptionIds) || expectedOptionIds.length === 0) {
+    throw new Error("[campaign-check-team] original reward row had no stable option identities");
+  }
+  let current = restored;
+  for (let step = 0; step <= 6; step++) {
+    if (restoredRewardRowMatches(current.authority, expectedOptionIds, expectedAddress)) {
+      const peerEvents = await Promise.all(
+        Object.values(rig.clients)
+          .filter(client => client !== owner)
+          .map(peer =>
+            peer.evidence.waitForCondition(
+              sink => {
+                const candidate = sink.findLastSemanticSurface(0, "reward-shop");
+                return rewardCursorProjectionMatches(current.authority, candidate?.observation) ? candidate : null;
+              },
+              { timeoutMs: rig.config.timeoutMs, description: `restored reward-card row on ${peer.label}` },
+            ),
+          ),
+      );
+      const proof = {
+        address: current.authority.address,
+        optionIds: current.authority.optionIds,
+        selectedOptionId: current.authority.selectedOptionId,
+        steps: step,
+      };
+      for (const client of Object.values(rig.clients)) {
+        client.evidence.record("campaign-check-team-reward-row-restored", proof);
+      }
+      return { ...current, peerEvents };
+    }
+    const fromCursor = owner.evidence.cursor();
+    const priorSelection = current.authority.selectedOptionId;
+    const priorOptions = JSON.stringify(current.authority.optionIds ?? null);
+    await owner.press("ArrowUp", `campaign-check-team-restore-reward-row-${step + 1}`);
+    const ownerEvent = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(fromCursor, "reward-shop");
+        const observation = candidate?.observation;
+        return candidate != null
+          && JSON.stringify(observation.address) === JSON.stringify(expectedAddress)
+          && isActionableSemanticObservation(observation)
+          && (observation.selectedOptionId !== priorSelection
+            || JSON.stringify(observation.optionIds ?? null) !== priorOptions)
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: "Check Team return navigation toward retained reward cards" },
+    );
+    current = { authority: ownerEvent.observation, ownerEvent, peerEvents: [] };
+  }
+  throw new Error(
+    `[campaign-check-team] could not restore reward row ${JSON.stringify(expectedOptionIds)} after returning from PARTY`,
+  );
+}
+
 /**
  * Exercise the player-reported nested reward path exclusively through public keyboard input:
  * reward row -> Check Team -> Move active slot 0 -> swap with reserve slot 2 -> return.
@@ -3858,7 +3926,7 @@ async function driveRewardCheckTeamReorder(rig, owner, boundary) {
       watcherSeats: restoredPeerEvents.map(event => event.observation.localSeat),
     });
   }
-  return restored;
+  return restoreRewardRowAfterCheckTeam(rig, owner, boundary, restored);
 }
 
 /**

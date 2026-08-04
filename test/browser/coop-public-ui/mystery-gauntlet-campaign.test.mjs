@@ -31,6 +31,7 @@ import {
   resolveSurfaceOwner,
   retainedPartyEvolutionNeedsProgressBudget,
   retainStableWatcherSurfaceCursors,
+  restoredRewardRowMatches,
   rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
   selectLatestMysteryAuthorityEvent,
@@ -847,6 +848,35 @@ test("Check Team return reuses only the watcher's proven stable post-reorder sur
   assert.throws(
     () => retainStableWatcherSurfaceCursors(returnCursors, {}, ["watcher"]),
     /watcher has no stable watcher cursor/u,
+  );
+});
+
+test("Check Team return does not mistake its transient action row for the retained reward cards", () => {
+  const address = { epoch: 19, wave: 4, turn: 2 };
+  const base = {
+    surfaceId: "reward-shop",
+    address,
+    ready: { handlerActive: true, inputBlocked: false },
+  };
+  assert.equal(
+    restoredRewardRowMatches(
+      {
+        ...base,
+        selectedOptionId: "reward-action:check-team",
+        optionIds: ["reward-action:reroll", "reward-action:check-team"],
+      },
+      ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"],
+      address,
+    ),
+    false,
+  );
+  assert.equal(
+    restoredRewardRowMatches(
+      { ...base, selectedOptionId: "POKEBALL", optionIds: ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"] },
+      ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"],
+      address,
+    ),
+    true,
   );
 });
 
