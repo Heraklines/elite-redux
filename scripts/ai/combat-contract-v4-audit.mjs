@@ -432,7 +432,7 @@ function finishEpisode(episode, globalFindings) {
     for (const decisionId of transition.decisionIds ?? []) {
       const decision = allDecisions.get(decisionId);
       if (decision == null) {
-        episodeFinding(episode, "transition_references_missing_decision", true, transition.transitionId);
+        episodeFinding(episode, "transition_references_missing_decision", false, transition.transitionId);
         continue;
       }
       decision.references++;
@@ -443,7 +443,7 @@ function finishEpisode(episode, globalFindings) {
   }
   for (const [decisionId, decision] of allDecisions) {
     if (decision.references === 0) {
-      episodeFinding(episode, "decision_missing_transition", true, decisionId);
+      episodeFinding(episode, "decision_missing_transition", false, decisionId);
     } else if (decision.references > 1) {
       episodeFinding(episode, "decision_joined_multiple_times", true, decisionId);
     }
@@ -452,7 +452,7 @@ function finishEpisode(episode, globalFindings) {
     if (terminal.transitionId != null) {
       const transition = episode.transitions.get(terminal.transitionId)?.record;
       if (transition == null) {
-        episodeFinding(episode, "battle_terminal_missing_transition", true, terminal.terminalId);
+        episodeFinding(episode, "battle_terminal_missing_transition", false, terminal.terminalId);
       } else if (transition.battleTerminal !== terminal.outcome) {
         episodeFinding(episode, "battle_terminal_transition_mismatch", true, terminal.terminalId);
       }
@@ -470,14 +470,17 @@ function finishEpisode(episode, globalFindings) {
     addFinding(globalFindings.incomplete, code, episode.id, finding.count);
   }
   const hardQuarantined = episode.hardFindings.size > 0;
+  const incomplete = episode.incompleteFindings.size > 0;
   const terminalComplete = episode.runTerminals.size === 1;
   const runOutcome = terminalComplete ? [...episode.runTerminals.values()][0].record.outcome : null;
   return {
     hardQuarantined,
+    incomplete,
     terminalComplete,
     policyDiagnosticEligible: !hardQuarantined,
-    completedOutcomeEligible: !hardQuarantined && terminalComplete,
-    winningPolicyEligible: !hardQuarantined && terminalComplete && runOutcome === "victory",
+    trajectoryEligible: !hardQuarantined && !incomplete,
+    completedOutcomeEligible: !hardQuarantined && !incomplete && terminalComplete,
+    winningPolicyEligible: !hardQuarantined && !incomplete && terminalComplete && runOutcome === "victory",
     runOutcome,
   };
 }
@@ -674,6 +677,7 @@ export function createCombatContractV4Audit() {
       hardQuarantinedEpisodes: 0,
       incompleteEpisodes: 0,
       policyDiagnosticEligibleEpisodes: 0,
+      trajectoryEligibleEpisodes: 0,
       completedOutcomeEligibleEpisodes: 0,
       winningPolicyEligibleEpisodes: 0,
       completedOutcomes: {},
@@ -685,8 +689,9 @@ export function createCombatContractV4Audit() {
     for (const episode of episodes.values()) {
       const result = finishEpisode(episode, globalFindings);
       eligibility.hardQuarantinedEpisodes += Number(result.hardQuarantined);
-      eligibility.incompleteEpisodes += Number(!result.terminalComplete);
+      eligibility.incompleteEpisodes += Number(result.incomplete);
       eligibility.policyDiagnosticEligibleEpisodes += Number(result.policyDiagnosticEligible);
+      eligibility.trajectoryEligibleEpisodes += Number(result.trajectoryEligible);
       eligibility.completedOutcomeEligibleEpisodes += Number(result.completedOutcomeEligible);
       eligibility.winningPolicyEligibleEpisodes += Number(result.winningPolicyEligible);
       if (result.runOutcome != null) {
@@ -804,6 +809,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     hardQuarantinedEpisodes: 0,
     incompleteEpisodes: 0,
     policyDiagnosticEligibleEpisodes: 0,
+    trajectoryEligibleEpisodes: 0,
     completedOutcomeEligibleEpisodes: 0,
     winningPolicyEligibleEpisodes: 0,
     completedOutcomes: {},
@@ -813,6 +819,7 @@ export function mergeCombatContractV4AuditReports(reports, sourcePartitionIds, e
     "hardQuarantinedEpisodes",
     "incompleteEpisodes",
     "policyDiagnosticEligibleEpisodes",
+    "trajectoryEligibleEpisodes",
     "completedOutcomeEligibleEpisodes",
     "winningPolicyEligibleEpisodes",
   ];

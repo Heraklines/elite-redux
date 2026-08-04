@@ -154,7 +154,11 @@ async function auditShard(path, crossShardRepeatedSessions) {
   });
   for await (const line of lines) {
     if (line.trim()) {
-      audit.ingestBatch(JSON.parse(line));
+      const decoded = decodeRow(JSON.parse(line));
+      if (decoded.batch == null) {
+        throw new Error("a previously validated telemetry row failed during shard replay");
+      }
+      audit.ingestBatch(decoded.batch);
     }
   }
   for (const sessionId of crossShardRepeatedSessions) {
@@ -175,6 +179,7 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
     selectedObjects: 0,
     compressedBytes: 0,
     expandedBytes: 0,
+    spooledBytes: 0,
     spooledBatches: 0,
     invalidObjects: 0,
     invalidObjectReasons: {},
@@ -223,7 +228,9 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
           }
           state.expandedBytes += Buffer.byteLength(json) + 1;
           state.spooledBatches++;
-          writeSync(spool.descriptors[index], `${json}\n`);
+          const spooled = `${JSON.stringify(row)}\n`;
+          state.spooledBytes += Buffer.byteLength(spooled);
+          writeSync(spool.descriptors[index], spooled);
         }
         state.cursor =
           response.headers.get("x-er-truncated") === "true" ? (response.headers.get("x-er-next-cursor") ?? "") : "";
@@ -259,6 +266,7 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, shardCount) {
       selectedObjects: state.selectedObjects,
       compressedBytes: state.compressedBytes,
       expandedBytes: state.expandedBytes,
+      spooledBytes: state.spooledBytes,
       auditShards: shardCount,
       invalidObjects: state.invalidObjects,
       invalidObjectReasons: state.invalidObjectReasons,
@@ -296,6 +304,7 @@ function markdownReport(report) {
     `- Hard-quarantined episodes: ${eligibility.hardQuarantinedEpisodes.toLocaleString()}`,
     `- Incomplete episodes: ${eligibility.incompleteEpisodes.toLocaleString()}`,
     `- Structurally valid BC episodes: ${eligibility.policyDiagnosticEligibleEpisodes.toLocaleString()}`,
+    `- Sequence-complete episodes: ${eligibility.trajectoryEligibleEpisodes.toLocaleString()}`,
     `- Completed-outcome episodes: ${eligibility.completedOutcomeEligibleEpisodes.toLocaleString()}`,
     `- Completed winning policy episodes: ${eligibility.winningPolicyEligibleEpisodes.toLocaleString()}`,
     "",

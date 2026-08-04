@@ -290,10 +290,22 @@ test("invalid labels and broken joins quarantine the episode without exposing ra
   const report = auditCombatContractV4Batches([fixture]);
   assert.equal(report.eligibility.hardQuarantinedEpisodes, 1);
   assert.ok(report.findings.hard.chosen_candidate_not_exactly_once);
-  assert.ok(report.findings.hard.decision_missing_transition);
+  assert.ok(report.findings.incomplete.decision_missing_transition);
   const encoded = JSON.stringify(report);
   assert.equal(encoded.includes(SESSION_ID), false);
   assert.equal(encoded.includes(SOURCE_ID), false);
+});
+
+test("interrupted joins stay usable for pointwise BC but not sequence or outcome training", () => {
+  const fixture = batch();
+  fixture.events = fixture.events.filter(event => event.kind !== "combat_contract_transition");
+  const report = auditCombatContractV4Batches([fixture]);
+  assert.equal(report.eligibility.hardQuarantinedEpisodes, 0);
+  assert.equal(report.eligibility.incompleteEpisodes, 1);
+  assert.equal(report.eligibility.policyDiagnosticEligibleEpisodes, 1);
+  assert.equal(report.eligibility.trajectoryEligibleEpisodes, 0);
+  assert.equal(report.eligibility.completedOutcomeEligibleEpisodes, 0);
+  assert.ok(report.findings.incomplete.decision_missing_transition);
 });
 
 test("malformed contract events are quarantined instead of counted as ignored telemetry", () => {
