@@ -5253,7 +5253,7 @@ async function advanceToNextWaveCommand(
   // observer-proven public action one ordinary surface allowance; never refresh from keepalives, phase names, or
   // time alone. The immutable ceiling remains derived from the finite required Mystery surface count.
   const registeredSurfaceProgressBudget =
-    policy.mysteryGauntlet.required || policy.navigation.required
+    policy.mysteryGauntlet.required || policy.navigation.required || policy.registeredInteractions.required
       ? createRegisteredSurfaceProgressBudget(
           betweenWaveTimeoutMs,
           rig.config.timeoutMs,
@@ -5574,7 +5574,7 @@ export async function runCampaign(rig) {
   let status = "continue";
   const marketCoverage = { visits: [], purchases: [] };
   const mysteryCoverage = { events: [], battleKinds: [] };
-  const registeredInteractionCoverage = { revival: [], stormglass: [] };
+  const registeredInteractionCoverage = { revival: [], stormglass: [], mysterySuccessor: null };
   try {
     for (let ordinal = 1; ordinal <= policy.maxBattleLoops && wavesCleared < policy.targetWaves; ordinal++) {
       battleLoops = ordinal;
@@ -5792,18 +5792,40 @@ export async function runCampaign(rig) {
           ...client.evidence.events.filter(event => event.kind === "campaign-stormglass-choice"),
         );
       }
-      if (registeredInteractionCoverage.revival.length !== 1 || registeredInteractionCoverage.stormglass.length !== 1) {
+      const stormglassMysterySuccessor = clients
+        .flatMap(client => client.evidence.events)
+        .find(
+          event =>
+            typeof event.text === "string"
+            && /\[coop:v2-replica\] apply rev=\d+ kind=INTERACTION_COMMIT .*STORMGLASS.*interactionAddresses:op%3Ame:ME_PRESENT:w2:t0/u.test(
+              event.text,
+            ),
+        );
+      const completedMysterySuccessor = mysteryCoverage.events.find(
+        event => event.kind === "mystery" && event.wave === 2 && event.terminal?.wave > event.wave,
+      );
+      registeredInteractionCoverage.mysterySuccessor = completedMysterySuccessor ?? null;
+      if (
+        registeredInteractionCoverage.revival.length !== 1
+        || registeredInteractionCoverage.stormglass.length !== 1
+        || stormglassMysterySuccessor == null
+        || completedMysterySuccessor == null
+      ) {
         throw new Error(
-          "[campaign-registered-interactions] exact fixture did not drive one Revival and one Stormglass choice: "
+          "[campaign-registered-interactions] exact fixture did not complete Revival -> Stormglass -> ME_PRESENT(t0) -> Mystery terminal: "
             + JSON.stringify({
               revival: registeredInteractionCoverage.revival,
               stormglass: registeredInteractionCoverage.stormglass,
+              stormglassMysterySuccessor: stormglassMysterySuccessor?.text ?? null,
+              mysterySuccessor: registeredInteractionCoverage.mysterySuccessor,
             }),
         );
       }
       const proof = {
         revival: registeredInteractionCoverage.revival[0],
         stormglass: registeredInteractionCoverage.stormglass[0],
+        stormglassMysterySuccessor: stormglassMysterySuccessor.text,
+        mysterySuccessor: registeredInteractionCoverage.mysterySuccessor,
       };
       for (const client of clients) {
         client.evidence.record("campaign-registered-interaction-coverage", proof);

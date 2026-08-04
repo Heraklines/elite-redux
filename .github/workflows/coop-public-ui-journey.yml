@@ -473,6 +473,11 @@ jobs:
           # The half-wipe caller explicitly selects the replica-owned guest seat.
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
+          # The focused registered-interaction journey must exercise the real alternative successor
+          # after Stormglass, not depend on a random Ace-mode ME roll. Selecting Mystery through the
+          # public difficulty menu guarantees wave 2 is an ME while every other journey retains Ace.
+          COOP_UI_DIFFICULTY_ID: ${{ inputs.journey == 'registered-interactions' && 'mystery' || 'ace' }}
+          COOP_UI_DIFFICULTY_OPTION_ID: ${{ inputs.journey == 'registered-interactions' && 'mystery' || 'ace' }}
           COOP_UI_HOST_LOCALE: en
           # The retained GameOver oracle isolates terminal ordering from the separately-gated
           # cross-locale fingerprint contract. All other public journeys keep the EN/DE lane.
@@ -539,7 +544,12 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
+            # Clear wave 1, choose Stormglass at wave 2, then finish the forced Mystery successor.
+            # A Mystery option may embed a battle at the same address, so target wave 2 keeps the
+            # campaign alive until the event reaches its real wave-3 terminal frontier.
+            export COOP_UI_CAMPAIGN_WAVES=2
+          elif [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" ]]; then
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
           if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then

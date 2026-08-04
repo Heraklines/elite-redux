@@ -836,7 +836,7 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   assert.match(journeys, /"evolution-sync": evolutionSync/u);
 });
 
-test("registered-interaction journey reaches Revival mid-turn and Stormglass at the next wave through public UI", async () => {
+test("registered-interaction journey reaches Revival, Stormglass, and its Mystery successor through public UI", async () => {
   const [workflow, config, harness, commandPhase, campaign, registry, starterCosts] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
@@ -854,8 +854,13 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
   );
   assert.match(
     workflow,
-    /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u,
-    "the focused occurrence journey overrides the retained 20-wave market contract only in its process",
+    /COOP_UI_DIFFICULTY_ID:.*registered-interactions.*'mystery'.*'ace'[\s\S]*COOP_UI_DIFFICULTY_OPTION_ID:.*registered-interactions.*'mystery'.*'ace'/u,
+    "the focused journey selects the real Mystery difficulty through the same public option driver",
+  );
+  assert.match(
+    workflow,
+    /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=2/u,
+    "the focused occurrence journey remains alive through a same-wave embedded battle and the completed Mystery terminal",
   );
   assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
   assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
@@ -894,7 +899,18 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
   );
   assert.match(
     campaign,
-    /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*campaign-registered-interactions/u,
+    /policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required \|\| policy\.registeredInteractions\.required[\s\S]*createRegisteredSurfaceProgressBudget/u,
+    "each proven public Mystery action extends only the bounded registered-surface budget",
+  );
+  assert.match(
+    campaign,
+    /interactionAddresses:op%3Ame:ME_PRESENT:w2:t0/u,
+    "the browser oracle requires the exact pre-turn Mystery successor address",
+  );
+  assert.match(
+    campaign,
+    /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*stormglassMysterySuccessor == null[\s\S]*completedMysterySuccessor == null[\s\S]*campaign-registered-interactions/u,
+    "the journey cannot pass until the t0 Mystery successor is admitted and its real terminal reaches a later wave",
   );
 });
 

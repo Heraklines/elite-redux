@@ -7450,3 +7450,26 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The production double-KO fix remains the already deployed staging bundle
   `github:296b89e01aa25e61b049c92ef88fba98bb85735b:run-30855403585.1`. Commits `8521d2dcb` and `689d9e86f`
   are test/observer-only, so no additional staging deploy is required. Production remains untouched.
+
+## 2026-08-04 - Stormglass successor closure and retained trainer-reward driver
+
+- Exact registered-interactions run `30863183864` exposed a real Authority V2 successor-address defect:
+  after the host chose Stormglass on a wave-2 Mystery battle, it authored `ME_PRESENT` in the protocol's
+  pre-turn domain `w2:t0`, while the predecessor admitted only the ambient battle shell's `w2:t1` address.
+  Production commit `a75912d9b` authorizes only the exact same-wave `ME_PRESENT:t0` alternative alongside
+  the ordinary command frontier. Focused rerun `30864499291` is green, but its random Ace-mode wave 2
+  selected the command alternative and therefore did not itself prove the Mystery branch.
+- Continuous navigation run `30862517427` failed at wave-5 shop rendezvous even though product authority,
+  state, and retained wave progression had converged. The replica was left on a real actionable Voucher
+  `ModifierRewardPhase` because the driver required a local `BattleEndPhase` marker that Authority V2
+  replicas intentionally never execute. Harness commits `39142a700`/`f4362888a` accept only the exact
+  ordered `projected trainer victory rev=N wave=W turn=T` proof and retain wrong-wave/no-proof negative
+  coverage. Exact remote build/type/format/contracts are green in run `30865215640`; its 30-wave browser
+  job remains active and must not be cancelled.
+- The registered-interactions journey is being strengthened instead of adding a production shortcut. It
+  now selects the real Mystery difficulty through the public UI, targets wave 2 so same-wave embedded
+  battles cannot end the test early, receives only bounded extensions from proven public surface actions,
+  and must observe the replica's exact Stormglass `ME_PRESENT:w2:t0` successor plus a completed paired
+  Mystery terminal at a later wave. Remote-only qualification is still required.
+- Staging deployment `30865970812` was dispatched at exact SHA `f4362888a` so testers can exercise the
+  product fixes while closure continues. Production remains untouched.
