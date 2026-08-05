@@ -14,7 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import lzString from "lz-string";
 import { createCombatContractV4Audit, mergeCombatContractV4AuditReports } from "./combat-contract-v4-audit.mjs";
 
@@ -33,6 +33,7 @@ function parseArgs(argv) {
     maxSelectedObjects: null,
     shards: DEFAULT_AUDIT_SHARDS,
     privatePolicyOutput: null,
+    privateEpisodeOutput: null,
   };
   const remaining = [...argv];
   while (remaining.length > 0) {
@@ -48,6 +49,8 @@ function parseArgs(argv) {
       args.shards = Number.parseInt(value, 10);
     } else if (name === "--private-policy-out" && value) {
       args.privatePolicyOutput = resolve(value);
+    } else if (name === "--private-episode-out" && value) {
+      args.privateEpisodeOutput = resolve(value);
     } else {
       throw new Error(`invalid argument: ${name ?? "<missing>"}`);
     }
@@ -185,14 +188,28 @@ async function auditShard(path, crossShardRepeatedSessions, onEpisodeFinished) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, ephemeral sharding, and bounded error accounting share one lifecycle.
-async function streamAudit(exportUrl, token, maxInvalidObjects, maxSelectedObjects, shardCount, privatePolicyOutput) {
+async function streamAudit(
+  exportUrl,
+  token,
+  maxInvalidObjects,
+  maxSelectedObjects,
+  shardCount,
+  privatePolicyOutput,
+  privateEpisodeOutput,
+) {
   const scratch = scratchDirectory();
   const spool = openShardSpool(scratch, shardCount);
   let privatePolicyDescriptor = null;
+  let privateEpisodeDescriptor = null;
   let policyDiagnosticDecisionsWritten = 0;
+  let privateEpisodesWritten = 0;
   if (privatePolicyOutput != null) {
     mkdirSync(dirname(privatePolicyOutput), { recursive: true });
     privatePolicyDescriptor = openSync(privatePolicyOutput, "w");
+  }
+  if (privateEpisodeOutput != null) {
+    mkdirSync(dirname(privateEpisodeOutput), { recursive: true });
+    privateEpisodeDescriptor = openSync(privateEpisodeOutput, "w");
   }
   const state = {
     cursor: "",
@@ -275,19 +292,27 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, maxSelectedObjec
       spool.descriptors.forEach(closeSync);
     }
     const reports = [];
-    const writeEligiblePolicy = ({ split, decisions, result }) => {
-      if (privatePolicyDescriptor == null || split === "test" || !result.policyDiagnosticEligible) {
-        return;
+    const writePrivateOutputs = episode => {
+      const { split, decisions, result } = episode;
+      if (privateEpisodeDescriptor != null) {
+        writeSync(privateEpisodeDescriptor, gzipSync(`${JSON.stringify(episode)}\n`));
+        privateEpisodesWritten++;
       }
-      for (const decision of decisions) {
-        if (decision.policySource === "human-v1" && decision.policyTarget === true && decision.candidates.length > 1) {
-          writeSync(privatePolicyDescriptor, `${JSON.stringify(decision)}\n`);
-          policyDiagnosticDecisionsWritten++;
+      if (privatePolicyDescriptor != null && split !== "test" && result.policyDiagnosticEligible) {
+        for (const decision of decisions) {
+          if (
+            decision.policySource === "human-v1"
+            && decision.policyTarget === true
+            && decision.candidates.length > 1
+          ) {
+            writeSync(privatePolicyDescriptor, `${JSON.stringify(decision)}\n`);
+            policyDiagnosticDecisionsWritten++;
+          }
         }
       }
     };
     for (let index = 0; index < spool.paths.length; index++) {
-      reports.push(await auditShard(spool.paths[index], crossShardRepeatedSessions[index], writeEligiblePolicy));
+      reports.push(await auditShard(spool.paths[index], crossShardRepeatedSessions[index], writePrivateOutputs));
       if ((index + 1) % 16 === 0 || index + 1 === spool.paths.length) {
         console.error(
           JSON.stringify({ event: "production-v4-audit-progress", stage: "audit", completedShards: index + 1 }),
@@ -307,6 +332,7 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, maxSelectedObjec
       invalidObjects: state.invalidObjects,
       invalidObjectReasons: state.invalidObjectReasons,
       policyDiagnosticDecisionsWritten,
+      privateEpisodesWritten,
       truncatedByObjectLimit: state.truncatedByObjectLimit === true,
     });
     report.corpus.repeatedPayloads += crossShardRepeatedPayloads;
@@ -314,6 +340,9 @@ async function streamAudit(exportUrl, token, maxInvalidObjects, maxSelectedObjec
   } finally {
     if (privatePolicyDescriptor != null) {
       closeSync(privatePolicyDescriptor);
+    }
+    if (privateEpisodeDescriptor != null) {
+      closeSync(privateEpisodeDescriptor);
     }
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -398,6 +427,21 @@ function markdownReport(report) {
   return lines.join("\n");
 }
 
+function validatePrivateOutput(path, outputDirectory, label, suffix = null) {
+  if (path == null) {
+    return;
+  }
+  if (suffix != null && !path.endsWith(suffix)) {
+    throw new Error(`${label} must use a ${suffix} suffix`);
+  }
+  if (pathWithin(path, outputDirectory)) {
+    throw new Error(`${label} must be outside the sanitized report directory`);
+  }
+  if (process.env.RUNNER_TEMP && !pathWithin(path, resolve(process.env.RUNNER_TEMP))) {
+    throw new Error(`${label} must remain under RUNNER_TEMP`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const token = process.env.TELEMETRY_EXPORT_TOKEN?.trim();
@@ -405,14 +449,8 @@ async function main() {
   if (!token) {
     throw new Error("TELEMETRY_EXPORT_TOKEN is required");
   }
-  if (args.privatePolicyOutput != null) {
-    if (pathWithin(args.privatePolicyOutput, args.output)) {
-      throw new Error("private policy output must be outside the sanitized report directory");
-    }
-    if (process.env.RUNNER_TEMP && !pathWithin(args.privatePolicyOutput, resolve(process.env.RUNNER_TEMP))) {
-      throw new Error("private policy output must remain under RUNNER_TEMP");
-    }
-  }
+  validatePrivateOutput(args.privatePolicyOutput, args.output, "private policy output");
+  validatePrivateOutput(args.privateEpisodeOutput, args.output, "private episode output", ".gz");
   const report = await streamAudit(
     exportUrl,
     token,
@@ -420,6 +458,7 @@ async function main() {
     args.maxSelectedObjects,
     args.shards,
     args.privatePolicyOutput,
+    args.privateEpisodeOutput,
   );
   mkdirSync(args.output, { recursive: true });
   writeFileSync(`${args.output}/production-v4-semantic-audit.json`, `${JSON.stringify(report, null, 2)}\n`);

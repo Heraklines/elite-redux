@@ -285,8 +285,13 @@ test("the opt-in episode sink receives policy rows only after episode joins are 
   assert.equal(finished[0].episodeId, SESSION_ID);
   assert.equal(finished[0].sourcePartitionId, SOURCE_ID);
   assert.equal(finished[0].split, sourceSplit(SOURCE_ID));
+  assert.equal(finished[0].envelope.seed, "run-seed");
+  assert.equal(finished[0].envelope.difficulty, "hell");
   assert.equal(finished[0].decisions.length, 1);
   assert.equal(finished[0].decisions[0].decisionId, DECISION_ID);
+  assert.equal(finished[0].transitions.length, 1);
+  assert.equal(finished[0].battleTerminals.length, 1);
+  assert.equal(finished[0].runTerminals.length, 1);
   assert.equal(finished[0].result.policyDiagnosticEligible, true);
   assert.equal(finished[0].result.completedOutcomeEligible, true);
 });

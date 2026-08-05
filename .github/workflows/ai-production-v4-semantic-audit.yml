@@ -15,6 +15,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_curation:
+        description: Build source/lineage-safe private training shards in R2
+        type: boolean
+        required: false
+        default: false
       validation_decisions:
         description: Source-disjoint validation decisions (256 full gate; 64 fast inference recheck)
         required: false
@@ -40,7 +45,7 @@ jobs:
           submodules: false
       - uses: ./.github/actions/setup-deps
       - uses: actions/setup-python@v6
-        if: inputs.run_learning_sanity
+        if: inputs.run_learning_sanity || inputs.run_curation
         with:
           python-version: "3.12"
           cache: pip
@@ -58,6 +63,10 @@ jobs:
           test_real_learning_sanity
           test_candidate_transformer
           test_train_candidate_transformer
+      - name: Verify source and team-lineage curation logic
+        if: inputs.run_curation
+        working-directory: ml/policy
+        run: python -W error::ResourceWarning -m unittest test_curate_contract_v4
       - name: Verify live committed-action and solo-isolation semantics
         env:
           ER_SCENARIO: "1"
@@ -79,7 +88,43 @@ jobs:
           if [[ "${{ inputs.run_learning_sanity }}" == "true" ]]; then
             args+=(--private-policy-out "$RUNNER_TEMP/eligible-policy.jsonl")
           fi
+          if [[ "${{ inputs.run_curation }}" == "true" ]]; then
+            args+=(--private-episode-out "$RUNNER_TEMP/eligible-episodes.jsonl.gz")
+          fi
           node scripts/ai/run-production-combat-v4-audit.mjs "${args[@]}"
+      - name: Curate source-disjoint private policy and critic shards
+        if: inputs.run_curation
+        run: >-
+          python ml/policy/curate_contract_v4.py
+          --episodes "$RUNNER_TEMP/eligible-episodes.jsonl.gz"
+          --private-out "$RUNNER_TEMP/curated-v4"
+          --report ai-report/curation-report.json
+      - name: Publish private curated shards to R2
+        if: inputs.run_curation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$RUNNER_TEMP/curated-v4/manifest.json"
+          dataset_id=$(jq -r '.datasetId' "$manifest")
+          [[ "$dataset_id" =~ ^[0-9a-f]{24}$ ]]
+          cp "$manifest" ai-report/curation-manifest.json
+          while IFS=$'\t' read -r name expected_hash; do
+            [[ "$name" =~ ^[a-z0-9-]+\.jsonl\.gz$ ]]
+            file="$RUNNER_TEMP/curated-v4/$name"
+            test -f "$file"
+            test "$(sha256sum "$file" | cut -d' ' -f1)" = "$expected_hash"
+            npx wrangler r2 object put \
+              "er-telemetry/ai-private/contract-v4/${dataset_id}/${name}" \
+              --file "$file" \
+              --remote
+          done < <(jq -r '.files[] | [.name, .sha256] | @tsv' "$manifest")
+          npx wrangler r2 object put \
+            "er-telemetry/ai-private/contract-v4/${dataset_id}/manifest.json" \
+            --file "$manifest" \
+            --remote
       - name: Select bounded source-disjoint real-data sample
         if: inputs.run_learning_sanity
         run: >-
@@ -145,14 +190,22 @@ jobs:
             jq '{passed, gates, samples, memorization: .memorization.final, shuffledLabels: {passed: .shuffledLabels.passed, final: .shuffledLabels.final, chanceTop1: .shuffledLabels.chanceTop1}, stateAblation: {passed: .stateAblation.passed, final: .stateAblation.final, top1Collapse: .stateAblation.top1Collapse}, inferenceContract, deterministicResume}' \
               ai-report/learning-sanity.json >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [[ -f ai-report/curation-report.json ]]; then
+            jq -e '.passed == true and .privacy.rawIdentifiersIncluded == false and .privacy.rawRecordsIncluded == false' \
+              ai-report/curation-report.json > /dev/null
+            jq '{passed, datasetId, identity, episodesScanned, policy, critic, excluded}' \
+              ai-report/curation-report.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Delete private runner-local inputs
-        if: always() && inputs.run_learning_sanity
+        if: always() && (inputs.run_learning_sanity || inputs.run_curation)
         shell: bash
         run: |
           rm -f \
             "$RUNNER_TEMP/eligible-policy.jsonl" \
             "$RUNNER_TEMP/learning-sample.jsonl" \
-            "$RUNNER_TEMP/er-combat-data-dictionary.json"
+            "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            "$RUNNER_TEMP/eligible-episodes.jsonl.gz"
+          rm -rf "$RUNNER_TEMP/curated-v4"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
