@@ -41,34 +41,81 @@ pub trait StorageAdapter: fmt::Debug {
 
 #[derive(Debug, Default)]
 pub struct MemoryStorage {
-    _contract: (),
+    values: BTreeMap<String, Value>,
+    pending_request_ids: BTreeSet<SafeU53>,
+    disposed: bool,
 }
 
 impl MemoryStorage {
-    pub fn new(_initial: BTreeMap<String, Value>) -> Self {
-        Self::default()
+    pub fn new(initial: BTreeMap<String, Value>) -> Self {
+        Self {
+            values: initial,
+            pending_request_ids: BTreeSet::new(),
+            disposed: false,
+        }
     }
 
-    pub fn value(&self, _key: &str) -> Option<&Value> {
-        None
+    pub fn value(&self, key: &str) -> Option<&Value> {
+        self.values.get(key)
     }
 }
 
 impl StorageAdapter for MemoryStorage {
-    fn execute(&mut self, _request: StorageRequest) -> Result<StorageResult, StorageAdapterError> {
-        Err(StorageAdapterError::Disposed)
+    fn execute(&mut self, request: StorageRequest) -> Result<StorageResult, StorageAdapterError> {
+        if self.disposed {
+            return Err(StorageAdapterError::Disposed);
+        }
+        let StorageRequest {
+            request_id,
+            key,
+            value,
+        } = request;
+        if self.pending_request_ids.contains(&request_id) {
+            return Err(StorageAdapterError::DuplicateRequest { request_id });
+        }
+        self.pending_request_ids.insert(request_id);
+
+        let result = match value {
+            Some(value) => {
+                self.values.insert(key, value);
+                StorageResult::Persisted
+            }
+            None => StorageResult::Loaded {
+                value: self.values.get(&key).cloned(),
+            },
+        };
+
+        self.pending_request_ids.remove(&request_id);
+        Ok(result)
     }
 
     fn apply_recovery_atomically(
         &mut self,
-        _updates: BTreeMap<String, Value>,
+        updates: BTreeMap<String, Value>,
     ) -> Result<(), StorageAdapterError> {
-        Err(StorageAdapterError::Disposed)
+        if self.disposed {
+            return Err(StorageAdapterError::Disposed);
+        }
+
+        let mut staged = self.values.clone();
+        for (key, value) in updates {
+            staged.insert(key, value);
+        }
+        self.values = staged;
+        Ok(())
     }
 
     fn diagnostics(&self) -> StorageDiagnostics {
-        StorageDiagnostics::default()
+        StorageDiagnostics {
+            keys: self.values.keys().cloned().collect(),
+            pending_request_ids: self.pending_request_ids.clone(),
+            disposed: self.disposed,
+        }
     }
 
-    fn dispose(&mut self) {}
+    fn dispose(&mut self) {
+        self.values.clear();
+        self.pending_request_ids.clear();
+        self.disposed = true;
+    }
 }
