@@ -80,14 +80,16 @@ pub enum StringIdError {
     AsciiControl,
 }
 
+const MAX_STRING_ID_BYTES: usize = 256;
+
 fn validate_string_id(value: &str) -> Result<(), StringIdError> {
     if value.is_empty() {
         return Err(StringIdError::Empty);
     }
-    if value.len() > 256 {
+    if value.len() > MAX_STRING_ID_BYTES {
         return Err(StringIdError::TooLong);
     }
-    if value.chars().any(|character| character.is_ascii_control()) {
+    if value.bytes().any(|byte| byte.is_ascii_control()) {
         return Err(StringIdError::AsciiControl);
     }
     Ok(())
@@ -208,3 +210,227 @@ string_id!(SessionId);
 string_id!(RunId);
 string_id!(OwnerId);
 string_id!(MenuOptionId);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::{de::DeserializeOwned, Serialize};
+
+    const OVERFLOW_JSON: [&str; 6] = [
+        "-1",
+        "9007199254740992",
+        "18446744073709551615",
+        "1.5",
+        "\"1\"",
+        "null",
+    ];
+
+    fn assert_numeric_id_serde<T>(zero: T, max: T) -> Result<(), serde_json::Error>
+    where
+        T: Copy + DeserializeOwned + Eq + std::fmt::Debug + Serialize,
+    {
+        for value in [zero, max] {
+            let encoded = serde_json::to_string(&value)?;
+            let decoded: T = serde_json::from_str(&encoded)?;
+            assert_eq!(decoded, value);
+        }
+
+        for input in OVERFLOW_JSON {
+            assert!(serde_json::from_str::<T>(input).is_err(), "accepted {input}");
+        }
+
+        Ok(())
+    }
+
+    fn assert_string_id_construction<T>(constructors: &[fn(String) -> Result<T, StringIdError>])
+    where
+        T: Eq + std::fmt::Debug,
+    {
+        for constructor in constructors {
+            assert_eq!(constructor(String::new()), Err(StringIdError::Empty));
+            assert_eq!(
+                constructor("a".repeat(MAX_STRING_ID_BYTES + 1)),
+                Err(StringIdError::TooLong)
+            );
+
+            let at_byte_limit = "é".repeat(MAX_STRING_ID_BYTES / 2);
+            assert_eq!(at_byte_limit.len(), MAX_STRING_ID_BYTES);
+            assert!(constructor(at_byte_limit).is_ok());
+
+            let over_byte_limit = "é".repeat((MAX_STRING_ID_BYTES / 2) + 1);
+            assert!(over_byte_limit.len() > MAX_STRING_ID_BYTES);
+            assert_eq!(
+                constructor(over_byte_limit),
+                Err(StringIdError::TooLong)
+            );
+
+            for byte in 0_u8..=31 {
+                let control = char::from(byte);
+                let value = format!("a{control}b");
+                assert_eq!(constructor(value), Err(StringIdError::AsciiControl));
+            }
+
+            let control = char::from(127_u8);
+            let value = format!("a{control}b");
+            assert_eq!(constructor(value), Err(StringIdError::AsciiControl));
+        }
+    }
+
+    fn assert_string_id_serde<T>(value: T) -> Result<(), serde_json::Error>
+    where
+        T: DeserializeOwned + Eq + std::fmt::Debug + Serialize,
+    {
+        let encoded = serde_json::to_string(&value)?;
+        let decoded: T = serde_json::from_str(&encoded)?;
+        assert_eq!(decoded, value);
+
+        let at_byte_limit = "é".repeat(MAX_STRING_ID_BYTES / 2);
+        let at_limit_json = serde_json::to_string(&at_byte_limit)?;
+        assert!(serde_json::from_str::<T>(&at_limit_json).is_ok());
+
+        let over_byte_limit = "é".repeat((MAX_STRING_ID_BYTES / 2) + 1);
+        let over_limit_json = serde_json::to_string(&over_byte_limit)?;
+        assert!(serde_json::from_str::<T>(&over_limit_json).is_err());
+
+        let empty_json = serde_json::to_string("")?;
+        assert!(serde_json::from_str::<T>(&empty_json).is_err());
+
+        for byte in 0_u8..=31 {
+            let control = char::from(byte);
+            let raw = format!("a{control}b");
+            let json = serde_json::to_string(&raw)?;
+            assert!(serde_json::from_str::<T>(&json).is_err());
+        }
+
+        let control = char::from(127_u8);
+        let raw = format!("a{control}b");
+        let json = serde_json::to_string(&raw)?;
+        assert!(serde_json::from_str::<T>(&json).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn safe_u53_accepts_inclusive_zero_and_maximum_boundaries() {
+        assert_eq!(SafeU53::new(0), Ok(SafeU53::ZERO));
+        assert_eq!(SafeU53::try_from(0), Ok(SafeU53::ZERO));
+        assert_eq!(SafeU53::new(JS_MAX_SAFE_INTEGER), Ok(SafeU53::MAX));
+        assert_eq!(
+            SafeU53::try_from(JS_MAX_SAFE_INTEGER),
+            Ok(SafeU53::MAX)
+        );
+        assert_eq!(SafeU53::MAX.get(), JS_MAX_SAFE_INTEGER);
+        assert_eq!(SafeU53::MAX.into_inner(), JS_MAX_SAFE_INTEGER);
+        assert_eq!(u64::from(SafeU53::MAX), JS_MAX_SAFE_INTEGER);
+        assert_eq!(SafeU53::MAX.to_string(), JS_MAX_SAFE_INTEGER.to_string());
+    }
+
+    #[test]
+    fn safe_u53_rejects_every_value_above_the_safe_integer_boundary() {
+        assert_eq!(
+            SafeU53::new(JS_MAX_SAFE_INTEGER + 1),
+            Err(SafeU53Error {
+                value: JS_MAX_SAFE_INTEGER + 1,
+            })
+        );
+        assert_eq!(
+            SafeU53::try_from(JS_MAX_SAFE_INTEGER + 1),
+            Err(SafeU53Error {
+                value: JS_MAX_SAFE_INTEGER + 1,
+            })
+        );
+        assert_eq!(
+            SafeU53::new(u64::MAX),
+            Err(SafeU53Error { value: u64::MAX })
+        );
+    }
+
+    #[test]
+    fn safe_u53_serde_checks_boundaries_and_types() -> Result<(), serde_json::Error> {
+        for (input, expected) in [
+            ("0", SafeU53::ZERO),
+            ("9007199254740991", SafeU53::MAX),
+        ] {
+            let decoded: SafeU53 = serde_json::from_str(input)?;
+            assert_eq!(decoded, expected);
+        }
+
+        for input in OVERFLOW_JSON {
+            assert!(serde_json::from_str::<SafeU53>(input).is_err(), "accepted {input}");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn safe_u53_round_trips_through_json_without_changing_value() -> Result<(), serde_json::Error> {
+        for value in [SafeU53::ZERO, SafeU53::MAX] {
+            let encoded = serde_json::to_string(&value)?;
+            let decoded: SafeU53 = serde_json::from_str(&encoded)?;
+            assert_eq!(decoded, value);
+        }
+
+        assert_eq!(
+            serde_json::to_string(&SafeU53::MAX)?,
+            JS_MAX_SAFE_INTEGER.to_string()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn numeric_ids_preserve_safe_u53_validation_and_round_trip() -> Result<(), serde_json::Error> {
+        macro_rules! check_numeric_id {
+            ($name:ty) => {{
+                let zero = <$name>::new(SafeU53::ZERO);
+                let max = <$name>::new(SafeU53::MAX);
+                assert_eq!(zero, <$name>::ZERO);
+                assert_eq!(<$name>::default(), zero);
+                assert_eq!(zero.get(), SafeU53::ZERO);
+                assert_eq!(max.into_inner(), SafeU53::MAX);
+                let from_safe: $name = SafeU53::MAX.into();
+                assert_eq!(from_safe, max);
+                let back_to_safe: SafeU53 = from_safe.into();
+                assert_eq!(back_to_safe, SafeU53::MAX);
+                assert_numeric_id_serde(zero, max)?;
+            }};
+        }
+
+        check_numeric_id!(Revision);
+        check_numeric_id!(SeatId);
+        check_numeric_id!(MembershipRevision);
+        check_numeric_id!(ConnectionGeneration);
+        check_numeric_id!(TimerId);
+        check_numeric_id!(MenuGeneration);
+        check_numeric_id!(PresentationEventId);
+        Ok(())
+    }
+
+    #[test]
+    fn opaque_string_ids_validate_all_paths() -> Result<(), serde_json::Error> {
+        macro_rules! check_string_id {
+            ($name:ty) => {{
+                let constructors: &[fn(String) -> Result<$name, StringIdError>] = &[
+                    |value| <$name>::new(value),
+                    |value| <$name>::try_from(value),
+                ];
+                assert_string_id_construction(constructors);
+
+                let valid = "opaque/é/🙂";
+                let value = <$name>::new(valid);
+                assert!(value.is_ok());
+                if let Ok(value) = value {
+                    assert_eq!(value.as_str(), valid);
+                    assert_eq!(value.clone().into_inner(), valid);
+                    assert_string_id_serde(value)?;
+                }
+            }};
+        }
+
+        check_string_id!(OperationId);
+        check_string_id!(SessionId);
+        check_string_id!(RunId);
+        check_string_id!(OwnerId);
+        check_string_id!(MenuOptionId);
+        Ok(())
+    }
+}
