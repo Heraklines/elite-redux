@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use er_kernel::{GameKernel, KernelError};
 use er_types::{
     InputFocus, KernelEffect, KernelInput, PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass,
-    TimerId,
+    TimerId, TimerOwner,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -156,7 +156,7 @@ impl<'kernel> KeyboardDriver<'kernel> {
                     delay_ms,
                     time_class,
                     ..
-                } if *time_class == TimeClass::Virtual => {
+                } if *time_class == TimeClass::Virtual && *delay_ms != SafeU53::ZERO => {
                     self.pending_timers.insert(
                         *timer_id,
                         PendingTimer {
@@ -244,6 +244,41 @@ mod tests {
                 .next_pending_timer()
                 .map(|(timer_id, timer)| (timer_id, timer.remaining_ms)),
             Some((first_id, safe_u53(25)))
+        );
+    }
+
+    #[test]
+    fn zero_delay_virtual_timers_are_not_pending_but_positive_timers_are() {
+        let mut kernel = GameKernel::default();
+        let mut driver = KeyboardDriver::new(&mut kernel, SeatId::ZERO);
+        let zero_id = TimerId::new(safe_u53(1));
+        let positive_id = TimerId::new(safe_u53(2));
+        let effects = [
+            KernelEffect::ScheduleTimer {
+                endpoint: SeatId::ZERO,
+                timer_id: zero_id,
+                owner: TimerOwner::Protocol,
+                delay_ms: SafeU53::ZERO,
+                time_class: TimeClass::Virtual,
+            },
+            KernelEffect::ScheduleTimer {
+                endpoint: SeatId::ZERO,
+                timer_id: positive_id,
+                owner: TimerOwner::Protocol,
+                delay_ms: safe_u53(25),
+                time_class: TimeClass::Virtual,
+            },
+        ];
+
+        driver.remember_timer_effects(&effects);
+
+        assert!(!driver.pending_timers.contains_key(&zero_id));
+        assert_eq!(
+            driver.pending_timers.get(&positive_id),
+            Some(&PendingTimer {
+                endpoint: SeatId::ZERO,
+                remaining_ms: safe_u53(25),
+            })
         );
     }
 }
