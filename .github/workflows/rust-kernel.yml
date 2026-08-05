@@ -5,6 +5,7 @@ on:
     branches:
       - "arch/rust-kernel-v0"
       - "arch/rust-kernel/**"
+      - "codex/rust-kernel-m2-*"
     paths:
       - ".nvmrc"
       - "rust/**"
