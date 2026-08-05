@@ -2,14 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use serde::{
-    de::Error as _,
-    ser::Error as _,
-    Deserialize,
-    Deserializer,
-    Serialize,
-    Serializer,
-};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _, ser::Error as _};
 use serde_json::Value;
 
 use crate::{
@@ -691,7 +684,7 @@ pub enum KernelEffect {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     const AUTHORITY_ENTRY_KINDS_FIXTURE: &str =
         include_str!("../../../../test/kernel-fixtures/v1/authority-entry-kinds.json");
@@ -742,7 +735,9 @@ mod tests {
         for kind in kinds {
             let decoded = serde_json::from_value::<AuthorityEntryKind>(kind.clone());
             assert!(decoded.is_ok());
-            let encoded = decoded.ok().and_then(|value| serde_json::to_value(value).ok());
+            let encoded = decoded
+                .ok()
+                .and_then(|value| serde_json::to_value(value).ok());
             assert_eq!(encoded, Some(kind.clone()));
         }
     }
@@ -868,7 +863,9 @@ mod tests {
         let with_null_payload = json!({"digest": "fixture-digest", "payload": null});
         let decoded = serde_json::from_value::<Material>(with_null_payload.clone());
         assert!(decoded.is_ok());
-        let encoded = decoded.ok().and_then(|value| serde_json::to_value(value).ok());
+        let encoded = decoded
+            .ok()
+            .and_then(|value| serde_json::to_value(value).ok());
         assert_eq!(encoded, Some(with_null_payload));
 
         let without_payload = json!({"digest": "fixture-digest"});
@@ -881,18 +878,15 @@ mod tests {
         let controls_payload = fixture_payload(NEXT_CONTROLS_FIXTURE);
         assert!(receipts_payload.is_some());
         assert!(controls_payload.is_some());
-        let (Some(receipts_payload), Some(controls_payload)) =
-            (receipts_payload, controls_payload)
+        let (Some(receipts_payload), Some(controls_payload)) = (receipts_payload, controls_payload)
         else {
             return;
         };
         let context = fixture_by_id(&receipts_payload, "admitted")
-            .and_then(|fixture| fixture.get("receipt"))
-            .and_then(|receipt| receipt.get("context"))
-            .cloned();
+            .and_then(|fixture| fixture.get("receipt").cloned())
+            .and_then(|receipt| receipt.get("context").cloned());
         let next_control = fixture_by_id(&controls_payload, "command-frontier")
-            .and_then(|fixture| fixture.get("control"))
-            .cloned();
+            .and_then(|fixture| fixture.get("control").cloned());
         assert!(context.is_some());
         assert!(next_control.is_some());
         let (Some(context), Some(next_control)) = (context, next_control) else {
@@ -940,7 +934,11 @@ mod tests {
             let encoded = round_trip::<AuthorityReceipt>(receipt);
             assert_eq!(encoded, Some(receipt.clone()));
             if fixture.get("id").and_then(Value::as_str) == Some("admitted") {
-                assert!(encoded.and_then(|value| value.get("controlId").cloned()).is_none());
+                assert!(
+                    encoded
+                        .and_then(|value| value.get("controlId").cloned())
+                        .is_none()
+                );
             }
         }
 
@@ -966,9 +964,8 @@ mod tests {
             return;
         };
         let context = fixture_by_id(&receipts_payload, "admitted")
-            .and_then(|fixture| fixture.get("receipt"))
-            .and_then(|receipt| receipt.get("context"))
-            .cloned();
+            .and_then(|fixture| fixture.get("receipt").cloned())
+            .and_then(|receipt| receipt.get("context").cloned());
         assert!(context.is_some());
         let Some(context) = context else {
             return;
@@ -1054,11 +1051,7 @@ mod tests {
         let Some(command) = command else {
             return;
         };
-        for invalid_coordinate in [
-            json!(-1),
-            json!(1.5),
-            json!(SafeU53::MAX.get() + 1),
-        ] {
+        for invalid_coordinate in [json!(-1), json!(1.5), json!(SafeU53::MAX.get() + 1)] {
             let mut invalid = command.clone();
             let inserted = invalid
                 .as_object_mut()

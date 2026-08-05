@@ -214,7 +214,7 @@ string_id!(MenuOptionId);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{de::DeserializeOwned, Serialize};
+    use serde::{Serialize, de::DeserializeOwned};
 
     const OVERFLOW_JSON: [&str; 6] = [
         "-1",
@@ -236,7 +236,10 @@ mod tests {
         }
 
         for input in OVERFLOW_JSON {
-            assert!(serde_json::from_str::<T>(input).is_err(), "accepted {input}");
+            assert!(
+                serde_json::from_str::<T>(input).is_err(),
+                "accepted {input}"
+            );
         }
 
         Ok(())
@@ -259,10 +262,7 @@ mod tests {
 
             let over_byte_limit = "é".repeat((MAX_STRING_ID_BYTES / 2) + 1);
             assert!(over_byte_limit.len() > MAX_STRING_ID_BYTES);
-            assert_eq!(
-                constructor(over_byte_limit),
-                Err(StringIdError::TooLong)
-            );
+            assert_eq!(constructor(over_byte_limit), Err(StringIdError::TooLong));
 
             for byte in 0_u8..=31 {
                 let control = char::from(byte);
@@ -315,10 +315,7 @@ mod tests {
         assert_eq!(SafeU53::new(0), Ok(SafeU53::ZERO));
         assert_eq!(SafeU53::try_from(0), Ok(SafeU53::ZERO));
         assert_eq!(SafeU53::new(JS_MAX_SAFE_INTEGER), Ok(SafeU53::MAX));
-        assert_eq!(
-            SafeU53::try_from(JS_MAX_SAFE_INTEGER),
-            Ok(SafeU53::MAX)
-        );
+        assert_eq!(SafeU53::try_from(JS_MAX_SAFE_INTEGER), Ok(SafeU53::MAX));
         assert_eq!(SafeU53::MAX.get(), JS_MAX_SAFE_INTEGER);
         assert_eq!(SafeU53::MAX.into_inner(), JS_MAX_SAFE_INTEGER);
         assert_eq!(u64::from(SafeU53::MAX), JS_MAX_SAFE_INTEGER);
@@ -347,16 +344,16 @@ mod tests {
 
     #[test]
     fn safe_u53_serde_checks_boundaries_and_types() -> Result<(), serde_json::Error> {
-        for (input, expected) in [
-            ("0", SafeU53::ZERO),
-            ("9007199254740991", SafeU53::MAX),
-        ] {
+        for (input, expected) in [("0", SafeU53::ZERO), ("9007199254740991", SafeU53::MAX)] {
             let decoded: SafeU53 = serde_json::from_str(input)?;
             assert_eq!(decoded, expected);
         }
 
         for input in OVERFLOW_JSON {
-            assert!(serde_json::from_str::<SafeU53>(input).is_err(), "accepted {input}");
+            assert!(
+                serde_json::from_str::<SafeU53>(input).is_err(),
+                "accepted {input}"
+            );
         }
 
         Ok(())

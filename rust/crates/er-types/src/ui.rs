@@ -249,7 +249,7 @@ pub struct UiReduction {
 mod tests {
     use std::error::Error;
 
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::{GameButton, JS_MAX_SAFE_INTEGER};

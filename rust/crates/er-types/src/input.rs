@@ -144,9 +144,9 @@ pub struct InputRouterOutput {
 #[cfg(test)]
 mod contract_tests {
     use super::*;
-    use serde::de::DeserializeOwned;
     use serde::Serialize;
-    use serde_json::{json, Value};
+    use serde::de::DeserializeOwned;
+    use serde_json::{Value, json};
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

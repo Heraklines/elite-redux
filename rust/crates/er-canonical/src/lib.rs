@@ -144,10 +144,7 @@ fn array_index_key(key: &str) -> Option<u32> {
     if key == "0" {
         return Some(0);
     }
-    if key.is_empty()
-        || key.starts_with('0')
-        || !key.bytes().all(|byte| byte.is_ascii_digit())
-    {
+    if key.is_empty() || key.starts_with('0') || !key.bytes().all(|byte| byte.is_ascii_digit()) {
         return None;
     }
     let value = key.parse::<u64>().ok()?;
@@ -175,7 +172,10 @@ mod tests {
         let mut utf16_keys = Map::new();
         utf16_keys.insert(bmp_high.to_owned(), Value::String("bmp-high".to_owned()));
         utf16_keys.insert(astral.to_owned(), Value::String("astral".to_owned()));
-        utf16_keys.insert(bmp_middle.to_owned(), Value::String("bmp-middle".to_owned()));
+        utf16_keys.insert(
+            bmp_middle.to_owned(),
+            Value::String("bmp-middle".to_owned()),
+        );
 
         let mut array_object = Map::new();
         array_object.insert("b".to_owned(), Value::from(2_u64));
@@ -212,15 +212,11 @@ mod tests {
     fn canonicalizes_compact_strings_and_null_absence() -> Result<(), Box<dyn Error>> {
         let with_null: Value =
             serde_json::from_str(r#"{"present":null,"text":"line\né","values":[3,1]}"#)?;
-        let without_field: Value =
-            serde_json::from_str(r#"{"text":"line\né","values":[3,1]}"#)?;
+        let without_field: Value = serde_json::from_str(r#"{"text":"line\né","values":[3,1]}"#)?;
 
         let expected = r#"{"present":null,"text":"line\né","values":[3,1]}"#;
         assert_eq!(canonicalize_value(&with_null)?, expected);
-        assert_eq!(
-            canonical_bytes(&with_null)?.as_slice(),
-            expected.as_bytes()
-        );
+        assert_eq!(canonical_bytes(&with_null)?.as_slice(), expected.as_bytes());
         assert_ne!(
             canonicalize_value(&with_null)?,
             canonicalize_value(&without_field)?
@@ -318,9 +314,8 @@ mod tests {
 
     #[test]
     fn reports_nested_fixture_digest_mismatch() -> Result<(), Box<dyn Error>> {
-        let value: Value = serde_json::from_str(
-            r#"{"outer":{"z":[2,1],"a":{"right":true,"left":null}}}"#,
-        )?;
+        let value: Value =
+            serde_json::from_str(r#"{"outer":{"z":[2,1],"a":{"right":true,"left":null}}}"#)?;
         let expected = fixture_digest(&value)?;
         assert!(verify_fixture_digest(&value, &expected).is_ok());
 
@@ -330,10 +325,7 @@ mod tests {
                 assert_eq!(expected, "incorrect");
                 assert_eq!(actual, fixture_digest(&value)?);
             }
-            other => assert!(matches!(
-                other,
-                Err(CanonicalError::DigestMismatch { .. })
-            )),
+            other => assert!(matches!(other, Err(CanonicalError::DigestMismatch { .. }))),
         }
         Ok(())
     }

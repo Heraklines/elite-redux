@@ -56,7 +56,7 @@ pub struct TraceReplayReport {
 #[cfg(test)]
 mod tests {
     use super::{
-        KernelTrace, KernelTraceEvent, TraceDivergence, TraceReplayReport, KERNEL_TRACE_VERSION,
+        KERNEL_TRACE_VERSION, KernelTrace, KernelTraceEvent, TraceDivergence, TraceReplayReport,
     };
     use crate::{KernelInput, LiveResourceSnapshot, SafeU53, SeatId};
     use serde_json::Value;
@@ -306,7 +306,10 @@ mod tests {
             .iter()
             .map(|event| event.virtual_time_ms.get())
             .collect::<Vec<_>>();
-        assert_eq!(virtual_times, vec![0, 250, 500, 750, 1000, 1250, 1500, 1750]);
+        assert_eq!(
+            virtual_times,
+            vec![0, 250, 500, 750, 1000, 1250, 1500, 1750]
+        );
 
         assert!(matches!(
             &trace.events[0].input,
@@ -332,7 +335,10 @@ mod tests {
             &trace.events[5].input,
             KernelInput::StorageResult { .. }
         ));
-        assert!(matches!(&trace.events[6].input, KernelInput::Suspend { .. }));
+        assert!(matches!(
+            &trace.events[6].input,
+            KernelInput::Suspend { .. }
+        ));
         assert!(matches!(&trace.events[7].input, KernelInput::Resume { .. }));
 
         assert_eq!(trace.events[0].expected_effect_digest, "effect-0");
