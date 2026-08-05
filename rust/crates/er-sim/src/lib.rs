@@ -1,1 +1,13 @@
-//! This crate is an empty PokéRogue Redux kernel scaffold.
+//! Deterministic virtual environment for the production Rust kernel.
+
+pub mod clock;
+pub mod network;
+pub mod pair;
+pub mod presenter;
+pub mod storage;
+
+pub use clock::*;
+pub use network::*;
+pub use pair::*;
+pub use presenter::*;
+pub use storage::*;

@@ -3,10 +3,16 @@
 use std::collections::BTreeMap;
 
 use er_canonical::content_digest;
-use er_types::{
-    ButtonEvent, GameButton, InputMap, InputRouterOutput, InputTimerCommand, MenuGeneration,
-    MenuState, SeatId, TimeClass, TimerId, TimerOwner, UiState,
+use er_protocol::{
+    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, ProposalLeaseConfig,
+    RecoveryTransactionConfig,
 };
+use er_types::{
+    ButtonEvent, CancelPolicy, GameButton, InputMap, InputRouterOutput, InputTimerCommand,
+    MenuGeneration, MenuOption, MenuOptionId, MenuState, OperationId, SafeU53, SeatId, TimeClass,
+    TimerId, TimerOwner, UiState,
+};
+use serde_json::Value;
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use thiserror::Error;
 
@@ -16,6 +22,77 @@ use crate::{InputRouteError, InputRouter, UiReducer};
 pub struct KernelConfig {
     pub input_map: InputMap,
     pub initial_ui: UiState,
+    pub protocol: Option<ProtocolKernelConfig>,
+}
+
+/// Frozen protocol composition for one independent kernel endpoint.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProtocolKernelConfig {
+    pub role: ProtocolRoleConfig,
+    /// Fixture/game-owned menu projections keyed by exact control identity.
+    pub menu_plans: Vec<ControlMenuPlan>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProtocolRoleConfig {
+    Authority {
+        log: AuthorityLogConfig,
+        proposal_capacity: SafeU53,
+        resolutions: Vec<AuthorityResolutionPlan>,
+    },
+    Replica {
+        replica: AuthorityReplicaConfig,
+        proposal_leases: ProposalLeaseConfig,
+        recovery: RecoveryTransactionConfig,
+    },
+}
+
+/// Game-owned menu data used to project an exact protocol control without
+/// allowing campaign code to mutate a reducer or submit a semantic choice.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MenuProposalPlan {
+    pub option_id: MenuOptionId,
+    pub fingerprint: String,
+    pub payload: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AuthorityResolutionPlan {
+    pub operation_id: OperationId,
+    pub fingerprint: String,
+    pub draft: AuthorityEntryDraft,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ControlMenuPlan {
+    Command {
+        control_id: String,
+        owner_seat_id: SeatId,
+        operation_id: OperationId,
+        field_index: SafeU53,
+        options: Vec<MenuOption>,
+        proposals: Vec<MenuProposalPlan>,
+        cancel: CancelPolicy,
+    },
+    Replacement {
+        control_id: String,
+        owner_seat_id: SeatId,
+        operation_id: OperationId,
+        field_index: SafeU53,
+        options: Vec<MenuOption>,
+        proposals: Vec<MenuProposalPlan>,
+        cancel: CancelPolicy,
+    },
+    Interaction {
+        control_id: String,
+        owner_seat_id: SeatId,
+        operation_id: OperationId,
+        surface_class: String,
+        operation_kind: String,
+        options: Vec<MenuOption>,
+        proposals: Vec<MenuProposalPlan>,
+        cancel: CancelPolicy,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -24,6 +101,8 @@ pub struct GameKernel {
     ui_reducer: UiReducer,
     repeat_timers: BTreeMap<TimerId, RepeatContext>,
     live_resources: LiveResourceSnapshot,
+    protocol_config: Option<ProtocolKernelConfig>,
+    disposed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -40,10 +119,15 @@ impl GameKernel {
             ui_reducer: UiReducer::new(config.initial_ui),
             repeat_timers: BTreeMap::new(),
             live_resources: LiveResourceSnapshot::default(),
+            protocol_config: config.protocol,
+            disposed: false,
         }
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
+        if self.disposed {
+            return Err(KernelError::Disposed);
+        }
         match input {
             KernelInput::RawInput { seat, event } => {
                 let generation = self.ui_reducer.state().generation;
@@ -61,9 +145,13 @@ impl GameKernel {
                 Ok(self.apply_timer_output(timer_id, context, output))
             }
             KernelInput::NetworkFrame { .. }
+            | KernelInput::RawNetworkFrame { .. }
+            | KernelInput::ProposalReceived { .. }
             | KernelInput::PresentationSettled { .. }
             | KernelInput::TransportChanged { .. }
             | KernelInput::StorageResult { .. }
+            | KernelInput::MaterialApplied { .. }
+            | KernelInput::ControlProjected { .. }
             | KernelInput::Suspend { .. }
             | KernelInput::Resume { .. } => Ok(Vec::new()),
         }
@@ -85,6 +173,32 @@ impl GameKernel {
 
     pub fn live_resources(&self) -> LiveResourceSnapshot {
         self.live_resources.clone()
+    }
+
+    pub fn protocol_config(&self) -> Option<&ProtocolKernelConfig> {
+        self.protocol_config.as_ref()
+    }
+
+    pub fn is_disposed(&self) -> bool {
+        self.disposed
+    }
+
+    pub fn dispose(&mut self, _reason: &str) -> Vec<KernelEffect> {
+        if self.disposed {
+            return Vec::new();
+        }
+        self.disposed = true;
+        let effects = self
+            .repeat_timers
+            .iter()
+            .map(|(timer_id, context)| KernelEffect::CancelTimer {
+                endpoint: context.endpoint,
+                timer_id: *timer_id,
+            })
+            .collect();
+        self.repeat_timers.clear();
+        self.live_resources = LiveResourceSnapshot::default();
+        effects
     }
 
     pub fn ui_state(&self) -> &UiState {
@@ -131,9 +245,9 @@ impl GameKernel {
                     effects.push(KernelEffect::ScheduleTimer {
                         endpoint,
                         timer_id,
-                        owner: TimerOwner::InputRepeat(button),
+                        owner: TimerOwner::input_repeat(button),
                         delay_ms,
-                        time_class: TimeClass::Virtual,
+                        time_class: TimeClass::HumanInput,
                     });
                 }
                 InputTimerCommand::Cancel { timer_id } => {
@@ -177,9 +291,9 @@ impl GameKernel {
                     effects.push(KernelEffect::ScheduleTimer {
                         endpoint: context.endpoint,
                         timer_id,
-                        owner: TimerOwner::InputRepeat(context.button),
+                        owner: TimerOwner::input_repeat(context.button),
                         delay_ms,
-                        time_class: TimeClass::Virtual,
+                        time_class: TimeClass::HumanInput,
                     });
                 }
                 InputTimerCommand::Schedule { .. } => {}
@@ -214,16 +328,20 @@ impl GameKernel {
             let ButtonEvent::Pressed(button) = event else {
                 continue;
             };
-            let accepted = self
+            let intents = self
                 .ui_reducer
-                .reduce_at(endpoint, generation, ButtonEvent::Pressed(button))
-                .is_ok();
+                .reduce_at(endpoint, generation, ButtonEvent::Pressed(button));
+            let accepted = intents.is_ok();
             pressed = Some((button, accepted));
-            if accepted {
+            if let Ok(intents) = intents {
                 effects.push(KernelEffect::UiChanged {
                     endpoint,
                     view: self.ui_reducer.view(),
                 });
+                effects.extend(intents.into_iter().map(|intent| KernelEffect::UiIntent {
+                    endpoint,
+                    intent,
+                }));
             }
         }
 
@@ -243,4 +361,6 @@ pub enum KernelError {
     Input(#[from] InputRouteError),
     #[error("kernel state could not be canonicalized: {reason}")]
     Canonical { reason: String },
+    #[error("kernel is disposed")]
+    Disposed,
 }

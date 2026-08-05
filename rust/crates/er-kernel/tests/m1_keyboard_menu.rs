@@ -118,6 +118,7 @@ fn kernel_with(menu: MenuState, owner_seat: Option<SeatId>, actionable: bool) ->
             actionable,
             stack: vec![menu],
         },
+        protocol: None,
     })
 }
 
@@ -194,18 +195,19 @@ fn assert_scheduled(
     timer_id: TimerId,
     button: GameButton,
 ) {
+    let expected_owner = TimerOwner::input_repeat(button);
     assert!(effects.iter().any(|effect| {
         matches!(
             effect,
             KernelEffect::ScheduleTimer {
                 endpoint: effect_endpoint,
                 timer_id: effect_timer,
-                owner: TimerOwner::InputRepeat(effect_button),
+                owner,
                 delay_ms,
-                time_class: TimeClass::Virtual,
+                time_class: TimeClass::HumanInput,
             } if *effect_endpoint == endpoint
                 && *effect_timer == timer_id
-                && *effect_button == button
+                && owner == &expected_owner
                 && *delay_ms == safe(250)
         )
     }));

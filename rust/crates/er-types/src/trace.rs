@@ -363,6 +363,7 @@ mod tests {
                     .into_iter()
                     .collect(),
                 storage_requests: [SafeU53::new(9)?].into_iter().collect(),
+                ..LiveResourceSnapshot::default()
             }
         );
 

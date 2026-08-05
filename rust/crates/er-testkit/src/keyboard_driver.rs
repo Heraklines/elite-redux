@@ -8,6 +8,73 @@ use er_types::{
     TimerId,
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetachedKeyboardDriver {
+    seat: SeatId,
+    focus: InputFocus,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyHoldPlan {
+    pub key_down: RawInputEvent,
+    pub duration_ms: SafeU53,
+    pub key_up: RawInputEvent,
+}
+
+impl DetachedKeyboardDriver {
+    pub fn new(seat: SeatId) -> Self {
+        Self {
+            seat,
+            focus: InputFocus::Game,
+        }
+    }
+
+    pub fn seat(&self) -> SeatId {
+        self.seat
+    }
+
+    pub fn input_focus(&self) -> InputFocus {
+        self.focus
+    }
+
+    pub fn key_down(&self, code: PhysicalKey, printable: bool) -> RawInputEvent {
+        RawInputEvent::KeyDown {
+            code,
+            printable,
+            browser_repeat: false,
+            focus: self.focus,
+        }
+    }
+
+    pub fn key_up(&self, code: PhysicalKey) -> RawInputEvent {
+        RawInputEvent::KeyUp { code }
+    }
+
+    pub fn press(&self, code: PhysicalKey) -> [RawInputEvent; 2] {
+        [
+            self.key_down(code.clone(), is_printable(&code)),
+            self.key_up(code),
+        ]
+    }
+
+    pub fn hold_for(&self, code: PhysicalKey, duration_ms: SafeU53) -> KeyHoldPlan {
+        KeyHoldPlan {
+            key_down: self.key_down(code.clone(), is_printable(&code)),
+            duration_ms,
+            key_up: self.key_up(code),
+        }
+    }
+
+    pub fn blur(&self) -> RawInputEvent {
+        RawInputEvent::WindowBlurred
+    }
+
+    pub fn focus(&mut self, focus: InputFocus) -> RawInputEvent {
+        self.focus = focus;
+        RawInputEvent::FocusChanged(focus)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PendingTimer {
     endpoint: SeatId,
@@ -153,7 +220,7 @@ impl<'kernel> KeyboardDriver<'kernel> {
                     delay_ms,
                     time_class,
                     ..
-                } if *time_class == TimeClass::Virtual && *delay_ms != SafeU53::ZERO => {
+                } if *time_class == TimeClass::HumanInput && *delay_ms != SafeU53::ZERO => {
                     self.pending_timers.insert(
                         *timer_id,
                         PendingTimer {
@@ -246,7 +313,7 @@ mod tests {
     }
 
     #[test]
-    fn zero_delay_virtual_timers_are_not_pending_but_positive_timers_are() {
+    fn zero_delay_human_input_timers_are_not_pending_but_positive_timers_are() {
         let mut kernel = GameKernel::default();
         let mut driver = KeyboardDriver::new(&mut kernel, SeatId::ZERO);
         let zero_id = TimerId::new(safe_u53(1));
@@ -255,16 +322,16 @@ mod tests {
             KernelEffect::ScheduleTimer {
                 endpoint: SeatId::ZERO,
                 timer_id: zero_id,
-                owner: TimerOwner::Protocol,
+                owner: protocol_timer_owner(),
                 delay_ms: SafeU53::ZERO,
-                time_class: TimeClass::Virtual,
+                time_class: TimeClass::HumanInput,
             },
             KernelEffect::ScheduleTimer {
                 endpoint: SeatId::ZERO,
                 timer_id: positive_id,
-                owner: TimerOwner::Protocol,
+                owner: protocol_timer_owner(),
                 delay_ms: safe_u53(25),
-                time_class: TimeClass::Virtual,
+                time_class: TimeClass::HumanInput,
             },
         ];
 
@@ -278,5 +345,16 @@ mod tests {
                 remaining_ms: safe_u53(25),
             })
         );
+    }
+
+    fn protocol_timer_owner() -> TimerOwner {
+        match TimerOwner::new("protocol-test", "protocol/test", "test") {
+            Ok(owner) => owner,
+            Err(error) => TimerOwner {
+                owner_id: "invalid-protocol-test-owner".to_owned(),
+                address: "invalid-protocol-test-address".to_owned(),
+                reason: error.to_string(),
+            },
+        }
     }
 }

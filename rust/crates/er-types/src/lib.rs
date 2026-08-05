@@ -1,11 +1,13 @@
 //! Shared deterministic DTOs for the PokéRogue Redux Rust kernel.
 
+pub mod authority;
 pub mod ids;
 pub mod input;
 pub mod protocol;
 pub mod trace;
 pub mod ui;
 
+pub use authority::*;
 pub use ids::*;
 pub use input::*;
 pub use protocol::*;

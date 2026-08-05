@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _, ser::Error as _};
 use serde_json::Value;
+use thiserror::Error;
 
 use crate::{
     ConnectionGeneration, GameButton, MembershipRevision, OperationId, PresentationEventId,
@@ -524,22 +525,74 @@ impl<'de> Deserialize<'de> for NetworkFrame {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "owner", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum TimerOwner {
-    InputRepeat(GameButton),
-    Protocol,
-    Presentation,
-    Storage,
-    Kernel,
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimerOwner {
+    pub owner_id: String,
+    pub address: String,
+    pub reason: String,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+impl TimerOwner {
+    pub fn new(
+        owner_id: impl Into<String>,
+        address: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Result<Self, TimerOwnerError> {
+        let owner = Self {
+            owner_id: owner_id.into(),
+            address: address.into(),
+            reason: reason.into(),
+        };
+        validate_timer_owner_field("ownerId", &owner.owner_id)?;
+        validate_timer_owner_field("address", &owner.address)?;
+        validate_timer_owner_field("reason", &owner.reason)?;
+        Ok(owner)
+    }
+
+    pub fn input_repeat(button: GameButton) -> Self {
+        Self {
+            owner_id: "input-router".to_owned(),
+            address: format!("input-repeat/{button:?}"),
+            reason: "input-repeat".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum TimerOwnerError {
+    #[error("timer owner {field} must not be empty")]
+    Empty { field: &'static str },
+    #[error("timer owner {field} must not exceed 256 UTF-8 bytes")]
+    TooLong { field: &'static str },
+    #[error("timer owner {field} must not contain ASCII control characters")]
+    AsciiControl { field: &'static str },
+}
+
+fn validate_timer_owner_field(
+    field: &'static str,
+    value: &str,
+) -> Result<(), TimerOwnerError> {
+    if value.is_empty() {
+        return Err(TimerOwnerError::Empty { field });
+    }
+    if value.len() > 256 {
+        return Err(TimerOwnerError::TooLong { field });
+    }
+    if value.bytes().any(|byte| byte.is_ascii_control()) {
+        return Err(TimerOwnerError::AsciiControl { field });
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum TimeClass {
-    Virtual,
-    Active,
-    WallClock,
+    Connected,
+    Recovery,
+    Renderer,
+    HumanInput,
+    Absolute,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -612,6 +665,20 @@ pub struct LiveResourceSnapshot {
     pub timers: BTreeSet<TimerId>,
     pub presentations: BTreeSet<PresentationEventId>,
     pub storage_requests: BTreeSet<SafeU53>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub delivery_leases: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub proposal_leases: BTreeSet<OperationId>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub recovery_transactions: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub waits: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub retained_revisions: BTreeSet<Revision>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub controls: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub network_packets: BTreeSet<SafeU53>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -624,6 +691,14 @@ pub enum KernelInput {
     NetworkFrame {
         endpoint: SeatId,
         frame: NetworkFrame,
+    },
+    RawNetworkFrame {
+        endpoint: SeatId,
+        frame: crate::RawFrame,
+    },
+    ProposalReceived {
+        endpoint: SeatId,
+        proposal: crate::ProposalMessage,
     },
     TimerFired {
         endpoint: SeatId,
@@ -644,6 +719,16 @@ pub enum KernelInput {
         request_id: SafeU53,
         result: StorageResult,
     },
+    MaterialApplied {
+        endpoint: SeatId,
+        revision: Revision,
+        outcome: crate::MaterialApplicationOutcome,
+    },
+    ControlProjected {
+        endpoint: SeatId,
+        revision: Revision,
+        outcome: crate::ControlProjectionOutcome,
+    },
     Suspend {
         endpoint: SeatId,
     },
@@ -658,6 +743,9 @@ pub enum KernelEffect {
     SendFrame {
         from: SeatId,
         frame: NetworkFrame,
+    },
+    SendProposal {
+        proposal: crate::ProposalMessage,
     },
     ScheduleTimer {
         endpoint: SeatId,
@@ -674,6 +762,10 @@ pub enum KernelEffect {
         endpoint: SeatId,
         view: UiViewModel,
     },
+    UiIntent {
+        endpoint: SeatId,
+        intent: crate::UiIntent,
+    },
     Present {
         endpoint: SeatId,
         event: PresentationEvent,
@@ -681,6 +773,18 @@ pub enum KernelEffect {
     Persist {
         endpoint: SeatId,
         request: StorageRequest,
+    },
+    ApplyAuthorityMaterial {
+        endpoint: SeatId,
+        revision: Revision,
+        operation_id: OperationId,
+        material: Material,
+    },
+    ProjectAuthorityControl {
+        endpoint: SeatId,
+        revision: Revision,
+        operation_id: OperationId,
+        control: NextControl,
     },
     EnterSharedTerminal {
         terminal: TerminalState,

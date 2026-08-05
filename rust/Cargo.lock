@@ -143,17 +143,36 @@ name = "er-kernel"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-protocol",
  "er-types",
+ "serde_json",
  "thiserror",
 ]
 
 [[package]]
 name = "er-protocol"
 version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "er-sim"
 version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-kernel",
+ "er-protocol",
+ "er-testkit",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "er-testkit"
@@ -161,6 +180,7 @@ version = "0.1.0"
 dependencies = [
  "er-canonical",
  "er-kernel",
+ "er-protocol",
  "er-types",
  "serde",
  "serde_json",
@@ -182,6 +202,7 @@ version = "0.1.0"
 dependencies = [
  "er-canonical",
  "er-kernel",
+ "er-protocol",
  "er-types",
  "serde_json",
  "wasm-bindgen",

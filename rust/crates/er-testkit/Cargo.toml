@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 er-canonical = { path = "../er-canonical" }
 er-kernel = { path = "../er-kernel" }
+er-protocol = { path = "../er-protocol" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 serde_json.workspace = true
