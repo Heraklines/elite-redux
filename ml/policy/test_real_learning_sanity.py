@@ -198,6 +198,9 @@ class RealLearningSanitySelectionTest(unittest.TestCase):
         ))
         result = inference_contract_checks(model, examples)
         self.assertTrue(result["passed"], result)
+        self.assertEqual(result["candidateOrder"]["selectedCandidateMismatches"], 0)
+        self.assertTrue(result["candidateOrder"]["logitsWithinTolerance"])
+        self.assertTrue(result["candidateOrder"]["probabilitiesWithinTolerance"])
         self.assertEqual(result["illegalCandidateMaximumProbability"], 0.0)
 
 

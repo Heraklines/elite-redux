@@ -57,6 +57,13 @@ class CandidateSetTransformerTest(unittest.TestCase):
                 token_mask[:, permutation],
             )
         torch.testing.assert_close(permuted_logits, logits[:, permutation], atol=1e-5, rtol=1e-5)
+        torch.testing.assert_close(
+            torch.softmax(permuted_logits, dim=-1),
+            torch.softmax(logits[:, permutation], dim=-1),
+            atol=1e-5,
+            rtol=1e-5,
+        )
+        self.assertEqual(int(permuted_logits.argmax(dim=-1)), int(logits[:, permutation].argmax(dim=-1)))
         torch.testing.assert_close(permuted_value, value, atol=1e-5, rtol=1e-5)
 
     def test_padding_cannot_receive_probability_mass(self) -> None:

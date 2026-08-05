@@ -460,6 +460,7 @@ def inference_contract_checks(
     examples: list,
     *,
     tolerance: float = 1e-5,
+    relative_tolerance: float = 1e-5,
 ) -> dict[str, Any]:
     device = next(model.parameters()).device
     batch = collate(examples[: min(16, len(examples))], history_length=0)
@@ -486,6 +487,39 @@ def inference_contract_checks(
         expected_permuted_logits = baseline_logits.gather(1, permutation.to(device))
         order_logit_difference = float((permuted_logits - expected_permuted_logits).abs().max().cpu())
         order_value_difference = float((permuted_values - baseline_values).abs().max().cpu())
+        baseline_probabilities = torch.softmax(baseline_logits, dim=-1)
+        permuted_probabilities = torch.softmax(permuted_logits, dim=-1)
+        expected_permuted_probabilities = baseline_probabilities.gather(1, permutation.to(device))
+        order_probability_difference = float(
+            (permuted_probabilities - expected_permuted_probabilities).abs().max().cpu()
+        )
+        selected_candidate_mismatches = int(
+            (permuted_logits.argmax(dim=-1) != expected_permuted_logits.argmax(dim=-1)).sum().cpu()
+        )
+        order_logits_close = bool(
+            torch.allclose(
+                permuted_logits,
+                expected_permuted_logits,
+                atol=tolerance,
+                rtol=relative_tolerance,
+            )
+        )
+        order_probabilities_close = bool(
+            torch.allclose(
+                permuted_probabilities,
+                expected_permuted_probabilities,
+                atol=tolerance,
+                rtol=relative_tolerance,
+            )
+        )
+        order_values_close = bool(
+            torch.allclose(
+                permuted_values,
+                baseline_values,
+                atol=tolerance,
+                rtol=relative_tolerance,
+            )
+        )
 
         padded = dict(batch)
         padded["features"] = torch.cat(
@@ -513,24 +547,50 @@ def inference_contract_checks(
         padding_value_difference = float((padded_values - baseline_values).abs().max().cpu())
         probabilities = torch.softmax(padded_logits, dim=-1)
         illegal_maximum = float(probabilities.masked_select(~padded["mask"].to(device)).max().cpu())
+        padding_logits_close = bool(
+            torch.allclose(
+                padded_logits[:, :candidate_count],
+                baseline_logits,
+                atol=tolerance,
+                rtol=relative_tolerance,
+            )
+        )
+        padding_values_close = bool(
+            torch.allclose(
+                padded_values,
+                baseline_values,
+                atol=tolerance,
+                rtol=relative_tolerance,
+            )
+        )
 
     passed = (
-        order_logit_difference <= tolerance
-        and order_value_difference <= tolerance
-        and padding_logit_difference <= tolerance
-        and padding_value_difference <= tolerance
+        order_logits_close
+        and order_probabilities_close
+        and order_values_close
+        and selected_candidate_mismatches == 0
+        and padding_logits_close
+        and padding_values_close
         and illegal_maximum <= 1e-12
     )
     return {
         "passed": passed,
-        "tolerance": tolerance,
+        "absoluteTolerance": tolerance,
+        "relativeTolerance": relative_tolerance,
         "candidateOrder": {
             "maximumLogitDifference": order_logit_difference,
+            "maximumProbabilityDifference": order_probability_difference,
             "maximumValueDifference": order_value_difference,
+            "logitsWithinTolerance": order_logits_close,
+            "probabilitiesWithinTolerance": order_probabilities_close,
+            "valuesWithinTolerance": order_values_close,
+            "selectedCandidateMismatches": selected_candidate_mismatches,
         },
         "padding": {
             "maximumLogitDifference": padding_logit_difference,
             "maximumValueDifference": padding_value_difference,
+            "logitsWithinTolerance": padding_logits_close,
+            "valuesWithinTolerance": padding_values_close,
         },
         "illegalCandidateMaximumProbability": illegal_maximum,
     }
