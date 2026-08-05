@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use er_kernel::{GameKernel, KernelError};
 use er_types::{
     InputFocus, KernelEffect, KernelInput, PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass,
-    TimerId, TimerOwner,
+    TimerId,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -194,6 +194,7 @@ fn is_printable(code: &PhysicalKey) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use er_types::TimerOwner;
 
     fn safe_u53(value: u64) -> SafeU53 {
         match SafeU53::new(value) {
