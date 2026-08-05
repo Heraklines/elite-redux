@@ -44,7 +44,10 @@ pub fn content_digest<T: Serialize>(value: &T) -> Result<String, CanonicalError>
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
-pub fn verify_fixture_digest<T: Serialize>(value: &T, expected: &str) -> Result<(), CanonicalError> {
+pub fn verify_fixture_digest<T: Serialize>(
+    value: &T,
+    expected: &str,
+) -> Result<(), CanonicalError> {
     let actual = fixture_digest(value)?;
     if actual == expected {
         Ok(())

@@ -96,7 +96,17 @@ fn validate_string_id(value: &str) -> Result<(), StringIdError> {
 macro_rules! numeric_id {
     ($name:ident) => {
         #[derive(
-            Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize,
+            Clone,
+            Copy,
+            Debug,
+            Default,
+            Eq,
+            Hash,
+            Ord,
+            PartialEq,
+            PartialOrd,
+            Serialize,
+            Deserialize,
         )]
         #[serde(transparent)]
         pub struct $name(SafeU53);

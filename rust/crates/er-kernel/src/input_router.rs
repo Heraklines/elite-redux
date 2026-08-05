@@ -3,8 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_types::{
-    GameButton, InputMap, InputRouterOutput, InputTimerCommand, PhysicalKey, RawInputEvent, SafeU53,
-    TimerId,
+    GameButton, InputMap, InputRouterOutput, InputTimerCommand, PhysicalKey, RawInputEvent,
+    SafeU53, TimerId,
 };
 use thiserror::Error;
 

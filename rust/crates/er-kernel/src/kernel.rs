@@ -1,10 +1,10 @@
 //! Side-effect-free kernel entry point.
 
 use er_canonical::fixture_digest;
-pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use er_types::{
     InputMap, InputTimerCommand, MenuGeneration, MenuState, SeatId, TimeClass, TimerOwner, UiState,
 };
+pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use thiserror::Error;
 
 use crate::{InputRouteError, InputRouter, UiReducer};
@@ -79,8 +79,7 @@ impl GameKernel {
         actionable: bool,
         menu: MenuState,
     ) -> MenuGeneration {
-        self.ui_reducer
-            .replace_menu(owner_seat, actionable, menu)
+        self.ui_reducer.replace_menu(owner_seat, actionable, menu)
     }
 
     fn effects_from_input_output(

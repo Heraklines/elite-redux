@@ -1,10 +1,10 @@
 //! Exact fixture and digest assertions expressed as fallible helpers.
 
-use er_canonical::{canonicalize_value, fixture_digest, CanonicalError};
+use er_canonical::{CanonicalError, canonicalize_value, fixture_digest};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::{load_fixture_envelope, FixtureError};
+use crate::{FixtureError, load_fixture_envelope};
 
 pub fn assert_fixture_digest(name: &str) -> Result<(), AssertionError> {
     let envelope = load_fixture_envelope::<Value>(name)?;

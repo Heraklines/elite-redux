@@ -108,7 +108,11 @@ pub struct TerminalMenu {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "option_id", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "kind",
+    content = "option_id",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum CancelPolicy {
     Disabled,
     Close,
