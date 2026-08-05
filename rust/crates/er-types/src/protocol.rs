@@ -561,7 +561,10 @@ pub enum TransportState {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum StorageResult {
-    Loaded { value: Option<Value> },
+    Loaded {
+        #[serde(deserialize_with = "deserialize_required_nullable")]
+        value: Option<Value>,
+    },
     Persisted,
     Failed { reason: String },
 }
@@ -570,6 +573,7 @@ pub enum StorageResult {
 pub struct StorageRequest {
     pub request_id: SafeU53,
     pub key: String,
+    #[serde(deserialize_with = "deserialize_required_nullable")]
     pub value: Option<Value>,
 }
 
@@ -1059,5 +1063,28 @@ mod tests {
             assert!(inserted.is_some());
             assert!(serde_json::from_value::<NextControl>(invalid).is_err());
         }
+    }
+
+    #[test]
+    fn storage_values_are_required_and_explicitly_nullable() {
+        let loaded = json!({"kind": "LOADED", "value": null});
+        assert_eq!(
+            round_trip::<StorageResult>(&loaded),
+            Some(loaded.clone())
+        );
+        assert!(serde_json::from_value::<StorageResult>(json!({"kind": "LOADED"})).is_err());
+
+        let request = json!({"request_id": 7, "key": "save:slot", "value": null});
+        assert_eq!(
+            round_trip::<StorageRequest>(&request),
+            Some(request.clone())
+        );
+        assert!(
+            serde_json::from_value::<StorageRequest>(json!({
+                "request_id": 7,
+                "key": "save:slot"
+            }))
+            .is_err()
+        );
     }
 }

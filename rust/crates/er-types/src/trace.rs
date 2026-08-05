@@ -448,9 +448,7 @@ mod tests {
             clean_report_json,
             r#"{"replayed_events":8,"first_divergent_sequence":null}"#
         );
-        assert!(
-            serde_json::from_str::<TraceReplayReport>(r#"{"replayed_events":8}"#).is_err()
-        );
+        assert!(serde_json::from_str::<TraceReplayReport>(r#"{"replayed_events":8}"#).is_err());
         Ok(())
     }
 }

@@ -637,13 +637,17 @@ mod tests {
         );
         assert_eq!(sha256.len(), 64);
         assert_eq!(blake3.len(), 64);
+        assert_eq!(
+            blake3,
+            "dfd61de4c8a028cefa26e6000ce1bb5f890602c325e919052179eea79c300796"
+        );
         assert_ne!(sha256, blake3);
         Ok(())
     }
 
     #[test]
-    fn fixture_digest_preserves_legacy_signed_and_fractional_json_numbers(
-    ) -> Result<(), Box<dyn Error>> {
+    fn fixture_digest_preserves_legacy_signed_and_fractional_json_numbers()
+    -> Result<(), Box<dyn Error>> {
         let value: Value =
             serde_json::from_str(r#"{"wholeFloat":1.0,"negative":-1,"fraction":0.4}"#)?;
         assert_eq!(
