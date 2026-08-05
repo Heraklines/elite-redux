@@ -1,0 +1,471 @@
+use er_protocol::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
+use er_types::{SafeU53, SeatId, TimeClass, TimerId, TimerOwner};
+use serde_json::json;
+
+fn safe(value: u64) -> SafeU53 {
+    match SafeU53::new(value) {
+        Ok(value) => value,
+        Err(_) => SafeU53::ZERO,
+    }
+}
+
+fn seat(value: u64) -> SeatId {
+    SeatId::new(safe(value))
+}
+
+fn timer(value: u64) -> TimerId {
+    TimerId::new(safe(value))
+}
+
+fn owner(owner_id: &str, address: &str, reason: &str) -> TimerOwner {
+    TimerOwner {
+        owner_id: owner_id.to_owned(),
+        address: address.to_owned(),
+        reason: reason.to_owned(),
+    }
+}
+
+fn scheduled_timer(
+    endpoint: SeatId,
+    timer_id: TimerId,
+    timer_owner: TimerOwner,
+    delay_ms: SafeU53,
+    time_class: TimeClass,
+) -> ScheduledTimer {
+    ScheduledTimer {
+        endpoint,
+        timer_id,
+        owner: timer_owner,
+        delay_ms,
+        time_class,
+    }
+}
+
+#[test]
+fn schedule_allocates_deterministic_ids_and_preserves_complete_metadata()
+-> Result<(), SchedulerError> {
+    let mut scheduler = KernelScheduler::new();
+    let first = scheduled_timer(
+        seat(2),
+        timer(0),
+        owner("delivery", "delivery/2/17", "redelivery backoff"),
+        safe(250),
+        TimeClass::Connected,
+    );
+    let second = scheduled_timer(
+        seat(1),
+        timer(1),
+        owner("recovery", "recovery/request", "recovery deadline"),
+        safe(300_000),
+        TimeClass::Recovery,
+    );
+
+    assert_eq!(
+        scheduler.schedule(
+            first.endpoint,
+            first.owner.clone(),
+            first.delay_ms,
+            first.time_class,
+        )?,
+        SchedulerCommand::Schedule {
+            timer: first.clone(),
+        }
+    );
+    assert_eq!(scheduler.timer(first.timer_id), Some(&first));
+
+    assert_eq!(
+        scheduler.schedule(
+            second.endpoint,
+            second.owner.clone(),
+            second.delay_ms,
+            second.time_class,
+        )?,
+        SchedulerCommand::Schedule {
+            timer: second.clone(),
+        }
+    );
+    assert_eq!(scheduler.timer(second.timer_id), Some(&second));
+    assert_eq!(scheduler.live_timers(), vec![first, second]);
+    assert_eq!(scheduler.pending_timer_count(), safe(2));
+    Ok(())
+}
+
+#[test]
+fn scheduler_commands_keep_the_frozen_serde_shape() -> Result<(), String> {
+    let command = SchedulerCommand::Schedule {
+        timer: scheduled_timer(
+            seat(3),
+            timer(4),
+            owner("input-router", "input-repeat/UP", "input-repeat"),
+            safe(250),
+            TimeClass::HumanInput,
+        ),
+    };
+    let expected = json!({
+        "kind": "SCHEDULE",
+        "timer": {
+            "endpoint": 3,
+            "timerId": 4,
+            "owner": {
+                "ownerId": "input-router",
+                "address": "input-repeat/UP",
+                "reason": "input-repeat"
+            },
+            "delayMs": 250,
+            "timeClass": "humanInput"
+        }
+    });
+
+    let encoded = serde_json::to_value(&command).map_err(|error| error.to_string())?;
+    assert_eq!(encoded, expected);
+    let decoded =
+        serde_json::from_value::<SchedulerCommand>(encoded).map_err(|error| error.to_string())?;
+    assert_eq!(decoded, command);
+    Ok(())
+}
+
+#[test]
+fn fired_removes_before_return_and_keeps_remaining_timer_order() -> Result<(), SchedulerError> {
+    let mut scheduler = KernelScheduler::new();
+    let first = scheduled_timer(
+        seat(1),
+        timer(0),
+        owner("same-owner", "first", "first reason"),
+        safe(10),
+        TimeClass::Renderer,
+    );
+    let second = scheduled_timer(
+        seat(1),
+        timer(1),
+        owner("same-owner", "second", "second reason"),
+        safe(20),
+        TimeClass::Renderer,
+    );
+    let third = scheduled_timer(
+        seat(1),
+        timer(2),
+        owner("other-owner", "third", "third reason"),
+        safe(30),
+        TimeClass::Absolute,
+    );
+    scheduler.schedule(
+        first.endpoint,
+        first.owner.clone(),
+        first.delay_ms,
+        first.time_class,
+    )?;
+    scheduler.schedule(
+        second.endpoint,
+        second.owner.clone(),
+        second.delay_ms,
+        second.time_class,
+    )?;
+    scheduler.schedule(
+        third.endpoint,
+        third.owner.clone(),
+        third.delay_ms,
+        third.time_class,
+    )?;
+
+    assert_eq!(scheduler.fired(second.timer_id)?, second);
+    assert_eq!(scheduler.timer(timer(1)), None);
+    assert_eq!(scheduler.pending_timer_count(), safe(2));
+    assert_eq!(
+        scheduler.fired(timer(1)),
+        Err(SchedulerError::UnknownTimer { timer_id: timer(1) })
+    );
+    assert_eq!(
+        scheduler.cancel(first.timer_id),
+        Some(SchedulerCommand::Cancel {
+            endpoint: first.endpoint,
+            timer_id: first.timer_id,
+        })
+    );
+    assert_eq!(scheduler.cancel(first.timer_id), None);
+    assert_eq!(scheduler.live_timers(), vec![third]);
+    Ok(())
+}
+
+#[test]
+fn cancel_owner_is_idempotent_and_orders_commands_by_timer_id() -> Result<(), SchedulerError> {
+    let mut scheduler = KernelScheduler::new();
+    for (endpoint, owner_id, address) in [
+        (seat(2), "owner-a", "a/first"),
+        (seat(2), "owner-b", "b/only"),
+        (seat(1), "owner-a", "a/second"),
+    ] {
+        scheduler.schedule(
+            endpoint,
+            owner(owner_id, address, "test"),
+            safe(100),
+            TimeClass::Connected,
+        )?;
+    }
+
+    assert_eq!(
+        scheduler.cancel_owner("owner-a"),
+        vec![
+            SchedulerCommand::Cancel {
+                endpoint: seat(2),
+                timer_id: timer(0),
+            },
+            SchedulerCommand::Cancel {
+                endpoint: seat(1),
+                timer_id: timer(2),
+            },
+        ]
+    );
+    assert_eq!(scheduler.cancel_owner("owner-a"), Vec::new());
+    assert_eq!(scheduler.pending_timer_count(), safe(1));
+    assert_eq!(scheduler.live_timers()[0].timer_id, timer(1));
+    Ok(())
+}
+
+#[test]
+fn explicit_pause_reasons_compose_per_endpoint_and_class() -> Result<(), SchedulerError> {
+    let mut scheduler = KernelScheduler::new();
+    let endpoint = seat(1);
+    let other_endpoint = seat(2);
+
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Recovery));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Renderer));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::HumanInput));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Absolute));
+
+    assert_eq!(
+        scheduler.pause_class(endpoint, TimeClass::Connected, "disconnect"),
+        Ok(Some(SchedulerCommand::PauseClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "disconnect".to_owned(),
+        }))
+    );
+    assert_eq!(
+        scheduler.pause_class(endpoint, TimeClass::Connected, "disconnect"),
+        Ok(None)
+    );
+    assert_eq!(
+        scheduler.pause_class(endpoint, TimeClass::Connected, "hidden"),
+        Ok(Some(SchedulerCommand::PauseClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "hidden".to_owned(),
+        }))
+    );
+    assert!(scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(other_endpoint, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Recovery));
+
+    assert_eq!(
+        scheduler.resume_class(endpoint, TimeClass::Connected, "disconnect"),
+        Ok(Some(SchedulerCommand::ResumeClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "disconnect".to_owned(),
+        }))
+    );
+    assert!(scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert_eq!(
+        scheduler.resume_class(endpoint, TimeClass::Connected, "missing"),
+        Ok(None)
+    );
+    assert_eq!(
+        scheduler.resume_class(endpoint, TimeClass::Connected, "hidden"),
+        Ok(Some(SchedulerCommand::ResumeClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "hidden".to_owned(),
+        }))
+    );
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert_eq!(
+        scheduler.resume_class(endpoint, TimeClass::Connected, "hidden"),
+        Ok(None)
+    );
+
+    assert_eq!(
+        scheduler.pause_class(endpoint, TimeClass::Absolute, "safety"),
+        Ok(None)
+    );
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Absolute));
+    assert_eq!(
+        scheduler.resume_class(endpoint, TimeClass::Absolute, "safety"),
+        Ok(None)
+    );
+    assert_eq!(
+        scheduler.pause_class(endpoint, TimeClass::Renderer, ""),
+        Err(SchedulerError::EmptyPauseReason)
+    );
+    Ok(())
+}
+
+#[test]
+fn connection_and_suspension_controls_have_class_specific_effects() -> Result<(), SchedulerError> {
+    let mut scheduler = KernelScheduler::new();
+    let endpoint = seat(7);
+
+    assert_eq!(
+        scheduler.set_connected(endpoint, false)?,
+        vec![SchedulerCommand::PauseClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "disconnected".to_owned(),
+        }]
+    );
+    assert_eq!(scheduler.set_connected(endpoint, false)?, Vec::new());
+    assert!(scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Recovery));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Renderer));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::HumanInput));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Absolute));
+
+    assert_eq!(
+        scheduler.set_suspended(endpoint, true)?,
+        vec![
+            SchedulerCommand::PauseClass {
+                endpoint,
+                time_class: TimeClass::Connected,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::PauseClass {
+                endpoint,
+                time_class: TimeClass::Recovery,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::PauseClass {
+                endpoint,
+                time_class: TimeClass::Renderer,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::PauseClass {
+                endpoint,
+                time_class: TimeClass::HumanInput,
+                reason: "suspended".to_owned(),
+            },
+        ]
+    );
+    assert_eq!(scheduler.set_suspended(endpoint, true)?, Vec::new());
+    for time_class in [
+        TimeClass::Connected,
+        TimeClass::Recovery,
+        TimeClass::Renderer,
+        TimeClass::HumanInput,
+    ] {
+        assert!(scheduler.is_class_paused(endpoint, time_class));
+    }
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Absolute));
+
+    assert_eq!(
+        scheduler.set_suspended(endpoint, false)?,
+        vec![
+            SchedulerCommand::ResumeClass {
+                endpoint,
+                time_class: TimeClass::Connected,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::ResumeClass {
+                endpoint,
+                time_class: TimeClass::Recovery,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::ResumeClass {
+                endpoint,
+                time_class: TimeClass::Renderer,
+                reason: "suspended".to_owned(),
+            },
+            SchedulerCommand::ResumeClass {
+                endpoint,
+                time_class: TimeClass::HumanInput,
+                reason: "suspended".to_owned(),
+            },
+        ]
+    );
+    assert!(scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Recovery));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Renderer));
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::HumanInput));
+
+    assert_eq!(
+        scheduler.set_connected(endpoint, true)?,
+        vec![SchedulerCommand::ResumeClass {
+            endpoint,
+            time_class: TimeClass::Connected,
+            reason: "disconnected".to_owned(),
+        }]
+    );
+    assert!(!scheduler.is_class_paused(endpoint, TimeClass::Connected));
+    assert_eq!(scheduler.set_connected(endpoint, true)?, Vec::new());
+    Ok(())
+}
+
+#[test]
+fn dispose_cancels_all_live_resources_and_rejects_future_transitions() -> Result<(), SchedulerError>
+{
+    let mut scheduler = KernelScheduler::new();
+    scheduler.schedule(
+        seat(1),
+        owner("first", "first", "first"),
+        safe(10),
+        TimeClass::Connected,
+    )?;
+    scheduler.schedule(
+        seat(2),
+        owner("second", "second", "second"),
+        safe(20),
+        TimeClass::Absolute,
+    )?;
+    let _ = scheduler.pause_class(seat(1), TimeClass::Connected, "manual")?;
+
+    assert_eq!(
+        scheduler.dispose(),
+        vec![
+            SchedulerCommand::Cancel {
+                endpoint: seat(1),
+                timer_id: timer(0),
+            },
+            SchedulerCommand::Cancel {
+                endpoint: seat(2),
+                timer_id: timer(1),
+            },
+        ]
+    );
+    assert!(scheduler.is_disposed());
+    assert_eq!(scheduler.dispose(), Vec::new());
+    assert_eq!(scheduler.live_timers(), Vec::new());
+    assert_eq!(scheduler.pending_timer_count(), SafeU53::ZERO);
+    assert_eq!(scheduler.timer(timer(0)), None);
+    assert!(!scheduler.is_class_paused(seat(1), TimeClass::Connected));
+    assert_eq!(scheduler.cancel(timer(0)), None);
+    assert_eq!(scheduler.cancel_owner("first"), Vec::new());
+    assert_eq!(
+        scheduler.schedule(
+            seat(1),
+            owner("later", "later", "later"),
+            safe(1),
+            TimeClass::Connected,
+        ),
+        Err(SchedulerError::Disposed)
+    );
+    assert_eq!(
+        scheduler.pause_class(seat(1), TimeClass::Connected, "later"),
+        Err(SchedulerError::Disposed)
+    );
+    assert_eq!(
+        scheduler.resume_class(seat(1), TimeClass::Connected, "later"),
+        Err(SchedulerError::Disposed)
+    );
+    assert_eq!(
+        scheduler.set_connected(seat(1), false),
+        Err(SchedulerError::Disposed)
+    );
+    assert_eq!(
+        scheduler.set_suspended(seat(1), true),
+        Err(SchedulerError::Disposed)
+    );
+    assert_eq!(
+        scheduler.fired(timer(1)),
+        Err(SchedulerError::UnknownTimer { timer_id: timer(1) })
+    );
+    Ok(())
+}
