@@ -15,6 +15,10 @@ on:
         type: boolean
         required: false
         default: false
+      validation_decisions:
+        description: Source-disjoint validation decisions (256 full gate; 64 fast inference recheck)
+        required: false
+        default: "256"
 
 permissions:
   contents: read
@@ -85,7 +89,7 @@ jobs:
           --sample-out "$RUNNER_TEMP/learning-sample.jsonl"
           --select-only
           --decisions 512
-          --validation-decisions 256
+          --validation-decisions "${{ inputs.validation_decisions }}"
           --max-per-source 8
       - name: Fetch exact production dictionary read-only
         if: inputs.run_learning_sanity
@@ -111,7 +115,7 @@ jobs:
           --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json"
           --report ai-report/learning-sanity.json
           --decisions 512
-          --validation-decisions 256
+          --validation-decisions "${{ inputs.validation_decisions }}"
           --max-per-source 8
           --epochs 120
           --shuffled-epochs 20
