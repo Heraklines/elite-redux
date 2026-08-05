@@ -10,6 +10,11 @@ on:
         description: Optional bounded object sample for fast aggregate diagnostics (0 audits all)
         required: false
         default: "0"
+      run_learning_sanity:
+        description: Run the bounded 512/256 real-data learning falsification gates
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -23,15 +28,32 @@ jobs:
     if: github.repository == 'Heraklines/elite-redux'
     name: Audit production contract-v4 semantics remotely
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
+      - uses: actions/setup-python@v6
+        if: inputs.run_learning_sanity
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/policy/requirements.txt
+      - name: Install bounded policy dependencies
+        if: inputs.run_learning_sanity
+        run: python -m pip install --requirement ml/policy/requirements.txt
       - name: Verify audit logic with synthetic records
         run: node --test scripts/ai/combat-contract-v4-audit.test.mjs
+      - name: Verify learning-gate logic
+        if: inputs.run_learning_sanity
+        working-directory: ml/policy
+        run: >-
+          python -m unittest
+          test_real_learning_sanity
+          test_candidate_transformer
+          test_train_candidate_transformer
       - name: Verify live committed-action and solo-isolation semantics
         env:
           ER_SCENARIO: "1"
@@ -50,8 +72,55 @@ jobs:
           if [[ "${{ inputs.max_selected_objects }}" =~ ^[1-9][0-9]*$ ]]; then
             args+=(--max-selected-objects "${{ inputs.max_selected_objects }}")
           fi
+          if [[ "${{ inputs.run_learning_sanity }}" == "true" ]]; then
+            args+=(--private-policy-out "$RUNNER_TEMP/eligible-policy.jsonl")
+          fi
           node scripts/ai/run-production-combat-v4-audit.mjs "${args[@]}"
+      - name: Select bounded source-disjoint real-data sample
+        if: inputs.run_learning_sanity
+        run: >-
+          python ml/policy/run_real_learning_sanity.py
+          --data "$RUNNER_TEMP/eligible-policy.jsonl"
+          --report ai-report/sample-selection.json
+          --sample-out "$RUNNER_TEMP/learning-sample.jsonl"
+          --select-only
+          --decisions 512
+          --validation-decisions 256
+          --max-per-source 8
+      - name: Fetch exact production dictionary read-only
+        if: inputs.run_learning_sanity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dictionary_hash=$(jq -r '.samples.training.dictionaryHash' ai-report/sample-selection.json)
+          [[ "$dictionary_hash" =~ ^[0-9a-f]{64}$ ]]
+          npx wrangler r2 object get \
+            "er-telemetry/dictionaries/${dictionary_hash}.json" \
+            --file "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            --remote
+          actual_hash=$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)
+          test "$actual_hash" = "$dictionary_hash"
+      - name: Run bounded real-data falsification suite
+        if: inputs.run_learning_sanity
+        run: >-
+          python ml/policy/run_real_learning_sanity.py
+          --data "$RUNNER_TEMP/learning-sample.jsonl"
+          --dictionary "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          --report ai-report/learning-sanity.json
+          --decisions 512
+          --validation-decisions 256
+          --max-per-source 8
+          --epochs 120
+          --shuffled-epochs 20
+          --batch-size 64
+          --target-top1 0.99
+          --chance-tolerance 0.10
+          --state-collapse-delta 0.15
       - name: Publish sanitized audit summary
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -68,7 +137,20 @@ jobs:
           }
           NODE
           cat ai-report/production-v4-semantic-audit.md >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f ai-report/learning-sanity.json ]]; then
+            jq '{passed, gates, samples, memorization: .memorization.final, shuffledLabels: {passed: .shuffledLabels.passed, final: .shuffledLabels.final, chanceTop1: .shuffledLabels.chanceTop1}, stateAblation: {passed: .stateAblation.passed, final: .stateAblation.final, top1Collapse: .stateAblation.top1Collapse}, inferenceContract, deterministicResume}' \
+              ai-report/learning-sanity.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Delete private runner-local inputs
+        if: always() && inputs.run_learning_sanity
+        shell: bash
+        run: |
+          rm -f \
+            "$RUNNER_TEMP/eligible-policy.jsonl" \
+            "$RUNNER_TEMP/learning-sample.jsonl" \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ai-production-v4-semantic-audit
           path: ai-report
