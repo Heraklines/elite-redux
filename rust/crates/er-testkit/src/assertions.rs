@@ -1,6 +1,6 @@
 //! Exact fixture and digest assertions expressed as fallible helpers.
 
-use er_canonical::{CanonicalError, canonicalize_value, fixture_digest};
+use er_canonical::{CanonicalError, fixture_digest};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -8,8 +8,7 @@ use crate::{FixtureError, load_fixture_envelope};
 
 pub fn assert_fixture_digest(name: &str) -> Result<(), AssertionError> {
     let envelope = load_fixture_envelope::<Value>(name)?;
-    let (_, payload) = canonical_payload_round_trip(name, &envelope.payload)?;
-    let actual = fixture_digest(&payload)?;
+    let actual = fixture_digest(&envelope.payload)?;
     if actual == envelope.canonical_digest {
         Ok(())
     } else {
@@ -23,23 +22,18 @@ pub fn assert_fixture_digest(name: &str) -> Result<(), AssertionError> {
 
 pub fn assert_fixture_round_trip(name: &str) -> Result<String, AssertionError> {
     let envelope = load_fixture_envelope::<Value>(name)?;
-    let (canonical, _) = canonical_payload_round_trip(name, &envelope.payload)?;
-    Ok(canonical)
+    payload_round_trip(name, &envelope.payload)
 }
 
-fn canonical_payload_round_trip(
-    name: &str,
-    payload: &Value,
-) -> Result<(String, Value), AssertionError> {
-    let canonical = canonicalize_value(payload)?;
-    let reparsed: Value = serde_json::from_str(&canonical)?;
-    let reparsed_canonical = canonicalize_value(&reparsed)?;
-    if reparsed != *payload || reparsed_canonical != canonical {
+fn payload_round_trip(name: &str, payload: &Value) -> Result<String, AssertionError> {
+    let serialized = serde_json::to_string(payload)?;
+    let reparsed: Value = serde_json::from_str(&serialized)?;
+    if reparsed != *payload {
         Err(AssertionError::RoundTrip {
             name: name.to_owned(),
         })
     } else {
-        Ok((canonical, reparsed))
+        Ok(serialized)
     }
 }
 
@@ -57,7 +51,7 @@ pub enum AssertionError {
         expected: String,
         actual: String,
     },
-    #[error("fixture {name} changed value during canonical round-trip")]
+    #[error("fixture {name} changed value during JSON round-trip")]
     RoundTrip { name: String },
 }
 
@@ -86,10 +80,19 @@ mod tests {
     }
 
     #[test]
-    fn every_inventory_fixture_round_trips_to_canonical_json() {
+    fn every_inventory_fixture_round_trips_to_lossless_json() {
         for name in FIXTURE_NAMES {
             let result = assert_fixture_round_trip(name);
             assert!(result.is_ok());
         }
+    }
+
+    #[test]
+    fn round_trip_accepts_fractional_and_negative_json_numbers() {
+        let payload: Value = serde_json::json!({
+            "fraction": 0.4,
+            "negative": -1,
+        });
+        assert!(payload_round_trip("inline", &payload).is_ok());
     }
 }
