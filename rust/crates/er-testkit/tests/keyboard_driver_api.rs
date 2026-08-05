@@ -101,6 +101,7 @@ fn assert_virtual_schedule(
     effects: &[KernelEffect],
     endpoint: SeatId,
     timer_id: er_types::TimerId,
+    button: GameButton,
 ) {
     assert!(effects.iter().any(|effect| {
         matches!(
@@ -108,11 +109,12 @@ fn assert_virtual_schedule(
             KernelEffect::ScheduleTimer {
                 endpoint: effect_endpoint,
                 timer_id: effect_timer,
-                owner: TimerOwner::Kernel,
+                owner: TimerOwner::InputRepeat(effect_button),
                 delay_ms,
                 time_class: TimeClass::Virtual,
             } if *effect_endpoint == endpoint
                 && *effect_timer == timer_id
+                && *effect_button == button
                 && *delay_ms == safe(250)
         )
     }));
@@ -156,7 +158,7 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
             timer_id
         })
         .ok_or_else(|| std::io::Error::other("raw keydown did not schedule a timer"))?;
-    assert_virtual_schedule(&first_down, seat, first_timer);
+    assert_virtual_schedule(&first_down, seat, first_timer, GameButton::Down);
     assert_ui_cursor(&first_down, seat, safe(1));
     assert_eq!(driver.kernel().ui_view().cursor, Some(safe(1)));
     assert!(driver.kernel().live_resources().timers.contains(&first_timer));
@@ -175,7 +177,7 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
             timer_id
         })
         .ok_or_else(|| std::io::Error::other("raw press did not schedule a timer"))?;
-    assert_virtual_schedule(&press, seat, pressed_timer);
+    assert_virtual_schedule(&press, seat, pressed_timer, GameButton::Up);
     assert_cancel(&press, seat, pressed_timer);
     assert_ui_cursor(&press, seat, safe(0));
     assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
@@ -190,7 +192,7 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
             timer_id
         })
         .ok_or_else(|| std::io::Error::other("raw hold did not schedule a timer"))?;
-    assert_virtual_schedule(&held, seat, held_timer);
+    assert_virtual_schedule(&held, seat, held_timer, GameButton::Down);
     assert_cancel(&held, seat, held_timer);
     assert_ui_cursor(&held, seat, safe(0));
     assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));

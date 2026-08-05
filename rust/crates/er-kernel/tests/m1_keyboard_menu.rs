@@ -191,18 +191,24 @@ fn scheduled_delay(effects: &[KernelEffect], timer_id: TimerId) -> Option<SafeU5
     })
 }
 
-fn assert_scheduled(effects: &[KernelEffect], endpoint: SeatId, timer_id: TimerId) {
+fn assert_scheduled(
+    effects: &[KernelEffect],
+    endpoint: SeatId,
+    timer_id: TimerId,
+    button: GameButton,
+) {
     assert!(effects.iter().any(|effect| {
         matches!(
             effect,
             KernelEffect::ScheduleTimer {
                 endpoint: effect_endpoint,
                 timer_id: effect_timer,
-                owner: TimerOwner::Kernel,
+                owner: TimerOwner::InputRepeat(effect_button),
                 delay_ms,
                 time_class: TimeClass::Virtual,
             } if *effect_endpoint == endpoint
                 && *effect_timer == timer_id
+                && *effect_button == button
                 && *delay_ms == safe(250)
         )
     }));
@@ -256,7 +262,7 @@ fn raw_keydown_keyup_moves_cursor_and_dispatches_command_submit() -> TestResult 
         InputFocus::Game,
     )?;
     assert_eq!(scheduled_delay(&moved, timer(0)), Some(safe(250)));
-    assert_scheduled(&moved, owner, timer(0));
+    assert_scheduled(&moved, owner, timer(0), GameButton::Down);
     assert!(kernel.live_resources().timers.contains(&timer(0)));
     assert_eq!(kernel.ui_view().cursor, Some(safe(1)));
     let moved_view = kernel.ui_view();
@@ -277,7 +283,7 @@ fn raw_keydown_keyup_moves_cursor_and_dispatches_command_submit() -> TestResult 
         InputFocus::Game,
     )?;
     assert_eq!(scheduled_delay(&submitted, timer(1)), Some(safe(250)));
-    assert_scheduled(&submitted, owner, timer(1));
+    assert_scheduled(&submitted, owner, timer(1), GameButton::Submit);
     assert_ui_changed(&submitted, owner, &submit_view);
     assert_eq!(kernel.ui_view(), submit_view);
     assert!(matches!(
@@ -378,13 +384,13 @@ fn repeat_uses_virtual_250ms_timer_and_keyup_cancels_it() -> TestResult {
         InputFocus::Game,
     )?;
     assert_eq!(scheduled_delay(&pressed, timer(0)), Some(safe(250)));
-    assert_scheduled(&pressed, owner, timer(0));
+    assert_scheduled(&pressed, owner, timer(0), GameButton::Down);
     assert!(kernel.live_resources().timers.contains(&timer(0)));
     assert_eq!(kernel.ui_view().cursor, Some(safe(1)));
 
     let repeated = timer_fired(&mut kernel, owner, timer(0))?;
     assert_eq!(scheduled_delay(&repeated, timer(0)), Some(safe(250)));
-    assert_scheduled(&repeated, owner, timer(0));
+    assert_scheduled(&repeated, owner, timer(0), GameButton::Down);
     assert!(kernel.live_resources().timers.contains(&timer(0)));
     assert_eq!(kernel.ui_view().cursor, Some(safe(2)));
     let repeated_view = kernel.ui_view();
@@ -475,7 +481,7 @@ fn focus_suppresses_printable_keys_and_preserves_matching_keyup() -> TestResult 
         InputFocus::Game,
     )?;
     assert_eq!(scheduled_delay(&accepted, timer(0)), Some(safe(250)));
-    assert_scheduled(&accepted, owner, timer(0));
+    assert_scheduled(&accepted, owner, timer(0), GameButton::Action);
     assert!(kernel.live_resources().timers.contains(&timer(0)));
     assert!(focus_changed(&mut kernel, owner, InputFocus::TextEntry)?.is_empty());
     let suppressed_repeat = timer_fired(&mut kernel, owner, timer(0))?;
@@ -587,7 +593,7 @@ fn ownership_generation_and_actionability_reject_raw_events_without_mutation() -
         InputFocus::Game,
     )?;
     assert_eq!(scheduled_delay(&stale_down, timer(0)), Some(safe(250)));
-    assert_scheduled(&stale_down, owner, timer(0));
+    assert_scheduled(&stale_down, owner, timer(0), GameButton::Down);
     assert!(stale.live_resources().timers.contains(&timer(0)));
     let old_generation = stale.ui_view().generation;
     let replacement = choice_menu(
@@ -600,14 +606,17 @@ fn ownership_generation_and_actionability_reject_raw_events_without_mutation() -
     let replaced = stale.snapshot();
 
     let stale_repeat = timer_fired(&mut stale, owner, timer(0))?;
-    assert_eq!(scheduled_delay(&stale_repeat, timer(0)), Some(safe(250)));
-    assert_scheduled(&stale_repeat, owner, timer(0));
+    assert!(stale_repeat.is_empty());
     assert_no_ui_change(&stale_repeat, owner);
-    assert!(stale.live_resources().timers.contains(&timer(0)));
+    assert!(stale.live_resources().timers.is_empty());
     assert_eq!(stale.snapshot().ui, replaced.ui);
+    assert!(matches!(
+        timer_fired(&mut stale, owner, timer(0)),
+        Err(KernelError::Input(_))
+    ));
     let stale_release = key_up(&mut stale, owner, PhysicalKey::ArrowDown)?;
+    assert!(stale_release.is_empty());
     assert_no_ui_change(&stale_release, owner);
-    assert!(cancelled(&stale_release, timer(0)));
     assert!(stale.live_resources().timers.is_empty());
     assert_eq!(stale.snapshot().ui, replaced.ui);
     Ok(())
@@ -681,12 +690,10 @@ fn hidden_and_disabled_choices_are_not_submitted_and_hidden_choices_are_skipped(
             false,
             InputFocus::Game,
         )?;
+        assert!(submitted.is_empty());
         assert_no_ui_change(&submitted, owner);
         assert_eq!(rejected.snapshot().ui, before.ui);
-        assert!(cancelled(
-            &key_up(&mut rejected, owner, PhysicalKey::Enter)?,
-            timer(0)
-        ));
+        assert!(key_up(&mut rejected, owner, PhysicalKey::Enter)?.is_empty());
         assert!(rejected.live_resources().timers.is_empty());
     }
     Ok(())

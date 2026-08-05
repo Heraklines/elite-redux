@@ -141,11 +141,12 @@ impl GameKernel {
                         .repeat_timers
                         .remove(&timer_id)
                         .map_or(endpoint, |context| context.endpoint);
-                    self.live_resources.timers.remove(&timer_id);
-                    effects.push(KernelEffect::CancelTimer {
-                        endpoint: cancel_endpoint,
-                        timer_id,
-                    });
+                    if self.live_resources.timers.remove(&timer_id) {
+                        effects.push(KernelEffect::CancelTimer {
+                            endpoint: cancel_endpoint,
+                            timer_id,
+                        });
+                    }
                 }
             }
         }
@@ -187,11 +188,12 @@ impl GameKernel {
                         .repeat_timers
                         .remove(&timer_id)
                         .map_or(context.endpoint, |timer_context| timer_context.endpoint);
-                    self.live_resources.timers.remove(&timer_id);
-                    effects.push(KernelEffect::CancelTimer {
-                        endpoint: cancel_endpoint,
-                        timer_id,
-                    });
+                    if self.live_resources.timers.remove(&timer_id) {
+                        effects.push(KernelEffect::CancelTimer {
+                            endpoint: cancel_endpoint,
+                            timer_id,
+                        });
+                    }
                 }
             }
         }
