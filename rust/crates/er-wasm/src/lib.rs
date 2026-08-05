@@ -238,32 +238,57 @@ pub mod tests {
         ]
     }"#;
 
+    const CANONICAL_VECTOR_INPUT: &str = r#"{"b":[true,null],"a":"é"}"#;
+    const CANONICAL_VECTOR_JSON: &str = r#"{"a":"é","b":[true,null]}"#;
+    const CANONICAL_VECTOR_SHA256: &str =
+        "c5cc0d1b9005cced90abb4178e4d502f70ee99f99e158b1841f82ab812241f3f";
+    const CANONICAL_VECTOR_BLAKE3: &str =
+        "dfd61de4c8a028cefa26e6000ce1bb5f890602c325e919052179eea79c300796";
+
     #[wasm_bindgen_test]
-    fn canonical_json_matches_native_schema_canonicalization() {
-        let result = canonicalize_json(
-            r#"{"z":1,"a":{"d":"é","c":null},"items":[{"b":2,"a":1}]}"#,
-        );
+    fn canonical_json_matches_fixed_vector() {
+        let result = canonicalize_json(CANONICAL_VECTOR_INPUT);
         assert!(result.is_ok(), "canonical JSON boundary rejected valid input");
         let Some(canonical) = result.ok() else {
             return;
         };
-        assert_eq!(
-            canonical,
-            r#"{"a":{"c":null,"d":"é"},"items":[{"a":1,"b":2}],"z":1}"#
-        );
+        assert_eq!(canonical, CANONICAL_VECTOR_JSON);
     }
 
     #[wasm_bindgen_test]
-    fn compatible_digest_matches_sha256_fixture_definition() {
-        let result = compatible_digest_json(r#"{"z":1,"a":2}"#);
+    fn compatible_digest_matches_fixed_sha256_vector() {
+        let result = compatible_digest_json(CANONICAL_VECTOR_INPUT);
         assert!(result.is_ok(), "compatible digest boundary rejected valid input");
         let Some(digest) = result.ok() else {
             return;
         };
-        assert_eq!(
-            digest,
-            "c2985c5ba6f7d2a55e768f92490ca09388e95bc4cccb9fdf11b15f4d42f93e73"
+        assert_eq!(digest, CANONICAL_VECTOR_SHA256);
+    }
+
+    #[wasm_bindgen_test]
+    fn content_digest_matches_fixed_blake3_vector() {
+        let canonical_result = canonicalize_json(CANONICAL_VECTOR_INPUT);
+        assert!(
+            canonical_result.is_ok(),
+            "canonical JSON boundary rejected valid input"
         );
+        let Some(canonical) = canonical_result.ok() else {
+            return;
+        };
+        assert_eq!(canonical, CANONICAL_VECTOR_JSON);
+
+        let value_result = serde_json::from_str::<Value>(&canonical);
+        assert!(value_result.is_ok(), "fixed canonical JSON did not parse");
+        let Some(value) = value_result.ok() else {
+            return;
+        };
+
+        let digest_result = er_canonical::content_digest(&value);
+        assert!(digest_result.is_ok(), "BLAKE3 digest calculation failed");
+        let Some(digest) = digest_result.ok() else {
+            return;
+        };
+        assert_eq!(digest, CANONICAL_VECTOR_BLAKE3);
     }
 
     #[wasm_bindgen_test]
@@ -282,6 +307,51 @@ pub mod tests {
                 "digest accepted invalid numeric input: {input}"
             );
         }
+    }
+
+    #[wasm_bindgen_test]
+    fn json_boundaries_reject_invalid_json() {
+        for input in [r#"{"a":}"#, r#"{"a":1,}"#, r#"{"a":"unterminated}"#] {
+            assert!(
+                canonicalize_json(input).is_err(),
+                "canonicalization accepted invalid JSON: {input}"
+            );
+            assert!(
+                compatible_digest_json(input).is_err(),
+                "digest accepted invalid JSON: {input}"
+            );
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn kernel_trace_boundary_rejects_invalid_trace() {
+        for input in [r#"{}"#, r#"{"header":{},"initial_snapshot":{},"events":[]}"#] {
+            assert!(
+                round_trip_kernel_trace(input).is_err(),
+                "trace boundary accepted invalid trace: {input}"
+            );
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn kernel_trace_boundary_rejects_invalid_frame() {
+        let invalid_frame_type = FULL_KERNEL_TRACE.replace(
+            r#""t": "authorityEntry""#,
+            r#""t": "notAFrame""#,
+        );
+        assert!(
+            round_trip_kernel_trace(&invalid_frame_type).is_err(),
+            "trace boundary accepted an unknown network frame type"
+        );
+
+        let unsafe_frame_context = FULL_KERNEL_TRACE.replace(
+            r#""connectionGeneration": 1"#,
+            r#""connectionGeneration": 9007199254740992"#,
+        );
+        assert!(
+            round_trip_kernel_trace(&unsafe_frame_context).is_err(),
+            "trace boundary accepted an unsafe network frame context integer"
+        );
     }
 
     #[wasm_bindgen_test]
