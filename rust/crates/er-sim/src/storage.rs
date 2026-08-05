@@ -27,10 +27,7 @@ pub enum StorageAdapterError {
 }
 
 pub trait StorageAdapter: fmt::Debug {
-    fn execute(
-        &mut self,
-        request: StorageRequest,
-    ) -> Result<StorageResult, StorageAdapterError>;
+    fn execute(&mut self, request: StorageRequest) -> Result<StorageResult, StorageAdapterError>;
 
     fn apply_recovery_atomically(
         &mut self,
@@ -58,10 +55,7 @@ impl MemoryStorage {
 }
 
 impl StorageAdapter for MemoryStorage {
-    fn execute(
-        &mut self,
-        _request: StorageRequest,
-    ) -> Result<StorageResult, StorageAdapterError> {
+    fn execute(&mut self, _request: StorageRequest) -> Result<StorageResult, StorageAdapterError> {
         Err(StorageAdapterError::Disposed)
     }
 
@@ -76,6 +70,5 @@ impl StorageAdapter for MemoryStorage {
         StorageDiagnostics::default()
     }
 
-    fn dispose(&mut self) {
-    }
+    fn dispose(&mut self) {}
 }

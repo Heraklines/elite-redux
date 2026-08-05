@@ -12,8 +12,8 @@ use er_types::{
     MenuGeneration, MenuOption, MenuOptionId, MenuState, OperationId, SafeU53, SeatId, TimeClass,
     TimerId, TimerOwner, UiState,
 };
-use serde_json::Value;
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
+use serde_json::Value;
 use thiserror::Error;
 
 use crate::{InputRouteError, InputRouter, UiReducer};
@@ -328,9 +328,9 @@ impl GameKernel {
             let ButtonEvent::Pressed(button) = event else {
                 continue;
             };
-            let intents = self
-                .ui_reducer
-                .reduce_at(endpoint, generation, ButtonEvent::Pressed(button));
+            let intents =
+                self.ui_reducer
+                    .reduce_at(endpoint, generation, ButtonEvent::Pressed(button));
             let accepted = intents.is_ok();
             pressed = Some((button, accepted));
             if let Ok(intents) = intents {
@@ -338,10 +338,11 @@ impl GameKernel {
                     endpoint,
                     view: self.ui_reducer.view(),
                 });
-                effects.extend(intents.into_iter().map(|intent| KernelEffect::UiIntent {
-                    endpoint,
-                    intent,
-                }));
+                effects.extend(
+                    intents
+                        .into_iter()
+                        .map(|intent| KernelEffect::UiIntent { endpoint, intent }),
+                );
             }
         }
 

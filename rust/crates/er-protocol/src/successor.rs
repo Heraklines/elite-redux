@@ -116,9 +116,6 @@ pub fn control_owner_seat_ids(_control: &NextControl) -> BTreeSet<SeatId> {
     BTreeSet::new()
 }
 
-pub fn partition_control_for_seat(
-    _control: &NextControl,
-    _seat: SeatId,
-) -> Option<NextControl> {
+pub fn partition_control_for_seat(_control: &NextControl, _seat: SeatId) -> Option<NextControl> {
     None
 }

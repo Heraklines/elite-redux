@@ -23,25 +23,30 @@ pub struct NetworkPacket {
 pub enum FrameCorruption {
     Replace { value: RawFrame },
     DeleteField { json_pointer: String },
-    ReplaceField {
-        json_pointer: String,
-        value: Value,
-    },
+    ReplaceField { json_pointer: String, value: Value },
     MalformedJson { text: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum FaultOperation {
-    Deliver { packet_id: SafeU53 },
+    Deliver {
+        packet_id: SafeU53,
+    },
     DeliverNext,
-    Drop { packet_id: SafeU53 },
-    Duplicate { packet_id: SafeU53 },
+    Drop {
+        packet_id: SafeU53,
+    },
+    Duplicate {
+        packet_id: SafeU53,
+    },
     Delay {
         packet_id: SafeU53,
         additional_ms: SafeU53,
     },
-    Reorder { packet_ids: Vec<SafeU53> },
+    Reorder {
+        packet_ids: Vec<SafeU53>,
+    },
     Corrupt {
         packet_id: SafeU53,
         corruption: FrameCorruption,
@@ -157,6 +162,5 @@ impl FaultNetwork {
         FaultNetworkDiagnostics::default()
     }
 
-    pub fn dispose(&mut self) {
-    }
+    pub fn dispose(&mut self) {}
 }

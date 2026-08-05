@@ -185,10 +185,7 @@ impl SimulatedPair {
         Err(SimulatedPairError::Disposed)
     }
 
-    pub fn blur(
-        &mut self,
-        endpoint: PairEndpoint,
-    ) -> Result<PairStep, SimulatedPairError> {
+    pub fn blur(&mut self, endpoint: PairEndpoint) -> Result<PairStep, SimulatedPairError> {
         self.apply(PairOperation::RawInput {
             endpoint,
             event: RawInputEvent::WindowBlurred,
@@ -206,10 +203,7 @@ impl SimulatedPair {
         })
     }
 
-    pub fn advance_time(
-        &mut self,
-        delta_ms: SafeU53,
-    ) -> Result<PairStep, SimulatedPairError> {
+    pub fn advance_time(&mut self, delta_ms: SafeU53) -> Result<PairStep, SimulatedPairError> {
         self.apply(PairOperation::AdvanceTime { delta_ms })
     }
 

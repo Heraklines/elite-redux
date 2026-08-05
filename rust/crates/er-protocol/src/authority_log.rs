@@ -69,7 +69,9 @@ pub enum AuthorityLogAction {
         to: SeatId,
         entry: Box<AuthorityEntry>,
     },
-    Scheduler { command: SchedulerCommand },
+    Scheduler {
+        command: SchedulerCommand,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -103,8 +105,12 @@ pub enum ReceiptRejectReason {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum AuthorityReceiptVerdict {
-    Rejected { reason: ReceiptRejectReason },
-    Duplicate { highest_stage: AckStage },
+    Rejected {
+        reason: ReceiptRejectReason,
+    },
+    Duplicate {
+        highest_stage: AckStage,
+    },
     Advanced {
         retired: bool,
         waiting_for_seat_ids: Vec<SeatId>,

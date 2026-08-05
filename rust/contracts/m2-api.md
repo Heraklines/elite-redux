@@ -214,6 +214,8 @@ The public campaign surface contains only:
 
 There is no public `select_command`, `choose_replacement`, `choose_option`, `set_cursor`, `submit_interaction`, or `open_menu`. Tests may not obtain mutable kernel, reducer, protocol-log, or menu handles.
 
+The M1 `UiReducer` and `GameKernel::replace_menu` compatibility surfaces remain available for their pinned low-level M1 contract tests, but `SimulatedPair` exposes no reference—mutable or immutable—to either owned kernel or reducer. Calling those APIs on a separately constructed object cannot affect a campaign pair. The campaign API is therefore structurally limited to `PairOperation`'s raw-input/environment union.
+
 Controls project into the M1 menu reducer at their exact owner/address. Command, replacement, and shared interaction decisions are produced only by raw physical input. Await opens a non-actionable waiting menu. Terminal opens symmetric terminal state and accepts no gameplay input. Menu generation changes on recovery; stale pre-recovery input cannot submit.
 
 ## Contract map, properties, campaigns, and parity

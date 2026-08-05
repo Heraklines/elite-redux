@@ -17,8 +17,13 @@ pub struct ScheduledTimer {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SchedulerCommand {
-    Schedule { timer: ScheduledTimer },
-    Cancel { endpoint: SeatId, timer_id: TimerId },
+    Schedule {
+        timer: ScheduledTimer,
+    },
+    Cancel {
+        endpoint: SeatId,
+        timer_id: TimerId,
+    },
     PauseClass {
         endpoint: SeatId,
         time_class: TimeClass,

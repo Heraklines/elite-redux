@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 
 use er_types::{
     AuthorityEntry, AuthorityFrontier, AuthorityReceipt, ConnectionGeneration,
-    ControlProjectionOutcome, FrameContext, MaterialApplicationOutcome, OperationId, Revision,
-    RecoveredFrontierTerminal, SeatId,
+    ControlProjectionOutcome, FrameContext, MaterialApplicationOutcome, OperationId,
+    RecoveredFrontierTerminal, Revision, SeatId,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -59,18 +59,26 @@ pub enum ReplicaRejectReason {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ReplicaAction {
-    EmitReceipt { receipt: AuthorityReceipt },
-    ApplyMaterial { entry: AuthorityEntry },
+    EmitReceipt {
+        receipt: AuthorityReceipt,
+    },
+    ApplyMaterial {
+        entry: AuthorityEntry,
+    },
     ProjectControl {
         entry: AuthorityEntry,
         expected_control_id: String,
     },
-    ProbePresentation { entry: AuthorityEntry },
+    ProbePresentation {
+        entry: AuthorityEntry,
+    },
     RequestTail {
         context: FrameContext,
         missing_from: Revision,
     },
-    EnterTerminal { reason: String },
+    EnterTerminal {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -226,6 +234,5 @@ impl AuthorityReplica {
         AuthorityReplicaDiagnostics::default()
     }
 
-    pub fn dispose(&mut self, _reason: &str) {
-    }
+    pub fn dispose(&mut self, _reason: &str) {}
 }

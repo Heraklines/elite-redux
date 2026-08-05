@@ -27,12 +27,16 @@ pub struct RecoveryValidationContext {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RecoveryBundleValidation {
-    Valid { bundle: Box<RecoveryBundle> },
+    Valid {
+        bundle: Box<RecoveryBundle>,
+    },
     Stale {
         captured_frontier: Revision,
         bundle_frontier: Revision,
     },
-    Mismatch { issues: Vec<String> },
+    Mismatch {
+        issues: Vec<String>,
+    },
 }
 
 pub fn validate_recovery_bundle(
@@ -57,21 +61,33 @@ pub struct RecoveryTransactionConfig {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecoveryAction {
-    FenceChanged { view: RecoveryFenceView },
-    SendRequest { request: RecoveryRequestBody },
-    Scheduler { command: SchedulerCommand },
+    FenceChanged {
+        view: RecoveryFenceView,
+    },
+    SendRequest {
+        request: RecoveryRequestBody,
+    },
+    Scheduler {
+        command: SchedulerCommand,
+    },
     ApplyMaterial {
         request_id: String,
         material: Material,
     },
-    StageRecoveredFrontier { entry: AuthorityEntry },
+    StageRecoveredFrontier {
+        entry: AuthorityEntry,
+    },
     ProjectControl {
         revision: Revision,
         control: NextControl,
         expected_control_id: String,
     },
-    SendAppliedProof { proof: RecoveryAppliedProof },
-    Terminalize { reason: String },
+    SendAppliedProof {
+        proof: RecoveryAppliedProof,
+    },
+    Terminalize {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -110,11 +126,9 @@ impl RecoveryFence {
         false
     }
 
-    pub fn release(&mut self) {
-    }
+    pub fn release(&mut self) {}
 
-    pub fn terminalize(&mut self, _reason: String) {
-    }
+    pub fn terminalize(&mut self, _reason: String) {}
 
     pub fn is_command_admission_frozen(&self) -> bool {
         false

@@ -18,9 +18,9 @@ pub use validation::*;
 
 pub use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityFrontier,
-    AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice, FrameContext, FrameType,
-    ControlProjectionOutcome, Material, MaterialApplicationOutcome, NetworkFrame, NetworkPayload,
+    AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice, ControlProjectionOutcome,
+    FrameContext, FrameType, Material, MaterialApplicationOutcome, NetworkFrame, NetworkPayload,
     NextControl, ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle,
-    RecoveryBundleBody, RecoveryFenceState, RecoveryFenceView, RecoveryPhase,
-    RecoveryRequestBody, SafeI53, TailRequestBody, TerminalFrameBody, TimeClass, TimerOwner,
+    RecoveryBundleBody, RecoveryFenceState, RecoveryFenceView, RecoveryPhase, RecoveryRequestBody,
+    SafeI53, TailRequestBody, TerminalFrameBody, TimeClass, TimerOwner,
 };

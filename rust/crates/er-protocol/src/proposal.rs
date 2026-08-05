@@ -154,8 +154,7 @@ impl ProposalAdmissionLedger {
         None
     }
 
-    pub fn reset(&mut self) {
-    }
+    pub fn reset(&mut self) {}
 
     pub fn len(&self) -> SafeU53 {
         SafeU53::ZERO
@@ -169,8 +168,7 @@ impl ProposalAdmissionLedger {
         ProposalAdmissionDiagnostics::default()
     }
 
-    pub fn dispose(&mut self) {
-    }
+    pub fn dispose(&mut self) {}
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -202,8 +200,12 @@ pub struct ProposalLeaseSpec {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProposalLeaseAction {
-    Send { proposal: RetainedProposal },
-    Scheduler { command: SchedulerCommand },
+    Send {
+        proposal: RetainedProposal,
+    },
+    Scheduler {
+        command: SchedulerCommand,
+    },
     Terminalize {
         operation_id: OperationId,
         reason: String,

@@ -33,7 +33,9 @@ pub enum InboundFrameResult {
     Valid {
         frame: Box<ValidatedFrame>,
     },
-    CosmeticDrop { reason: String },
+    CosmeticDrop {
+        reason: String,
+    },
     ProtocolViolation {
         frame_type: Option<String>,
         issues: Vec<String>,

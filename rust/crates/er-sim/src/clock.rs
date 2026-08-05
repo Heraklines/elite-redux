@@ -55,10 +55,7 @@ impl VirtualClock {
         Err(VirtualClockError::Disposed)
     }
 
-    pub fn advance(
-        &mut self,
-        _delta_ms: SafeU53,
-    ) -> Result<Vec<ClockEvent>, VirtualClockError> {
+    pub fn advance(&mut self, _delta_ms: SafeU53) -> Result<Vec<ClockEvent>, VirtualClockError> {
         Err(VirtualClockError::Disposed)
     }
 
@@ -82,6 +79,5 @@ impl VirtualClock {
         false
     }
 
-    pub fn dispose(&mut self) {
-    }
+    pub fn dispose(&mut self) {}
 }

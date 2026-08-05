@@ -569,10 +569,7 @@ pub enum TimerOwnerError {
     AsciiControl { field: &'static str },
 }
 
-fn validate_timer_owner_field(
-    field: &'static str,
-    value: &str,
-) -> Result<(), TimerOwnerError> {
+fn validate_timer_owner_field(field: &'static str, value: &str) -> Result<(), TimerOwnerError> {
     if value.is_empty() {
         return Err(TimerOwnerError::Empty { field });
     }

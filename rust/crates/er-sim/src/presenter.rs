@@ -87,8 +87,7 @@ impl Presenter for InstantPresenter {
         PresenterDiagnostics::default()
     }
 
-    fn dispose(&mut self) {
-    }
+    fn dispose(&mut self) {}
 }
 
 #[derive(Debug, Default)]
@@ -129,6 +128,5 @@ impl Presenter for FaultPresenter {
         PresenterDiagnostics::default()
     }
 
-    fn dispose(&mut self) {
-    }
+    fn dispose(&mut self) {}
 }
