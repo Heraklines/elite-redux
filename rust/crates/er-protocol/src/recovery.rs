@@ -27,7 +27,7 @@ pub struct RecoveryValidationContext {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RecoveryBundleValidation {
-    Valid { bundle: RecoveryBundle },
+    Valid { bundle: Box<RecoveryBundle> },
     Stale {
         captured_frontier: Revision,
         bundle_frontier: Revision,

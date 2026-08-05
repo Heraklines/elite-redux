@@ -65,7 +65,10 @@ pub struct PreparedCommit {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AuthorityLogAction {
-    Deliver { to: SeatId, entry: AuthorityEntry },
+    Deliver {
+        to: SeatId,
+        entry: Box<AuthorityEntry>,
+    },
     Scheduler { command: SchedulerCommand },
 }
 

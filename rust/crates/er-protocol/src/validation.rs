@@ -30,7 +30,9 @@ pub struct ValidatedFrame {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum InboundFrameResult {
-    Valid { frame: ValidatedFrame },
+    Valid {
+        frame: Box<ValidatedFrame>,
+    },
     CosmeticDrop { reason: String },
     ProtocolViolation {
         frame_type: Option<String>,
