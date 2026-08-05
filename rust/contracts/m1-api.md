@@ -122,11 +122,13 @@ Input/menu-only M1 snapshots use a typed `UiState` plus a lossless JSON `state` 
 
 - sort object keys with the oracle's JavaScript-compatible lexical order;
 - preserve arrays;
-- reject every floating value and integer outside U53;
+- reject every floating value and integer outside U53 on the strict kernel canonical/content path;
 - preserve UTF-8 strings and absent-versus-null semantics;
 - emit compact JSON with no insignificant whitespace;
 - use SHA-256 for existing TypeScript fixture/wire compatibility;
 - use BLAKE3 only for new content/fixture hashes.
+
+The TypeScript fixture SHA-256 path is a separate compatibility algorithm. It reproduces `JSON.stringify(stableValue(payload))`, including finite negative and fractional JSON numbers already present in the pinned checkpoint and input-map fixtures, JavaScript `-0` normalization, and the exporter's object-property enumeration. It must not be reused as the canonical identity for new kernel state.
 
 ## Representative driver and Wasm surface
 

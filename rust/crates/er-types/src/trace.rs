@@ -1,6 +1,6 @@
 //! Deterministic boundary trace schema.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{KernelInput, KernelSnapshot, LiveResourceSnapshot, SafeU53};
 
@@ -50,7 +50,16 @@ pub struct TraceDivergence {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TraceReplayReport {
     pub replayed_events: SafeU53,
+    #[serde(deserialize_with = "deserialize_required_nullable")]
     pub first_divergent_sequence: Option<SafeU53>,
+}
+
+fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
 }
 
 #[cfg(test)]
@@ -438,6 +447,9 @@ mod tests {
         assert_eq!(
             clean_report_json,
             r#"{"replayed_events":8,"first_divergent_sequence":null}"#
+        );
+        assert!(
+            serde_json::from_str::<TraceReplayReport>(r#"{"replayed_events":8}"#).is_err()
         );
         Ok(())
     }

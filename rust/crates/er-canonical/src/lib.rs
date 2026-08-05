@@ -17,7 +17,7 @@ use thiserror::Error;
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
-pub const FIXTURE_DIGEST_KIND: &str = "sha256-stable-json-v1";
+pub const FIXTURE_DIGEST_KIND: &str = "fixture-content-sha256-v1";
 pub const CONTENT_DIGEST_KIND: &str = "blake3-v1";
 
 #[derive(Debug, Error)]
@@ -75,7 +75,9 @@ pub fn verify_fixture_digest<T: Serialize>(
 fn fixture_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalError> {
     // The TypeScript fixture exporter materializes sorted keys before calling
     // JSON.stringify, whose own-property enumeration puts array-index keys first.
-    let value = validated_value(value)?;
+    // Unlike the strict kernel canonicalizer, this compatibility path preserves
+    // the exporter's finite fractional and negative JSON numbers.
+    let value = serde_json::to_value(value)?;
     let mut output = String::new();
     write_value(&value, &mut output, true)?;
     Ok(output.into_bytes())
@@ -290,10 +292,7 @@ impl SerializeSeq for NumberValidationCompound {
     type Ok = ();
     type Error = NumberValidationError;
 
-    fn serialize_element<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         value.serialize(NumberValidationSerializer)
     }
 
@@ -306,10 +305,7 @@ impl SerializeTuple for NumberValidationCompound {
     type Ok = ();
     type Error = NumberValidationError;
 
-    fn serialize_element<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         value.serialize(NumberValidationSerializer)
     }
 
@@ -322,10 +318,7 @@ impl SerializeTupleStruct for NumberValidationCompound {
     type Ok = ();
     type Error = NumberValidationError;
 
-    fn serialize_field<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         value.serialize(NumberValidationSerializer)
     }
 
@@ -338,10 +331,7 @@ impl SerializeTupleVariant for NumberValidationCompound {
     type Ok = ();
     type Error = NumberValidationError;
 
-    fn serialize_field<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         value.serialize(NumberValidationSerializer)
     }
 
@@ -411,6 +401,22 @@ fn write_value(
         Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
         Value::String(value) => output.push_str(&serde_json::to_string(value)?),
         Value::Number(number) => {
+            if fixture_order {
+                if let Some(value) = number.as_i64() {
+                    output.push_str(&value.to_string());
+                } else if let Some(value) = number.as_u64() {
+                    output.push_str(&value.to_string());
+                } else if let Some(value) = number.as_f64() {
+                    if value == 0.0 {
+                        output.push('0');
+                    } else {
+                        output.push_str(&value.to_string());
+                    }
+                } else {
+                    return Err(CanonicalError::UnsupportedNumber);
+                }
+                return Ok(());
+            }
             if number.is_f64() {
                 return Err(CanonicalError::UnsupportedNumber);
             }
@@ -632,6 +638,19 @@ mod tests {
         assert_eq!(sha256.len(), 64);
         assert_eq!(blake3.len(), 64);
         assert_ne!(sha256, blake3);
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_digest_preserves_legacy_signed_and_fractional_json_numbers(
+    ) -> Result<(), Box<dyn Error>> {
+        let value: Value =
+            serde_json::from_str(r#"{"wholeFloat":1.0,"negative":-1,"fraction":0.4}"#)?;
+        assert_eq!(
+            fixture_digest(&value)?,
+            "136b7fcc9fb4bb777cf127b35dc6b929d88451b2a0c01c7ab27cdfd4d79c27e0"
+        );
+        assert!(canonicalize_value(&value).is_err());
         Ok(())
     }
 

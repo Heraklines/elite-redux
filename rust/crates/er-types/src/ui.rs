@@ -604,6 +604,28 @@ mod tests {
     }
 
     #[test]
+    fn every_view_kind_has_a_stable_wire_tag() -> TestResult {
+        let cases = [
+            (UiViewKind::None, "NONE"),
+            (UiViewKind::Waiting, "WAITING"),
+            (UiViewKind::Message, "MESSAGE"),
+            (UiViewKind::Confirm, "CONFIRM"),
+            (UiViewKind::ChoiceList, "CHOICE_LIST"),
+            (UiViewKind::Command, "COMMAND"),
+            (UiViewKind::Replacement, "REPLACEMENT"),
+            (UiViewKind::Interaction, "INTERACTION"),
+            (UiViewKind::Terminal, "TERMINAL"),
+        ];
+        for (kind, tag) in cases {
+            let encoded = serde_json::to_value(kind)?;
+            assert_eq!(encoded, json!(tag));
+            let decoded: UiViewKind = serde_json::from_value(encoded)?;
+            assert_eq!(decoded, kind);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn reduction_and_rejection_dtos_round_trip() -> TestResult {
         let reduction = UiReduction {
             source: ButtonEvent::Pressed(GameButton::Submit),
