@@ -1,9 +1,18 @@
 //! Canonical JSON and digest primitives shared by native and Wasm kernels.
 
 use serde::Serialize;
+use serde::Serializer;
+use serde::ser::SerializeMap;
+use serde::ser::SerializeSeq;
+use serde::ser::SerializeStruct;
+use serde::ser::SerializeStructVariant;
+use serde::ser::SerializeTuple;
+use serde::ser::SerializeTupleStruct;
+use serde::ser::SerializeTupleVariant;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
+use std::fmt;
 use thiserror::Error;
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -24,7 +33,7 @@ pub enum CanonicalError {
 }
 
 pub fn canonicalize<T: Serialize>(value: &T) -> Result<String, CanonicalError> {
-    let value = serde_json::to_value(value)?;
+    let value = validated_value(value)?;
     canonicalize_value(&value)
 }
 
@@ -66,10 +75,330 @@ pub fn verify_fixture_digest<T: Serialize>(
 fn fixture_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalError> {
     // The TypeScript fixture exporter materializes sorted keys before calling
     // JSON.stringify, whose own-property enumeration puts array-index keys first.
-    let value = serde_json::to_value(value)?;
+    let value = validated_value(value)?;
     let mut output = String::new();
     write_value(&value, &mut output, true)?;
     Ok(output.into_bytes())
+}
+
+fn validated_value<T: Serialize>(value: &T) -> Result<Value, CanonicalError> {
+    match value.serialize(NumberValidationSerializer) {
+        Ok(()) => Ok(serde_json::to_value(value)?),
+        Err(NumberValidationError::UnsupportedNumber) => Err(CanonicalError::UnsupportedNumber),
+        Err(NumberValidationError::Custom(message)) => Err(CanonicalError::Serialization(
+            <serde_json::Error as serde::ser::Error>::custom(message),
+        )),
+    }
+}
+
+#[derive(Debug)]
+enum NumberValidationError {
+    UnsupportedNumber,
+    Custom(String),
+}
+
+impl fmt::Display for NumberValidationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedNumber => formatter.write_str("floating-point values are unsupported"),
+            Self::Custom(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for NumberValidationError {}
+
+impl serde::ser::Error for NumberValidationError {
+    fn custom<T: fmt::Display>(message: T) -> Self {
+        Self::Custom(message.to_string())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct NumberValidationSerializer;
+
+impl Serializer for NumberValidationSerializer {
+    type Ok = ();
+    type Error = NumberValidationError;
+    type SerializeSeq = NumberValidationCompound;
+    type SerializeTuple = NumberValidationCompound;
+    type SerializeTupleStruct = NumberValidationCompound;
+    type SerializeTupleVariant = NumberValidationCompound;
+    type SerializeMap = NumberValidationCompound;
+    type SerializeStruct = NumberValidationCompound;
+    type SerializeStructVariant = NumberValidationCompound;
+
+    fn serialize_bool(self, _value: bool) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_i8(self, _value: i8) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_i16(self, _value: i16) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_i32(self, _value: i32) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_i64(self, _value: i64) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_i128(self, _value: i128) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_u8(self, _value: u8) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_u16(self, _value: u16) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_u32(self, _value: u32) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_u64(self, _value: u64) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_u128(self, _value: u128) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_f32(self, _value: f32) -> Result<Self::Ok, Self::Error> {
+        Err(NumberValidationError::UnsupportedNumber)
+    }
+
+    fn serialize_f64(self, _value: f64) -> Result<Self::Ok, Self::Error> {
+        Err(NumberValidationError::UnsupportedNumber)
+    }
+
+    fn serialize_char(self, _value: char) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_str(self, _value: &str) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_bytes(self, _value: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_seq(self, _length: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_tuple(self, _length: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_map(self, _length: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Ok(NumberValidationCompound)
+    }
+}
+
+struct NumberValidationCompound;
+
+impl SerializeSeq for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_element<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTuple for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_element<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleStruct for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleVariant for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeMap for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Self::Error> {
+        key.serialize(NumberValidationSerializer)
+    }
+
+    fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeStruct for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        _key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeStructVariant for NumberValidationCompound {
+    type Ok = ();
+    type Error = NumberValidationError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        _key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        value.serialize(NumberValidationSerializer)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
 }
 
 fn write_value(
@@ -266,8 +595,17 @@ mod tests {
         }
 
         for value in [1.0_f64, 1.5_f64, -0.0_f64, f64::INFINITY, f64::NAN] {
-            assert!(canonicalize(&value).is_err());
+            assert!(matches!(
+                canonicalize(&value),
+                Err(CanonicalError::UnsupportedNumber)
+            ));
         }
+
+        let nested_float = vec![Some(1.0_f64)];
+        assert!(matches!(
+            canonicalize(&nested_float),
+            Err(CanonicalError::UnsupportedNumber)
+        ));
 
         let nested: Value = serde_json::from_str(r#"{"outer":[{"bad":9007199254740992}]}"#)?;
         assert!(matches!(

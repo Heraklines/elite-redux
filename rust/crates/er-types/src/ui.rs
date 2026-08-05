@@ -364,7 +364,7 @@ mod tests {
             .ok_or_else(|| invalid_data("stack must be an array"))?;
         let kinds = stack
             .iter()
-            .map(|menu| required(menu, "kind").map(|kind| kind.clone()))
+            .map(|menu| required(menu, "kind").cloned())
             .collect::<TestResult<Vec<_>>>()?;
         assert_eq!(
             kinds,

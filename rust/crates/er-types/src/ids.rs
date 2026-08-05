@@ -216,6 +216,8 @@ mod tests {
     use super::*;
     use serde::{Serialize, de::DeserializeOwned};
 
+    type StringIdConstructor<T> = fn(String) -> Result<T, StringIdError>;
+
     const OVERFLOW_JSON: [&str; 6] = [
         "-1",
         "9007199254740992",
@@ -245,7 +247,7 @@ mod tests {
         Ok(())
     }
 
-    fn assert_string_id_construction<T>(constructors: &[fn(String) -> Result<T, StringIdError>])
+    fn assert_string_id_construction<T>(constructors: &[StringIdConstructor<T>])
     where
         T: Eq + std::fmt::Debug,
     {
