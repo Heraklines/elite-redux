@@ -32,7 +32,12 @@ impl UiReducer {
         actionable: bool,
         menu: MenuState,
     ) -> MenuGeneration {
-        self.state.generation = Self::next_generation(self.state.generation);
+        let Some(generation) = Self::next_generation(self.state.generation) else {
+            self.invalidate_menu();
+            return Self::max_generation();
+        };
+
+        self.state.generation = generation;
         self.state.owner_seat = owner_seat;
         self.state.actionable = actionable;
         self.state.stack = vec![menu];
@@ -157,13 +162,20 @@ impl UiReducer {
         view
     }
 
-    fn next_generation(generation: MenuGeneration) -> MenuGeneration {
-        let next = generation.get().get().saturating_add(1);
-        let next = match SafeU53::new(next) {
-            Ok(value) => value,
-            Err(_) => SafeU53::MAX,
-        };
-        MenuGeneration::new(next)
+    fn max_generation() -> MenuGeneration {
+        MenuGeneration::new(SafeU53::MAX)
+    }
+
+    fn next_generation(generation: MenuGeneration) -> Option<MenuGeneration> {
+        let next = generation.get().get().checked_add(1)?;
+        Some(MenuGeneration::new(SafeU53::new(next).ok()?))
+    }
+
+    fn invalidate_menu(&mut self) {
+        self.state.generation = Self::max_generation();
+        self.state.owner_seat = None;
+        self.state.actionable = false;
+        self.state.stack = vec![MenuState::None];
     }
 
     fn is_none_menu(&self) -> bool {
@@ -336,6 +348,10 @@ impl UiReducer {
         seat: SeatId,
         generation: MenuGeneration,
     ) -> Result<Vec<UiIntent>, UiRejectReason> {
+        if let Some((cursor, _, options)) = self.cursor_snapshot() {
+            let _ = Self::cursor_index(cursor, options.len())?;
+        }
+
         let policy = match self.state.stack.last() {
             Some(MenuState::Message(menu)) => Some(menu.cancel.clone()),
             Some(MenuState::Confirm(menu)) => Some(menu.cancel.clone()),
@@ -420,7 +436,12 @@ impl UiReducer {
     }
 
     fn close_menu(&mut self, seat: SeatId, generation: MenuGeneration) -> Vec<UiIntent> {
-        self.state.generation = Self::next_generation(generation);
+        let Some(next_generation) = Self::next_generation(generation) else {
+            self.invalidate_menu();
+            return vec![UiIntent::MenuClosed { seat, generation }];
+        };
+
+        self.state.generation = next_generation;
         self.state.owner_seat = None;
         self.state.actionable = false;
         self.state.stack = vec![MenuState::None];
@@ -432,8 +453,13 @@ impl UiReducer {
             return vec![UiIntent::CancelRequested { seat, generation }];
         }
 
+        let Some(next_generation) = Self::next_generation(generation) else {
+            self.invalidate_menu();
+            return vec![UiIntent::MenuClosed { seat, generation }];
+        };
+
         self.state.stack.truncate(self.state.stack.len() - 1);
-        self.state.generation = Self::next_generation(generation);
+        self.state.generation = next_generation;
         vec![UiIntent::MenuClosed { seat, generation }]
     }
 
@@ -454,6 +480,7 @@ impl UiReducer {
         options: &[MenuOption],
         cursor: SafeU53,
     ) -> Result<(usize, &MenuOption), UiRejectReason> {
+        Self::validate_unique_option_ids(options)?;
         let index = Self::cursor_index(cursor, options.len())?;
         let option = options.get(index).ok_or(UiRejectReason::InvalidCursor)?;
         if !option.visible || !option.enabled {
@@ -466,6 +493,7 @@ impl UiReducer {
         options: &'a [MenuOption],
         option_id: &MenuOptionId,
     ) -> Result<(usize, &'a MenuOption), UiRejectReason> {
+        Self::validate_unique_option_ids(options)?;
         let Some((index, option)) = options
             .iter()
             .enumerate()
@@ -477,6 +505,18 @@ impl UiReducer {
             return Err(UiRejectReason::DisabledOption);
         }
         Ok((index, option))
+    }
+
+    fn validate_unique_option_ids(options: &[MenuOption]) -> Result<(), UiRejectReason> {
+        for (index, option) in options.iter().enumerate() {
+            if options[..index]
+                .iter()
+                .any(|previous| previous.id.as_str() == option.id.as_str())
+            {
+                return Err(UiRejectReason::InvalidCursor);
+            }
+        }
+        Ok(())
     }
 
     fn confirmation_value(options: &[MenuOption], index: usize) -> bool {
@@ -611,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn replacement_increments_generation_and_saturates_at_safe_maximum() {
+    fn generation_overflow_invalidates_menu_instead_of_reusing_safe_maximum() {
         let mut reducer = UiReducer::new(UiState {
             generation: generation(SafeU53::MAX.get() - 1),
             owner_seat: None,
@@ -620,9 +660,24 @@ mod tests {
         });
         let generation = reducer.replace_menu(None, true, MenuState::None);
         assert_eq!(generation, MenuGeneration::new(SafeU53::MAX));
+
+        let before_overflow = reducer.state().clone();
         assert_eq!(
             reducer.replace_menu(None, true, MenuState::None),
             MenuGeneration::new(SafeU53::MAX)
+        );
+        assert_ne!(reducer.state(), &before_overflow);
+        assert_eq!(reducer.state().generation, MenuGeneration::new(SafeU53::MAX));
+        assert_eq!(reducer.state().owner_seat, None);
+        assert!(!reducer.state().actionable);
+        assert_eq!(reducer.state().stack, vec![MenuState::None]);
+        assert_eq!(
+            reducer.reduce_at(
+                seat(0),
+                MenuGeneration::new(SafeU53::MAX),
+                pressed(GameButton::Menu),
+            ),
+            Err(UiRejectReason::NonActionable)
         );
     }
 
@@ -715,6 +770,81 @@ mod tests {
             Err(UiRejectReason::InvalidCursor)
         );
         assert_eq!(reducer.state(), &before);
+    }
+
+    #[test]
+    fn cancel_rejects_invalid_cursor_before_applying_its_policy() {
+        let Some(operation_id) = operation("cancel-invalid-cursor") else {
+            return;
+        };
+        let mut reducer = UiReducer::new(UiState {
+            generation: generation(6),
+            owner_seat: None,
+            actionable: true,
+            stack: vec![MenuState::Command(CommandMenu {
+                operation_id,
+                control_id: "cancel-control".to_owned(),
+                cursor: safe(1),
+                options: Vec::new(),
+                cancel: CancelPolicy::Close,
+            })],
+        });
+        let before = reducer.state().clone();
+
+        assert_eq!(
+            reducer.reduce(seat(0), pressed(GameButton::Cancel)),
+            Err(UiRejectReason::InvalidCursor)
+        );
+        assert_eq!(reducer.state(), &before);
+    }
+
+    #[test]
+    fn duplicate_option_ids_reject_actionable_submissions_as_invalid_cursor() {
+        let Some(first) = option("duplicate", true, true) else {
+            return;
+        };
+        let duplicate_id = first.id.clone();
+        let Some(operation_id) = operation("duplicate-option") else {
+            return;
+        };
+
+        let mut submit = UiReducer::new(UiState {
+            generation: generation(7),
+            owner_seat: None,
+            actionable: true,
+            stack: vec![MenuState::Command(CommandMenu {
+                operation_id: operation_id.clone(),
+                control_id: "submit-control".to_owned(),
+                cursor: safe(0),
+                options: vec![first.clone(), first.clone()],
+                cancel: CancelPolicy::Disabled,
+            })],
+        });
+        let before_submit = submit.state().clone();
+        assert_eq!(
+            submit.reduce(seat(0), pressed(GameButton::Action)),
+            Err(UiRejectReason::InvalidCursor)
+        );
+        assert_eq!(submit.state(), &before_submit);
+
+        let mut cancel = UiReducer::new(UiState {
+            generation: generation(8),
+            owner_seat: None,
+            actionable: true,
+            stack: vec![MenuState::Command(CommandMenu {
+                operation_id,
+                control_id: "cancel-control".to_owned(),
+                cursor: safe(0),
+                options: vec![first.clone(), first],
+                cancel: CancelPolicy::Select(duplicate_id),
+            })],
+        });
+        let before_cancel = cancel.state().clone();
+        assert_eq!(
+            cancel.reduce(seat(0), pressed(GameButton::Cancel)),
+            Err(UiRejectReason::InvalidCursor)
+        );
+        assert_eq!(cancel.state(), &before_cancel);
     }
 
     #[test]
