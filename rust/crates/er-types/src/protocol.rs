@@ -566,7 +566,9 @@ pub enum StorageResult {
         value: Option<Value>,
     },
     Persisted,
-    Failed { reason: String },
+    Failed {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1068,10 +1070,7 @@ mod tests {
     #[test]
     fn storage_values_are_required_and_explicitly_nullable() {
         let loaded = json!({"kind": "LOADED", "value": null});
-        assert_eq!(
-            round_trip::<StorageResult>(&loaded),
-            Some(loaded.clone())
-        );
+        assert_eq!(round_trip::<StorageResult>(&loaded), Some(loaded.clone()));
         assert!(serde_json::from_value::<StorageResult>(json!({"kind": "LOADED"})).is_err());
 
         let request = json!({"request_id": 7, "key": "save:slot", "value": null});
