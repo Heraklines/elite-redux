@@ -14,6 +14,17 @@ enum PhysicalPress {
     Blocked,
 }
 
+const FIXED_REPEAT_CADENCE_MS: SafeU53 = match SafeU53::new(250) {
+    Ok(value) => value,
+    Err(_) => SafeU53::ZERO,
+};
+
+fn normalize_map(mut map: InputMap) -> InputMap {
+    map.initial_repeat_delay_ms = FIXED_REPEAT_CADENCE_MS;
+    map.repeat_interval_ms = FIXED_REPEAT_CADENCE_MS;
+    map
+}
+
 #[derive(Clone, Debug)]
 pub struct InputRouter {
     map: InputMap,
@@ -30,7 +41,7 @@ pub struct InputRouter {
 impl InputRouter {
     pub fn new(map: InputMap) -> Self {
         Self {
-            map,
+            map: normalize_map(map),
             held_buttons: BTreeSet::new(),
             suppressed_keys: BTreeSet::new(),
             keyboard_presses: BTreeMap::new(),
@@ -48,7 +59,7 @@ impl InputRouter {
 
     pub fn replace_map(&mut self, map: InputMap) -> InputRouterOutput {
         let output = self.clear();
-        self.map = map;
+        self.map = normalize_map(map);
         output
     }
 
@@ -300,6 +311,15 @@ mod tests {
         keyboard: Vec<(PhysicalKey, GameButton)>,
         gamepad: Vec<(u16, GameButton)>,
     ) -> InputMap {
+        input_map_with_timing(keyboard, gamepad, safe(250), safe(250))
+    }
+
+    fn input_map_with_timing(
+        keyboard: Vec<(PhysicalKey, GameButton)>,
+        gamepad: Vec<(u16, GameButton)>,
+        initial_repeat_delay_ms: SafeU53,
+        repeat_interval_ms: SafeU53,
+    ) -> InputMap {
         InputMap {
             keyboard: keyboard
                 .into_iter()
@@ -312,9 +332,116 @@ mod tests {
                     button,
                 })
                 .collect(),
-            initial_repeat_delay_ms: safe(250),
-            repeat_interval_ms: safe(250),
+            initial_repeat_delay_ms,
+            repeat_interval_ms,
         }
+    }
+
+    #[test]
+    fn new_normalizes_repeat_cadence_and_preserves_bindings() -> Result<(), InputRouteError> {
+        let mut router = InputRouter::new(input_map_with_timing(
+            vec![(PhysicalKey::KeyA, GameButton::Action)],
+            vec![(7, GameButton::Submit)],
+            safe(0),
+            safe(1_000),
+        ));
+
+        assert_eq!(router.input_map().initial_repeat_delay_ms, safe(250));
+        assert_eq!(router.input_map().repeat_interval_ms, safe(250));
+        assert_eq!(
+            router.input_map().keyboard,
+            vec![KeyBinding {
+                key: PhysicalKey::KeyA,
+                button: GameButton::Action,
+            }]
+        );
+        assert_eq!(
+            router.input_map().gamepad,
+            vec![GamepadBinding {
+                button_index: 7,
+                button: GameButton::Submit,
+            }]
+        );
+
+        assert_eq!(
+            router.handle(RawInputEvent::KeyDown {
+                code: PhysicalKey::KeyA,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            })?,
+            InputRouterOutput {
+                events: vec![ButtonEvent::Pressed(GameButton::Action)],
+                timers: vec![InputTimerCommand::Schedule {
+                    timer_id: timer(0),
+                    delay_ms: safe(250),
+                }],
+            }
+        );
+        assert_eq!(
+            router.timer_fired(timer(0))?,
+            InputRouterOutput {
+                events: vec![ButtonEvent::Pressed(GameButton::Action)],
+                timers: vec![InputTimerCommand::Schedule {
+                    timer_id: timer(0),
+                    delay_ms: safe(250),
+                }],
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replace_map_normalizes_repeat_cadence_and_preserves_bindings() -> Result<(), InputRouteError> {
+        let mut router = InputRouter::new(input_map(Vec::new(), Vec::new()));
+
+        assert_eq!(
+            router.replace_map(input_map_with_timing(
+                vec![(PhysicalKey::KeyB, GameButton::Cancel)],
+                vec![(9, GameButton::Menu)],
+                safe(999),
+                safe(0),
+            )),
+            InputRouterOutput::default()
+        );
+        assert_eq!(router.input_map().initial_repeat_delay_ms, safe(250));
+        assert_eq!(router.input_map().repeat_interval_ms, safe(250));
+        assert_eq!(
+            router.input_map().keyboard,
+            vec![KeyBinding {
+                key: PhysicalKey::KeyB,
+                button: GameButton::Cancel,
+            }]
+        );
+        assert_eq!(
+            router.input_map().gamepad,
+            vec![GamepadBinding {
+                button_index: 9,
+                button: GameButton::Menu,
+            }]
+        );
+
+        assert_eq!(
+            router.handle(RawInputEvent::GamepadDown { button: 9 })?,
+            InputRouterOutput {
+                events: vec![ButtonEvent::Pressed(GameButton::Menu)],
+                timers: vec![InputTimerCommand::Schedule {
+                    timer_id: timer(0),
+                    delay_ms: safe(250),
+                }],
+            }
+        );
+        assert_eq!(
+            router.timer_fired(timer(0))?,
+            InputRouterOutput {
+                events: vec![ButtonEvent::Pressed(GameButton::Menu)],
+                timers: vec![InputTimerCommand::Schedule {
+                    timer_id: timer(0),
+                    delay_ms: safe(250),
+                }],
+            }
+        );
+        Ok(())
     }
 
     #[test]
