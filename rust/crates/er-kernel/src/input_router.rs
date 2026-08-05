@@ -103,13 +103,12 @@ impl InputRouter {
             });
         }
 
-        let events = if self.focus == InputFocus::TextEntry
-            && self.printable_timers.contains(&timer_id)
-        {
-            Vec::new()
-        } else {
-            vec![ButtonEvent::Pressed(button)]
-        };
+        let events =
+            if self.focus == InputFocus::TextEntry && self.printable_timers.contains(&timer_id) {
+                Vec::new()
+            } else {
+                vec![ButtonEvent::Pressed(button)]
+            };
         Ok(InputRouterOutput {
             events,
             timers: vec![InputTimerCommand::Schedule {
@@ -248,13 +247,16 @@ impl InputRouter {
             return InputRouterOutput::default();
         }
 
-        let timer_id = self.timer_buttons.iter().find_map(|(timer_id, timer_button)| {
-            if *timer_button == button {
-                Some(*timer_id)
-            } else {
-                None
-            }
-        });
+        let timer_id = self
+            .timer_buttons
+            .iter()
+            .find_map(|(timer_id, timer_button)| {
+                if *timer_button == button {
+                    Some(*timer_id)
+                } else {
+                    None
+                }
+            });
         let timers = match timer_id {
             Some(timer_id) => {
                 let _ = self.timer_buttons.remove(&timer_id);
@@ -275,7 +277,8 @@ impl InputRouter {
             .get()
             .checked_add(1)
             .ok_or(InputRouteError::TimerIdExhausted)?;
-        let next_timer_id = SafeU53::new(next_value).map_err(|_| InputRouteError::TimerIdExhausted)?;
+        let next_timer_id =
+            SafeU53::new(next_value).map_err(|_| InputRouteError::TimerIdExhausted)?;
         let timer_id = TimerId::new(self.next_timer_id);
         self.next_timer_id = next_timer_id;
         self.timer_buttons.insert(timer_id, button);
@@ -392,7 +395,8 @@ mod tests {
     }
 
     #[test]
-    fn replace_map_normalizes_repeat_cadence_and_preserves_bindings() -> Result<(), InputRouteError> {
+    fn replace_map_normalizes_repeat_cadence_and_preserves_bindings() -> Result<(), InputRouteError>
+    {
         let mut router = InputRouter::new(input_map(Vec::new(), Vec::new()));
 
         assert_eq!(
@@ -445,7 +449,8 @@ mod tests {
     }
 
     #[test]
-    fn maps_keyboard_and_gamepad_with_immediate_press_and_initial_timer() -> Result<(), InputRouteError> {
+    fn maps_keyboard_and_gamepad_with_immediate_press_and_initial_timer()
+    -> Result<(), InputRouteError> {
         let mut router = InputRouter::new(input_map(
             vec![(PhysicalKey::KeyA, GameButton::Action)],
             vec![(7, GameButton::Submit)],
@@ -513,7 +518,10 @@ mod tests {
             browser_repeat: false,
             focus: InputFocus::Game,
         })?;
-        assert_eq!(output.events, vec![ButtonEvent::Pressed(GameButton::Action)]);
+        assert_eq!(
+            output.events,
+            vec![ButtonEvent::Pressed(GameButton::Action)]
+        );
         assert_eq!(
             router.handle(RawInputEvent::KeyUp {
                 code: PhysicalKey::KeyA,
@@ -525,12 +533,16 @@ mod tests {
         );
 
         let output = router.handle(RawInputEvent::GamepadDown { button: 3 })?;
-        assert_eq!(output.events, vec![ButtonEvent::Pressed(GameButton::Submit)]);
+        assert_eq!(
+            output.events,
+            vec![ButtonEvent::Pressed(GameButton::Submit)]
+        );
         Ok(())
     }
 
     #[test]
-    fn logical_lock_deduplicates_keyboard_gamepad_and_browser_repeat() -> Result<(), InputRouteError> {
+    fn logical_lock_deduplicates_keyboard_gamepad_and_browser_repeat() -> Result<(), InputRouteError>
+    {
         let mut router = InputRouter::new(input_map(
             vec![
                 (PhysicalKey::KeyA, GameButton::Action),
@@ -632,7 +644,8 @@ mod tests {
     }
 
     #[test]
-    fn text_entry_suppression_has_matching_keyup_after_focus_changes() -> Result<(), InputRouteError> {
+    fn text_entry_suppression_has_matching_keyup_after_focus_changes() -> Result<(), InputRouteError>
+    {
         let mut router = InputRouter::new(input_map(
             vec![(PhysicalKey::KeyA, GameButton::Action)],
             Vec::new(),

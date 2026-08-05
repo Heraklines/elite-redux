@@ -727,7 +727,7 @@ fn hidden_and_disabled_choices_are_not_submitted_and_hidden_choices_are_skipped(
 #[test]
 fn ui_view_is_an_immutable_cloned_projection() -> TestResult {
     let owner = seat(1);
-    let mut kernel = kernel_with(
+    let kernel = kernel_with(
         command_menu(options(&[("one", true, true), ("two", true, true)])?)?,
         Some(owner),
         true,
