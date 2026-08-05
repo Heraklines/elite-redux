@@ -18,8 +18,7 @@ const FIXTURE_PROJECT_NAME: &str = "PokéRogue Redux";
 const FIXTURE_ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const FIXTURE_PROTOCOL_VERSION: &str = "er-coop-47";
 const FIXTURE_DIGEST_KIND: &str = "fixture-content-sha256-v1";
-const FIXTURE_DIGEST_DEFINITION: &str =
-    "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.";
+const FIXTURE_DIGEST_DEFINITION: &str = "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -66,17 +65,15 @@ pub fn load_fixture_envelope<T: DeserializeOwned>(
         path: path.clone(),
         source,
     })?;
-    let envelope = serde_json::from_slice(&bytes)
-        .map_err(|source| FixtureError::Json { path: path.clone(), source })?;
+    let envelope = serde_json::from_slice(&bytes).map_err(|source| FixtureError::Json {
+        path: path.clone(),
+        source,
+    })?;
     validate_envelope_metadata(&envelope, &path)?;
     Ok(envelope)
 }
 
-fn verify_fixture_digest(
-    path: &Path,
-    payload: &Value,
-    expected: &str,
-) -> Result<(), FixtureError> {
+fn verify_fixture_digest(path: &Path, payload: &Value, expected: &str) -> Result<(), FixtureError> {
     let actual = fixture_digest(payload).map_err(|source| FixtureError::DigestComputation {
         path: path.to_path_buf(),
         source,
@@ -101,7 +98,10 @@ fn validate_fixture_name(name: &str) -> Result<(), FixtureError> {
     );
     let has_forbidden_character = name.chars().any(|character| {
         character.is_control()
-            || matches!(character, '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*')
+            || matches!(
+                character,
+                '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*'
+            )
     });
     let has_ambiguous_windows_suffix = matches!(name.chars().last(), Some('.' | ' '));
     if name.is_empty()
@@ -202,10 +202,7 @@ fn validate_source_file(path: &Path, source_file: &str) -> Result<(), FixtureErr
         Some("source_file must use forward slashes")
     } else if source_file.contains(':') {
         Some("source_file must not contain a path prefix")
-    } else if source_file
-        .split('/')
-        .any(|component| component.is_empty())
-    {
+    } else if source_file.split('/').any(|component| component.is_empty()) {
         Some("source_file must be a normalized relative path")
     } else if source_file
         .split('/')
@@ -218,7 +215,10 @@ fn validate_source_file(path: &Path, source_file: &str) -> Result<(), FixtureErr
             || source_path.components().any(|component| {
                 matches!(
                     component,
-                    Component::Prefix(_) | Component::RootDir | Component::CurDir | Component::ParentDir
+                    Component::Prefix(_)
+                        | Component::RootDir
+                        | Component::CurDir
+                        | Component::ParentDir
                 )
             })
         {
@@ -287,9 +287,7 @@ pub enum FixtureError {
         #[source]
         source: CanonicalError,
     },
-    #[error(
-        "fixture {path:?} canonical digest mismatch: expected {expected:?}, actual {actual:?}"
-    )]
+    #[error("fixture {path:?} canonical digest mismatch: expected {expected:?}, actual {actual:?}")]
     DigestMismatch {
         path: PathBuf,
         expected: String,
@@ -465,9 +463,6 @@ mod tests {
             assert_eq!(expected, "incorrect");
             assert_ne!(actual, expected);
         }
-        assert!(matches!(
-            result,
-            Err(FixtureError::DigestMismatch { .. })
-        ));
+        assert!(matches!(result, Err(FixtureError::DigestMismatch { .. })));
     }
 }

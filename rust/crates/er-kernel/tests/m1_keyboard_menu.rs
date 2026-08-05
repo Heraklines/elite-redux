@@ -2,10 +2,10 @@ use std::error::Error;
 
 use er_kernel::{GameKernel, KernelConfig, KernelEffect, KernelError, KernelInput};
 use er_types::{
-    CancelPolicy, ChoiceListMenu, CommandMenu, GameButton, InputFocus, InputMap,
-    InteractionMenu, KeyBinding, MenuGeneration, MenuOption, MenuOptionId,
-    MenuState, OperationId, PhysicalKey, RawInputEvent, ReplacementMenu, SafeU53, SeatId,
-    TimeClass, TimerId, TimerOwner, UiState, UiViewKind, UiViewModel,
+    CancelPolicy, ChoiceListMenu, CommandMenu, GameButton, InputFocus, InputMap, InteractionMenu,
+    KeyBinding, MenuGeneration, MenuOption, MenuOptionId, MenuState, OperationId, PhysicalKey,
+    RawInputEvent, ReplacementMenu, SafeU53, SeatId, TimeClass, TimerId, TimerOwner, UiState,
+    UiViewKind, UiViewModel,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -174,10 +174,7 @@ fn timer_fired(
     endpoint: SeatId,
     timer_id: TimerId,
 ) -> Result<Vec<KernelEffect>, KernelError> {
-    kernel.step(KernelInput::TimerFired {
-        endpoint,
-        timer_id,
-    })
+    kernel.step(KernelInput::TimerFired { endpoint, timer_id })
 }
 
 fn scheduled_delay(effects: &[KernelEffect], timer_id: TimerId) -> Option<SafeU53> {
@@ -248,7 +245,11 @@ fn assert_no_ui_change(effects: &[KernelEffect], endpoint: SeatId) {
 fn raw_keydown_keyup_moves_cursor_and_dispatches_command_submit() -> TestResult {
     let owner = seat(1);
     let mut kernel = kernel_with(
-        choice_menu(options(&[("first", true, true), ("second", true, true)])?, 0, false),
+        choice_menu(
+            options(&[("first", true, true), ("second", true, true)])?,
+            0,
+            false,
+        ),
         Some(owner),
         true,
     );
@@ -338,22 +339,24 @@ fn raw_submit_dispatches_replacement_and_interaction_paths() -> TestResult {
         assert_eq!(kernel.ui_view().kind, expected_kind);
         assert_ui_changed(&submitted, owner, &kernel.ui_view());
         assert_eq!(kernel.snapshot().ui, before.ui);
-        assert!(matches!(
-            kernel.ui_state().stack.last(),
-            Some(MenuState::Command(menu))
-                if menu.operation_id.as_str() == expected_operation
-                    && menu.control_id == expected_control
-        ) || matches!(
-            kernel.ui_state().stack.last(),
-            Some(MenuState::Replacement(menu))
-                if menu.operation_id.as_str() == expected_operation
-                    && menu.control_id == expected_control
-        ) || matches!(
-            kernel.ui_state().stack.last(),
-            Some(MenuState::Interaction(menu))
-                if menu.operation_id.as_str() == expected_operation
-                    && menu.control_id == expected_control
-        ));
+        assert!(
+            matches!(
+                kernel.ui_state().stack.last(),
+                Some(MenuState::Command(menu))
+                    if menu.operation_id.as_str() == expected_operation
+                        && menu.control_id == expected_control
+            ) || matches!(
+                kernel.ui_state().stack.last(),
+                Some(MenuState::Replacement(menu))
+                    if menu.operation_id.as_str() == expected_operation
+                        && menu.control_id == expected_control
+            ) || matches!(
+                kernel.ui_state().stack.last(),
+                Some(MenuState::Interaction(menu))
+                    if menu.operation_id.as_str() == expected_operation
+                        && menu.control_id == expected_control
+            )
+        );
 
         let released = key_up(&mut kernel, owner, PhysicalKey::Enter)?;
         assert!(cancelled(&released, timer(0)));
@@ -367,7 +370,11 @@ fn repeat_uses_virtual_250ms_timer_and_keyup_cancels_it() -> TestResult {
     let owner = seat(1);
     let mut kernel = kernel_with(
         choice_menu(
-            options(&[("one", true, true), ("two", true, true), ("three", true, true)])?,
+            options(&[
+                ("one", true, true),
+                ("two", true, true),
+                ("three", true, true),
+            ])?,
             0,
             true,
         ),
@@ -410,7 +417,11 @@ fn repeat_uses_virtual_250ms_timer_and_keyup_cancels_it() -> TestResult {
 fn browser_repeat_is_deduplicated_and_keyup_is_symmetric() -> TestResult {
     let owner = seat(1);
     let mut kernel = kernel_with(
-        choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, false),
+        choice_menu(
+            options(&[("one", true, true), ("two", true, true)])?,
+            0,
+            false,
+        ),
         Some(owner),
         true,
     );
@@ -485,7 +496,10 @@ fn focus_suppresses_printable_keys_and_preserves_matching_keyup() -> TestResult 
     assert!(kernel.live_resources().timers.contains(&timer(0)));
     assert!(focus_changed(&mut kernel, owner, InputFocus::TextEntry)?.is_empty());
     let suppressed_repeat = timer_fired(&mut kernel, owner, timer(0))?;
-    assert_eq!(scheduled_delay(&suppressed_repeat, timer(0)), Some(safe(250)));
+    assert_eq!(
+        scheduled_delay(&suppressed_repeat, timer(0)),
+        Some(safe(250))
+    );
     assert_no_ui_change(&suppressed_repeat, owner);
     let accepted_release = key_up(&mut kernel, owner, PhysicalKey::KeyA)?;
     assert!(cancelled(&accepted_release, timer(0)));
@@ -545,7 +559,11 @@ fn blur_cancels_all_owned_timers_without_synthetic_releases() -> TestResult {
 fn ownership_generation_and_actionability_reject_raw_events_without_mutation() -> TestResult {
     let owner = seat(1);
     let other_seat = seat(2);
-    let menu = choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, false);
+    let menu = choice_menu(
+        options(&[("one", true, true), ("two", true, true)])?,
+        0,
+        false,
+    );
 
     let mut wrong_owner = kernel_with(menu.clone(), Some(owner), true);
     let wrong_before = wrong_owner.snapshot();
@@ -597,7 +615,10 @@ fn ownership_generation_and_actionability_reject_raw_events_without_mutation() -
     assert!(stale.live_resources().timers.contains(&timer(0)));
     let old_generation = stale.ui_view().generation;
     let replacement = choice_menu(
-        options(&[("replacement-one", true, true), ("replacement-two", true, true)])?,
+        options(&[
+            ("replacement-one", true, true),
+            ("replacement-two", true, true),
+        ])?,
         0,
         false,
     );
@@ -677,7 +698,11 @@ fn hidden_and_disabled_choices_are_not_submitted_and_hidden_choices_are_skipped(
 
     for (id, enabled, visible) in [("hidden-selected", true, false), ("disabled", false, true)] {
         let mut rejected = kernel_with(
-            choice_menu(options(&[("valid", true, true), (id, enabled, visible)])?, 1, false),
+            choice_menu(
+                options(&[("valid", true, true), (id, enabled, visible)])?,
+                1,
+                false,
+            ),
             Some(owner),
             true,
         );

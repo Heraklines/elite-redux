@@ -89,9 +89,7 @@ fn cancels(effects: &[KernelEffect]) -> usize {
 fn scheduled_timer(effects: &[KernelEffect]) -> Option<(SeatId, er_types::TimerId)> {
     effects.iter().find_map(|effect| match effect {
         KernelEffect::ScheduleTimer {
-            endpoint,
-            timer_id,
-            ..
+            endpoint, timer_id, ..
         } => Some((*endpoint, *timer_id)),
         _ => None,
     })
@@ -161,7 +159,13 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
     assert_virtual_schedule(&first_down, seat, first_timer, GameButton::Down);
     assert_ui_cursor(&first_down, seat, safe(1));
     assert_eq!(driver.kernel().ui_view().cursor, Some(safe(1)));
-    assert!(driver.kernel().live_resources().timers.contains(&first_timer));
+    assert!(
+        driver
+            .kernel()
+            .live_resources()
+            .timers
+            .contains(&first_timer)
+    );
 
     let first_up = driver.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancels(&first_up), 1);

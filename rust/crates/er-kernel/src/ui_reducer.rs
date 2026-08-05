@@ -667,7 +667,10 @@ mod tests {
             MenuGeneration::new(SafeU53::MAX)
         );
         assert_ne!(reducer.state(), &before_overflow);
-        assert_eq!(reducer.state().generation, MenuGeneration::new(SafeU53::MAX));
+        assert_eq!(
+            reducer.state().generation,
+            MenuGeneration::new(SafeU53::MAX)
+        );
         assert_eq!(reducer.state().owner_seat, None);
         assert!(!reducer.state().actionable);
         assert_eq!(reducer.state().stack, vec![MenuState::None]);
@@ -725,8 +728,8 @@ mod tests {
             }])
         );
         assert_eq!(reducer.view().cursor, Some(safe(1)));
-        assert_eq!(reducer.view().options[0].selected, false);
-        assert_eq!(reducer.view().options[2].enabled, false);
+        assert!(!reducer.view().options[0].selected);
+        assert!(!reducer.view().options[2].enabled);
     }
 
     #[test]

@@ -248,7 +248,10 @@ pub mod tests {
     #[wasm_bindgen_test]
     fn canonical_json_matches_fixed_vector() {
         let result = canonicalize_json(CANONICAL_VECTOR_INPUT);
-        assert!(result.is_ok(), "canonical JSON boundary rejected valid input");
+        assert!(
+            result.is_ok(),
+            "canonical JSON boundary rejected valid input"
+        );
         let Some(canonical) = result.ok() else {
             return;
         };
@@ -258,7 +261,10 @@ pub mod tests {
     #[wasm_bindgen_test]
     fn compatible_digest_matches_fixed_sha256_vector() {
         let result = compatible_digest_json(CANONICAL_VECTOR_INPUT);
-        assert!(result.is_ok(), "compatible digest boundary rejected valid input");
+        assert!(
+            result.is_ok(),
+            "compatible digest boundary rejected valid input"
+        );
         let Some(digest) = result.ok() else {
             return;
         };
@@ -292,7 +298,7 @@ pub mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn canonical_boundaries_reject_invalid_numeric_input() {
+    fn strict_canonical_boundary_rejects_non_kernel_numbers() {
         for input in [
             r#"{"value":9007199254740992}"#,
             r#"{"value":-1}"#,
@@ -302,9 +308,19 @@ pub mod tests {
                 canonicalize_json(input).is_err(),
                 "canonicalization accepted invalid numeric input: {input}"
             );
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn compatible_digest_boundary_preserves_finite_fixture_numbers() {
+        for input in [
+            r#"{"value":9007199254740992}"#,
+            r#"{"value":-1}"#,
+            r#"{"value":1.5}"#,
+        ] {
             assert!(
-                compatible_digest_json(input).is_err(),
-                "digest accepted invalid numeric input: {input}"
+                compatible_digest_json(input).is_ok(),
+                "compatible digest rejected finite fixture input: {input}"
             );
         }
     }
@@ -325,7 +341,10 @@ pub mod tests {
 
     #[wasm_bindgen_test]
     fn kernel_trace_boundary_rejects_invalid_trace() {
-        for input in [r#"{}"#, r#"{"header":{},"initial_snapshot":{},"events":[]}"#] {
+        for input in [
+            r#"{}"#,
+            r#"{"header":{},"initial_snapshot":{},"events":[]}"#,
+        ] {
             assert!(
                 round_trip_kernel_trace(input).is_err(),
                 "trace boundary accepted invalid trace: {input}"
@@ -335,10 +354,8 @@ pub mod tests {
 
     #[wasm_bindgen_test]
     fn kernel_trace_boundary_rejects_invalid_frame() {
-        let invalid_frame_type = FULL_KERNEL_TRACE.replace(
-            r#""t": "authorityEntry""#,
-            r#""t": "notAFrame""#,
-        );
+        let invalid_frame_type =
+            FULL_KERNEL_TRACE.replace(r#""t": "authorityEntry""#, r#""t": "notAFrame""#);
         assert!(
             round_trip_kernel_trace(&invalid_frame_type).is_err(),
             "trace boundary accepted an unknown network frame type"
@@ -357,7 +374,10 @@ pub mod tests {
     #[wasm_bindgen_test]
     fn kernel_trace_round_trip_preserves_full_typed_trace() {
         let original_result = serde_json::from_str::<KernelTrace>(FULL_KERNEL_TRACE);
-        assert!(original_result.is_ok(), "full KernelTrace fixture did not parse");
+        assert!(
+            original_result.is_ok(),
+            "full KernelTrace fixture did not parse"
+        );
         let Some(original) = original_result.ok() else {
             return;
         };

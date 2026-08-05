@@ -667,7 +667,8 @@ mod tests {
     }
 
     #[test]
-    fn accepted_printable_key_releases_after_focus_moves_to_text_entry() -> Result<(), InputRouteError> {
+    fn accepted_printable_key_releases_after_focus_moves_to_text_entry()
+    -> Result<(), InputRouteError> {
         let mut router = InputRouter::new(input_map(
             vec![(PhysicalKey::KeyA, GameButton::Action)],
             Vec::new(),

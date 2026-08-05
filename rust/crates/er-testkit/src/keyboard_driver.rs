@@ -99,10 +99,7 @@ impl<'kernel> KeyboardDriver<'kernel> {
         Ok(effects)
     }
 
-    fn drive_timers(
-        &mut self,
-        duration_ms: SafeU53,
-    ) -> Result<Vec<KernelEffect>, KernelError> {
+    fn drive_timers(&mut self, duration_ms: SafeU53) -> Result<Vec<KernelEffect>, KernelError> {
         let mut remaining_ms = duration_ms.get();
         let mut effects = Vec::new();
 
