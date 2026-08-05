@@ -5,5 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+er-canonical = { path = "../er-canonical" }
+er-types = { path = "../er-types" }
+thiserror.workspace = true
+
 [lints]
 workspace = true

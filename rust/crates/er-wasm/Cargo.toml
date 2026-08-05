@@ -8,5 +8,15 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[dependencies]
+er-canonical = { path = "../er-canonical" }
+er-kernel = { path = "../er-kernel" }
+er-types = { path = "../er-types" }
+serde_json.workspace = true
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test.workspace = true
+
 [lints]
 workspace = true

@@ -1,0 +1,103 @@
+schema_version = 1
+milestone = "M1"
+project = "PokéRogue Redux"
+g1_sha = "7c034639823ed8d57bc0e36882014167c3e976fe"
+integration_branch = "arch/rust-kernel-v0"
+public_api = "rust/contracts/m1-api.md"
+
+[rules]
+isolated_worktree = true
+exclusive_paths = true
+public_signatures_frozen = true
+workers_may_spawn_agents = false
+integration_owner_only_merges = true
+integration_owner_only_pushes = true
+
+[[lanes]]
+id = "M1-01"
+branch = "codex/rust-kernel-m1-01"
+paths = ["rust/crates/er-canonical/**"]
+deliverable = "Canonical JSON and compatible/content digest primitives"
+
+[[lanes]]
+id = "M1-02"
+branch = "codex/rust-kernel-m1-02"
+paths = ["rust/crates/er-types/src/ids.rs"]
+deliverable = "Newtypes, SafeU53, and validation"
+
+[[lanes]]
+id = "M1-03"
+branch = "codex/rust-kernel-m1-03"
+paths = ["rust/crates/er-types/src/input.rs"]
+deliverable = "Raw input and logical-button schemas"
+
+[[lanes]]
+id = "M1-04"
+branch = "codex/rust-kernel-m1-04"
+paths = ["rust/crates/er-types/src/ui.rs"]
+deliverable = "Menu state, intent, and UiViewModel schemas"
+
+[[lanes]]
+id = "M1-05"
+branch = "codex/rust-kernel-m1-05"
+paths = ["rust/crates/er-types/src/protocol.rs"]
+deliverable = "Authority V2 and kernel boundary serde schemas"
+
+[[lanes]]
+id = "M1-06"
+branch = "codex/rust-kernel-m1-06"
+paths = ["rust/crates/er-types/src/trace.rs"]
+deliverable = "KernelTrace and input/menu replay schemas"
+
+[[lanes]]
+id = "M1-07"
+branch = "codex/rust-kernel-m1-07"
+paths = ["rust/crates/er-kernel/src/input_router.rs"]
+deliverable = "Keyboard, gamepad, focus, lock, and repeat reducer"
+
+[[lanes]]
+id = "M1-08"
+branch = "codex/rust-kernel-m1-08"
+paths = ["rust/crates/er-kernel/src/ui_reducer.rs"]
+deliverable = "Logical menu reducer and immutable projection"
+
+[[lanes]]
+id = "M1-09"
+branch = "codex/rust-kernel-m1-09"
+paths = ["rust/crates/er-testkit/src/keyboard_driver.rs"]
+deliverable = "Raw-keystroke-only representative driver"
+
+[[lanes]]
+id = "M1-10"
+branch = "codex/rust-kernel-m1-10"
+paths = ["rust/crates/er-testkit/src/fixture.rs", "rust/crates/er-testkit/src/assertions.rs"]
+deliverable = "Fixture loading, exact round-trip, and digest assertions"
+
+[[lanes]]
+id = "M1-11"
+branch = "codex/rust-kernel-m1-11"
+paths = ["rust/crates/er-wasm/**"]
+deliverable = "Native/Wasm schema, digest, and trace parity"
+
+[[lanes]]
+id = "M1-12"
+branch = "codex/rust-kernel-m1-12"
+paths = ["rust/crates/er-kernel/tests/m1_keyboard_menu.rs", "rust/crates/er-testkit/tests/keyboard_driver_api.rs"]
+deliverable = "Cross-module keystroke/menu traces and API-bypass guard"
+
+[integration_owned]
+paths = [
+  "rust/Cargo.toml",
+  "rust/Cargo.lock",
+  "rust/crates/er-types/Cargo.toml",
+  "rust/crates/er-kernel/Cargo.toml",
+  "rust/crates/er-protocol/Cargo.toml",
+  "rust/crates/er-sim/Cargo.toml",
+  "rust/crates/er-testkit/Cargo.toml",
+  "rust/crates/er-types/src/lib.rs",
+  "rust/crates/er-kernel/src/lib.rs",
+  "rust/crates/er-kernel/src/kernel.rs",
+  "rust/crates/er-testkit/src/lib.rs",
+  "rust/contracts/**",
+  ".github/workflows/rust-kernel.yml",
+]

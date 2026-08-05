@@ -284,6 +284,22 @@ jobs:
           restore-keys: |
             rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
+      - name: Verify Cargo.lock is current
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          committed_lock="$RUNNER_TEMP/Cargo.lock.committed"
+          cp Cargo.lock "$committed_lock"
+          cargo generate-lockfile
+          if ! cmp -s "$committed_lock" Cargo.lock; then
+            mkdir -p ../rust-ci-summary
+            cp Cargo.lock ../rust-ci-summary/generated-Cargo.lock
+            echo "::error::rust/Cargo.lock is stale; generated-Cargo.lock is attached to the failure artifact."
+            exit 1
+          fi
+
       - name: Verify locked workspace metadata
         if: steps.contract.outputs.ready == 'true'
         working-directory: rust
