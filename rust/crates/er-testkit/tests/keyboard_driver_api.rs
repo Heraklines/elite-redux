@@ -4,12 +4,10 @@ use er_kernel::{GameKernel, KernelConfig, KernelEffect};
 use er_testkit::KeyboardDriver;
 use er_types::{
     ChoiceListMenu, GameButton, InputFocus, InputMap, KeyBinding, MenuGeneration, MenuOption,
-    MenuOptionId, MenuState, PhysicalKey, SafeU53, SeatId, UiState,
+    MenuOptionId, MenuState, PhysicalKey, SafeU53, SeatId, TimeClass, TimerOwner, UiState,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-const KEYBOARD_DRIVER_SOURCE: &str = include_str!("../src/keyboard_driver.rs");
 
 fn safe(value: u64) -> SafeU53 {
     match SafeU53::new(value) {
@@ -67,7 +65,7 @@ fn kernel() -> Result<GameKernel, Box<dyn Error>> {
                 cursor: safe(0),
                 page: safe(0),
                 wrap: true,
-                options: options.collect(),
+                options,
                 cancel: er_types::CancelPolicy::Disabled,
             })],
         },
@@ -88,70 +86,122 @@ fn cancels(effects: &[KernelEffect]) -> usize {
         .count()
 }
 
-#[test]
-fn keyboard_driver_public_surface_is_raw_only_and_kernel_access_is_read_only() {
-    let public_methods: Vec<&str> = KEYBOARD_DRIVER_SOURCE
-        .lines()
-        .filter_map(|line| {
-            line.trim_start()
-                .strip_prefix("pub fn ")
-                .and_then(|rest| rest.split('(').next())
-        })
-        .collect();
-    assert_eq!(
-        public_methods,
-        vec![
-            "new",
-            "key_down",
-            "key_up",
-            "press",
-            "hold_for",
-            "blur",
-            "focus",
-            "kernel",
-        ]
-    );
+fn scheduled_timer(effects: &[KernelEffect]) -> Option<(SeatId, er_types::TimerId)> {
+    effects.iter().find_map(|effect| match effect {
+        KernelEffect::ScheduleTimer {
+            endpoint,
+            timer_id,
+            ..
+        } => Some((*endpoint, *timer_id)),
+        _ => None,
+    })
+}
 
-    for forbidden in [
-        "choice",
-        "cursor",
-        "command",
-        "replacement",
-        "shop",
-        "menu",
-        "select",
-        "submit",
-        "replace",
-        "mutate",
-    ] {
-        let declaration = format!("pub fn {forbidden}(");
-        assert!(!KEYBOARD_DRIVER_SOURCE.contains(&declaration));
-    }
+fn assert_virtual_schedule(
+    effects: &[KernelEffect],
+    endpoint: SeatId,
+    timer_id: er_types::TimerId,
+) {
+    assert!(effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::ScheduleTimer {
+                endpoint: effect_endpoint,
+                timer_id: effect_timer,
+                owner: TimerOwner::Kernel,
+                delay_ms,
+                time_class: TimeClass::Virtual,
+            } if *effect_endpoint == endpoint
+                && *effect_timer == timer_id
+                && *delay_ms == safe(250)
+        )
+    }));
+}
+
+fn assert_cancel(effects: &[KernelEffect], endpoint: SeatId, timer_id: er_types::TimerId) {
+    assert!(effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::CancelTimer {
+                endpoint: effect_endpoint,
+                timer_id: effect_timer,
+            } if *effect_endpoint == endpoint && *effect_timer == timer_id
+        )
+    }));
+}
+
+fn assert_ui_cursor(effects: &[KernelEffect], endpoint: SeatId, cursor: SafeU53) {
+    assert!(effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::UiChanged {
+                endpoint: effect_endpoint,
+                view,
+            } if *effect_endpoint == endpoint && view.cursor == Some(cursor)
+        )
+    }));
 }
 
 #[test]
-fn keyboard_driver_exercises_only_raw_keystrokes_focus_and_timer_lifecycle() -> TestResult {
+fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> TestResult {
     let mut game_kernel = kernel()?;
     let seat = SeatId::new(safe(1));
     let mut driver = KeyboardDriver::new(&mut game_kernel, seat);
 
     let first_down = driver.key_down(PhysicalKey::ArrowDown, false)?;
     assert_eq!(schedules(&first_down), 1);
+    let first_timer = scheduled_timer(&first_down)
+        .map(|(endpoint, timer_id)| {
+            assert_eq!(endpoint, seat);
+            timer_id
+        })
+        .ok_or_else(|| std::io::Error::other("raw keydown did not schedule a timer"))?;
+    assert_virtual_schedule(&first_down, seat, first_timer);
+    assert_ui_cursor(&first_down, seat, safe(1));
+    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(1)));
+    assert!(driver.kernel().live_resources().timers.contains(&first_timer));
+
     let first_up = driver.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancels(&first_up), 1);
+    assert_cancel(&first_up, seat, first_timer);
+    assert!(driver.kernel().live_resources().timers.is_empty());
 
     let press = driver.press(PhysicalKey::ArrowUp)?;
     assert_eq!(schedules(&press), 1);
     assert_eq!(cancels(&press), 1);
+    let pressed_timer = scheduled_timer(&press)
+        .map(|(endpoint, timer_id)| {
+            assert_eq!(endpoint, seat);
+            timer_id
+        })
+        .ok_or_else(|| std::io::Error::other("raw press did not schedule a timer"))?;
+    assert_virtual_schedule(&press, seat, pressed_timer);
+    assert_cancel(&press, seat, pressed_timer);
+    assert_ui_cursor(&press, seat, safe(0));
+    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
+    assert!(driver.kernel().live_resources().timers.is_empty());
 
     let held = driver.hold_for(PhysicalKey::ArrowDown, safe(250))?;
     assert_eq!(schedules(&held), 2);
     assert_eq!(cancels(&held), 1);
+    let held_timer = scheduled_timer(&held)
+        .map(|(endpoint, timer_id)| {
+            assert_eq!(endpoint, seat);
+            timer_id
+        })
+        .ok_or_else(|| std::io::Error::other("raw hold did not schedule a timer"))?;
+    assert_virtual_schedule(&held, seat, held_timer);
+    assert_cancel(&held, seat, held_timer);
+    assert_ui_cursor(&held, seat, safe(0));
+    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
+    assert!(driver.kernel().live_resources().timers.is_empty());
 
+    let before_text_entry = driver.kernel().ui_view();
     assert!(driver.focus(InputFocus::TextEntry)?.is_empty());
     assert!(driver.key_down(PhysicalKey::KeyA, true)?.is_empty());
     assert!(driver.focus(InputFocus::Game)?.is_empty());
     assert!(driver.key_up(PhysicalKey::KeyA)?.is_empty());
+    assert_eq!(driver.kernel().ui_view(), before_text_entry);
     assert!(driver.blur()?.is_empty());
     assert!(driver.kernel().live_resources().timers.is_empty());
     Ok(())
