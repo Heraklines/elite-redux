@@ -1,0 +1,344 @@
+{
+  "invariant": "no-park",
+  "seed": 20260806,
+  "wave": 3,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 2 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260806",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 2,
+    "guestInteractionCounter": 2,
+    "hostWave": 3,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 2833302006,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 297,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1810605897,
+        "battlerIndex": -1,
+        "speciesId": 94,
+        "speciesName": "Gengar",
+        "hp": 179,
+        "maxHp": 179,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1715832163,
+        "battlerIndex": -1,
+        "speciesId": 263,
+        "speciesName": "Zigzagoon",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 38,
+            "ppUsed": 0
+          },
+          {
+            "id": 707,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 316,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3276782696,
+        "battlerIndex": -1,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 458,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 1
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 2833302006,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 297,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1810605897,
+        "battlerIndex": 1,
+        "speciesId": 94,
+        "speciesName": "Gengar",
+        "hp": 179,
+        "maxHp": 179,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1715832163,
+        "battlerIndex": 2,
+        "speciesId": 263,
+        "speciesName": "Zigzagoon",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 38,
+            "ppUsed": 0
+          },
+          {
+            "id": 707,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 316,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3276782696,
+        "battlerIndex": 3,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 458,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 1
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260806 preseeded=false",
+    "wave 1 turn 1: replay guest crossed cmd:1:1 through real public COMMAND=opened",
+    "wave 1: host slot move=85 guest slot move=85",
+    "wave 1 turn 1: guest SWITCH -> party[3]",
+    "wave 1 turn 1: progress enemyHp=[16:0/14,263:13/14] playerHp=[143:303/303,248:224/225]",
+    "wave 1 turn 2: replay guest crossed cmd:1:2 through real public COMMAND=opened",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=53 guest slot move=53",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[734:0/16,396:16/16] playerHp=[143:297/303,248:0/225]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2 turn 3: replay guest crossed cmd:2:3 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=85 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[263:0/16,276:0/16] playerHp=[143:297/303,94:179/179]"
+  ]
+}
