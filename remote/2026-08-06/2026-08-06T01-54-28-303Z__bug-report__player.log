@@ -1,0 +1,2065 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:7bd1a215937037a618d9a5390487e117a207b72d:run-30835750818.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1366x768 @1x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@32143ms -> title-shown@39680ms
+lastSess: ok (reached title)
+mode:     0  wave:72  difficulty:hell
+seed:     9YPtPR4CpouEDELSOZuF7o8t
+party:    Golisopod(L57 102/170), Toucannon(L57 0/175), Incineroar(L57 198/198), Decidueye(L57 173/173), Mimikyu(L57 147/147), Vikavolt(L57 172/172)
+
+----- DESCRIPTION -----
+Pyro Shells, K.O the pokemon its on.
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:7bd1a215937037a618d9a5390487e117a207b72d:run-30835750818.1","source":"github","sha":"7bd1a215937037a618d9a5390487e117a207b72d","workflow":{"provider":"github-actions","runId":"30835750818","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"integrate/prod-bugs-20260802"},"deployment":null}
+
+----- CONSOLE -----
+[01:43:09.432] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:09.432] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:09.432] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:09.432] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:09.433] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:09.433] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:09.433] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:09.433] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:09.434] LOG: %cStart Phase NewBattlePhase color:green;
+[01:43:09.434] LOG: Wave Seed: ºz¶µ» »}µ~º 70
+[01:43:09.457] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:43:09.462] LOG: Starting species pool tier: BOSS
+[01:43:09.489] LOG: Pokemon: Wild Castform | Species ID: 351 | Level: 60 | Nature: Jolly (+Spd/-SpAtk)
+[01:43:09.489] LOG: Stats (IVs): HP: 167 (11), Atk: 113 (26), Def: 99 (15), Spatk: 121 (8), Spdef: 96 (15), Spd: 168 (20)
+[01:43:09.489] LOG: Ability: Anticipation | Passive Ability: Forecast | Boss Bars: 2
+[01:43:09.489] LOG: Moveset: ["Weather Ball","Fairy Lock","Quiver Dance","Razor Wind"]
+[01:43:09.691] LOG: Applied Iron (enemy)
+[01:43:09.691] LOG: Applied Calcium (enemy)
+[01:43:09.855] DEBUG: Session data saved to slot 0!
+[01:43:09.855] LOG: Applied Iron (enemy)
+[01:43:09.855] LOG: Applied Calcium (enemy)
+[01:43:09.860] LOG: Wave Seed: ºz¶µ» »}µ~º 70
+[01:43:10.899] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:43:10.900] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:43:11.381] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:11.438] WARN: Could not get co-op identity ticket! 503 
+[01:43:11.438] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:12.832] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:43:12.833] LOG: %cStart Phase PostSummonPhase color:green;
+[01:43:12.833] LOG: Ran PSP for: Castform
+[01:43:12.834] LOG: %cStart Phase PostSummonPhase color:green;
+[01:43:12.835] LOG: %cStart Phase PostSummonPhase color:green;
+[01:43:12.836] LOG: %cStart Phase TurnInitPhase color:green;
+[01:43:12.836] LOG: %cStart Phase CommandPhase color:green;
+[01:43:12.856] LOG: Applied Charcoal 
+[01:43:12.856] LOG: Applied Charcoal 
+[01:43:13.456] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:13.502] WARN: Could not get co-op identity ticket! 503 
+[01:43:13.502] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:15.503] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:15.554] WARN: Could not get co-op identity ticket! 503 
+[01:43:15.555] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:17.557] LOG: Move: SACRED_FIRE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Incineroar
+[01:43:17.570] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:43:17.579] LOG: Applied Sharp Beak (enemy)
+[01:43:17.582] LOG: Battle Seed: EZ5m7fZ6EZE81ETZ
+[01:43:17.587] LOG: Applied Charcoal 
+[01:43:17.600] LOG: Applied Sharp Beak (enemy)
+[01:43:17.602] LOG: Move Pool: ["Weather Ball","Fairy Lock","Quiver Dance","Razor Wind"]
+[01:43:17.602] LOG: Move Scores: [-497.8205128205128,-520.3846153846154,-520.3846153846154,-474.7435897435897]
+[01:43:17.602] LOG: Sorted Move Pool: ["Razor Wind","Weather Ball","Fairy Lock","Quiver Dance"]
+[01:43:17.602] LOG: Chosen Move: Razor Wind
+[01:43:17.602] LOG: ER AI: experimental brain (sharpness 1)
+[01:43:17.602] LOG: %cStart Phase TurnStartPhase color:green;
+[01:43:17.606] LOG: %cStart Phase MovePhase color:green;
+[01:43:17.606] LOG: %cUser: Castform
+Move: RAZOR_WIND
+Use Mode: NORMAL color:orchid
+[01:43:17.612] LOG: %cStart Phase MessagePhase color:green;
+[01:43:17.617] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:17.679] WARN: Could not get co-op identity ticket! 503 
+[01:43:17.679] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:17.856] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:43:18.664] LOG: crit stage: +1
+[01:43:18.668] LOG: Applied Sharp Beak (enemy)
+[01:43:18.673] LOG: Move: Razor Wind | Base damage: 89.61365853658538 | Power: 157 | Source attack: 132 | Target defense: 123
+[01:43:18.674] LOG: Move: Razor Wind | Attack damage: 82
+[01:43:18.677] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:43:18.693] LOG: %cStart Phase MessagePhase color:green;
+[01:43:19.171] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:43:19.573] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:43:19.681] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:19.743] WARN: Could not get co-op identity ticket! 503 
+[01:43:19.743] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:20.029] LOG: %cStart Phase MessagePhase color:green;
+[01:43:20.553] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:43:20.606] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:43:21.006] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:43:21.455] LOG: %cStart Phase MessagePhase color:green;
+[01:43:21.744] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:21.797] WARN: Could not get co-op identity ticket! 503 
+[01:43:21.797] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:22.051] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:43:22.105] LOG: %cStart Phase MoveEndPhase color:green;
+[01:43:22.106] LOG: %cStart Phase MovePhase color:green;
+[01:43:22.106] LOG: %cUser: Incineroar
+Move: SACRED_FIRE
+Use Mode: NORMAL color:orchid
+[01:43:22.111] LOG: %cStart Phase MessagePhase color:green;
+[01:43:22.402] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:43:23.570] LOG: crit stage: +0
+[01:43:23.574] LOG: Applied Charcoal 
+[01:43:23.576] LOG: Move: Sacred Fire | Base damage: 610.6057142857143 | Power: 180 | Source attack: 776 | Target defense: 112
+[01:43:23.578] LOG: Move: Sacred Fire | Attack damage: 851
+[01:43:23.580] LOG: Applied Amulet Coin 
+[01:43:23.580] LOG: Applied Golden Punch 
+[01:43:23.582] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:43:23.604] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:43:23.604] LOG: %cStart Phase FaintPhase color:green;
+[01:43:23.752] LOG: %cStart Phase MessagePhase color:green;
+[01:43:23.804] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:23.848] WARN: Could not get co-op identity ticket! 503 
+[01:43:23.849] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:24.196] LOG: %cStart Phase VictoryPhase color:green;
+[01:43:24.198] LOG: %cStart Phase MoveEndPhase color:green;
+[01:43:24.198] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:43:24.198] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:43:24.198] LOG: %cStart Phase TurnEndPhase color:green;
+[01:43:24.216] LOG: %cStart Phase BattleEndPhase color:green;
+[01:43:24.217] LOG: Battle Score: 325 (1 Turns x1)
+[01:43:24.217] LOG: Total Score: 15135
+[01:43:24.218] LOG: Applied Protein 
+[01:43:24.219] LOG: Applied Carbos 
+[01:43:24.219] LOG: Applied Zinc 
+[01:43:24.219] LOG: Applied Protein 
+[01:43:24.219] LOG: Applied Protein 
+[01:43:24.219] LOG: Applied Calcium 
+[01:43:24.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.222] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.227] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.227] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.227] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.227] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.228] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.228] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.228] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.228] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.230] LOG: %cStart Phase EggLapsePhase color:green;
+[01:43:24.230] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:43:24.231] LOG: Applied Protein 
+[01:43:24.231] LOG: Applied Carbos 
+[01:43:24.231] LOG: Applied Zinc 
+[01:43:24.231] LOG: Applied Protein 
+[01:43:24.232] LOG: Applied Protein 
+[01:43:24.232] LOG: Applied Calcium 
+[01:43:24.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.234] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.234] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.234] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.235] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:24.235] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:24.907] LOG: %cStart Phase PartyHealPhase color:green;
+[01:43:25.851] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:25.896] WARN: Could not get co-op identity ticket! 503 
+[01:43:25.896] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:27.599] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.602] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.604] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.604] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.605] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.605] LOG: %cStart Phase ResetStatusPhase color:green;
+[01:43:27.605] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:43:27.902] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:27.954] WARN: Could not get co-op identity ticket! 503 
+[01:43:27.954] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:28.479] LOG: Applied Amulet Coin 
+[01:43:29.956] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:30.006] WARN: Could not get co-op identity ticket! 503 
+[01:43:30.006] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:31.337] LOG: Applied Amulet Coin 
+[01:43:32.008] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:32.066] WARN: Could not get co-op identity ticket! 503 
+[01:43:32.066] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:33.523] LOG: Applied Protein 
+[01:43:33.524] LOG: Applied Carbos 
+[01:43:33.526] LOG: Applied Zinc 
+[01:43:33.526] LOG: Applied Protein 
+[01:43:33.527] LOG: Applied Protein 
+[01:43:33.529] LOG: Applied Calcium 
+[01:43:33.533] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:33.533] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:33.561] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:33.561] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:33.562] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:33.562] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:33.563] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:33.563] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:33.564] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:33.564] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:34.067] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:34.117] WARN: Could not get co-op identity ticket! 503 
+[01:43:34.117] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:34.457] LOG: Applied Amulet Coin 
+[01:43:35.298] LOG: Applied Amulet Coin 
+[01:43:36.118] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:36.175] WARN: Could not get co-op identity ticket! 503 
+[01:43:36.176] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:38.021] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:38.021] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:38.074] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:43:38.074] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:43:38.176] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:38.235] WARN: Could not get co-op identity ticket! 503 
+[01:43:38.236] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:40.237] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:40.303] WARN: Could not get co-op identity ticket! 503 
+[01:43:40.303] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:42.304] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:42.371] WARN: Could not get co-op identity ticket! 503 
+[01:43:42.371] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:44.372] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:44.426] WARN: Could not get co-op identity ticket! 503 
+[01:43:44.426] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:44.830] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:44.830] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:44.897] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:43:44.897] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:43:46.427] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:46.498] WARN: Could not get co-op identity ticket! 503 
+[01:43:46.498] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:48.500] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:48.567] WARN: Could not get co-op identity ticket! 503 
+[01:43:48.567] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:50.568] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:50.620] WARN: Could not get co-op identity ticket! 503 
+[01:43:50.620] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:52.623] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:52.691] WARN: Could not get co-op identity ticket! 503 
+[01:43:52.692] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:53.598] LOG: Applied Protein 
+[01:43:53.599] LOG: Applied Carbos 
+[01:43:53.601] LOG: Applied Zinc 
+[01:43:53.601] LOG: Applied Protein 
+[01:43:53.601] LOG: Applied Protein 
+[01:43:53.602] LOG: Applied Calcium 
+[01:43:53.604] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:53.604] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:53.614] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:53.614] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:53.615] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:53.615] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:53.616] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:53.616] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:53.617] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:43:53.617] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:43:54.693] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:54.746] WARN: Could not get co-op identity ticket! 503 
+[01:43:54.746] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:56.747] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:56.800] WARN: Could not get co-op identity ticket! 503 
+[01:43:56.800] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:43:58.802] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:43:58.848] WARN: Could not get co-op identity ticket! 503 
+[01:43:58.848] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:00.849] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:00.900] WARN: Could not get co-op identity ticket! 503 
+[01:44:00.900] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:02.901] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:02.954] WARN: Could not get co-op identity ticket! 503 
+[01:44:02.954] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:04.955] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:04.997] WARN: Could not get co-op identity ticket! 503 
+[01:44:04.997] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:06.997] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:07.054] WARN: Could not get co-op identity ticket! 503 
+[01:44:07.054] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:09.058] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:09.112] WARN: Could not get co-op identity ticket! 503 
+[01:44:09.113] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:11.115] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:11.155] WARN: Could not get co-op identity ticket! 503 
+[01:44:11.156] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:13.156] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:13.212] WARN: Could not get co-op identity ticket! 503 
+[01:44:13.212] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:15.213] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:15.270] WARN: Could not get co-op identity ticket! 503 
+[01:44:15.271] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:17.271] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:17.317] WARN: Could not get co-op identity ticket! 503 
+[01:44:17.317] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:19.318] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:19.375] WARN: Could not get co-op identity ticket! 503 
+[01:44:19.375] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:21.379] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:21.430] WARN: Could not get co-op identity ticket! 503 
+[01:44:21.430] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:23.431] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:23.487] WARN: Could not get co-op identity ticket! 503 
+[01:44:23.487] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:25.492] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:25.550] WARN: Could not get co-op identity ticket! 503 
+[01:44:25.550] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:27.552] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:27.602] WARN: Could not get co-op identity ticket! 503 
+[01:44:27.602] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:29.604] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:29.654] WARN: Could not get co-op identity ticket! 503 
+[01:44:29.654] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:31.657] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:31.714] WARN: Could not get co-op identity ticket! 503 
+[01:44:31.714] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:33.720] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:33.777] WARN: Could not get co-op identity ticket! 503 
+[01:44:33.778] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:35.779] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:35.837] WARN: Could not get co-op identity ticket! 503 
+[01:44:35.837] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:37.837] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:37.892] WARN: Could not get co-op identity ticket! 503 
+[01:44:37.892] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:39.895] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:39.949] WARN: Could not get co-op identity ticket! 503 
+[01:44:39.949] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:41.950] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:41.998] WARN: Could not get co-op identity ticket! 503 
+[01:44:41.999] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:43.999] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:44.045] WARN: Could not get co-op identity ticket! 503 
+[01:44:44.046] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:46.046] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:46.108] WARN: Could not get co-op identity ticket! 503 
+[01:44:46.109] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:48.110] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:48.163] WARN: Could not get co-op identity ticket! 503 
+[01:44:48.163] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:50.163] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:50.214] WARN: Could not get co-op identity ticket! 503 
+[01:44:50.214] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:52.217] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:52.275] WARN: Could not get co-op identity ticket! 503 
+[01:44:52.276] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:54.276] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:54.334] WARN: Could not get co-op identity ticket! 503 
+[01:44:54.334] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:56.335] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:56.388] WARN: Could not get co-op identity ticket! 503 
+[01:44:56.388] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:44:58.394] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:44:58.455] WARN: Could not get co-op identity ticket! 503 
+[01:44:58.455] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:00.458] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:00.513] WARN: Could not get co-op identity ticket! 503 
+[01:45:00.513] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:01.106] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:01.106] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:01.160] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:01.160] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:02.514] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:02.582] WARN: Could not get co-op identity ticket! 503 
+[01:45:02.583] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:02.747] LOG: Applied Amulet Coin 
+[01:45:03.902] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:03.902] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:03.954] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:03.954] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:04.583] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:04.641] WARN: Could not get co-op identity ticket! 503 
+[01:45:04.641] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:06.642] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:06.698] WARN: Could not get co-op identity ticket! 503 
+[01:45:06.698] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:08.702] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:08.755] WARN: Could not get co-op identity ticket! 503 
+[01:45:08.756] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:10.756] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:10.810] WARN: Could not get co-op identity ticket! 503 
+[01:45:10.810] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:11.849] LOG: Applied Protein 
+[01:45:11.851] LOG: Applied Carbos 
+[01:45:11.854] LOG: Applied Zinc 
+[01:45:11.854] LOG: Applied Protein 
+[01:45:11.855] LOG: Applied Protein 
+[01:45:11.856] LOG: Applied Calcium 
+[01:45:11.859] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:11.859] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:11.884] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:11.884] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:11.886] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:11.886] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:11.887] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:11.887] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:11.889] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:11.889] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:12.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:12.327] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:12.383] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:12.383] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:12.812] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:12.870] WARN: Could not get co-op identity ticket! 503 
+[01:45:12.870] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:14.406] LOG: Applied Protein 
+[01:45:14.406] LOG: Applied Zinc 
+[01:45:14.407] LOG: Applied Carbos 
+[01:45:14.408] LOG: Applied Zinc 
+[01:45:14.408] LOG: Applied Protein 
+[01:45:14.409] LOG: Applied Protein 
+[01:45:14.410] LOG: Applied Calcium 
+[01:45:14.414] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.415] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.429] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.430] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.430] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.430] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.430] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.431] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.431] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.431] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.431] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:14.431] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:14.871] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:14.927] WARN: Could not get co-op identity ticket! 503 
+[01:45:14.927] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:16.927] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:16.974] WARN: Could not get co-op identity ticket! 503 
+[01:45:16.974] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:18.976] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:19.036] WARN: Could not get co-op identity ticket! 503 
+[01:45:19.036] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:21.037] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:21.089] WARN: Could not get co-op identity ticket! 503 
+[01:45:21.090] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:23.091] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:23.144] WARN: Could not get co-op identity ticket! 503 
+[01:45:23.144] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:25.145] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:25.201] WARN: Could not get co-op identity ticket! 503 
+[01:45:25.201] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:27.202] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:27.245] WARN: Could not get co-op identity ticket! 503 
+[01:45:27.245] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:29.246] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:29.304] WARN: Could not get co-op identity ticket! 503 
+[01:45:29.304] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:31.305] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:31.367] WARN: Could not get co-op identity ticket! 503 
+[01:45:31.368] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:33.369] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:33.421] WARN: Could not get co-op identity ticket! 503 
+[01:45:33.421] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:35.422] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:35.478] WARN: Could not get co-op identity ticket! 503 
+[01:45:35.479] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:37.479] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:37.527] WARN: Could not get co-op identity ticket! 503 
+[01:45:37.527] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:39.528] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:39.588] WARN: Could not get co-op identity ticket! 503 
+[01:45:39.588] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:41.589] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:41.635] WARN: Could not get co-op identity ticket! 503 
+[01:45:41.635] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:43.638] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:43.686] WARN: Could not get co-op identity ticket! 503 
+[01:45:43.686] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:45.146] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:45.146] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:45.206] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:45.206] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:45.687] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:45.742] WARN: Could not get co-op identity ticket! 503 
+[01:45:45.742] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:47.233] LOG: Applied Amulet Coin 
+[01:45:47.744] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:47.798] WARN: Could not get co-op identity ticket! 503 
+[01:45:47.798] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:48.059] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:48.059] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:48.115] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:48.115] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:49.799] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:49.851] WARN: Could not get co-op identity ticket! 503 
+[01:45:49.851] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:51.852] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:51.908] WARN: Could not get co-op identity ticket! 503 
+[01:45:51.909] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:52.702] LOG: Applied Protein 
+[01:45:52.702] LOG: Applied Zinc 
+[01:45:52.703] LOG: Applied Carbos 
+[01:45:52.705] LOG: Applied Zinc 
+[01:45:52.705] LOG: Applied Protein 
+[01:45:52.706] LOG: Applied Protein 
+[01:45:52.707] LOG: Applied Calcium 
+[01:45:52.710] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.710] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:52.734] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.734] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:52.735] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.735] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:52.735] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.735] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:52.736] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.736] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:52.737] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:52.737] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:53.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:53.270] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:53.311] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:53.311] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:53.910] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:53.962] WARN: Could not get co-op identity ticket! 503 
+[01:45:53.962] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:54.133] LOG: Applied Protein 
+[01:45:54.133] LOG: Applied Zinc 
+[01:45:54.134] LOG: Applied Carbos 
+[01:45:54.135] LOG: Applied Zinc 
+[01:45:54.135] LOG: Applied Protein 
+[01:45:54.136] LOG: Applied Protein 
+[01:45:54.137] LOG: Applied Calcium 
+[01:45:54.140] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.140] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:54.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.154] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:54.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.155] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:54.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.156] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:54.156] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.156] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:54.157] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:54.157] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:55.402] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:45:55.402] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:45:55.435] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:45:55.435] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:45:55.963] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:56.012] WARN: Could not get co-op identity ticket! 503 
+[01:45:56.012] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:45:58.013] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:45:58.075] WARN: Could not get co-op identity ticket! 503 
+[01:45:58.075] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:00.077] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:00.137] WARN: Could not get co-op identity ticket! 503 
+[01:46:00.137] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:02.138] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:02.188] WARN: Could not get co-op identity ticket! 503 
+[01:46:02.188] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:04.189] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:04.251] WARN: Could not get co-op identity ticket! 503 
+[01:46:04.251] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:06.252] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:06.302] WARN: Could not get co-op identity ticket! 503 
+[01:46:06.302] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:08.303] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:08.359] WARN: Could not get co-op identity ticket! 503 
+[01:46:08.360] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:10.362] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:10.413] WARN: Could not get co-op identity ticket! 503 
+[01:46:10.414] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:10.454] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:10.454] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:10.519] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:46:10.519] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:46:12.414] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:12.478] WARN: Could not get co-op identity ticket! 503 
+[01:46:12.478] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:14.478] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:14.534] WARN: Could not get co-op identity ticket! 503 
+[01:46:14.535] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:16.535] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:16.589] WARN: Could not get co-op identity ticket! 503 
+[01:46:16.589] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:18.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:18.230] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:18.295] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:46:18.295] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:46:18.590] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:18.641] WARN: Could not get co-op identity ticket! 503 
+[01:46:18.641] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:20.642] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:20.700] WARN: Could not get co-op identity ticket! 503 
+[01:46:20.700] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:22.702] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:22.754] WARN: Could not get co-op identity ticket! 503 
+[01:46:22.755] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:24.758] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:24.815] WARN: Could not get co-op identity ticket! 503 
+[01:46:24.815] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:26.817] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:26.881] WARN: Could not get co-op identity ticket! 503 
+[01:46:26.881] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:28.882] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:28.946] WARN: Could not get co-op identity ticket! 503 
+[01:46:28.946] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:30.962] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:31.031] WARN: Could not get co-op identity ticket! 503 
+[01:46:31.032] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:33.035] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:33.088] WARN: Could not get co-op identity ticket! 503 
+[01:46:33.088] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:35.089] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:35.149] WARN: Could not get co-op identity ticket! 503 
+[01:46:35.149] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:37.150] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:37.207] WARN: Could not get co-op identity ticket! 503 
+[01:46:37.208] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:39.212] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:39.269] WARN: Could not get co-op identity ticket! 503 
+[01:46:39.269] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:40.865] LOG: %cStart Phase FormChangePhase color:green;
+[01:46:41.269] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:41.323] WARN: Could not get co-op identity ticket! 503 
+[01:46:41.323] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:43.331] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:43.388] WARN: Could not get co-op identity ticket! 503 
+[01:46:43.388] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:43.579] LOG: Applied Protein 
+[01:46:43.580] LOG: Applied Zinc 
+[01:46:43.580] LOG: Applied Carbos 
+[01:46:43.583] LOG: Applied Zinc 
+[01:46:43.583] LOG: Applied Protein 
+[01:46:43.584] LOG: Applied Protein 
+[01:46:43.584] LOG: Applied Calcium 
+[01:46:43.590] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.590] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:43.622] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.623] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:43.623] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.624] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:43.624] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.624] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:43.625] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.625] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:43.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:46:43.626] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:46:45.389] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:45.445] WARN: Could not get co-op identity ticket! 503 
+[01:46:45.445] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:47.446] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:47.503] WARN: Could not get co-op identity ticket! 503 
+[01:46:47.503] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:49.505] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:49.560] WARN: Could not get co-op identity ticket! 503 
+[01:46:49.560] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:50.269] LOG: %cStart Phase EndEvolutionPhase color:green;
+[01:46:50.388] LOG: %cStart Phase LearnMovePhase color:green;
+[01:46:51.561] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:51.616] WARN: Could not get co-op identity ticket! 503 
+[01:46:51.616] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:53.618] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:53.658] WARN: Could not get co-op identity ticket! 503 
+[01:46:53.658] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:55.662] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:55.708] WARN: Could not get co-op identity ticket! 503 
+[01:46:55.708] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:57.659] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[01:46:57.713] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:57.781] WARN: Could not get co-op identity ticket! 503 
+[01:46:57.781] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:46:59.383] LOG: %cStart Phase LearnMovePhase color:green;
+[01:46:59.782] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:46:59.862] WARN: Could not get co-op identity ticket! 503 
+[01:46:59.862] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:01.862] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:01.909] WARN: Could not get co-op identity ticket! 503 
+[01:47:01.909] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:02.824] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:47:03.910] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:03.972] WARN: Could not get co-op identity ticket! 503 
+[01:47:03.972] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:05.783] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:05.783] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:05.853] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:47:05.853] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:47:05.974] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:06.026] WARN: Could not get co-op identity ticket! 503 
+[01:47:06.026] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:08.027] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:08.087] WARN: Could not get co-op identity ticket! 503 
+[01:47:08.087] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:10.088] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:10.142] WARN: Could not get co-op identity ticket! 503 
+[01:47:10.143] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:12.148] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:12.204] WARN: Could not get co-op identity ticket! 503 
+[01:47:12.204] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:12.524] LOG: Applied Protein 
+[01:47:12.524] LOG: Applied Zinc 
+[01:47:12.526] LOG: Applied Carbos 
+[01:47:12.527] LOG: Applied Zinc 
+[01:47:12.527] LOG: Applied Protein 
+[01:47:12.528] LOG: Applied Protein 
+[01:47:12.530] LOG: Applied Calcium 
+[01:47:12.532] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.532] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:12.562] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.562] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:12.563] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.563] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:12.563] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.563] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:12.564] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.564] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:12.564] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:12.564] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:14.205] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:14.260] WARN: Could not get co-op identity ticket! 503 
+[01:47:14.260] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:16.261] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:16.320] WARN: Could not get co-op identity ticket! 503 
+[01:47:16.320] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:17.415] LOG: %cStart Phase NewBattlePhase color:green;
+[01:47:17.416] LOG: Wave Seed:  »{·¶¼¡¼~¶» 71
+[01:47:17.417] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:47:17.421] LOG: Starting species pool tier: COMMON
+[01:47:17.422] LOG: Replaced LILLIPUP with STOUTLAND
+[01:47:17.440] LOG: Pokemon: Wild Stoutland | Species ID: 508 | Level: 61 | Nature: Hasty (+Spd/-Def)
+[01:47:17.440] LOG: Stats (IVs): HP: 183 (15), Atk: 156 (8), Def: 105 (25), Spatk: 66 (11), Spdef: 114 (0), Spd: 146 (29)
+[01:47:17.441] LOG: Ability: Sand Rush | Passive Ability: Overcoat 
+[01:47:17.441] LOG: Moveset: ["Double-Edge","Body Slam","Noble Roar","Roar"]
+[01:47:17.441] LOG: Starting species pool tier: COMMON
+[01:47:17.443] LOG: Replaced RATTATA with 
+[01:47:17.463] LOG: Pokemon: Wild Eraticate | Species ID: 10680 | Level: 61 | Nature: Rash (+SpAtk/-SpDef)
+[01:47:17.463] LOG: Stats (IVs): HP: 203 (18), Atk: 159 (9), Def: 119 (7), Spatk: 76 (5), Spdef: 86 (0), Spd: 91 (0)
+[01:47:17.464] LOG: Ability: Fur Coat | Passive Ability: Poison Touch 
+[01:47:17.464] LOG: Moveset: ["Close Combat","Scary Face","Lash Out","Super Fang"]
+[01:47:17.917] LOG: Applied Protein (enemy)
+[01:47:18.106] DEBUG: Session data saved to slot 0!
+[01:47:18.107] LOG: Applied Protein (enemy)
+[01:47:18.109] LOG: Wave Seed:  »{·¶¼¡¼~¶» 71
+[01:47:18.324] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:18.373] WARN: Could not get co-op identity ticket! 503 
+[01:47:18.374] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:18.621] WARN: cry/10680 not found
+[01:47:19.239] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:47:19.388] LOG: %cStart Phase SummonPhase color:green;
+[01:47:19.770] LOG: Applied Protein 
+[01:47:19.770] LOG: Applied Zinc 
+[01:47:19.771] LOG: Applied Carbos 
+[01:47:19.771] LOG: Applied Zinc 
+[01:47:19.771] LOG: Applied Protein 
+[01:47:19.772] LOG: Applied Protein 
+[01:47:19.773] LOG: Applied Calcium 
+[01:47:19.778] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.778] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:19.786] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.786] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:19.787] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.787] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:19.787] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.787] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:19.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.788] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:19.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:19.788] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:20.102] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:47:20.368] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:47:20.378] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:20.434] WARN: Could not get co-op identity ticket! 503 
+[01:47:20.435] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:22.438] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:22.490] WARN: Could not get co-op identity ticket! 503 
+[01:47:22.491] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:24.492] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:24.543] WARN: Could not get co-op identity ticket! 503 
+[01:47:24.543] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:25.921] LOG: %cStart Phase SwitchPhase color:green;
+[01:47:26.029] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:26.029] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:26.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:47:26.068] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:47:26.543] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:26.602] WARN: Could not get co-op identity ticket! 503 
+[01:47:26.603] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:27.908] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:47:28.380] LOG: Applied Carbos 
+[01:47:28.382] LOG: Applied Protein 
+[01:47:28.383] LOG: Applied Zinc 
+[01:47:28.384] LOG: Applied Zinc 
+[01:47:28.384] LOG: Applied Protein 
+[01:47:28.387] LOG: Applied Protein 
+[01:47:28.388] LOG: Applied Calcium 
+[01:47:28.603] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:28.664] WARN: Could not get co-op identity ticket! 503 
+[01:47:28.664] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:28.736] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:47:28.977] LOG: %cStart Phase PostSummonPhase color:green;
+[01:47:28.977] LOG: Ran PSP for: Mega Toucannon
+[01:47:28.985] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:47:30.665] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:30.719] WARN: Could not get co-op identity ticket! 503 
+[01:47:30.719] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:32.721] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:32.770] WARN: Could not get co-op identity ticket! 503 
+[01:47:32.770] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:34.750] LOG: %cStart Phase SwitchPhase color:green;
+[01:47:34.777] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:34.835] WARN: Could not get co-op identity ticket! 503 
+[01:47:34.835] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:34.879] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:34.879] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:34.944] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:47:34.945] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:47:36.841] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:36.891] WARN: Could not get co-op identity ticket! 503 
+[01:47:36.891] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:37.966] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:47:38.436] LOG: Applied Zinc 
+[01:47:38.437] LOG: Applied Protein 
+[01:47:38.438] LOG: Applied Protein 
+[01:47:38.438] LOG: Applied Zinc 
+[01:47:38.439] LOG: Applied Carbos 
+[01:47:38.440] LOG: Applied Protein 
+[01:47:38.441] LOG: Applied Calcium 
+[01:47:38.797] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:47:38.892] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:38.938] WARN: Could not get co-op identity ticket! 503 
+[01:47:38.938] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:39.033] LOG: %cStart Phase PostSummonPhase color:green;
+[01:47:39.033] LOG: Ran PSP for: Mega Golisopod Y
+[01:47:39.038] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:47:39.041] LOG: %cStart Phase PostSummonPhase color:green;
+[01:47:39.042] LOG: Ran PSP for: Stoutland
+[01:47:39.046] LOG: %cStart Phase PostSummonPhase color:green;
+[01:47:39.046] LOG: Ran PSP for: Eraticate
+[01:47:39.053] LOG: %cStart Phase TurnInitPhase color:green;
+[01:47:39.053] LOG: %cStart Phase CommandPhase color:green;
+[01:47:39.983] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:47:39.983] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:47:40.020] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:47:40.020] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:47:40.939] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:40.991] WARN: Could not get co-op identity ticket! 503 
+[01:47:40.991] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:42.992] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:43.071] WARN: Could not get co-op identity ticket! 503 
+[01:47:43.072] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:45.073] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:45.135] WARN: Could not get co-op identity ticket! 503 
+[01:47:45.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:47.137] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:47.191] WARN: Could not get co-op identity ticket! 503 
+[01:47:47.191] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:49.198] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:49.261] WARN: Could not get co-op identity ticket! 503 
+[01:47:49.261] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:51.261] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:51.319] WARN: Could not get co-op identity ticket! 503 
+[01:47:51.319] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:53.325] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:53.381] WARN: Could not get co-op identity ticket! 503 
+[01:47:53.381] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:55.382] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:55.444] WARN: Could not get co-op identity ticket! 503 
+[01:47:55.444] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:57.445] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:57.497] WARN: Could not get co-op identity ticket! 503 
+[01:47:57.498] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:47:59.504] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:47:59.570] WARN: Could not get co-op identity ticket! 503 
+[01:47:59.570] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:01.571] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:01.632] WARN: Could not get co-op identity ticket! 503 
+[01:48:01.633] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:03.633] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:03.690] WARN: Could not get co-op identity ticket! 503 
+[01:48:03.690] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:05.699] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:05.754] WARN: Could not get co-op identity ticket! 503 
+[01:48:05.754] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:07.756] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:07.822] WARN: Could not get co-op identity ticket! 503 
+[01:48:07.822] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:09.830] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:09.897] WARN: Could not get co-op identity ticket! 503 
+[01:48:09.897] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:11.898] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:11.958] WARN: Could not get co-op identity ticket! 503 
+[01:48:11.958] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:13.959] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:14.009] WARN: Could not get co-op identity ticket! 503 
+[01:48:14.010] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:16.011] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:16.076] WARN: Could not get co-op identity ticket! 503 
+[01:48:16.076] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:18.077] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:18.142] WARN: Could not get co-op identity ticket! 503 
+[01:48:18.142] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:20.149] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:20.203] WARN: Could not get co-op identity ticket! 503 
+[01:48:20.204] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:22.205] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:22.292] WARN: Could not get co-op identity ticket! 503 
+[01:48:22.293] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:24.296] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:24.363] WARN: Could not get co-op identity ticket! 503 
+[01:48:24.363] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:25.217] WARN: cry/734 not found
+[01:48:26.363] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:26.465] WARN: Could not get co-op identity ticket! 503 
+[01:48:26.465] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:28.466] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:28.526] WARN: Could not get co-op identity ticket! 503 
+[01:48:28.526] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:30.530] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:30.608] WARN: Could not get co-op identity ticket! 503 
+[01:48:30.608] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:32.616] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:32.687] WARN: Could not get co-op identity ticket! 503 
+[01:48:32.687] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:34.689] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:34.751] WARN: Could not get co-op identity ticket! 503 
+[01:48:34.751] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:36.752] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:36.823] WARN: Could not get co-op identity ticket! 503 
+[01:48:36.823] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:38.831] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:38.898] WARN: Could not get co-op identity ticket! 503 
+[01:48:38.899] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:40.900] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:40.951] WARN: Could not get co-op identity ticket! 503 
+[01:48:40.952] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:42.960] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:43.028] WARN: Could not get co-op identity ticket! 503 
+[01:48:43.028] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:45.029] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:45.096] WARN: Could not get co-op identity ticket! 503 
+[01:48:45.096] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:47.099] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:47.163] WARN: Could not get co-op identity ticket! 503 
+[01:48:47.163] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:49.172] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:49.225] WARN: Could not get co-op identity ticket! 503 
+[01:48:49.225] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:51.226] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:51.289] WARN: Could not get co-op identity ticket! 503 
+[01:48:51.289] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:53.291] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:53.354] WARN: Could not get co-op identity ticket! 503 
+[01:48:53.354] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:55.355] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:55.418] WARN: Could not get co-op identity ticket! 503 
+[01:48:55.419] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:57.420] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:57.476] WARN: Could not get co-op identity ticket! 503 
+[01:48:57.477] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:48:59.478] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:48:59.549] WARN: Could not get co-op identity ticket! 503 
+[01:48:59.549] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:01.550] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:01.609] WARN: Could not get co-op identity ticket! 503 
+[01:49:01.610] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:03.611] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:03.672] WARN: Could not get co-op identity ticket! 503 
+[01:49:03.672] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:05.672] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:05.726] WARN: Could not get co-op identity ticket! 503 
+[01:49:05.727] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:07.737] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:07.803] WARN: Could not get co-op identity ticket! 503 
+[01:49:07.803] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:09.804] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:09.868] WARN: Could not get co-op identity ticket! 503 
+[01:49:09.868] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:11.868] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:11.918] WARN: Could not get co-op identity ticket! 503 
+[01:49:11.918] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:13.920] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:13.980] WARN: Could not get co-op identity ticket! 503 
+[01:49:13.980] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:15.981] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:16.036] WARN: Could not get co-op identity ticket! 503 
+[01:49:16.036] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:18.042] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:18.098] WARN: Could not get co-op identity ticket! 503 
+[01:49:18.098] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:20.098] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:20.155] WARN: Could not get co-op identity ticket! 503 
+[01:49:20.155] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:22.156] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:22.224] WARN: Could not get co-op identity ticket! 503 
+[01:49:22.224] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:24.225] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:24.287] WARN: Could not get co-op identity ticket! 503 
+[01:49:24.287] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:26.288] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:26.352] WARN: Could not get co-op identity ticket! 503 
+[01:49:26.352] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:28.353] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:28.400] WARN: Could not get co-op identity ticket! 503 
+[01:49:28.400] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:30.401] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:30.467] WARN: Could not get co-op identity ticket! 503 
+[01:49:30.467] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:32.467] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:32.535] WARN: Could not get co-op identity ticket! 503 
+[01:49:32.535] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:34.541] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:34.597] WARN: Could not get co-op identity ticket! 503 
+[01:49:34.597] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:36.598] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:36.658] WARN: Could not get co-op identity ticket! 503 
+[01:49:36.659] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:38.660] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:38.726] WARN: Could not get co-op identity ticket! 503 
+[01:49:38.727] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:40.729] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:40.786] WARN: Could not get co-op identity ticket! 503 
+[01:49:40.786] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:42.788] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:42.846] WARN: Could not get co-op identity ticket! 503 
+[01:49:42.846] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:44.851] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:44.903] WARN: Could not get co-op identity ticket! 503 
+[01:49:44.903] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:46.904] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:46.969] WARN: Could not get co-op identity ticket! 503 
+[01:49:46.969] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:48.970] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:49.066] WARN: Could not get co-op identity ticket! 503 
+[01:49:49.067] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:51.068] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:51.135] WARN: Could not get co-op identity ticket! 503 
+[01:49:51.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:53.144] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:53.211] WARN: Could not get co-op identity ticket! 503 
+[01:49:53.211] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:55.212] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:55.274] WARN: Could not get co-op identity ticket! 503 
+[01:49:55.274] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:57.275] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:57.337] WARN: Could not get co-op identity ticket! 503 
+[01:49:57.338] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:49:59.340] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:49:59.407] WARN: Could not get co-op identity ticket! 503 
+[01:49:59.407] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:01.408] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:01.467] WARN: Could not get co-op identity ticket! 503 
+[01:50:01.467] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:03.469] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:03.537] WARN: Could not get co-op identity ticket! 503 
+[01:50:03.537] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:05.538] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:05.602] WARN: Could not get co-op identity ticket! 503 
+[01:50:05.602] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:07.604] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:07.671] WARN: Could not get co-op identity ticket! 503 
+[01:50:07.672] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:09.678] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:09.747] WARN: Could not get co-op identity ticket! 503 
+[01:50:09.747] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:11.748] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:11.807] WARN: Could not get co-op identity ticket! 503 
+[01:50:11.807] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:13.808] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:13.894] WARN: Could not get co-op identity ticket! 503 
+[01:50:13.894] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:15.895] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:15.971] WARN: Could not get co-op identity ticket! 503 
+[01:50:15.972] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:17.973] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:18.026] WARN: Could not get co-op identity ticket! 503 
+[01:50:18.026] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:20.030] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:20.085] WARN: Could not get co-op identity ticket! 503 
+[01:50:20.085] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:22.086] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:22.148] WARN: Could not get co-op identity ticket! 503 
+[01:50:22.148] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:24.149] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:24.201] WARN: Could not get co-op identity ticket! 503 
+[01:50:24.201] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:26.202] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:26.270] WARN: Could not get co-op identity ticket! 503 
+[01:50:26.270] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:28.272] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:28.332] WARN: Could not get co-op identity ticket! 503 
+[01:50:28.332] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:30.337] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:30.395] WARN: Could not get co-op identity ticket! 503 
+[01:50:30.395] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:32.395] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:32.473] WARN: Could not get co-op identity ticket! 503 
+[01:50:32.474] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:34.474] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:34.530] WARN: Could not get co-op identity ticket! 503 
+[01:50:34.530] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:36.534] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:36.588] WARN: Could not get co-op identity ticket! 503 
+[01:50:36.588] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:38.589] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:38.668] WARN: Could not get co-op identity ticket! 503 
+[01:50:38.668] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:40.669] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:40.735] WARN: Could not get co-op identity ticket! 503 
+[01:50:40.735] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:42.743] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:42.801] WARN: Could not get co-op identity ticket! 503 
+[01:50:42.801] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:44.807] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:44.859] WARN: Could not get co-op identity ticket! 503 
+[01:50:44.859] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:46.863] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:46.928] WARN: Could not get co-op identity ticket! 503 
+[01:50:46.928] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:48.929] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:49.005] WARN: Could not get co-op identity ticket! 503 
+[01:50:49.006] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:51.007] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:51.061] WARN: Could not get co-op identity ticket! 503 
+[01:50:51.061] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:53.072] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:53.136] WARN: Could not get co-op identity ticket! 503 
+[01:50:53.136] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:55.137] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:55.204] WARN: Could not get co-op identity ticket! 503 
+[01:50:55.204] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:57.212] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:57.282] WARN: Could not get co-op identity ticket! 503 
+[01:50:57.283] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:50:59.283] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:50:59.345] WARN: Could not get co-op identity ticket! 503 
+[01:50:59.345] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:01.352] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:01.414] WARN: Could not get co-op identity ticket! 503 
+[01:51:01.415] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:03.421] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:03.492] WARN: Could not get co-op identity ticket! 503 
+[01:51:03.493] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:05.493] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:05.589] WARN: Could not get co-op identity ticket! 503 
+[01:51:05.589] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:07.591] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:07.653] WARN: Could not get co-op identity ticket! 503 
+[01:51:07.654] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:09.655] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:09.718] WARN: Could not get co-op identity ticket! 503 
+[01:51:09.718] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:11.719] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:11.780] WARN: Could not get co-op identity ticket! 503 
+[01:51:11.781] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:13.783] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:13.826] WARN: Could not get co-op identity ticket! 503 
+[01:51:13.827] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:15.827] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:15.880] WARN: Could not get co-op identity ticket! 503 
+[01:51:15.880] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:17.881] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:17.933] WARN: Could not get co-op identity ticket! 503 
+[01:51:17.933] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:18.172] LOG: crit stage: +0
+[01:51:19.936] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:19.976] WARN: Could not get co-op identity ticket! 503 
+[01:51:19.977] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:21.977] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:22.039] WARN: Could not get co-op identity ticket! 503 
+[01:51:22.039] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:24.039] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:24.090] WARN: Could not get co-op identity ticket! 503 
+[01:51:24.090] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:25.370] LOG: Move: POPULATION_BOMB Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:51:25.372] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:51:25.888] LOG: %cStart Phase CommandPhase color:green;
+[01:51:26.091] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:26.131] WARN: Could not get co-op identity ticket! 503 
+[01:51:26.131] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:27.904] LOG: Move: FIRST_IMPRESSION Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Mega Golisopod Y
+[01:51:27.906] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:51:28.133] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:28.190] WARN: Could not get co-op identity ticket! 503 
+[01:51:28.191] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:28.397] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:51:28.481] LOG: Battle Seed: XPkAKTKxI73doiW2
+[01:51:28.598] LOG: Move Pool: ["Double-Edge","Body Slam","Noble Roar","Roar"]
+[01:51:28.598] LOG: Move Scores: [28.5,14.25,4,-20]
+[01:51:28.598] LOG: Sorted Move Pool: ["Double-Edge","Body Slam","Noble Roar","Roar"]
+[01:51:28.598] LOG: Chosen Move: Double-Edge
+[01:51:28.598] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:51:28.751] LOG: Move Pool: ["Close Combat"]
+[01:51:28.751] LOG: Move Scores: [336]
+[01:51:28.751] LOG: Sorted Move Pool: ["Close Combat"]
+[01:51:28.751] LOG: Chosen Move: Close Combat
+[01:51:28.751] LOG: %cStart Phase TurnStartPhase color:green;
+[01:51:28.837] LOG: %cStart Phase MovePhase color:green;
+[01:51:28.837] LOG: %cUser: Mega Golisopod Y
+Move: FIRST_IMPRESSION
+Use Mode: NORMAL color:orchid
+[01:51:28.907] LOG: %cStart Phase MessagePhase color:green;
+[01:51:29.224] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:29.543] LOG: crit stage: +0
+[01:51:29.557] LOG: Move: First Impression | Base damage: 93.96134453781514 | Power: 97.5 | Source attack: 230 | Target defense: 119
+[01:51:29.562] LOG: Move: First Impression | Attack damage: 16
+[01:51:29.588] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:29.611] LOG: %cStart Phase MessagePhase color:green;
+[01:51:30.123] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:51:30.196] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:30.365] WARN: Could not get co-op identity ticket! 503 
+[01:51:30.366] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:30.527] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[01:51:30.941] LOG: %cStart Phase MessagePhase color:green;
+[01:51:31.505] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:51:31.561] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:31.579] LOG: %cStart Phase MovePhase color:green;
+[01:51:31.579] LOG: %cUser: Stoutland
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[01:51:31.618] LOG: %cStart Phase MessagePhase color:green;
+[01:51:31.887] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:32.367] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:32.497] WARN: Could not get co-op identity ticket! 503 
+[01:51:32.497] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:32.591] LOG: crit stage: +0
+[01:51:32.601] LOG: Move: Double-Edge | Base damage: 67.18882681564246 | Power: 130 | Source attack: 170 | Target defense: 179
+[01:51:32.604] LOG: Move: Double-Edge | Attack damage: 77
+[01:51:32.608] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:32.626] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:32.627] LOG: %cStart Phase MessagePhase color:green;
+[01:51:33.236] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:33.240] LOG: %cStart Phase MovePhase color:green;
+[01:51:33.240] LOG: %cUser: Mega Toucannon
+Move: POPULATION_BOMB
+Use Mode: NORMAL color:orchid
+[01:51:33.281] LOG: %cStart Phase MessagePhase color:green;
+[01:51:33.569] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:33.838] LOG: crit stage: +0
+[01:51:33.846] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:33.857] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:33.861] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:33.875] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:34.139] LOG: crit stage: +0
+[01:51:34.150] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:34.167] LOG: Move: Population Bomb | Attack damage: 10
+[01:51:34.173] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:34.188] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:34.453] LOG: crit stage: +0
+[01:51:34.466] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:34.482] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:34.487] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:34.499] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:34.515] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:34.565] WARN: Could not get co-op identity ticket! 503 
+[01:51:34.565] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:34.787] LOG: crit stage: +0
+[01:51:34.801] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:34.820] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:34.824] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:34.841] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:35.104] LOG: crit stage: +0
+[01:51:35.113] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:35.125] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:35.128] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:35.144] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:35.419] LOG: crit stage: +0
+[01:51:35.428] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:35.442] LOG: Move: Population Bomb | Attack damage: 12
+[01:51:35.445] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:35.459] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:35.719] LOG: crit stage: +0
+[01:51:35.727] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:35.738] LOG: Move: Population Bomb | Attack damage: 17
+[01:51:35.742] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:35.757] LOG: %cStart Phase MessagePhase color:green;
+[01:51:36.233] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:36.501] LOG: crit stage: +0
+[01:51:36.508] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:36.520] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:36.522] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:36.539] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:36.570] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:36.625] WARN: Could not get co-op identity ticket! 503 
+[01:51:36.625] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:36.802] LOG: crit stage: +0
+[01:51:36.811] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:36.821] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:36.823] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:36.840] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:37.102] LOG: crit stage: +0
+[01:51:37.115] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:37.129] LOG: Move: Population Bomb | Attack damage: 18
+[01:51:37.134] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:37.156] LOG: %cStart Phase MessagePhase color:green;
+[01:51:37.632] LOG: %cStart Phase MessagePhase color:green;
+[01:51:38.115] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:38.115] LOG: %cStart Phase MovePhase color:green;
+[01:51:38.116] LOG: %cUser: Eraticate
+Move: CLOSE_COMBAT
+Use Mode: NORMAL color:orchid
+[01:51:38.118] LOG: %cStart Phase MessagePhase color:green;
+[01:51:38.626] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:38.660] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:38.661] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:51:38.661] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:51:38.661] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:51:38.661] LOG: %cStart Phase BerryPhase color:green;
+[01:51:38.722] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:51:38.762] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[01:51:38.768] WARN: Could not get co-op identity ticket! 503 
+[01:51:38.768] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:39.164] LOG: %cStart Phase MessagePhase color:green;
+[01:51:39.746] LOG: %cStart Phase TurnEndPhase color:green;
+[01:51:39.777] LOG: %cStart Phase TurnInitPhase color:green;
+[01:51:39.777] LOG: %cStart Phase CommandPhase color:green;
+[01:51:40.769] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:40.824] WARN: Could not get co-op identity ticket! 503 
+[01:51:40.824] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:42.824] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:42.883] WARN: Could not get co-op identity ticket! 503 
+[01:51:42.884] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:44.318] LOG: Move: FLASH_CANNON Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:51:44.321] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:51:44.884] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:44.947] WARN: Could not get co-op identity ticket! 503 
+[01:51:44.947] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:46.077] LOG: %cStart Phase CommandPhase color:green;
+[01:51:46.949] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:47.010] WARN: Could not get co-op identity ticket! 503 
+[01:51:47.011] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:47.882] LOG: Move: POPULATION_BOMB Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:51:47.885] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:51:48.280] LOG: %cStart Phase CommandPhase color:green;
+[01:51:49.012] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:49.058] WARN: Could not get co-op identity ticket! 503 
+[01:51:49.058] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:49.742] LOG: Move: JET_PUNCH Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Mega Golisopod Y
+[01:51:49.746] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:51:51.059] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:51.111] WARN: Could not get co-op identity ticket! 503 
+[01:51:51.111] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:51.276] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:51:51.306] LOG: Battle Seed: XPkAKTKxI73doiW2
+[01:51:51.309] LOG: Move Pool: ["Double-Edge"]
+[01:51:51.309] LOG: Move Scores: [13.5]
+[01:51:51.309] LOG: Sorted Move Pool: ["Double-Edge"]
+[01:51:51.309] LOG: Chosen Move: Double-Edge
+[01:51:51.309] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:51:51.371] LOG: Move Pool: ["Close Combat"]
+[01:51:51.371] LOG: Move Scores: [14.25]
+[01:51:51.371] LOG: Sorted Move Pool: ["Close Combat"]
+[01:51:51.371] LOG: Chosen Move: Close Combat
+[01:51:51.371] LOG: %cStart Phase TurnStartPhase color:green;
+[01:51:51.421] LOG: %cStart Phase MovePhase color:green;
+[01:51:51.421] LOG: %cUser: Mega Golisopod Y
+Move: JET_PUNCH
+Use Mode: NORMAL color:orchid
+[01:51:51.458] LOG: %cStart Phase MessagePhase color:green;
+[01:51:51.601] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:52.686] LOG: crit stage: +0
+[01:51:52.693] LOG: Move: Jet Punch | Base damage: 75.56907563025209 | Power: 78 | Source attack: 230 | Target defense: 119
+[01:51:52.695] LOG: Move: Jet Punch | Attack damage: 53
+[01:51:52.698] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:52.724] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:52.732] LOG: %cStart Phase MovePhase color:green;
+[01:51:52.732] LOG: %cUser: Stoutland
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[01:51:52.771] LOG: %cStart Phase MessagePhase color:green;
+[01:51:53.050] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:53.113] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:53.169] WARN: Could not get co-op identity ticket! 503 
+[01:51:53.170] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:53.752] LOG: crit stage: +0
+[01:51:53.761] LOG: Move: Double-Edge | Base damage: 82.4744827586207 | Power: 130 | Source attack: 170 | Target defense: 145
+[01:51:53.766] LOG: Move: Double-Edge | Attack damage: 58
+[01:51:53.771] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:53.792] LOG: %cStart Phase MessagePhase color:green;
+[01:51:54.316] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:54.322] LOG: %cStart Phase MessagePhase color:green;
+[01:51:54.931] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:54.937] LOG: %cStart Phase MovePhase color:green;
+[01:51:54.938] LOG: %cUser: Mega Toucannon
+Move: POPULATION_BOMB
+Use Mode: NORMAL color:orchid
+[01:51:54.999] LOG: %cStart Phase MessagePhase color:green;
+[01:51:55.171] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:55.221] WARN: Could not get co-op identity ticket! 503 
+[01:51:55.222] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:55.281] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:55.550] LOG: crit stage: +0
+[01:51:55.561] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:55.572] LOG: Move: Population Bomb | Attack damage: 11
+[01:51:55.574] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:55.591] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:55.866] LOG: crit stage: +0
+[01:51:55.875] LOG: Move: Population Bomb | Base damage: 16.50057142857143 | Power: 20 | Source attack: 156 | Target defense: 105
+[01:51:55.887] LOG: Move: Population Bomb | Attack damage: 12
+[01:51:55.890] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:55.902] LOG: %cStart Phase MessagePhase color:green;
+[01:51:56.381] LOG: %cStart Phase FaintPhase color:green;
+[01:51:56.542] LOG: %cStart Phase MessagePhase color:green;
+[01:51:56.773] LOG: %cStart Phase VictoryPhase color:green;
+[01:51:56.774] LOG: %cStart Phase ExpPhase color:green;
+[01:51:56.774] LOG: Applied Super EXP. Charm 
+[01:51:56.774] LOG: Applied EXP. Charm 
+[01:51:57.223] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:57.267] WARN: Could not get co-op identity ticket! 503 
+[01:51:57.267] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:57.499] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:57.500] LOG: %cStart Phase ExpPhase color:green;
+[01:51:57.500] LOG: Applied Super EXP. Charm 
+[01:51:57.500] LOG: Applied EXP. Charm 
+[01:51:58.284] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:58.285] LOG: Applied Zinc 
+[01:51:58.285] LOG: Applied Protein 
+[01:51:58.286] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:51:58.286] LOG: Applied Super EXP. Charm 
+[01:51:58.286] LOG: Applied EXP. Charm 
+[01:51:58.287] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:58.287] LOG: Applied Protein 
+[01:51:58.287] LOG: Applied Zinc 
+[01:51:58.288] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:51:58.288] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:51:58.288] LOG: Applied Super EXP. Charm 
+[01:51:58.288] LOG: Applied EXP. Charm 
+[01:51:58.288] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:58.288] LOG: Applied Carbos 
+[01:51:58.289] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:51:58.289] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:51:58.289] LOG: Applied Super EXP. Charm 
+[01:51:58.289] LOG: Applied EXP. Charm 
+[01:51:58.289] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:58.290] LOG: Applied Protein 
+[01:51:58.290] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:51:58.290] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:51:58.290] LOG: Applied Super EXP. Charm 
+[01:51:58.290] LOG: Applied EXP. Charm 
+[01:51:58.291] LOG: %cStart Phase LevelUpPhase color:green;
+[01:51:58.291] LOG: Applied Calcium 
+[01:51:58.291] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:51:58.291] LOG: %cStart Phase MoveEndPhase color:green;
+[01:51:58.292] LOG: %cStart Phase MovePhase color:green;
+[01:51:58.292] LOG: %cUser: Eraticate
+Move: CLOSE_COMBAT
+Use Mode: NORMAL color:orchid
+[01:51:58.325] LOG: %cStart Phase MessagePhase color:green;
+[01:51:58.595] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:51:59.269] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:51:59.320] WARN: Could not get co-op identity ticket! 503 
+[01:51:59.320] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:51:59.331] LOG: crit stage: +0
+[01:51:59.338] LOG: Move: Close Combat | Base damage: 57.35296703296704 | Power: 120 | Source attack: 159 | Target defense: 182
+[01:51:59.342] LOG: Move: Close Combat | Attack damage: 29
+[01:51:59.347] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:51:59.365] LOG: %cStart Phase MessagePhase color:green;
+[01:51:59.893] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:51:59.894] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:52:00.352] LOG: %cStart Phase MessagePhase color:green;
+[01:52:00.909] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:52:01.321] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:01.364] LOG: %cStart Phase MessagePhase color:green;
+[01:52:01.385] WARN: Could not get co-op identity ticket! 503 
+[01:52:01.385] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:01.925] LOG: %cStart Phase MoveEndPhase color:green;
+[01:52:01.925] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:52:01.926] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:52:01.926] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:52:01.926] LOG: %cStart Phase BerryPhase color:green;
+[01:52:01.935] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:52:01.943] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[01:52:02.359] LOG: %cStart Phase MessagePhase color:green;
+[01:52:02.940] LOG: %cStart Phase TurnEndPhase color:green;
+[01:52:02.949] LOG: %cStart Phase TurnInitPhase color:green;
+[01:52:02.949] LOG: %cStart Phase CommandPhase color:green;
+[01:52:03.386] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:03.437] WARN: Could not get co-op identity ticket! 503 
+[01:52:03.438] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:03.771] LOG: Move: POPULATION_BOMB Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:52:03.776] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:52:04.120] LOG: %cStart Phase CommandPhase color:green;
+[01:52:04.830] LOG: Move: JET_PUNCH Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Mega Golisopod Y
+[01:52:04.832] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:52:05.228] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:52:05.276] LOG: Battle Seed: XPkAKTKxI73doiW2
+[01:52:05.293] LOG: Move Pool: ["Close Combat","Lash Out"]
+[01:52:05.293] LOG: Move Scores: [336,16]
+[01:52:05.293] LOG: Sorted Move Pool: ["Close Combat","Lash Out"]
+[01:52:05.293] LOG: Chosen Move: Lash Out
+[01:52:05.293] LOG: %cStart Phase TurnStartPhase color:green;
+[01:52:05.312] LOG: %cStart Phase MovePhase color:green;
+[01:52:05.312] LOG: %cUser: Mega Golisopod Y
+Move: JET_PUNCH
+Use Mode: NORMAL color:orchid
+[01:52:05.328] LOG: %cStart Phase MessagePhase color:green;
+[01:52:05.442] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:05.501] WARN: Could not get co-op identity ticket! 503 
+[01:52:05.502] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:05.554] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:06.638] LOG: crit stage: +0
+[01:52:06.645] LOG: Move: Jet Punch | Base damage: 116.594835443038 | Power: 78 | Source attack: 234 | Target defense: 79
+[01:52:06.648] LOG: Move: Jet Punch | Attack damage: 75
+[01:52:06.654] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:06.673] LOG: %cStart Phase MoveEndPhase color:green;
+[01:52:06.675] LOG: %cStart Phase MovePhase color:green;
+[01:52:06.676] LOG: %cUser: Mega Toucannon
+Move: POPULATION_BOMB
+Use Mode: NORMAL color:orchid
+[01:52:06.690] LOG: %cStart Phase MessagePhase color:green;
+[01:52:07.003] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:07.272] LOG: crit stage: +0
+[01:52:07.279] LOG: Move: Population Bomb | Base damage: 21.965569620253163 | Power: 20 | Source attack: 159 | Target defense: 79
+[01:52:07.281] LOG: Move: Population Bomb | Attack damage: 14
+[01:52:07.284] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:07.305] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:07.506] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:07.556] WARN: Could not get co-op identity ticket! 503 
+[01:52:07.556] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:07.571] LOG: crit stage: +0
+[01:52:07.577] LOG: Move: Population Bomb | Base damage: 21.965569620253163 | Power: 20 | Source attack: 159 | Target defense: 79
+[01:52:07.579] LOG: Move: Population Bomb | Attack damage: 15
+[01:52:07.581] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:07.605] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:07.872] LOG: crit stage: +0
+[01:52:07.877] LOG: Move: Population Bomb | Base damage: 21.965569620253163 | Power: 20 | Source attack: 159 | Target defense: 79
+[01:52:07.880] LOG: Move: Population Bomb | Attack damage: 16
+[01:52:07.883] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:07.904] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:08.171] LOG: crit stage: +0
+[01:52:08.176] LOG: Move: Population Bomb | Base damage: 21.965569620253163 | Power: 20 | Source attack: 159 | Target defense: 79
+[01:52:08.178] LOG: Move: Population Bomb | Attack damage: 14
+[01:52:08.180] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:08.204] LOG: %cStart Phase MessagePhase color:green;
+[01:52:08.684] LOG: %cStart Phase FaintPhase color:green;
+[01:52:08.693] WARN: cry/10680 not found
+[01:52:08.825] LOG: %cStart Phase MessagePhase color:green;
+[01:52:08.965] LOG: %cStart Phase VictoryPhase color:green;
+[01:52:08.971] LOG: %cStart Phase ExpPhase color:green;
+[01:52:08.972] LOG: Applied Super EXP. Charm 
+[01:52:08.973] LOG: Applied EXP. Charm 
+[01:52:09.474] LOG: %cStart Phase ExpPhase color:green;
+[01:52:09.474] LOG: Applied Super EXP. Charm 
+[01:52:09.475] LOG: Applied EXP. Charm 
+[01:52:09.558] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:09.625] WARN: Could not get co-op identity ticket! 503 
+[01:52:09.625] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:09.921] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:52:09.922] LOG: Applied Super EXP. Charm 
+[01:52:09.922] LOG: Applied EXP. Charm 
+[01:52:09.923] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:52:09.923] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:52:09.923] LOG: Applied Super EXP. Charm 
+[01:52:09.923] LOG: Applied EXP. Charm 
+[01:52:09.924] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:52:09.924] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:52:09.925] LOG: Applied Super EXP. Charm 
+[01:52:09.925] LOG: Applied EXP. Charm 
+[01:52:09.925] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:52:09.925] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:52:09.925] LOG: Applied Super EXP. Charm 
+[01:52:09.926] LOG: Applied EXP. Charm 
+[01:52:09.926] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:52:09.926] LOG: %cStart Phase MoveEndPhase color:green;
+[01:52:09.926] LOG: %cStart Phase TurnInitPhase color:green;
+[01:52:09.926] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:52:09.926] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:52:09.926] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:52:09.926] LOG: %cStart Phase BerryPhase color:green;
+[01:52:09.929] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:52:09.931] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[01:52:10.334] LOG: %cStart Phase MessagePhase color:green;
+[01:52:10.916] LOG: %cStart Phase TurnEndPhase color:green;
+[01:52:10.923] LOG: %cStart Phase BattleEndPhase color:green;
+[01:52:10.924] LOG: Battle Score: 239 (3 Turns x0.69)
+[01:52:10.924] LOG: Total Score: 15374
+[01:52:10.929] LOG: Applied Zinc 
+[01:52:10.929] LOG: Applied Protein 
+[01:52:10.930] LOG: Applied Protein 
+[01:52:10.930] LOG: Applied Zinc 
+[01:52:10.931] LOG: Applied Carbos 
+[01:52:10.931] LOG: Applied Protein 
+[01:52:10.932] LOG: Applied Calcium 
+[01:52:10.942] LOG: %cStart Phase EggLapsePhase color:green;
+[01:52:10.943] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:52:10.944] LOG: Wave Seed:  »{·¶¼¡¼~¶» 71
+[01:52:10.968] LOG: Applied Golden Poké Ball 
+[01:52:11.626] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:11.692] WARN: Could not get co-op identity ticket! 503 
+[01:52:11.692] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:13.692] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:13.753] WARN: Could not get co-op identity ticket! 503 
+[01:52:13.754] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:15.755] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:15.820] WARN: Could not get co-op identity ticket! 503 
+[01:52:15.820] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:16.525] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:52:16.526] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:52:16.579] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:52:16.579] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:52:17.821] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:17.872] WARN: Could not get co-op identity ticket! 503 
+[01:52:17.872] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:17.937] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:52:17.938] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:52:18.005] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:52:18.005] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:52:19.878] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:19.925] WARN: Could not get co-op identity ticket! 503 
+[01:52:19.925] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:20.325] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:52:20.326] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:52:20.375] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:52:20.375] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:52:21.927] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:21.990] WARN: Could not get co-op identity ticket! 503 
+[01:52:21.990] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:23.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:52:23.051] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:52:23.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:52:23.164] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:52:23.992] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:24.052] WARN: Could not get co-op identity ticket! 503 
+[01:52:24.052] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:26.057] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:26.145] WARN: Could not get co-op identity ticket! 503 
+[01:52:26.146] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:28.147] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:28.208] WARN: Could not get co-op identity ticket! 503 
+[01:52:28.208] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:29.255] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[01:52:30.209] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:30.286] WARN: Could not get co-op identity ticket! 503 
+[01:52:30.286] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:30.975] LOG: %cStart Phase SelectBiomePhase color:green;
+[01:52:30.976] LOG: Wave Seed:  »{·¶¼¡¼~¶» 71
+[01:52:32.287] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:32.354] WARN: Could not get co-op identity ticket! 503 
+[01:52:32.355] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:34.355] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:34.409] WARN: Could not get co-op identity ticket! 503 
+[01:52:34.409] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:36.415] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:36.479] LOG: %cStart Phase SwitchBiomePhase color:green;
+[01:52:36.489] WARN: Could not get co-op identity ticket! 503 
+[01:52:36.489] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:37.508] LOG: %cStart Phase NewBattlePhase color:green;
+[01:52:37.508] LOG: Wave Seed: ¡¼|¸·½¢½·¼ 72
+[01:52:37.514] LOG: Starting trainer pool tier: UNCOMMON
+[01:52:37.522] LOG: %cStart Phase ReturnPhase color:green;
+[01:52:37.775] LOG: %cStart Phase ReturnPhase color:green;
+[01:52:38.057] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:52:38.322] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[01:52:38.352] LOG: Pokemon: Foe Granitun | Species ID: 10040 | Level: 57 | Nature: Quiet (+SpAtk/-Spd)
+[01:52:38.353] LOG: Stats (IVs): HP: 203 (31), Atk: 126 (31), Def: 121 (31), Spatk: 116 (31), Spdef: 149 (31), Spd: 48 (0)
+[01:52:38.353] LOG: Ability: Friend Guard | Passive Ability: Apple Pie 
+[01:52:38.353] LOG: Moveset: ["Astonish","Dragon Rage","Rage Powder","Apple Acid"]
+[01:52:38.376] LOG: Pokemon: Foe Stakataka | Species ID: 805 | Level: 57 | Nature: Sassy (+SpDef/-Spd)
+[01:52:38.376] LOG: Stats (IVs): HP: 136 (31), Atk: 151 (31), Def: 254 (31), Spatk: 85 (31), Spdef: 134 (31), Spd: 16 (0)
+[01:52:38.376] LOG: Ability: Juggernaut | Passive Ability: Beast Boost 
+[01:52:38.376] LOG: Moveset: ["Body Press","Rock Wrecker","Heavy Slam","Heat Crash"]
+[01:52:38.497] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:38.565] WARN: Could not get co-op identity ticket! 503 
+[01:52:38.565] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:39.050] LOG: Battle Seed: DV9pc0Ch8nxIpXTu
+[01:52:39.051] LOG: Applied HP Up (enemy)
+[01:52:39.051] LOG: Applied Iron (enemy)
+[01:52:39.051] LOG: Applied Calcium (enemy)
+[01:52:39.052] LOG: Applied Zinc (enemy)
+[01:52:39.052] LOG: Applied HP Up (enemy)
+[01:52:39.052] LOG: Applied Iron (enemy)
+[01:52:39.052] LOG: Applied Calcium (enemy)
+[01:52:39.052] LOG: Applied Zinc (enemy)
+[01:52:39.053] LOG: Generated AI funcs
+[01:52:39.232] DEBUG: Session data saved to slot 0!
+[01:52:39.233] LOG: Applied HP Up (enemy)
+[01:52:39.233] LOG: Applied Iron (enemy)
+[01:52:39.234] LOG: Applied Calcium (enemy)
+[01:52:39.234] LOG: Applied Zinc (enemy)
+[01:52:39.240] LOG: Wave Seed: ¡¼|¸·½¢½·¼ 72
+[01:52:39.756] LOG: Baker Chris
+[01:52:39.757] LOG: Dialogue dialogue:baker.encounter.1 skipped
+[01:52:39.842] LOG: %cStart Phase SummonPhase color:green;
+[01:52:39.843] LOG: Chris
+[01:52:40.172] LOG: Applied HP Up (enemy)
+[01:52:40.173] LOG: Applied Iron (enemy)
+[01:52:40.173] LOG: Applied Calcium (enemy)
+[01:52:40.173] LOG: Applied Zinc (enemy)
+[01:52:40.238] WARN: cry/10040 not found
+[01:52:40.504] LOG: %cStart Phase SummonPhase color:green;
+[01:52:40.566] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:40.617] WARN: Could not get co-op identity ticket! 503 
+[01:52:40.618] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:40.890] LOG: Applied Zinc 
+[01:52:40.891] LOG: Applied Protein 
+[01:52:40.891] LOG: Applied Protein 
+[01:52:40.891] LOG: Applied Zinc 
+[01:52:40.893] LOG: Applied Carbos 
+[01:52:40.896] LOG: Applied Protein 
+[01:52:40.897] LOG: Applied Calcium 
+[01:52:41.219] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:52:41.486] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:52:41.490] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:52:41.494] LOG: %cStart Phase PostSummonPhase color:green;
+[01:52:41.494] LOG: Ran PSP for: Mega Toucannon
+[01:52:41.495] LOG: %cStart Phase PostSummonPhase color:green;
+[01:52:41.495] LOG: Ran PSP for: Granitun
+[01:52:41.496] LOG: %cStart Phase TurnInitPhase color:green;
+[01:52:41.496] LOG: %cStart Phase CommandPhase color:green;
+[01:52:42.625] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:42.684] WARN: Could not get co-op identity ticket! 503 
+[01:52:42.684] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:44.388] LOG: Move: FLASH_CANNON Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:52:44.402] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:52:44.428] LOG: %cStart Phase TurnStartPhase color:green;
+[01:52:44.433] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:52:44.434] LOG: Chris
+[01:52:44.686] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:44.745] WARN: Could not get co-op identity ticket! 503 
+[01:52:44.745] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:45.066] LOG: Chris
+[01:52:45.250] LOG: Applied HP Up (enemy)
+[01:52:45.250] LOG: Applied Iron (enemy)
+[01:52:45.250] LOG: Applied Calcium (enemy)
+[01:52:45.250] LOG: Applied Zinc (enemy)
+[01:52:45.585] LOG: %cStart Phase PostSummonPhase color:green;
+[01:52:45.586] LOG: Ran PSP for: Stakataka
+[01:52:45.587] LOG: %cStart Phase MovePhase color:green;
+[01:52:45.587] LOG: %cUser: Mega Toucannon
+Move: FLASH_CANNON
+Use Mode: NORMAL color:orchid
+[01:52:45.594] LOG: %cStart Phase MessagePhase color:green;
+[01:52:45.898] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:46.750] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:46.813] WARN: Could not get co-op identity ticket! 503 
+[01:52:46.813] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:47.134] LOG: crit stage: +0
+[01:52:47.141] LOG: Move: Flash Cannon | Base damage: 91.24189268292683 | Power: 152.1 | Source attack: 194 | Target defense: 164
+[01:52:47.148] LOG: Move: Flash Cannon | Attack damage: 74
+[01:52:47.155] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:47.176] LOG: %cStart Phase MoveEndPhase color:green;
+[01:52:47.177] LOG: %cStart Phase MovePhase color:green;
+[01:52:47.177] LOG: %cUser: Mega Toucannon
+Move: OUTBURST
+Use Mode: INDIRECT color:orchid
+[01:52:47.184] LOG: %cStart Phase MessagePhase color:green;
+[01:52:47.464] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:52:47.499] LOG: crit stage: +0
+[01:52:47.505] LOG: Move: Outburst | Base damage: 31.336585365853658 | Power: 50 | Source attack: 194 | Target defense: 164
+[01:52:47.511] LOG: Move: Outburst | Attack damage: 10
+[01:52:47.515] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:47.533] LOG: %cStart Phase MessagePhase color:green;
+[01:52:48.063] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:52:48.065] LOG: %cStart Phase FaintPhase color:green;
+[01:52:48.214] LOG: %cStart Phase MessagePhase color:green;
+[01:52:48.814] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:48.868] WARN: Could not get co-op identity ticket! 503 
+[01:52:48.868] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:50.871] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:50.935] WARN: Could not get co-op identity ticket! 503 
+[01:52:50.936] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:52.937] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:52.988] WARN: Could not get co-op identity ticket! 503 
+[01:52:52.988] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:54.989] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:55.039] WARN: Could not get co-op identity ticket! 503 
+[01:52:55.039] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:57.044] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:57.087] WARN: Could not get co-op identity ticket! 503 
+[01:52:57.087] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:58.309] LOG: %cStart Phase MessagePhase color:green;
+[01:52:59.028] LOG: %cStart Phase MoveEndPhase color:green;
+[01:52:59.028] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:52:59.028] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:52:59.028] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:52:59.028] LOG: %cStart Phase BerryPhase color:green;
+[01:52:59.029] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:52:59.029] LOG: %cStart Phase TurnEndPhase color:green;
+[01:52:59.041] LOG: %cStart Phase SwitchPhase color:green;
+[01:52:59.090] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:52:59.145] WARN: Could not get co-op identity ticket! 503 
+[01:52:59.145] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:52:59.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:52:59.168] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:52:59.303] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:52:59.303] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:53:00.970] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:53:01.147] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:01.154] LOG: Applied Zinc 
+[01:53:01.154] LOG: Applied Protein 
+[01:53:01.158] LOG: Applied Protein 
+[01:53:01.158] LOG: Applied Zinc 
+[01:53:01.159] LOG: Applied Carbos 
+[01:53:01.160] LOG: Applied Protein 
+[01:53:01.161] LOG: Applied Calcium 
+[01:53:01.210] WARN: Could not get co-op identity ticket! 503 
+[01:53:01.210] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:01.487] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:53:01.750] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:01.750] LOG: Ran PSP for: Mega Golisopod Y
+[01:53:01.752] LOG: %cStart Phase TurnInitPhase color:green;
+[01:53:01.752] LOG: %cStart Phase CommandPhase color:green;
+[01:53:02.738] LOG: Seed: ixAcMN4YcwpUQfPCREEptoUG
+[01:53:02.738] LOG: Wave Seed: ixAcMN4YcwpUQfPCREEptoUG 0
+[01:53:02.741] LOG: Getting Session Slot id: %d 0
+[01:53:02.789] LOG: Wave Seed: 9YPtPR4CpouEDELSOZuF7o8t 0
+[01:53:02.790] LOG: Seed: 9YPtPR4CpouEDELSOZuF7o8t
+[01:53:02.791] LOG: Wave Seed: ¡¼|¸·½¢½·¼ 72
+[01:53:02.794] LOG: Applied Zinc 
+[01:53:02.794] LOG: Applied Protein 
+[01:53:02.794] LOG: Applied Protein 
+[01:53:02.794] LOG: Applied Zinc 
+[01:53:02.794] LOG: Applied Carbos 
+[01:53:02.795] LOG: Applied Protein 
+[01:53:02.795] LOG: Applied Calcium 
+[01:53:02.796] LOG: Applied Zinc 
+[01:53:02.796] LOG: Applied Protein 
+[01:53:02.796] LOG: Applied Protein 
+[01:53:02.796] LOG: Applied Zinc 
+[01:53:02.796] LOG: Applied Carbos 
+[01:53:02.797] LOG: Applied Protein 
+[01:53:02.797] LOG: Applied Calcium 
+[01:53:02.800] LOG: Applied Zinc 
+[01:53:02.800] LOG: Applied Protein 
+[01:53:02.800] LOG: Applied Protein 
+[01:53:02.800] LOG: Applied Zinc 
+[01:53:02.801] LOG: Applied Carbos 
+[01:53:02.801] LOG: Applied Protein 
+[01:53:02.801] LOG: Applied Calcium 
+[01:53:02.802] LOG: Applied HP Up (enemy)
+[01:53:02.803] LOG: Applied Iron (enemy)
+[01:53:02.803] LOG: Applied Calcium (enemy)
+[01:53:02.803] LOG: Applied Zinc (enemy)
+[01:53:02.803] LOG: %cStart Phase EncounterPhase color:green;
+[01:53:02.805] LOG: Pokemon: Foe Granitun | Species ID: 10040 | Level: 57 | Nature: Quiet (+SpAtk/-Spd)
+[01:53:02.805] LOG: Stats (IVs): HP: 210 (31), Atk: 136 (31), Def: 125 (31), Spatk: 157 (31), Spdef: 159 (31), Spd: 35 (0)
+[01:53:02.805] LOG: Ability: Friend Guard | Passive Ability: Apple Pie 
+[01:53:02.805] LOG: Moveset: ["Astonish","Dragon Rage","Rage Powder","Apple Acid"]
+[01:53:02.806] LOG: Pokemon: Foe Stakataka | Species ID: 805 | Level: 57 | Nature: Sassy (+SpDef/-Spd)
+[01:53:02.806] LOG: Stats (IVs): HP: 157 (31), Atk: 181 (31), Def: 311 (31), Spatk: 88 (31), Spdef: 164 (31), Spd: 10 (0)
+[01:53:02.806] LOG: Ability: Juggernaut | Passive Ability: Beast Boost 
+[01:53:02.806] LOG: Moveset: ["Body Press","Rock Wrecker","Heavy Slam","Heat Crash"]
+[01:53:02.857] LOG: Generated AI funcs
+[01:53:02.858] LOG: Applied HP Up (enemy)
+[01:53:02.858] LOG: Applied Iron (enemy)
+[01:53:02.858] LOG: Applied Calcium (enemy)
+[01:53:02.858] LOG: Applied Zinc (enemy)
+[01:53:02.859] LOG: Wave Seed: ¡¼|¸·½¢½·¼ 72
+[01:53:03.211] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:03.260] WARN: Could not get co-op identity ticket! 503 
+[01:53:03.260] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:03.415] LOG: Baker Chris
+[01:53:03.417] LOG: Dialogue dialogue:baker.encounter.1 skipped
+[01:53:03.499] LOG: Baker Chris
+[01:53:04.420] LOG: %cStart Phase SummonPhase color:green;
+[01:53:04.420] LOG: Chris
+[01:53:04.754] LOG: Applied HP Up (enemy)
+[01:53:04.755] LOG: Applied Iron (enemy)
+[01:53:04.755] LOG: Applied Calcium (enemy)
+[01:53:04.755] LOG: Applied Zinc (enemy)
+[01:53:04.818] WARN: cry/10040 not found
+[01:53:05.083] LOG: %cStart Phase SummonPhase color:green;
+[01:53:05.261] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:05.322] WARN: Could not get co-op identity ticket! 503 
+[01:53:05.322] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:05.470] LOG: Applied Zinc 
+[01:53:05.470] LOG: Applied Protein 
+[01:53:05.471] LOG: Applied Protein 
+[01:53:05.471] LOG: Applied Zinc 
+[01:53:05.472] LOG: Applied Carbos 
+[01:53:05.472] LOG: Applied Protein 
+[01:53:05.473] LOG: Applied Calcium 
+[01:53:05.798] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:53:06.065] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:53:06.069] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:06.070] LOG: Ran PSP for: Mega Toucannon
+[01:53:06.071] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:06.072] LOG: Ran PSP for: Granitun
+[01:53:06.073] LOG: %cStart Phase TurnInitPhase color:green;
+[01:53:06.073] LOG: %cStart Phase CommandPhase color:green;
+[01:53:06.829] LOG: crit stage: +0
+[01:53:07.322] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:07.370] WARN: Could not get co-op identity ticket! 503 
+[01:53:07.370] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:09.371] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:09.435] WARN: Could not get co-op identity ticket! 503 
+[01:53:09.435] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:11.437] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:11.487] WARN: Could not get co-op identity ticket! 503 
+[01:53:11.488] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:13.494] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:13.571] WARN: Could not get co-op identity ticket! 503 
+[01:53:13.571] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:15.575] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:15.636] WARN: Could not get co-op identity ticket! 503 
+[01:53:15.636] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:17.639] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:17.695] WARN: Could not get co-op identity ticket! 503 
+[01:53:17.695] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:19.696] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:19.763] WARN: Could not get co-op identity ticket! 503 
+[01:53:19.763] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:21.766] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:21.808] WARN: Could not get co-op identity ticket! 503 
+[01:53:21.808] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:23.809] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:23.870] WARN: Could not get co-op identity ticket! 503 
+[01:53:23.871] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:25.871] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:25.923] WARN: Could not get co-op identity ticket! 503 
+[01:53:25.923] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:27.925] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:27.970] WARN: Could not get co-op identity ticket! 503 
+[01:53:27.970] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:29.970] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:30.036] WARN: Could not get co-op identity ticket! 503 
+[01:53:30.037] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:32.039] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:32.107] WARN: Could not get co-op identity ticket! 503 
+[01:53:32.107] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:34.109] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:34.192] WARN: Could not get co-op identity ticket! 503 
+[01:53:34.192] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:36.194] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:36.245] WARN: Could not get co-op identity ticket! 503 
+[01:53:36.245] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:38.246] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:38.308] WARN: Could not get co-op identity ticket! 503 
+[01:53:38.308] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:40.310] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:40.360] WARN: Could not get co-op identity ticket! 503 
+[01:53:40.360] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:42.362] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:42.427] WARN: Could not get co-op identity ticket! 503 
+[01:53:42.427] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:44.430] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:44.484] WARN: Could not get co-op identity ticket! 503 
+[01:53:44.484] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:46.484] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:46.545] WARN: Could not get co-op identity ticket! 503 
+[01:53:46.545] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:48.545] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:48.611] WARN: Could not get co-op identity ticket! 503 
+[01:53:48.611] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:50.611] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:50.659] WARN: Could not get co-op identity ticket! 503 
+[01:53:50.659] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:51.908] LOG: Move: FLASH_CANNON Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Toucannon
+[01:53:51.918] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:53:51.950] LOG: %cStart Phase TurnStartPhase color:green;
+[01:53:51.954] LOG: Battle Seed: DV9pc0Ch8nxIpXTu
+[01:53:51.955] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:53:51.956] LOG: Chris
+[01:53:52.600] LOG: Chris
+[01:53:52.659] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:52.723] WARN: Could not get co-op identity ticket! 503 
+[01:53:52.723] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:52.786] LOG: Applied HP Up (enemy)
+[01:53:52.786] LOG: Applied Iron (enemy)
+[01:53:52.787] LOG: Applied Calcium (enemy)
+[01:53:52.787] LOG: Applied Zinc (enemy)
+[01:53:53.122] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:53.123] LOG: Ran PSP for: Stakataka
+[01:53:53.125] LOG: %cStart Phase MovePhase color:green;
+[01:53:53.125] LOG: %cUser: Mega Toucannon
+Move: FLASH_CANNON
+Use Mode: NORMAL color:orchid
+[01:53:53.136] LOG: %cStart Phase MessagePhase color:green;
+[01:53:53.432] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:54.666] LOG: crit stage: +0
+[01:53:54.673] LOG: Move: Flash Cannon | Base damage: 91.24189268292683 | Power: 152.1 | Source attack: 194 | Target defense: 164
+[01:53:54.678] LOG: Move: Flash Cannon | Attack damage: 80
+[01:53:54.689] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:54.702] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:54.703] LOG: %cStart Phase MovePhase color:green;
+[01:53:54.704] LOG: %cUser: Mega Toucannon
+Move: OUTBURST
+Use Mode: INDIRECT color:orchid
+[01:53:54.706] LOG: %cStart Phase MessagePhase color:green;
+[01:53:54.725] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:54.772] WARN: Could not get co-op identity ticket! 503 
+[01:53:54.772] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:54.997] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:53:55.032] LOG: crit stage: +0
+[01:53:55.037] LOG: Move: Outburst | Base damage: 31.336585365853658 | Power: 50 | Source attack: 194 | Target defense: 164
+[01:53:55.043] LOG: Move: Outburst | Attack damage: 11
+[01:53:55.046] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:55.066] LOG: %cStart Phase MessagePhase color:green;
+[01:53:55.596] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:53:55.600] LOG: %cStart Phase FaintPhase color:green;
+[01:53:55.749] LOG: %cStart Phase MessagePhase color:green;
+[01:53:56.774] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:56.836] WARN: Could not get co-op identity ticket! 503 
+[01:53:56.836] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:56.885] LOG: %cStart Phase MessagePhase color:green;
+[01:53:57.320] LOG: %cStart Phase MoveEndPhase color:green;
+[01:53:57.321] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:53:57.321] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:53:57.321] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:53:57.321] LOG: %cStart Phase BerryPhase color:green;
+[01:53:57.322] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:53:57.322] LOG: %cStart Phase TurnEndPhase color:green;
+[01:53:57.346] LOG: %cStart Phase SwitchPhase color:green;
+[01:53:57.483] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 727_2
+[01:53:57.483] LOG: Incineroar's variant icon does not exist. Replacing with default.
+[01:53:57.576] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 738_2
+[01:53:57.576] LOG: Vikavolt's variant icon does not exist. Replacing with default.
+[01:53:58.635] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:53:58.829] LOG: Applied Zinc 
+[01:53:58.829] LOG: Applied Protein 
+[01:53:58.833] LOG: Applied Protein 
+[01:53:58.834] LOG: Applied Zinc 
+[01:53:58.834] LOG: Applied Carbos 
+[01:53:58.835] LOG: Applied Protein 
+[01:53:58.836] LOG: Applied Calcium 
+[01:53:58.850] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:53:58.905] WARN: Could not get co-op identity ticket! 503 
+[01:53:58.905] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:53:59.164] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:53:59.426] LOG: %cStart Phase PostSummonPhase color:green;
+[01:53:59.426] LOG: Ran PSP for: Mega Golisopod Y
+[01:53:59.428] LOG: %cStart Phase TurnInitPhase color:green;
+[01:53:59.428] LOG: %cStart Phase CommandPhase color:green;
+[01:54:00.907] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:00.981] WARN: Could not get co-op identity ticket! 503 
+[01:54:00.981] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:02.982] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:03.038] WARN: Could not get co-op identity ticket! 503 
+[01:54:03.038] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:05.042] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:05.093] WARN: Could not get co-op identity ticket! 503 
+[01:54:05.094] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:07.094] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:07.149] WARN: Could not get co-op identity ticket! 503 
+[01:54:07.149] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:09.150] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:09.208] WARN: Could not get co-op identity ticket! 503 
+[01:54:09.208] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:11.209] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:11.271] WARN: Could not get co-op identity ticket! 503 
+[01:54:11.271] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:13.272] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:13.325] WARN: Could not get co-op identity ticket! 503 
+[01:54:13.325] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:15.326] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:15.385] WARN: Could not get co-op identity ticket! 503 
+[01:54:15.385] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:17.385] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:17.453] WARN: Could not get co-op identity ticket! 503 
+[01:54:17.453] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:19.454] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:19.502] WARN: Could not get co-op identity ticket! 503 
+[01:54:19.502] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:21.503] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:21.566] WARN: Could not get co-op identity ticket! 503 
+[01:54:21.566] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:23.576] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:23.631] WARN: Could not get co-op identity ticket! 503 
+[01:54:23.631] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+[01:54:25.632] LOG: [coop:lobby] start announce name=HolyRedux2 protocol=p33
+[01:54:25.707] WARN: Could not get co-op identity ticket! 503 
+[01:54:25.707] WARN: [coop:lobby] start failed: could not authenticate co-op identity (503)
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"9YPtPR4CpouEDELSOZuF7o8t","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":1613565725,"player":true,"species":737,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":32,"exp":32768,"levelExp":0,"gender":0,"hp":63,"stats":[88,45,75,80,62,41],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":909,"ppUsed":5,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":405,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0}],"status":null,"friendship":55,"metLevel":5,"metBiome":-1,"metSpecies":736,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[405],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2804075420,"player":true,"species":778,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":26,"exp":17725,"levelExp":149,"gender":1,"hp":0,"stats":[82,68,62,39,77,79],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":712,"ppUsed":1,"ppUp":0},{"moveId":5015,"ppUsed":1,"ppUp":0},{"moveId":882,"ppUsed":0,"ppUp":0},{"moveId":680,"ppUsed":0,"ppUp":0}],"status":{"effect":7,"toxicTurnCount":0,"sleepTurnsRemaining":0},"friendship":42,"metLevel":5,"metBiome":-1,"metSpecies":778,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":614806561,"player":true,"species":723,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":32,"exp":30900,"levelExp":0,"gender":1,"hp":77,"stats":[101,62,62,41,53,74],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":5034,"ppUsed":2,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0},{"moveId":444,"ppUsed":0,"ppUp":0},{"moveId":614,"ppUsed":0,"ppUp":0}],"status":null,"friendship":173,"metLevel":5,"metBiome":-1,"metSpecies":722,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[402],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[11],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5034,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":945700396,"player":true,"species":726,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":33,"exp":33990,"levelExp":0,"gender":0,"hp":65,"stats":[96,91,48,61,48,74],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":221,"ppUsed":2,"ppUp":3},{"moveId":389,"ppUsed":2,"ppUp":1},{"moveId":575,"ppUsed":1,"ppUp":0},{"moveId":303,"ppUsed":1,"ppUp":0}],"status":null,"friendship":206,"metLevel":5,"metBiome":-1,"metSpecies":725,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[9],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":221,"targets":[5],"result":1,"useMode":1},{"move":221,"targets":[4],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4052860868,"player":true,"species":768,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":30,"exp":28585,"levelExp":1585,"gender":0,"hp":94,"stats":[99,94,104,47,78,44],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":537,"ppUsed":0,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":792,"ppUsed":0,"ppUp":0}],"status":null,"friendship":51,"metLevel":5,"metBiome":-1,"metSpecies":767,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[141],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2068307340,"player":true,"species":733,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":32,"exp":32768,"levelExp":0,"gender":0,"hp":103,"stats":[103,91,75,69,67,53],"ivs":[31,31,31,31,31,31],"nature":19,"moveset":[{"moveId":860,"ppUsed":3,"ppUp":0},{"moveId":64,"ppUsed":0,"ppUp":0},{"moveId":908,"ppUsed":2,"ppUp":0},{"moveId":198,"ppUsed":0,"ppUp":0}],"status":null,"friendship":104,"metLevel":5,"metBiome":-1,"metSpecies":731,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[4],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":63,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":73,"kind":"learnMove","choice":4},{"type":"interaction","seq":74,"kind":"learnMove","choice":4},{"type":"interaction","seq":75,"kind":"learnMove","choice":4},{"type":"command","wave":63,"turn":2,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":63,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":4,"target":2}},{"type":"command","wave":63,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":76,"kind":"learnMove","choice":4},{"type":"interaction","seq":77,"kind":"learnMove","choice":4},{"type":"interaction","seq":78,"kind":"learnMove","choice":4},{"type":"command","wave":63,"turn":2,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":63,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":4,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":63,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":63,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":79,"kind":"learnMove","choice":4},{"type":"interaction","seq":80,"kind":"learnMove","choice":4},{"type":"interaction","seq":81,"kind":"learnMove","choice":4},{"type":"command","wave":63,"turn":2,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":4}},{"type":"command","wave":63,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":63,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":63,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":63,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":63,"turn":8,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":4}},{"type":"command","wave":63,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":82,"kind":"learnMove","choice":4},{"type":"interaction","seq":83,"kind":"learnMove","choice":4},{"type":"interaction","seq":84,"kind":"learnMove","choice":4},{"type":"command","wave":63,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":63,"turn":3,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":5}},{"type":"command","wave":63,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":63,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":63,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":63,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":63,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":63,"turn":9,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":5}},{"type":"command","wave":63,"turn":10,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":63,"turn":11,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":63,"turn":12,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":63,"turn":13,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":63,"turn":14,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":63,"turn":15,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":63,"turn":16,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":63,"turn":17,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":85,"kind":"reward","choice":1},{"type":"command","wave":64,"turn":1,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":64,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":64,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":64,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":64,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":64,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"command","wave":64,"turn":7,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":4}},{"type":"command","wave":64,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":64,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":64,"turn":10,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":64,"turn":11,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":86,"kind":"reward","choice":1},{"type":"interaction","seq":87,"kind":"me","choice":1},{"type":"interaction","seq":88,"kind":"reward","choice":2},{"type":"command","wave":66,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":66,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":66,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":66,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":66,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":66,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":66,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":66,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":66,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":66,"turn":10,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":66,"turn":11,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":89,"kind":"reward","choice":1},{"type":"interaction","seq":90,"kind":"crossroads","choice":0},{"type":"command","wave":67,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":67,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":67,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":67,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2,"target":1}},{"type":"interaction","seq":91,"kind":"reward","choice":0},{"type":"command","wave":68,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":68,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":68,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":68,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":68,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":68,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":68,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":68,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":68,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":68,"turn":10,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":68,"turn":11,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":68,"turn":12,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":68,"turn":13,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":68,"turn":14,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":92,"kind":"reward","choice":0},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":69,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":69,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":69,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":69,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":69,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":69,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":4,"target":2}},{"type":"command","wave":69,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":69,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":69,"turn":5,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":4}},{"type":"command","wave":69,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":69,"turn":7,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":69,"turn":1,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":69,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":4,"target":2}},{"type":"command","wave":69,"turn":3,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":69,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":69,"turn":5,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":69,"turn":6,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3,"target":0}},{"type":"command","wave":69,"turn":7,"slotFieldIndex":0,"command":{"kind":"switch","partyIndex":3}},{"type":"command","wave":69,"turn":8,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":4,"target":2}},{"type":"command","wave":69,"turn":9,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":93,"kind":"reward","choice":0},{"type":"command","wave":70,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"interaction","seq":94,"kind":"learnMove","choice":1},{"type":"interaction","seq":95,"kind":"learnMove","choice":4},{"type":"command","wave":71,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":71,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":71,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":71,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":71,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":71,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":71,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"interaction","seq":96,"kind":"reward","choice":3},{"type":"interaction","seq":97,"kind":"crossroads","choice":1},{"type":"interaction","seq":98,"kind":"biome","choice":30},{"type":"command","wave":72,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":72,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}}],"endState":{"waveIndex":72,"money":16704,"party":[{"species":768,"level":57,"hp":102,"maxHp":170},{"species":733,"level":57,"hp":0,"maxHp":175},{"species":727,"level":57,"hp":198,"maxHp":198},{"species":724,"level":57,"hp":173,"maxHp":173},{"species":778,"level":57,"hp":147,"maxHp":147},{"species":738,"level":57,"hp":172,"maxHp":172}]},"checkpoint":{"wave":63,"seed":"9YPtPR4CpouEDELSOZuF7o8t","party":[{"id":1613565725,"player":true,"species":738,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":55,"exp":173940,"levelExp":7565,"gender":0,"hp":136,"stats":[169,115,133,184,106,159],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":405,"ppUsed":0,"ppUp":0},{"moveId":84,"ppUsed":2,"ppUp":0},{"moveId":414,"ppUsed":2,"ppUp":0},{"moveId":347,"ppUsed":1,"ppUp":0}],"status":null,"friendship":130,"metLevel":5,"metBiome":-1,"metSpecies":736,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[405],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[4],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,1,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":414,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4052860868,"player":true,"species":768,"formIndex":1,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":55,"exp":167543,"levelExp":1168,"gender":0,"hp":137,"stats":[167,212,179,120,145,98],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":660,"ppUsed":1,"ppUp":0},{"moveId":857,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":792,"ppUsed":0,"ppUp":0}],"status":null,"friendship":94,"metLevel":5,"metBiome":-1,"metSpecies":767,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[141],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2068307340,"player":true,"species":733,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":54,"exp":165653,"levelExp":8189,"gender":0,"hp":167,"stats":[172,156,128,117,115,89],"ivs":[31,31,31,31,31,31],"nature":19,"moveset":[{"moveId":860,"ppUsed":0,"ppUp":0},{"moveId":331,"ppUsed":0,"ppUp":0},{"moveId":350,"ppUsed":0,"ppUp":0},{"moveId":5112,"ppUsed":0,"ppUp":0}],"status":null,"friendship":134,"metLevel":5,"metBiome":-1,"metSpecies":731,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":945700396,"player":true,"species":727,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":55,"exp":173347,"levelExp":9163,"gender":0,"hp":109,"stats":[195,194,123,99,123,89],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":221,"ppUsed":1,"ppUp":3},{"moveId":389,"ppUsed":0,"ppUp":2},{"moveId":575,"ppUsed":1,"ppUp":0},{"moveId":303,"ppUsed":0,"ppUp":0},{"moveId":252,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":725,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":9,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[{"typeId":"REVIVER_SEED"}]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":1,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2804075420,"player":true,"species":778,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":54,"exp":165653,"levelExp":8189,"gender":1,"hp":140,"stats":[144,143,111,70,139,142],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":421,"ppUsed":0,"ppUp":0},{"moveId":5015,"ppUsed":0,"ppUp":0},{"moveId":882,"ppUsed":0,"ppUp":0},{"moveId":680,"ppUsed":0,"ppUp":0}],"status":null,"friendship":89,"metLevel":5,"metBiome":-1,"metSpecies":778,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[421],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":13,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":614806561,"player":true,"species":724,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":54,"exp":163170,"levelExp":7978,"gender":1,"hp":164,"stats":[170,142,106,90,123,167],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":5034,"ppUsed":0,"ppUp":1},{"moveId":662,"ppUsed":0,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0},{"moveId":614,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":722,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[402],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":2,"className":"MapModifier"},{"player":true,"typeId":"BERRY_POUCH","args":[],"stackCount":1,"className":"PreserveBerryModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":4,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":4,"className":"ExpShareModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":5,"className":"ExpBoosterModifier"},{"player":true,"typeId":"AMULET_COIN","args":[],"stackCount":4,"className":"MoneyMultiplierModifier"},{"player":true,"typeId":"MEGA_BRACELET","args":[],"stackCount":1,"className":"MegaEvolutionAccessModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[945700396,1],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_LUCKY_HEART","args":[945700396,"luckyHeart",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_EXPERT_BELT","args":[2804075420,"expertBelt",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"ATTACK_TYPE_BOOSTER","typePregenArgs":[9],"args":[945700396,9,20],"stackCount":1,"className":"AttackTypeBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[614806561,1],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[4],"args":[4052860868,4],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"GOLDEN_PUNCH","args":[945700396],"stackCount":1,"className":"DamageMoneyRewardModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[2804075420,1],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"MULTI_LENS","args":[614806561],"stackCount":1,"className":"PokemonMultiHitModifier"},{"player":true,"typeId":"GOLDEN_POKEBALL","args":[],"stackCount":1,"className":"ExtraModifierModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[229],"args":[4052860868,229,false],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"ER_WISE_GLASSES","args":[1613565725,"wiseGlasses",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"REVIVER_SEED","args":[945700396],"stackCount":1,"className":"PokemonInstantReviveModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[614806561],"stackCount":1,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[230],"args":[4052860868,230,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[4052860868,1],"stackCount":1,"className":"BaseStatModifier"}],"money":18036,"pokeballCounts":{"0":45,"1":0,"2":0,"3":0,"4":0}}}
