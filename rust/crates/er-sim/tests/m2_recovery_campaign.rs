@@ -19,11 +19,12 @@ use er_sim::{
     SimulatedPair, SimulatedPairConfig, SimulatedPairError,
 };
 use er_types::{
-    AuthorityEntryKind, CancelPolicy, CommandControlTarget, CommandFrontierControl,
-    ConnectionGeneration, FrameContext, FrameType, GameButton, InputMap, KeyBinding, KernelEffect,
-    LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
-    MembershipRevision, NetworkFrame, NextControl, OperationId, PhysicalKey, ProposalMessage,
-    Revision, RunId, SafeU53, SeatId, SessionId, UiIntent, UiState, UiViewKind, WaitingMenu,
+    AckStage, AuthorityEntryKind, AuthorityReceiptBody, CancelPolicy, CommandControlTarget,
+    CommandFrontierControl, ConnectionGeneration, FrameContext, FrameType, GameButton, InputFocus,
+    InputMap, KeyBinding, KernelEffect, LiveResourceSnapshot, Material, MenuGeneration,
+    MenuOption, MenuOptionId, MenuState, MembershipRevision, NetworkFrame, NextControl, OperationId,
+    PhysicalKey, ProposalMessage, RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId,
+    TimeClass, UiIntent, UiState, UiViewKind, WaitingMenu,
 };
 use serde_json::{Value, json};
 
@@ -127,6 +128,16 @@ fn option(turn: u64) -> Result<MenuOption, Box<dyn Error>> {
     })
 }
 
+fn directional_option(turn: u64) -> Result<MenuOption, Box<dyn Error>> {
+    let option_id = MenuOptionId::new(format!("action-{turn}-directional"))?;
+    Ok(MenuOption {
+        id: option_id,
+        label_key: format!("recovery.action.{turn}.directional"),
+        enabled: true,
+        visible: true,
+    })
+}
+
 fn proposal_payload(turn: u64) -> Value {
     json!({
         "surface": "m2-recovery-campaign",
@@ -163,7 +174,7 @@ fn command_menu(turn: u64, owner_seat_id: u64) -> Result<MenuState, Box<dyn Erro
         operation_id: operation(turn)?,
         control_id: control_id_of(&control),
         cursor: safe(0),
-        options: vec![option(turn)?],
+        options: vec![option(turn)?, directional_option(turn)?],
         cancel: CancelPolicy::Disabled,
     }))
 }
@@ -176,7 +187,7 @@ fn command_plan(turn: u64, owner_seat_id: u64) -> Result<ControlMenuPlan, Box<dy
         owner_seat_id: seat(owner_seat_id),
         operation_id: operation(turn)?,
         field_index: safe(0),
-        options: vec![option.clone()],
+        options: vec![option.clone(), directional_option(turn)?],
         proposals: vec![MenuProposalPlan {
             option_id: option.id,
             fingerprint: production_proposal_fingerprint(turn)?,
@@ -329,17 +340,79 @@ fn drop_queued_packets(pair: &mut SimulatedPair, trace: &mut Vec<PairStep>) -> T
 fn hold_new_packets_after_guest_action(
     pair: &mut SimulatedPair,
     trace: &mut Vec<PairStep>,
-) -> TestResult {
+) -> TestResult<(ProposalMessage, SafeU53)> {
     let action_start = trace.len();
-    trace.extend(pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?);
-    let emitted_proposal = trace[action_start..].iter().any(|step| {
-        step.generated_effects.iter().any(|effect| {
-            matches!(
-                effect,
-                KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
-            )
-        })
-    });
+    let previous_packet_ids = trace
+        .last()
+        .map(|step| step.snapshot.network.queued_packet_ids.clone())
+        .ok_or_else(|| std::io::Error::other("guest action has no preceding campaign step"))?;
+    trace.push(pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::Enter,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?);
+    trace.push(pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::Enter,
+        },
+    })?);
+    let proposals = proposal_effects(&trace[action_start..]);
+    assert_eq!(proposals.len(), 1, "guest action must retain one proposal lease");
+    let retained_proposal = proposals[0].clone();
+    assert_eq!(retained_proposal.from, seat(GUEST_SEAT));
+
+    let proposal_packet_id = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("guest action did not produce a packet step"))?
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(&previous_packet_ids)
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        proposal_packet_id.len(),
+        1,
+        "guest proposal must be the only newly queued packet"
+    );
+    let proposal_packet_id = proposal_packet_id[0];
+    let duplicate_step = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Duplicate {
+            packet_id: proposal_packet_id,
+        },
+    })?;
+    let duplicate_packet_ids = duplicate_step
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(
+            &trace
+                .last()
+                .ok_or_else(|| std::io::Error::other("proposal duplicate has no prior step"))?
+                .snapshot
+                .network
+                .queued_packet_ids,
+        )
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        duplicate_packet_ids.len(),
+        1,
+        "proposal duplication must add exactly one packet"
+    );
+    let stale_packet_id = duplicate_packet_ids[0];
+    trace.push(duplicate_step);
+    trace.push(pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Delay {
+            packet_id: stale_packet_id,
+            additional_ms: safe(1_000),
+        },
+    })?);
     let mut previous = trace
         .last()
         .map(|step| step.snapshot.network.queued_packet_ids.clone())
@@ -355,8 +428,7 @@ fn hold_new_packets_after_guest_action(
         let removed = previous.difference(&current).next().is_some();
         trace.push(step);
 
-        let hold_now = (!emitted_proposal && !added.is_empty()) || (emitted_proposal && removed);
-        if hold_now && !added.is_empty() {
+        if removed && !added.is_empty() {
             for packet_id in added {
                 trace.push(pair.apply(PairOperation::Fault {
                     operation: FaultOperation::Delay {
@@ -365,7 +437,7 @@ fn hold_new_packets_after_guest_action(
                     },
                 })?);
             }
-            return Ok(());
+            return Ok((retained_proposal, stale_packet_id));
         }
         previous = trace
             .last()
@@ -395,10 +467,10 @@ fn has_frame(effects: &[KernelEffect], frame_type: FrameType) -> bool {
     })
 }
 
-fn frame_effects<'a>(
-    effects: &'a [KernelEffect],
+fn frame_effects(
+    effects: &[KernelEffect],
     frame_type: FrameType,
-) -> Vec<(SeatId, &'a NetworkFrame)> {
+) -> Vec<(SeatId, &NetworkFrame)> {
     effects
         .iter()
         .filter_map(|effect| match effect {
@@ -408,6 +480,53 @@ fn frame_effects<'a>(
             _ => None,
         })
         .collect()
+}
+
+fn send_effect_packets(
+    before: &PairSnapshot,
+    step: &PairStep,
+) -> TestResult<Vec<(SafeU53, KernelEffect)>> {
+    let queued_packet_ids = step
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(&before.network.queued_packet_ids)
+        .copied()
+        .collect::<Vec<_>>();
+    let send_effects = step
+        .generated_effects
+        .iter()
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::SendFrame { .. } | KernelEffect::SendProposal { .. }
+            )
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        queued_packet_ids.len(),
+        send_effects.len(),
+        "every connected send effect must produce one newly queued packet"
+    );
+
+    let packets = queued_packet_ids
+        .into_iter()
+        .zip(send_effects)
+        .collect::<Vec<_>>();
+    Ok(packets)
+}
+
+fn is_control_installed_receipt(effect: &KernelEffect) -> bool {
+    let KernelEffect::SendFrame { frame, .. } = effect else {
+        return false;
+    };
+    if frame.frame_type != FrameType::AuthorityReceipt {
+        return false;
+    }
+    serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())
+        .map(|receipt| receipt.stage == AckStage::ControlInstalled)
+        .unwrap_or(false)
 }
 
 fn typed_frame_body<T: DeserializeOwned>(frame: &NetworkFrame) -> TestResult<T> {
@@ -465,16 +584,129 @@ fn assert_proposal_identities(
     Ok(())
 }
 
-fn has_guest_stale_effect(effects: &[KernelEffect]) -> bool {
+fn has_guest_stale_effect(
+    effects: &[KernelEffect],
+    current_connection_generation: ConnectionGeneration,
+) -> bool {
     effects.iter().any(|effect| {
         matches!(
             effect,
             KernelEffect::UiIntent { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
         ) || matches!(
             effect,
-            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
+            KernelEffect::SendProposal { proposal }
+                if proposal.from == seat(GUEST_SEAT)
+                    && proposal.connection_generation != current_connection_generation
         )
     })
+}
+
+fn assert_no_pair_progression(before: &PairSnapshot, after: &PairSnapshot) -> TestResult {
+    assert_eq!(before.host.kernel, after.host.kernel);
+    assert_eq!(before.guest.kernel, after.guest.kernel);
+    assert_eq!(before.host.ui, after.host.ui);
+    assert_eq!(before.guest.ui, after.guest.ui);
+    assert_eq!(before.host.live_resources, after.host.live_resources);
+    assert_eq!(before.guest.live_resources, after.guest.live_resources);
+    assert_eq!(before.host.live_resources.retained_revisions, after.host.live_resources.retained_revisions);
+    assert_eq!(before.guest.live_resources.proposal_leases, after.guest.live_resources.proposal_leases);
+    assert_eq!(before.guest.live_resources.controls, after.guest.live_resources.controls);
+    assert_eq!(before.network.queued_packet_ids, after.network.queued_packet_ids);
+    Ok(())
+}
+
+fn assert_no_protocol_progression(before: &PairSnapshot, after: &PairSnapshot) -> TestResult {
+    assert_eq!(before.host.kernel, after.host.kernel);
+    assert_eq!(before.guest.kernel, after.guest.kernel);
+    assert_eq!(before.host.ui, after.host.ui);
+    assert_eq!(before.guest.ui, after.guest.ui);
+    assert_eq!(before.host.live_resources, after.host.live_resources);
+    assert_eq!(before.guest.live_resources, after.guest.live_resources);
+    assert_eq!(
+        before.host.live_resources.retained_revisions,
+        after.host.live_resources.retained_revisions
+    );
+    assert_eq!(
+        before.guest.live_resources.proposal_leases,
+        after.guest.live_resources.proposal_leases
+    );
+    assert_eq!(
+        before.guest.live_resources.controls,
+        after.guest.live_resources.controls
+    );
+    Ok(())
+}
+
+fn assert_directional_hold_started(
+    before: &PairSnapshot,
+    step: &PairStep,
+) -> TestResult {
+    assert_eq!(before.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(before.guest.ui.owner_seat, Some(seat(GUEST_SEAT)));
+    assert!(before.guest.ui.actionable);
+    assert_eq!(before.guest.ui.cursor, Some(safe(0)));
+    assert!(
+        before
+            .guest
+            .ui
+            .options
+            .iter()
+            .filter(|option| option.enabled && option.visible)
+            .count()
+            >= 2
+    );
+    let enabled_visible = step
+        .snapshot
+        .guest
+        .ui
+        .options
+        .iter()
+        .filter(|option| option.enabled && option.visible)
+        .count();
+    assert!(enabled_visible >= 2);
+    assert_eq!(step.snapshot.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(step.snapshot.guest.ui.owner_seat, Some(seat(GUEST_SEAT)));
+    assert!(step.snapshot.guest.ui.actionable);
+    assert_eq!(step.snapshot.guest.ui.cursor, Some(safe(1)));
+
+    let repeat_timers = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
+                endpoint,
+                timer_id,
+                delay_ms,
+                time_class,
+                ..
+            } if *endpoint == seat(GUEST_SEAT)
+                && *delay_ms == safe(250)
+                && *time_class == TimeClass::HumanInput => Some(*timer_id),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(repeat_timers.len(), 1);
+    assert!(
+        step.snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&repeat_timers[0]),
+        "directional hold repeat timer must remain live"
+    );
+    assert!(step.generated_effects.iter().all(|effect| {
+        !matches!(
+            effect,
+            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
+        ) && !matches!(
+            effect,
+            KernelEffect::UiIntent {
+                endpoint,
+                intent: UiIntent::CommandSubmitted { .. },
+            } if *endpoint == seat(GUEST_SEAT)
+        )
+    }));
+    Ok(())
 }
 
 fn recovery_transaction_is_held(step: &PairStep) -> bool {
@@ -603,16 +835,38 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let stale_generation = after_first_entry.snapshot.guest.ui.generation;
 
     let pre_recovery_action_start = trace.len();
-    trace.push(pair.key_down(
-        PairEndpoint::Guest,
-        PhysicalKey::ArrowDown,
-        false,
-    )?);
-    hold_new_packets_after_guest_action(&mut pair, &mut trace)?;
+    let (retained_proposal, stale_packet_id) =
+        hold_new_packets_after_guest_action(&mut pair, &mut trace)?;
     assert_proposal_identities(
         &trace[pre_recovery_action_start..],
         &[(2, generation(0))],
     )?;
+
+    let directional_hold_before = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("directional hold has no preceding step"))?
+        .snapshot
+        .clone();
+    let directional_hold = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowDown,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
+    assert_eq!(directional_hold.operation, PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowDown,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    });
+    assert_directional_hold_started(&directional_hold_before, &directional_hold)?;
+    trace.push(directional_hold);
 
     trace.extend(pair.press(PairEndpoint::Host, PhysicalKey::Enter)?);
     let disconnect_step = pair.apply(PairOperation::Disconnect {
@@ -640,23 +894,107 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         FrameType::RecoveryRequest
     ));
 
-    let reconnect_time = reconnect_step.snapshot.virtual_time_ms;
-    let held_advance = pair.advance_time(safe(250))?;
+    let rebound_proposals = proposal_effects(std::slice::from_ref(reconnect_step));
     assert_eq!(
-        held_advance.operation,
-        PairOperation::AdvanceTime { delta_ms: safe(250) }
+        rebound_proposals.len(),
+        1,
+        "reconnect must resend the retained guest proposal exactly once"
     );
-    assert_eq!(
-        held_advance.snapshot.virtual_time_ms,
-        safe(reconnect_time.get() + 250)
-    );
-    assert!(
-        !has_guest_stale_effect(&held_advance.generated_effects),
-        "the held pre-recovery input must not emit a stale intent or proposal"
-    );
-    trace.push(held_advance);
+    let rebound_proposal = rebound_proposals[0];
+    assert_eq!(rebound_proposal.operation_id, retained_proposal.operation_id);
+    assert_eq!(rebound_proposal.fingerprint, retained_proposal.fingerprint);
+    assert_eq!(rebound_proposal.payload, retained_proposal.payload);
+    assert_eq!(rebound_proposal.from, retained_proposal.from);
+    assert_eq!(rebound_proposal.to, retained_proposal.to);
+    assert_eq!(rebound_proposal.connection_generation, generation(1));
+    assert_proposal_identities(std::slice::from_ref(reconnect_step), &[(2, generation(1))])?;
 
+    assert!(
+        reconnect_step
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&stale_packet_id),
+        "the duplicated old-generation proposal must remain available for stale delivery"
+    );
+    let before_stale_delivery = reconnect_step.snapshot.clone();
+    let stale_delivery = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Deliver {
+            packet_id: stale_packet_id,
+        },
+    })?;
+    assert!(stale_delivery.generated_effects.is_empty());
+    assert_eq!(
+        stale_delivery.snapshot.network.dropped_count.get(),
+        before_stale_delivery
+            .network
+            .dropped_count
+            .get()
+            .saturating_add(1)
+    );
+    assert_eq!(
+        stale_delivery.snapshot.host.kernel,
+        before_stale_delivery.host.kernel
+    );
+    assert_eq!(
+        stale_delivery.snapshot.guest.kernel,
+        before_stale_delivery.guest.kernel
+    );
+    trace.push(stale_delivery);
+
+    let before_fence_waiting_submit = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("recovery-fence submit has no preceding step"))?
+        .snapshot
+        .clone();
+    assert!(recovery_transaction_is_held(
+        trace.last().ok_or_else(|| {
+            std::io::Error::other("recovery-fence step was not retained")
+        })?
+    ));
+    let fence_waiting_submit = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::Enter,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
+    assert!(fence_waiting_submit.generated_effects.iter().all(|effect| {
+        !matches!(
+            effect,
+            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
+        ) && !matches!(
+            effect,
+            KernelEffect::UiIntent { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
+        )
+    }));
+    assert_no_pair_progression(
+        &before_fence_waiting_submit,
+        &fence_waiting_submit.snapshot,
+    )?;
+    trace.push(fence_waiting_submit);
+    let fence_waiting_release = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::Enter,
+        },
+    })?;
+    assert_no_pair_progression(
+        &before_fence_waiting_submit,
+        &fence_waiting_release.snapshot,
+    )?;
+    trace.push(fence_waiting_release);
+
+    let mut delayed_recovery_evidence = Vec::<(SafeU53, FrameType)>::new();
+    let mut delayed_control_receipt_packets = Vec::<SafeU53>::new();
     for _ in 0..48 {
+        let before_step = trace
+            .last()
+            .ok_or_else(|| std::io::Error::other("recovery step has no preceding snapshot"))?
+            .snapshot
+            .clone();
         let step = pair.advance_time(safe(10))?;
         let recovery_released = step
             .snapshot
@@ -665,11 +1003,74 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .recovery_transactions
             .is_empty()
             && has_frame(&step.generated_effects, FrameType::RecoveryApplied);
+        let evidence = if recovery_released {
+            let send_packets = send_effect_packets(&before_step, &step)?;
+            delayed_control_receipt_packets = send_packets
+                .iter()
+                .filter_map(|(packet_id, effect)| {
+                    is_control_installed_receipt(effect).then_some(*packet_id)
+                })
+                .collect();
+            send_packets
+                .into_iter()
+                .filter_map(|(packet_id, effect)| match effect {
+                    KernelEffect::SendFrame { from, frame }
+                        if from == seat(GUEST_SEAT)
+                            && matches!(
+                                frame.frame_type,
+                                FrameType::AuthorityReceipt | FrameType::RecoveryApplied
+                            ) => Some((packet_id, frame.frame_type)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         trace.push(step);
         if recovery_released {
+            assert!(
+                evidence
+                    .iter()
+                    .any(|(_, frame_type)| *frame_type == FrameType::AuthorityReceipt),
+                "recovery must emit the prior revision's control-installed receipt"
+            );
+            assert!(
+                evidence
+                    .iter()
+                    .any(|(_, frame_type)| *frame_type == FrameType::RecoveryApplied),
+                "recovery must emit the prior revision's applied proof"
+            );
+            delayed_recovery_evidence = evidence;
+            for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+                let delayed = pair.apply(PairOperation::Fault {
+                    operation: FaultOperation::Delay {
+                        packet_id,
+                        additional_ms: safe(1_000),
+                    },
+                })?;
+                assert!(
+                    delayed.snapshot.network.queued_packet_ids.contains(&packet_id),
+                    "delayed recovery evidence must remain queued"
+                );
+                trace.push(delayed);
+            }
             break;
         }
     }
+    assert!(
+        !delayed_recovery_evidence.is_empty(),
+        "recovery did not produce delayable control-installed evidence"
+    );
+    assert_eq!(
+        delayed_control_receipt_packets.len(),
+        1,
+        "recovery must delay exactly one control-installed receipt"
+    );
+    assert!(delayed_control_receipt_packets.iter().all(|packet_id| {
+        delayed_recovery_evidence
+            .iter()
+            .any(|(delayed_id, _)| delayed_id == packet_id)
+    }));
 
     let recovery_trace = &trace[recovery_start..];
     let recovery_effects = effects(recovery_trace);
@@ -789,15 +1190,23 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             )
         })
         .ok_or_else(|| std::io::Error::other("recovery proof effect was not emitted"))?;
+    let control_receipt_index = recovery_effects
+        .iter()
+        .position(is_control_installed_receipt)
+        .ok_or_else(|| std::io::Error::other("control-installed receipt effect was not emitted"))?;
     assert!(
-        material_index < control_index && control_index < applied_index,
-        "recovery must apply material, project control, then send the applied proof"
+        material_index < control_index
+            && control_index < control_receipt_index
+            && control_receipt_index < applied_index,
+        "recovery must apply material, project control, send the control receipt, then send the applied proof"
     );
     assert!(
         recovery_effects[..control_index].iter().all(|effect| {
             !matches!(
                 effect,
-                KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
+                KernelEffect::SendProposal { proposal }
+                    if proposal.from == seat(GUEST_SEAT)
+                        && proposal.connection_generation != generation(1)
             ) && !matches!(
                 effect,
                 KernelEffect::UiIntent {
@@ -825,8 +1234,8 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert!(
         recovery_trace
             .iter()
-            .all(|step| !has_guest_stale_effect(&step.generated_effects)),
-        "the held pre-recovery input must not emit stale UiIntent or proposal effects"
+            .all(|step| !has_guest_stale_effect(&step.generated_effects, generation(1))),
+        "the held pre-recovery input must not emit a guest intent or an old-generation proposal"
     );
 
     let applied_step_index = recovery_trace
@@ -908,14 +1317,327 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .contains(&control_id_of(&command_control(4, GUEST_SEAT))));
 
     let fresh_menu_generation = final_step.snapshot.guest.ui.generation;
-    trace.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowDown)?);
-    let post_rejoin_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
-    assert_fresh_guest_command(&post_rejoin_steps, fresh_menu_generation)?;
+    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+        assert!(
+            final_step
+                .snapshot
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "prior control evidence must remain delayed after the fresh menu opens"
+        );
+    }
+
+    let stale_hold_before = final_step.snapshot.clone();
+    let stale_hold_advance = pair.advance_time(safe(250))?;
+    assert_eq!(
+        stale_hold_advance.operation,
+        PairOperation::AdvanceTime { delta_ms: safe(250) }
+    );
+    assert_eq!(
+        stale_hold_advance.snapshot.virtual_time_ms,
+        safe(stale_hold_before.virtual_time_ms.get() + 250)
+    );
+    assert!(
+        !has_guest_stale_effect(&stale_hold_advance.generated_effects, generation(1)),
+        "the stale held input must not emit a guest intent or old-generation proposal"
+    );
+    assert_eq!(
+        stale_hold_advance.snapshot.guest.ui,
+        stale_hold_before.guest.ui,
+        "the stale held input must not move the fresh cursor or submit the fresh menu"
+    );
+    assert_eq!(
+        stale_hold_advance.snapshot.guest.kernel.ui,
+        stale_hold_before.guest.kernel.ui,
+        "the stale held input must not mutate the fresh successor surface"
+    );
+    assert!(stale_hold_advance.generated_effects.iter().all(|effect| {
+        !matches!(
+            effect,
+            KernelEffect::UiChanged { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
+        ) && !matches!(
+            effect,
+            KernelEffect::ApplyAuthorityMaterial { endpoint, .. }
+                if *endpoint == seat(GUEST_SEAT)
+        ) && !matches!(
+            effect,
+            KernelEffect::ProjectAuthorityControl { endpoint, .. }
+                if *endpoint == seat(GUEST_SEAT)
+        )
+    }));
+    trace.push(stale_hold_advance);
+    trace.push(pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::ArrowDown,
+        },
+    })?);
+
+    let before_control_pending_submit = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("control-pending submit has no preceding step"))?
+        .snapshot
+        .clone();
+    assert_eq!(before_control_pending_submit.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(
+        before_control_pending_submit.guest.ui.owner_seat,
+        Some(seat(GUEST_SEAT))
+    );
+    assert!(before_control_pending_submit.guest.ui.actionable);
+    assert!(
+        before_control_pending_submit
+            .guest
+            .ui
+            .options
+            .iter()
+            .filter(|option| option.enabled && option.visible)
+            .count()
+            >= 2,
+        "control-pending submit must target the recovered actionable menu"
+    );
+    let control_pending_submit = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::Enter,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
+    assert_fresh_guest_command(
+        std::slice::from_ref(&control_pending_submit),
+        fresh_menu_generation,
+    )?;
     assert_proposal_identities(
-        &post_rejoin_steps,
+        std::slice::from_ref(&control_pending_submit),
         &[(4, generation(1))],
     )?;
-    trace.extend(post_rejoin_steps);
+    let pending_packets = send_effect_packets(
+        &before_control_pending_submit,
+        &control_pending_submit,
+    )?;
+    let pending_proposals = pending_packets
+        .iter()
+        .filter_map(|(packet_id, effect)| match effect {
+            KernelEffect::SendProposal { proposal }
+                if proposal.from == seat(GUEST_SEAT) => Some((*packet_id, proposal.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pending_proposals.len(),
+        1,
+        "fresh N+1 Submit must queue exactly one retained proposal"
+    );
+    let (pending_proposal_packet_id, retained_next_proposal) = pending_proposals[0].clone();
+    assert_eq!(
+        retained_next_proposal.connection_generation,
+        generation(1)
+    );
+    trace.push(control_pending_submit);
+    let control_pending_release = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::Enter,
+        },
+    })?;
+    trace.push(control_pending_release);
+
+    let before_pending_delivery = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("pending proposal release was not retained"))?
+        .snapshot
+        .clone();
+    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+        assert!(
+            before_pending_delivery
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "delayed control evidence must remain queued ahead of N+1 delivery"
+        );
+    }
+    let pending_delivery = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Deliver {
+            packet_id: pending_proposal_packet_id,
+        },
+    })?;
+    let mut expected_pending_queue = before_pending_delivery
+        .network
+        .queued_packet_ids
+        .clone();
+    assert!(expected_pending_queue.remove(&pending_proposal_packet_id));
+    assert_eq!(
+        pending_delivery.snapshot.network.queued_packet_ids,
+        expected_pending_queue,
+        "N+1 delivery must precede, and not consume, delayed control evidence"
+    );
+    assert_no_protocol_progression(
+        &before_pending_delivery,
+        &pending_delivery.snapshot,
+    )?;
+    assert!(pending_delivery.generated_effects.iter().all(|effect| {
+        !matches!(effect, KernelEffect::SendProposal { .. })
+            && !matches!(effect, KernelEffect::ApplyAuthorityMaterial { .. })
+            && !matches!(effect, KernelEffect::ProjectAuthorityControl { .. })
+            && !matches!(
+                effect,
+                KernelEffect::SendFrame { frame, .. }
+                    if frame.frame_type == FrameType::AuthorityEntry
+            )
+            && !matches!(effect, KernelEffect::UiChanged { .. })
+    }));
+    trace.push(pending_delivery);
+
+    for (packet_id, frame_type) in delayed_recovery_evidence.iter().copied() {
+        let before_evidence_delivery = trace
+            .last()
+            .ok_or_else(|| std::io::Error::other("evidence delivery has no preceding step"))?
+            .snapshot
+            .clone();
+        assert!(
+            before_evidence_delivery
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "the exact delayed recovery evidence packet must be deliverable"
+        );
+        let evidence_delivery = pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Deliver { packet_id },
+        })?;
+        assert_eq!(
+            evidence_delivery.operation,
+            PairOperation::Fault {
+                operation: FaultOperation::Deliver { packet_id },
+            }
+        );
+        assert!(
+            !evidence_delivery
+                .snapshot
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "delivered {frame_type:?} evidence must leave the network queue"
+        );
+        trace.push(evidence_delivery);
+    }
+    let after_recovery_evidence = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("recovery evidence was not retained"))?
+        .snapshot
+        .clone();
+    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+        assert!(
+            !after_recovery_evidence
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "all delayed recovery evidence must be delivered before retry"
+        );
+    }
+
+    let before_retry_submit = after_recovery_evidence.clone();
+    let retry_submit = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::Enter,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
+    assert_fresh_guest_command(std::slice::from_ref(&retry_submit), fresh_menu_generation)?;
+    assert_proposal_identities(
+        std::slice::from_ref(&retry_submit),
+        &[(4, generation(1))],
+    )?;
+    let retry_packets = send_effect_packets(&before_retry_submit, &retry_submit)?;
+    let retry_proposals = retry_packets
+        .iter()
+        .filter_map(|(packet_id, effect)| match effect {
+            KernelEffect::SendProposal { proposal }
+                if proposal.from == seat(GUEST_SEAT) => Some((*packet_id, proposal.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        retry_proposals.len(),
+        1,
+        "the retained N+1 proposal must retry exactly once after evidence"
+    );
+    let (retry_packet_id, retry_proposal) = retry_proposals[0].clone();
+    assert_eq!(retry_proposal, retained_next_proposal);
+    trace.push(retry_submit);
+    trace.push(pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::Enter,
+        },
+    })?);
+
+    let before_retry_delivery = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("retry release was not retained"))?
+        .snapshot
+        .clone();
+    let retry_delivery = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Deliver {
+            packet_id: retry_packet_id,
+        },
+    })?;
+    assert_ne!(
+        retry_delivery.snapshot.host.kernel,
+        before_retry_delivery.host.kernel,
+        "the retained N+1 identity must execute only after delayed evidence"
+    );
+    let retry_material_effects = retry_delivery
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ApplyAuthorityMaterial {
+                endpoint,
+                revision,
+                operation_id,
+                material,
+            } if *endpoint == seat(HOST_SEAT) => {
+                Some((*revision, operation_id.clone(), material.clone()))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(retry_material_effects.len(), 1);
+    assert_eq!(retry_material_effects[0].0, revision(4));
+    assert_eq!(retry_material_effects[0].1, operation(4)?);
+    assert_eq!(retry_material_effects[0].2, material(4));
+    let retry_control_effects = retry_delivery
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ProjectAuthorityControl {
+                endpoint,
+                revision,
+                operation_id,
+                control,
+            } if *endpoint == seat(HOST_SEAT) => {
+                Some((*revision, operation_id.clone(), control.clone()))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(retry_control_effects.len(), 1);
+    assert_eq!(retry_control_effects[0].0, revision(4));
+    assert_eq!(retry_control_effects[0].1, operation(4)?);
+    assert_eq!(retry_control_effects[0].2, next_control(4));
+    let retry_entry_frames = frame_effects(
+        &retry_delivery.generated_effects,
+        FrameType::AuthorityEntry,
+    );
+    assert_eq!(retry_entry_frames.len(), 1);
+    assert_eq!(retry_entry_frames[0].0, seat(HOST_SEAT));
+    let retry_entry: AuthorityEntryBody = typed_frame_body(retry_entry_frames[0].1)?;
+    assert_full_tail_entry(&retry_entry, 4)?;
+    trace.push(retry_delivery);
 
     let before_teardown = pair.snapshot()?;
     assert!(!before_teardown.storage.keys.is_empty());
