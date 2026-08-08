@@ -20,8 +20,8 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    FaultNetwork, FaultNetworkDiagnostics, FaultOperation, InstantPresenter, MemoryStorage,
-    NetworkEvent, Presenter, PresenterDiagnostics, PresenterMode, StorageAdapter,
+    ClockTimerSnapshot, FaultNetwork, FaultNetworkDiagnostics, FaultOperation, InstantPresenter,
+    MemoryStorage, NetworkEvent, Presenter, PresenterDiagnostics, PresenterMode, StorageAdapter,
     StorageDiagnostics,
 };
 
@@ -88,6 +88,7 @@ pub struct EndpointSnapshot {
     pub ui: UiViewModel,
     pub state_digest: String,
     pub live_resources: LiveResourceSnapshot,
+    pub presenter: PresenterDiagnostics,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -95,6 +96,7 @@ pub struct PairSnapshot {
     pub sequence: SafeU53,
     pub seed: String,
     pub virtual_time_ms: SafeU53,
+    pub clock_timers: Vec<ClockTimerSnapshot>,
     pub host: EndpointSnapshot,
     pub guest: EndpointSnapshot,
     pub network: FaultNetworkDiagnostics,
@@ -109,6 +111,7 @@ struct PairSnapshotWire {
     sequence: SafeU53,
     seed: String,
     virtual_time_ms: SafeU53,
+    clock_timers: Vec<ClockTimerSnapshot>,
     host: EndpointSnapshot,
     guest: EndpointSnapshot,
     network: FaultNetworkDiagnostics,
@@ -127,6 +130,7 @@ impl Serialize for PairSnapshot {
             sequence: self.sequence,
             seed: self.seed.clone(),
             virtual_time_ms: self.virtual_time_ms,
+            clock_timers: self.clock_timers.clone(),
             host: self.host.clone(),
             guest: self.guest.clone(),
             network: self.network.clone(),
@@ -149,6 +153,7 @@ impl<'de> Deserialize<'de> for PairSnapshot {
             sequence: wire.sequence,
             seed: wire.seed,
             virtual_time_ms: wire.virtual_time_ms,
+            clock_timers: wire.clock_timers,
             host: wire.host,
             guest: wire.guest,
             network: wire.network,
@@ -493,13 +498,7 @@ impl SimulatedPair {
                 self.disconnect(endpoint, work)?;
             }
             PairOperation::Reconnect { endpoint } => {
-                self.reconnect(
-                    endpoint,
-                    work,
-                    generated_effects,
-                    generated_events,
-                    event_budget,
-                )?;
+                self.reconnect(endpoint, work)?;
             }
             PairOperation::PresentationSettled {
                 endpoint,
@@ -738,9 +737,6 @@ impl SimulatedPair {
         &mut self,
         endpoint: PairEndpoint,
         work: &mut VecDeque<PairWork>,
-        generated_effects: &mut Vec<KernelEffect>,
-        generated_events: &mut u64,
-        event_budget: SafeU53,
     ) -> Result<(), SimulatedPairError> {
         let seat = self.seat(endpoint);
 
@@ -749,19 +745,6 @@ impl SimulatedPair {
         // and remote identities has moved to the new generation.
         if self.network.disconnect(seat) {
             self.set_shared_connected_clock(false)?;
-            let generation = self.network.connection_generation(seat);
-            work.push_back(PairWork::InputBatch(
-                self.shared_transport_inputs(TransportState::Disconnected, generation),
-            ));
-            self.run_work(
-                work,
-                generated_effects,
-                generated_events,
-                Some(event_budget),
-            )?;
-            if self.shared_terminal.is_some() {
-                return Ok(());
-            }
         }
 
         let generation = self.network.reconnect(seat).map_err(network_error)?;
@@ -774,34 +757,42 @@ impl SimulatedPair {
             self.set_shared_connected_clock(true)?;
         }
 
-        let mut inputs = self.shared_transport_inputs(TransportState::Disconnected, generation);
-        if link_connected {
-            // Each independent kernel observes its remote identity first and
-            // its local identity last. InputBatch defers all resulting effects
-            // until both kernels hold the complete shared generation.
-            for kernel_endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
-                let local_seat = self.seat(kernel_endpoint);
-                let remote_seat = self.peer_seat(local_seat)?;
+        // Each independent kernel observes the new generation's local and
+        // remote disconnection before remote and local reconnection. A single
+        // InputBatch defers every resulting effect until both kernels hold the
+        // complete generation; the old-generation batch is intentionally never
+        // delivered during a hot rebind.
+        work.push_back(PairWork::InputBatch(
+            self.reconnect_transport_inputs(generation)?,
+        ));
+        Ok(())
+    }
+
+    fn reconnect_transport_inputs(
+        &self,
+        generation: ConnectionGeneration,
+    ) -> Result<Vec<(PairEndpoint, KernelInput)>, SimulatedPairError> {
+        let mut inputs = Vec::with_capacity(8);
+        for kernel_endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            let local_seat = self.seat(kernel_endpoint);
+            let remote_seat = self.peer_seat(local_seat)?;
+            for (observed_endpoint, state) in [
+                (local_seat, TransportState::Disconnected),
+                (remote_seat, TransportState::Disconnected),
+                (remote_seat, TransportState::Connected),
+                (local_seat, TransportState::Connected),
+            ] {
                 inputs.push((
                     kernel_endpoint,
                     KernelInput::TransportChanged {
-                        endpoint: remote_seat,
-                        state: TransportState::Connected,
-                        generation,
-                    },
-                ));
-                inputs.push((
-                    kernel_endpoint,
-                    KernelInput::TransportChanged {
-                        endpoint: local_seat,
-                        state: TransportState::Connected,
+                        endpoint: observed_endpoint,
+                        state,
                         generation,
                     },
                 ));
             }
         }
-        work.push_back(PairWork::InputBatch(inputs));
-        Ok(())
+        Ok(inputs)
     }
 
     fn shared_transport_inputs(
@@ -1307,6 +1298,7 @@ impl SimulatedPair {
             sequence: self.sequence,
             seed: self.seed.to_string(),
             virtual_time_ms: self.clock.now(),
+            clock_timers: self.clock.pending_timers(),
             host: self.endpoint_snapshot(PairEndpoint::Host),
             guest: self.endpoint_snapshot(PairEndpoint::Guest),
             network: self.network.diagnostics(),
@@ -1326,6 +1318,7 @@ impl SimulatedPair {
             ui: kernel.ui_view(),
             state_digest: kernel.state_digest(),
             live_resources: kernel.live_resources(),
+            presenter: self.presenter.diagnostics_for(self.seat(endpoint)),
         }
     }
 
@@ -1819,6 +1812,7 @@ mod tests {
         assert_eq!(snapshot.host.live_resources, LiveResourceSnapshot::default());
         assert_eq!(snapshot.guest.live_resources, LiveResourceSnapshot::default());
         assert!(pair.clock.pending_timers().is_empty());
+        assert!(snapshot.clock_timers.is_empty());
         assert!(snapshot.network.queued_packet_ids.is_empty());
         assert!(snapshot.network.disconnected_endpoints.is_empty());
         assert!(snapshot.network.suspended_endpoints.is_empty());
@@ -1826,6 +1820,11 @@ mod tests {
         assert!(snapshot.presenter.pending_event_ids.is_empty());
         assert!(snapshot.presenter.settled_event_ids.is_empty());
         assert!(snapshot.presenter.disposed);
+        for endpoint in [&snapshot.host, &snapshot.guest] {
+            assert!(endpoint.presenter.pending_event_ids.is_empty());
+            assert!(endpoint.presenter.settled_event_ids.is_empty());
+            assert!(endpoint.presenter.disposed);
+        }
         assert!(snapshot.storage.keys.is_empty());
         assert!(snapshot.storage.pending_request_ids.is_empty());
         assert!(snapshot.storage.disposed);
@@ -1836,6 +1835,7 @@ mod tests {
         assert_eq!(actual.virtual_time_ms, expected.virtual_time_ms);
         assert_eq!(actual.host, expected.host);
         assert_eq!(actual.guest, expected.guest);
+        assert_eq!(actual.clock_timers, expected.clock_timers);
         assert_eq!(actual.network, expected.network);
         assert_eq!(actual.presenter, expected.presenter);
         assert_eq!(actual.storage, expected.storage);
@@ -2110,6 +2110,84 @@ mod tests {
                 item: BoundaryOrderItem::Packet { packet_id },
             } if *at_ms == safe(250) && *packet_id == equal_packet_id
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn hot_reconnect_queues_exact_four_generation_inputs_per_kernel() -> TestResult {
+        let mut pair = SimulatedPair::new(config(0xcafe_0000, safe(64)))?;
+        let mut work = VecDeque::new();
+
+        pair.reconnect(PairEndpoint::Guest, &mut work)?;
+
+        let batch = work.pop_front().ok_or_else(|| SimulatedPairError::Adapter {
+            reason: "reconnect must queue a transport batch".to_owned(),
+        })?;
+        let inputs = match batch {
+            PairWork::InputBatch(inputs) => inputs,
+            _ => {
+                return Err(Box::new(SimulatedPairError::Adapter {
+                    reason: "reconnect must queue transport inputs as one batch".to_owned(),
+                }));
+            }
+        };
+        assert!(work.is_empty());
+        assert_eq!(inputs.len(), 8);
+
+        let mut actual = Vec::with_capacity(inputs.len());
+        for (kernel_endpoint, input) in &inputs {
+            let (observed_endpoint, state, input_generation) = match input {
+                KernelInput::TransportChanged {
+                    endpoint,
+                    state,
+                    generation,
+                } => (*endpoint, *state, *generation),
+                _ => {
+                    return Err(Box::new(SimulatedPairError::Adapter {
+                        reason: "reconnect batch must contain only transport inputs".to_owned(),
+                    }));
+                }
+            };
+            actual.push((
+                *kernel_endpoint,
+                observed_endpoint,
+                state,
+                input_generation,
+            ));
+        }
+
+        let mut expected = Vec::with_capacity(8);
+        for kernel_endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            let local_seat = pair.seat(kernel_endpoint);
+            let remote_seat = pair.peer_seat(local_seat)?;
+            expected.extend([
+                (
+                    kernel_endpoint,
+                    local_seat,
+                    TransportState::Disconnected,
+                    generation(1),
+                ),
+                (
+                    kernel_endpoint,
+                    remote_seat,
+                    TransportState::Disconnected,
+                    generation(1),
+                ),
+                (
+                    kernel_endpoint,
+                    remote_seat,
+                    TransportState::Connected,
+                    generation(1),
+                ),
+                (
+                    kernel_endpoint,
+                    local_seat,
+                    TransportState::Connected,
+                    generation(1),
+                ),
+            ]);
+        }
+        assert_eq!(actual, expected);
         Ok(())
     }
 
@@ -2550,6 +2628,80 @@ mod tests {
     }
 
     #[test]
+    fn live_snapshot_round_trips_clock_and_endpoint_presenter_diagnostics() -> TestResult {
+        let mut pair_config = protocol_pair_config(0xab50_12bf, false)?;
+        pair_config.presenter = PresenterMode::FaultControlled;
+        let mut pair = SimulatedPair::new(pair_config)?;
+        let _proposal = raw_press_proposal(&mut pair)?;
+
+        let event_id = PresentationEventId::new(safe(91));
+        let mut work = VecDeque::new();
+        pair.consume_effect(
+            KernelEffect::Present {
+                endpoint: test_seat(TEST_HOST_SEAT),
+                event: PresentationEvent {
+                    event_id,
+                    event_kind: "pair-live-diagnostics".to_owned(),
+                    payload: json!({"pending": true}),
+                },
+            },
+            &mut work,
+        )?;
+        assert!(work.is_empty());
+
+        let pending = pair.snapshot()?;
+        assert!(!pending.clock_timers.is_empty());
+        assert_eq!(pending.clock_timers, pair.clock.pending_timers());
+        assert!(pending.host.presenter.pending_event_ids.contains(&event_id));
+        assert!(pending.host.presenter.settled_event_ids.is_empty());
+        assert!(pending.guest.presenter.pending_event_ids.is_empty());
+        assert!(pending.guest.presenter.settled_event_ids.is_empty());
+
+        let settled_step = pair.apply(PairOperation::PresentationSettled {
+            endpoint: PairEndpoint::Host,
+            event_id,
+            outcome: PresentationOutcome::Settled,
+        })?;
+        assert!(settled_step.snapshot.host.presenter.pending_event_ids.is_empty());
+        assert!(settled_step
+            .snapshot
+            .host
+            .presenter
+            .settled_event_ids
+            .contains(&event_id));
+        assert!(settled_step
+            .snapshot
+            .host
+            .live_resources
+            .presentations
+            .is_empty());
+        assert!(settled_step.snapshot.guest.presenter.pending_event_ids.is_empty());
+        assert!(settled_step.snapshot.guest.presenter.settled_event_ids.is_empty());
+
+        let encoded = serde_json::to_value(&settled_step.snapshot)?;
+        assert_eq!(
+            encoded
+                .get("clockTimers")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(settled_step.snapshot.clock_timers.len())
+        );
+        for endpoint in ["host", "guest"] {
+            assert!(encoded
+                .get(endpoint)
+                .and_then(Value::as_object)
+                .and_then(|snapshot| snapshot.get("presenter"))
+                .is_some());
+        }
+        let decoded: PairSnapshot = serde_json::from_value(encoded)?;
+        assert_eq!(decoded, settled_step.snapshot);
+
+        let torn_down = pair.teardown("live diagnostics teardown")?;
+        assert_zero_pair_resources(&pair, &torn_down);
+        Ok(())
+    }
+
+    #[test]
     fn pair_snapshot_seed_round_trips_the_complete_u64_spelling() -> TestResult {
         let above_js_safe = 9_007_199_254_740_993_u64;
         let above_js_safe_pair =
@@ -2560,6 +2712,20 @@ mod tests {
             above_js_safe_encoded.get("seed"),
             Some(&Value::String(above_js_safe.to_string()))
         );
+        assert_eq!(
+            above_js_safe_encoded
+                .get("clockTimers")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(above_js_safe_snapshot.clock_timers.len())
+        );
+        for endpoint in ["host", "guest"] {
+            assert!(above_js_safe_encoded
+                .get(endpoint)
+                .and_then(Value::as_object)
+                .and_then(|snapshot| snapshot.get("presenter"))
+                .is_some());
+        }
         let above_js_safe_decoded: PairSnapshot =
             serde_json::from_value(above_js_safe_encoded)?;
         assert_eq!(above_js_safe_decoded, above_js_safe_snapshot);
