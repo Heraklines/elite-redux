@@ -48,6 +48,15 @@ struct ReplacementIds {
     tail_choice: MenuOptionId,
 }
 
+struct ReplacementFingerprints {
+    head_alpha: String,
+    head_beta: String,
+    head_gamma: String,
+    head_disabled: String,
+    tail_alpha: String,
+    tail_beta: String,
+}
+
 struct CampaignRun {
     trace: Vec<PairStep>,
     final_snapshot: PairSnapshot,
@@ -72,8 +81,17 @@ fn operation(value: &str) -> TestResult<OperationId> {
     Ok(OperationId::new(value.to_owned())?)
 }
 
-fn replacement_fingerprints() -> TestResult<(String, String)> {
-    let head = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+fn replacement_fingerprints() -> TestResult<ReplacementFingerprints> {
+    let head_alpha = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(1),
+        label: "replacement/head".to_owned(),
+        choice: SafeI53::new(0)?,
+        wire: Some(ProposalJson::new(r#"{"party":"party:alpha"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:alpha","surface":"replacement"}"#,
+        )?),
+    })?;
+    let head_beta = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
         sequence: safe(1),
         label: "replacement/head".to_owned(),
         choice: SafeI53::new(1)?,
@@ -82,16 +100,76 @@ fn replacement_fingerprints() -> TestResult<(String, String)> {
             r#"{"party":"party:beta","surface":"replacement"}"#,
         )?),
     })?;
-    let tail = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+    let head_gamma = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(1),
+        label: "replacement/head".to_owned(),
+        choice: SafeI53::new(2)?,
+        wire: Some(ProposalJson::new(r#"{"party":"party:gamma"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:gamma","surface":"replacement"}"#,
+        )?),
+    })?;
+    let head_disabled = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(1),
+        label: "replacement/head".to_owned(),
+        choice: SafeI53::new(3)?,
+        wire: Some(ProposalJson::new(r#"{"party":"party:disabled"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:disabled","surface":"replacement"}"#,
+        )?),
+    })?;
+    let tail_alpha = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
         sequence: safe(2),
         label: "replacement/tail".to_owned(),
-        choice: SafeI53::ZERO,
+        choice: SafeI53::new(0)?,
         wire: Some(ProposalJson::new(r#"{"party":"party:alpha"}"#)?),
         reward_surface: Some(ProposalJson::new(
             r#"{"party":"party:alpha","surface":"replacement"}"#,
         )?),
     })?;
-    Ok((head, tail))
+    let tail_beta = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(2),
+        label: "replacement/tail".to_owned(),
+        choice: SafeI53::new(1)?,
+        wire: Some(ProposalJson::new(r#"{"party":"party:beta"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:beta","surface":"replacement"}"#,
+        )?),
+    })?;
+
+    assert_eq!(
+        head_alpha,
+        r#"[1,"replacement/head",0,{"party":"party:alpha"},{"party":"party:alpha","surface":"replacement"}]"#,
+    );
+    assert_eq!(
+        head_beta,
+        r#"[1,"replacement/head",1,{"party":"party:beta"},{"party":"party:beta","surface":"replacement"}]"#,
+    );
+    assert_eq!(
+        head_gamma,
+        r#"[1,"replacement/head",2,{"party":"party:gamma"},{"party":"party:gamma","surface":"replacement"}]"#,
+    );
+    assert_eq!(
+        head_disabled,
+        r#"[1,"replacement/head",3,{"party":"party:disabled"},{"party":"party:disabled","surface":"replacement"}]"#,
+    );
+    assert_eq!(
+        tail_alpha,
+        r#"[2,"replacement/tail",0,{"party":"party:alpha"},{"party":"party:alpha","surface":"replacement"}]"#,
+    );
+    assert_eq!(
+        tail_beta,
+        r#"[2,"replacement/tail",1,{"party":"party:beta"},{"party":"party:beta","surface":"replacement"}]"#,
+    );
+
+    Ok(ReplacementFingerprints {
+        head_alpha,
+        head_beta,
+        head_gamma,
+        head_disabled,
+        tail_alpha,
+        tail_beta,
+    })
 }
 
 fn option(id: &str, enabled: bool) -> TestResult<MenuOption> {
@@ -258,14 +336,16 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
     let tail_options = vec![option("party:alpha", true)?, option("party:beta", true)?];
     let head_choice = head_options[1].id.clone();
     let tail_choice = tail_options[0].id.clone();
-    let (head_fingerprint, tail_fingerprint) = replacement_fingerprints()?;
+    let fingerprints = replacement_fingerprints()?;
+    let head_fingerprint = fingerprints.head_beta.clone();
+    let tail_fingerprint = fingerprints.tail_alpha.clone();
     let head_proposal_payload = json!({"party": "party:beta"});
     let tail_proposal_payload = json!({"party": "party:alpha"});
 
     let head_plans = vec![
         MenuProposalPlan {
             option_id: head_options[0].id.clone(),
-            fingerprint: "replacement/head/party-alpha".to_owned(),
+            fingerprint: fingerprints.head_alpha.clone(),
             payload: json!({"party": "party:alpha"}),
         },
         MenuProposalPlan {
@@ -275,12 +355,12 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
         },
         MenuProposalPlan {
             option_id: head_options[2].id.clone(),
-            fingerprint: "replacement/head/party-gamma".to_owned(),
+            fingerprint: fingerprints.head_gamma.clone(),
             payload: json!({"party": "party:gamma"}),
         },
         MenuProposalPlan {
             option_id: head_options[3].id.clone(),
-            fingerprint: "replacement/head/disabled".to_owned(),
+            fingerprint: fingerprints.head_disabled.clone(),
             payload: json!({"party": "party:disabled"}),
         },
     ];
@@ -292,7 +372,7 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
         },
         MenuProposalPlan {
             option_id: tail_options[1].id.clone(),
-            fingerprint: "replacement/tail/party-beta".to_owned(),
+            fingerprint: fingerprints.tail_beta.clone(),
             payload: json!({"party": "party:beta"}),
         },
     ];
@@ -498,21 +578,28 @@ fn assert_replacement_menu(
     field_index: SafeU53,
     cursor: SafeU53,
     option_id: &MenuOptionId,
-) {
+) -> TestResult {
     let endpoint_snapshot = endpoint_snapshot(snapshot, endpoint);
     assert_eq!(endpoint_snapshot.kernel.ui.generation, generation);
     assert_eq!(endpoint_snapshot.kernel.ui.owner_seat, Some(owner));
     assert!(endpoint_snapshot.kernel.ui.actionable);
-    match endpoint_snapshot.kernel.ui.stack.as_slice() {
-        [MenuState::Replacement(menu)] => {
-            assert_eq!(&menu.operation_id, operation_id);
-            assert_eq!(&menu.control_id, control_id);
-            assert_eq!(menu.field_index, field_index);
-            assert_eq!(menu.cursor, cursor);
-            assert_eq!(&menu.options[cursor.get() as usize].id, option_id);
-        }
-        stack => panic!("expected one replacement menu, found {stack:?}"),
-    }
+    let stack = endpoint_snapshot.kernel.ui.stack.as_slice();
+    let [MenuState::Replacement(menu)] = stack else {
+        return Err(
+            std::io::Error::other(format!("expected one replacement menu, found {stack:?}"))
+                .into(),
+        );
+    };
+    assert_eq!(&menu.operation_id, operation_id);
+    assert_eq!(&menu.control_id, control_id);
+    assert_eq!(menu.field_index, field_index);
+    assert_eq!(menu.cursor, cursor);
+    let cursor_index = usize::try_from(cursor.get())?;
+    let selected_option = menu.options.get(cursor_index).ok_or_else(|| {
+        std::io::Error::other(format!("replacement cursor {cursor:?} has no menu option"))
+    })?;
+    assert_eq!(&selected_option.id, option_id);
+    Ok(())
 }
 
 fn assert_cursor_intent(
@@ -555,7 +642,7 @@ fn assert_replacement_intent(
     field_index: SafeU53,
     cursor: SafeU53,
     option_id: &MenuOptionId,
-) {
+) -> TestResult {
     assert_replacement_menu(
         pre_submission,
         menu_endpoint,
@@ -566,7 +653,7 @@ fn assert_replacement_intent(
         field_index,
         cursor,
         option_id,
-    );
+    )?;
 
     let intents = steps
         .iter()
@@ -605,6 +692,7 @@ fn assert_replacement_intent(
         ],
         "raw replacement submission lost its seat/menu/operation/control/party identity"
     );
+    Ok(())
 }
 
 fn assert_no_replacement_submission(steps: &[PairStep], endpoint: SeatId, reason: &str) {
@@ -805,7 +893,10 @@ fn assert_authority_chain(
     let control_location = control_locations[0];
     let control_effect = &steps[control_location.0].generated_effects[control_location.1];
     let KernelEffect::ProjectAuthorityControl { control, .. } = control_effect else {
-        unreachable!("control location did not point to ProjectAuthorityControl")
+        return Err(std::io::Error::other(
+            "control location did not point to ProjectAuthorityControl",
+        )
+        .into());
     };
     assert_eq!(control_id_of(control), expected_control_id);
 
@@ -1036,7 +1127,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(3),
         &MenuOptionId::new("party:disabled".to_owned())?,
-    );
+    )?;
 
     let wrong_seat = pair.press(PairEndpoint::Host, PhysicalKey::Enter)?;
     assert_no_ui_intent(&wrong_seat, ids.host, "non-owner host input must be rejected");
@@ -1066,7 +1157,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(2),
         &MenuOptionId::new("party:gamma".to_owned())?,
-    );
+    )?;
     assert_eq!(
         selected_option(
             &first_move_snapshot,
@@ -1091,7 +1182,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(1),
         &ids.head_choice,
-    );
+    )?;
     assert_eq!(
         selected_option(&held_move.snapshot, PairEndpoint::Guest).as_deref(),
         Some("party:beta")
@@ -1110,7 +1201,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(1),
         &ids.head_choice,
-    );
+    )?;
     assert_eq!(
         proposal_effects(&head_submit),
         vec![ProposalMessage {
@@ -1148,7 +1239,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(0),
         &ids.tail_choice,
-    );
+    )?;
     assert_replacement_menu(
         &tail_ready,
         PairEndpoint::Guest,
@@ -1159,7 +1250,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(0),
         &ids.tail_choice,
-    );
+    )?;
 
     let before_stale = pair.snapshot()?;
     let stale_repeat = pair.advance_time(safe(250))?;
@@ -1204,7 +1295,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         safe(0),
         safe(0),
         &ids.tail_choice,
-    );
+    )?;
     assert!(
         proposal_effects(&tail_submit).is_empty(),
         "authority-local replacement must not emit a self-signed proposal"
