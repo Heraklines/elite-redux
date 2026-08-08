@@ -298,6 +298,12 @@ impl KernelScheduler {
         self.disposed
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_next_timer_id_for_test(&mut self, next_timer_id: SafeU53) {
+        debug_assert!(self.timers.is_empty());
+        self.next_timer_id = Some(next_timer_id);
+    }
+
     pub fn dispose(&mut self) -> Vec<SchedulerCommand> {
         if self.disposed {
             return Vec::new();
