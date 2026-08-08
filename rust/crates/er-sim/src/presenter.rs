@@ -1,9 +1,9 @@
 //! Deterministic presentation adapters isolated from protocol truth.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use er_types::{PresentationEvent, PresentationEventId, PresentationOutcome};
+use er_types::{PresentationEvent, PresentationEventId, PresentationOutcome, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -42,14 +42,28 @@ pub enum PresenterError {
 pub trait Presenter: fmt::Debug {
     fn present(
         &mut self,
+        endpoint: SeatId,
         event: PresentationEvent,
     ) -> Result<Vec<PresentationCompletion>, PresenterError>;
 
     fn settle(
         &mut self,
+        endpoint: SeatId,
         event_id: PresentationEventId,
         outcome: PresentationOutcome,
     ) -> Result<Vec<PresentationCompletion>, PresenterError>;
+
+    fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId>;
+
+    fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId>;
+
+    fn diagnostics_for(&self, endpoint: SeatId) -> PresenterDiagnostics {
+        PresenterDiagnostics {
+            pending_event_ids: self.pending_event_ids(endpoint),
+            settled_event_ids: self.settled_event_ids(endpoint),
+            disposed: self.diagnostics().disposed,
+        }
+    }
 
     fn diagnostics(&self) -> PresenterDiagnostics;
 
@@ -58,7 +72,8 @@ pub trait Presenter: fmt::Debug {
 
 #[derive(Debug, Default)]
 pub struct InstantPresenter {
-    _contract: (),
+    settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
+    disposed: bool,
 }
 
 impl InstantPresenter {
@@ -70,29 +85,78 @@ impl InstantPresenter {
 impl Presenter for InstantPresenter {
     fn present(
         &mut self,
-        _event: PresentationEvent,
+        endpoint: SeatId,
+        event: PresentationEvent,
     ) -> Result<Vec<PresentationCompletion>, PresenterError> {
-        Err(PresenterError::Disposed)
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        let key = (endpoint, event.event_id);
+        if self.settled.contains_key(&key) {
+            return Err(PresenterError::AlreadySettled {
+                event_id: event.event_id,
+            });
+        }
+
+        let outcome = PresentationOutcome::Settled;
+        self.settled.insert(key, outcome.clone());
+        Ok(vec![PresentationCompletion {
+            event_id: event.event_id,
+            outcome,
+        }])
     }
 
     fn settle(
         &mut self,
+        endpoint: SeatId,
         event_id: PresentationEventId,
         _outcome: PresentationOutcome,
     ) -> Result<Vec<PresentationCompletion>, PresenterError> {
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        if self.settled.contains_key(&(endpoint, event_id)) {
+            return Err(PresenterError::AlreadySettled { event_id });
+        }
         Err(PresenterError::UnknownEvent { event_id })
     }
 
-    fn diagnostics(&self) -> PresenterDiagnostics {
-        PresenterDiagnostics::default()
+    fn pending_event_ids(&self, _endpoint: SeatId) -> BTreeSet<PresentationEventId> {
+        BTreeSet::new()
     }
 
-    fn dispose(&mut self) {}
+    fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
+        self.settled
+            .keys()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(*event_id)
+            })
+            .collect()
+    }
+
+    fn diagnostics(&self) -> PresenterDiagnostics {
+        PresenterDiagnostics {
+            pending_event_ids: BTreeSet::new(),
+            settled_event_ids: self
+                .settled
+                .keys()
+                .map(|(_, event_id)| *event_id)
+                .collect(),
+            disposed: self.disposed,
+        }
+    }
+
+    fn dispose(&mut self) {
+        self.disposed = true;
+        self.settled.clear();
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct FaultPresenter {
-    _contract: (),
+    pending: BTreeSet<(SeatId, PresentationEventId)>,
+    settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
+    disposed: bool,
 }
 
 impl FaultPresenter {
@@ -102,31 +166,98 @@ impl FaultPresenter {
 
     pub fn duplicate_completion(
         &mut self,
+        endpoint: SeatId,
         event_id: PresentationEventId,
     ) -> Result<PresentationCompletion, PresenterError> {
-        Err(PresenterError::UnknownEvent { event_id })
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        self.settled
+            .get(&(endpoint, event_id))
+            .cloned()
+            .map(|outcome| PresentationCompletion { event_id, outcome })
+            .ok_or(PresenterError::UnknownEvent { event_id })
     }
 }
 
 impl Presenter for FaultPresenter {
     fn present(
         &mut self,
-        _event: PresentationEvent,
+        endpoint: SeatId,
+        event: PresentationEvent,
     ) -> Result<Vec<PresentationCompletion>, PresenterError> {
-        Err(PresenterError::Disposed)
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        let key = (endpoint, event.event_id);
+        if self.settled.contains_key(&key) {
+            return Err(PresenterError::AlreadySettled {
+                event_id: event.event_id,
+            });
+        }
+
+        self.pending.insert(key);
+        Ok(Vec::new())
     }
 
     fn settle(
         &mut self,
+        endpoint: SeatId,
         event_id: PresentationEventId,
-        _outcome: PresentationOutcome,
+        outcome: PresentationOutcome,
     ) -> Result<Vec<PresentationCompletion>, PresenterError> {
-        Err(PresenterError::UnknownEvent { event_id })
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        let key = (endpoint, event_id);
+        if !self.pending.remove(&key) {
+            if self.settled.contains_key(&key) {
+                return Err(PresenterError::AlreadySettled { event_id });
+            }
+            return Err(PresenterError::UnknownEvent { event_id });
+        }
+
+        self.settled.insert(key, outcome.clone());
+        Ok(vec![PresentationCompletion { event_id, outcome }])
+    }
+
+    fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
+        self.pending
+            .iter()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(*event_id)
+            })
+            .collect()
+    }
+
+    fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
+        self.settled
+            .keys()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(*event_id)
+            })
+            .collect()
     }
 
     fn diagnostics(&self) -> PresenterDiagnostics {
-        PresenterDiagnostics::default()
+        PresenterDiagnostics {
+            pending_event_ids: self
+                .pending
+                .iter()
+                .map(|(_, event_id)| *event_id)
+                .collect(),
+            settled_event_ids: self
+                .settled
+                .keys()
+                .map(|(_, event_id)| *event_id)
+                .collect(),
+            disposed: self.disposed,
+        }
     }
 
-    fn dispose(&mut self) {}
+    fn dispose(&mut self) {
+        self.disposed = true;
+        self.pending.clear();
+        self.settled.clear();
+    }
 }
