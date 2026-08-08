@@ -314,7 +314,9 @@ fn fired_removes_before_return_and_keeps_remaining_timer_order() -> TestResult {
     assert_eq!(scheduler.pending_timer_count(), safe(2)?);
     assert_eq!(
         scheduler.fired(timer(1)?),
-        Err(SchedulerError::UnknownTimer { timer_id: timer(1)? })
+        Err(SchedulerError::UnknownTimer {
+            timer_id: timer(1)?
+        })
     );
     assert_eq!(
         scheduler.cancel(first.timer_id),
@@ -710,7 +712,9 @@ fn dispose_cancels_all_live_resources_and_rejects_future_transitions() -> TestRe
     );
     assert_eq!(
         scheduler.fired(timer(1)?),
-        Err(SchedulerError::UnknownTimer { timer_id: timer(1)? })
+        Err(SchedulerError::UnknownTimer {
+            timer_id: timer(1)?
+        })
     );
     Ok(())
 }

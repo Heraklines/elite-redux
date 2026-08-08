@@ -439,13 +439,7 @@ mod tests {
             );
         }
 
-        for input in [
-            "9007199254740991.5",
-            "1e400",
-            "true",
-            "[]",
-            "{}",
-        ] {
+        for input in ["9007199254740991.5", "1e400", "true", "[]", "{}"] {
             assert!(
                 serde_json::from_str::<SafeU53>(input).is_err(),
                 "accepted {input}"

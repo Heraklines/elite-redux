@@ -434,11 +434,7 @@ mod tests {
     fn clone_preserves_value_state_without_sharing_mutations() -> Result<(), SchedulerError> {
         let mut scheduler = KernelScheduler::new();
         scheduler.schedule_batch(vec![spec("clone")])?;
-        scheduler.pause_class(
-            SeatId::new(SafeU53::ZERO),
-            TimeClass::Connected,
-            "clone",
-        )?;
+        scheduler.pause_class(SeatId::new(SafeU53::ZERO), TimeClass::Connected, "clone")?;
 
         let mut clone = scheduler.clone();
         assert_eq!(clone.live_timers(), scheduler.live_timers());
