@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "manifest_id": "rust-kernel-m2-bench-v1",
+  "project": "Pokerogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+  "protocol_version": "er-coop-47",
+  "frame_protocol_version": 2,
+  "source_lock_schema_version": 1,
+  "ownership_schema_version": 6,
+  "toolchain": {
+    "channel": "1.97.1",
+    "profile": "minimal",
+    "package": "er-sim",
+    "bench_target": "m2_benchmark",
+    "build_profile": "release"
+  },
+  "content_identity": {
+    "algorithm": "sha256",
+    "definition": "sha256 of the exact manifest bytes plus sorted declared benchmark-source sha256 values"
+  },
+  "measurement_policy": {
+    "runner": "github-hosted-linux",
+    "rss_source": "GNU /usr/bin/time %M KiB, converted to bytes",
+    "kernel_clock_source": "none",
+    "preexisting_baseline": "none",
+    "regression_comparison": "optional accepted same-input same-runner artifact; fail above 125 percent"
+  },
+  "source_paths": [
+    "rust/crates/er-sim/benches/m2_benchmark.rs"
+  ],
+  "workloads": [
+    {
+      "id": "raw-input-menu-transitions",
+      "description": "Raw keyboard input and menu reducer transitions through production GameKernel",
+      "bench_target": "m2_benchmark",
+      "test_name": "m2_raw_input_menu_transitions",
+      "iterations": 1000,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "1469598103934665603",
+      "requires_linux": true,
+      "timeout_ms": 120000,
+      "target": null,
+      "source_paths": [
+        "rust/crates/er-sim/benches/m2_benchmark.rs"
+      ]
+    },
+    {
+      "id": "proposal-receipt-cycles",
+      "description": "Complete proposal, authority admission/commit, replica material/control, and receipt cycles through SimulatedPair",
+      "bench_target": "m2_benchmark",
+      "test_name": "m2_proposal_receipt_cycles",
+      "iterations": 1000,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "1099511628211",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": null,
+      "source_paths": [
+        "rust/crates/er-sim/benches/m2_benchmark.rs"
+      ]
+    },
+    {
+      "id": "fault-network-schedules",
+      "description": "Short deterministic FaultNetwork and protocol validation schedules",
+      "bench_target": "m2_benchmark",
+      "test_name": "m2_fault_network_schedules",
+      "iterations": 0,
+      "schedules": 10000,
+      "steps": 0,
+      "seed": "16045690984833335023",
+      "requires_linux": true,
+      "timeout_ms": 120000,
+      "target": {
+        "max_elapsed_wall_ms": 60000
+      },
+      "source_paths": [
+        "rust/crates/er-sim/benches/m2_benchmark.rs"
+      ]
+    },
+    {
+      "id": "synthetic-pair-campaign",
+      "description": "Deterministic synthetic SimulatedPair campaign with one hundred thousand steps",
+      "bench_target": "m2_benchmark",
+      "test_name": "m2_synthetic_pair_campaign",
+      "iterations": 0,
+      "schedules": 0,
+      "steps": 100000,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": null,
+      "source_paths": [
+        "rust/crates/er-sim/benches/m2_benchmark.rs"
+      ]
+    }
+  ]
+}
