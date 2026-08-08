@@ -1,6 +1,6 @@
 //! Representative raw-keystroke driver with no semantic-choice bypass API.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use er_kernel::{GameKernel, KernelError};
 use er_types::{
@@ -87,6 +87,7 @@ pub struct KeyboardDriver<'kernel> {
     seat: SeatId,
     focus: InputFocus,
     pending_timers: BTreeMap<TimerId, PendingTimer>,
+    held_keys: BTreeSet<PhysicalKey>,
 }
 
 impl<'kernel> KeyboardDriver<'kernel> {
@@ -96,6 +97,7 @@ impl<'kernel> KeyboardDriver<'kernel> {
             seat,
             focus: InputFocus::Game,
             pending_timers: BTreeMap::new(),
+            held_keys: BTreeSet::new(),
         }
     }
 
@@ -104,22 +106,26 @@ impl<'kernel> KeyboardDriver<'kernel> {
         code: PhysicalKey,
         printable: bool,
     ) -> Result<Vec<KernelEffect>, KernelError> {
-        self.step_kernel(KernelInput::RawInput {
+        let effects = self.step_kernel(KernelInput::RawInput {
             seat: self.seat,
             event: RawInputEvent::KeyDown {
-                code,
+                code: code.clone(),
                 printable,
                 browser_repeat: false,
                 focus: self.focus,
             },
-        })
+        })?;
+        self.held_keys.insert(code);
+        Ok(effects)
     }
 
     pub fn key_up(&mut self, code: PhysicalKey) -> Result<Vec<KernelEffect>, KernelError> {
-        self.step_kernel(KernelInput::RawInput {
+        let effects = self.step_kernel(KernelInput::RawInput {
             seat: self.seat,
-            event: RawInputEvent::KeyUp { code },
-        })
+            event: RawInputEvent::KeyUp { code: code.clone() },
+        })?;
+        self.held_keys.remove(&code);
+        Ok(effects)
     }
 
     pub fn press(&mut self, code: PhysicalKey) -> Result<Vec<KernelEffect>, KernelError> {
@@ -141,10 +147,12 @@ impl<'kernel> KeyboardDriver<'kernel> {
     }
 
     pub fn blur(&mut self) -> Result<Vec<KernelEffect>, KernelError> {
-        self.step_kernel(KernelInput::RawInput {
+        let effects = self.step_kernel(KernelInput::RawInput {
             seat: self.seat,
             event: RawInputEvent::WindowBlurred,
-        })
+        })?;
+        self.held_keys.clear();
+        Ok(effects)
     }
 
     pub fn focus(&mut self, focus: InputFocus) -> Result<Vec<KernelEffect>, KernelError> {
@@ -345,6 +353,39 @@ mod tests {
                 remaining_ms: safe_u53(25),
             })
         );
+    }
+
+    #[test]
+    fn held_keys_are_persistent_per_seat_and_clear_on_symmetric_release_or_blur() {
+        let mut host_kernel = GameKernel::default();
+        let mut guest_kernel = GameKernel::default();
+        let host_seat = SeatId::new(safe_u53(1));
+        let guest_seat = SeatId::new(safe_u53(2));
+        let mut host = KeyboardDriver::new(&mut host_kernel, host_seat);
+        let mut guest = KeyboardDriver::new(&mut guest_kernel, guest_seat);
+
+        host.key_down(PhysicalKey::ArrowDown, false)
+            .expect("host keydown should reach the raw kernel boundary");
+        guest.key_down(PhysicalKey::ArrowDown, false)
+            .expect("guest keydown should reach the raw kernel boundary");
+        assert!(host.held_keys.contains(&PhysicalKey::ArrowDown));
+        assert!(guest.held_keys.contains(&PhysicalKey::ArrowDown));
+
+        host.key_up(PhysicalKey::ArrowDown)
+            .expect("host keyup should reach the raw kernel boundary");
+        assert!(host.held_keys.is_empty());
+        assert!(guest.held_keys.contains(&PhysicalKey::ArrowDown));
+
+        host.key_down(PhysicalKey::ArrowUp, false)
+            .expect("host second keydown should reach the raw kernel boundary");
+        host.blur()
+            .expect("host blur should reach the raw environment boundary");
+        assert!(host.held_keys.is_empty());
+        assert!(guest.held_keys.contains(&PhysicalKey::ArrowDown));
+
+        guest.key_up(PhysicalKey::ArrowDown)
+            .expect("guest keyup should reach the raw kernel boundary");
+        assert!(guest.held_keys.is_empty());
     }
 
     fn protocol_timer_owner() -> TimerOwner {

@@ -9,6 +9,41 @@ use er_types::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[test]
+fn keyboard_driver_public_surface_stays_on_raw_input_and_read_only_state() {
+    let source = include_str!("../src/keyboard_driver.rs");
+    let implementation = source
+        .split("impl<'kernel> KeyboardDriver<'kernel> {")
+        .nth(1)
+        .and_then(|body| body.split("\nfn is_printable").next())
+        .expect("KeyboardDriver implementation must remain present");
+    let public_methods = implementation
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("pub fn "))
+        .filter_map(|signature| signature.split('(').next())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        public_methods,
+        vec![
+            "new", "key_down", "key_up", "press", "hold_for", "blur", "focus", "kernel",
+        ]
+    );
+    for forbidden in [
+        "select_command",
+        "choose_replacement",
+        "choose_option",
+        "set_cursor",
+        "submit_interaction",
+        "open_menu",
+    ] {
+        assert!(
+            !implementation.contains(&format!("pub fn {forbidden}")),
+            "semantic choice bypass method {forbidden} must not enter the driver surface"
+        );
+    }
+}
+
 fn safe(value: u64) -> SafeU53 {
     match SafeU53::new(value) {
         Ok(value) => value,
