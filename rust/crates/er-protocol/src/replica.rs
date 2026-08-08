@@ -6,13 +6,12 @@ use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, AuthorityReceipt,
     ConnectionGeneration, ControlProjectionOutcome, FrameContext, Material,
     MaterialApplicationOutcome, NextControl, OperationId, RecoveredFrontierTerminal, Revision,
-    SafeU53, SeatId,
-    validate_authority_material_digest, validate_authority_operation_id,
+    SafeU53, SeatId, validate_authority_material_digest, validate_authority_operation_id,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{control_id_of, SuccessorValidator};
+use crate::{SuccessorValidator, control_id_of};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -198,11 +197,7 @@ impl EntryIdentity {
         }
     }
 
-    fn matches_terminal(
-        &self,
-        revision: Revision,
-        terminal: &RecoveredFrontierTerminal,
-    ) -> bool {
+    fn matches_terminal(&self, revision: Revision, terminal: &RecoveredFrontierTerminal) -> bool {
         self.revision == revision
             && self.operation_id == terminal.operation_id
             && self.next_control == terminal.next_control
@@ -224,7 +219,9 @@ impl AuthorityReplica {
             || config.receipt_context.authority_seat_id != config.authority_seat_id
             || config.receipt_context.sender_seat_id == config.authority_seat_id
         {
-            return Err(invalid_stage("replica configuration is not a receiving-peer context"));
+            return Err(invalid_stage(
+                "replica configuration is not a receiving-peer context",
+            ));
         }
         Ok(Self {
             receipt_context: config.receipt_context,
@@ -315,7 +312,8 @@ impl AuthorityReplica {
             }
             ReplicaClassification::Next => {
                 if self.frontier.control != Revision::ZERO {
-                    let Some(predecessor) = self.installed_controls.get(&self.frontier.control) else {
+                    let Some(predecessor) = self.installed_controls.get(&self.frontier.control)
+                    else {
                         return rejected_step(ReplicaRejectReason::PredecessorControlMismatch);
                     };
                     if !SuccessorValidator::new().allows(
@@ -369,13 +367,17 @@ impl AuthorityReplica {
             }
             MaterialApplicationOutcome::Deferred => {
                 if pending.stage != PendingStage::Admitted {
-                    return Err(invalid_stage("material result arrived after material was applied"));
+                    return Err(invalid_stage(
+                        "material result arrived after material was applied",
+                    ));
                 }
                 Ok(Vec::new())
             }
             MaterialApplicationOutcome::Rejected { reason } => {
                 if pending.stage != PendingStage::Admitted {
-                    return Err(invalid_stage("material rejection arrived after material was applied"));
+                    return Err(invalid_stage(
+                        "material rejection arrived after material was applied",
+                    ));
                 }
                 Ok(vec![ReplicaAction::EnterTerminal { reason }])
             }
@@ -391,19 +393,24 @@ impl AuthorityReplica {
         let pending = self.pending_for_revision(revision)?;
         match outcome {
             ControlProjectionOutcome::Installed { control_id }
-            | ControlProjectionOutcome::AlreadyInstalled { control_id } => self.record_replica_stage(
-                &pending.entry,
-                ReplicaMechanicalStage::ControlInstalled { control_id },
-            ),
+            | ControlProjectionOutcome::AlreadyInstalled { control_id } => self
+                .record_replica_stage(
+                    &pending.entry,
+                    ReplicaMechanicalStage::ControlInstalled { control_id },
+                ),
             ControlProjectionOutcome::Deferred => {
                 if pending.stage != PendingStage::MaterialApplied {
-                    return Err(invalid_stage("control result arrived before material was applied"));
+                    return Err(invalid_stage(
+                        "control result arrived before material was applied",
+                    ));
                 }
                 Ok(Vec::new())
             }
             ControlProjectionOutcome::Rejected { reason } => {
                 if pending.stage != PendingStage::MaterialApplied {
-                    return Err(invalid_stage("control rejection arrived before material was applied"));
+                    return Err(invalid_stage(
+                        "control rejection arrived before material was applied",
+                    ));
                 }
                 Ok(vec![ReplicaAction::EnterTerminal { reason }])
             }
@@ -448,7 +455,9 @@ impl AuthorityReplica {
                 if self.frontier.material != previous_material
                     || self.frontier.received != pending.entry.revision
                 {
-                    return Err(invalid_stage("materialApplied does not advance the ordered frontier"));
+                    return Err(invalid_stage(
+                        "materialApplied does not advance the ordered frontier",
+                    ));
                 }
                 self.frontier.material = pending.entry.revision;
                 if let Some(current) = self.pending.as_mut() {
@@ -473,11 +482,15 @@ impl AuthorityReplica {
                 if self.frontier.material != pending.entry.revision
                     || self.frontier.control != previous_control
                 {
-                    return Err(invalid_stage("controlInstalled does not advance the ordered frontier"));
+                    return Err(invalid_stage(
+                        "controlInstalled does not advance the ordered frontier",
+                    ));
                 }
                 let expected_control_id = control_id_of(&pending.entry.next_control);
                 if control_id != expected_control_id {
-                    return Err(invalid_stage("projected control identity does not match the entry"));
+                    return Err(invalid_stage(
+                        "projected control identity does not match the entry",
+                    ));
                 }
                 self.frontier.control = pending.entry.revision;
                 self.installed_controls.insert(
@@ -510,22 +523,28 @@ impl AuthorityReplica {
         let incoming = revision_value(revision);
         if incoming == 0 {
             if terminal.is_some() {
-                return Err(invalid_recovery("revision zero cannot carry a terminal proof"));
+                return Err(invalid_recovery(
+                    "revision zero cannot carry a terminal proof",
+                ));
             }
             if self.frontier != AuthorityFrontier::default()
                 || self.pending.is_some()
                 || self.recovery_proof.is_some()
                 || !self.installed_controls.is_empty()
             {
-                return Err(invalid_recovery("revision zero would rewind the replica frontier"));
+                return Err(invalid_recovery(
+                    "revision zero would rewind the replica frontier",
+                ));
             }
             return Ok(Vec::new());
         }
         if self.recovery_proof.is_some() && terminal.is_none() {
-            return Err(invalid_recovery("recovery frontier proof requires its exact terminal"));
+            return Err(invalid_recovery(
+                "recovery frontier proof requires its exact terminal",
+            ));
         }
         if let Some(terminal) = terminal.as_ref()
-            && (!is_valid_authority_operation_id(terminal.operation_id.as_str())
+            && (validate_authority_operation_id(terminal.operation_id.as_str()).is_err()
                 || !is_valid_successor_control(&terminal.next_control))
         {
             return Err(invalid_recovery(
@@ -546,7 +565,9 @@ impl AuthorityReplica {
             ));
         };
         if incoming < received {
-            return Err(invalid_recovery("recovery frontier would rewind received material"));
+            return Err(invalid_recovery(
+                "recovery frontier would rewind received material",
+            ));
         }
         // RecoveredFrontierTerminal carries no material-bearing identity, so
         // a positive terminal-only call can only confirm the exact recovery
@@ -565,11 +586,15 @@ impl AuthorityReplica {
             return Err(invalid_recovery("recovered entry is invalid"));
         }
         if let Some(reason) = self.context_rejection(&entry) {
-            return Err(invalid_recovery(&format!("recovered entry context rejected: {reason:?}")));
+            return Err(invalid_recovery(&format!(
+                "recovered entry context rejected: {reason:?}"
+            )));
         }
         let recovered_revision = revision_value(entry.revision);
         if recovered_revision == 0 {
-            return Err(invalid_recovery("recovered entry revision must be positive"));
+            return Err(invalid_recovery(
+                "recovered entry revision must be positive",
+            ));
         }
         if let Some(pending) = self.pending.as_ref() {
             if !same_entry_identity(&pending.entry, &entry)
@@ -583,7 +608,9 @@ impl AuthorityReplica {
             }]);
         }
         let Some(previous) = previous_revision(entry.revision) else {
-            return Err(invalid_recovery("recovered entry has no predecessor revision"));
+            return Err(invalid_recovery(
+                "recovered entry has no predecessor revision",
+            ));
         };
         let entry_identity = EntryIdentity::from_entry(&entry);
         if let Some(proof) = self.recovery_proof.as_ref() {
@@ -645,10 +672,14 @@ impl AuthorityReplica {
             || receipt_context.connection_generation < self.receipt_context.connection_generation
             || authority_connection_generation < self.authority_connection_generation
         {
-            return Err(invalid_stage("connection rebind changed or rolled back authenticated identity"));
+            return Err(invalid_stage(
+                "connection rebind changed or rolled back authenticated identity",
+            ));
         }
         if receipt_context.sender_seat_id == self.authority_seat_id {
-            return Err(invalid_stage("connection rebind would make the authority self-sign receipts"));
+            return Err(invalid_stage(
+                "connection rebind would make the authority self-sign receipts",
+            ));
         }
         let context_unchanged = receipt_context == self.receipt_context
             && authority_connection_generation == self.authority_connection_generation;
@@ -785,9 +816,7 @@ impl AuthorityReplica {
                             control: previous,
                         })
                 })
-                && self.identity_matches_current_context(&EntryIdentity::from_entry(
-                    &pending.entry,
-                ))
+                && self.identity_matches_current_context(&EntryIdentity::from_entry(&pending.entry))
         }) || self
             .installed_controls
             .get(&revision)
@@ -800,7 +829,9 @@ impl AuthorityReplica {
         terminal: &RecoveredFrontierTerminal,
     ) -> Result<(), AuthorityReplicaError> {
         let Some(previous) = previous_revision(revision) else {
-            return Err(invalid_recovery("recovered frontier has no predecessor revision"));
+            return Err(invalid_recovery(
+                "recovered frontier has no predecessor revision",
+            ));
         };
         if self.frontier
             != (AuthorityFrontier {
@@ -818,9 +849,7 @@ impl AuthorityReplica {
                 "positive terminal-only adoption requires a complete pending entry",
             ));
         };
-        if pending.stage != PendingStage::MaterialApplied
-            || pending.entry.revision != revision
-        {
+        if pending.stage != PendingStage::MaterialApplied || pending.entry.revision != revision {
             return Err(invalid_recovery(
                 "positive terminal-only adoption requires material-applied pending state",
             ));
@@ -870,11 +899,15 @@ impl AuthorityReplica {
         entry: &AuthorityEntry,
     ) -> Result<PendingReplicaEntry, AuthorityReplicaError> {
         if let Some(reason) = self.context_rejection(entry) {
-            return Err(invalid_stage(&format!("stage entry context rejected: {reason:?}")));
+            return Err(invalid_stage(&format!(
+                "stage entry context rejected: {reason:?}"
+            )));
         }
         let pending = self.pending_for_revision(entry.revision)?;
         if !same_entry_identity(&pending.entry, entry) {
-            return Err(invalid_stage("stage entry does not match the pending identity"));
+            return Err(invalid_stage(
+                "stage entry does not match the pending identity",
+            ));
         }
         Ok(pending)
     }
@@ -939,7 +972,9 @@ impl AuthorityReplica {
     }
 
     fn clear_tail_request_through(&mut self, revision: Revision) {
-        if let Some(requested) = self.requested_tail_from && revision >= requested {
+        if let Some(requested) = self.requested_tail_from
+            && revision >= requested
+        {
             self.requested_tail_from = None;
         }
     }
@@ -996,7 +1031,10 @@ fn is_valid_entry(entry: &AuthorityEntry) -> bool {
         || validate_authority_operation_id(entry.operation_id.as_str()).is_err()
         || validate_authority_material_digest(entry.material.digest.as_str()).is_err()
         || !is_valid_context(&entry.context)
-        || entry.subsumes.iter().any(|revision| revision_value(*revision) == 0)
+        || entry
+            .subsumes
+            .iter()
+            .any(|revision| revision_value(*revision) == 0)
         || !is_valid_successor_control(&entry.next_control)
     {
         return false;

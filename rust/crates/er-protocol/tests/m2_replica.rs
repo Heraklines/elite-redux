@@ -1,9 +1,9 @@
 use std::error::Error;
 
 use er_protocol::{
-    control_id_of, AuthorityReplica, AuthorityReplicaConfig, AuthorityReplicaError,
-    ControlProjectionOutcome, PresentationProbeOutcome, ReplicaAction, ReplicaAdmission,
-    ReplicaMechanicalStage, ReplicaRejectReason, ReplicaResume, ReplicaStep,
+    AuthorityReplica, AuthorityReplicaConfig, AuthorityReplicaError, ControlProjectionOutcome,
+    PresentationProbeOutcome, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
+    ReplicaRejectReason, ReplicaResume, ReplicaStep, control_id_of,
 };
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, AwaitSuccessorControl,
@@ -296,10 +296,7 @@ impl RecoveryBoundaryHarness {
 #[test]
 fn canonical_control_ids_match_the_frozen_wire_addresses() {
     let fixtures = [
-        (
-            command_control(),
-            "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42",
-        ),
+        (command_control(), "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"),
         (
             replacement_control(),
             "REPLACEMENT/replace%2Fhead/s1/e1/w1/t1/o0/f0/remaining:replace%2Ftail:s0:e1:w1:t1:o1:f1",
@@ -346,7 +343,8 @@ fn invalid_controls_are_rejected_before_replica_state_or_actions_change() -> Tes
         (
             "replacement chain",
             NextControl::Replacement(ReplacementControl {
-                operation_id: OperationId::new("replace/head").expect("valid replacement operation id"),
+                operation_id: OperationId::new("replace/head")
+                    .expect("valid replacement operation id"),
                 owner_seat_id: seat(1),
                 epoch: safe(1),
                 wave: safe(1),
@@ -368,7 +366,8 @@ fn invalid_controls_are_rejected_before_replica_state_or_actions_change() -> Tes
         (
             "shared interaction compatibility and successor set",
             NextControl::SharedInteraction(SharedInteractionControl {
-                operation_id: OperationId::new("op/shared").expect("valid interaction operation id"),
+                operation_id: OperationId::new("op/shared")
+                    .expect("valid interaction operation id"),
                 owner_seat_id: seat(1),
                 epoch: safe(1),
                 wave: safe(1),
@@ -422,8 +421,15 @@ fn invalid_controls_are_rejected_before_replica_state_or_actions_change() -> Tes
             },
             "fixture {label} unexpectedly admitted",
         );
-        assert!(result.actions.is_empty(), "fixture {label} emitted an action");
-        assert_eq!(replica.diagnostics(), before, "fixture {label} mutated state");
+        assert!(
+            result.actions.is_empty(),
+            "fixture {label} emitted an action"
+        );
+        assert_eq!(
+            replica.diagnostics(),
+            before,
+            "fixture {label} mutated state"
+        );
     }
     Ok(())
 }
@@ -628,9 +634,11 @@ fn staged_pipeline_keeps_frontiers_independent_and_resumes_exactly() -> TestResu
             .and_then(|receipt| receipt.control_id.as_deref()),
         Some(control_id.as_str())
     );
-    assert!(installed
-        .iter()
-        .any(|action| matches!(action, ReplicaAction::ProbePresentation { .. })));
+    assert!(
+        installed
+            .iter()
+            .any(|action| matches!(action, ReplicaAction::ProbePresentation { .. }))
+    );
     assert_eq!(replica.frontier().received, revision(1));
     assert_eq!(replica.frontier().material, revision(1));
     assert_eq!(replica.frontier().control, revision(1));
@@ -710,7 +718,11 @@ fn every_frame_context_dimension_is_bound_on_stage_duplicates_and_recovery() -> 
                 .is_err(),
             "direct stage accepted changed {label}"
         );
-        assert_eq!(pending.diagnostics(), before, "direct stage changed {label}");
+        assert_eq!(
+            pending.diagnostics(),
+            before,
+            "direct stage changed {label}"
+        );
         assert_eq!(
             pending.pending_entry(),
             pending_before.as_ref(),
@@ -1021,7 +1033,10 @@ fn generation_only_rebind_updates_pending_context_and_resumes() -> TestResult {
         material_receipt.context.membership_revision,
         MembershipRevision::new(safe(1))
     );
-    assert_eq!(material_receipt.context.connection_generation, generation(2));
+    assert_eq!(
+        material_receipt.context.connection_generation,
+        generation(2)
+    );
 
     let control = replica.control_result(
         revision(1),
@@ -1060,7 +1075,10 @@ fn rebind_accepts_monotonic_membership_and_generation_and_updates_pending_contex
         let Some(pending) = replica.pending_entry() else {
             return Err("missing pending entry after monotonic rebind".into());
         };
-        assert_eq!(pending.context.membership_revision, MembershipRevision::new(safe(2)));
+        assert_eq!(
+            pending.context.membership_revision,
+            MembershipRevision::new(safe(2))
+        );
         assert_eq!(pending.context.connection_generation, generation(2));
         control_id_of(&pending.next_control)
     };
@@ -1073,7 +1091,10 @@ fn rebind_accepts_monotonic_membership_and_generation_and_updates_pending_contex
         material_receipt.context.membership_revision,
         MembershipRevision::new(safe(2))
     );
-    assert_eq!(material_receipt.context.connection_generation, generation(2));
+    assert_eq!(
+        material_receipt.context.connection_generation,
+        generation(2)
+    );
     let control = replica.control_result(
         revision(1),
         ControlProjectionOutcome::Installed {
@@ -1090,12 +1111,7 @@ fn rebind_accepts_monotonic_membership_and_generation_and_updates_pending_contex
     assert_eq!(control_receipt.context.connection_generation, generation(2));
 
     replica.rebind_connection(context(1, 2, 3)?, generation(2))?;
-    let rebound_duplicate = replica.admit(entry_for_context(
-        1,
-        "op-membership-rebind",
-        2,
-        2,
-    )?);
+    let rebound_duplicate = replica.admit(entry_for_context(1, "op-membership-rebind", 2, 2)?);
     assert!(matches!(
         rebound_duplicate.admission,
         ReplicaAdmission::Duplicate {
@@ -1164,7 +1180,10 @@ fn rebind_rejects_membership_generation_and_stable_axis_rollbacks_without_mutati
         let before_pending = replica.pending_entry().cloned();
         let before_diagnostics = replica.diagnostics();
         let rejected = replica.rebind_connection(next_context, next_authority_generation);
-        assert!(matches!(rejected, Err(AuthorityReplicaError::InvalidStage { .. })));
+        assert!(matches!(
+            rejected,
+            Err(AuthorityReplicaError::InvalidStage { .. })
+        ));
         assert_eq!(replica.frontier(), before_frontier);
         assert_eq!(replica.pending_entry(), before_pending.as_ref());
         assert_eq!(replica.diagnostics(), before_diagnostics);
@@ -1183,9 +1202,11 @@ fn receipts_preserve_receiving_context_and_serde_omission_rules() -> TestResult 
     assert_eq!(admitted_receipt.context.sender_seat_id, seat(1));
     assert_eq!(admitted_receipt.context.authority_seat_id, seat(0));
     let admitted_json = serde_json::to_value(admitted_receipt)?;
-    assert!(!admitted_json
-        .as_object()
-        .is_some_and(|object| object.contains_key("controlId")));
+    assert!(
+        !admitted_json
+            .as_object()
+            .is_some_and(|object| object.contains_key("controlId"))
+    );
 
     replica.material_result(revision(1), MaterialApplicationOutcome::Applied)?;
     let control_id = control_id_of(&first.next_control);
@@ -1205,9 +1226,11 @@ fn receipts_preserve_receiving_context_and_serde_omission_rules() -> TestResult 
             .and_then(|value| value.as_str()),
         Some(control_id.as_str())
     );
-    assert!(!control_json
-        .get("controlId")
-        .is_some_and(serde_json::Value::is_null));
+    assert!(
+        !control_json
+            .get("controlId")
+            .is_some_and(serde_json::Value::is_null)
+    );
 
     let settled = replica.presentation_result(revision(1), PresentationProbeOutcome::Settled)?;
     assert_eq!(
@@ -1244,7 +1267,10 @@ fn fresh_gap_recovery_stages_full_entry_and_then_unblocks_tail() -> TestResult {
     assert_eq!(replica.frontier().received, revision(7));
     assert_eq!(replica.frontier().material, revision(7));
     assert_eq!(replica.frontier().control, revision(6));
-    assert_eq!(replica.pending_entry().map(|entry| entry.revision), Some(revision(7)));
+    assert_eq!(
+        replica.pending_entry().map(|entry| entry.revision),
+        Some(revision(7))
+    );
     assert_eq!(
         replica
             .pending_entry()
@@ -1266,7 +1292,9 @@ fn fresh_gap_recovery_stages_full_entry_and_then_unblocks_tail() -> TestResult {
     )?;
     assert_eq!(replica.frontier().control, revision(7));
     assert!(matches!(
-        replica.admit(entry_for_context(8, "op-next", 2, 2)?).admission,
+        replica
+            .admit(entry_for_context(8, "op-next", 2, 2)?)
+            .admission,
         ReplicaAdmission::Admitted { .. }
     ));
     Ok(())
@@ -1317,7 +1345,11 @@ fn fresh_recovered_stage_rejects_malformed_identity_and_context_atomically() -> 
             ),
             "fresh recovery accepted {label}"
         );
-        assert_eq!(replica.diagnostics(), before, "fresh recovery changed {label}");
+        assert_eq!(
+            replica.diagnostics(),
+            before,
+            "fresh recovery changed {label}"
+        );
         assert_eq!(replica.frontier(), AuthorityFrontier::default());
         assert!(replica.pending_entry().is_none());
     }
@@ -1353,9 +1385,7 @@ fn recovery_staging_seam_requires_full_entry_before_staged_signal() -> TestResul
     let before_terminal_only = harness.replica.diagnostics();
     harness.events.push("terminal-only-adopt-attempt");
     assert!(matches!(
-        harness
-            .replica
-            .adopt_frontier(revision(3), Some(terminal)),
+        harness.replica.adopt_frontier(revision(3), Some(terminal)),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
     harness.events.push("terminal-only-adopt-rejected");
@@ -1551,14 +1581,16 @@ fn maximum_frontiers_are_checked_without_safe_integer_overflow() -> TestResult {
     let mut replica = replica()?;
     assert_eq!(replica.missing_from(), revision(1));
     assert_eq!(
-        replica.admit(entry_with(
-            SafeU53::MAX.get(),
-            "op-max-gap",
-            context(0, 1, 1)?,
-            AuthorityEntryKind::TurnCommit,
-            json!({"epoch": 1, "revision": SafeU53::MAX.get()}),
-            command_control(),
-        )?).admission,
+        replica
+            .admit(entry_with(
+                SafeU53::MAX.get(),
+                "op-max-gap",
+                context(0, 1, 1)?,
+                AuthorityEntryKind::TurnCommit,
+                json!({"epoch": 1, "revision": SafeU53::MAX.get()}),
+                command_control(),
+            )?)
+            .admission,
         ReplicaAdmission::Gap {
             missing_from: revision(1)
         }
@@ -1585,7 +1617,10 @@ fn maximum_frontiers_are_checked_without_safe_integer_overflow() -> TestResult {
     replica.stage_recovered_frontier(recovered.clone())?;
     assert_eq!(replica.frontier().received, maximum);
     assert_eq!(replica.frontier().material, maximum);
-    assert_eq!(replica.frontier().control, Revision::new(safe(SafeU53::MAX.get() - 1)));
+    assert_eq!(
+        replica.frontier().control,
+        Revision::new(safe(SafeU53::MAX.get() - 1))
+    );
     replica.control_result(
         maximum,
         ControlProjectionOutcome::Installed {
@@ -1594,7 +1629,10 @@ fn maximum_frontiers_are_checked_without_safe_integer_overflow() -> TestResult {
     )?;
     assert_eq!(replica.frontier().control, maximum);
     assert_eq!(replica.missing_from(), Revision::ZERO);
-    assert_eq!(replica.classify(maximum), er_protocol::ReplicaClassification::DuplicateComplete);
+    assert_eq!(
+        replica.classify(maximum),
+        er_protocol::ReplicaClassification::DuplicateComplete
+    );
     Ok(())
 }
 
@@ -1615,9 +1653,11 @@ fn stale_and_duplicate_stage_inputs_fail_without_frontier_changes() -> TestResul
     assert_eq!(replica.diagnostics(), before);
 
     replica.material_result(revision(1), MaterialApplicationOutcome::Applied)?;
-    assert!(replica
-        .record_replica_stage(&first, ReplicaMechanicalStage::MaterialApplied)
-        .is_err());
+    assert!(
+        replica
+            .record_replica_stage(&first, ReplicaMechanicalStage::MaterialApplied)
+            .is_err()
+    );
     assert_eq!(replica.frontier().material, revision(1));
     Ok(())
 }
@@ -1652,10 +1692,7 @@ fn disposal_clears_pending_and_tombstones_idempotently() -> TestResult {
         Err(AuthorityReplicaError::Disposed)
     ));
     assert!(matches!(
-        replica.control_result(
-            revision(1),
-            ControlProjectionOutcome::Deferred,
-        ),
+        replica.control_result(revision(1), ControlProjectionOutcome::Deferred,),
         Err(AuthorityReplicaError::Disposed)
     ));
     assert!(matches!(
