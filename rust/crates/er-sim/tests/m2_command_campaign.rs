@@ -1118,8 +1118,16 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let final_snapshot = pair.teardown("m2b-04 command campaign complete")?;
     assert_eq!(final_snapshot.host.live_resources, Default::default());
     assert_eq!(final_snapshot.guest.live_resources, Default::default());
+    assert!(final_snapshot.clock_timers.is_empty());
     assert!(final_snapshot.network.queued_packet_ids.is_empty());
+    assert!(final_snapshot.host.presenter.pending_event_ids.is_empty());
+    assert!(final_snapshot.host.presenter.settled_event_ids.is_empty());
+    assert!(final_snapshot.host.presenter.disposed);
+    assert!(final_snapshot.guest.presenter.pending_event_ids.is_empty());
+    assert!(final_snapshot.guest.presenter.settled_event_ids.is_empty());
+    assert!(final_snapshot.guest.presenter.disposed);
     assert!(final_snapshot.presenter.pending_event_ids.is_empty());
+    assert!(final_snapshot.presenter.settled_event_ids.is_empty());
     assert!(final_snapshot.storage.pending_request_ids.is_empty());
     assert!(final_snapshot.network.disposed);
     assert!(final_snapshot.presenter.disposed);
