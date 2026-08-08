@@ -594,7 +594,7 @@ fn assert_terminal_absorbing_path(
     }
 
     let before_teardown = pair.snapshot()?;
-    let first_teardown = pair.teardown(teardown_reason)?;
+    let first_teardown = pair.teardown(teardown_reason);
     assert_eq!(first_teardown, Ok(before_teardown.clone()));
     let final_snapshot = first_teardown?;
     assert_eq!(final_snapshot, before_teardown);
