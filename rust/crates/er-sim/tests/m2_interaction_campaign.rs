@@ -662,13 +662,25 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         raw_body: serde_json::to_value(&expected_entry_body)?,
         body: expected_entry_body,
     };
-    let expected_material = (
+    let expected_host_material = (
+        fixture.host,
+        fixture.interaction_revision,
+        fixture.interaction_operation.clone(),
+        fixture.interaction_material.clone(),
+    );
+    let expected_guest_material = (
         fixture.guest,
         fixture.interaction_revision,
         fixture.interaction_operation.clone(),
         fixture.interaction_material.clone(),
     );
-    let expected_control = (
+    let expected_host_control = (
+        fixture.host,
+        fixture.interaction_revision,
+        fixture.interaction_operation.clone(),
+        fixture.wait_control.clone(),
+    );
+    let expected_guest_control = (
         fixture.guest,
         fixture.interaction_revision,
         fixture.interaction_operation.clone(),
@@ -808,6 +820,14 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         authority_entry_effects(std::slice::from_ref(&first_proposal_delivery))?,
         vec![expected_entry.clone()]
     );
+    assert_eq!(
+        material_effects(std::slice::from_ref(&first_proposal_delivery)),
+        vec![expected_host_material.clone()]
+    );
+    assert_eq!(
+        control_effects(std::slice::from_ref(&first_proposal_delivery)),
+        vec![expected_host_control.clone()]
+    );
     assert!(receipt_effects(std::slice::from_ref(&first_proposal_delivery))?.is_empty());
     let after_first_proposal = first_proposal_delivery
         .snapshot
@@ -833,6 +853,8 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     let resend_step = fixture.pair.advance_time(safe(250)?)?;
     let resent = proposal_effects(std::slice::from_ref(&resend_step));
     assert_eq!(resent, vec![expected_proposal.clone()]);
+    assert!(material_effects(std::slice::from_ref(&resend_step)).is_empty());
+    assert!(control_effects(std::slice::from_ref(&resend_step)).is_empty());
     assert!(
         resend_step
             .snapshot
@@ -858,6 +880,8 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             .contains(&material_packet)
     );
     assert!(authority_entry_effects(std::slice::from_ref(&retry_delivery))?.is_empty());
+    assert!(material_effects(std::slice::from_ref(&retry_delivery)).is_empty());
+    assert!(control_effects(std::slice::from_ref(&retry_delivery)).is_empty());
     assert!(receipt_effects(std::slice::from_ref(&retry_delivery))?.is_empty());
     let material_queue_before_duplicate = retry_delivery
         .snapshot
@@ -938,11 +962,11 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert_eq!(
         material_effects(std::slice::from_ref(&first_material)),
-        vec![expected_material.clone()]
+        vec![expected_guest_material.clone()]
     );
     assert_eq!(
         control_effects(std::slice::from_ref(&first_material)),
-        vec![expected_control.clone()]
+        vec![expected_guest_control.clone()]
     );
     assert_eq!(
         receipt_effects(std::slice::from_ref(&first_material))?,
@@ -1013,8 +1037,14 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         vec![expected_proposal.clone(), expected_proposal]
     );
     assert_eq!(authority_entry_effects(&trace)?, vec![expected_entry]);
-    assert_eq!(material_effects(&trace), vec![expected_material]);
-    assert_eq!(control_effects(&trace), vec![expected_control]);
+    assert_eq!(
+        material_effects(&trace),
+        vec![expected_host_material, expected_guest_material]
+    );
+    assert_eq!(
+        control_effects(&trace),
+        vec![expected_host_control, expected_guest_control]
+    );
     let receipts = receipt_effects(&trace)?;
     assert_eq!(
         receipts,
