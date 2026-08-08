@@ -822,7 +822,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert_eq!(
         control_effects(std::slice::from_ref(&first_proposal_delivery)),
-        vec![expected_host_control.clone()]
+        vec![
+            expected_host_control.clone(),
+            expected_guest_control.clone(),
+        ]
     );
     assert!(receipt_effects(std::slice::from_ref(&first_proposal_delivery))?.is_empty());
     let after_first_proposal = first_proposal_delivery
