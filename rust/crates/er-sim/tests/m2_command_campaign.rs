@@ -534,11 +534,11 @@ fn assert_authority_local_submission(
             _ => None,
         })
         .collect::<Vec<ProposalMessage>>();
-    assert_eq!(proposals, Vec::<ProposalMessage>::new());
+    assert!(proposals.is_empty());
 
     assert_material_effect(step, endpoint, revision, operation_id, material);
     assert_control_effect(step, endpoint, revision, operation_id, control);
-    let local_effect_order = step
+    let authority_effect_order = step
         .generated_effects
         .iter()
         .filter_map(|effect| match effect {
@@ -550,10 +550,18 @@ fn assert_authority_local_submission(
                 endpoint: effect_endpoint,
                 ..
             } if *effect_endpoint == endpoint => Some("control"),
+            KernelEffect::SendFrame { from, frame }
+                if *from == endpoint && frame.frame_type == FrameType::AuthorityEntry =>
+            {
+                Some("authorityEntry")
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(local_effect_order, vec!["material", "control"]);
+    assert_eq!(
+        authority_effect_order,
+        vec!["material", "control", "authorityEntry"]
+    );
 
     let mut entries = Vec::new();
     for effect in &step.generated_effects {
