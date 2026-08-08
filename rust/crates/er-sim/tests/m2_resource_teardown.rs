@@ -449,7 +449,7 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
     assert!(snapshot.storage.disposed);
 }
 
-fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) {
+fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) -> TestResult {
     assert!(!terminal.terminal_id.is_empty());
     assert!(!terminal.reason.is_empty());
     assert_eq!(
@@ -489,7 +489,7 @@ fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) {
         snapshot.guest.kernel.ui.stack,
         "host and guest terminal kernel UI must be symmetric"
     );
-    for endpoint in [&snapshot.host, &snapshot.guest] {
+    for (endpoint_name, endpoint) in [("host", &snapshot.host), ("guest", &snapshot.guest)] {
         assert_eq!(endpoint.kernel.ui.owner_seat, None);
         assert!(!endpoint.kernel.ui.actionable);
         assert_eq!(endpoint.kernel.ui.stack.len(), 1);
@@ -498,8 +498,15 @@ fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) {
                 assert_eq!(menu.terminal_id, terminal.terminal_id);
                 assert_eq!(menu.prompt_key.as_deref(), Some(terminal.reason.as_str()));
             }
-            other => panic!("terminal kernel UI was not projected: {other:?}"),
+            other => {
+                return Err(format!(
+                    "{endpoint_name} terminal kernel UI was not projected: {other:?}"
+                )
+                .into());
+            }
         }
+        // Generations are endpoint-local; each public view must match its canonical UI.
+        assert_eq!(endpoint.kernel.ui.generation, endpoint.ui.generation);
         assert_eq!(endpoint.ui.kind, UiViewKind::Terminal);
         assert_eq!(endpoint.ui.owner_seat, None);
         assert!(!endpoint.ui.actionable);
@@ -507,6 +514,7 @@ fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) {
         assert!(endpoint.ui.options.is_empty());
         assert_eq!(endpoint.ui.prompt_key.as_deref(), Some(terminal.reason.as_str()));
     }
+    Ok(())
 }
 
 fn assert_terminal_trace(steps: &[PairStep]) -> TestResult<(TerminalState, PairSnapshot)> {
@@ -535,7 +543,7 @@ fn assert_terminal_trace(steps: &[PairStep]) -> TestResult<(TerminalState, PairS
             })
         })
         .ok_or("terminal effect was not associated with a triggering step")?;
-    assert_terminal_snapshot(&triggering_step.snapshot, &terminal);
+    assert_terminal_snapshot(&triggering_step.snapshot, &terminal)?;
     assert_zero_resources(&triggering_step.snapshot);
     Ok((terminal, triggering_step.snapshot.clone()))
 }
@@ -559,7 +567,7 @@ fn assert_terminal_absorbing_path(
     let (terminal, triggering_snapshot) = assert_terminal_trace(trace)?;
     let terminal_snapshot = pair.snapshot()?;
     assert_eq!(terminal_snapshot, triggering_snapshot);
-    assert_terminal_snapshot(&terminal_snapshot, &terminal);
+    assert_terminal_snapshot(&terminal_snapshot, &terminal)?;
 
     let mut inert_steps = Vec::new();
     inert_steps.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?);
@@ -589,7 +597,7 @@ fn assert_terminal_absorbing_path(
         );
         assert!(step.generated_effects.is_empty());
         assert_absorbed_state(&step.snapshot, &terminal_snapshot);
-        assert_terminal_snapshot(&step.snapshot, &terminal);
+        assert_terminal_snapshot(&step.snapshot, &terminal)?;
         assert_zero_resources(&step.snapshot);
     }
 
@@ -598,7 +606,7 @@ fn assert_terminal_absorbing_path(
     assert_eq!(first_teardown, Ok(before_teardown.clone()));
     let final_snapshot = first_teardown?;
     assert_eq!(final_snapshot, before_teardown);
-    assert_terminal_snapshot(&final_snapshot, &terminal);
+    assert_terminal_snapshot(&final_snapshot, &terminal)?;
     assert_zero_resources(&final_snapshot);
     assert_post_disposal_rejected(pair)?;
     Ok(())
