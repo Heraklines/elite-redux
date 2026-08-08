@@ -4,16 +4,30 @@ use std::collections::BTreeMap;
 
 use er_canonical::content_digest;
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, KernelScheduler,
-    ProposalLeaseConfig, RecoveryTransactionConfig, ScheduledTimer, SchedulerCommand,
+    control_id_of, AuthorityEntryDraft, AuthorityEntryBody, AuthorityLog, AuthorityLogAction,
+    AuthorityLogConfig, AuthorityReplica, AuthorityReplicaConfig, FrameValidator,
+    InboundFrameResult, KernelScheduler, ProposalAdmission, ProposalAdmissionLedger,
+    ProposalIdentity, ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager,
+    ProposalLeaseSpec, ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome,
+    RecoveryLiveState, RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig,
+    ReplicaAction, ReplicaAdmission, ScheduledTimer, SchedulerCommand, ValidatedFrame,
+    ValidatedFrameBody, frame_contexts_compatible,
+    PresentationProbeOutcome,
 };
 use er_types::{
-    ButtonEvent, CancelPolicy, GameButton, InputMap, InputRouterOutput, InputTimerCommand,
-    MenuGeneration, MenuOption, MenuOptionId, MenuState, OperationId, SafeU53, SeatId, TimeClass,
-    TimerId, TimerOwner, UiState,
+    AuthorityEntry, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice,
+    ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration,
+    ControlProjectionOutcome, FrameContext, FrameType, GameButton, InputMap, InputRouterOutput,
+    InputTimerCommand, InteractionMenu, MaterialApplicationOutcome, MenuGeneration, MenuOption,
+    MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId, PresentationEvent,
+    PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame, RecoveryAppliedProof,
+    RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody, Revision, SafeU53,
+    SeatId, TerminalFrameBody, TerminalMenu, TerminalState, TailRequestBody,
+    TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
+    ReplacementMenu, FRAME_PROTOCOL_VERSION,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
-use serde_json::Value;
+use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::{InputRouteError, InputRouter, UiReducer};
@@ -95,15 +109,116 @@ pub enum ControlMenuPlan {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct GameKernel {
     input_router: InputRouter,
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
     repeat_timers: BTreeMap<TimerId, RepeatContext>,
+    pending_presentations: BTreeMap<PresentationEventId, Revision>,
     live_resources: LiveResourceSnapshot,
     protocol_config: Option<ProtocolKernelConfig>,
+    protocol: Option<ProtocolState>,
+    protocol_init_error: Option<String>,
+    terminal: Option<TerminalState>,
     disposed: bool,
+}
+
+#[derive(Debug)]
+enum ProtocolState {
+    Authority(AuthorityKernelState),
+    Replica(ReplicaKernelState),
+}
+
+#[derive(Debug)]
+struct AuthorityKernelState {
+    context: FrameContext,
+    peer_bindings: Vec<er_protocol::PeerBinding>,
+    log: AuthorityLog,
+    proposals: ProposalAdmissionLedger,
+    resolutions: Vec<AuthorityResolutionPlan>,
+    menu_plans: Vec<ControlMenuPlan>,
+    pending_material: Option<AuthorityEntry>,
+    pending_control: Option<PendingControl>,
+    pending_recoveries: BTreeMap<String, PendingRecoveryExpectation>,
+    authority_rebind_pending: bool,
+    staged_peer_rebinds: BTreeMap<SeatId, ConnectionGeneration>,
+    transports: BTreeMap<SeatId, TransportState>,
+}
+
+#[derive(Debug)]
+struct ReplicaKernelState {
+    context: FrameContext,
+    authority_seat_id: SeatId,
+    authority_generation: ConnectionGeneration,
+    replica: AuthorityReplica,
+    leases: ProposalLeaseManager,
+    recovery: RecoveryTransaction,
+    recovery_config: RecoveryTransactionConfig,
+    recovery_context: FrameContext,
+    menu_plans: Vec<ControlMenuPlan>,
+    pending_material: Option<PendingMaterial>,
+    pending_control: Option<PendingControl>,
+    pending_recovery: Option<RecoveryBundle>,
+    staged_authority_rebind: Option<ConnectionGeneration>,
+    transports: BTreeMap<SeatId, TransportState>,
+}
+
+#[derive(Clone, Debug)]
+struct PendingMaterial {
+    revision: Revision,
+    operation_id: OperationId,
+}
+
+#[derive(Clone, Debug)]
+struct PendingControl {
+    revision: Revision,
+    operation_id: OperationId,
+    control: NextControl,
+    expected_control_id: String,
+}
+
+#[derive(Clone, Debug)]
+struct PendingRecoveryExpectation {
+    peer: SeatId,
+    context: FrameContext,
+    connection_generation: ConnectionGeneration,
+    captured_frontier: Revision,
+    reason: String,
+    frontier: Revision,
+    material_digest: String,
+    control_id: Option<String>,
+    response_frame: NetworkFrame,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MenuSubmissionKind {
+    Command,
+    Replacement,
+    Interaction,
+}
+
+#[derive(Clone, Debug)]
+struct MenuSubmission {
+    kind: MenuSubmissionKind,
+    seat: SeatId,
+    operation_id: OperationId,
+    control_id: String,
+    option_id: MenuOptionId,
+}
+
+#[derive(Clone, Debug)]
+enum ProtocolActionBatch {
+    Authority(Vec<AuthorityLogAction>),
+    Proposal(Vec<ProposalLeaseAction>),
+    Recovery(Vec<RecoveryAction>),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProtocolTimerKind {
+    Authority,
+    Proposal,
+    Recovery,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -115,26 +230,52 @@ struct RepeatContext {
 
 impl GameKernel {
     pub fn new(config: KernelConfig) -> Self {
-        Self {
+        let protocol_config = config.protocol;
+        let (protocol, protocol_init_error) = match protocol_config.as_ref() {
+            Some(protocol_config) => match ProtocolState::new(protocol_config) {
+                Ok(protocol) => (Some(protocol), None),
+                Err(reason) => (None, Some(reason)),
+            },
+            None => (None, None),
+        };
+        let mut kernel = Self {
             input_router: InputRouter::new(config.input_map),
             ui_reducer: UiReducer::new(config.initial_ui),
             scheduler: KernelScheduler::new(),
             repeat_timers: BTreeMap::new(),
+            pending_presentations: BTreeMap::new(),
             live_resources: LiveResourceSnapshot::default(),
-            protocol_config: config.protocol,
+            protocol_config,
+            protocol,
+            protocol_init_error,
+            terminal: None,
             disposed: false,
+        };
+        if kernel.protocol.is_some() {
+            kernel.sync_live_resources();
         }
+        kernel
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
         if self.disposed {
             return Err(KernelError::Disposed);
         }
+        if let Some(reason) = self.protocol_init_error.as_ref() {
+            return Err(KernelError::Canonical {
+                reason: reason.clone(),
+            });
+        }
+        if self.terminal.is_some() {
+            return Ok(Vec::new());
+        }
         match input {
             KernelInput::RawInput { seat, event } => {
                 let generation = self.ui_reducer.state().generation;
                 let output = self.input_router.handle(seat, event, &mut self.scheduler)?;
-                Ok(self.apply_raw_input_output(seat, generation, output))
+                let effects = self.apply_raw_input_output(seat, generation, output);
+                self.sync_live_resources();
+                Ok(effects)
             }
             KernelInput::TimerFired { endpoint, timer_id } => {
                 let Some(scheduled) = self.scheduler.timer(timer_id).cloned() else {
@@ -143,46 +284,115 @@ impl GameKernel {
                 if scheduled.endpoint != endpoint {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
-                let Some(context) = self.repeat_timers.get(&timer_id).copied() else {
-                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
-                };
-                if !Self::is_input_repeat_timer(&scheduled, context) {
-                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                if let Some(context) = self.repeat_timers.get(&timer_id).copied() {
+                    if !Self::is_input_repeat_timer(&scheduled, context) {
+                        return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                    }
+
+                    let fired = self
+                        .scheduler
+                        .fired(timer_id)
+                        .map_err(InputRouteError::from)?;
+                    self.repeat_timers.remove(&timer_id);
+                    let output = match self.input_router.timer_fired(fired, &mut self.scheduler) {
+                        Ok(output) => output,
+                        Err(error) => {
+                            self.input_router
+                                .discard_timer(timer_id, &mut self.scheduler);
+                            self.sync_live_resources();
+                            return Err(error.into());
+                        }
+                    };
+                    let effects = self.apply_timer_output(context, output);
+                    self.sync_live_resources();
+                    return Ok(effects);
                 }
 
+                let protocol_timer = self.protocol_timer_kind(timer_id);
+                if protocol_timer.is_none() {
+                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                }
                 let fired = self
                     .scheduler
                     .fired(timer_id)
                     .map_err(InputRouteError::from)?;
-                self.repeat_timers.remove(&timer_id);
-                let output = match self.input_router.timer_fired(fired, &mut self.scheduler) {
-                    Ok(output) => output,
-                    Err(error) => {
-                        self.input_router
-                            .discard_timer(timer_id, &mut self.scheduler);
-                        self.sync_live_timers();
-                        return Err(error.into());
-                    }
-                };
-                Ok(self.apply_timer_output(context, output))
+                let effects = self.dispatch_protocol_timer(protocol_timer, fired)?;
+                self.sync_live_resources();
+                Ok(effects)
             }
-            KernelInput::NetworkFrame { .. }
-            | KernelInput::RawNetworkFrame { .. }
-            | KernelInput::ProposalReceived { .. }
-            | KernelInput::PresentationSettled { .. }
-            | KernelInput::TransportChanged { .. }
-            | KernelInput::StorageResult { .. }
-            | KernelInput::MaterialApplied { .. }
-            | KernelInput::ControlProjected { .. }
-            | KernelInput::Suspend { .. }
-            | KernelInput::Resume { .. } => Ok(Vec::new()),
+            KernelInput::NetworkFrame { endpoint, frame } => {
+                self.dispatch_network_frame(endpoint, frame)
+            }
+            KernelInput::RawNetworkFrame { endpoint, frame } => {
+                self.dispatch_raw_network_frame(endpoint, frame)
+            }
+            KernelInput::ProposalReceived { endpoint, proposal } => {
+                let effects = self.dispatch_proposal(endpoint, proposal)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::PresentationSettled {
+                endpoint,
+                event_id,
+                outcome,
+            } => {
+                let effects = self.dispatch_presentation(endpoint, event_id, outcome)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::TransportChanged {
+                endpoint,
+                state,
+                generation,
+            } => {
+                let effects = self.dispatch_transport(endpoint, state, generation)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::StorageResult {
+                endpoint,
+                request_id,
+                result,
+            } => {
+                let _ = (endpoint, request_id, result);
+                self.sync_live_resources();
+                Ok(Vec::new())
+            }
+            KernelInput::MaterialApplied {
+                endpoint,
+                revision,
+                outcome,
+            } => {
+                let effects = self.dispatch_material(endpoint, revision, outcome)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::ControlProjected {
+                endpoint,
+                revision,
+                outcome,
+            } => {
+                let effects = self.dispatch_control(endpoint, revision, outcome)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::Suspend { endpoint } => {
+                let effects = self.dispatch_suspend(endpoint, true)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
+            KernelInput::Resume { endpoint } => {
+                let effects = self.dispatch_suspend(endpoint, false)?;
+                self.sync_live_resources();
+                Ok(effects)
+            }
         }
     }
 
     pub fn snapshot(&self) -> KernelSnapshot {
         KernelSnapshot {
             ui: self.ui_reducer.state().clone(),
-            ..KernelSnapshot::default()
+            state: self.protocol_snapshot(),
         }
     }
 
@@ -205,7 +415,7 @@ impl GameKernel {
         self.disposed
     }
 
-    pub fn dispose(&mut self, _reason: &str) -> Vec<KernelEffect> {
+    pub fn dispose(&mut self, reason: &str) -> Vec<KernelEffect> {
         if self.disposed {
             return Vec::new();
         }
@@ -226,12 +436,53 @@ impl GameKernel {
         }
         self.repeat_timers.clear();
 
+        let protocol_batches = if let Some(protocol) = self.protocol.as_mut() {
+            match protocol {
+                ProtocolState::Authority(authority) => vec![ProtocolActionBatch::Authority(
+                    authority.log.dispose(reason, &mut self.scheduler),
+                )],
+                ProtocolState::Replica(replica) => vec![
+                    ProtocolActionBatch::Recovery(
+                        replica.recovery.dispose(reason, &mut self.scheduler),
+                    ),
+                    ProtocolActionBatch::Proposal(
+                        replica.leases.dispose(reason, &mut self.scheduler),
+                    ),
+                ],
+            }
+        } else {
+            Vec::new()
+        };
+        for batch in protocol_batches {
+            match batch {
+                ProtocolActionBatch::Authority(actions) => {
+                    effects.extend(self.map_authority_actions(actions));
+                }
+                ProtocolActionBatch::Proposal(actions) => {
+                    effects.extend(self.map_proposal_actions(actions));
+                }
+                ProtocolActionBatch::Recovery(actions) => {
+                    if let Ok(mapped) = self.apply_recovery_actions(actions) {
+                        effects.extend(mapped);
+                    }
+                }
+            }
+        }
+        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+            authority.proposals.dispose();
+        }
+        if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+            replica.replica.dispose(reason);
+        }
+
         for command in self.scheduler.dispose() {
             if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
                 effects.push(KernelEffect::CancelTimer { endpoint, timer_id });
             }
         }
 
+        self.protocol = None;
+        self.pending_presentations.clear();
         self.disposed = true;
         self.live_resources = LiveResourceSnapshot::default();
         effects
@@ -251,7 +502,9 @@ impl GameKernel {
         actionable: bool,
         menu: MenuState,
     ) -> MenuGeneration {
-        self.ui_reducer.replace_menu(owner_seat, actionable, menu)
+        let generation = self.ui_reducer.replace_menu(owner_seat, actionable, menu);
+        self.sync_live_resources();
+        generation
     }
 
     fn apply_raw_input_output(
@@ -419,6 +672,10 @@ impl GameKernel {
             let ButtonEvent::Pressed(button) = event else {
                 continue;
             };
+            if self.command_admission_frozen() {
+                pressed = Some((button, false));
+                continue;
+            }
             let intents =
                 self.ui_reducer
                     .reduce_at(endpoint, generation, ButtonEvent::Pressed(button));
@@ -429,15 +686,2400 @@ impl GameKernel {
                     endpoint,
                     view: self.ui_reducer.view(),
                 });
-                effects.extend(
-                    intents
-                        .into_iter()
-                        .map(|intent| KernelEffect::UiIntent { endpoint, intent }),
-                );
+                for intent in intents {
+                    effects.push(KernelEffect::UiIntent {
+                        endpoint,
+                        intent: intent.clone(),
+                    });
+                    effects.extend(self.route_ui_intent(intent));
+                }
             }
         }
 
         (effects, pressed)
+    }
+
+    fn local_endpoint(&self) -> SeatId {
+        match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(authority)) => authority.context.sender_seat_id,
+            Some(ProtocolState::Replica(replica)) => replica.context.sender_seat_id,
+            None => match self.ui_reducer.state().owner_seat {
+                Some(owner) => owner,
+                None => SeatId::ZERO,
+            },
+        }
+    }
+
+    fn command_admission_frozen(&self) -> bool {
+        self.protocol.as_ref().is_some_and(|protocol| match protocol {
+            ProtocolState::Authority(authority) => {
+                authority.pending_material.is_some()
+                    || authority.pending_control.is_some()
+                    || authority.authority_rebind_pending
+            }
+            ProtocolState::Replica(replica) => {
+                replica.pending_material.is_some()
+                    || replica.pending_control.is_some()
+                    || replica.staged_authority_rebind.is_some()
+                    || replica
+                        .recovery
+                        .fence()
+                        .is_some_and(|fence| fence.is_command_admission_frozen())
+            }
+        })
+    }
+
+    fn protocol_timer_kind(&self, timer_id: TimerId) -> Option<ProtocolTimerKind> {
+        match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority)
+                if authority.log.diagnostics().delivery_timer_ids.contains(&timer_id) =>
+            {
+                Some(ProtocolTimerKind::Authority)
+            }
+            ProtocolState::Replica(replica)
+                if replica.leases.diagnostics().timer_ids.contains(&timer_id) =>
+            {
+                Some(ProtocolTimerKind::Proposal)
+            }
+            ProtocolState::Replica(replica)
+                if replica.recovery.diagnostics().timer_ids.contains(&timer_id) =>
+            {
+                Some(ProtocolTimerKind::Recovery)
+            }
+            _ => None,
+        }
+    }
+
+    fn dispatch_protocol_timer(
+        &mut self,
+        kind: Option<ProtocolTimerKind>,
+        fired: ScheduledTimer,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(kind) = kind else {
+            return Err(InputRouteError::UnknownTimer {
+                timer_id: fired.timer_id,
+            }
+            .into());
+        };
+        let batch = match kind {
+            ProtocolTimerKind::Authority => {
+                let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
+                    return Err(kernel_protocol_error("authority timer has no authority owner"));
+                };
+                let actions = authority
+                    .log
+                    .timer_fired(fired, &mut self.scheduler)
+                    .map_err(kernel_protocol_error)?;
+                ProtocolActionBatch::Authority(actions)
+            }
+            ProtocolTimerKind::Proposal => {
+                let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                    return Err(kernel_protocol_error("proposal timer has no replica owner"));
+                };
+                let actions = replica
+                    .leases
+                    .timer_fired(fired, &mut self.scheduler)
+                    .map_err(kernel_protocol_error)?;
+                ProtocolActionBatch::Proposal(actions)
+            }
+            ProtocolTimerKind::Recovery => {
+                let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                    return Err(kernel_protocol_error("recovery timer has no replica owner"));
+                };
+                let live = RecoveryLiveState {
+                    frontier: replica.replica.frontier(),
+                    context: replica.recovery_context.clone(),
+                };
+                let actions = replica
+                    .recovery
+                    .timer_fired(fired, live, &mut self.scheduler)
+                    .map_err(kernel_protocol_error)?;
+                ProtocolActionBatch::Recovery(actions)
+            }
+        };
+        self.apply_protocol_batch(batch)
+    }
+
+    fn apply_protocol_batch(
+        &mut self,
+        batch: ProtocolActionBatch,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        match batch {
+            ProtocolActionBatch::Authority(actions) => Ok(self.map_authority_actions(actions)),
+            ProtocolActionBatch::Proposal(actions) => Ok(self.map_proposal_actions(actions)),
+            ProtocolActionBatch::Recovery(actions) => self.apply_recovery_actions(actions),
+        }
+    }
+
+    fn map_scheduler_command(command: SchedulerCommand) -> Option<KernelEffect> {
+        match command {
+            SchedulerCommand::Schedule { timer } => Some(KernelEffect::ScheduleTimer {
+                endpoint: timer.endpoint,
+                timer_id: timer.timer_id,
+                owner: timer.owner,
+                delay_ms: timer.delay_ms,
+                time_class: timer.time_class,
+            }),
+            SchedulerCommand::Cancel { endpoint, timer_id } => {
+                Some(KernelEffect::CancelTimer { endpoint, timer_id })
+            }
+            SchedulerCommand::PauseClass { .. } | SchedulerCommand::ResumeClass { .. } => None,
+        }
+    }
+
+    fn map_authority_actions(&mut self, actions: Vec<AuthorityLogAction>) -> Vec<KernelEffect> {
+        let mut effects = Vec::new();
+        for action in actions {
+            match action {
+                AuthorityLogAction::Scheduler { command } => {
+                    if let Some(effect) = Self::map_scheduler_command(command) {
+                        effects.push(effect);
+                    }
+                }
+                AuthorityLogAction::Deliver { entry, .. } => {
+                    match authority_entry_frame(&entry) {
+                        Ok(frame) => effects.push(KernelEffect::SendFrame {
+                            from: entry.context.sender_seat_id,
+                            frame,
+                        }),
+                        Err(reason) => effects.extend(self.enter_terminal(reason)),
+                    }
+                }
+            }
+        }
+        self.sync_live_resources();
+        effects
+    }
+
+    fn map_proposal_actions(&mut self, actions: Vec<ProposalLeaseAction>) -> Vec<KernelEffect> {
+        let mut effects = Vec::new();
+        for action in actions {
+            match action {
+                ProposalLeaseAction::Scheduler { command } => {
+                    if let Some(effect) = Self::map_scheduler_command(command) {
+                        effects.push(effect);
+                    }
+                }
+                ProposalLeaseAction::Send { proposal } => {
+                    effects.push(KernelEffect::SendProposal { proposal });
+                }
+                ProposalLeaseAction::Terminalize {
+                    operation_id,
+                    reason,
+                } => effects.extend(self.enter_terminal(format!(
+                    "proposal {operation_id} terminalized: {reason}"
+                ))),
+            }
+        }
+        self.sync_live_resources();
+        effects
+    }
+
+    fn map_replica_actions(&mut self, actions: Vec<ReplicaAction>) -> Vec<KernelEffect> {
+        let mut effects = Vec::new();
+        for action in actions {
+            match action {
+                ReplicaAction::EmitReceipt { receipt } => {
+                    match receipt_frame(&receipt) {
+                        Ok(frame) => effects.push(KernelEffect::SendFrame {
+                            from: receipt.context.sender_seat_id,
+                            frame,
+                        }),
+                        Err(reason) => effects.extend(self.enter_terminal(reason)),
+                    }
+                }
+                ReplicaAction::ApplyMaterial { entry } => {
+                    self.set_pending_material(entry.revision, entry.operation_id.clone());
+                    effects.push(KernelEffect::ApplyAuthorityMaterial {
+                        endpoint: self.local_endpoint(),
+                        revision: entry.revision,
+                        operation_id: entry.operation_id,
+                        material: entry.material,
+                    });
+                }
+                ReplicaAction::ProjectControl {
+                    entry,
+                    expected_control_id,
+                } => {
+                    self.set_pending_control(PendingControl {
+                        revision: entry.revision,
+                        operation_id: entry.operation_id.clone(),
+                        control: entry.next_control.clone(),
+                        expected_control_id: expected_control_id.clone(),
+                    });
+                    effects.push(KernelEffect::ProjectAuthorityControl {
+                        endpoint: self.local_endpoint(),
+                        revision: entry.revision,
+                        operation_id: entry.operation_id,
+                        control: entry.next_control,
+                    });
+                }
+                ReplicaAction::ProbePresentation { entry } => {
+                    let event_id = PresentationEventId::new(entry.revision.get());
+                    self.pending_presentations
+                        .insert(event_id, entry.revision);
+                    effects.push(KernelEffect::Present {
+                        endpoint: self.local_endpoint(),
+                        event: PresentationEvent {
+                            event_id,
+                            event_kind: "authority-entry".to_owned(),
+                            payload: entry.material.payload,
+                        },
+                    });
+                }
+                ReplicaAction::RequestTail {
+                    context,
+                    missing_from,
+                } => match tail_request_frame(&context, missing_from) {
+                    Ok(frame) => effects.push(KernelEffect::SendFrame {
+                        from: context.sender_seat_id,
+                        frame,
+                    }),
+                    Err(reason) => effects.extend(self.enter_terminal(reason)),
+                },
+                ReplicaAction::EnterTerminal { reason } => {
+                    effects.extend(self.enter_terminal(reason));
+                }
+            }
+        }
+        self.sync_live_resources();
+        effects
+    }
+
+    fn route_ui_intent(&mut self, intent: UiIntent) -> Vec<KernelEffect> {
+        let Some(submission) = menu_submission(intent) else {
+            return Vec::new();
+        };
+        let Some(plan) = self.menu_proposal_plan(&submission) else {
+            return self.enter_terminal(format!(
+                "missing exact menu proposal plan for {} / {}",
+                submission.operation_id, submission.option_id
+            ));
+        };
+        let local = self.local_endpoint();
+        if submission.seat != local {
+            return Vec::new();
+        }
+
+        let authority = match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(authority)) => authority.context.authority_seat_id,
+            Some(ProtocolState::Replica(replica)) => replica.authority_seat_id,
+            None => return Vec::new(),
+        };
+        let proposal = ProposalMessage {
+            operation_id: submission.operation_id,
+            fingerprint: plan.fingerprint,
+            from: local,
+            to: authority,
+            connection_generation: match self.protocol.as_ref() {
+                Some(ProtocolState::Authority(authority)) => {
+                    authority.context.connection_generation
+                }
+                Some(ProtocolState::Replica(replica)) => replica.authority_generation,
+                None => ConnectionGeneration::ZERO,
+            },
+            payload: plan.payload,
+        };
+
+        match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(_)) => {
+                match self.submit_authority_proposal(local, proposal) {
+                    Ok(effects) => effects,
+                    Err(reason) => self.enter_terminal(reason),
+                }
+            }
+            Some(ProtocolState::Replica(_)) => match self.arm_replica_proposal(proposal) {
+                Ok(effects) => effects,
+                Err(reason) => self.enter_terminal(reason),
+            },
+            None => Vec::new(),
+        }
+    }
+
+    fn menu_proposal_plan(&self, submission: &MenuSubmission) -> Option<MenuProposalPlan> {
+        let plans = match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => &authority.menu_plans,
+            ProtocolState::Replica(replica) => &replica.menu_plans,
+        };
+        plans.iter().find_map(|plan| {
+            let (kind, control_id, owner_seat_id, operation_id) = match plan {
+                ControlMenuPlan::Command {
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                    ..
+                } => (MenuSubmissionKind::Command, control_id, owner_seat_id, operation_id),
+                ControlMenuPlan::Replacement {
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                    ..
+                } => (
+                    MenuSubmissionKind::Replacement,
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                ),
+                ControlMenuPlan::Interaction {
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                    ..
+                } => (
+                    MenuSubmissionKind::Interaction,
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                ),
+            };
+            (kind == submission.kind
+                && control_id == &submission.control_id
+                && *owner_seat_id == submission.seat
+                && operation_id == &submission.operation_id)
+                .then(|| match plan {
+                    ControlMenuPlan::Command { proposals, .. }
+                    | ControlMenuPlan::Replacement { proposals, .. }
+                    | ControlMenuPlan::Interaction { proposals, .. } => proposals
+                        .iter()
+                        .find(|proposal| proposal.option_id == submission.option_id)
+                        .cloned(),
+                })
+                .flatten()
+        })
+    }
+
+    fn arm_replica_proposal(
+        &mut self,
+        proposal: ProposalMessage,
+    ) -> Result<Vec<KernelEffect>, String> {
+        let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if proposal.from != replica.context.sender_seat_id
+            || proposal.to != replica.authority_seat_id
+            || proposal.connection_generation != replica.authority_generation
+        {
+            return Ok(Vec::new());
+        }
+        let outcome = replica
+            .leases
+            .arm(
+                ProposalLeaseSpec {
+                    proposal,
+                    absolute_ceiling_ms: None,
+                },
+                &mut self.scheduler,
+            )
+            .map_err(|error| format!("proposal lease arm failed: {error}"))?;
+        let effects = match outcome.result {
+            ProposalLeaseStart::Retained | ProposalLeaseStart::AlreadyRetained => {
+                self.map_proposal_actions(outcome.actions)
+            }
+            ProposalLeaseStart::AlreadyCommitted => Vec::new(),
+            ProposalLeaseStart::Conflict
+            | ProposalLeaseStart::Invalid
+            | ProposalLeaseStart::Disposed => self.enter_terminal(format!(
+                "proposal lease rejected with {:?}",
+                outcome.result
+            )),
+        };
+        Ok(effects)
+    }
+
+    fn submit_authority_proposal(
+        &mut self,
+        endpoint: SeatId,
+        proposal: ProposalMessage,
+    ) -> Result<Vec<KernelEffect>, String> {
+        let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if endpoint != authority.context.sender_seat_id
+            || proposal.to != authority.context.sender_seat_id
+        {
+            return Ok(Vec::new());
+        }
+        let local_submission = proposal.from == authority.context.sender_seat_id;
+        if local_submission
+            && proposal.connection_generation != authority.context.connection_generation
+        {
+            return Ok(Vec::new());
+        }
+        let bound_peer = authority.peer_bindings.iter().any(|binding| {
+            binding.seat_id == proposal.from
+                && binding.connection_generation == proposal.connection_generation
+        });
+        if !local_submission && !bound_peer {
+            return Ok(Vec::new());
+        }
+        if authority.pending_material.is_some()
+            || authority.pending_control.is_some()
+            || authority.authority_rebind_pending
+        {
+            return Ok(Vec::new());
+        }
+
+        let Some(resolution) = authority.resolutions.iter().find(|resolution| {
+            resolution.operation_id == proposal.operation_id
+                && resolution.fingerprint == proposal.fingerprint
+        }) else {
+            return Err(format!(
+                "no exact authority resolution for {}",
+                proposal.operation_id
+            ));
+        };
+        let identity = ProposalIdentity {
+            operation_id: proposal.operation_id.clone(),
+            fingerprint: proposal.fingerprint.clone(),
+        };
+        match authority.proposals.admit(&identity) {
+            ProposalAdmission::Admitted => {}
+            ProposalAdmission::Duplicate => return Ok(Vec::new()),
+            ProposalAdmission::Conflict
+            | ProposalAdmission::Invalid
+            | ProposalAdmission::CapacityExhausted => {
+                return Err(format!(
+                    "authority proposal admission rejected for {}",
+                    proposal.operation_id
+                ));
+            }
+        }
+
+        let outcome = authority
+            .log
+            .commit(resolution.draft.clone(), &mut self.scheduler)
+            .map_err(|error| format!("authority proposal commit failed: {error}"))?;
+        Ok(self.map_authority_commit(outcome))
+    }
+
+    fn map_authority_commit(
+        &mut self,
+        outcome: er_protocol::CommitOutcome,
+    ) -> Vec<KernelEffect> {
+        let entry = outcome.entry;
+        self.set_pending_authority_entry(entry.clone());
+        let mut effects = self.map_authority_actions(outcome.actions);
+        if self.terminal.is_some() {
+            return effects;
+        }
+        let apply = KernelEffect::ApplyAuthorityMaterial {
+            endpoint: entry.context.sender_seat_id,
+            revision: entry.revision,
+            operation_id: entry.operation_id,
+            material: entry.material,
+        };
+        let insertion = match effects
+            .iter()
+            .position(|effect| matches!(effect, KernelEffect::SendFrame { .. }))
+        {
+            Some(insertion) => insertion,
+            None => effects.len(),
+        };
+        effects.insert(insertion, apply);
+        self.sync_live_resources();
+        effects
+    }
+
+    fn dispatch_proposal(
+        &mut self,
+        endpoint: SeatId,
+        proposal: ProposalMessage,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let effects = match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(_)) => self
+                .submit_authority_proposal(endpoint, proposal)
+                .map_err(kernel_protocol_error)?,
+            Some(ProtocolState::Replica(_)) | None => Vec::new(),
+        };
+        Ok(effects)
+    }
+
+    fn dispatch_network_frame(
+        &mut self,
+        endpoint: SeatId,
+        frame: NetworkFrame,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let raw = RawFrame::JsonValue(json!({
+            "v": frame.version,
+            "t": frame.frame_type,
+            "ctx": frame.context,
+            "body": frame.body,
+        }));
+        self.dispatch_raw_network_frame(endpoint, raw)
+    }
+
+    fn dispatch_raw_network_frame(
+        &mut self,
+        endpoint: SeatId,
+        frame: RawFrame,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        if self.protocol.is_none() && self.protocol_config.is_none() {
+            return Ok(Vec::new());
+        }
+        let result = FrameValidator::new().validate(&frame);
+        let mut effects = match result {
+            InboundFrameResult::Valid { frame } => {
+                self.dispatch_validated_frame(endpoint, *frame)?
+            }
+            InboundFrameResult::CosmeticDrop { .. } => Vec::new(),
+            InboundFrameResult::ProtocolViolation { frame_type, issues } => {
+                self.enter_terminal(format!(
+                    "inbound frame protocol violation {:?}: {:?}",
+                    frame_type, issues
+                ))
+            }
+        };
+        self.sync_live_resources();
+        effects.shrink_to_fit();
+        Ok(effects)
+    }
+
+    fn dispatch_validated_frame(
+        &mut self,
+        endpoint: SeatId,
+        validated: ValidatedFrame,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let context = validated.frame.context;
+        match validated.body {
+            ValidatedFrameBody::AuthorityEntry(body) => {
+                self.dispatch_authority_entry(endpoint, context, body)
+            }
+            ValidatedFrameBody::AuthorityReceipt(body) => {
+                self.dispatch_authority_receipt(endpoint, context, body)
+            }
+            ValidatedFrameBody::TailRequest(body) => {
+                self.dispatch_tail_request(endpoint, context, body)
+            }
+            ValidatedFrameBody::RecoveryRequest(body) => {
+                self.dispatch_recovery_request(endpoint, context, body)
+            }
+            ValidatedFrameBody::RecoveryBundle(body) => {
+                self.dispatch_recovery_bundle(endpoint, context, body)
+            }
+            ValidatedFrameBody::RecoveryApplied(proof) => {
+                self.dispatch_recovery_applied(endpoint, context, proof)
+            }
+            ValidatedFrameBody::Terminal(body) => self.dispatch_terminal(endpoint, context, body),
+        }
+    }
+
+    fn dispatch_terminal(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: er_types::TerminalFrameBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let admitted = match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(authority)) => {
+                authority_accepts_peer_frame(authority, endpoint, &context)
+            }
+            Some(ProtocolState::Replica(replica)) => {
+                replica_accepts_authority_frame(replica, endpoint, &context)
+            }
+            None => false,
+        };
+        if admitted {
+            Ok(self.enter_terminal_frame(body))
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn dispatch_authority_entry(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: AuthorityEntryBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if !replica_accepts_authority_frame(replica, endpoint, &context) {
+            return Ok(Vec::new());
+        }
+        let entry = body.with_context(context);
+        let step = replica.replica.admit(entry);
+        let mut effects = match step.admission {
+            ReplicaAdmission::Rejected { reason } => {
+                self.enter_terminal(format!("authority entry rejected: {reason:?}"))
+            }
+            ReplicaAdmission::Admitted { .. }
+            | ReplicaAdmission::Duplicate { .. }
+            | ReplicaAdmission::Gap { .. } => Vec::new(),
+        };
+        effects.extend(self.map_replica_actions(step.actions));
+        Ok(effects)
+    }
+
+    fn dispatch_authority_receipt(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: AuthorityReceiptBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if !authority_accepts_peer_frame(authority, endpoint, &context) {
+            return Ok(Vec::new());
+        }
+        let receipt = AuthorityReceipt {
+            context,
+            revision: body.revision,
+            operation_id: body.operation_id,
+            stage: body.stage,
+            control_id: body.control_id,
+        };
+        let outcome = authority
+            .log
+            .accept_receipt_detailed(receipt, &mut self.scheduler);
+        Ok(self.map_authority_actions(outcome.actions))
+    }
+
+    fn dispatch_tail_request(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: er_types::TailRequestBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(ProtocolState::Authority(authority)) = self.protocol.as_ref() else {
+            return Ok(Vec::new());
+        };
+        if !authority_accepts_peer_frame(authority, endpoint, &context) {
+            return Ok(Vec::new());
+        }
+        let captured = match previous_revision(body.from_revision) {
+            Some(captured) => captured,
+            None => Revision::ZERO,
+        };
+        let Some(slice) = authority.log.recovery_slice(captured) else {
+            return Ok(Vec::new());
+        };
+        let from = authority.context.sender_seat_id;
+        let effects = slice
+            .required_tail
+            .iter()
+            .filter_map(|entry| {
+                authority_entry_frame(entry).ok().map(|frame| KernelEffect::SendFrame {
+                    from,
+                    frame,
+                })
+            })
+            .collect();
+        Ok(effects)
+    }
+
+    fn dispatch_recovery_request(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: RecoveryRequestBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let mut duplicate_response = None;
+        let mut conflict = false;
+        let mut response = None;
+        let from;
+        {
+            let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            if !authority_accepts_peer_frame(authority, endpoint, &context) {
+                return Ok(Vec::new());
+            }
+            from = authority.context.sender_seat_id;
+            if let Some(expected) = authority.pending_recoveries.get(&body.request_id) {
+                let exact_request = expected.peer == context.sender_seat_id
+                    && expected.context == context
+                    && expected.connection_generation == context.connection_generation
+                    && expected.captured_frontier == body.captured_frontier
+                    && expected.reason == body.reason;
+                if exact_request {
+                    duplicate_response = Some(expected.response_frame.clone());
+                } else {
+                    conflict = true;
+                }
+            } else {
+                let Some(slice) = authority.log.recovery_slice(body.captured_frontier) else {
+                    return Ok(Vec::new());
+                };
+                let request_id = body.request_id.clone();
+                let frame = recovery_bundle_frame(
+                    &authority.context,
+                    request_id.clone(),
+                    authority.context.membership_revision,
+                    &slice,
+                )
+                .map_err(kernel_protocol_error)?;
+                response = Some(frame.clone());
+                authority.pending_recoveries.insert(
+                    request_id,
+                    PendingRecoveryExpectation {
+                        peer: context.sender_seat_id,
+                        context: context.clone(),
+                        connection_generation: context.connection_generation,
+                        captured_frontier: body.captured_frontier,
+                        reason: body.reason,
+                        frontier: slice.frontier,
+                        material_digest: recovery_material_digest(&slice),
+                        control_id: slice
+                            .next_control
+                            .as_ref()
+                            .map(control_id_of),
+                        response_frame: frame,
+                    },
+                );
+            }
+        }
+        if conflict {
+            return Ok(self.enter_terminal(
+                "recovery request identity conflicts with a live request".to_owned(),
+            ));
+        }
+        if let Some(frame) = duplicate_response.or(response) {
+            return Ok(vec![KernelEffect::SendFrame {
+                from,
+                frame,
+            }]);
+        }
+        Ok(Vec::new())
+    }
+
+    fn dispatch_recovery_applied(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        proof: RecoveryAppliedProof,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let mut mismatch = false;
+        {
+            let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            if !authority_accepts_peer_frame(authority, endpoint, &context) {
+                return Ok(Vec::new());
+            }
+            let Some(expected) = authority.pending_recoveries.get(&proof.request_id) else {
+                return Ok(Vec::new());
+            };
+            let exact = expected.peer == context.sender_seat_id
+                && expected.connection_generation == context.connection_generation
+                && expected.frontier == proof.frontier
+                && expected.material_digest == proof.material_digest
+                && expected.control_id == proof.control_id;
+            if exact {
+                authority.pending_recoveries.remove(&proof.request_id);
+            } else {
+                mismatch = true;
+            }
+        }
+        if mismatch {
+            Ok(self.enter_terminal(
+                "recovery applied proof did not match its authenticated bundle".to_owned(),
+            ))
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn dispatch_recovery_bundle(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: RecoveryBundleBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if !replica_accepts_authority_frame(replica, endpoint, &context) {
+            return Ok(Vec::new());
+        }
+        let bundle = body.with_context(context);
+        replica.pending_recovery = Some(bundle.clone());
+        let live = RecoveryLiveState {
+            frontier: replica.replica.frontier(),
+            context: replica.recovery_context.clone(),
+        };
+        let actions = replica
+            .recovery
+            .accept_bundle(bundle, live, &mut self.scheduler)
+            .map_err(kernel_protocol_error)?;
+        self.apply_recovery_actions(actions)
+    }
+
+    fn apply_recovery_actions(
+        &mut self,
+        actions: Vec<RecoveryAction>,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let mut effects = Vec::new();
+        for action in actions {
+            match action {
+                RecoveryAction::FenceChanged { view } => {
+                    if view.state == er_types::RecoveryFenceState::Terminal {
+                        let reason = match view.terminal_reason {
+                            Some(reason) => reason,
+                            None => "recovery terminalized".to_owned(),
+                        };
+                        effects.extend(self.enter_terminal(reason));
+                    } else if view.command_admission_frozen {
+                        effects.extend(self.clear_input_effects());
+                        let already_waiting = matches!(
+                            self.ui_reducer.state().stack.last(),
+                            Some(MenuState::Waiting(_))
+                        );
+                        if !already_waiting && self.terminal.is_none() {
+                            self.ui_reducer.replace_menu(
+                                None,
+                                false,
+                                MenuState::Waiting(WaitingMenu {
+                                    prompt_key: Some("authority-v2.recovery".to_owned()),
+                                }),
+                            );
+                            effects.push(KernelEffect::UiChanged {
+                                endpoint: self.local_endpoint(),
+                                view: self.ui_reducer.view(),
+                            });
+                        }
+                    }
+                }
+                RecoveryAction::SendRequest { request } => {
+                    let Some(ProtocolState::Replica(replica)) = self.protocol.as_ref() else {
+                        continue;
+                    };
+                    let frame = recovery_request_frame(&replica.recovery_context, request)
+                        .map_err(kernel_protocol_error)?;
+                    effects.push(KernelEffect::SendFrame {
+                        from: replica.recovery_context.sender_seat_id,
+                        frame,
+                    });
+                }
+                RecoveryAction::Scheduler { command } => {
+                    if let Some(effect) = Self::map_scheduler_command(command) {
+                        effects.push(effect);
+                    }
+                }
+                RecoveryAction::ApplyMaterial { request_id, material } => {
+                    let Some((endpoint, frontier, operation_id)) = (|| {
+                        let Some(ProtocolState::Replica(replica)) = self.protocol.as_ref() else {
+                            return None;
+                        };
+                        let bundle = replica.pending_recovery.as_ref()?;
+                        (bundle.request_id == request_id).then(|| {
+                            (
+                                replica.context.sender_seat_id,
+                                bundle.frontier,
+                                recovery_operation_id(bundle),
+                            )
+                        })
+                    })() else {
+                        effects.extend(self.enter_terminal(
+                            "recovery material action has no matching retained bundle".to_owned(),
+                        ));
+                        continue;
+                    };
+                    let operation_id = operation_id?;
+                    self.set_pending_material(frontier, operation_id.clone());
+                    effects.push(KernelEffect::ApplyAuthorityMaterial {
+                        endpoint,
+                        revision: frontier,
+                        operation_id,
+                        material,
+                    });
+                }
+                RecoveryAction::StageRecoveredFrontier { entry } => {
+                    effects.extend(self.stage_recovered_frontier(entry)?);
+                }
+                RecoveryAction::ProjectControl {
+                    revision,
+                    control,
+                    expected_control_id,
+                } => {
+                    let Some((endpoint, operation_id)) = (|| {
+                        let Some(ProtocolState::Replica(replica)) = self.protocol.as_ref() else {
+                            return None;
+                        };
+                        let bundle = replica.pending_recovery.as_ref()?;
+                        Some((
+                            replica.context.sender_seat_id,
+                            recovery_operation_id(bundle),
+                        ))
+                    })() else {
+                        effects.extend(self.enter_terminal(
+                            "recovery control action has no retained bundle".to_owned(),
+                        ));
+                        continue;
+                    };
+                    let operation_id = operation_id?;
+                    self.set_pending_control(PendingControl {
+                        revision,
+                        operation_id: operation_id.clone(),
+                        control: control.clone(),
+                        expected_control_id: expected_control_id.clone(),
+                    });
+                    effects.push(KernelEffect::ProjectAuthorityControl {
+                        endpoint,
+                        revision,
+                        operation_id,
+                        control,
+                    });
+                }
+                RecoveryAction::SendAppliedProof { proof } => {
+                    let Some(ProtocolState::Replica(replica)) = self.protocol.as_ref() else {
+                        continue;
+                    };
+                    let frame = recovery_applied_frame(&replica.recovery_context, proof)
+                        .map_err(kernel_protocol_error)?;
+                    effects.push(KernelEffect::SendFrame {
+                        from: replica.recovery_context.sender_seat_id,
+                        frame,
+                    });
+                    if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                        replica.pending_recovery = None;
+                        replica.pending_material = None;
+                    }
+                }
+                RecoveryAction::Terminalize { reason } => {
+                    effects.extend(self.enter_terminal(reason));
+                    if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                        replica.pending_recovery = None;
+                        replica.pending_material = None;
+                        replica.pending_control = None;
+                    }
+                }
+            }
+        }
+        self.sync_live_resources();
+        Ok(effects)
+    }
+
+    fn stage_recovered_frontier(
+        &mut self,
+        entry: AuthorityEntry,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let actions = {
+            let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            let staged = replica
+                .replica
+                .stage_recovered_frontier(entry.clone())
+                .map_err(kernel_protocol_error)?;
+            if !staged.iter().any(|action| {
+                matches!(
+                    action,
+                    ReplicaAction::ProjectControl {
+                        entry: staged_entry,
+                        expected_control_id,
+                    } if staged_entry == &entry
+                        && expected_control_id == &control_id_of(&entry.next_control)
+                )
+            }) {
+                return Err(kernel_protocol_error(
+                    "recovery replica did not retain the exact staged AuthorityEntry",
+                ));
+            }
+            let live = RecoveryLiveState {
+                frontier: replica.replica.frontier(),
+                context: replica.recovery_context.clone(),
+            };
+            replica
+                .recovery
+                .recovered_frontier_staged(
+                    RecoveryFrontierStagingOutcome::Staged {
+                        revision: entry.revision,
+                    },
+                    live,
+                    &mut self.scheduler,
+                )
+                .map_err(kernel_protocol_error)?
+        };
+        self.apply_recovery_actions(actions)
+    }
+
+    fn dispatch_material(
+        &mut self,
+        endpoint: SeatId,
+        revision: Revision,
+        outcome: MaterialApplicationOutcome,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        if endpoint != self.local_endpoint() {
+            return Ok(Vec::new());
+        }
+        let mut authority_project = None;
+        let mut authority_rejection = None;
+        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+            let Some(entry) = authority.pending_material.as_ref() else {
+                return Ok(Vec::new());
+            };
+            if entry.revision != revision {
+                return Ok(Vec::new());
+            }
+            match &outcome {
+                MaterialApplicationOutcome::Applied => {
+                    let entry = authority
+                        .pending_material
+                        .take()
+                        .ok_or_else(|| {
+                            kernel_protocol_error("authority material pending state disappeared")
+                        })?;
+                    let expected_control_id = control_id_of(&entry.next_control);
+                    authority.pending_control = Some(PendingControl {
+                        revision: entry.revision,
+                        operation_id: entry.operation_id.clone(),
+                        control: entry.next_control.clone(),
+                        expected_control_id,
+                    });
+                    authority_project = Some((
+                        authority.context.sender_seat_id,
+                        entry.revision,
+                        entry.operation_id,
+                        entry.next_control,
+                    ));
+                }
+                MaterialApplicationOutcome::Deferred => {}
+                MaterialApplicationOutcome::Rejected { reason } => {
+                    authority.pending_material = None;
+                    authority.pending_control = None;
+                    authority_rejection = Some(reason.clone());
+                }
+            }
+        }
+        if let Some(reason) = authority_rejection {
+            return Ok(self.enter_terminal(reason));
+        }
+        if let Some((endpoint, revision, operation_id, control)) = authority_project {
+            return Ok(vec![KernelEffect::ProjectAuthorityControl {
+                endpoint,
+                revision,
+                operation_id,
+                control,
+            }]);
+        }
+        if self
+            .protocol
+            .as_ref()
+            .is_some_and(|protocol| matches!(protocol, ProtocolState::Authority(_)))
+        {
+            return Ok(Vec::new());
+        }
+        let recovery_pending = matches!(
+            self.protocol.as_ref(),
+            Some(ProtocolState::Replica(replica))
+                if replica.recovery.phase() == Some(RecoveryPhase::Validated)
+                    && replica.pending_recovery.is_some()
+        );
+        if recovery_pending {
+            let recovery_outcome = match &outcome {
+                MaterialApplicationOutcome::Applied => RecoveryMaterialOutcome::Applied,
+                MaterialApplicationOutcome::Deferred => RecoveryMaterialOutcome::Deferred,
+                MaterialApplicationOutcome::Rejected { .. } => RecoveryMaterialOutcome::Rejected,
+            };
+            let actions = {
+                let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                    return Ok(Vec::new());
+                };
+                if replica.pending_material.is_none()
+                    || replica
+                        .pending_material
+                        .as_ref()
+                        .is_some_and(|pending| pending.revision != revision)
+                {
+                    return Ok(Vec::new());
+                }
+                let live = RecoveryLiveState {
+                    frontier: replica.replica.frontier(),
+                    context: replica.recovery_context.clone(),
+                };
+                replica
+                    .recovery
+                    .material_result(recovery_outcome, live, &mut self.scheduler)
+                    .map_err(kernel_protocol_error)?
+            };
+            let effects = self.apply_recovery_actions(actions)?;
+            if !matches!(outcome, MaterialApplicationOutcome::Deferred) {
+                if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                    replica.pending_material = None;
+                }
+            }
+            return Ok(effects);
+        }
+
+        let actions = {
+            let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            replica
+                .replica
+                .material_result(revision, outcome.clone())
+                .map_err(kernel_protocol_error)?
+        };
+        let effects = self.map_replica_actions(actions);
+        if !matches!(outcome, MaterialApplicationOutcome::Deferred) {
+            if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                replica.pending_material = None;
+            }
+        }
+        Ok(effects)
+    }
+
+    fn dispatch_control(
+        &mut self,
+        endpoint: SeatId,
+        revision: Revision,
+        outcome: ControlProjectionOutcome,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        if endpoint != self.local_endpoint() {
+            return Ok(Vec::new());
+        }
+        if self
+            .protocol
+            .as_ref()
+            .is_some_and(|protocol| matches!(protocol, ProtocolState::Authority(_)))
+        {
+            let pending = match self.protocol.as_ref() {
+                Some(ProtocolState::Authority(authority)) => authority.pending_control.clone(),
+                _ => None,
+            };
+            let Some(pending) = pending else {
+                return Ok(Vec::new());
+            };
+            if pending.revision != revision {
+                return Ok(Vec::new());
+            }
+            match outcome {
+                ControlProjectionOutcome::Installed { control_id }
+                | ControlProjectionOutcome::AlreadyInstalled { control_id } => {
+                    if control_id != pending.expected_control_id {
+                        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+                            authority.pending_control = None;
+                        }
+                        return Ok(self.enter_terminal(format!(
+                            "authority control projection proved {control_id}, expected {}",
+                            pending.expected_control_id
+                        )));
+                    }
+                    if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+                        authority.pending_control = None;
+                    }
+                    return Ok(self.install_control(pending));
+                }
+                ControlProjectionOutcome::Deferred => return Ok(Vec::new()),
+                ControlProjectionOutcome::Rejected { reason } => {
+                    if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+                        authority.pending_control = None;
+                    }
+                    return Ok(self.enter_terminal(reason));
+                }
+            }
+        }
+        let recovery_pending = matches!(
+            self.protocol.as_ref(),
+            Some(ProtocolState::Replica(replica))
+                if replica.recovery.phase() == Some(RecoveryPhase::FrontierInstalled)
+                    && replica.pending_recovery.is_some()
+        );
+        let successful = matches!(
+            &outcome,
+            ControlProjectionOutcome::Installed { .. }
+                | ControlProjectionOutcome::AlreadyInstalled { .. }
+        );
+        if recovery_pending {
+            let (replica_actions, recovery_actions) = {
+                let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                    return Ok(Vec::new());
+                };
+                if replica.pending_control.is_none()
+                    || replica
+                        .pending_control
+                        .as_ref()
+                        .is_some_and(|pending| pending.revision != revision)
+                {
+                    return Ok(Vec::new());
+                }
+                let replica_actions = replica
+                    .replica
+                    .control_result(revision, outcome.clone())
+                    .map_err(kernel_protocol_error)?;
+                let live = RecoveryLiveState {
+                    frontier: replica.replica.frontier(),
+                    context: replica.recovery_context.clone(),
+                };
+                let recovery_actions = replica
+                    .recovery
+                    .control_result(outcome.clone(), live, &mut self.scheduler)
+                    .map_err(kernel_protocol_error)?;
+                (replica_actions, recovery_actions)
+            };
+            // The replica's exact controlInstalled receipt is mechanical
+            // evidence for the installed control and must precede the
+            // correlated recoveryApplied proof. Recovery actions retain their
+            // own proof-before-fence-release order, and the menu is exposed
+            // only after both batches have been mapped.
+            let mut effects = self.map_replica_actions(replica_actions);
+            if self.terminal.is_some() {
+                return Ok(effects);
+            }
+            effects.extend(self.apply_recovery_actions(recovery_actions)?);
+            if self.terminal.is_some() {
+                return Ok(effects);
+            }
+            if successful {
+                effects.extend(self.install_pending_control());
+            }
+            if successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }) {
+                if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                    replica.pending_control = None;
+                }
+            }
+            return Ok(effects);
+        }
+
+        let actions = {
+            let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            replica
+                .replica
+                .control_result(revision, outcome.clone())
+                .map_err(kernel_protocol_error)?
+        };
+        let mut effects = self.map_replica_actions(actions);
+        if self.terminal.is_some() {
+            return Ok(effects);
+        }
+        if successful {
+            effects.extend(self.install_pending_control());
+        }
+        if successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }) {
+            if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+                replica.pending_control = None;
+            }
+        }
+        Ok(effects)
+    }
+
+    fn dispatch_presentation(
+        &mut self,
+        endpoint: SeatId,
+        event_id: PresentationEventId,
+        outcome: PresentationOutcome,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        if endpoint != self.local_endpoint() {
+            return Ok(Vec::new());
+        }
+        let Some(revision) = self.pending_presentations.remove(&event_id) else {
+            return Ok(Vec::new());
+        };
+        let probe = match outcome {
+            PresentationOutcome::Settled => PresentationProbeOutcome::Settled,
+            PresentationOutcome::Cancelled | PresentationOutcome::Failed { .. } => {
+                PresentationProbeOutcome::Failed
+            }
+        };
+        let actions = {
+            let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            replica
+                .replica
+                .presentation_result(revision, probe)
+                .map_err(kernel_protocol_error)?
+        };
+        Ok(self.map_replica_actions(actions))
+    }
+
+    fn dispatch_suspend(
+        &mut self,
+        endpoint: SeatId,
+        suspended: bool,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        if !self.protocol_endpoint_known(endpoint) {
+            return Ok(Vec::new());
+        }
+        let commands = self
+            .scheduler
+            .set_suspended(endpoint, suspended)
+            .map_err(kernel_protocol_error)?;
+        Ok(Self::map_scheduler_commands(commands))
+    }
+
+    fn dispatch_transport(
+        &mut self,
+        endpoint: SeatId,
+        state: TransportState,
+        generation: ConnectionGeneration,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let Some(current_generation) = self.protocol_endpoint_generation(endpoint) else {
+            return Ok(Vec::new());
+        };
+        if generation < current_generation {
+            return Ok(Vec::new());
+        }
+        if generation == current_generation
+            && self.protocol_endpoint_state(endpoint) == Some(state)
+        {
+            return Ok(Vec::new());
+        }
+        let connected = state == TransportState::Connected;
+        let mut effects = Self::map_scheduler_commands(
+            self.scheduler
+                .set_connected(endpoint, connected)
+                .map_err(kernel_protocol_error)?,
+        );
+        let mut authority_actions = Vec::new();
+        let mut proposal_actions = Vec::new();
+        let mut recovery_cleanup_actions = Vec::new();
+        let mut recovery_actions = Vec::new();
+        let mut clear_presentations = false;
+        match self.protocol.as_mut() {
+            Some(ProtocolState::Authority(authority)) => {
+                let generation_changed = generation > current_generation;
+                let local = authority.context.sender_seat_id;
+                authority.transports.insert(endpoint, state);
+                if endpoint == local && generation_changed {
+                    authority.context.connection_generation = generation;
+                    authority.authority_rebind_pending = true;
+                    // Every cached bundle embeds the authority's exact response
+                    // context, so a local generation change invalidates all of
+                    // them before any new-generation traffic is admitted.
+                    authority.pending_recoveries.clear();
+                } else if endpoint != local && generation_changed {
+                    if let Some(binding) = authority
+                        .peer_bindings
+                        .iter_mut()
+                        .find(|binding| binding.seat_id == endpoint)
+                    {
+                        binding.connection_generation = generation;
+                    }
+                    authority
+                        .pending_recoveries
+                        .retain(|_, expected| expected.peer != endpoint);
+                    authority.authority_rebind_pending = true;
+                    authority.staged_peer_rebinds.insert(endpoint, generation);
+                }
+
+                let staged_peer_connected = endpoint != local
+                    && connected
+                    && authority.staged_peer_rebinds.get(&endpoint) == Some(&generation);
+                if staged_peer_connected {
+                    authority_actions = authority
+                        .log
+                        .rebind_connection(
+                            authority.context.clone(),
+                            authority.peer_bindings.clone(),
+                        )
+                        .map_err(kernel_protocol_error)?
+                        .actions;
+                    authority.staged_peer_rebinds.remove(&endpoint);
+                    authority.authority_rebind_pending =
+                        !authority.staged_peer_rebinds.is_empty();
+                    if let Some(entry) = authority.pending_material.as_mut() {
+                        entry.context = authority.context.clone();
+                    }
+                }
+            }
+            Some(ProtocolState::Replica(replica)) => {
+                let local = replica.context.sender_seat_id;
+                let authority_seat_id = replica.authority_seat_id;
+                let generation_changed = generation > current_generation;
+                replica.transports.insert(endpoint, state);
+                if endpoint == local && generation_changed {
+                    replica.context.connection_generation = generation;
+                    replica.recovery_context.connection_generation = generation;
+                    replica.recovery_config.local_context = replica.recovery_context.clone();
+                }
+                if endpoint == authority_seat_id && generation_changed {
+                    replica.authority_generation = generation;
+                    replica.staged_authority_rebind = Some(generation);
+                }
+
+                let authority_link_connected = endpoint == authority_seat_id
+                    && connected
+                    && replica.staged_authority_rebind == Some(generation);
+                if authority_link_connected {
+                    replica
+                        .replica
+                        .rebind_connection(replica.context.clone(), replica.authority_generation)
+                        .map_err(kernel_protocol_error)?;
+                    proposal_actions = replica
+                        .leases
+                        .rebind(authority_seat_id, replica.authority_generation)
+                        .map_err(kernel_protocol_error)?
+                        .1;
+
+                    let mut next_recovery =
+                        RecoveryTransaction::new(replica.recovery_config.clone())
+                            .map_err(kernel_protocol_error)?;
+                    if replica.recovery.phase().is_some() {
+                        recovery_cleanup_actions = replica
+                            .recovery
+                            .dispose("superseded transport generation", &mut self.scheduler);
+                    }
+                    clear_presentations = true;
+                    replica.pending_recovery = None;
+                    replica.pending_material = None;
+                    replica.pending_control = None;
+                    let captured = replica.replica.frontier();
+                    let request_id =
+                        format!("recovery-{}", replica.authority_generation.get().get());
+                    recovery_actions = next_recovery
+                        .start(
+                            request_id,
+                            captured,
+                            "transport-reconnect".to_owned(),
+                            &mut self.scheduler,
+                        )
+                        .map_err(kernel_protocol_error)?;
+                    replica.recovery = next_recovery;
+                    replica.staged_authority_rebind = None;
+                }
+            }
+            None => {}
+        }
+        if clear_presentations {
+            self.pending_presentations.clear();
+        }
+        effects.extend(self.map_authority_actions(authority_actions));
+        effects.extend(Self::map_rebind_recovery_cleanup(
+            recovery_cleanup_actions,
+        )?);
+        effects.extend(self.map_proposal_actions(proposal_actions));
+        effects.extend(self.apply_recovery_actions(recovery_actions)?);
+        self.sync_live_resources();
+        Ok(effects)
+    }
+
+    fn install_pending_control(&mut self) -> Vec<KernelEffect> {
+        let pending = match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(authority)) => authority.pending_control.clone(),
+            Some(ProtocolState::Replica(replica)) => replica.pending_control.clone(),
+            None => None,
+        };
+        let Some(pending) = pending else {
+            return self.enter_terminal(
+                "control projection completed without a pending control".to_owned(),
+            );
+        };
+        self.install_control(pending)
+    }
+
+    fn install_control(&mut self, pending: PendingControl) -> Vec<KernelEffect> {
+        let actual_control_id = control_id_of(&pending.control);
+        if actual_control_id != pending.expected_control_id {
+            return self.enter_terminal(format!(
+                "control identity mismatch: expected {}, got {}",
+                pending.expected_control_id, actual_control_id
+            ));
+        }
+        let menu = match &pending.control {
+            NextControl::AwaitSuccessor(control) => Some((
+                None,
+                false,
+                MenuState::Waiting(WaitingMenu {
+                    prompt_key: Some(format!("await/{}", control.after_operation_id)),
+                }),
+            )),
+            NextControl::Terminal(control) => {
+                return self.enter_terminal_control(control.terminal_id.clone());
+            }
+            NextControl::CommandFrontier(control) => {
+                let plan = self.find_command_plan(&pending, control);
+                plan.map(|(owner, operation_id, options, cancel)| {
+                    (
+                        Some(owner),
+                        true,
+                        MenuState::Command(CommandMenu {
+                            operation_id,
+                            control_id: actual_control_id.clone(),
+                            cursor: SafeU53::ZERO,
+                            options,
+                            cancel,
+                        }),
+                    )
+                })
+            }
+            NextControl::Replacement(control) => self.find_replacement_plan(&pending, control).map(
+                |(owner, operation_id, field_index, options, cancel)| {
+                    (
+                        Some(owner),
+                        true,
+                        MenuState::Replacement(ReplacementMenu {
+                            operation_id,
+                            control_id: actual_control_id.clone(),
+                            field_index,
+                            cursor: SafeU53::ZERO,
+                            options,
+                            cancel,
+                        }),
+                    )
+                },
+            ),
+            NextControl::SharedInteraction(control) => {
+                self.find_interaction_plan(&pending, control).map(
+                    |(owner, operation_id, surface_class, operation_kind, options, cancel)| {
+                        (
+                            Some(owner),
+                            true,
+                            MenuState::Interaction(InteractionMenu {
+                                operation_id,
+                                control_id: actual_control_id.clone(),
+                                surface_class,
+                                operation_kind,
+                                choice: ChoiceListMenu {
+                                    cursor: SafeU53::ZERO,
+                                    page: SafeU53::ZERO,
+                                    wrap: false,
+                                    options,
+                                    cancel,
+                                },
+                            }),
+                        )
+                    },
+                )
+            }
+        };
+        let Some((owner, actionable, menu)) = menu else {
+            return self.enter_terminal(format!(
+                "missing exact control menu plan for {actual_control_id}"
+            ));
+        };
+        self.ui_reducer.replace_menu(owner, actionable, menu);
+        vec![KernelEffect::UiChanged {
+            endpoint: self.local_endpoint(),
+            view: self.ui_reducer.view(),
+        }]
+    }
+
+    fn find_command_plan(
+        &self,
+        pending: &PendingControl,
+        control: &er_types::CommandFrontierControl,
+    ) -> Option<(SeatId, OperationId, Vec<MenuOption>, CancelPolicy)> {
+        let local_endpoint = self.local_endpoint();
+        let plans = match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => &authority.menu_plans,
+            ProtocolState::Replica(replica) => &replica.menu_plans,
+        };
+        let Some(target) = control
+            .commands
+            .iter()
+            .filter(|target| target.owner_seat_id == local_endpoint)
+            .min_by(|left, right| {
+                left.field_index
+                    .cmp(&right.field_index)
+                    .then_with(|| left.owner_seat_id.cmp(&right.owner_seat_id))
+                    .then_with(|| left.pokemon_id.cmp(&right.pokemon_id))
+            })
+        else {
+            return None;
+        };
+        let matches = plans.iter().filter_map(|plan| {
+            let ControlMenuPlan::Command {
+                control_id,
+                owner_seat_id,
+                operation_id,
+                field_index,
+                options,
+                cancel,
+                ..
+            } = plan
+            else {
+                return None;
+            };
+            let selected_target = target.owner_seat_id == *owner_seat_id
+                && target.field_index == *field_index;
+            (control_id == &pending.expected_control_id && selected_target).then(|| {
+                (
+                    *owner_seat_id,
+                    operation_id.clone(),
+                    options.clone(),
+                    cancel.clone(),
+                )
+            })
+        });
+        let mut matches = matches.collect::<Vec<_>>();
+        if matches.len() == 1 {
+            matches.pop()
+        } else {
+            None
+        }
+    }
+
+    fn find_replacement_plan(
+        &self,
+        pending: &PendingControl,
+        control: &er_types::ReplacementControl,
+    ) -> Option<(SeatId, OperationId, SafeU53, Vec<MenuOption>, CancelPolicy)> {
+        let plans = match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => &authority.menu_plans,
+            ProtocolState::Replica(replica) => &replica.menu_plans,
+        };
+        let matches = plans.iter().filter_map(|plan| {
+            let ControlMenuPlan::Replacement {
+                control_id,
+                owner_seat_id,
+                operation_id,
+                field_index,
+                options,
+                cancel,
+                ..
+            } = plan
+            else {
+                return None;
+            };
+            (control_id == &pending.expected_control_id
+                && operation_id == &control.operation_id
+                && *owner_seat_id == control.owner_seat_id
+                && *field_index == control.field_index)
+                .then(|| {
+                    (
+                        *owner_seat_id,
+                        operation_id.clone(),
+                        *field_index,
+                        options.clone(),
+                        cancel.clone(),
+                    )
+                })
+        });
+        let mut matches = matches.collect::<Vec<_>>();
+        if matches.len() == 1 {
+            matches.pop()
+        } else {
+            None
+        }
+    }
+
+    fn find_interaction_plan(
+        &self,
+        pending: &PendingControl,
+        control: &er_types::SharedInteractionControl,
+    ) -> Option<(
+        SeatId,
+        OperationId,
+        String,
+        String,
+        Vec<MenuOption>,
+        CancelPolicy,
+    )> {
+        let plans = match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => &authority.menu_plans,
+            ProtocolState::Replica(replica) => &replica.menu_plans,
+        };
+        let matches = plans.iter().filter_map(|plan| {
+            let ControlMenuPlan::Interaction {
+                control_id,
+                owner_seat_id,
+                operation_id,
+                surface_class,
+                operation_kind,
+                options,
+                cancel,
+                ..
+            } = plan
+            else {
+                return None;
+            };
+            (control_id == &pending.expected_control_id
+                && operation_id == &control.operation_id
+                && *owner_seat_id == control.owner_seat_id
+                && surface_class == &control.surface_class
+                && operation_kind == &control.operation_kind)
+                .then(|| {
+                    (
+                        *owner_seat_id,
+                        operation_id.clone(),
+                        surface_class.clone(),
+                        operation_kind.clone(),
+                        options.clone(),
+                        cancel.clone(),
+                    )
+                })
+        });
+        let mut matches = matches.collect::<Vec<_>>();
+        if matches.len() == 1 {
+            matches.pop()
+        } else {
+            None
+        }
+    }
+
+    fn clear_input_effects(&mut self) -> Vec<KernelEffect> {
+        let contexts = self.repeat_timers.clone();
+        let output = self.input_router.clear(&mut self.scheduler);
+        let mut effects = Vec::new();
+        for timer in output.timers {
+            if let InputTimerCommand::Cancel { timer_id } = timer {
+                if let Some(context) = contexts.get(&timer_id) {
+                    effects.push(KernelEffect::CancelTimer {
+                        endpoint: context.endpoint,
+                        timer_id,
+                    });
+                }
+            }
+        }
+        self.repeat_timers.clear();
+        self.sync_live_timers();
+        effects
+    }
+
+    fn protocol_endpoint_known(&self, endpoint: SeatId) -> bool {
+        self.protocol_endpoint_state(endpoint).is_some()
+    }
+
+    fn protocol_endpoint_state(&self, endpoint: SeatId) -> Option<TransportState> {
+        match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => authority.transports.get(&endpoint).copied(),
+            ProtocolState::Replica(replica) => replica.transports.get(&endpoint).copied(),
+        }
+    }
+
+    fn protocol_endpoint_generation(&self, endpoint: SeatId) -> Option<ConnectionGeneration> {
+        match self.protocol.as_ref()? {
+            ProtocolState::Authority(authority) => {
+                if endpoint == authority.context.sender_seat_id {
+                    Some(authority.context.connection_generation)
+                } else {
+                    authority
+                        .peer_bindings
+                        .iter()
+                        .find(|binding| binding.seat_id == endpoint)
+                        .map(|binding| binding.connection_generation)
+                }
+            }
+            ProtocolState::Replica(replica) => {
+                if endpoint == replica.authority_seat_id {
+                    Some(replica.authority_generation)
+                } else if endpoint == replica.context.sender_seat_id {
+                    Some(replica.context.connection_generation)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn map_scheduler_commands(commands: Vec<SchedulerCommand>) -> Vec<KernelEffect> {
+        commands
+            .into_iter()
+            .filter_map(Self::map_scheduler_command)
+            .collect()
+    }
+
+    fn map_rebind_recovery_cleanup(
+        actions: Vec<RecoveryAction>,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let mut effects = Vec::new();
+        for action in actions {
+            match action {
+                RecoveryAction::Scheduler { command } => {
+                    if let Some(effect) = Self::map_scheduler_command(command) {
+                        effects.push(effect);
+                    }
+                }
+                RecoveryAction::FenceChanged { .. } | RecoveryAction::Terminalize { .. } => {}
+                RecoveryAction::SendRequest { .. }
+                | RecoveryAction::ApplyMaterial { .. }
+                | RecoveryAction::StageRecoveredFrontier { .. }
+                | RecoveryAction::ProjectControl { .. }
+                | RecoveryAction::SendAppliedProof { .. } => {
+                    return Err(kernel_protocol_error(
+                        "superseded recovery emitted non-cleanup work during rebind",
+                    ));
+                }
+            }
+        }
+        Ok(effects)
+    }
+
+    fn enter_terminal(&mut self, reason: String) -> Vec<KernelEffect> {
+        let reason = if reason.is_empty() {
+            "authority-v2 terminal".to_owned()
+        } else {
+            reason
+        };
+        self.enter_terminal_state(TerminalState {
+            terminal_id: "authority-v2-terminal".to_owned(),
+            reason,
+        })
+    }
+
+    fn enter_terminal_frame(&mut self, body: TerminalFrameBody) -> Vec<KernelEffect> {
+        self.enter_terminal_state(TerminalState {
+            terminal_id: body.terminal_id,
+            reason: body.reason,
+        })
+    }
+
+    fn enter_terminal_control(&mut self, terminal_id: String) -> Vec<KernelEffect> {
+        self.enter_terminal_state(TerminalState {
+            reason: format!("terminal control {terminal_id}"),
+            terminal_id,
+        })
+    }
+
+    fn enter_terminal_state(&mut self, terminal: TerminalState) -> Vec<KernelEffect> {
+        if self.terminal.is_some() {
+            return Vec::new();
+        }
+        self.terminal = Some(terminal.clone());
+        let mut effects = self.clear_input_effects();
+        let protocol_batches = if let Some(protocol) = self.protocol.as_mut() {
+            match protocol {
+                ProtocolState::Authority(authority) => vec![ProtocolActionBatch::Authority(
+                    authority.log.dispose(&terminal.reason, &mut self.scheduler),
+                )],
+                ProtocolState::Replica(replica) => vec![
+                    ProtocolActionBatch::Recovery(
+                        replica.recovery.dispose(&terminal.reason, &mut self.scheduler),
+                    ),
+                    ProtocolActionBatch::Proposal(
+                        replica.leases.dispose(&terminal.reason, &mut self.scheduler),
+                    ),
+                ],
+            }
+        } else {
+            Vec::new()
+        };
+        for batch in protocol_batches {
+            match batch {
+                ProtocolActionBatch::Authority(actions) => {
+                    effects.extend(self.map_authority_actions(actions));
+                }
+                ProtocolActionBatch::Proposal(actions) => {
+                    effects.extend(self.map_proposal_actions(actions));
+                }
+                ProtocolActionBatch::Recovery(actions) => {
+                    if let Ok(mapped) = self.apply_recovery_actions(actions) {
+                        effects.extend(mapped);
+                    }
+                }
+            }
+        }
+        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+            authority.proposals.dispose();
+        }
+        if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+            replica.replica.dispose(&terminal.reason);
+        }
+        match self.protocol.as_mut() {
+            Some(ProtocolState::Authority(authority)) => {
+                authority.pending_material = None;
+                authority.pending_control = None;
+                authority.pending_recoveries.clear();
+                authority.authority_rebind_pending = false;
+                authority.staged_peer_rebinds.clear();
+            }
+            Some(ProtocolState::Replica(replica)) => {
+                replica.pending_material = None;
+                replica.pending_control = None;
+                replica.pending_recovery = None;
+                replica.staged_authority_rebind = None;
+            }
+            None => {}
+        }
+        for command in self.scheduler.dispose() {
+            if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
+                effects.push(KernelEffect::CancelTimer { endpoint, timer_id });
+            }
+        }
+        self.pending_presentations.clear();
+        self.live_resources = LiveResourceSnapshot::default();
+        self.ui_reducer.replace_menu(
+            None,
+            false,
+            MenuState::Terminal(TerminalMenu {
+                terminal_id: terminal.terminal_id.clone(),
+                prompt_key: Some(terminal.reason.clone()),
+            }),
+        );
+        effects.push(KernelEffect::UiChanged {
+            endpoint: self.local_endpoint(),
+            view: self.ui_reducer.view(),
+        });
+        effects.push(KernelEffect::EnterSharedTerminal {
+            terminal: terminal.clone(),
+        });
+        effects
+    }
+
+    fn protocol_snapshot(&self) -> Value {
+        let Some(protocol_state) = self.protocol.as_ref() else {
+            // Preserve the frozen M1/native-Wasm snapshot shape for kernels
+            // without protocol composition: KernelSnapshot::default().state
+            // is the empty object, not a protocol diagnostic envelope.
+            if self.protocol_config.is_none() {
+                return Value::Object(serde_json::Map::new());
+            }
+            return json!({
+                "protocol": Value::Null,
+                "terminal": self.terminal,
+                "liveResources": self.live_resources,
+                "initError": self.protocol_init_error,
+            });
+        };
+        let protocol = match protocol_state {
+            ProtocolState::Authority(authority) => json!({
+                "role": "authority",
+                "context": authority.context,
+                "peerBindings": authority.peer_bindings,
+                "transports": authority.transports,
+                "log": authority.log.diagnostics(),
+                "proposals": authority.proposals.diagnostics(),
+                "pendingMaterial": authority.pending_material,
+                "pendingControl": pending_control_snapshot(authority.pending_control.as_ref()),
+                "pendingRecoveries": pending_recoveries_snapshot(&authority.pending_recoveries),
+                "authorityRebindPending": authority.authority_rebind_pending,
+                "stagedPeerRebinds": authority.staged_peer_rebinds,
+            }),
+            ProtocolState::Replica(replica) => json!({
+                "role": "replica",
+                "context": replica.context,
+                "authoritySeatId": replica.authority_seat_id,
+                "authorityGeneration": replica.authority_generation,
+                "transports": replica.transports,
+                "replica": replica.replica.diagnostics(),
+                "leases": replica.leases.diagnostics(),
+                "recovery": replica.recovery.diagnostics(),
+                "pendingMaterial": pending_material_snapshot(replica.pending_material.as_ref()),
+                "pendingControl": pending_control_snapshot(replica.pending_control.as_ref()),
+                "pendingRecovery": replica.pending_recovery,
+                "stagedAuthorityRebind": replica.staged_authority_rebind,
+            }),
+        };
+        json!({
+            "protocol": protocol,
+            "terminal": self.terminal,
+            "liveResources": self.live_resources,
+            "initError": self.protocol_init_error,
+        })
+    }
+
+    fn sync_live_resources(&mut self) {
+        self.sync_live_timers();
+        self.live_resources.presentations = self.pending_presentations.keys().copied().collect();
+        self.live_resources.storage_requests.clear();
+        self.live_resources.network_packets.clear();
+        self.live_resources.delivery_leases.clear();
+        self.live_resources.proposal_leases.clear();
+        self.live_resources.recovery_transactions.clear();
+        self.live_resources.waits.clear();
+        self.live_resources.retained_revisions.clear();
+        self.live_resources.controls.clear();
+
+        match self.protocol.as_ref() {
+            Some(ProtocolState::Authority(authority)) => {
+                let diagnostics = authority.log.diagnostics();
+                self.live_resources.delivery_leases = diagnostics.delivery_owner_ids;
+                self.live_resources.retained_revisions = diagnostics.retained_revisions;
+                self.live_resources.recovery_transactions = authority
+                    .pending_recoveries
+                    .keys()
+                    .cloned()
+                    .collect();
+            }
+            Some(ProtocolState::Replica(replica)) => {
+                let lease_diagnostics = replica.leases.diagnostics();
+                self.live_resources.proposal_leases = lease_diagnostics.live_operation_ids;
+                let recovery_diagnostics = replica.recovery.diagnostics();
+                if let Some(request_id) = recovery_diagnostics.request_id {
+                    if !matches!(
+                        recovery_diagnostics.phase,
+                        Some(RecoveryPhase::Released | RecoveryPhase::Terminalized)
+                    ) {
+                        self.live_resources.recovery_transactions.insert(request_id);
+                    }
+                }
+            }
+            None => {}
+        }
+        if self.protocol.is_none() {
+            return;
+        }
+        if let Some(menu) = self.ui_reducer.state().stack.last() {
+            match menu {
+                MenuState::Waiting(waiting) => {
+                    let wait = match waiting.prompt_key.clone() {
+                        Some(prompt) => prompt,
+                        None => "waiting".to_owned(),
+                    };
+                    self.live_resources.waits.insert(wait);
+                }
+                MenuState::Command(command) => {
+                    self.live_resources.controls.insert(command.control_id.clone());
+                }
+                MenuState::Replacement(replacement) => {
+                    self.live_resources
+                        .controls
+                        .insert(replacement.control_id.clone());
+                }
+                MenuState::Interaction(interaction) => {
+                    self.live_resources
+                        .controls
+                        .insert(interaction.control_id.clone());
+                }
+                MenuState::None
+                | MenuState::Message(_)
+                | MenuState::Confirm(_)
+                | MenuState::ChoiceList(_)
+                | MenuState::Terminal(_) => {}
+            }
+        }
+    }
+
+    fn set_pending_material(&mut self, revision: Revision, operation_id: OperationId) {
+        if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
+            replica.pending_material = Some(PendingMaterial {
+                revision,
+                operation_id,
+            });
+        }
+    }
+
+    fn set_pending_authority_entry(&mut self, entry: AuthorityEntry) {
+        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
+            authority.pending_material = Some(entry);
+        }
+    }
+
+    fn set_pending_control(&mut self, pending: PendingControl) {
+        match self.protocol.as_mut() {
+            Some(ProtocolState::Authority(authority)) => {
+                authority.pending_control = Some(pending);
+            }
+            Some(ProtocolState::Replica(replica)) => {
+                replica.pending_control = Some(pending);
+            }
+            None => {}
+        }
+    }
+}
+
+impl ProtocolState {
+    fn new(config: &ProtocolKernelConfig) -> Result<Self, String> {
+        match &config.role {
+            ProtocolRoleConfig::Authority {
+                log,
+                proposal_capacity,
+                resolutions,
+            } => {
+                let context = log.local_context.clone();
+                let peer_bindings = log.peer_bindings.clone();
+                let log = AuthorityLog::new(log.clone())
+                    .map_err(|error| format!("authority log initialization failed: {error}"))?;
+                let proposals = ProposalAdmissionLedger::new(*proposal_capacity)
+                    .map_err(|error| format!("proposal admission initialization failed: {error}"))?;
+                let mut transports = BTreeMap::new();
+                transports.insert(context.sender_seat_id, TransportState::Connected);
+                for peer in &peer_bindings {
+                    transports.insert(peer.seat_id, TransportState::Connected);
+                }
+                Ok(Self::Authority(AuthorityKernelState {
+                    context,
+                    peer_bindings,
+                    log,
+                    proposals,
+                    resolutions: resolutions.clone(),
+                    menu_plans: config.menu_plans.clone(),
+                    pending_material: None,
+                    pending_control: None,
+                    pending_recoveries: BTreeMap::new(),
+                    authority_rebind_pending: false,
+                    staged_peer_rebinds: BTreeMap::new(),
+                    transports,
+                }))
+            }
+            ProtocolRoleConfig::Replica {
+                replica,
+                proposal_leases,
+                recovery,
+            } => {
+                let context = replica.receipt_context.clone();
+                let authority_seat_id = replica.authority_seat_id;
+                let authority_generation = replica.authority_connection_generation;
+                let replica_owner = AuthorityReplica::new(replica.clone())
+                    .map_err(|error| format!("authority replica initialization failed: {error}"))?;
+                let leases = ProposalLeaseManager::new(proposal_leases.clone())
+                    .map_err(|error| format!("proposal lease initialization failed: {error}"))?;
+                let recovery_owner = RecoveryTransaction::new(recovery.clone())
+                    .map_err(|error| format!("recovery initialization failed: {error}"))?;
+                let recovery_context = recovery.local_context.clone();
+                let mut transports = BTreeMap::new();
+                transports.insert(context.sender_seat_id, TransportState::Connected);
+                transports.insert(authority_seat_id, TransportState::Connected);
+                Ok(Self::Replica(ReplicaKernelState {
+                    context,
+                    authority_seat_id,
+                    authority_generation,
+                    replica: replica_owner,
+                    leases,
+                    recovery: recovery_owner,
+                    recovery_config: recovery.clone(),
+                    recovery_context,
+                    menu_plans: config.menu_plans.clone(),
+                    pending_material: None,
+                    pending_control: None,
+                    pending_recovery: None,
+                    staged_authority_rebind: None,
+                    transports,
+                }))
+            }
+        }
+    }
+}
+
+fn menu_submission(intent: UiIntent) -> Option<MenuSubmission> {
+    match intent {
+        UiIntent::CommandSubmitted {
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+            ..
+        } => Some(MenuSubmission {
+            kind: MenuSubmissionKind::Command,
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+        }),
+        UiIntent::ReplacementSubmitted {
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+            ..
+        } => Some(MenuSubmission {
+            kind: MenuSubmissionKind::Replacement,
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+        }),
+        UiIntent::InteractionSubmitted {
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+            ..
+        } => Some(MenuSubmission {
+            kind: MenuSubmissionKind::Interaction,
+            seat,
+            operation_id,
+            control_id,
+            option_id,
+        }),
+        UiIntent::CursorChanged { .. }
+        | UiIntent::CancelRequested { .. }
+        | UiIntent::MessageAdvanced { .. }
+        | UiIntent::Confirmed { .. }
+        | UiIntent::MenuOpened { .. }
+        | UiIntent::MenuClosed { .. } => None,
+    }
+}
+
+fn authority_accepts_peer_frame(
+    authority: &AuthorityKernelState,
+    endpoint: SeatId,
+    context: &FrameContext,
+) -> bool {
+    endpoint == authority.context.sender_seat_id
+        && context.authority_seat_id == authority.context.authority_seat_id
+        && context.sender_seat_id != authority.context.sender_seat_id
+        && frame_contexts_compatible(context, &authority.context)
+        && authority.peer_bindings.iter().any(|binding| {
+            binding.seat_id == context.sender_seat_id
+                && binding.connection_generation == context.connection_generation
+        })
+}
+
+fn replica_accepts_authority_frame(
+    replica: &ReplicaKernelState,
+    endpoint: SeatId,
+    context: &FrameContext,
+) -> bool {
+    endpoint == replica.context.sender_seat_id
+        && context.sender_seat_id == replica.authority_seat_id
+        && context.authority_seat_id == replica.authority_seat_id
+        && context.connection_generation == replica.authority_generation
+        && frame_contexts_compatible(context, &replica.context)
+}
+
+fn pending_material_snapshot(pending: Option<&PendingMaterial>) -> Value {
+    match pending {
+        Some(pending) => json!({
+            "revision": pending.revision,
+            "operationId": pending.operation_id,
+        }),
+        None => Value::Null,
+    }
+}
+
+fn pending_control_snapshot(pending: Option<&PendingControl>) -> Value {
+    match pending {
+        Some(pending) => json!({
+            "revision": pending.revision,
+            "operationId": pending.operation_id,
+            "control": pending.control,
+            "expectedControlId": pending.expected_control_id,
+        }),
+        None => Value::Null,
+    }
+}
+
+fn pending_recoveries_snapshot(
+    pending: &BTreeMap<String, PendingRecoveryExpectation>,
+) -> Value {
+    let mut snapshot = serde_json::Map::new();
+    for (request_id, expectation) in pending {
+        snapshot.insert(
+            request_id.clone(),
+            json!({
+                "peer": expectation.peer,
+                "context": expectation.context,
+                "connectionGeneration": expectation.connection_generation,
+                "capturedFrontier": expectation.captured_frontier,
+                "reason": expectation.reason,
+                "frontier": expectation.frontier,
+                "materialDigest": expectation.material_digest,
+                "controlId": expectation.control_id,
+            }),
+        );
+    }
+    Value::Object(snapshot)
+}
+
+fn network_frame(
+    context: &FrameContext,
+    frame_type: FrameType,
+    body: Value,
+) -> Result<NetworkFrame, String> {
+    Ok(NetworkFrame {
+        version: FRAME_PROTOCOL_VERSION,
+        frame_type,
+        context: context.clone(),
+        body,
+    })
+}
+
+fn authority_entry_frame(entry: &AuthorityEntry) -> Result<NetworkFrame, String> {
+    network_frame(
+        &entry.context,
+        FrameType::AuthorityEntry,
+        serde_json::to_value(AuthorityEntryBody::from(entry))
+            .map_err(|error| error.to_string())?,
+    )
+}
+
+fn receipt_frame(receipt: &AuthorityReceipt) -> Result<NetworkFrame, String> {
+    network_frame(
+        &receipt.context,
+        FrameType::AuthorityReceipt,
+        serde_json::to_value(AuthorityReceiptBody {
+            revision: receipt.revision,
+            operation_id: receipt.operation_id.clone(),
+            stage: receipt.stage,
+            control_id: receipt.control_id.clone(),
+        })
+        .map_err(|error| error.to_string())?,
+    )
+}
+
+fn tail_request_frame(
+    context: &FrameContext,
+    missing_from: Revision,
+) -> Result<NetworkFrame, String> {
+    network_frame(
+        context,
+        FrameType::TailRequest,
+        serde_json::to_value(TailRequestBody {
+            from_revision: missing_from,
+        })
+        .map_err(|error| error.to_string())?,
+    )
+}
+
+fn recovery_request_frame(
+    context: &FrameContext,
+    request: RecoveryRequestBody,
+) -> Result<NetworkFrame, String> {
+    network_frame(
+        context,
+        FrameType::RecoveryRequest,
+        serde_json::to_value(request).map_err(|error| error.to_string())?,
+    )
+}
+
+fn recovery_bundle_frame(
+    context: &FrameContext,
+    request_id: String,
+    membership_revision: er_types::MembershipRevision,
+    slice: &AuthorityRecoverySlice,
+) -> Result<NetworkFrame, String> {
+    let material = match slice.required_tail.last() {
+        Some(entry) => entry.material.clone(),
+        None => er_types::Material {
+            digest: "recovery-empty".to_owned(),
+            payload: Value::Null,
+        },
+    };
+    let body = RecoveryBundleBody {
+        request_id,
+        material,
+        frontier: slice.frontier,
+        frontier_operation_id: slice.frontier_operation_id.clone(),
+        membership_revision,
+        next_control: slice.next_control.clone(),
+        required_tail: slice
+            .required_tail
+            .iter()
+            .map(AuthorityEntryBody::from)
+            .collect(),
+    };
+    network_frame(
+        context,
+        FrameType::RecoveryBundle,
+        serde_json::to_value(body).map_err(|error| error.to_string())?,
+    )
+}
+
+fn recovery_material_digest(slice: &AuthorityRecoverySlice) -> String {
+    match slice.required_tail.last() {
+        Some(entry) => entry.material.digest.clone(),
+        None => "recovery-empty".to_owned(),
+    }
+}
+
+fn recovery_applied_frame(
+    context: &FrameContext,
+    proof: RecoveryAppliedProof,
+) -> Result<NetworkFrame, String> {
+    network_frame(
+        context,
+        FrameType::RecoveryApplied,
+        serde_json::to_value(proof).map_err(|error| error.to_string())?,
+    )
+}
+
+fn recovery_operation_id(bundle: &RecoveryBundle) -> Result<OperationId, KernelError> {
+    if let Some(operation_id) = bundle.frontier_operation_id.clone() {
+        return Ok(operation_id);
+    }
+    OperationId::new(format!("recovery/{}/zero", bundle.request_id))
+        .or_else(|_| OperationId::new("recovery/zero"))
+        .map_err(kernel_protocol_error)
+}
+
+fn previous_revision(revision: Revision) -> Option<Revision> {
+    let value = revision.get().get();
+    if value == 0 {
+        None
+    } else {
+        SafeU53::new(value - 1).ok().map(Revision::new)
+    }
+}
+
+fn kernel_protocol_error<T: std::fmt::Display>(error: T) -> KernelError {
+    KernelError::Canonical {
+        reason: error.to_string(),
     }
 }
 

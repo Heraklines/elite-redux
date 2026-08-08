@@ -920,9 +920,9 @@ fn dispose_cancels_each_real_input_timer_once_and_reports_zero_resources() -> Te
 }
 
 #[test]
-fn cloned_game_kernel_keeps_scheduler_state_without_sharing_mutations() -> TestResult {
+fn no_protocol_snapshot_and_resources_retain_the_frozen_m1_shape() -> TestResult {
     let owner = seat(1);
-    let mut original = kernel_with(
+    let mut kernel = kernel_with(
         choice_menu(
             options(&[("one", true, true), ("two", true, true)])?,
             0,
@@ -931,30 +931,33 @@ fn cloned_game_kernel_keeps_scheduler_state_without_sharing_mutations() -> TestR
         Some(owner),
         true,
     );
+    let frozen = er_types::KernelSnapshot {
+        ui: kernel.snapshot().ui.clone(),
+        state: serde_json::json!({}),
+    };
+    assert_eq!(kernel.snapshot(), frozen);
+    assert_eq!(
+        kernel.state_digest(),
+        er_canonical::content_digest(&frozen)?
+    );
+    assert_eq!(kernel.live_resources(), Default::default());
+
     key_down(
-        &mut original,
+        &mut kernel,
         owner,
         PhysicalKey::ArrowDown,
         false,
         false,
         InputFocus::Game,
     )?;
-
-    let mut clone = original.clone();
-    assert!(original.live_resources().timers.contains(&timer(0)));
-    assert!(clone.live_resources().timers.contains(&timer(0)));
-
-    assert!(cancelled(
-        &key_up(&mut original, owner, PhysicalKey::ArrowDown)?,
-        timer(0)
-    ));
-    assert!(original.live_resources().timers.is_empty());
-    assert!(clone.live_resources().timers.contains(&timer(0)));
-
-    assert!(cancelled(
-        &key_up(&mut clone, owner, PhysicalKey::ArrowDown)?,
-        timer(0)
-    ));
-    assert!(clone.live_resources().timers.is_empty());
+    assert_eq!(kernel.snapshot().state, frozen.state);
+    let resources = kernel.live_resources();
+    assert!(resources.timers.contains(&timer(0)));
+    assert!(resources.presentations.is_empty());
+    assert!(resources.waits.is_empty());
+    assert!(resources.controls.is_empty());
+    assert!(resources.delivery_leases.is_empty());
+    assert!(resources.proposal_leases.is_empty());
+    assert!(resources.recovery_transactions.is_empty());
     Ok(())
 }
