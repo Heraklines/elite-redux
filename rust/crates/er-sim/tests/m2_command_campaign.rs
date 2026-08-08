@@ -565,15 +565,15 @@ fn assert_authority_local_submission(
 
     let mut entries = Vec::new();
     for effect in &step.generated_effects {
-        if let KernelEffect::SendFrame { from, frame } = effect {
-            if frame.frame_type == FrameType::AuthorityEntry {
-                entries.push((
-                    *from,
-                    frame.version,
-                    frame.context.clone(),
-                    serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?,
-                ));
-            }
+        if let KernelEffect::SendFrame { from, frame } = effect
+            && frame.frame_type == FrameType::AuthorityEntry
+        {
+            entries.push((
+                *from,
+                frame.version,
+                frame.context.clone(),
+                serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?,
+            ));
         }
     }
     assert_eq!(
