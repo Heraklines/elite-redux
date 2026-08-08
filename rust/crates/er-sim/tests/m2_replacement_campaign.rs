@@ -9,18 +9,18 @@ use er_protocol::{
     AckStage, AuthorityEntryBody, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLogConfig,
     AuthorityReceiptBody, AuthorityReplicaConfig, BackoffPolicy, FrameContext, FrameType,
     Material, PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
-    RecoveryTransactionConfig, SafeI53, proposal_fingerprint, control_id_of,
+    RecoveryTransactionConfig, SafeI53, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
     SimulatedPair, SimulatedPairConfig, SimulatedPairError,
 };
 use er_types::{
-    AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, InputMap, KeyBinding,
-    LiveResourceSnapshot, MenuGeneration, MenuOption, MenuOptionId, MenuState, MembershipRevision,
-    NextControl, OperationId, PhysicalKey, ProposalMessage, ReplacementControl,
-    ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId, SessionId, TimeClass,
-    UiIntent, UiState, UiViewKind,
+    AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, GameButton, InputFocus, InputMap,
+    KeyBinding, LiveResourceSnapshot, MenuGeneration, MenuOption, MenuOptionId, MenuState,
+    MembershipRevision, NextControl, OperationId, PhysicalKey, ProposalMessage, RawInputEvent,
+    ReplacementControl, ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId,
+    SessionId, TimeClass, TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -60,6 +60,39 @@ struct ReplacementFingerprints {
 struct CampaignRun {
     trace: Vec<PairStep>,
     final_snapshot: PairSnapshot,
+}
+
+struct ReplacementMenuExpectation<'a> {
+    endpoint: PairEndpoint,
+    owner: SeatId,
+    generation: MenuGeneration,
+    operation_id: &'a OperationId,
+    control_id: &'a str,
+    field_index: SafeU53,
+    cursor: SafeU53,
+    option_id: &'a MenuOptionId,
+}
+
+struct ReplacementIntentExpectation<'a> {
+    menu: ReplacementMenuExpectation<'a>,
+    endpoint: SeatId,
+}
+
+struct AuthorityChainContext<'a> {
+    authority_context: &'a FrameContext,
+    replica_context: &'a FrameContext,
+    authority_seat: SeatId,
+    replica_seat: SeatId,
+}
+
+struct AuthorityChainExpectation<'a> {
+    operation_id: &'a OperationId,
+    revision_value: u64,
+    material: &'a Material,
+    next_control: &'a NextControl,
+    expected_control_id: &'a str,
+    context: AuthorityChainContext<'a>,
+    prior_frontier: (u64, u64, u64),
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -570,18 +603,11 @@ fn assert_no_ui_intent(steps: &[PairStep], endpoint: SeatId, reason: &str) {
 
 fn assert_replacement_menu(
     snapshot: &PairSnapshot,
-    endpoint: PairEndpoint,
-    owner: SeatId,
-    generation: MenuGeneration,
-    operation_id: &OperationId,
-    control_id: &str,
-    field_index: SafeU53,
-    cursor: SafeU53,
-    option_id: &MenuOptionId,
+    expected: &ReplacementMenuExpectation<'_>,
 ) -> TestResult {
-    let endpoint_snapshot = endpoint_snapshot(snapshot, endpoint);
-    assert_eq!(endpoint_snapshot.kernel.ui.generation, generation);
-    assert_eq!(endpoint_snapshot.kernel.ui.owner_seat, Some(owner));
+    let endpoint_snapshot = endpoint_snapshot(snapshot, expected.endpoint);
+    assert_eq!(endpoint_snapshot.kernel.ui.generation, expected.generation);
+    assert_eq!(endpoint_snapshot.kernel.ui.owner_seat, Some(expected.owner));
     assert!(endpoint_snapshot.kernel.ui.actionable);
     let stack = endpoint_snapshot.kernel.ui.stack.as_slice();
     let [MenuState::Replacement(menu)] = stack else {
@@ -590,15 +616,27 @@ fn assert_replacement_menu(
                 .into(),
         );
     };
-    assert_eq!(&menu.operation_id, operation_id);
-    assert_eq!(&menu.control_id, control_id);
-    assert_eq!(menu.field_index, field_index);
-    assert_eq!(menu.cursor, cursor);
-    let cursor_index = usize::try_from(cursor.get())?;
+    let enabled_visible_options = menu
+        .options
+        .iter()
+        .filter(|option| option.enabled && option.visible)
+        .count();
+    assert!(
+        enabled_visible_options >= 2,
+        "replacement menu must have at least two enabled visible options, found {enabled_visible_options}"
+    );
+    assert_eq!(&menu.operation_id, expected.operation_id);
+    assert_eq!(&menu.control_id, expected.control_id);
+    assert_eq!(menu.field_index, expected.field_index);
+    assert_eq!(menu.cursor, expected.cursor);
+    let cursor_index = usize::try_from(expected.cursor.get())?;
     let selected_option = menu.options.get(cursor_index).ok_or_else(|| {
-        std::io::Error::other(format!("replacement cursor {cursor:?} has no menu option"))
+        std::io::Error::other(format!(
+            "replacement cursor {:?} has no menu option",
+            expected.cursor
+        ))
     })?;
-    assert_eq!(&selected_option.id, option_id);
+    assert_eq!(&selected_option.id, expected.option_id);
     Ok(())
 }
 
@@ -634,26 +672,9 @@ fn assert_cursor_intent(
 fn assert_replacement_intent(
     steps: &[PairStep],
     pre_submission: &PairSnapshot,
-    menu_endpoint: PairEndpoint,
-    endpoint: SeatId,
-    generation: MenuGeneration,
-    operation_id: &OperationId,
-    control_id: &str,
-    field_index: SafeU53,
-    cursor: SafeU53,
-    option_id: &MenuOptionId,
+    expected: &ReplacementIntentExpectation<'_>,
 ) -> TestResult {
-    assert_replacement_menu(
-        pre_submission,
-        menu_endpoint,
-        endpoint,
-        generation,
-        operation_id,
-        control_id,
-        field_index,
-        cursor,
-        option_id,
-    )?;
+    assert_replacement_menu(pre_submission, &expected.menu)?;
 
     let intents = steps
         .iter()
@@ -669,7 +690,7 @@ fn assert_replacement_intent(
                         control_id: intent_control,
                         option_id: intent_option,
                     },
-            } if *effect_endpoint == endpoint => Some((
+            } if *effect_endpoint == expected.endpoint => Some((
                 *seat,
                 *intent_generation,
                 intent_operation.clone(),
@@ -683,11 +704,11 @@ fn assert_replacement_intent(
         intents,
         vec![
             (
-                endpoint,
-                generation,
-                operation_id.clone(),
-                control_id.to_owned(),
-                option_id.clone(),
+                expected.endpoint,
+                expected.menu.generation,
+                expected.menu.operation_id.clone(),
+                expected.menu.control_id.to_owned(),
+                expected.menu.option_id.clone(),
             )
         ],
         "raw replacement submission lost its seat/menu/operation/control/party identity"
@@ -803,17 +824,18 @@ fn guest_frontier(step: &PairStep) -> TestResult<(u64, u64, u64)> {
 
 fn assert_authority_chain(
     steps: &[PairStep],
-    operation_id: &OperationId,
-    revision_value: u64,
-    material: &Material,
-    next_control: &NextControl,
-    expected_control_id: &str,
-    authority_context: &FrameContext,
-    replica_context: &FrameContext,
-    authority_seat: SeatId,
-    replica_seat: SeatId,
-    prior_frontier: (u64, u64, u64),
+    expected: &AuthorityChainExpectation<'_>,
 ) -> TestResult {
+    let operation_id = expected.operation_id;
+    let revision_value = expected.revision_value;
+    let material = expected.material;
+    let next_control = expected.next_control;
+    let expected_control_id = expected.expected_control_id;
+    let authority_context = expected.context.authority_context;
+    let replica_context = expected.context.replica_context;
+    let authority_seat = expected.context.authority_seat;
+    let replica_seat = expected.context.replica_seat;
+    let prior_frontier = expected.prior_frontier;
     let revision = Revision::new(safe(revision_value));
     let expected_entry = AuthorityEntryBody {
         revision,
@@ -1119,14 +1141,16 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_eq!(selected_option(&initial, PairEndpoint::Guest).as_deref(), Some("party:disabled"));
     assert_replacement_menu(
         &initial,
-        PairEndpoint::Guest,
-        ids.guest,
-        initial_generation,
-        &ids.head_operation,
-        &ids.head_control_id,
-        safe(0),
-        safe(3),
-        &MenuOptionId::new("party:disabled".to_owned())?,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.guest,
+            generation: initial_generation,
+            operation_id: &ids.head_operation,
+            control_id: &ids.head_control_id,
+            field_index: safe(0),
+            cursor: safe(3),
+            option_id: &MenuOptionId::new("party:disabled".to_owned())?,
+        },
     )?;
 
     let wrong_seat = pair.press(PairEndpoint::Host, PhysicalKey::Enter)?;
@@ -1149,14 +1173,16 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         .clone();
     assert_replacement_menu(
         &first_move_snapshot,
-        PairEndpoint::Guest,
-        ids.guest,
-        initial_generation,
-        &ids.head_operation,
-        &ids.head_control_id,
-        safe(0),
-        safe(2),
-        &MenuOptionId::new("party:gamma".to_owned())?,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.guest,
+            generation: initial_generation,
+            operation_id: &ids.head_operation,
+            control_id: &ids.head_control_id,
+            field_index: safe(0),
+            cursor: safe(2),
+            option_id: &MenuOptionId::new("party:gamma".to_owned())?,
+        },
     )?;
     assert_eq!(
         selected_option(
@@ -1169,38 +1195,106 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
 
     // Keep the physical key held so its repeat carries the old menu generation
     // across the delayed control transition and is rejected as stale.
-    let held_move = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
+    let held_move = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowUp,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
     assert_cursor_intent(&[held_move.clone()], ids.guest, initial_generation, safe(1));
     trace.push(held_move.clone());
     assert_replacement_menu(
         &held_move.snapshot,
-        PairEndpoint::Guest,
-        ids.guest,
-        initial_generation,
-        &ids.head_operation,
-        &ids.head_control_id,
-        safe(0),
-        safe(1),
-        &ids.head_choice,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.guest,
+            generation: initial_generation,
+            operation_id: &ids.head_operation,
+            control_id: &ids.head_control_id,
+            field_index: safe(0),
+            cursor: safe(1),
+            option_id: &ids.head_choice,
+        },
     )?;
     assert_eq!(
         selected_option(&held_move.snapshot, PairEndpoint::Guest).as_deref(),
         Some("party:beta")
     );
 
+    let expected_repeat_owner = TimerOwner::input_repeat(GameButton::Up);
+    let held_repeat_timer = held_move
+        .generated_effects
+        .iter()
+        .find_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
+                endpoint,
+                timer_id,
+                owner,
+                delay_ms,
+                time_class: TimeClass::HumanInput,
+            } if *endpoint == ids.guest
+                && owner == &expected_repeat_owner
+                && *delay_ms == safe(250) => Some(*timer_id),
+            _ => None,
+        })
+        .ok_or_else(|| {
+            std::io::Error::other("held directional input did not schedule a 250ms repeat timer")
+        })?;
+    assert!(
+        held_move
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&held_repeat_timer),
+        "held directional input did not retain its scheduled repeat timer"
+    );
+
     let before_head_submit = pair.snapshot()?;
+    assert_eq!(before_head_submit.guest.ui.generation, initial_generation);
+    assert_eq!(before_head_submit.guest.ui.owner_seat, Some(ids.guest));
+    assert!(before_head_submit.guest.ui.actionable);
+    assert_replacement_menu(
+        &before_head_submit,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.guest,
+            generation: initial_generation,
+            operation_id: &ids.head_operation,
+            control_id: &ids.head_control_id,
+            field_index: safe(0),
+            cursor: safe(1),
+            option_id: &ids.head_choice,
+        },
+    )?;
+    assert!(
+        before_head_submit
+            .guest
+            .live_resources
+            .timers
+            .contains(&held_repeat_timer),
+        "the held repeat timer must be live before the successor control change"
+    );
     let head_submit = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     assert_replacement_intent(
         &head_submit,
         &before_head_submit,
-        PairEndpoint::Guest,
-        ids.guest,
-        before_head_submit.guest.ui.generation,
-        &ids.head_operation,
-        &ids.head_control_id,
-        safe(0),
-        safe(1),
-        &ids.head_choice,
+        &ReplacementIntentExpectation {
+            menu: ReplacementMenuExpectation {
+                endpoint: PairEndpoint::Guest,
+                owner: ids.guest,
+                generation: before_head_submit.guest.ui.generation,
+                operation_id: &ids.head_operation,
+                control_id: &ids.head_control_id,
+                field_index: safe(0),
+                cursor: safe(1),
+                option_id: &ids.head_choice,
+            },
+            endpoint: ids.guest,
+        },
     )?;
     assert_eq!(
         proposal_effects(&head_submit),
@@ -1225,40 +1319,89 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     let tail_ready = pair.snapshot()?;
     assert_eq!(tail_ready.host.ui.kind, UiViewKind::Replacement);
     assert_eq!(tail_ready.host.ui.owner_seat, Some(ids.host));
+    assert_ne!(
+        tail_ready.guest.ui.generation, before_head_submit.guest.ui.generation,
+        "successor menu must advance its generation"
+    );
+    assert_ne!(
+        tail_ready.guest.ui.owner_seat, before_head_submit.guest.ui.owner_seat,
+        "successor menu must change its owner"
+    );
+    assert!(
+        tail_ready
+            .guest
+            .live_resources
+            .timers
+            .contains(&held_repeat_timer),
+        "the held repeat timer must remain live until the stale 250ms fire"
+    );
     assert_eq!(
         selected_option(&tail_ready, PairEndpoint::Host).as_deref(),
         Some("party:alpha")
     );
     assert_replacement_menu(
         &tail_ready,
-        PairEndpoint::Host,
-        ids.host,
-        tail_ready.host.ui.generation,
-        &ids.tail_operation,
-        &ids.tail_control_id,
-        safe(0),
-        safe(0),
-        &ids.tail_choice,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Host,
+            owner: ids.host,
+            generation: tail_ready.host.ui.generation,
+            operation_id: &ids.tail_operation,
+            control_id: &ids.tail_control_id,
+            field_index: safe(0),
+            cursor: safe(0),
+            option_id: &ids.tail_choice,
+        },
     )?;
     assert_replacement_menu(
         &tail_ready,
-        PairEndpoint::Guest,
-        ids.host,
-        tail_ready.guest.ui.generation,
-        &ids.tail_operation,
-        &ids.tail_control_id,
-        safe(0),
-        safe(0),
-        &ids.tail_choice,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.host,
+            generation: tail_ready.guest.ui.generation,
+            operation_id: &ids.tail_operation,
+            control_id: &ids.tail_control_id,
+            field_index: safe(0),
+            cursor: safe(0),
+            option_id: &ids.tail_choice,
+        },
     )?;
 
     let before_stale = pair.snapshot()?;
-    let stale_repeat = pair.advance_time(safe(250))?;
+    let stale_repeat = pair.apply(PairOperation::AdvanceTime {
+        delta_ms: safe(250),
+    })?;
     trace.push(stale_repeat.clone());
-    assert_eq!(stale_repeat.snapshot.guest.ui, before_stale.guest.ui);
+    assert_eq!(
+        stale_repeat.operation,
+        PairOperation::AdvanceTime {
+            delta_ms: safe(250),
+        }
+    );
     assert_eq!(
         stale_repeat.snapshot.virtual_time_ms.get(),
         before_stale.virtual_time_ms.get() + 250
+    );
+    assert_replacement_menu(
+        &stale_repeat.snapshot,
+        &ReplacementMenuExpectation {
+            endpoint: PairEndpoint::Guest,
+            owner: ids.host,
+            generation: tail_ready.guest.ui.generation,
+            operation_id: &ids.tail_operation,
+            control_id: &ids.tail_control_id,
+            field_index: safe(0),
+            cursor: safe(0),
+            option_id: &ids.tail_choice,
+        },
+    )?;
+    assert!(
+        !stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&held_repeat_timer),
+        "stale repeat processing must consume the old held-input timer"
     );
     assert_no_ui_intent(
         std::slice::from_ref(&stale_repeat),
@@ -1287,14 +1430,19 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_replacement_intent(
         &tail_submit,
         &before_tail_submit,
-        PairEndpoint::Host,
-        ids.host,
-        before_tail_submit.host.ui.generation,
-        &ids.tail_operation,
-        &ids.tail_control_id,
-        safe(0),
-        safe(0),
-        &ids.tail_choice,
+        &ReplacementIntentExpectation {
+            menu: ReplacementMenuExpectation {
+                endpoint: PairEndpoint::Host,
+                owner: ids.host,
+                generation: before_tail_submit.host.ui.generation,
+                operation_id: &ids.tail_operation,
+                control_id: &ids.tail_control_id,
+                field_index: safe(0),
+                cursor: safe(0),
+                option_id: &ids.tail_choice,
+            },
+            endpoint: ids.host,
+        },
     )?;
     assert!(
         proposal_effects(&tail_submit).is_empty(),
@@ -1316,29 +1464,37 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     let replica_context = context(ids.guest)?;
     assert_authority_chain(
         &trace,
-        &ids.head_operation,
-        1,
-        &ids.head_material,
-        &ids.head_next_control,
-        &ids.tail_control_id,
-        &authority_context,
-        &replica_context,
-        ids.host,
-        ids.guest,
-        (0, 0, 0),
+        &AuthorityChainExpectation {
+            operation_id: &ids.head_operation,
+            revision_value: 1,
+            material: &ids.head_material,
+            next_control: &ids.head_next_control,
+            expected_control_id: &ids.tail_control_id,
+            context: AuthorityChainContext {
+                authority_context: &authority_context,
+                replica_context: &replica_context,
+                authority_seat: ids.host,
+                replica_seat: ids.guest,
+            },
+            prior_frontier: (0, 0, 0),
+        },
     )?;
     assert_authority_chain(
         &trace,
-        &ids.tail_operation,
-        2,
-        &ids.tail_material,
-        &ids.tail_next_control,
-        &ids.await_control_id,
-        &authority_context,
-        &replica_context,
-        ids.host,
-        ids.guest,
-        (1, 1, 1),
+        &AuthorityChainExpectation {
+            operation_id: &ids.tail_operation,
+            revision_value: 2,
+            material: &ids.tail_material,
+            next_control: &ids.tail_next_control,
+            expected_control_id: &ids.await_control_id,
+            context: AuthorityChainContext {
+                authority_context: &authority_context,
+                replica_context: &replica_context,
+                authority_seat: ids.host,
+                replica_seat: ids.guest,
+            },
+            prior_frontier: (1, 1, 1),
+        },
     )?;
 
     let final_snapshot = pair.teardown("replacement campaign complete")?;
