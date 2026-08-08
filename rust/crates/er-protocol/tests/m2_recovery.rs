@@ -583,10 +583,16 @@ fn allocator_ids_are_composed_with_other_scheduler_owners_and_metadata_is_exact(
             TimeClass::Absolute,
         )
         .expect("foreign timer");
-    let foreign_timer = match foreign {
-        SchedulerCommand::Schedule { timer } => timer,
-        _ => panic!("scheduler returned a non-schedule command"),
-    };
+    let foreign_timer = scheduler
+        .timer(TimerId::new(safe(0)))
+        .cloned()
+        .expect("foreign timer registration");
+    assert_eq!(
+        foreign,
+        SchedulerCommand::Schedule {
+            timer: foreign_timer.clone(),
+        }
+    );
 
     let mut transaction = transaction();
     let actions = transaction

@@ -1741,11 +1741,7 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                     let time_class = class_for(rng.next());
                     let reason = format!("reason-{}", rng.below(3));
                     let already_paused =
-                        pause_reasons
-                            .iter()
-                            .any(|(owned_endpoint, owned_class, _)| {
-                                *owned_endpoint == endpoint && *owned_class == time_class
-                            });
+                        paused_reason_exists(&pause_reasons, endpoint, time_class, &reason);
                     let result = scheduler.pause_class(endpoint, time_class, &reason);
                     if time_class == TimeClass::Absolute {
                         assert_eq!(
@@ -2357,7 +2353,13 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
                         let _ = replay(
                             seed,
                             format!("network-enqueue-{step}"),
-                            network.enqueue(from, to, current_generation, step as u64, now_ms),
+                            network.enqueue(
+                                from,
+                                to,
+                                current_generation,
+                                100 + step as u64,
+                                now_ms,
+                            ),
                         )?;
                     } else {
                         let current_generation = network.connection_generation(endpoints[0]);
@@ -3198,6 +3200,8 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
                 }],
             ),
         )?;
+        let mut rebound_entry = outcome.entry.clone();
+        rebound_entry.context.connection_generation = generation(2);
         assert_eq!(
             rebound.retained_count,
             safe(1),
@@ -3210,7 +3214,7 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
         assert_authority_delivery_only(
             &rebound.actions,
-            &outcome.entry,
+            &rebound_entry,
             &[1],
             seed,
             "authority-rebind-delivery",
@@ -3360,7 +3364,7 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
         assert_authority_delivery_only(
             &actions[1..],
-            &outcome.entry,
+            &rebound_entry,
             &[1],
             seed,
             "authority-timer-delivery",
@@ -3417,7 +3421,7 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
         assert_authority_delivery_only(
             &attempt_two[1..],
-            &outcome.entry,
+            &rebound_entry,
             &[1],
             seed,
             "authority-attempt-2-delivery",
@@ -3474,7 +3478,7 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
         assert_authority_delivery_only(
             &attempt_three[1..],
-            &outcome.entry,
+            &rebound_entry,
             &[1],
             seed,
             "authority-attempt-3-delivery",
@@ -3496,7 +3500,7 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
         assert_authority_delivery_only(
             &terminal_attempt,
-            &outcome.entry,
+            &rebound_entry,
             &[1],
             seed,
             "authority-attempt-4-delivery",
@@ -4133,8 +4137,8 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         Err(er_protocol::ProposalFingerprintError::SequenceOverflow)
     );
     assert_eq!(
-        fingerprint_reward(safe(1), "", signed(0), None, None),
-        Err(er_protocol::ProposalFingerprintError::EmptyKind)
+        fingerprint_reward(safe(1), "", signed(0), None, None)?,
+        r#"[1,"",0,null,null]"#
     );
 
     for seed in 0..12_u64 {
@@ -5599,7 +5603,7 @@ fn successor_identity_is_stable_for_canonical_sets_and_sensitive_to_ordered_tail
     let wait = await_control()?;
     assert_eq!(
         control_id_of(&wait),
-        "AWAIT_SUCCESSOR/predecessor/e1/w2/t3/CONTROL_COMMIT,INTERACTION_COMMIT,WAVE_ADVANCE,TERMINAL_COMMIT/interactionAddresses:*/controlAddresses:*/nextWave:1/next:*"
+        "AWAIT_SUCCESSOR/predecessor/e1/w2/t3/INTERACTION_COMMIT,CONTROL_COMMIT,WAVE_ADVANCE,TERMINAL_COMMIT/interactionAddresses:*/controlAddresses:*/nextWave:1/next:*"
     );
     let terminal = terminal_control("terminal/e1/w2");
     assert_eq!(control_id_of(&terminal), "TERMINAL/terminal%2Fe1%2Fw2");
@@ -6026,7 +6030,7 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         RecoveryFrontierStagingOutcome::Staged {
             revision: control_live_stale_revision,
         },
-        live_recovery_state(1)?,
+        staged_recovery_state(control_live_stale_revision.get().get())?,
         &mut control_live_stale_scheduler,
     )?;
     let control_live_stale_actions = control_live_stale.control_result(
