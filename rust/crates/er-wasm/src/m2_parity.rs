@@ -567,7 +567,7 @@ fn observe(
 }
 
 fn effects_digest(effects: &[KernelEffect]) -> Result<String, ParityReplayError> {
-    content_digest(effects).map_err(|error| ParityReplayError::Canonical {
+    content_digest(&effects).map_err(|error| ParityReplayError::Canonical {
         field: "effects",
         reason: error.to_string(),
     })
