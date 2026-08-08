@@ -1,11 +1,10 @@
 use er_protocol::{
-    control_id_of, validate_recovery_bundle, ControlProjectionOutcome, KernelScheduler,
-    RecoveryAction, RecoveryBundleValidation, RecoveryError, RecoveryFence, RecoveryFenceState,
-    RecoveryFenceView, RecoveryFrontierStagingOutcome, RecoveryLiveState,
-    RecoveryMaterialOutcome, RecoveryPhase, RecoveryTransaction, RecoveryTransactionConfig,
-    RecoveryValidationContext, ScheduledTimer, SchedulerCommand,
-    DEFAULT_RECOVERY_CONTROL_TIMEOUT_MS,
-    DEFAULT_RECOVERY_PACING_MS, DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS,
+    ControlProjectionOutcome, DEFAULT_RECOVERY_CONTROL_TIMEOUT_MS, DEFAULT_RECOVERY_PACING_MS,
+    DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS, KernelScheduler, RecoveryAction, RecoveryBundleValidation,
+    RecoveryError, RecoveryFence, RecoveryFenceState, RecoveryFenceView,
+    RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome, RecoveryPhase,
+    RecoveryTransaction, RecoveryTransactionConfig, RecoveryValidationContext, ScheduledTimer,
+    SchedulerCommand, control_id_of, validate_recovery_bundle,
 };
 use er_types::{
     AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, CommandControlTarget,
@@ -172,10 +171,7 @@ fn terminalize_count(actions: &[RecoveryAction]) -> usize {
         .count()
 }
 
-fn assert_no_live_resources(
-    transaction: &RecoveryTransaction,
-    scheduler: &KernelScheduler,
-) {
+fn assert_no_live_resources(transaction: &RecoveryTransaction, scheduler: &KernelScheduler) {
     assert!(transaction.diagnostics().timer_ids.is_empty());
     assert!(scheduler.live_timers().is_empty());
     assert_eq!(scheduler.pending_timer_count(), safe(0));
@@ -221,8 +217,9 @@ fn assert_exact_terminal_actions(
     let terminal_view = actions
         .iter()
         .find_map(|action| match action {
-            RecoveryAction::FenceChanged { view }
-                if view.state == RecoveryFenceState::Terminal => Some(view.clone()),
+            RecoveryAction::FenceChanged { view } if view.state == RecoveryFenceState::Terminal => {
+                Some(view.clone())
+            }
             _ => None,
         })
         .expect("terminal action vector must begin with a terminal fence change");
@@ -377,8 +374,7 @@ fn recovery_validation_applies_distinct_operation_and_material_digest_rules() {
     };
 
     let mut control_character_operation = bundle(10, 12);
-    control_character_operation.required_tail[0].operation_id =
-        operation("operation-\u{0000}");
+    control_character_operation.required_tail[0].operation_id = operation("operation-\u{0000}");
     assert!(matches!(
         validate_recovery_bundle(&context, &control_character_operation),
         RecoveryBundleValidation::Mismatch { .. }
@@ -633,7 +629,10 @@ fn allocator_ids_are_composed_with_other_scheduler_owners_and_metadata_is_exact(
         .expect("stage");
     let control_timer = scheduled(&staged);
     assert_eq!(control_timer.timer_id, TimerId::new(safe(2)));
-    assert_eq!(control_timer.owner.address, "recovery-control/session-1/run-1/recovery-1");
+    assert_eq!(
+        control_timer.owner.address,
+        "recovery-control/session-1/run-1/recovery-1"
+    );
     assert!(scheduler.timer(foreign_timer.timer_id).is_some());
 }
 
@@ -687,7 +686,15 @@ fn material_success_stages_the_exact_full_entry_before_staged_signal_and_control
             && *expected_control_id == control_id_of(&expected_entry.next_control)
     ));
     trace.push("control");
-    assert_eq!(trace, vec!["material-success", "full-entry-stage", "staged-signal", "control"]);
+    assert_eq!(
+        trace,
+        vec![
+            "material-success",
+            "full-entry-stage",
+            "staged-signal",
+            "control"
+        ]
+    );
     assert_eq!(transaction.phase(), Some(RecoveryPhase::FrontierInstalled));
     assert_eq!(scheduler.live_timers().len(), 1);
 }
@@ -711,9 +718,9 @@ fn changed_live_state_terminalizes_at_every_deferred_boundary() {
     };
     let actions = accept
         .accept_bundle(
-        bundle(10, 12),
-        live_with_frontier(changed_frontier),
-        &mut scheduler,
+            bundle(10, 12),
+            live_with_frontier(changed_frontier),
+            &mut scheduler,
         )
         .expect("changed accept state terminalizes");
     assert_exact_terminal_actions(
@@ -747,12 +754,12 @@ fn changed_live_state_terminalizes_at_every_deferred_boundary() {
     };
     let actions = material
         .material_result(
-        RecoveryMaterialOutcome::Applied,
-        RecoveryLiveState {
-            frontier: frontier(10),
-            context: changed_context,
-        },
-        &mut scheduler,
+            RecoveryMaterialOutcome::Applied,
+            RecoveryLiveState {
+                frontier: frontier(10),
+                context: changed_context,
+            },
+            &mut scheduler,
         )
         .expect("changed material state terminalizes");
     assert_exact_terminal_actions(
@@ -766,11 +773,11 @@ fn changed_live_state_terminalizes_at_every_deferred_boundary() {
     let (mut stage, mut scheduler) = prepare_material_pending();
     let actions = stage
         .recovered_frontier_staged(
-        RecoveryFrontierStagingOutcome::Staged {
-            revision: Revision::new(safe(12)),
-        },
-        live(10),
-        &mut scheduler,
+            RecoveryFrontierStagingOutcome::Staged {
+                revision: Revision::new(safe(12)),
+            },
+            live(10),
+            &mut scheduler,
         )
         .expect("changed stage state terminalizes");
     assert_exact_terminal_actions(
@@ -797,12 +804,12 @@ fn changed_live_state_terminalizes_at_every_deferred_boundary() {
         .expect("control timer");
     let actions = control
         .control_result(
-        ControlProjectionOutcome::Deferred,
-        RecoveryLiveState {
-            frontier: staged_frontier(12),
-            context: changed_context,
-        },
-        &mut scheduler,
+            ControlProjectionOutcome::Deferred,
+            RecoveryLiveState {
+                frontier: staged_frontier(12),
+                context: changed_context,
+            },
+            &mut scheduler,
         )
         .expect("changed control state terminalizes");
     assert_exact_terminal_actions(
@@ -857,7 +864,11 @@ fn changed_live_state_terminalizes_at_every_deferred_boundary() {
 fn material_deferred_and_rejected_outcomes_terminalize_with_exact_actions() {
     let (mut deferred, mut deferred_scheduler) = prepare_validated();
     let deferred_actions = deferred
-        .material_result(RecoveryMaterialOutcome::Deferred, live(10), &mut deferred_scheduler)
+        .material_result(
+            RecoveryMaterialOutcome::Deferred,
+            live(10),
+            &mut deferred_scheduler,
+        )
         .expect("material deferred outcome terminalizes");
     assert_exact_terminal_actions(
         &deferred,
@@ -869,7 +880,11 @@ fn material_deferred_and_rejected_outcomes_terminalize_with_exact_actions() {
 
     let (mut rejected, mut rejected_scheduler) = prepare_validated();
     let rejected_actions = rejected
-        .material_result(RecoveryMaterialOutcome::Rejected, live(10), &mut rejected_scheduler)
+        .material_result(
+            RecoveryMaterialOutcome::Rejected,
+            live(10),
+            &mut rejected_scheduler,
+        )
         .expect("material rejected outcome terminalizes");
     assert_exact_terminal_actions(
         &rejected,
@@ -956,7 +971,9 @@ fn timer_callback_requires_exact_removed_registration_and_duplicate_callbacks_ar
     wrong.delay_ms = safe(7);
     assert!(matches!(
         transaction.timer_fired(wrong, live(10), &mut scheduler),
-        Err(RecoveryError::InvalidPhase { phase: Some(RecoveryPhase::Requested) })
+        Err(RecoveryError::InvalidPhase {
+            phase: Some(RecoveryPhase::Requested)
+        })
     ));
     assert_eq!(transaction.diagnostics().timer_ids.len(), 1);
     assert!(scheduler.timer(timer.timer_id).is_some());
@@ -1044,13 +1061,7 @@ fn removed_registration_with_wrong_owner_fails_atomically() {
     assert!(scheduler.live_timers().is_empty());
 
     let abort = transaction.abort("wrong removed timer".to_owned(), &mut scheduler);
-    assert_exact_terminal_actions(
-        &transaction,
-        &scheduler,
-        &abort,
-        &[],
-        "wrong removed timer",
-    );
+    assert_exact_terminal_actions(&transaction, &scheduler, &abort, &[], "wrong removed timer");
 }
 
 #[test]
@@ -1245,7 +1256,10 @@ fn wrong_control_timer_metadata_is_rejected_while_pacing_remains_live() {
     ));
     assert_eq!(transaction.phase(), phase);
     assert_eq!(transaction.diagnostics(), diagnostics);
-    assert_eq!(scheduler.timer(control_timer.timer_id), Some(&control_timer));
+    assert_eq!(
+        scheduler.timer(control_timer.timer_id),
+        Some(&control_timer)
+    );
     assert_eq!(scheduler.timer(pacing_timer.timer_id), Some(&pacing_timer));
     assert_eq!(scheduler.pending_timer_count(), safe(2));
 }
@@ -1356,8 +1370,7 @@ fn installed_outcome_missing_pacing_terminalizes_before_cancelling_control() {
     assert!(scheduler.cancel(pacing_timer.timer_id).is_some());
 
     let before = transaction.diagnostics();
-    let reason =
-        "recovery pacing timer registration disappeared before control installation";
+    let reason = "recovery pacing timer registration disappeared before control installation";
     let actions = transaction
         .control_result(
             ControlProjectionOutcome::Installed {
@@ -1399,8 +1412,7 @@ fn installed_outcome_missing_control_terminalizes_before_cancelling_pacing() {
     assert!(scheduler.cancel(control_timer.timer_id).is_some());
 
     let before = transaction.diagnostics();
-    let reason =
-        "recovery control timer registration disappeared before control installation";
+    let reason = "recovery control timer registration disappeared before control installation";
     let actions = transaction
         .control_result(
             ControlProjectionOutcome::Installed {
@@ -1457,8 +1469,7 @@ fn installed_outcome_after_mismatched_pacing_metadata_terminalizes_before_cancel
     ));
     assert_eq!(transaction.diagnostics(), before);
 
-    let reason =
-        "recovery pacing timer registration disappeared before control installation";
+    let reason = "recovery pacing timer registration disappeared before control installation";
     let actions = transaction
         .control_result(
             ControlProjectionOutcome::Installed {
@@ -1514,8 +1525,7 @@ fn installed_outcome_after_mismatched_control_metadata_terminalizes_before_cance
     ));
     assert_eq!(transaction.diagnostics(), before);
 
-    let reason =
-        "recovery control timer registration disappeared before control installation";
+    let reason = "recovery control timer registration disappeared before control installation";
     let actions = transaction
         .control_result(
             ControlProjectionOutcome::Installed {
@@ -1555,9 +1565,8 @@ fn installed_outcome_mismatched_control_terminalizes_with_both_cancels_in_order(
     let pacing_timer = scheduled(&deferred);
     let wrong_control_id = "wrong-control".to_owned();
     let expected_control_id = control_id_of(&command_control(1));
-    let reason = format!(
-        "control projection proved {wrong_control_id}, expected {expected_control_id}"
-    );
+    let reason =
+        format!("control projection proved {wrong_control_id}, expected {expected_control_id}");
 
     let actions = transaction
         .control_result(
@@ -1597,8 +1606,7 @@ fn installed_outcome_disposed_scheduler_terminalizes_without_successful_path_can
     let _pacing_timer = scheduled(&deferred);
     scheduler.dispose();
 
-    let reason =
-        "recovery control timer registration disappeared before control installation";
+    let reason = "recovery control timer registration disappeared before control installation";
     let actions = transaction
         .control_result(
             ControlProjectionOutcome::Installed {
@@ -1704,9 +1712,11 @@ fn deferred_and_completion_paths_require_the_staged_then_installed_frontiers() {
             staged_frontier(12)
         ),
     );
-    assert!(incomplete_actions
-        .iter()
-        .all(|action| !matches!(action, RecoveryAction::SendAppliedProof { .. })));
+    assert!(
+        incomplete_actions
+            .iter()
+            .all(|action| !matches!(action, RecoveryAction::SendAppliedProof { .. }))
+    );
 }
 
 #[test]
@@ -1728,9 +1738,11 @@ fn rejected_staging_and_empty_inputs_fail_closed_without_completion_proof() {
         &[],
         "recovery frontier staging rejected: replica refused",
     );
-    assert!(actions
-        .iter()
-        .all(|action| !matches!(action, RecoveryAction::SendAppliedProof { .. })));
+    assert!(
+        actions
+            .iter()
+            .all(|action| !matches!(action, RecoveryAction::SendAppliedProof { .. }))
+    );
 
     let mut empty = transaction();
     let mut scheduler = KernelScheduler::new();
@@ -1764,10 +1776,10 @@ fn scheduler_failure_terminalizes_atomically_and_cancels_survivors() {
 
     let actions = request_transaction
         .start(
-        "recovery-1".to_owned(),
-        frontier(10),
-        "rejoin".to_owned(),
-        &mut scheduler,
+            "recovery-1".to_owned(),
+            frontier(10),
+            "rejoin".to_owned(),
+            &mut scheduler,
         )
         .expect("scheduler failure is an operational terminal result");
     assert_exact_terminal_actions(
@@ -1855,7 +1867,11 @@ fn abort_and_dispose_cancel_via_scheduler_and_are_idempotent() {
         &[request_timer],
         "operator cancelled",
     );
-    assert!(aborted.abort("second".to_owned(), &mut scheduler).is_empty());
+    assert!(
+        aborted
+            .abort("second".to_owned(), &mut scheduler)
+            .is_empty()
+    );
     assert!(matches!(
         aborted.start(
             "again".to_owned(),

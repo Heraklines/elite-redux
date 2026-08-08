@@ -233,11 +233,9 @@ fn next_control_issue(control: &NextControl) -> Option<String> {
                     &interaction.operation_kind,
                 )
             {
-                issue =
-                    Some(
-                        "shared interaction surface and operation kind are incompatible"
-                            .to_owned(),
-                    );
+                issue = Some(
+                    "shared interaction surface and operation kind are incompatible".to_owned(),
+                );
             } else {
                 let mut kinds = BTreeSet::new();
                 if interaction
@@ -415,15 +413,10 @@ fn await_control_issue(control: &AwaitSuccessorControl) -> Option<String> {
         for address in addresses {
             if !is_known_interaction_surface(&address.surface_class)
                 || !is_known_interaction_kind(&address.operation_kind)
-                || !interaction_surface_allows_kind(
-                    &address.surface_class,
-                    &address.operation_kind,
-                )
+                || !interaction_surface_allows_kind(&address.surface_class, &address.operation_kind)
                 || address.wave != control.wave
             {
-                return Some(
-                    "await interaction address is not a known coupled address".to_owned(),
-                );
+                return Some("await interaction address is not a known coupled address".to_owned());
             }
             let key = (
                 address.surface_class.clone(),
@@ -564,7 +557,10 @@ fn tail_issue(bundle: &RecoveryBundle, captured: u64, frontier: u64) -> Option<S
     let Some(final_entry) = bundle.required_tail.last() else {
         return Some("tail has no final reconstruction entry".to_owned());
     };
-    if !crate::controls_equal(bundle.next_control.as_ref(), Some(&final_entry.next_control)) {
+    if !crate::controls_equal(
+        bundle.next_control.as_ref(),
+        Some(&final_entry.next_control),
+    ) {
         return Some("tail final next control does not match the recovery successor".to_owned());
     }
     if bundle.frontier_operation_id.as_ref() != Some(&final_entry.operation_id) {
@@ -940,9 +936,9 @@ impl RecoveryTransaction {
             }
         };
 
-        let request_timer_id = self.timer_id_for(RecoveryTimerKind::Request).ok_or(
-            RecoveryError::InvalidPhase { phase: self.phase },
-        )?;
+        let request_timer_id = self
+            .timer_id_for(RecoveryTimerKind::Request)
+            .ok_or(RecoveryError::InvalidPhase { phase: self.phase })?;
         let mut actions = match self.cancel_timer_checked(request_timer_id, scheduler) {
             Ok(actions) => actions,
             Err(error) => {
@@ -1205,10 +1201,7 @@ impl RecoveryTransaction {
                         scheduler,
                     ));
                 }
-                if self
-                    .timer_id_for(RecoveryTimerKind::Pacing)
-                    .is_some()
-                {
+                if self.timer_id_for(RecoveryTimerKind::Pacing).is_some() {
                     if !self.timer_registration_matches(RecoveryTimerKind::Pacing, scheduler) {
                         return Ok(self.terminalize_with_actions(
                             "recovery pacing timer registration disappeared before deferred retry"
@@ -1402,9 +1395,8 @@ impl RecoveryTransaction {
         if self.disposed {
             return Vec::new();
         }
-        let actions = if self.phase == Some(RecoveryPhase::Released) {
-            self.cancel_all_timers(scheduler)
-        } else if self.phase == Some(RecoveryPhase::Terminalized)
+        let actions = if self.phase == Some(RecoveryPhase::Released)
+            || self.phase == Some(RecoveryPhase::Terminalized)
             || self.fence.state() == RecoveryFenceState::Terminal
         {
             self.cancel_all_timers(scheduler)
@@ -1473,11 +1465,7 @@ impl RecoveryTransaction {
         None
     }
 
-    fn staged_live_issue(
-        &self,
-        live: &RecoveryLiveState,
-        frontier: Revision,
-    ) -> Option<String> {
+    fn staged_live_issue(&self, live: &RecoveryLiveState, frontier: Revision) -> Option<String> {
         if live.context != self.config.local_context {
             return Some("recovery live context changed under the fence".to_owned());
         }
@@ -1501,11 +1489,7 @@ impl RecoveryTransaction {
         None
     }
 
-    fn installed_live_issue(
-        &self,
-        live: &RecoveryLiveState,
-        frontier: Revision,
-    ) -> Option<String> {
+    fn installed_live_issue(&self, live: &RecoveryLiveState, frontier: Revision) -> Option<String> {
         if live.context != self.config.local_context {
             return Some("recovery live context changed under the fence".to_owned());
         }
@@ -1540,9 +1524,7 @@ impl RecoveryTransaction {
             self.config.timer_owner_id.clone(),
             format!(
                 "{address_prefix}/{}/{}/{}",
-                self.config.local_context.session_id,
-                self.config.local_context.run_id,
-                request_id
+                self.config.local_context.session_id, self.config.local_context.run_id, request_id
             ),
             reason.to_owned(),
         )
@@ -1756,8 +1738,7 @@ mod exhaustion_tests {
         AuthorityEntry {
             context: context.clone(),
             revision: Revision::new(safe(revision)),
-            operation_id: OperationId::new(format!("operation-{revision}"))
-                .expect("operation id"),
+            operation_id: OperationId::new(format!("operation-{revision}")).expect("operation id"),
             kind: AuthorityEntryKind::TurnCommit,
             material: Material {
                 digest: format!("digest-{revision}"),
@@ -1969,7 +1950,12 @@ mod exhaustion_tests {
             SchedulerCommand::Schedule { timer } => timer,
             _ => panic!("scheduler returned a non-schedule command"),
         };
-        assert_eq!(scheduler.fired(timer.timer_id).expect("remove fixture timer"), timer);
+        assert_eq!(
+            scheduler
+                .fired(timer.timer_id)
+                .expect("remove fixture timer"),
+            timer
+        );
     }
 
     #[test]
@@ -2058,7 +2044,10 @@ mod exhaustion_tests {
             .expect("control timer allocation");
         let control_timer = scheduled(&stage_actions);
         assert_eq!(control_timer.timer_id, TimerId::new(SafeU53::MAX));
-        assert_eq!(scheduler.timer(control_timer.timer_id), Some(&control_timer));
+        assert_eq!(
+            scheduler.timer(control_timer.timer_id),
+            Some(&control_timer)
+        );
         assert_eq!(
             transaction.diagnostics(),
             recovery_diagnostics(

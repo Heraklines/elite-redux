@@ -10,29 +10,29 @@ use er_protocol::{
     AuthorityEntryDraft, AuthorityLog, AuthorityLogAction, AuthorityLogConfig,
     AuthorityReceiptVerdict, AuthorityReplica, AuthorityReplicaConfig, BackoffPolicy,
     ControlProjectionOutcome, FrameValidator, InboundFrameResult, KernelScheduler,
-    ProposalAdmission, ProposalAdmissionLedger, ProposalFingerprintInput, ProposalIdentity,
-    ProposalJson, ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager,
+    PresentationProbeOutcome, ProposalAdmission, ProposalAdmissionLedger, ProposalFingerprintInput,
+    ProposalIdentity, ProposalJson, ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager,
     ProposalLeaseSpec, ProposalLeaseStart, ProposalMessage, ReceiptRejectReason, RecoveryAction,
     RecoveryBundleValidation, RecoveryError, RecoveryFence, RecoveryFenceState,
-    RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome, RecoveryTransaction,
-    RecoveryTransactionConfig, RecoveryValidationContext, ReplicaAction, ReplicaAdmission,
-    ReplicaMechanicalStage, ReplicaRejectReason, ReplicaResume, PresentationProbeOutcome,
-    ScheduledTimer, SchedulerCommand, SchedulerError, SuccessorValidator, TimerSpec,
+    RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome,
+    RecoveryTransaction, RecoveryTransactionConfig, RecoveryValidationContext, ReplicaAction,
+    ReplicaAdmission, ReplicaMechanicalStage, ReplicaRejectReason, ReplicaResume, ScheduledTimer,
+    SchedulerCommand, SchedulerError, SuccessorValidator, TimerSpec, ValidatedFrameBody,
     control_allows_successor_entry, control_id_of, control_owner_seat_id, control_owner_seat_ids,
     controls_equal, fingerprint_bargain, fingerprint_biome_shop_buy, fingerprint_biome_shop_leave,
     fingerprint_reward, frame_context_issues, frame_contexts_compatible, frame_contexts_equal,
     is_valid_next_control, next_control_issues, partition_control_for_seat, proposal_fingerprint,
     same_control_address, successor_wait_allows, successor_wait_allows_local_presentation_input,
-    validate_inbound_frame, validate_next_control, ValidatedFrameBody,
+    validate_inbound_frame, validate_next_control,
 };
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, AuthorityReceipt,
-    AwaitSuccessorControl, CommandControlTarget, CommandFrontierControl,
-    ConnectionGeneration, FrameContext, FrameType, InteractionSuccessor, Material,
-    MaterialApplicationOutcome, MembershipRevision, NextControl, OperationId, RawFrame,
-    RecoveryBundle, RecoveryPhase, Revision, RunId, SafeI53, SafeU53,
-    SeatId, SessionId, SharedInteractionControl, TerminalControl, TimeClass, TimerId, TimerOwner,
-    validate_authority_material_digest, validate_authority_operation_id,
+    AwaitSuccessorControl, CommandControlTarget, CommandFrontierControl, ConnectionGeneration,
+    FrameContext, FrameType, InteractionSuccessor, Material, MaterialApplicationOutcome,
+    MembershipRevision, NextControl, OperationId, RawFrame, RecoveryBundle, RecoveryPhase,
+    Revision, RunId, SafeI53, SafeU53, SeatId, SessionId, SharedInteractionControl,
+    TerminalControl, TimeClass, TimerId, TimerOwner, validate_authority_material_digest,
+    validate_authority_operation_id,
 };
 use serde_json::{Map, Value, json};
 
@@ -54,8 +54,7 @@ const GOLDEN_PROPOSAL_TEST_CEILING_MS: u64 = 1_000;
 const GOLDEN_AUTHORITY_STRING_UTF16_LIMIT: usize = 256;
 const GOLDEN_AUTHORITY_CONTROL_ID: &str = "COMMAND_FRONTIER/e3/w4/t1/f0:s0:p7";
 const GOLDEN_REPLICA_CONTROL_ID: &str = "COMMAND_FRONTIER/e3/w4/t1/f0:s1:p42";
-const GOLDEN_MAX_CONTROL_ID: &str =
-    "COMMAND_FRONTIER/e9007199254740991/w9007199254740991/t9007199254740991/f9007199254740991:s9007199254740991:p9007199254740991";
+const GOLDEN_MAX_CONTROL_ID: &str = "COMMAND_FRONTIER/e9007199254740991/w9007199254740991/t9007199254740991/f9007199254740991:s9007199254740991:p9007199254740991";
 
 fn missing(message: impl Into<String>) -> Box<dyn Error> {
     Box::new(std::io::Error::new(
@@ -164,23 +163,26 @@ fn replacement_control(head: &str) -> Result<NextControl, Box<dyn Error>> {
         turn: safe(3),
         occurrence: safe(0),
         field_index: safe(0),
-        remaining: vec![er_types::ReplacementControlAddress {
-            operation_id: operation("replacement/tail/1")?,
-            owner_seat_id: seat(1),
-            epoch: safe(1),
-            wave: safe(2),
-            turn: safe(3),
-            occurrence: safe(1),
-            field_index: safe(1),
-        }, er_types::ReplacementControlAddress {
-            operation_id: operation("replacement/tail/2")?,
-            owner_seat_id: seat(0),
-            epoch: safe(1),
-            wave: safe(2),
-            turn: safe(3),
-            occurrence: safe(2),
-            field_index: safe(2),
-        }],
+        remaining: vec![
+            er_types::ReplacementControlAddress {
+                operation_id: operation("replacement/tail/1")?,
+                owner_seat_id: seat(1),
+                epoch: safe(1),
+                wave: safe(2),
+                turn: safe(3),
+                occurrence: safe(1),
+                field_index: safe(1),
+            },
+            er_types::ReplacementControlAddress {
+                operation_id: operation("replacement/tail/2")?,
+                owner_seat_id: seat(0),
+                epoch: safe(1),
+                wave: safe(2),
+                turn: safe(3),
+                occurrence: safe(2),
+                field_index: safe(2),
+            },
+        ],
     }))
 }
 
@@ -189,10 +191,12 @@ fn replay<T, E: std::fmt::Display>(
     operation: impl AsRef<str>,
     result: Result<T, E>,
 ) -> Result<T, Box<dyn Error>> {
-    result.map_err(|error| missing(format!(
-        "seed={seed} operation={}: {error}",
-        operation.as_ref()
-    )))
+    result.map_err(|error| {
+        missing(format!(
+            "seed={seed} operation={}: {error}",
+            operation.as_ref()
+        ))
+    })
 }
 
 fn shared_control(
@@ -480,10 +484,7 @@ fn assert_authority_delivery_actions(
     assert_eq!(
         timer.owner,
         timer_owner(
-            &format!(
-                "authority-v2-property:delivery:{}",
-                expected_entry.revision
-            ),
+            &format!("authority-v2-property:delivery:{}", expected_entry.revision),
             &format!("authority-log/delivery/{}", expected_entry.revision),
             &format!(
                 "redeliver revision {} until mechanical quorum",
@@ -516,9 +517,9 @@ fn assert_authority_delivery_actions(
                     "seed={seed} operation={operation} delivered entry index={index}"
                 );
             }
-            other => panic!(
-                "seed={seed} operation={operation} delivery index={index} was {other:?}"
-            ),
+            other => {
+                panic!("seed={seed} operation={operation} delivery index={index} was {other:?}")
+            }
         }
     }
 }
@@ -538,7 +539,11 @@ fn assert_authority_delivery_only(
     for (index, peer) in peers.iter().enumerate() {
         match actions.get(index) {
             Some(AuthorityLogAction::Deliver { to, entry }) => {
-                assert_eq!(*to, seat(*peer), "seed={seed} operation={operation} delivery peer");
+                assert_eq!(
+                    *to,
+                    seat(*peer),
+                    "seed={seed} operation={operation} delivery peer"
+                );
                 assert_eq!(
                     entry.as_ref(),
                     expected_entry,
@@ -563,11 +568,27 @@ fn assert_replica_admitted_actions(
             ReplicaAction::EmitReceipt { receipt },
             ReplicaAction::ApplyMaterial { entry: applied },
         ] => {
-            assert_eq!(receipt.revision, entry.revision, "seed={seed} operation={operation} admitted revision");
-            assert_eq!(receipt.operation_id, entry.operation_id, "seed={seed} operation={operation} admitted operation");
-            assert_eq!(receipt.stage, AckStage::Admitted, "seed={seed} operation={operation} admitted stage");
-            assert_eq!(receipt.control_id, None, "seed={seed} operation={operation} admitted control id");
-            assert_eq!(applied, entry, "seed={seed} operation={operation} admitted entry");
+            assert_eq!(
+                receipt.revision, entry.revision,
+                "seed={seed} operation={operation} admitted revision"
+            );
+            assert_eq!(
+                receipt.operation_id, entry.operation_id,
+                "seed={seed} operation={operation} admitted operation"
+            );
+            assert_eq!(
+                receipt.stage,
+                AckStage::Admitted,
+                "seed={seed} operation={operation} admitted stage"
+            );
+            assert_eq!(
+                receipt.control_id, None,
+                "seed={seed} operation={operation} admitted control id"
+            );
+            assert_eq!(
+                applied, entry,
+                "seed={seed} operation={operation} admitted entry"
+            );
         }
         other => panic!("seed={seed} operation={operation} admitted action order was {other:?}"),
     }
@@ -588,12 +609,32 @@ fn assert_replica_material_actions(
                 expected_control_id: projected_id,
             },
         ] => {
-            assert_eq!(receipt.revision, entry.revision, "seed={seed} operation={operation} material receipt revision");
-            assert_eq!(receipt.operation_id, entry.operation_id, "seed={seed} operation={operation} material receipt operation");
-            assert_eq!(receipt.stage, AckStage::MaterialApplied, "seed={seed} operation={operation} material receipt stage");
-            assert_eq!(receipt.control_id, None, "seed={seed} operation={operation} material receipt control id");
-            assert_eq!(projected, entry, "seed={seed} operation={operation} projected entry");
-            assert_eq!(projected_id.as_str(), expected_control_id, "seed={seed} operation={operation} projected control id");
+            assert_eq!(
+                receipt.revision, entry.revision,
+                "seed={seed} operation={operation} material receipt revision"
+            );
+            assert_eq!(
+                receipt.operation_id, entry.operation_id,
+                "seed={seed} operation={operation} material receipt operation"
+            );
+            assert_eq!(
+                receipt.stage,
+                AckStage::MaterialApplied,
+                "seed={seed} operation={operation} material receipt stage"
+            );
+            assert_eq!(
+                receipt.control_id, None,
+                "seed={seed} operation={operation} material receipt control id"
+            );
+            assert_eq!(
+                projected, entry,
+                "seed={seed} operation={operation} projected entry"
+            );
+            assert_eq!(
+                projected_id.as_str(),
+                expected_control_id,
+                "seed={seed} operation={operation} projected control id"
+            );
         }
         other => panic!("seed={seed} operation={operation} material action order was {other:?}"),
     }
@@ -611,11 +652,28 @@ fn assert_replica_control_actions(
             ReplicaAction::EmitReceipt { receipt },
             ReplicaAction::ProbePresentation { entry: probed },
         ] => {
-            assert_eq!(receipt.revision, entry.revision, "seed={seed} operation={operation} control receipt revision");
-            assert_eq!(receipt.operation_id, entry.operation_id, "seed={seed} operation={operation} control receipt operation");
-            assert_eq!(receipt.stage, AckStage::ControlInstalled, "seed={seed} operation={operation} control receipt stage");
-            assert_eq!(receipt.control_id.as_deref(), Some(expected_control_id), "seed={seed} operation={operation} exact control id");
-            assert_eq!(probed, entry, "seed={seed} operation={operation} presentation probe entry");
+            assert_eq!(
+                receipt.revision, entry.revision,
+                "seed={seed} operation={operation} control receipt revision"
+            );
+            assert_eq!(
+                receipt.operation_id, entry.operation_id,
+                "seed={seed} operation={operation} control receipt operation"
+            );
+            assert_eq!(
+                receipt.stage,
+                AckStage::ControlInstalled,
+                "seed={seed} operation={operation} control receipt stage"
+            );
+            assert_eq!(
+                receipt.control_id.as_deref(),
+                Some(expected_control_id),
+                "seed={seed} operation={operation} exact control id"
+            );
+            assert_eq!(
+                probed, entry,
+                "seed={seed} operation={operation} presentation probe entry"
+            );
         }
         other => panic!("seed={seed} operation={operation} control action order was {other:?}"),
     }
@@ -629,14 +687,25 @@ fn assert_replica_recovery_stage(
     operation: &str,
 ) {
     match actions {
-        [ReplicaAction::ProjectControl {
-            entry: projected,
-            expected_control_id: projected_id,
-        }] => {
-            assert_eq!(projected, entry, "seed={seed} operation={operation} recovery entry");
-            assert_eq!(projected_id.as_str(), expected_control_id, "seed={seed} operation={operation} recovery control id");
+        [
+            ReplicaAction::ProjectControl {
+                entry: projected,
+                expected_control_id: projected_id,
+            },
+        ] => {
+            assert_eq!(
+                projected, entry,
+                "seed={seed} operation={operation} recovery entry"
+            );
+            assert_eq!(
+                projected_id.as_str(),
+                expected_control_id,
+                "seed={seed} operation={operation} recovery control id"
+            );
         }
-        other => panic!("seed={seed} operation={operation} recovery stage action order was {other:?}"),
+        other => {
+            panic!("seed={seed} operation={operation} recovery stage action order was {other:?}")
+        }
     }
 }
 
@@ -648,22 +717,14 @@ fn stage_recovered_entry(
     operation: &str,
 ) -> Result<Revision, Box<dyn Error>> {
     let actions = replica.stage_recovered_frontier(entry.clone())?;
-    assert_replica_recovery_stage(
-        &actions,
-        &entry,
-        expected_control_id,
-        seed,
-        operation,
-    );
+    assert_replica_recovery_stage(&actions, &entry, expected_control_id, seed, operation);
     let frontier = replica.frontier();
     assert_eq!(
-        frontier.received,
-        entry.revision,
+        frontier.received, entry.revision,
         "seed={seed} operation={operation} staged received frontier comes from full entry"
     );
     assert_eq!(
-        frontier.material,
-        entry.revision,
+        frontier.material, entry.revision,
         "seed={seed} operation={operation} staged material frontier comes from full entry"
     );
     assert_eq!(
@@ -695,11 +756,30 @@ fn assert_recovery_schedule(
         } => timer,
         other => panic!("seed={seed} operation={operation} recovery schedule index was {other:?}"),
     };
-    assert_eq!(timer.timer_id, TimerId::new(safe(expected_timer_id)), "seed={seed} operation={operation} recovery timer id");
-    assert_eq!(timer.endpoint, seat(1), "seed={seed} operation={operation} recovery timer endpoint");
-    assert_eq!(timer.owner, timer_owner("recovery-property", expected_address, expected_reason), "seed={seed} operation={operation} recovery timer owner");
-    assert_eq!(timer.delay_ms, safe(expected_delay), "seed={seed} operation={operation} recovery timer delay");
-    assert_eq!(timer.time_class, expected_class, "seed={seed} operation={operation} recovery timer class");
+    assert_eq!(
+        timer.timer_id,
+        TimerId::new(safe(expected_timer_id)),
+        "seed={seed} operation={operation} recovery timer id"
+    );
+    assert_eq!(
+        timer.endpoint,
+        seat(1),
+        "seed={seed} operation={operation} recovery timer endpoint"
+    );
+    assert_eq!(
+        timer.owner,
+        timer_owner("recovery-property", expected_address, expected_reason),
+        "seed={seed} operation={operation} recovery timer owner"
+    );
+    assert_eq!(
+        timer.delay_ms,
+        safe(expected_delay),
+        "seed={seed} operation={operation} recovery timer delay"
+    );
+    assert_eq!(
+        timer.time_class, expected_class,
+        "seed={seed} operation={operation} recovery timer class"
+    );
     timer.to_owned()
 }
 
@@ -714,20 +794,29 @@ fn assert_recovery_terminalized(
         expected_cancel_timer_ids.len() + 2,
         "seed={seed} operation={operation} exact terminal action count"
     );
-    assert!(matches!(
-        actions.first(),
-        Some(RecoveryAction::FenceChanged { view })
-            if view.state == RecoveryFenceState::Terminal
-    ), "seed={seed} operation={operation} terminal fence action first");
+    assert!(
+        matches!(
+            actions.first(),
+            Some(RecoveryAction::FenceChanged { view })
+                if view.state == RecoveryFenceState::Terminal
+        ),
+        "seed={seed} operation={operation} terminal fence action first"
+    );
     for (index, expected_timer_id) in expected_cancel_timer_ids.iter().enumerate() {
-        assert!(matches!(
-            actions.get(index + 1),
-            Some(RecoveryAction::Scheduler {
-                command: SchedulerCommand::Cancel { endpoint, timer_id }
-            }) if *endpoint == seat(1) && *timer_id == TimerId::new(safe(*expected_timer_id))
-        ), "seed={seed} operation={operation} terminal cancellation index={index}");
+        assert!(
+            matches!(
+                actions.get(index + 1),
+                Some(RecoveryAction::Scheduler {
+                    command: SchedulerCommand::Cancel { endpoint, timer_id }
+                }) if *endpoint == seat(1) && *timer_id == TimerId::new(safe(*expected_timer_id))
+            ),
+            "seed={seed} operation={operation} terminal cancellation index={index}"
+        );
     }
-    assert!(matches!(actions.last(), Some(RecoveryAction::Terminalize { .. })), "seed={seed} operation={operation} terminal action is final");
+    assert!(
+        matches!(actions.last(), Some(RecoveryAction::Terminalize { .. })),
+        "seed={seed} operation={operation} terminal action is final"
+    );
 }
 
 fn assert_proposal_arm_actions(
@@ -746,19 +835,70 @@ fn assert_proposal_arm_actions(
             },
             ProposalLeaseAction::Send { proposal: sent },
         ] => {
-            assert_eq!(absolute.timer_id, TimerId::new(safe(0)), "seed={seed} operation={operation} absolute timer id");
-            assert_eq!(absolute.endpoint, proposal.from, "seed={seed} operation={operation} absolute endpoint");
-            assert_eq!(absolute.owner, timer_owner("authority-v2:proposal:lease/first", "lease/first", "v2 proposal absolute ceiling"), "seed={seed} operation={operation} absolute owner");
-            assert_eq!(absolute.delay_ms, safe(GOLDEN_PROPOSAL_TEST_CEILING_MS), "seed={seed} operation={operation} absolute delay");
-            assert_eq!(absolute.time_class, TimeClass::Absolute, "seed={seed} operation={operation} absolute class");
-            assert_eq!(retry.timer_id, TimerId::new(safe(1)), "seed={seed} operation={operation} retry timer id");
-            assert_eq!(retry.endpoint, proposal.from, "seed={seed} operation={operation} retry endpoint");
-            assert_eq!(retry.owner, timer_owner("authority-v2:proposal:lease/first", "lease/first", "v2 proposal retry"), "seed={seed} operation={operation} retry owner");
-            assert_eq!(retry.delay_ms, safe(GOLDEN_PROPOSAL_RETRY_INITIAL_MS), "seed={seed} operation={operation} retry delay");
-            assert_eq!(retry.time_class, TimeClass::Connected, "seed={seed} operation={operation} retry class");
-            assert_eq!(sent, proposal, "seed={seed} operation={operation} proposal send ordering");
+            assert_eq!(
+                absolute.timer_id,
+                TimerId::new(safe(0)),
+                "seed={seed} operation={operation} absolute timer id"
+            );
+            assert_eq!(
+                absolute.endpoint, proposal.from,
+                "seed={seed} operation={operation} absolute endpoint"
+            );
+            assert_eq!(
+                absolute.owner,
+                timer_owner(
+                    "authority-v2:proposal:lease/first",
+                    "lease/first",
+                    "v2 proposal absolute ceiling"
+                ),
+                "seed={seed} operation={operation} absolute owner"
+            );
+            assert_eq!(
+                absolute.delay_ms,
+                safe(GOLDEN_PROPOSAL_TEST_CEILING_MS),
+                "seed={seed} operation={operation} absolute delay"
+            );
+            assert_eq!(
+                absolute.time_class,
+                TimeClass::Absolute,
+                "seed={seed} operation={operation} absolute class"
+            );
+            assert_eq!(
+                retry.timer_id,
+                TimerId::new(safe(1)),
+                "seed={seed} operation={operation} retry timer id"
+            );
+            assert_eq!(
+                retry.endpoint, proposal.from,
+                "seed={seed} operation={operation} retry endpoint"
+            );
+            assert_eq!(
+                retry.owner,
+                timer_owner(
+                    "authority-v2:proposal:lease/first",
+                    "lease/first",
+                    "v2 proposal retry"
+                ),
+                "seed={seed} operation={operation} retry owner"
+            );
+            assert_eq!(
+                retry.delay_ms,
+                safe(GOLDEN_PROPOSAL_RETRY_INITIAL_MS),
+                "seed={seed} operation={operation} retry delay"
+            );
+            assert_eq!(
+                retry.time_class,
+                TimeClass::Connected,
+                "seed={seed} operation={operation} retry class"
+            );
+            assert_eq!(
+                sent, proposal,
+                "seed={seed} operation={operation} proposal send ordering"
+            );
         }
-        other => panic!("seed={seed} operation={operation} proposal arm action order was {other:?}"),
+        other => {
+            panic!("seed={seed} operation={operation} proposal arm action order was {other:?}")
+        }
     }
 }
 
@@ -768,11 +908,11 @@ fn fire_exact_timer(
     seed: u64,
     operation: usize,
 ) -> Result<ScheduledTimer, Box<dyn Error>> {
-    let fired = scheduler
-        .fired(expected.timer_id)
-        .map_err(|error| missing(format!(
+    let fired = scheduler.fired(expected.timer_id).map_err(|error| {
+        missing(format!(
             "seed={seed} operation={operation}: fire timer: {error}"
-        )))?;
+        ))
+    })?;
     assert_eq!(
         fired, *expected,
         "seed={seed} operation={operation} removed ScheduledTimer"
@@ -890,12 +1030,11 @@ impl VirtualClockProperty {
                 );
                 Ok(())
             }
-            SchedulerCommand::Cancel { endpoint, timer_id } => {
-                self.timers
-                    .remove(&(endpoint, timer_id))
-                    .map(|_| ())
-                    .ok_or_else(|| format!("unknown timer ({endpoint}, {timer_id})"))
-            }
+            SchedulerCommand::Cancel { endpoint, timer_id } => self
+                .timers
+                .remove(&(endpoint, timer_id))
+                .map(|_| ())
+                .ok_or_else(|| format!("unknown timer ({endpoint}, {timer_id})")),
             SchedulerCommand::PauseClass {
                 endpoint,
                 time_class,
@@ -960,7 +1099,12 @@ impl VirtualClockProperty {
             let remaining = if self.is_paused(key.0, timer.timer.time_class) {
                 timer.remaining_active_ms
             } else {
-                safe(timer.remaining_active_ms.get().saturating_sub(delta_ms.get()))
+                safe(
+                    timer
+                        .remaining_active_ms
+                        .get()
+                        .saturating_sub(delta_ms.get()),
+                )
             };
             updates.push((*key, remaining));
         }
@@ -1485,18 +1629,13 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                         "seeded property timer",
                     );
                     let delay_ms = safe(1 + rng.below(500));
-                    let result = scheduler.schedule(
-                        endpoint,
-                        owner.clone(),
-                        delay_ms,
-                        time_class,
-                    );
+                    let result = scheduler.schedule(endpoint, owner.clone(), delay_ms, time_class);
                     let command = match result {
                         Ok(command) => command,
                         Err(error) => {
                             return Err(missing(format!(
                                 "seed={seed} operation={step}: schedule failed: {error}"
-                            )))
+                            )));
                         }
                     };
                     let timer = match command {
@@ -1504,12 +1643,18 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                         other => {
                             return Err(missing(format!(
                                 "seed={seed} operation={step}: unexpected schedule command: {other:?}"
-                            )))
+                            )));
                         }
                     };
-                    assert_eq!(timer.endpoint, endpoint, "seed={seed} operation={step} endpoint");
+                    assert_eq!(
+                        timer.endpoint, endpoint,
+                        "seed={seed} operation={step} endpoint"
+                    );
                     assert_eq!(timer.owner, owner, "seed={seed} operation={step} owner");
-                    assert_eq!(timer.delay_ms, delay_ms, "seed={seed} operation={step} delay");
+                    assert_eq!(
+                        timer.delay_ms, delay_ms,
+                        "seed={seed} operation={step} delay"
+                    );
                     assert_eq!(
                         timer.time_class, time_class,
                         "seed={seed} operation={step} class"
@@ -1579,7 +1724,11 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                     let expected = live.remove(&timer_id);
                     let fired = scheduler.fired(timer_id);
                     if let Some(expected_timer) = expected {
-                        assert_eq!(fired, Ok(expected_timer), "seed={seed} operation={step} fired");
+                        assert_eq!(
+                            fired,
+                            Ok(expected_timer),
+                            "seed={seed} operation={step} fired"
+                        );
                     } else {
                         assert_eq!(
                             fired,
@@ -1600,7 +1749,11 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                             });
                     let result = scheduler.pause_class(endpoint, time_class, &reason);
                     if time_class == TimeClass::Absolute {
-                        assert_eq!(result, Ok(None), "seed={seed} operation={step} absolute pause");
+                        assert_eq!(
+                            result,
+                            Ok(None),
+                            "seed={seed} operation={step} absolute pause"
+                        );
                     } else {
                         let expected = (!already_paused).then(|| SchedulerCommand::PauseClass {
                             endpoint,
@@ -1619,13 +1772,17 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
                         paused_reason_exists(&pause_reasons, endpoint, time_class, &reason);
                     let result = scheduler.resume_class(endpoint, time_class, &reason);
                     if time_class == TimeClass::Absolute {
-                        assert_eq!(result, Ok(None), "seed={seed} operation={step} absolute resume");
+                        assert_eq!(
+                            result,
+                            Ok(None),
+                            "seed={seed} operation={step} absolute resume"
+                        );
                     } else {
                         let expected = existed.then(|| SchedulerCommand::ResumeClass {
-                                endpoint,
-                                time_class,
-                                reason: reason.clone(),
-                            });
+                            endpoint,
+                            time_class,
+                            reason: reason.clone(),
+                        });
                         assert_eq!(result, Ok(expected), "seed={seed} operation={step} resume");
                         pause_reasons.remove(&(endpoint, time_class, reason));
                     }
@@ -1657,7 +1814,10 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
             expected_dispose,
             "seed={seed} operation=disposal disposal commands"
         );
-        assert!(scheduler.is_disposed(), "seed={seed} operation=disposal disposed flag");
+        assert!(
+            scheduler.is_disposed(),
+            "seed={seed} operation=disposal disposed flag"
+        );
         assert!(
             scheduler.live_timers().is_empty(),
             "seed={seed} operation=disposal live timers after disposal"
@@ -1800,9 +1960,20 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
         ],
         "seed=0 operation=batch exact registration order and metadata"
     );
-    assert_eq!(batch.pending_timer_count(), safe(2), "seed=0 operation=batch registration count");
-    assert_eq!(batch.dispose().len(), 2, "seed=0 operation=batch cleanup count");
-    assert!(batch.live_timers().is_empty(), "seed=0 operation=batch cleanup resources");
+    assert_eq!(
+        batch.pending_timer_count(),
+        safe(2),
+        "seed=0 operation=batch registration count"
+    );
+    assert_eq!(
+        batch.dispose().len(),
+        2,
+        "seed=0 operation=batch cleanup count"
+    );
+    assert!(
+        batch.live_timers().is_empty(),
+        "seed=0 operation=batch cleanup resources"
+    );
 
     // CR-0006/CR-0009: numeric timer IDs are lifetime-unique only inside one
     // scheduler; the simulator identity is the endpoint-qualified pair.
@@ -1850,35 +2021,94 @@ fn scheduler_seeded_state_machine_preserves_timer_ownership_and_pause_compositio
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(ids_a, vec![TimerId::new(safe(0)), TimerId::new(safe(1))], "seed=0 operation=two-scheduler A two-timer allocation boundary");
-    assert_eq!(ids_b, ids_a, "seed=0 operation=two-scheduler independent numeric cursor");
+    assert_eq!(
+        ids_a,
+        vec![TimerId::new(safe(0)), TimerId::new(safe(1))],
+        "seed=0 operation=two-scheduler A two-timer allocation boundary"
+    );
+    assert_eq!(
+        ids_b, ids_a,
+        "seed=0 operation=two-scheduler independent numeric cursor"
+    );
     let a_identity = (seat(10), ids_a[0]);
     let b_identity = (seat(20), ids_b[0]);
-    assert_ne!(a_identity, b_identity, "seed=0 operation=two-scheduler endpoint-qualified timer identity");
+    assert_ne!(
+        a_identity, b_identity,
+        "seed=0 operation=two-scheduler endpoint-qualified timer identity"
+    );
     let before_two_scheduler_a = scheduler_snapshot(&scheduler_a);
     let before_two_scheduler_b = scheduler_snapshot(&scheduler_b);
-    assert_eq!(before_two_scheduler_a.live_timers.len(), 2, "seed=0 operation=two-scheduler A live resources");
-    assert_eq!(before_two_scheduler_b.live_timers.len(), 2, "seed=0 operation=two-scheduler B live resources");
+    assert_eq!(
+        before_two_scheduler_a.live_timers.len(),
+        2,
+        "seed=0 operation=two-scheduler A live resources"
+    );
+    assert_eq!(
+        before_two_scheduler_b.live_timers.len(),
+        2,
+        "seed=0 operation=two-scheduler B live resources"
+    );
     let _ = scheduler_a.fired(ids_a[0])?;
-    assert!(scheduler_b.timer(ids_b[0]).is_some(), "seed=0 operation=two-scheduler A fire cannot consume B timer");
-    assert_eq!(scheduler_snapshot(&scheduler_a).live_timers.len(), 1, "seed=0 operation=two-scheduler A fire resource count");
-    assert_eq!(scheduler_snapshot(&scheduler_b), before_two_scheduler_b, "seed=0 operation=two-scheduler B resource snapshot after A fire");
-    assert_eq!(scheduler_a.schedule(
-        seat(12),
-        timer_owner("kernel-a", "clock/a/third", "a third"),
-        safe(7),
-        TimeClass::Connected,
-    )?, SchedulerCommand::Schedule { timer: ScheduledTimer { timer_id: TimerId::new(safe(2)), .. } }, "seed=0 operation=two-scheduler A cursor after two-timer batch");
-    assert_eq!(scheduler_b.schedule(
-        seat(22),
-        timer_owner("kernel-b", "clock/b/third", "b third"),
-        safe(7),
-        TimeClass::Connected,
-    )?, SchedulerCommand::Schedule { timer: ScheduledTimer { timer_id: TimerId::new(safe(2)), .. } }, "seed=0 operation=two-scheduler B cursor after two-timer batch");
+    assert!(
+        scheduler_b.timer(ids_b[0]).is_some(),
+        "seed=0 operation=two-scheduler A fire cannot consume B timer"
+    );
+    assert_eq!(
+        scheduler_snapshot(&scheduler_a).live_timers.len(),
+        1,
+        "seed=0 operation=two-scheduler A fire resource count"
+    );
+    assert_eq!(
+        scheduler_snapshot(&scheduler_b),
+        before_two_scheduler_b,
+        "seed=0 operation=two-scheduler B resource snapshot after A fire"
+    );
+    assert_eq!(
+        scheduler_a.schedule(
+            seat(12),
+            timer_owner("kernel-a", "clock/a/third", "a third"),
+            safe(7),
+            TimeClass::Connected,
+        )?,
+        SchedulerCommand::Schedule {
+            timer: ScheduledTimer {
+                endpoint: seat(12),
+                timer_id: TimerId::new(safe(2)),
+                owner: timer_owner("kernel-a", "clock/a/third", "a third"),
+                delay_ms: safe(7),
+                time_class: TimeClass::Connected,
+            },
+        },
+        "seed=0 operation=two-scheduler A cursor after two-timer batch"
+    );
+    assert_eq!(
+        scheduler_b.schedule(
+            seat(22),
+            timer_owner("kernel-b", "clock/b/third", "b third"),
+            safe(7),
+            TimeClass::Connected,
+        )?,
+        SchedulerCommand::Schedule {
+            timer: ScheduledTimer {
+                endpoint: seat(22),
+                timer_id: TimerId::new(safe(2)),
+                owner: timer_owner("kernel-b", "clock/b/third", "b third"),
+                delay_ms: safe(7),
+                time_class: TimeClass::Connected,
+            },
+        },
+        "seed=0 operation=two-scheduler B cursor after two-timer batch"
+    );
     let _ = scheduler_a.dispose();
     let _ = scheduler_b.dispose();
-    assert!(scheduler_a.live_timers().is_empty(), "seed=0 operation=two-scheduler A disposal resources");
-    assert!(scheduler_b.live_timers().is_empty(), "seed=0 operation=two-scheduler B disposal resources");
+    assert!(
+        scheduler_a.live_timers().is_empty(),
+        "seed=0 operation=two-scheduler A disposal resources"
+    );
+    assert!(
+        scheduler_b.live_timers().is_empty(),
+        "seed=0 operation=two-scheduler B disposal resources"
+    );
 
     let mut disposed_batch = KernelScheduler::new();
     let _ = disposed_batch.dispose();
@@ -1924,13 +2154,24 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
         )?;
         let first_a_timer = match &first_a {
             SchedulerCommand::Schedule { timer } => timer.clone(),
-            other => return Err(missing(format!("seed={seed} operation=clock-scheduler-a command was {other:?}"))),
+            other => {
+                return Err(missing(format!(
+                    "seed={seed} operation=clock-scheduler-a command was {other:?}"
+                )));
+            }
         };
         let first_b_timer = match &first_b {
             SchedulerCommand::Schedule { timer } => timer.clone(),
-            other => return Err(missing(format!("seed={seed} operation=clock-scheduler-b command was {other:?}"))),
+            other => {
+                return Err(missing(format!(
+                    "seed={seed} operation=clock-scheduler-b command was {other:?}"
+                )));
+            }
         };
-        assert_eq!(first_a_timer.timer_id, first_b_timer.timer_id, "seed={seed} operation=clock same numeric IDs are independent");
+        assert_eq!(
+            first_a_timer.timer_id, first_b_timer.timer_id,
+            "seed={seed} operation=clock same numeric IDs are independent"
+        );
         replay(seed, "clock-apply-a", clock.apply(first_a))?;
         replay(seed, "clock-apply-b", clock.apply(first_b))?;
         let pause_b = scheduler_b
@@ -1938,17 +2179,43 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
             .ok_or_else(|| missing(format!("seed={seed} operation=clock pause command missing")))?;
         replay(seed, "clock-pause-b", clock.apply(pause_b))?;
         let due_a = replay(seed, "clock-advance-a", clock.advance(safe(3)))?;
-        assert_eq!(due_a, vec![(endpoints[0], first_a_timer.timer_id)], "seed={seed} operation=clock endpoint A fires while B is paused");
-        let fired_a = replay(seed, "clock-fire-a", scheduler_a.fired(first_a_timer.timer_id))?;
-        assert_eq!(fired_a, first_a_timer, "seed={seed} operation=clock A fire identity");
+        assert_eq!(
+            due_a,
+            vec![(endpoints[0], first_a_timer.timer_id)],
+            "seed={seed} operation=clock endpoint A fires while B is paused"
+        );
+        let fired_a = replay(
+            seed,
+            "clock-fire-a",
+            scheduler_a.fired(first_a_timer.timer_id),
+        )?;
+        assert_eq!(
+            fired_a, first_a_timer,
+            "seed={seed} operation=clock A fire identity"
+        );
         let resume_b = scheduler_b
             .resume_class(endpoints[1], TimeClass::Connected, "network-suspended")?
-            .ok_or_else(|| missing(format!("seed={seed} operation=clock resume command missing")))?;
+            .ok_or_else(|| {
+                missing(format!(
+                    "seed={seed} operation=clock resume command missing"
+                ))
+            })?;
         replay(seed, "clock-resume-b", clock.apply(resume_b))?;
         let due_b = replay(seed, "clock-advance-b", clock.advance(safe(3)))?;
-        assert_eq!(due_b, vec![(endpoints[1], first_b_timer.timer_id)], "seed={seed} operation=clock endpoint B resumes and fires independently");
-        let fired_b = replay(seed, "clock-fire-b", scheduler_b.fired(first_b_timer.timer_id))?;
-        assert_eq!(fired_b, first_b_timer, "seed={seed} operation=clock B fire identity");
+        assert_eq!(
+            due_b,
+            vec![(endpoints[1], first_b_timer.timer_id)],
+            "seed={seed} operation=clock endpoint B resumes and fires independently"
+        );
+        let fired_b = replay(
+            seed,
+            "clock-fire-b",
+            scheduler_b.fired(first_b_timer.timer_id),
+        )?;
+        assert_eq!(
+            fired_b, first_b_timer,
+            "seed={seed} operation=clock B fire identity"
+        );
         assert!(
             replay(seed, "clock-sync-empty", clock.sync())?.is_empty(),
             "seed={seed} operation=clock sync after both timer fires is empty"
@@ -1979,18 +2246,46 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
                 SafeU53::ZERO,
             ),
         )?;
-        assert_eq!(first_packet, SafeU53::ZERO, "seed={seed} operation=network first packet ID");
-        assert_eq!(second_packet, safe(1), "seed={seed} operation=network second packet ID");
-        let delayed_initial = replay(seed, "network-delay-initial", network.delay(first_packet, safe(2)))?;
-        assert_eq!(delayed_initial, (), "seed={seed} operation=network delay mutation result");
-        let duplicate_packet = replay(seed, "network-duplicate-initial", network.duplicate(first_packet))?;
-        assert_eq!(duplicate_packet, safe(2), "seed={seed} operation=network duplicate packet ID");
+        assert_eq!(
+            first_packet,
+            SafeU53::ZERO,
+            "seed={seed} operation=network first packet ID"
+        );
+        assert_eq!(
+            second_packet,
+            safe(1),
+            "seed={seed} operation=network second packet ID"
+        );
+        let delayed_initial = replay(
+            seed,
+            "network-delay-initial",
+            network.delay(first_packet, safe(2)),
+        )?;
+        assert_eq!(
+            delayed_initial,
+            (),
+            "seed={seed} operation=network delay mutation result"
+        );
+        let duplicate_packet = replay(
+            seed,
+            "network-duplicate-initial",
+            network.duplicate(first_packet),
+        )?;
+        assert_eq!(
+            duplicate_packet,
+            safe(2),
+            "seed={seed} operation=network duplicate packet ID"
+        );
         replay(
             seed,
             "network-reorder-initial",
             network.reorder(vec![second_packet, first_packet, duplicate_packet]),
         )?;
-        replay(seed, "network-corrupt-initial", network.corrupt(second_packet))?;
+        replay(
+            seed,
+            "network-corrupt-initial",
+            network.corrupt(second_packet),
+        )?;
         assert!(matches!(
             replay(seed, "network-deliver-initial", network.deliver(second_packet))?,
             PropertyNetworkEvent::Delivered { packet_id, payload }
@@ -2000,9 +2295,15 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
             replay(seed, "network-drop-duplicate", network.drop_packet(duplicate_packet))?,
             PropertyNetworkEvent::Dropped { packet_id } if packet_id == duplicate_packet
         ));
-        assert!(network.suspend(endpoints[0]), "seed={seed} operation=network-suspend-initial");
+        assert!(
+            network.suspend(endpoints[0]),
+            "seed={seed} operation=network-suspend-initial"
+        );
         assert!(network.snapshot().suspended.contains(&endpoints[0]));
-        assert!(network.resume(endpoints[0]), "seed={seed} operation=network-resume-initial");
+        assert!(
+            network.resume(endpoints[0]),
+            "seed={seed} operation=network-resume-initial"
+        );
         let stale_generation = network.connection_generation(endpoints[0]);
         let stale_packet = replay(
             seed,
@@ -2015,23 +2316,49 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
                 SafeU53::ZERO,
             ),
         )?;
-        assert!(network.disconnect(endpoints[0]), "seed={seed} operation=network-disconnect-initial");
-        let next_generation = replay(seed, "network-reconnect-initial", network.reconnect(endpoints[0]))?;
-        assert_eq!(next_generation, generation(1), "seed={seed} operation=network-reconnect-initial generation");
+        assert!(
+            network.disconnect(endpoints[0]),
+            "seed={seed} operation=network-disconnect-initial"
+        );
+        let next_generation = replay(
+            seed,
+            "network-reconnect-initial",
+            network.reconnect(endpoints[0]),
+        )?;
+        assert_eq!(
+            next_generation,
+            generation(1),
+            "seed={seed} operation=network-reconnect-initial generation"
+        );
         let stale_events = replay(seed, "network-deliver-stale", network.deliver_due(safe(10)))?;
         assert!(stale_events.iter().any(|event| matches!(event, PropertyNetworkEvent::Dropped { packet_id } if *packet_id == stale_packet)), "seed={seed} operation=network-generation-stale packet drops");
-        assert!(!network.snapshot().disconnected.contains(&endpoints[0]), "seed={seed} operation=network-reconnect-initial disconnected state");
+        assert!(
+            !network.snapshot().disconnected.contains(&endpoints[0]),
+            "seed={seed} operation=network-reconnect-initial disconnected state"
+        );
         let mut rng = DeterministicRng::new(seed ^ 0xC0FF_EE11);
         let mut now_ms = SafeU53::ZERO;
         for step in 0..96_usize {
             let operation = rng.below(12);
             let before = network.snapshot();
-            let queued = before.queue.iter().map(|packet| packet.packet_id).collect::<Vec<_>>();
+            let queued = before
+                .queue
+                .iter()
+                .map(|packet| packet.packet_id)
+                .collect::<Vec<_>>();
             match operation {
                 0 => {
                     if before.disconnected.is_empty() {
-                        let from = if step % 2 == 0 { endpoints[0] } else { endpoints[1] };
-                        let to = if from == endpoints[0] { endpoints[1] } else { endpoints[0] };
+                        let from = if step % 2 == 0 {
+                            endpoints[0]
+                        } else {
+                            endpoints[1]
+                        };
+                        let to = if from == endpoints[0] {
+                            endpoints[1]
+                        } else {
+                            endpoints[0]
+                        };
                         let current_generation = network.connection_generation(from);
                         let _ = replay(
                             seed,
@@ -2040,115 +2367,310 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
                         )?;
                     } else {
                         let current_generation = network.connection_generation(endpoints[0]);
-                        assert!(network
-                            .enqueue(
-                                endpoints[0],
-                                endpoints[1],
-                                current_generation,
-                                step as u64,
-                                now_ms,
-                            )
-                            .is_err(), "seed={seed} operation=network-enqueue-{step} disconnected send rejects");
-                        assert_eq!(network.snapshot(), before, "seed={seed} operation=network-enqueue-{step} disconnected send is fail-atomic");
+                        assert!(
+                            network
+                                .enqueue(
+                                    endpoints[0],
+                                    endpoints[1],
+                                    current_generation,
+                                    step as u64,
+                                    now_ms,
+                                )
+                                .is_err(),
+                            "seed={seed} operation=network-enqueue-{step} disconnected send rejects"
+                        );
+                        assert_eq!(
+                            network.snapshot(),
+                            before,
+                            "seed={seed} operation=network-enqueue-{step} disconnected send is fail-atomic"
+                        );
                     }
                 }
                 1 if !queued.is_empty() => {
-                    replay(seed, format!("network-delay-{step}"), network.delay(queued[0], safe(2)))?;
+                    replay(
+                        seed,
+                        format!("network-delay-{step}"),
+                        network.delay(queued[0], safe(2)),
+                    )?;
                 }
                 2 if !queued.is_empty() => {
-                    let _ = replay(seed, format!("network-duplicate-{step}"), network.duplicate(queued[0]))?;
+                    let _ = replay(
+                        seed,
+                        format!("network-duplicate-{step}"),
+                        network.duplicate(queued[0]),
+                    )?;
                 }
                 3 if queued.len() >= 2 => {
-                    replay(seed, format!("network-reorder-{step}"), network.reorder(vec![queued[1], queued[0]]))?;
+                    replay(
+                        seed,
+                        format!("network-reorder-{step}"),
+                        network.reorder(vec![queued[1], queued[0]]),
+                    )?;
                 }
                 4 => {
                     now_ms = safe(now_ms.get().saturating_add(1));
-                    let events = replay(seed, format!("network-deliver-due-{step}"), network.deliver_due(now_ms))?;
+                    let events = replay(
+                        seed,
+                        format!("network-deliver-due-{step}"),
+                        network.deliver_due(now_ms),
+                    )?;
                     for event in events {
                         match event {
                             PropertyNetworkEvent::Delivered { packet_id, payload } => {
-                                assert!(payload >= 100, "seed={seed} operation=network-deliver-{step} delivered payload identity");
-                                assert!(!network.snapshot().queue.iter().any(|packet| packet.packet_id == packet_id), "seed={seed} operation=network-deliver-{step} delivered packet removed");
+                                assert!(
+                                    payload >= 100,
+                                    "seed={seed} operation=network-deliver-{step} delivered payload identity"
+                                );
+                                assert!(
+                                    !network
+                                        .snapshot()
+                                        .queue
+                                        .iter()
+                                        .any(|packet| packet.packet_id == packet_id),
+                                    "seed={seed} operation=network-deliver-{step} delivered packet removed"
+                                );
                             }
-                            PropertyNetworkEvent::Dropped { packet_id } => assert!(!network.snapshot().queue.iter().any(|packet| packet.packet_id == packet_id), "seed={seed} operation=network-drop-{step} dropped packet removed"),
+                            PropertyNetworkEvent::Dropped { packet_id } => assert!(
+                                !network
+                                    .snapshot()
+                                    .queue
+                                    .iter()
+                                    .any(|packet| packet.packet_id == packet_id),
+                                "seed={seed} operation=network-drop-{step} dropped packet removed"
+                            ),
                         }
                     }
                 }
                 5 if !queued.is_empty() => {
-                    replay(seed, format!("network-drop-{step}"), network.drop_packet(queued[0]))?;
+                    replay(
+                        seed,
+                        format!("network-drop-{step}"),
+                        network.drop_packet(queued[0]),
+                    )?;
                 }
                 6 => {
                     let changed = network.disconnect(endpoints[step % 2]);
-                    assert!(changed || network.snapshot().disconnected.contains(&endpoints[step % 2]), "seed={seed} operation=network-disconnect-{step} idempotent endpoint state");
+                    assert!(
+                        changed
+                            || network
+                                .snapshot()
+                                .disconnected
+                                .contains(&endpoints[step % 2]),
+                        "seed={seed} operation=network-disconnect-{step} idempotent endpoint state"
+                    );
                 }
                 7 => {
                     let endpoint = endpoints[step % 2];
                     if network.snapshot().disconnected.contains(&endpoint) {
-                        replay(seed, format!("network-reconnect-{step}"), network.reconnect(endpoint))?;
+                        replay(
+                            seed,
+                            format!("network-reconnect-{step}"),
+                            network.reconnect(endpoint),
+                        )?;
                     } else {
                         let before_reconnect = network.snapshot();
-                        assert!(network.reconnect(endpoint).is_ok(), "seed={seed} operation=network-reconnect-{step} live generation advances");
-                        assert_ne!(network.snapshot().generations, before_reconnect.generations, "seed={seed} operation=network-reconnect-{step} generation changes");
+                        assert!(
+                            network.reconnect(endpoint).is_ok(),
+                            "seed={seed} operation=network-reconnect-{step} live generation advances"
+                        );
+                        assert_ne!(
+                            network.snapshot().generations,
+                            before_reconnect.generations,
+                            "seed={seed} operation=network-reconnect-{step} generation changes"
+                        );
                     }
                 }
                 8 => {
                     let endpoint = endpoints[step % 2];
                     let _ = network.suspend(endpoint);
-                    assert!(network.snapshot().suspended.contains(&endpoint), "seed={seed} operation=network-suspend-{step} suspended diagnostic");
+                    assert!(
+                        network.snapshot().suspended.contains(&endpoint),
+                        "seed={seed} operation=network-suspend-{step} suspended diagnostic"
+                    );
                 }
                 9 => {
                     let endpoint = endpoints[step % 2];
                     let _ = network.resume(endpoint);
-                    assert!(!network.snapshot().suspended.contains(&endpoint), "seed={seed} operation=network-resume-{step} resumed diagnostic");
+                    assert!(
+                        !network.snapshot().suspended.contains(&endpoint),
+                        "seed={seed} operation=network-resume-{step} resumed diagnostic"
+                    );
                 }
                 10 if !queued.is_empty() => {
-                    replay(seed, format!("network-corrupt-{step}"), network.corrupt(queued[0]))?;
-                    assert!(network.snapshot().queue.iter().any(|packet| packet.packet_id == queued[0] && packet.corrupted), "seed={seed} operation=network-corrupt-{step} packet mutation");
+                    replay(
+                        seed,
+                        format!("network-corrupt-{step}"),
+                        network.corrupt(queued[0]),
+                    )?;
+                    assert!(
+                        network
+                            .snapshot()
+                            .queue
+                            .iter()
+                            .any(|packet| packet.packet_id == queued[0] && packet.corrupted),
+                        "seed={seed} operation=network-corrupt-{step} packet mutation"
+                    );
                 }
                 _ => {
                     now_ms = safe(now_ms.get().saturating_add(1));
-                    let _ = replay(seed, format!("clock-state-{step}"), clock.advance(safe(step as u64 % 3)))?;
+                    let _ = replay(
+                        seed,
+                        format!("clock-state-{step}"),
+                        clock.advance(safe(step as u64 % 3)),
+                    )?;
                 }
             }
             let after = network.snapshot();
-            assert_eq!(after.seed, seed.to_string(), "seed={seed} operation=network-state-{step} canonical seed diagnostic");
-            assert!(after.queue.windows(2).all(|packets| packets[0].packet_id != packets[1].packet_id), "seed={seed} operation=network-state-{step} packet IDs remain unique");
-            assert!(after.reordered_packet_ids.iter().all(|packet_id| after.queue.iter().any(|packet| packet.packet_id == *packet_id)), "seed={seed} operation=network-state-{step} reorder markers have no leaked packet IDs");
-            assert_eq!(after.queue.len(), after.queue.iter().map(|packet| packet.packet_id).collect::<BTreeSet<_>>().len(), "seed={seed} operation=network-state-{step} queue identity set");
-            assert!(!clock.timers.keys().any(|(endpoint, _)| *endpoint != endpoints[0] && *endpoint != endpoints[1]), "seed={seed} operation=clock-state-{step} endpoint resource scope");
+            assert_eq!(
+                after.seed,
+                seed.to_string(),
+                "seed={seed} operation=network-state-{step} canonical seed diagnostic"
+            );
+            assert!(
+                after
+                    .queue
+                    .windows(2)
+                    .all(|packets| packets[0].packet_id != packets[1].packet_id),
+                "seed={seed} operation=network-state-{step} packet IDs remain unique"
+            );
+            assert!(
+                after.reordered_packet_ids.iter().all(|packet_id| after
+                    .queue
+                    .iter()
+                    .any(|packet| packet.packet_id == *packet_id)),
+                "seed={seed} operation=network-state-{step} reorder markers have no leaked packet IDs"
+            );
+            assert_eq!(
+                after.queue.len(),
+                after
+                    .queue
+                    .iter()
+                    .map(|packet| packet.packet_id)
+                    .collect::<BTreeSet<_>>()
+                    .len(),
+                "seed={seed} operation=network-state-{step} queue identity set"
+            );
+            assert!(
+                !clock
+                    .timers
+                    .keys()
+                    .any(|(endpoint, _)| *endpoint != endpoints[0] && *endpoint != endpoints[1]),
+                "seed={seed} operation=clock-state-{step} endpoint resource scope"
+            );
         }
 
         let mut invalid_reorder = FaultNetworkProperty::new(seed, endpoints);
-        let invalid_packet = replay(seed, "network-invalid-enqueue", invalid_reorder.enqueue(endpoints[0], endpoints[1], ConnectionGeneration::ZERO, 7, SafeU53::ZERO))?;
+        let invalid_packet = replay(
+            seed,
+            "network-invalid-enqueue",
+            invalid_reorder.enqueue(
+                endpoints[0],
+                endpoints[1],
+                ConnectionGeneration::ZERO,
+                7,
+                SafeU53::ZERO,
+            ),
+        )?;
         let before_invalid_reorder = invalid_reorder.snapshot();
-        assert!(invalid_reorder.reorder(vec![invalid_packet, invalid_packet]).is_err(), "seed={seed} operation=network-invalid-reorder duplicate packet rejects");
-        assert_eq!(invalid_reorder.snapshot(), before_invalid_reorder, "seed={seed} operation=network-invalid-reorder is fail-atomic");
+        assert!(
+            invalid_reorder
+                .reorder(vec![invalid_packet, invalid_packet])
+                .is_err(),
+            "seed={seed} operation=network-invalid-reorder duplicate packet rejects"
+        );
+        assert_eq!(
+            invalid_reorder.snapshot(),
+            before_invalid_reorder,
+            "seed={seed} operation=network-invalid-reorder is fail-atomic"
+        );
         invalid_reorder.queue[0].deliver_at_ms = SafeU53::MAX;
         let before_invalid_delay = invalid_reorder.snapshot();
-        assert!(invalid_reorder.delay(invalid_packet, SafeU53::new(1).expect("one-millisecond delay fixture must fit SafeU53")).is_err(), "seed={seed} operation=network-invalid-delay overflow rejects");
-        assert_eq!(invalid_reorder.snapshot(), before_invalid_delay, "seed={seed} operation=network-invalid-delay is fail-atomic");
+        assert!(
+            invalid_reorder
+                .delay(
+                    invalid_packet,
+                    SafeU53::new(1).expect("one-millisecond delay fixture must fit SafeU53")
+                )
+                .is_err(),
+            "seed={seed} operation=network-invalid-delay overflow rejects"
+        );
+        assert_eq!(
+            invalid_reorder.snapshot(),
+            before_invalid_delay,
+            "seed={seed} operation=network-invalid-delay is fail-atomic"
+        );
         invalid_reorder.next_packet_id = SafeU53::MAX.get() + 1;
         let before_packet_exhaustion = invalid_reorder.snapshot();
-        assert!(invalid_reorder.enqueue(endpoints[0], endpoints[1], ConnectionGeneration::ZERO, 8, SafeU53::ZERO).is_err(), "seed={seed} operation=network-packet-id-exhaustion rejects");
-        assert_eq!(invalid_reorder.snapshot(), before_packet_exhaustion, "seed={seed} operation=network-packet-id-exhaustion is fail-atomic");
-        invalid_reorder.generations.insert(endpoints[0], ConnectionGeneration::new(SafeU53::MAX));
-        invalid_reorder.generations.insert(endpoints[1], ConnectionGeneration::new(SafeU53::MAX));
+        assert!(
+            invalid_reorder
+                .enqueue(
+                    endpoints[0],
+                    endpoints[1],
+                    ConnectionGeneration::ZERO,
+                    8,
+                    SafeU53::ZERO
+                )
+                .is_err(),
+            "seed={seed} operation=network-packet-id-exhaustion rejects"
+        );
+        assert_eq!(
+            invalid_reorder.snapshot(),
+            before_packet_exhaustion,
+            "seed={seed} operation=network-packet-id-exhaustion is fail-atomic"
+        );
+        invalid_reorder
+            .generations
+            .insert(endpoints[0], ConnectionGeneration::new(SafeU53::MAX));
+        invalid_reorder
+            .generations
+            .insert(endpoints[1], ConnectionGeneration::new(SafeU53::MAX));
         let before_generation_exhaustion = invalid_reorder.snapshot();
-        assert!(invalid_reorder.reconnect(endpoints[0]).is_err(), "seed={seed} operation=network-generation-exhaustion rejects");
-        assert_eq!(invalid_reorder.snapshot(), before_generation_exhaustion, "seed={seed} operation=network-generation-exhaustion is fail-atomic");
+        assert!(
+            invalid_reorder.reconnect(endpoints[0]).is_err(),
+            "seed={seed} operation=network-generation-exhaustion rejects"
+        );
+        assert_eq!(
+            invalid_reorder.snapshot(),
+            before_generation_exhaustion,
+            "seed={seed} operation=network-generation-exhaustion is fail-atomic"
+        );
         let before_clock_overflow = clock.clone();
         clock.now_ms = SafeU53::MAX;
         let overflow_snapshot = clock.clone();
-        assert!(clock.advance(safe(1)).is_err(), "seed={seed} operation=clock-time-overflow rejects");
-        assert_eq!(clock, overflow_snapshot, "seed={seed} operation=clock-time-overflow is fail-atomic");
-        assert_ne!(before_clock_overflow, clock, "seed={seed} operation=clock-overflow fixture reached max boundary");
+        assert!(
+            clock.advance(safe(1)).is_err(),
+            "seed={seed} operation=clock-time-overflow rejects"
+        );
+        assert_eq!(
+            clock, overflow_snapshot,
+            "seed={seed} operation=clock-time-overflow is fail-atomic"
+        );
+        assert_ne!(
+            before_clock_overflow, clock,
+            "seed={seed} operation=clock-overflow fixture reached max boundary"
+        );
         clock.dispose();
         network.dispose();
-        assert!(clock.timers.is_empty(), "seed={seed} operation=clock-disposal no timers");
-        assert!(network.queue.is_empty(), "seed={seed} operation=network-disposal no queued packets");
-        assert!(network.reordered_packet_ids.is_empty(), "seed={seed} operation=network-disposal no reorder markers");
-        assert!(network.disconnected.is_empty() && network.suspended.is_empty(), "seed={seed} operation=network-disposal no endpoint resources");
-        assert!(network.snapshot().disposed, "seed={seed} operation=network-disposal disposed diagnostic");
+        assert!(
+            clock.timers.is_empty(),
+            "seed={seed} operation=clock-disposal no timers"
+        );
+        assert!(
+            network.queue.is_empty(),
+            "seed={seed} operation=network-disposal no queued packets"
+        );
+        assert!(
+            network.reordered_packet_ids.is_empty(),
+            "seed={seed} operation=network-disposal no reorder markers"
+        );
+        assert!(
+            network.disconnected.is_empty() && network.suspended.is_empty(),
+            "seed={seed} operation=network-disposal no endpoint resources"
+        );
+        assert!(
+            network.snapshot().disposed,
+            "seed={seed} operation=network-disposal disposed diagnostic"
+        );
     }
     Ok(())
 }
@@ -2160,13 +2682,17 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         let mut log = replay(seed, "authority-init", authority_log(capacity, &[(1, 4)]))?;
         let mut scheduler = KernelScheduler::new();
         let authority = replay(seed, "authority-context", authority_context())?;
-        let invalid = replay(seed, "invalid-draft", draft(
-            &authority,
-            &format!("invalid-{seed}"),
-            AuthorityEntryKind::TurnCommit,
-            json!({"epoch": 3, "wave": 4, "turn": 1}),
-            command_control(3, 4, 1, Vec::new()),
-        ))?;
+        let invalid = replay(
+            seed,
+            "invalid-draft",
+            draft(
+                &authority,
+                &format!("invalid-{seed}"),
+                AuthorityEntryKind::TurnCommit,
+                json!({"epoch": 3, "wave": 4, "turn": 1}),
+                command_control(3, 4, 1, Vec::new()),
+            ),
+        )?;
         assert!(
             matches!(
                 log.commit(invalid, &mut scheduler),
@@ -2181,14 +2707,22 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         );
 
         for value in 1..=capacity {
-            let commit_draft = replay(seed, format!("draft-{value}"), draft(
-                &authority,
-                &format!("operation-{seed}-{value}"),
-                AuthorityEntryKind::TurnCommit,
-                json!({"epoch": 3, "wave": 4, "turn": 1}),
-                command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-            ))?;
-            let outcome = replay(seed, format!("commit-{value}"), log.commit(commit_draft, &mut scheduler))?;
+            let commit_draft = replay(
+                seed,
+                format!("draft-{value}"),
+                draft(
+                    &authority,
+                    &format!("operation-{seed}-{value}"),
+                    AuthorityEntryKind::TurnCommit,
+                    json!({"epoch": 3, "wave": 4, "turn": 1}),
+                    command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
+                ),
+            )?;
+            let outcome = replay(
+                seed,
+                format!("commit-{value}"),
+                log.commit(commit_draft, &mut scheduler),
+            )?;
             assert_eq!(
                 outcome.entry.revision,
                 revision(value),
@@ -2214,13 +2748,17 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             );
         }
 
-        let overflow_draft = replay(seed, "capacity-overflow-draft", draft(
-            &authority,
-            &format!("overflow-{seed}"),
-            AuthorityEntryKind::TurnCommit,
-            json!({"epoch": 3, "wave": 4, "turn": 1}),
-            command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-        ))?;
+        let overflow_draft = replay(
+            seed,
+            "capacity-overflow-draft",
+            draft(
+                &authority,
+                &format!("overflow-{seed}"),
+                AuthorityEntryKind::TurnCommit,
+                json!({"epoch": 3, "wave": 4, "turn": 1}),
+                command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
+            ),
+        )?;
         let overflow = log.commit(overflow_draft, &mut scheduler);
         assert!(
             matches!(overflow, Err(er_protocol::AuthorityLogError::RetentionOverflow { attempted_revision, .. }) if attempted_revision == revision(capacity + 1)),
@@ -2258,14 +2796,20 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             "seed={seed} operation=recovery-slice recovery tail end"
         );
         let equal = log.recovery_slice(revision(capacity));
-        assert!(equal.is_some(), "seed={seed} operation=recovery-equal equal frontier recovery proof");
+        assert!(
+            equal.is_some(),
+            "seed={seed} operation=recovery-equal equal frontier recovery proof"
+        );
         assert_eq!(
             equal.as_ref().map(|slice| slice.required_tail.len()),
             Some(1),
             "seed={seed} operation=recovery-equal equal frontier reconstruction"
         );
         let _ = log.dispose("property teardown", &mut scheduler);
-        assert!(log.diagnostics().disposed, "seed={seed} operation=disposal disposed log");
+        assert!(
+            log.diagnostics().disposed,
+            "seed={seed} operation=disposal disposed log"
+        );
         assert!(
             log.retained().is_empty(),
             "seed={seed} operation=disposal retained entries after disposal"
@@ -2292,10 +2836,21 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
     )?)?;
     assert_eq!(prepared.token, safe(1), "seed=8 operation=prepared token");
-    assert_eq!(prepared_log.head_revision(), Revision::ZERO, "seed=8 operation=prepared head remains unpublished");
-    assert!(prepared_log.retained().is_empty(), "seed=8 operation=prepared retention remains unpublished");
+    assert_eq!(
+        prepared_log.head_revision(),
+        Revision::ZERO,
+        "seed=8 operation=prepared head remains unpublished"
+    );
+    assert!(
+        prepared_log.retained().is_empty(),
+        "seed=8 operation=prepared retention remains unpublished"
+    );
     let published = prepared_log.publish_prepared(prepared.token, &mut prepared_scheduler)?;
-    assert_eq!(published.entry.revision, revision(1), "seed=8 operation=publish revision");
+    assert_eq!(
+        published.entry.revision,
+        revision(1),
+        "seed=8 operation=publish revision"
+    );
     assert_authority_delivery_actions(&published.actions, &published.entry, &[1], 0, 8, "publish");
 
     let mut superseding_draft = draft(
@@ -2307,7 +2862,8 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
     )?;
     superseding_draft.subsumes = vec![revision(1)];
     let superseding = prepared_log.prepare_commit(superseding_draft)?;
-    let published_superseding = prepared_log.publish_prepared(superseding.token, &mut prepared_scheduler)?;
+    let published_superseding =
+        prepared_log.publish_prepared(superseding.token, &mut prepared_scheduler)?;
     assert_authority_delivery_actions(
         &published_superseding.actions,
         &published_superseding.entry,
@@ -2335,8 +2891,14 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         }],
         "seed=8 operation=supersession prior lease cancellation"
     );
-    assert!(prepared_log.retained_entry(revision(1)).is_none(), "seed=8 operation=supersession prior entry retired");
-    assert!(prepared_log.retained_entry(revision(2)).is_some(), "seed=8 operation=supersession successor retained");
+    assert!(
+        prepared_log.retained_entry(revision(1)).is_none(),
+        "seed=8 operation=supersession prior entry retired"
+    );
+    assert!(
+        prepared_log.retained_entry(revision(2)).is_some(),
+        "seed=8 operation=supersession successor retained"
+    );
     let rejected_prepared = prepared_log.prepare_commit(draft(
         &authority,
         "prepared-rejected",
@@ -2344,23 +2906,39 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         json!({"epoch": 3, "wave": 4, "turn": 1}),
         command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
     )?)?;
-    assert!(prepared_log.reject_prepared(rejected_prepared.token), "seed=8 operation=prepared-reject removes live preparation");
-    assert_eq!(prepared_log.head_revision(), revision(2), "seed=8 operation=prepared-reject head unchanged");
-    assert_eq!(prepared_log.diagnostics().delivery_timer_ids, BTreeSet::from([TimerId::new(safe(1))]), "seed=8 operation=prepared-reject live timer unchanged");
+    assert!(
+        prepared_log.reject_prepared(rejected_prepared.token),
+        "seed=8 operation=prepared-reject removes live preparation"
+    );
+    assert_eq!(
+        prepared_log.head_revision(),
+        revision(2),
+        "seed=8 operation=prepared-reject head unchanged"
+    );
+    assert_eq!(
+        prepared_log.diagnostics().delivery_timer_ids,
+        BTreeSet::from([TimerId::new(safe(1))]),
+        "seed=8 operation=prepared-reject live timer unchanged"
+    );
     let _ = prepared_log.dispose("prepared teardown", &mut prepared_scheduler);
-    assert!(prepared_scheduler.live_timers().is_empty(), "seed=8 operation=prepared-cleanup resources");
+    assert!(
+        prepared_scheduler.live_timers().is_empty(),
+        "seed=8 operation=prepared-cleanup resources"
+    );
 
     let mut log = authority_log(4, &[(1, 4), (2, 4)])?;
     let mut scheduler = KernelScheduler::new();
     let authority = authority_context()?;
-    let receipt_commit = log
-        .commit(draft(
+    let receipt_commit = log.commit(
+        draft(
             &authority,
             "receipt-operation",
             AuthorityEntryKind::TurnCommit,
             json!({"epoch": 3, "wave": 4, "turn": 1}),
             command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-        )?, &mut scheduler)?;
+        )?,
+        &mut scheduler,
+    )?;
     assert_authority_delivery_actions(
         &receipt_commit.actions,
         &receipt_commit.entry,
@@ -2386,7 +2964,10 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         AuthorityReceiptVerdict::Advanced { retired: false, waiting_for_seat_ids }
             if waiting_for_seat_ids == vec![seat(1), seat(2)]
     ));
-    assert!(admitted.actions.is_empty(), "seed=8 operation=receipt-admitted no retirement before quorum");
+    assert!(
+        admitted.actions.is_empty(),
+        "seed=8 operation=receipt-admitted no retirement before quorum"
+    );
     let duplicate = log.accept_receipt_detailed(
         receipt_for(&entry, 1, 4, AckStage::Admitted, None)?,
         &mut scheduler,
@@ -2400,13 +2981,7 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
     let before_mechanical_diagnostics = log.diagnostics();
     let before_mechanical_timers = scheduler.live_timers();
     let before_mechanical = log.accept_receipt_detailed(
-        receipt_for(
-            &entry,
-            1,
-            4,
-            AckStage::PresentationSettled,
-            None,
-        )?,
+        receipt_for(&entry, 1, 4, AckStage::PresentationSettled, None)?,
         &mut scheduler,
     );
     assert!(matches!(
@@ -2415,8 +2990,16 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             reason: ReceiptRejectReason::PresentationBeforeMechanical
         }
     ));
-    assert_eq!(log.diagnostics(), before_mechanical_diagnostics, "seed=8 operation=receipt-order rejected receipt atomic diagnostics");
-    assert_eq!(scheduler.live_timers(), before_mechanical_timers, "seed=8 operation=receipt-order rejected receipt atomic timers");
+    assert_eq!(
+        log.diagnostics(),
+        before_mechanical_diagnostics,
+        "seed=8 operation=receipt-order rejected receipt atomic diagnostics"
+    );
+    assert_eq!(
+        scheduler.live_timers(),
+        before_mechanical_timers,
+        "seed=8 operation=receipt-order rejected receipt atomic timers"
+    );
     let material = log.accept_receipt_detailed(
         receipt_for(&entry, 1, 4, AckStage::MaterialApplied, None)?,
         &mut scheduler,
@@ -2444,8 +3027,16 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             reason: ReceiptRejectReason::ControlIdMismatch
         }
     ));
-    assert_eq!(log.diagnostics(), before_wrong_control_diagnostics, "seed=8 operation=receipt-control rejected receipt atomic diagnostics");
-    assert_eq!(scheduler.live_timers(), before_wrong_control_timers, "seed=8 operation=receipt-control rejected receipt atomic timers");
+    assert_eq!(
+        log.diagnostics(),
+        before_wrong_control_diagnostics,
+        "seed=8 operation=receipt-control rejected receipt atomic diagnostics"
+    );
+    assert_eq!(
+        scheduler.live_timers(),
+        before_wrong_control_timers,
+        "seed=8 operation=receipt-control rejected receipt atomic timers"
+    );
     let installed_one = log.accept_receipt_detailed(
         receipt_for(
             &entry,
@@ -2462,13 +3053,7 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             if waiting_for_seat_ids == vec![seat(2)]
     ));
     let settled_one = log.accept_receipt_detailed(
-        receipt_for(
-            &entry,
-            1,
-            4,
-            AckStage::PresentationSettled,
-            None,
-        )?,
+        receipt_for(&entry, 1, 4, AckStage::PresentationSettled, None)?,
         &mut scheduler,
     );
     assert!(matches!(
@@ -2476,7 +3061,10 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
         AuthorityReceiptVerdict::Advanced { retired: false, waiting_for_seat_ids }
             if waiting_for_seat_ids == vec![seat(2)]
     ));
-    assert!(settled_one.actions.is_empty(), "seed=8 operation=receipt-presentation settlement does not retire before quorum");
+    assert!(
+        settled_one.actions.is_empty(),
+        "seed=8 operation=receipt-presentation settlement does not retire before quorum"
+    );
     let self_signed = log.accept_receipt_detailed(
         receipt_for(&entry, 0, 1, AckStage::Admitted, None)?,
         &mut scheduler,
@@ -2506,13 +3094,7 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
             if waiting_for_seat_ids == vec![seat(2)]
     ));
     let installed_two = log.accept_receipt_detailed(
-        receipt_for(
-            &entry,
-            2,
-            4,
-            AckStage::ControlInstalled,
-            Some(control_id),
-        )?,
+        receipt_for(&entry, 2, 4, AckStage::ControlInstalled, Some(control_id))?,
         &mut scheduler,
     );
     assert!(matches!(
@@ -2534,8 +3116,14 @@ fn authority_log_seeded_commit_receipt_and_recovery_properties() -> TestResult {
     assert!(log.peer_stage_quorum(&entry.operation_id, AckStage::ControlInstalled));
     assert!(log.diagnostics().delivery_timer_ids.is_empty());
     log.dispose("receipt teardown", &mut scheduler);
-    assert!(log.diagnostics().disposed, "seed=8 operation=receipt cleanup disposed log");
-    assert!(scheduler.live_timers().is_empty(), "seed=8 operation=receipt cleanup resources");
+    assert!(
+        log.diagnostics().disposed,
+        "seed=8 operation=receipt cleanup disposed log"
+    );
+    assert!(
+        scheduler.live_timers().is_empty(),
+        "seed=8 operation=receipt cleanup resources"
+    );
     Ok(())
 }
 
@@ -2545,14 +3133,22 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         let mut log = replay(seed, "authority-timer-init", authority_log(4, &[(1, 4)]))?;
         let mut scheduler = KernelScheduler::new();
         let authority = replay(seed, "authority-timer-context", authority_context())?;
-        let timer_draft = replay(seed, "authority-timer-draft", draft(
+        let timer_draft = replay(
+            seed,
+            "authority-timer-draft",
+            draft(
                 &authority,
                 &format!("authority-timer-{seed}"),
                 AuthorityEntryKind::TurnCommit,
                 json!({"epoch": 3, "wave": 4, "turn": 1}),
                 command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-            ))?;
-        let outcome = replay(seed, "authority-timer-commit", log.commit(timer_draft, &mut scheduler))?;
+            ),
+        )?;
+        let outcome = replay(
+            seed,
+            "authority-timer-commit",
+            log.commit(timer_draft, &mut scheduler),
+        )?;
         assert_authority_delivery_actions(
             &outcome.actions,
             &outcome.entry,
@@ -2568,34 +3164,46 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
             other => {
                 return Err(missing(format!(
                     "seed={seed} operation=0 authority schedule index was {other:?}"
-                )))
+                )));
             }
         };
-        let unauthorized_draft = replay(seed, "authority-unauthorized-draft", draft(
+        let unauthorized_draft = replay(
+            seed,
+            "authority-unauthorized-draft",
+            draft(
                 &authority,
                 &format!("authority-unauthorized-successor-{seed}"),
                 AuthorityEntryKind::TurnCommit,
                 json!({"epoch": 3, "wave": 4, "turn": 4}),
                 command_control(3, 4, 4, vec![command_target(0, 0, 7)]),
-            ))?;
-        let unauthorized_successor = log.commit(
-            unauthorized_draft,
-            &mut scheduler,
+            ),
+        )?;
+        let unauthorized_successor = log.commit(unauthorized_draft, &mut scheduler);
+        assert!(
+            matches!(
+                unauthorized_successor,
+                Err(er_protocol::AuthorityLogError::SuccessorRejected)
+            ),
+            "seed={seed} operation=1 predecessor successor authorization"
         );
-        assert!(matches!(
-            unauthorized_successor,
-            Err(er_protocol::AuthorityLogError::SuccessorRejected)
-        ), "seed={seed} operation=1 predecessor successor authorization");
-        assert_eq!(log.head_revision(), revision(1), "seed={seed} operation=1 successor rejection preserves frontier");
+        assert_eq!(
+            log.head_revision(),
+            revision(1),
+            "seed={seed} operation=1 successor rejection preserves frontier"
+        );
         let live_before_rebind = scheduler.live_timers();
 
-        let rebound = replay(seed, "authority-rebind", log.rebind_connection(
-            replay(seed, "authority-rebind-context", context(0, 0, 2, 2, 3))?,
-            vec![er_protocol::PeerBinding {
-                seat_id: seat(1),
-                connection_generation: generation(5),
-            }],
-        ))?;
+        let rebound = replay(
+            seed,
+            "authority-rebind",
+            log.rebind_connection(
+                replay(seed, "authority-rebind-context", context(0, 0, 2, 2, 3))?,
+                vec![er_protocol::PeerBinding {
+                    seat_id: seat(1),
+                    connection_generation: generation(5),
+                }],
+            ),
+        )?;
         assert_eq!(
             rebound.retained_count,
             safe(1),
@@ -2613,21 +3221,40 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
             seed,
             "authority-rebind-delivery",
         );
-        let unchanged_context = replay(seed, "authority-rebind-unchanged-context", context(0, 0, 2, 2, 3))?;
-        let unchanged_rebind = replay(seed, "authority-rebind-unchanged", log.rebind_connection(
-            unchanged_context,
-            vec![er_protocol::PeerBinding {
-                seat_id: seat(1),
-                connection_generation: generation(5),
-            }],
-        ))?;
-        assert_eq!(unchanged_rebind.retained_count, SafeU53::ZERO, "seed={seed} operation=1b unchanged rebind count");
-        assert!(unchanged_rebind.actions.is_empty(), "seed={seed} operation=1b unchanged rebind actions");
+        let unchanged_context = replay(
+            seed,
+            "authority-rebind-unchanged-context",
+            context(0, 0, 2, 2, 3),
+        )?;
+        let unchanged_rebind = replay(
+            seed,
+            "authority-rebind-unchanged",
+            log.rebind_connection(
+                unchanged_context,
+                vec![er_protocol::PeerBinding {
+                    seat_id: seat(1),
+                    connection_generation: generation(5),
+                }],
+            ),
+        )?;
+        assert_eq!(
+            unchanged_rebind.retained_count,
+            SafeU53::ZERO,
+            "seed={seed} operation=1b unchanged rebind count"
+        );
+        assert!(
+            unchanged_rebind.actions.is_empty(),
+            "seed={seed} operation=1b unchanged rebind actions"
+        );
         let before_invalid_rebind = log.diagnostics();
         let before_invalid_rebind_scheduler = scheduler_snapshot(&scheduler);
         assert!(
             log.rebind_connection(
-                replay(seed, "authority-invalid-rebind-context", context(0, 0, 1, 2, 3))?,
+                replay(
+                    seed,
+                    "authority-invalid-rebind-context",
+                    context(0, 0, 1, 2, 3)
+                )?,
                 vec![er_protocol::PeerBinding {
                     seat_id: seat(1),
                     connection_generation: generation(4),
@@ -2648,18 +3275,32 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
         );
 
         let stale_receipt = log.accept_receipt_detailed(
-            replay(seed, "authority-stale-receipt", receipt_for(&outcome.entry, 1, 3, AckStage::Admitted, None))?,
+            replay(
+                seed,
+                "authority-stale-receipt",
+                receipt_for(&outcome.entry, 1, 3, AckStage::Admitted, None),
+            )?,
             &mut scheduler,
         );
-        assert!(matches!(
-            stale_receipt.verdict,
-            AuthorityReceiptVerdict::Rejected {
-                reason: ReceiptRejectReason::ConnectionGenerationMismatch
-            }
-        ), "seed={seed} operation=2 stale receipt generation");
-        assert!(stale_receipt.actions.is_empty(), "seed={seed} operation=2 stale receipt has no action");
+        assert!(
+            matches!(
+                stale_receipt.verdict,
+                AuthorityReceiptVerdict::Rejected {
+                    reason: ReceiptRejectReason::ConnectionGenerationMismatch
+                }
+            ),
+            "seed={seed} operation=2 stale receipt generation"
+        );
+        assert!(
+            stale_receipt.actions.is_empty(),
+            "seed={seed} operation=2 stale receipt has no action"
+        );
 
-        let removed_timer = replay(seed, "authority-fire-timer", fire_exact_timer(&mut scheduler, &timer, seed, 3))?;
+        let removed_timer = replay(
+            seed,
+            "authority-fire-timer",
+            fire_exact_timer(&mut scheduler, &timer, seed, 3),
+        )?;
         let mut invalid_timer = removed_timer.clone();
         invalid_timer.delay_ms = safe(251);
         let before_invalid_timer = log.diagnostics();
@@ -2678,86 +3319,271 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
             before_invalid_timer_scheduler,
             "seed={seed} operation=3 stale delivery timer preserves complete scheduler resources"
         );
-        let actions = replay(seed, "authority-timer-continuation", log.timer_fired(removed_timer, &mut scheduler))?;
-        assert_eq!(actions.len(), 2, "seed={seed} operation=4 continuation schedule precedes delivery");
+        let actions = replay(
+            seed,
+            "authority-timer-continuation",
+            log.timer_fired(removed_timer, &mut scheduler),
+        )?;
+        assert_eq!(
+            actions.len(),
+            2,
+            "seed={seed} operation=4 continuation schedule precedes delivery"
+        );
         let continuation = match &actions[0] {
-            AuthorityLogAction::Scheduler { command: SchedulerCommand::Schedule { timer } } => timer,
+            AuthorityLogAction::Scheduler {
+                command: SchedulerCommand::Schedule { timer },
+            } => timer,
             other => panic!("seed={seed} operation=4 continuation first action was {other:?}"),
         };
-        assert_eq!(continuation.timer_id, TimerId::new(safe(1)), "seed={seed} operation=4 continuation timer id");
-        assert_eq!(continuation.endpoint, seat(0), "seed={seed} operation=4 continuation endpoint");
-        assert_eq!(continuation.owner, timer_owner("authority-v2-property:delivery:1", "authority-log/delivery/1", "redeliver revision 1 until mechanical quorum"), "seed={seed} operation=4 continuation owner");
-        assert_eq!(continuation.delay_ms, safe(500), "seed={seed} operation=4 continuation delay");
-        assert_eq!(continuation.time_class, TimeClass::Connected, "seed={seed} operation=4 continuation class");
-        assert_authority_delivery_only(&actions[1..], &outcome.entry, &[1], seed, "authority-timer-delivery");
-        let next = replay(seed, "authority-fire-attempt-2", fire_exact_timer(&mut scheduler, continuation, seed, 5))?;
-        let attempt_two = replay(seed, "authority-attempt-2", log.timer_fired(next, &mut scheduler))?;
-        assert_eq!(attempt_two.len(), 2, "seed={seed} operation=5 retry schedule precedes delivery");
+        assert_eq!(
+            continuation.timer_id,
+            TimerId::new(safe(1)),
+            "seed={seed} operation=4 continuation timer id"
+        );
+        assert_eq!(
+            continuation.endpoint,
+            seat(0),
+            "seed={seed} operation=4 continuation endpoint"
+        );
+        assert_eq!(
+            continuation.owner,
+            timer_owner(
+                "authority-v2-property:delivery:1",
+                "authority-log/delivery/1",
+                "redeliver revision 1 until mechanical quorum"
+            ),
+            "seed={seed} operation=4 continuation owner"
+        );
+        assert_eq!(
+            continuation.delay_ms,
+            safe(500),
+            "seed={seed} operation=4 continuation delay"
+        );
+        assert_eq!(
+            continuation.time_class,
+            TimeClass::Connected,
+            "seed={seed} operation=4 continuation class"
+        );
+        assert_authority_delivery_only(
+            &actions[1..],
+            &outcome.entry,
+            &[1],
+            seed,
+            "authority-timer-delivery",
+        );
+        let next = replay(
+            seed,
+            "authority-fire-attempt-2",
+            fire_exact_timer(&mut scheduler, continuation, seed, 5),
+        )?;
+        let attempt_two = replay(
+            seed,
+            "authority-attempt-2",
+            log.timer_fired(next, &mut scheduler),
+        )?;
+        assert_eq!(
+            attempt_two.len(),
+            2,
+            "seed={seed} operation=5 retry schedule precedes delivery"
+        );
         let attempt_two_timer = match &attempt_two[0] {
-            AuthorityLogAction::Scheduler { command: SchedulerCommand::Schedule { timer } } => timer,
+            AuthorityLogAction::Scheduler {
+                command: SchedulerCommand::Schedule { timer },
+            } => timer,
             other => panic!("seed={seed} operation=5 retry first action was {other:?}"),
         };
-        assert_eq!(attempt_two_timer.timer_id, TimerId::new(safe(2)), "seed={seed} operation=5 retry timer id");
-        assert_eq!(attempt_two_timer.endpoint, seat(0), "seed={seed} operation=5 retry endpoint");
-        assert_eq!(attempt_two_timer.owner, timer_owner("authority-v2-property:delivery:1", "authority-log/delivery/1", "redeliver revision 1 until mechanical quorum"), "seed={seed} operation=5 retry owner");
-        assert_eq!(attempt_two_timer.delay_ms, safe(1_000), "seed={seed} operation=5 retry delay");
-        assert_eq!(attempt_two_timer.time_class, TimeClass::Connected, "seed={seed} operation=5 retry class");
-        assert_authority_delivery_only(&attempt_two[1..], &outcome.entry, &[1], seed, "authority-attempt-2-delivery");
-        let next = replay(seed, "authority-fire-attempt-3", fire_exact_timer(&mut scheduler, attempt_two_timer, seed, 6))?;
-        let attempt_three = replay(seed, "authority-attempt-3", log.timer_fired(next, &mut scheduler))?;
-        assert_eq!(attempt_three.len(), 2, "seed={seed} operation=6 retry schedule precedes delivery");
+        assert_eq!(
+            attempt_two_timer.timer_id,
+            TimerId::new(safe(2)),
+            "seed={seed} operation=5 retry timer id"
+        );
+        assert_eq!(
+            attempt_two_timer.endpoint,
+            seat(0),
+            "seed={seed} operation=5 retry endpoint"
+        );
+        assert_eq!(
+            attempt_two_timer.owner,
+            timer_owner(
+                "authority-v2-property:delivery:1",
+                "authority-log/delivery/1",
+                "redeliver revision 1 until mechanical quorum"
+            ),
+            "seed={seed} operation=5 retry owner"
+        );
+        assert_eq!(
+            attempt_two_timer.delay_ms,
+            safe(1_000),
+            "seed={seed} operation=5 retry delay"
+        );
+        assert_eq!(
+            attempt_two_timer.time_class,
+            TimeClass::Connected,
+            "seed={seed} operation=5 retry class"
+        );
+        assert_authority_delivery_only(
+            &attempt_two[1..],
+            &outcome.entry,
+            &[1],
+            seed,
+            "authority-attempt-2-delivery",
+        );
+        let next = replay(
+            seed,
+            "authority-fire-attempt-3",
+            fire_exact_timer(&mut scheduler, attempt_two_timer, seed, 6),
+        )?;
+        let attempt_three = replay(
+            seed,
+            "authority-attempt-3",
+            log.timer_fired(next, &mut scheduler),
+        )?;
+        assert_eq!(
+            attempt_three.len(),
+            2,
+            "seed={seed} operation=6 retry schedule precedes delivery"
+        );
         let attempt_three_timer = match &attempt_three[0] {
-            AuthorityLogAction::Scheduler { command: SchedulerCommand::Schedule { timer } } => timer,
+            AuthorityLogAction::Scheduler {
+                command: SchedulerCommand::Schedule { timer },
+            } => timer,
             other => panic!("seed={seed} operation=6 retry first action was {other:?}"),
         };
-        assert_eq!(attempt_three_timer.timer_id, TimerId::new(safe(3)), "seed={seed} operation=6 retry timer id");
-        assert_eq!(attempt_three_timer.endpoint, seat(0), "seed={seed} operation=6 retry endpoint");
-        assert_eq!(attempt_three_timer.owner, timer_owner("authority-v2-property:delivery:1", "authority-log/delivery/1", "redeliver revision 1 until mechanical quorum"), "seed={seed} operation=6 retry owner");
-        assert_eq!(attempt_three_timer.delay_ms, safe(2_000), "seed={seed} operation=6 retry delay");
-        assert_eq!(attempt_three_timer.time_class, TimeClass::Connected, "seed={seed} operation=6 retry class");
-        assert_authority_delivery_only(&attempt_three[1..], &outcome.entry, &[1], seed, "authority-attempt-3-delivery");
-        let next = replay(seed, "authority-fire-attempt-4", fire_exact_timer(&mut scheduler, attempt_three_timer, seed, 7))?;
-        let terminal_attempt = replay(seed, "authority-attempt-4", log.timer_fired(next, &mut scheduler))?;
-        assert_eq!(terminal_attempt.len(), 1, "seed={seed} operation=7 exhausted retry emits delivery only");
-        assert_authority_delivery_only(&terminal_attempt, &outcome.entry, &[1], seed, "authority-attempt-4-delivery");
-        assert!(scheduler.live_timers().is_empty(), "seed={seed} operation=7 exhausted retry resources");
+        assert_eq!(
+            attempt_three_timer.timer_id,
+            TimerId::new(safe(3)),
+            "seed={seed} operation=6 retry timer id"
+        );
+        assert_eq!(
+            attempt_three_timer.endpoint,
+            seat(0),
+            "seed={seed} operation=6 retry endpoint"
+        );
+        assert_eq!(
+            attempt_three_timer.owner,
+            timer_owner(
+                "authority-v2-property:delivery:1",
+                "authority-log/delivery/1",
+                "redeliver revision 1 until mechanical quorum"
+            ),
+            "seed={seed} operation=6 retry owner"
+        );
+        assert_eq!(
+            attempt_three_timer.delay_ms,
+            safe(2_000),
+            "seed={seed} operation=6 retry delay"
+        );
+        assert_eq!(
+            attempt_three_timer.time_class,
+            TimeClass::Connected,
+            "seed={seed} operation=6 retry class"
+        );
+        assert_authority_delivery_only(
+            &attempt_three[1..],
+            &outcome.entry,
+            &[1],
+            seed,
+            "authority-attempt-3-delivery",
+        );
+        let next = replay(
+            seed,
+            "authority-fire-attempt-4",
+            fire_exact_timer(&mut scheduler, attempt_three_timer, seed, 7),
+        )?;
+        let terminal_attempt = replay(
+            seed,
+            "authority-attempt-4",
+            log.timer_fired(next, &mut scheduler),
+        )?;
+        assert_eq!(
+            terminal_attempt.len(),
+            1,
+            "seed={seed} operation=7 exhausted retry emits delivery only"
+        );
+        assert_authority_delivery_only(
+            &terminal_attempt,
+            &outcome.entry,
+            &[1],
+            seed,
+            "authority-attempt-4-delivery",
+        );
+        assert!(
+            scheduler.live_timers().is_empty(),
+            "seed={seed} operation=7 exhausted retry resources"
+        );
 
         let _ = log.dispose("seed teardown", &mut scheduler);
-        assert!(scheduler.live_timers().is_empty(), "seed={seed} operation=5 disposal resource zero");
+        assert!(
+            scheduler.live_timers().is_empty(),
+            "seed={seed} operation=5 disposal resource zero"
+        );
 
         let mut failed_scheduler = KernelScheduler::new();
         let _ = failed_scheduler.dispose();
-        let mut rollback_log = replay(seed, "authority-rollback-init", authority_log(2, &[(1, 4)]))?;
-        let failed_draft = replay(seed, "authority-rollback-draft", draft(
+        let mut rollback_log =
+            replay(seed, "authority-rollback-init", authority_log(2, &[(1, 4)]))?;
+        let failed_draft = replay(
+            seed,
+            "authority-rollback-draft",
+            draft(
                 &authority,
                 &format!("authority-rollback-{seed}"),
                 AuthorityEntryKind::TurnCommit,
                 json!({"epoch": 3, "wave": 4, "turn": 1}),
                 command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-            ))?;
+            ),
+        )?;
         let failed = rollback_log.commit(failed_draft, &mut failed_scheduler);
-        assert!(matches!(
-            failed,
-            Err(er_protocol::AuthorityLogError::Scheduler(
-                SchedulerError::Disposed
-            ))
-        ), "seed={seed} operation=6 schedule exhaustion error");
-        assert_eq!(rollback_log.head_revision(), Revision::ZERO, "seed={seed} operation=6 revision rollback");
-        assert!(rollback_log.retained().is_empty(), "seed={seed} operation=6 retention rollback");
-        assert!(rollback_log.diagnostics().delivery_timer_ids.is_empty(), "seed={seed} operation=6 timer rollback");
+        assert!(
+            matches!(
+                failed,
+                Err(er_protocol::AuthorityLogError::Scheduler(
+                    SchedulerError::Disposed
+                ))
+            ),
+            "seed={seed} operation=6 schedule exhaustion error"
+        );
+        assert_eq!(
+            rollback_log.head_revision(),
+            Revision::ZERO,
+            "seed={seed} operation=6 revision rollback"
+        );
+        assert!(
+            rollback_log.retained().is_empty(),
+            "seed={seed} operation=6 retention rollback"
+        );
+        assert!(
+            rollback_log.diagnostics().delivery_timer_ids.is_empty(),
+            "seed={seed} operation=6 timer rollback"
+        );
 
         let mut retry_scheduler = KernelScheduler::new();
-        let retry_draft = replay(seed, "authority-rollback-retry-draft", draft(
+        let retry_draft = replay(
+            seed,
+            "authority-rollback-retry-draft",
+            draft(
                 &authority,
                 &format!("authority-rollback-retry-{seed}"),
                 AuthorityEntryKind::TurnCommit,
                 json!({"epoch": 3, "wave": 4, "turn": 1}),
                 command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
-            ))?;
-        let retry = replay(seed, "authority-rollback-retry-commit", rollback_log.commit(retry_draft, &mut retry_scheduler))?;
-        assert_eq!(retry.entry.revision, revision(1), "seed={seed} operation=7 retry revision");
+            ),
+        )?;
+        let retry = replay(
+            seed,
+            "authority-rollback-retry-commit",
+            rollback_log.commit(retry_draft, &mut retry_scheduler),
+        )?;
+        assert_eq!(
+            retry.entry.revision,
+            revision(1),
+            "seed={seed} operation=7 retry revision"
+        );
         let _ = rollback_log.dispose("retry teardown", &mut retry_scheduler);
-        assert!(retry_scheduler.live_timers().is_empty(), "seed={seed} operation=7 retry disposal");
+        assert!(
+            retry_scheduler.live_timers().is_empty(),
+            "seed={seed} operation=7 retry disposal"
+        );
     }
     Ok(())
 }
@@ -2766,7 +3592,11 @@ fn authority_scheduler_continuations_rebind_and_schedule_failure_are_atomic() ->
 fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() -> TestResult {
     for seed in 0..10_u64 {
         let mut replica = replay(seed, "replica-init", replica())?;
-        let first = replay(seed, "replica-entry-1", replica_entry(1, &format!("replica-{seed}-1")))?;
+        let first = replay(
+            seed,
+            "replica-entry-1",
+            replica_entry(1, &format!("replica-{seed}-1")),
+        )?;
         let admitted = replica.admit(first.clone());
         assert!(
             matches!(
@@ -2812,7 +3642,13 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
         let material = replica
             .material_result(revision(1), MaterialApplicationOutcome::Applied)
             .map_err(|error| missing(format!("seed={seed} operation=material-2: {error}")))?;
-        assert_replica_material_actions(&material, &first, GOLDEN_REPLICA_CONTROL_ID, seed, "material-2");
+        assert_replica_material_actions(
+            &material,
+            &first,
+            GOLDEN_REPLICA_CONTROL_ID,
+            seed,
+            "material-2",
+        );
         assert_eq!(
             replica.frontier(),
             AuthorityFrontier {
@@ -2851,15 +3687,26 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
         );
         assert_replica_frontier_invariants(&replica, seed, "control-deferred");
         let control_id = GOLDEN_REPLICA_CONTROL_ID.to_owned();
-        assert_eq!(control_id_of(&first.next_control), GOLDEN_REPLICA_CONTROL_ID, "seed={seed} operation=control-id golden identity");
-        let installed = replica.control_result(
-            revision(1),
-            ControlProjectionOutcome::Installed {
-                control_id: control_id.clone(),
-            },
-        )
-        .map_err(|error| missing(format!("seed={seed} operation=control-2: {error}")))?;
-        assert_replica_control_actions(&installed, &first, GOLDEN_REPLICA_CONTROL_ID, seed, "control-2");
+        assert_eq!(
+            control_id_of(&first.next_control),
+            GOLDEN_REPLICA_CONTROL_ID,
+            "seed={seed} operation=control-id golden identity"
+        );
+        let installed = replica
+            .control_result(
+                revision(1),
+                ControlProjectionOutcome::Installed {
+                    control_id: control_id.clone(),
+                },
+            )
+            .map_err(|error| missing(format!("seed={seed} operation=control-2: {error}")))?;
+        assert_replica_control_actions(
+            &installed,
+            &first,
+            GOLDEN_REPLICA_CONTROL_ID,
+            seed,
+            "control-2",
+        );
         assert_eq!(
             replica.frontier(),
             AuthorityFrontier {
@@ -2877,22 +3724,53 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
 
         let pending_presentation = replica
             .presentation_result(revision(1), PresentationProbeOutcome::Pending)
-            .map_err(|error| missing(format!("seed={seed} operation=presentation-pending: {error}")))?;
-        assert!(pending_presentation.is_empty(), "seed={seed} operation=presentation-pending no receipt");
+            .map_err(|error| {
+                missing(format!(
+                    "seed={seed} operation=presentation-pending: {error}"
+                ))
+            })?;
+        assert!(
+            pending_presentation.is_empty(),
+            "seed={seed} operation=presentation-pending no receipt"
+        );
         let settled_presentation = replica
             .presentation_result(revision(1), PresentationProbeOutcome::Settled)
-            .map_err(|error| missing(format!("seed={seed} operation=presentation-settled: {error}")))?;
+            .map_err(|error| {
+                missing(format!(
+                    "seed={seed} operation=presentation-settled: {error}"
+                ))
+            })?;
         match settled_presentation.as_slice() {
             [ReplicaAction::EmitReceipt { receipt }] => {
-                assert_eq!(receipt.revision, revision(1), "seed={seed} operation=presentation-settled revision");
-                assert_eq!(receipt.operation_id, first.operation_id, "seed={seed} operation=presentation-settled operation");
-                assert_eq!(receipt.stage, AckStage::PresentationSettled, "seed={seed} operation=presentation-settled stage");
-                assert_eq!(receipt.control_id, None, "seed={seed} operation=presentation-settled control id");
+                assert_eq!(
+                    receipt.revision,
+                    revision(1),
+                    "seed={seed} operation=presentation-settled revision"
+                );
+                assert_eq!(
+                    receipt.operation_id, first.operation_id,
+                    "seed={seed} operation=presentation-settled operation"
+                );
+                assert_eq!(
+                    receipt.stage,
+                    AckStage::PresentationSettled,
+                    "seed={seed} operation=presentation-settled stage"
+                );
+                assert_eq!(
+                    receipt.control_id, None,
+                    "seed={seed} operation=presentation-settled control id"
+                );
             }
-            other => panic!("seed={seed} operation=presentation-settled action order was {other:?}"),
+            other => {
+                panic!("seed={seed} operation=presentation-settled action order was {other:?}")
+            }
         }
 
-        let second = replay(seed, "replica-entry-2", replica_entry(2, &format!("replica-{seed}-2")))?;
+        let second = replay(
+            seed,
+            "replica-entry-2",
+            replica_entry(2, &format!("replica-{seed}-2")),
+        )?;
         let second_admission = replica.admit(second.clone());
         assert!(
             matches!(
@@ -2903,7 +3781,11 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
         );
         assert_replica_admitted_actions(&second_admission.actions, &second, seed, "admit-4");
         assert_replica_frontier_invariants(&replica, seed, "second-admitted");
-        let conflict = replay(seed, "replica-entry-conflict", replica_entry(2, &format!("replica-{seed}-conflict")))?;
+        let conflict = replay(
+            seed,
+            "replica-entry-conflict",
+            replica_entry(2, &format!("replica-{seed}-conflict")),
+        )?;
         let before_conflict = replica.diagnostics();
         let conflict_step = replica.admit(conflict);
         assert!(
@@ -2915,9 +3797,20 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
             ),
             "seed={seed} operation=admit-5 same-revision conflict"
         );
-        assert!(conflict_step.actions.is_empty(), "seed={seed} operation=admit-5 conflict has no action");
-        assert_eq!(replica.diagnostics(), before_conflict, "seed={seed} operation=admit-5 conflict fail-atomic snapshot");
-        let blocked_entry = replay(seed, "replica-entry-3", replica_entry(3, &format!("replica-{seed}-3")))?;
+        assert!(
+            conflict_step.actions.is_empty(),
+            "seed={seed} operation=admit-5 conflict has no action"
+        );
+        assert_eq!(
+            replica.diagnostics(),
+            before_conflict,
+            "seed={seed} operation=admit-5 conflict fail-atomic snapshot"
+        );
+        let blocked_entry = replay(
+            seed,
+            "replica-entry-3",
+            replica_entry(3, &format!("replica-{seed}-3")),
+        )?;
         let blocked = replica.admit(blocked_entry);
         assert!(
             matches!(blocked.admission, ReplicaAdmission::Gap { missing_from } if missing_from == revision(2)),
@@ -2936,30 +3829,52 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
         let second_material = replica
             .material_result(revision(2), MaterialApplicationOutcome::Applied)
             .map_err(|error| missing(format!("seed={seed} operation=second-material: {error}")))?;
-        assert_replica_material_actions(&second_material, &second, GOLDEN_REPLICA_CONTROL_ID, seed, "second-material");
+        assert_replica_material_actions(
+            &second_material,
+            &second,
+            GOLDEN_REPLICA_CONTROL_ID,
+            seed,
+            "second-material",
+        );
         assert_replica_frontier_invariants(&replica, seed, "second-material-applied");
-        let still_blocked_entry = replay(seed, "replica-entry-3b", replica_entry(3, &format!("replica-{seed}-3b")))?;
+        let still_blocked_entry = replay(
+            seed,
+            "replica-entry-3b",
+            replica_entry(3, &format!("replica-{seed}-3b")),
+        )?;
         let still_blocked = replica.admit(still_blocked_entry);
         assert!(
             matches!(still_blocked.admission, ReplicaAdmission::Gap { missing_from } if missing_from == revision(2)),
             "seed={seed} operation=admit-7 N+1 blocked while N control pending"
         );
-        assert!(still_blocked.actions.is_empty(), "seed={seed} operation=admit-7 coalesced gap request");
+        assert!(
+            still_blocked.actions.is_empty(),
+            "seed={seed} operation=admit-7 coalesced gap request"
+        );
         assert_replica_frontier_invariants(&replica, seed, "gap-before-control");
-        let second_control = replica.control_result(
-            revision(2),
-            ControlProjectionOutcome::Installed {
-                control_id: GOLDEN_REPLICA_CONTROL_ID.to_owned(),
-            },
-        )
-        .map_err(|error| missing(format!("seed={seed} operation=second-control: {error}")))?;
-        assert_replica_control_actions(&second_control, &second, GOLDEN_REPLICA_CONTROL_ID, seed, "second-control");
-        let third_entry = replay(seed, "replica-entry-3c", replica_entry(3, &format!("replica-{seed}-3c")))?;
+        let second_control = replica
+            .control_result(
+                revision(2),
+                ControlProjectionOutcome::Installed {
+                    control_id: GOLDEN_REPLICA_CONTROL_ID.to_owned(),
+                },
+            )
+            .map_err(|error| missing(format!("seed={seed} operation=second-control: {error}")))?;
+        assert_replica_control_actions(
+            &second_control,
+            &second,
+            GOLDEN_REPLICA_CONTROL_ID,
+            seed,
+            "second-control",
+        );
+        let third_entry = replay(
+            seed,
+            "replica-entry-3c",
+            replica_entry(3, &format!("replica-{seed}-3c")),
+        )?;
         assert!(
             matches!(
-                replica
-                    .admit(third_entry)
-                    .admission,
+                replica.admit(third_entry).admission,
                 ReplicaAdmission::Admitted { .. }
             ),
             "seed={seed} operation=admit-8 successor unblocked after control"
@@ -3036,10 +3951,8 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
     let mut direct_stage = replica()?;
     let direct_entry = replica_entry(1, "replica-direct-stage")?;
     let _ = direct_stage.admit(direct_entry.clone());
-    let direct_material = direct_stage.record_replica_stage(
-        &direct_entry,
-        ReplicaMechanicalStage::MaterialApplied,
-    )?;
+    let direct_material = direct_stage
+        .record_replica_stage(&direct_entry, ReplicaMechanicalStage::MaterialApplied)?;
     assert_replica_material_actions(
         &direct_material,
         &direct_entry,
@@ -3089,15 +4002,30 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
     assert!(coalesced.actions.is_empty());
     assert_replica_frontier_invariants(&fresh, 10, "gap-coalesced");
     fresh.dispose("fresh gap teardown");
-    assert!(fresh.diagnostics().disposed, "seed=10 operation=fresh-cleanup disposed replica");
+    assert!(
+        fresh.diagnostics().disposed,
+        "seed=10 operation=fresh-cleanup disposed replica"
+    );
 
     let mut recovered = replica()?;
     let recovered_entry = replica_entry(7, "recovered-7")?;
     let stage_actions = recovered.stage_recovered_frontier(recovered_entry.clone())?;
     match stage_actions.as_slice() {
-        [ReplicaAction::ProjectControl { entry, expected_control_id }] => {
-            assert_eq!(entry, &recovered_entry, "seed=11 operation=recovery-stage full final entry");
-            assert_eq!(expected_control_id.as_str(), GOLDEN_REPLICA_CONTROL_ID, "seed=11 operation=recovery-stage exact control id");
+        [
+            ReplicaAction::ProjectControl {
+                entry,
+                expected_control_id,
+            },
+        ] => {
+            assert_eq!(
+                entry, &recovered_entry,
+                "seed=11 operation=recovery-stage full final entry"
+            );
+            assert_eq!(
+                expected_control_id.as_str(),
+                GOLDEN_REPLICA_CONTROL_ID,
+                "seed=11 operation=recovery-stage exact control id"
+            );
         }
         other => panic!("seed=11 operation=recovery-stage action order was {other:?}"),
     }
@@ -3128,7 +4056,10 @@ fn replica_seeded_pipeline_has_one_incomplete_entry_and_monotonic_frontiers() ->
     assert_eq!(recovered.control_installed_through(), revision(7));
     assert_replica_frontier_invariants(&recovered, 11, "recovery-installed");
     recovered.dispose("recovery replica teardown");
-    assert!(recovered.diagnostics().disposed, "seed=11 operation=recovery-cleanup disposed replica");
+    assert!(
+        recovered.diagnostics().disposed,
+        "seed=11 operation=recovery-cleanup disposed replica"
+    );
 
     let mut rebound = replica()?;
     let original_frontier = rebound.frontier();
@@ -3213,9 +4144,17 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
     );
 
     for seed in 0..12_u64 {
-        let mut ledger = replay(seed, "proposal-ledger-init", ProposalAdmissionLedger::new(safe(3)))?;
+        let mut ledger = replay(
+            seed,
+            "proposal-ledger-init",
+            ProposalAdmissionLedger::new(safe(3)),
+        )?;
         for ordinal in 0..3_u64 {
-            let proposal_operation = replay(seed, format!("proposal-operation-{ordinal}"), operation(&format!("proposal-{seed}-{ordinal}")))?;
+            let proposal_operation = replay(
+                seed,
+                format!("proposal-operation-{ordinal}"),
+                operation(&format!("proposal-{seed}-{ordinal}")),
+            )?;
             let proposal = ProposalIdentity {
                 operation_id: proposal_operation,
                 fingerprint: format!("fingerprint-{}", (seed + ordinal) % 4),
@@ -3246,7 +4185,11 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
             );
         }
         let full = ProposalIdentity {
-            operation_id: replay(seed, "proposal-full-operation", operation(&format!("proposal-{seed}-full")))?,
+            operation_id: replay(
+                seed,
+                "proposal-full-operation",
+                operation(&format!("proposal-{seed}-full")),
+            )?,
             fingerprint: "new".to_owned(),
         };
         assert_eq!(
@@ -3254,15 +4197,27 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
             ProposalAdmission::CapacityExhausted,
             "seed={seed} operation=capacity capacity"
         );
-        assert_eq!(ledger.len(), safe(3), "seed={seed} operation=capacity non-evicting capacity");
+        assert_eq!(
+            ledger.len(),
+            safe(3),
+            "seed={seed} operation=capacity non-evicting capacity"
+        );
         assert!(
             ledger
-                .fingerprint(&replay(seed, "proposal-fingerprint-operation", operation(&format!("proposal-{seed}-0")))?)
+                .fingerprint(&replay(
+                    seed,
+                    "proposal-fingerprint-operation",
+                    operation(&format!("proposal-{seed}-0"))
+                )?)
                 .is_some(),
             "seed={seed} operation=capacity retained original proposal"
         );
         let invalid = ProposalIdentity {
-            operation_id: replay(seed, "proposal-invalid-operation", operation(&format!("proposal-{seed}-invalid")))?,
+            operation_id: replay(
+                seed,
+                "proposal-invalid-operation",
+                operation(&format!("proposal-{seed}-invalid")),
+            )?,
             fingerprint: String::new(),
         };
         assert_eq!(
@@ -3311,12 +4266,15 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         },
         &mut exhausted_scheduler,
     );
-    assert!(matches!(
-        failed_arm,
-        Err(er_protocol::ProposalLeaseError::Scheduler(
-            SchedulerError::Disposed
-        ))
-    ), "seed=0 operation=proposal-capacity schedule failure");
+    assert!(
+        matches!(
+            failed_arm,
+            Err(er_protocol::ProposalLeaseError::Scheduler(
+                SchedulerError::Disposed
+            ))
+        ),
+        "seed=0 operation=proposal-capacity schedule failure"
+    );
     assert_eq!(
         rollback_manager.retained_count(),
         SafeU53::ZERO,
@@ -3326,10 +4284,13 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         rollback_manager.diagnostics().timer_ids.is_empty(),
         "seed=0 operation=proposal-capacity timer rollback"
     );
-    let armed = manager.arm(ProposalLeaseSpec {
-        proposal: first.clone(),
-        absolute_ceiling_ms: Some(safe(GOLDEN_PROPOSAL_TEST_CEILING_MS)),
-    }, &mut scheduler)?;
+    let armed = manager.arm(
+        ProposalLeaseSpec {
+            proposal: first.clone(),
+            absolute_ceiling_ms: Some(safe(GOLDEN_PROPOSAL_TEST_CEILING_MS)),
+        },
+        &mut scheduler,
+    )?;
     assert_eq!(armed.result, ProposalLeaseStart::Retained);
     assert_proposal_arm_actions(&armed.actions, &first, 0, "proposal-arm");
     let timer_ids = armed
@@ -3348,12 +4309,21 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         "seed=0 operation=proposal-arm exact scheduled timer ids"
     );
     assert_eq!(manager.retained_count(), safe(1));
-    let refreshed = manager.arm(ProposalLeaseSpec {
-        proposal: first.clone(),
-        absolute_ceiling_ms: Some(safe(GOLDEN_PROPOSAL_TEST_CEILING_MS)),
-    }, &mut scheduler)?;
+    let refreshed = manager.arm(
+        ProposalLeaseSpec {
+            proposal: first.clone(),
+            absolute_ceiling_ms: Some(safe(GOLDEN_PROPOSAL_TEST_CEILING_MS)),
+        },
+        &mut scheduler,
+    )?;
     assert_eq!(refreshed.result, ProposalLeaseStart::AlreadyRetained);
-    assert_eq!(refreshed.actions, vec![ProposalLeaseAction::Send { proposal: first.clone() }], "seed=0 operation=proposal-refresh exact resend");
+    assert_eq!(
+        refreshed.actions,
+        vec![ProposalLeaseAction::Send {
+            proposal: first.clone()
+        }],
+        "seed=0 operation=proposal-refresh exact resend"
+    );
     assert_eq!(
         manager.diagnostics().timer_ids,
         BTreeSet::from([TimerId::new(safe(0)), TimerId::new(safe(1))]),
@@ -3377,10 +4347,25 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         },
         &mut scheduler,
     )?;
-    assert_eq!(sender_change.result, ProposalLeaseStart::Invalid, "seed=0 operation=proposal-refresh sender change rejected");
-    assert!(sender_change.actions.is_empty(), "seed=0 operation=proposal-refresh sender change has no actions");
-    assert_eq!(manager.diagnostics(), before_sender_change, "seed=0 operation=proposal-refresh sender change is fail-atomic");
-    assert_eq!(scheduler_snapshot(&scheduler), before_sender_change_scheduler, "seed=0 operation=proposal-refresh sender change preserves scheduler resources");
+    assert_eq!(
+        sender_change.result,
+        ProposalLeaseStart::Invalid,
+        "seed=0 operation=proposal-refresh sender change rejected"
+    );
+    assert!(
+        sender_change.actions.is_empty(),
+        "seed=0 operation=proposal-refresh sender change has no actions"
+    );
+    assert_eq!(
+        manager.diagnostics(),
+        before_sender_change,
+        "seed=0 operation=proposal-refresh sender change is fail-atomic"
+    );
+    assert_eq!(
+        scheduler_snapshot(&scheduler),
+        before_sender_change_scheduler,
+        "seed=0 operation=proposal-refresh sender change preserves scheduler resources"
+    );
     let conflict = ProposalMessage {
         fingerprint: "different".to_owned(),
         ..first.clone()
@@ -3425,9 +4410,11 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         Some(ProposalLeaseAction::Scheduler {
             command: SchedulerCommand::Schedule { timer },
         }) => timer.to_owned(),
-        other => return Err(missing(format!(
-            "seed=0 operation=proposal-retry-0 retry schedule index was {other:?}"
-        ))),
+        other => {
+            return Err(missing(format!(
+                "seed=0 operation=proposal-retry-0 retry schedule index was {other:?}"
+            )));
+        }
     };
     let removed_retry = fire_exact_timer(&mut scheduler, &retry_timer, 0, 0)?;
     let mut malformed_retry = removed_retry.clone();
@@ -3435,7 +4422,9 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
     let before_malformed_retry = manager.diagnostics();
     let before_malformed_retry_scheduler = scheduler_snapshot(&scheduler);
     assert!(
-        manager.timer_fired(malformed_retry, &mut scheduler).is_err(),
+        manager
+            .timer_fired(malformed_retry, &mut scheduler)
+            .is_err(),
         "seed=0 operation=0 malformed proposal timer rejected"
     );
     assert_eq!(
@@ -3449,40 +4438,93 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         "seed=0 operation=0 malformed proposal timer preserves complete scheduler resources"
     );
     let first_retry = manager.timer_fired(removed_retry, &mut scheduler)?;
-    assert_eq!(first_retry.len(), 2, "seed=0 operation=1 retry schedule precedes send");
+    assert_eq!(
+        first_retry.len(),
+        2,
+        "seed=0 operation=1 retry schedule precedes send"
+    );
     match &first_retry[1] {
-        ProposalLeaseAction::Send { proposal } => assert_eq!(proposal, &rebound_first, "seed=0 operation=1 initial retry send"),
+        ProposalLeaseAction::Send { proposal } => assert_eq!(
+            proposal, &rebound_first,
+            "seed=0 operation=1 initial retry send"
+        ),
         other => panic!("seed=0 operation=1 retry send index was {other:?}"),
     }
     let first_retry_timer = match &first_retry[0] {
-        ProposalLeaseAction::Scheduler { command: SchedulerCommand::Schedule { timer } } => timer,
+        ProposalLeaseAction::Scheduler {
+            command: SchedulerCommand::Schedule { timer },
+        } => timer,
         other => panic!("seed=0 operation=1 retry schedule index was {other:?}"),
     };
-    assert_eq!(first_retry_timer.timer_id, TimerId::new(safe(2)), "seed=0 operation=1 retry timer id");
-    assert_eq!(first_retry_timer.endpoint, first.from, "seed=0 operation=1 retry endpoint");
-    assert_eq!(first_retry_timer.owner, timer_owner("authority-v2:proposal:lease/first", "lease/first", "v2 proposal retry"), "seed=0 operation=1 retry owner");
-    assert_eq!(first_retry_timer.time_class, TimeClass::Connected, "seed=0 operation=1 retry class");
+    assert_eq!(
+        first_retry_timer.timer_id,
+        TimerId::new(safe(2)),
+        "seed=0 operation=1 retry timer id"
+    );
+    assert_eq!(
+        first_retry_timer.endpoint, first.from,
+        "seed=0 operation=1 retry endpoint"
+    );
+    assert_eq!(
+        first_retry_timer.owner,
+        timer_owner(
+            "authority-v2:proposal:lease/first",
+            "lease/first",
+            "v2 proposal retry"
+        ),
+        "seed=0 operation=1 retry owner"
+    );
+    assert_eq!(
+        first_retry_timer.time_class,
+        TimeClass::Connected,
+        "seed=0 operation=1 retry class"
+    );
     retry_timer = first_retry_timer.to_owned();
-    assert_eq!(retry_timer.delay_ms, safe(500), "seed=0 operation=1 retry delay");
-    for (operation, expected_delay) in [1_000_u64, 2_000, 4_000, 5_000]
-        .into_iter()
-        .enumerate()
-    {
+    assert_eq!(
+        retry_timer.delay_ms,
+        safe(500),
+        "seed=0 operation=1 retry delay"
+    );
+    for (operation, expected_delay) in [1_000_u64, 2_000, 4_000, 5_000].into_iter().enumerate() {
         let operation = operation + 2;
         let fired = fire_exact_timer(&mut scheduler, &retry_timer, 0, operation)?;
         let retry = manager.timer_fired(fired, &mut scheduler)?;
-        assert_eq!(retry.len(), 2, "seed=0 operation={operation} retry schedule precedes send");
+        assert_eq!(
+            retry.len(),
+            2,
+            "seed=0 operation={operation} retry schedule precedes send"
+        );
         match &retry[1] {
-            ProposalLeaseAction::Send { proposal } => assert_eq!(proposal, &rebound_first, "seed=0 operation={operation} retry send at {expected_delay}ms"),
+            ProposalLeaseAction::Send { proposal } => assert_eq!(
+                proposal, &rebound_first,
+                "seed=0 operation={operation} retry send at {expected_delay}ms"
+            ),
             other => panic!("seed=0 operation={operation} retry send index was {other:?}"),
         }
         let retry_schedule = match &retry[0] {
-            ProposalLeaseAction::Scheduler { command: SchedulerCommand::Schedule { timer } } => timer,
+            ProposalLeaseAction::Scheduler {
+                command: SchedulerCommand::Schedule { timer },
+            } => timer,
             other => panic!("seed=0 operation={operation} retry schedule index was {other:?}"),
         };
-        assert_eq!(retry_schedule.endpoint, first.from, "seed=0 operation={operation} retry endpoint");
-        assert_eq!(retry_schedule.owner, timer_owner("authority-v2:proposal:lease/first", "lease/first", "v2 proposal retry"), "seed=0 operation={operation} retry owner");
-        assert_eq!(retry_schedule.time_class, TimeClass::Connected, "seed=0 operation={operation} retry class");
+        assert_eq!(
+            retry_schedule.endpoint, first.from,
+            "seed=0 operation={operation} retry endpoint"
+        );
+        assert_eq!(
+            retry_schedule.owner,
+            timer_owner(
+                "authority-v2:proposal:lease/first",
+                "lease/first",
+                "v2 proposal retry"
+            ),
+            "seed=0 operation={operation} retry owner"
+        );
+        assert_eq!(
+            retry_schedule.time_class,
+            TimeClass::Connected,
+            "seed=0 operation={operation} retry class"
+        );
         retry_timer = retry_schedule.to_owned();
         assert_eq!(
             retry_timer.delay_ms,
@@ -3499,9 +4541,11 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         Some(ProposalLeaseAction::Scheduler {
             command: SchedulerCommand::Schedule { timer },
         }) => timer.to_owned(),
-        other => return Err(missing(format!(
-            "seed=0 operation=proposal-expiry absolute schedule index was {other:?}"
-        ))),
+        other => {
+            return Err(missing(format!(
+                "seed=0 operation=proposal-expiry absolute schedule index was {other:?}"
+            )));
+        }
     };
     let fired = fire_exact_timer(&mut scheduler, &absolute_timer, 0, 6)?;
     let expiry = manager.timer_fired(fired, &mut scheduler)?;
@@ -3523,10 +4567,16 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
     );
     assert_eq!(manager.retained_count(), SafeU53::ZERO);
     assert!(manager.diagnostics().timer_ids.is_empty());
-    assert!(scheduler.live_timers().is_empty(), "seed=0 operation=7 expiry cancels retry");
+    assert!(
+        scheduler.live_timers().is_empty(),
+        "seed=0 operation=7 expiry cancels retry"
+    );
     manager.dispose("seed teardown", &mut scheduler);
     manager.dispose("duplicate", &mut scheduler);
-    assert!(manager.diagnostics().disposed, "seed=0 operation=8 proposal disposal");
+    assert!(
+        manager.diagnostics().disposed,
+        "seed=0 operation=8 proposal disposal"
+    );
 
     let mut active_disposal = ProposalLeaseManager::new(config.clone())?;
     let mut active_disposal_scheduler = KernelScheduler::new();
@@ -3541,7 +4591,11 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         },
         &mut active_disposal_scheduler,
     )?;
-    assert_eq!(active_arm.result, ProposalLeaseStart::Retained, "seed=0 operation=active-disposal retained");
+    assert_eq!(
+        active_arm.result,
+        ProposalLeaseStart::Retained,
+        "seed=0 operation=active-disposal retained"
+    );
     let active_actions = active_disposal.dispose("active disposal", &mut active_disposal_scheduler);
     assert_eq!(
         active_actions,
@@ -3561,10 +4615,25 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
         ],
         "seed=0 operation=active-disposal exact terminal cancellations"
     );
-    assert_eq!(active_disposal.retained_count(), SafeU53::ZERO, "seed=0 operation=active-disposal retained zero");
-    assert!(active_disposal.diagnostics().timer_ids.is_empty(), "seed=0 operation=active-disposal timer diagnostics zero");
-    assert!(active_disposal_scheduler.live_timers().is_empty(), "seed=0 operation=active-disposal scheduler resources zero");
-    assert!(active_disposal.dispose("duplicate", &mut active_disposal_scheduler).is_empty(), "seed=0 operation=active-disposal idempotent");
+    assert_eq!(
+        active_disposal.retained_count(),
+        SafeU53::ZERO,
+        "seed=0 operation=active-disposal retained zero"
+    );
+    assert!(
+        active_disposal.diagnostics().timer_ids.is_empty(),
+        "seed=0 operation=active-disposal timer diagnostics zero"
+    );
+    assert!(
+        active_disposal_scheduler.live_timers().is_empty(),
+        "seed=0 operation=active-disposal scheduler resources zero"
+    );
+    assert!(
+        active_disposal
+            .dispose("duplicate", &mut active_disposal_scheduler)
+            .is_empty(),
+        "seed=0 operation=active-disposal idempotent"
+    );
 
     let mut tombstones = ProposalLeaseManager::new(config)?;
     let committed = operation("lease/committed")?;
@@ -3607,7 +4676,10 @@ fn proposal_seeded_generators_preserve_fingerprints_dedup_conflicts_and_tombston
     let settled = tombstones.observe_committed(&live.operation_id, &mut scheduler);
     assert!(settled.0);
     assert_eq!(tombstones.retained_count(), SafeU53::ZERO);
-    assert!(scheduler.live_timers().is_empty(), "seed=0 operation=10 committed observation cancels timers");
+    assert!(
+        scheduler.live_timers().is_empty(),
+        "seed=0 operation=10 committed observation cancels timers"
+    );
     assert_eq!(
         tombstones.observe_committed(&live.operation_id, &mut scheduler),
         (false, Vec::new()),
@@ -3711,7 +4783,9 @@ fn known_frame_cases() -> [(&'static str, Value); 7] {
 
 #[derive(Debug)]
 enum RawCaseExpectation {
-    ValidTailRequest { from_revision: u64 },
+    ValidTailRequest {
+        from_revision: u64,
+    },
     Violation {
         frame_type: Option<&'static str>,
         issues: Vec<&'static str>,
@@ -3737,32 +4811,42 @@ fn malformed_raw_cases() -> Vec<(String, RawCaseExpectation)> {
     let nested_control_epoch = r#"{"revision":1,"operationId":"operation","kind":"TURN_COMMIT","material":{"digest":"digest","payload":null},"nextControl":{"kind":"COMMAND_FRONTIER","epoch":1e400,"wave":1,"turn":1,"commands":[{"ownerSeatId":0,"pokemonId":1,"fieldIndex":0}]},"subsumes":[]}"#;
     vec![
         (
-            format!(r#"{{"v":1,"v":2,"t":"tailRequest","ctx":{context},"body":{{"fromRevision":1,"fromRevision":0}}}}"#),
+            format!(
+                r#"{{"v":1,"v":2,"t":"tailRequest","ctx":{context},"body":{{"fromRevision":1,"fromRevision":0}}}}"#
+            ),
             RawCaseExpectation::ValidTailRequest { from_revision: 0 },
         ),
         (
-            format!(r#"{{"v":2,"t":"tailRequest","ctx":{context},"body":{{"fromRevision":0,"fromRevision":1e400}}}}"#),
+            format!(
+                r#"{{"v":2,"t":"tailRequest","ctx":{context},"body":{{"fromRevision":0,"fromRevision":1e400}}}}"#
+            ),
             RawCaseExpectation::Violation {
                 frame_type: Some("tailRequest"),
                 issues: vec!["body.fromRevision"],
             },
         ),
         (
-            format!(r#"{{"v":2,"t":"terminal","ctx":{{"sessionId":"\uD800","runId":"run-1","sessionEpoch":3,"seatMapId":"seat-map-1","membershipRevision":2,"senderSeatId":1,"authoritySeatId":0,"connectionGeneration":2}},"body":{{"terminalId":"terminal-1","reason":"protocol"}}}}"#),
+            format!(
+                r#"{{"v":2,"t":"terminal","ctx":{{"sessionId":"\uD800","runId":"run-1","sessionEpoch":3,"seatMapId":"seat-map-1","membershipRevision":2,"senderSeatId":1,"authoritySeatId":0,"connectionGeneration":2}},"body":{{"terminalId":"terminal-1","reason":"protocol"}}}}"#
+            ),
             RawCaseExpectation::Violation {
                 frame_type: None,
                 issues: vec!["malformed JSON"],
             },
         ),
         (
-            format!(r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"frontierOperationId":null,"membershipRevision":2,"nextControl":null,"requiredTail":[{nested_tail_revision}]}}}}"#),
+            format!(
+                r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"frontierOperationId":null,"membershipRevision":2,"nextControl":null,"requiredTail":[{nested_tail_revision}]}}}}"#
+            ),
             RawCaseExpectation::Violation {
                 frame_type: Some("recoveryBundle"),
                 issues: vec!["body.requiredTail[0].revision"],
             },
         ),
         (
-            format!(r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"frontierOperationId":null,"membershipRevision":2,"nextControl":null,"requiredTail":[{nested_control_epoch}]}}}}"#),
+            format!(
+                r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"frontierOperationId":null,"membershipRevision":2,"nextControl":null,"requiredTail":[{nested_control_epoch}]}}}}"#
+            ),
             RawCaseExpectation::Violation {
                 frame_type: Some("recoveryBundle"),
                 issues: vec!["body.requiredTail[0].nextControl.epoch"],
@@ -3846,7 +4930,9 @@ fn malformed_raw_cases() -> Vec<(String, RawCaseExpectation)> {
             },
         ),
         (
-            format!(r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"membershipRevision":2,"requiredTail":[]}}}}"#),
+            format!(
+                r#"{{"v":2,"t":"recoveryBundle","ctx":{context},"body":{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"membershipRevision":2,"requiredTail":[]}}}}"#
+            ),
             RawCaseExpectation::Violation {
                 frame_type: Some("recoveryBundle"),
                 issues: vec![
@@ -3879,8 +4965,8 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
                     serde_json::to_string(&value),
                 )?)
             };
-            let result = catch_unwind(AssertUnwindSafe(|| validate_inbound_frame(&raw)))
-                .map_err(|_| {
+            let result =
+                catch_unwind(AssertUnwindSafe(|| validate_inbound_frame(&raw))).map_err(|_| {
                     missing(format!(
                         "seed={seed} operation={step} validator panicked for {raw:?}"
                     ))
@@ -3917,9 +5003,11 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
         let result = catch_unwind(AssertUnwindSafe(|| {
             validate_inbound_frame(&RawFrame::JsonText(raw.clone()))
         }))
-        .map_err(|_| missing(format!(
-            "seed=20 operation={operation} malformed raw case panicked: {raw}"
-        )))?;
+        .map_err(|_| {
+            missing(format!(
+                "seed=20 operation={operation} malformed raw case panicked: {raw}"
+            ))
+        })?;
         match expectation {
             RawCaseExpectation::ValidTailRequest { from_revision } => match result {
                 InboundFrameResult::Valid { frame } => match &frame.body {
@@ -3928,9 +5016,9 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
                         from_revision,
                         "seed=20 operation={operation} duplicate-key last value"
                     ),
-                    other => panic!(
-                        "seed=20 operation={operation} duplicate-key body was {other:?}"
-                    ),
+                    other => {
+                        panic!("seed=20 operation={operation} duplicate-key body was {other:?}")
+                    }
                 },
                 other => panic!(
                     "seed=20 operation={operation} duplicate-key valid case classified as {other:?}"
@@ -3952,9 +5040,9 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
                         "seed=20 operation={operation} malformed issue paths"
                     );
                 }
-                other => panic!(
-                    "seed=20 operation={operation} malformed case classified as {other:?}"
-                ),
+                other => {
+                    panic!("seed=20 operation={operation} malformed case classified as {other:?}")
+                }
             },
         }
     }
@@ -3990,7 +5078,11 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
     identity_cases.push(("seat-map", changed, ReceiptRejectReason::SessionMismatch));
     let mut changed = identity_receipt.clone();
     changed.context.membership_revision = MembershipRevision::new(safe(3));
-    identity_cases.push(("membership", changed, ReceiptRejectReason::MembershipMismatch));
+    identity_cases.push((
+        "membership",
+        changed,
+        ReceiptRejectReason::MembershipMismatch,
+    ));
     let mut changed = identity_receipt.clone();
     changed.context.sender_seat_id = seat(2);
     identity_cases.push(("sender", changed, ReceiptRejectReason::UnboundPeer));
@@ -3999,7 +5091,11 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
     identity_cases.push(("authority", changed, ReceiptRejectReason::AuthorityMismatch));
     let mut changed = identity_receipt;
     changed.context.connection_generation = generation(3);
-    identity_cases.push(("generation", changed, ReceiptRejectReason::ConnectionGenerationMismatch));
+    identity_cases.push((
+        "generation",
+        changed,
+        ReceiptRejectReason::ConnectionGenerationMismatch,
+    ));
     for (operation, receipt, expected_reason) in identity_cases {
         let before_diagnostics = identity_log.diagnostics();
         let before_timers = identity_scheduler.live_timers();
@@ -4011,14 +5107,34 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
             },
             "seed=21 operation={operation} identity reject classification"
         );
-        assert!(outcome.actions.is_empty(), "seed=21 operation={operation} identity reject actions");
-        assert_eq!(identity_log.diagnostics(), before_diagnostics, "seed=21 operation={operation} identity reject fail-atomic diagnostics");
-        assert_eq!(identity_scheduler.live_timers(), before_timers, "seed=21 operation={operation} identity reject fail-atomic timers");
+        assert!(
+            outcome.actions.is_empty(),
+            "seed=21 operation={operation} identity reject actions"
+        );
+        assert_eq!(
+            identity_log.diagnostics(),
+            before_diagnostics,
+            "seed=21 operation={operation} identity reject fail-atomic diagnostics"
+        );
+        assert_eq!(
+            identity_scheduler.live_timers(),
+            before_timers,
+            "seed=21 operation={operation} identity reject fail-atomic timers"
+        );
     }
     identity_log.dispose("identity matrix teardown", &mut identity_scheduler);
-    assert!(identity_log.diagnostics().disposed, "seed=21 operation=identity-cleanup disposed log");
-    assert!(identity_log.retained().is_empty(), "seed=21 operation=identity-cleanup retained entries");
-    assert!(identity_scheduler.live_timers().is_empty(), "seed=21 operation=identity-cleanup scheduler resources");
+    assert!(
+        identity_log.diagnostics().disposed,
+        "seed=21 operation=identity-cleanup disposed log"
+    );
+    assert!(
+        identity_log.retained().is_empty(),
+        "seed=21 operation=identity-cleanup retained entries"
+    );
+    assert!(
+        identity_scheduler.live_timers().is_empty(),
+        "seed=21 operation=identity-cleanup scheduler resources"
+    );
 
     let left = context(1, 0, 2, 2, 3)?;
     let mut context_axes = Vec::new();
@@ -4048,8 +5164,15 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
     context_axes.push(("generation", changed, true));
     let base_context = context(1, 0, 2, 2, 3)?;
     for (operation, right, compatible) in context_axes {
-        assert!(!frame_contexts_equal(&base_context, &right), "seed=22 operation={operation} identity equality axis");
-        assert_eq!(frame_contexts_compatible(&base_context, &right), compatible, "seed=22 operation={operation} compatibility axis");
+        assert!(
+            !frame_contexts_equal(&base_context, &right),
+            "seed=22 operation={operation} identity equality axis"
+        );
+        assert_eq!(
+            frame_contexts_compatible(&base_context, &right),
+            compatible,
+            "seed=22 operation={operation} compatibility axis"
+        );
     }
 
     let malformed =
@@ -4374,8 +5497,7 @@ fn shared_boundary_cases_cover_safe_numbers_utf16_tokens_nullability_and_max_ids
     );
     let max_id = control_id_of(&max_typed);
     assert_eq!(
-        max_id,
-        GOLDEN_MAX_CONTROL_ID,
+        max_id, GOLDEN_MAX_CONTROL_ID,
         "seed=0 operation=25 maximum control coordinates retain exact ID"
     );
 
@@ -4415,10 +5537,13 @@ fn shared_boundary_cases_cover_safe_numbers_utf16_tokens_nullability_and_max_ids
         command_control(3, 4, 1, vec![command_target(0, 0, 7)]),
     )?;
     overlong_digest.material.digest = over_limit;
-    assert!(matches!(
-        invalid_log.commit(overlong_digest, &mut invalid_scheduler),
-        Err(er_protocol::AuthorityLogError::InvalidEntry { .. })
-    ), "seed=0 operation=27 Authority digest UTF-16 enforcement");
+    assert!(
+        matches!(
+            invalid_log.commit(overlong_digest, &mut invalid_scheduler),
+            Err(er_protocol::AuthorityLogError::InvalidEntry { .. })
+        ),
+        "seed=0 operation=27 Authority digest UTF-16 enforcement"
+    );
     assert_eq!(invalid_log.head_revision(), Revision::ZERO);
     assert!(invalid_scheduler.live_timers().is_empty());
     Ok(())
@@ -4589,7 +5714,11 @@ fn successor_identity_is_stable_for_canonical_sets_and_sensitive_to_ordered_tail
 
     let mut wait_value = match wait {
         NextControl::AwaitSuccessor(value) => value,
-        _ => return Err(missing("seed=0 operation=successor-wait-control: await helper returned another control")),
+        _ => {
+            return Err(missing(
+                "seed=0 operation=successor-wait-control: await helper returned another control",
+            ));
+        }
     };
     wait_value.allowed_kinds = vec![
         AuthorityEntryKind::ControlCommit,
@@ -4682,10 +5811,7 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
                 format!("recovery-validation-context-{captured}"),
                 recovery_validation_context(captured),
             )?;
-            let verdict = er_protocol::validate_recovery_bundle(
-                &validation_context,
-                &bundle,
-            );
+            let verdict = er_protocol::validate_recovery_bundle(&validation_context, &bundle);
             if frontier < captured {
                 assert!(
                     matches!(verdict, RecoveryBundleValidation::Stale { .. }),
@@ -4865,7 +5991,12 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         live_recovery_state(2)?,
         &mut material_live_stale_scheduler,
     )?;
-    assert_recovery_terminalized(&material_live_stale_actions, &[], 0, "recovery-material-live");
+    assert_recovery_terminalized(
+        &material_live_stale_actions,
+        &[],
+        0,
+        "recovery-material-live",
+    );
     assert!(material_live_stale_scheduler.live_timers().is_empty());
 
     let mut control_live_stale = recovery_transaction()?;
@@ -4953,9 +6084,13 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         staged_recovery_state(wrong_control_revision.get().get())?,
         &mut wrong_control_scheduler,
     )?;
-    let wrong_actions = wrong_control.control_result(ControlProjectionOutcome::Installed {
-        control_id: "wrong-control-id".to_owned(),
-    }, live_recovery_state(wrong_control_revision.get().get())?, &mut wrong_control_scheduler)?;
+    let wrong_actions = wrong_control.control_result(
+        ControlProjectionOutcome::Installed {
+            control_id: "wrong-control-id".to_owned(),
+        },
+        live_recovery_state(wrong_control_revision.get().get())?,
+        &mut wrong_control_scheduler,
+    )?;
     assert_eq!(wrong_control.phase(), Some(RecoveryPhase::Terminalized));
     assert_eq!(
         wrong_control.fence_view().map(|view| view.state),
@@ -4977,7 +6112,9 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         happy.fence_view().map(|view| view.state),
         Some(RecoveryFenceState::Held)
     );
-    assert!(matches!(start.first(), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Held));
+    assert!(
+        matches!(start.first(), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Held)
+    );
     let request_timer = assert_recovery_schedule(
         &start[1],
         0,
@@ -4989,7 +6126,9 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         "recovery-start-timer",
     );
     assert!(happy_scheduler.timer(request_timer.timer_id).is_some());
-    assert!(matches!(start.get(2), Some(RecoveryAction::SendRequest { request }) if request.request_id == "recovery-1" && request.captured_frontier == revision(1)));
+    assert!(
+        matches!(start.get(2), Some(RecoveryAction::SendRequest { request }) if request.request_id == "recovery-1" && request.captured_frontier == revision(1))
+    );
     let happy_bundle = recovered_bundle(1, 3)?;
     assert!(
         happy
@@ -5014,7 +6153,10 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         .ok_or_else(|| missing("seed=0 operation=recovery-stage missing full final entry"))?;
     match material.as_slice() {
         [RecoveryAction::StageRecoveredFrontier { entry }] => {
-            assert_eq!(entry, &final_entry, "seed=0 operation=recovery-stage action carries full final entry");
+            assert_eq!(
+                entry, &final_entry,
+                "seed=0 operation=recovery-stage action carries full final entry"
+            );
         }
         other => panic!("seed=0 operation=recovery-stage action order was {other:?}"),
     }
@@ -5040,7 +6182,9 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
     assert!(happy.fence_view().is_some_and(
         |view| !view.control_surface_start_frozen && !view.authority_wait_creation_frozen
     ));
-    assert!(matches!(staged.first(), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Held));
+    assert!(
+        matches!(staged.first(), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Held)
+    );
     assert_recovery_schedule(
         &staged[1],
         1,
@@ -5052,10 +6196,24 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         "recovery-stage-control-timer",
     );
     match staged.get(2) {
-        Some(RecoveryAction::ProjectControl { revision: projected_revision, control, expected_control_id }) => {
-            assert_eq!(*projected_revision, staged_revision, "seed=0 operation=recovery-stage-control projected revision");
-            assert_eq!(control, &final_entry.next_control, "seed=0 operation=recovery-stage-control exact control");
-            assert_eq!(expected_control_id.as_str(), GOLDEN_AUTHORITY_CONTROL_ID, "seed=0 operation=recovery-stage-control exact control id");
+        Some(RecoveryAction::ProjectControl {
+            revision: projected_revision,
+            control,
+            expected_control_id,
+        }) => {
+            assert_eq!(
+                *projected_revision, staged_revision,
+                "seed=0 operation=recovery-stage-control projected revision"
+            );
+            assert_eq!(
+                control, &final_entry.next_control,
+                "seed=0 operation=recovery-stage-control exact control"
+            );
+            assert_eq!(
+                expected_control_id.as_str(),
+                GOLDEN_AUTHORITY_CONTROL_ID,
+                "seed=0 operation=recovery-stage-control exact control id"
+            );
         }
         other => panic!("seed=0 operation=recovery-stage-control projection index was {other:?}"),
     }
@@ -5092,15 +6250,23 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         happy.fence_view().map(|view| view.state),
         Some(RecoveryFenceState::Open)
     );
-    assert_eq!(installed.len(), 3, "seed=0 operation=recovery-control-install exact action count");
+    assert_eq!(
+        installed.len(),
+        3,
+        "seed=0 operation=recovery-control-install exact action count"
+    );
     assert!(matches!(
         installed.first(),
         Some(RecoveryAction::Scheduler {
             command: SchedulerCommand::Cancel { endpoint, timer_id }
         }) if *endpoint == seat(1) && *timer_id == TimerId::new(safe(1))
     ));
-    assert!(matches!(installed.get(1), Some(RecoveryAction::SendAppliedProof { proof }) if proof.frontier == staged_revision && proof.control_id.as_deref() == Some(GOLDEN_AUTHORITY_CONTROL_ID)));
-    assert!(matches!(installed.get(2), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Open));
+    assert!(
+        matches!(installed.get(1), Some(RecoveryAction::SendAppliedProof { proof }) if proof.frontier == staged_revision && proof.control_id.as_deref() == Some(GOLDEN_AUTHORITY_CONTROL_ID))
+    );
+    assert!(
+        matches!(installed.get(2), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Open)
+    );
     assert!(happy.diagnostics().timer_ids.is_empty());
     assert!(happy_scheduler.live_timers().is_empty());
     happy_replica.dispose("recovery full-entry teardown");
@@ -5130,9 +6296,21 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         live_recovery_state(1)?,
         &mut rejected_stage_scheduler,
     )?;
-    assert_recovery_terminalized(&rejected_stage_actions, &[], 0, "recovery-frontier-rejected");
-    assert_eq!(rejected_stage.phase(), Some(RecoveryPhase::Terminalized), "seed=0 operation=recovery-frontier-rejected phase");
-    assert!(rejected_stage_scheduler.live_timers().is_empty(), "seed=0 operation=recovery-frontier-rejected resources");
+    assert_recovery_terminalized(
+        &rejected_stage_actions,
+        &[],
+        0,
+        "recovery-frontier-rejected",
+    );
+    assert_eq!(
+        rejected_stage.phase(),
+        Some(RecoveryPhase::Terminalized),
+        "seed=0 operation=recovery-frontier-rejected phase"
+    );
+    assert!(
+        rejected_stage_scheduler.live_timers().is_empty(),
+        "seed=0 operation=recovery-frontier-rejected resources"
+    );
 
     let mut control_rejected = recovery_transaction()?;
     let mut control_rejected_scheduler = KernelScheduler::new();
@@ -5180,9 +6358,21 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         staged_recovery_state(control_rejected_revision.get().get())?,
         &mut control_rejected_scheduler,
     )?;
-    assert_recovery_terminalized(&control_rejected_actions, &[1], 0, "recovery-control-rejected");
-    assert_eq!(control_rejected.phase(), Some(RecoveryPhase::Terminalized), "seed=0 operation=recovery-control-rejected phase");
-    assert!(control_rejected_scheduler.live_timers().is_empty(), "seed=0 operation=recovery-control-rejected resources");
+    assert_recovery_terminalized(
+        &control_rejected_actions,
+        &[1],
+        0,
+        "recovery-control-rejected",
+    );
+    assert_eq!(
+        control_rejected.phase(),
+        Some(RecoveryPhase::Terminalized),
+        "seed=0 operation=recovery-control-rejected phase"
+    );
+    assert!(
+        control_rejected_scheduler.live_timers().is_empty(),
+        "seed=0 operation=recovery-control-rejected resources"
+    );
     control_rejected_replica.dispose("rejected control teardown");
 
     let mut control_timeout = recovery_transaction()?;
@@ -5234,20 +6424,23 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         0,
         "recovery-control-timeout-schedule",
     );
-    let control_timeout_fired = fire_exact_timer(
-        &mut control_timeout_scheduler,
-        &control_timer,
-        0,
-        1,
-    )?;
+    let control_timeout_fired =
+        fire_exact_timer(&mut control_timeout_scheduler, &control_timer, 0, 1)?;
     let control_timeout_actions = control_timeout.timer_fired(
         control_timeout_fired,
         staged_recovery_state(control_timeout_revision.get().get())?,
         &mut control_timeout_scheduler,
     )?;
     assert_recovery_terminalized(&control_timeout_actions, &[], 0, "recovery-control-timeout");
-    assert_eq!(control_timeout.phase(), Some(RecoveryPhase::Terminalized), "seed=0 operation=recovery-control-timeout phase");
-    assert!(control_timeout_scheduler.live_timers().is_empty(), "seed=0 operation=recovery-control-timeout resources");
+    assert_eq!(
+        control_timeout.phase(),
+        Some(RecoveryPhase::Terminalized),
+        "seed=0 operation=recovery-control-timeout phase"
+    );
+    assert!(
+        control_timeout_scheduler.live_timers().is_empty(),
+        "seed=0 operation=recovery-control-timeout resources"
+    );
     control_timeout_replica.dispose("control timeout teardown");
 
     let mut zero = recovery_transaction()?;
@@ -5269,10 +6462,21 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         &mut zero_scheduler,
     )?;
     assert_eq!(zero.phase(), Some(RecoveryPhase::Released));
-    assert_eq!(zero_actions.len(), 2, "seed=0 operation=recovery-zero exact action count");
-    assert!(matches!(zero_actions.first(), Some(RecoveryAction::SendAppliedProof { proof }) if proof.frontier == revision(0) && proof.control_id.is_none()));
-    assert!(matches!(zero_actions.get(1), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Open));
-    assert!(zero_scheduler.live_timers().is_empty(), "seed=0 operation=recovery-zero disposal resource zero");
+    assert_eq!(
+        zero_actions.len(),
+        2,
+        "seed=0 operation=recovery-zero exact action count"
+    );
+    assert!(
+        matches!(zero_actions.first(), Some(RecoveryAction::SendAppliedProof { proof }) if proof.frontier == revision(0) && proof.control_id.is_none())
+    );
+    assert!(
+        matches!(zero_actions.get(1), Some(RecoveryAction::FenceChanged { view }) if view.state == RecoveryFenceState::Open)
+    );
+    assert!(
+        zero_scheduler.live_timers().is_empty(),
+        "seed=0 operation=recovery-zero disposal resource zero"
+    );
 
     for outcome in [
         RecoveryMaterialOutcome::Deferred,
@@ -5291,11 +6495,8 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
             live_recovery_state(1)?,
             &mut failed_scheduler,
         )?;
-        let actions = failed.material_result(
-            outcome,
-            live_recovery_state(1)?,
-            &mut failed_scheduler,
-        )?;
+        let actions =
+            failed.material_result(outcome, live_recovery_state(1)?, &mut failed_scheduler)?;
         assert_eq!(failed.phase(), Some(RecoveryPhase::Terminalized));
         assert!(
             failed
@@ -5356,12 +6557,8 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         0,
         "recovery-malformed-schedule",
     );
-    let removed_malformed = fire_exact_timer(
-        &mut malformed_timeout_scheduler,
-        &malformed_timer,
-        0,
-        2,
-    )?;
+    let removed_malformed =
+        fire_exact_timer(&mut malformed_timeout_scheduler, &malformed_timer, 0, 2)?;
     let mut wrong_malformed = removed_malformed.clone();
     wrong_malformed.time_class = TimeClass::Connected;
     let before_malformed_timeout = malformed_timeout.diagnostics();
@@ -5409,10 +6606,14 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
     )?;
     let first_abort = aborted.abort("operator cancellation".to_owned(), &mut aborted_scheduler);
     assert_recovery_terminalized(&first_abort, &[0], 0, "recovery-abort");
-    assert!(matches!(first_abort.last(), Some(RecoveryAction::Terminalize { reason }) if reason == "operator cancellation"));
-    assert!(aborted
-        .abort("second cancellation".to_owned(), &mut aborted_scheduler)
-        .is_empty());
+    assert!(
+        matches!(first_abort.last(), Some(RecoveryAction::Terminalize { reason }) if reason == "operator cancellation")
+    );
+    assert!(
+        aborted
+            .abort("second cancellation".to_owned(), &mut aborted_scheduler)
+            .is_empty()
+    );
     assert!(matches!(
         aborted.start(
             "again".to_owned(),
@@ -5437,7 +6638,11 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         &mut rollback_scheduler,
     )?;
     assert_recovery_terminalized(&rollback_actions, &[], 0, "recovery-rollback");
-    assert_eq!(rollback_recovery.phase(), Some(RecoveryPhase::Terminalized), "seed=0 operation=recovery-rollback phase rollback");
+    assert_eq!(
+        rollback_recovery.phase(),
+        Some(RecoveryPhase::Terminalized),
+        "seed=0 operation=recovery-rollback phase rollback"
+    );
     assert_eq!(
         rollback_recovery.fence_view().map(|view| view.state),
         Some(RecoveryFenceState::Terminal),
