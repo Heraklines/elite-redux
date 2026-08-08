@@ -125,6 +125,7 @@ fn report(
         "M2_BENCHMARK_RESULT {}",
         serde_json::to_string(&marker)?
     )?;
+    stdout.flush()?;
     Ok(())
 }
 
@@ -231,11 +232,18 @@ fn command_control(field_index: u64) -> NextControl {
         epoch: safe(1),
         wave: safe(1),
         turn: safe(1),
-        commands: vec![CommandControlTarget {
-            owner_seat_id: seat(1),
-            pokemon_id: safe(42),
-            field_index: safe(field_index),
-        }],
+        commands: vec![
+            CommandControlTarget {
+                owner_seat_id: seat(1),
+                pokemon_id: safe(42),
+                field_index: safe(field_index),
+            },
+            CommandControlTarget {
+                owner_seat_id: seat(0),
+                pokemon_id: safe(99),
+                field_index: safe(field_index + 1),
+            },
+        ],
     })
 }
 
@@ -261,6 +269,8 @@ fn command_menu(
 
 fn command_plan(
     index: u64,
+    owner_seat_id: SeatId,
+    field_index: u64,
     control_id: String,
     operation_id: OperationId,
     option: MenuOption,
@@ -269,9 +279,9 @@ fn command_plan(
     let option_id = option.id.clone();
     ControlMenuPlan::Command {
         control_id,
-        owner_seat_id: seat(1),
+        owner_seat_id,
         operation_id,
-        field_index: safe(index),
+        field_index: safe(field_index),
         options: vec![option],
         proposals: vec![MenuProposalPlan {
             option_id,
@@ -371,19 +381,31 @@ fn protocol_pair(seed: u64) -> TestResult<SimulatedPair> {
         r#"[1001,"turnCommand",0,{"choice":1000},null]"#,
     );
 
-    let mut menu_plans = Vec::with_capacity((PROPOSAL_CYCLES + 1) as usize);
+    let mut menu_plans = Vec::with_capacity(((PROPOSAL_CYCLES + 1) * 2) as usize);
     let mut resolutions = Vec::with_capacity(PROPOSAL_CYCLES as usize);
     for index in 0..=PROPOSAL_CYCLES {
-        let option = menu_option(format!("choice/{index}"))?;
+        let guest_option = menu_option(format!("choice/{index}"))?;
+        let host_option = guest_option.clone();
         let operation_id = operation(format!("turn/benchmark/{index}"))?;
         let control = command_control(index);
         let control_id = control_id_of(&control);
         let fingerprint = benchmark_proposal_fingerprint(index)?;
         menu_plans.push(command_plan(
             index,
+            seat(1),
+            index,
+            control_id.clone(),
+            operation_id.clone(),
+            guest_option,
+            fingerprint.clone(),
+        ));
+        menu_plans.push(command_plan(
+            index,
+            seat(0),
+            index + 1,
             control_id,
             operation_id.clone(),
-            option,
+            host_option,
             fingerprint.clone(),
         ));
         if index < PROPOSAL_CYCLES {
@@ -562,6 +584,9 @@ fn m2_proposal_receipt_cycles() -> TestResult {
         assert_eq!(snapshot.guest.ui.kind, UiViewKind::Command);
         assert_eq!(snapshot.guest.ui.owner_seat, Some(seat(1)));
         assert!(snapshot.guest.ui.actionable);
+        assert_eq!(snapshot.host.ui.kind, UiViewKind::Command);
+        assert_eq!(snapshot.host.ui.owner_seat, Some(seat(0)));
+        assert!(snapshot.host.ui.actionable);
         assert!(evidence.authority_entry_sent);
         assert!(evidence.material_applied);
         assert!(evidence.control_projected);

@@ -645,15 +645,23 @@ function runCargoBench(context) {
 }
 
 function parseChildMarker(stdout, spec) {
-  const markers = String(stdout)
-    .split(/\r?\n/u)
-    .filter(line => line.startsWith(RESULT_MARKER));
-  if (markers.length !== 1) {
-    fail(`workload ${spec.id} emitted ${markers.length} benchmark result markers, expected one`);
+  const output = String(stdout);
+  const markerOffsets = [];
+  let markerOffset = output.indexOf(RESULT_MARKER);
+  while (markerOffset !== -1) {
+    markerOffsets.push(markerOffset);
+    markerOffset = output.indexOf(RESULT_MARKER, markerOffset + RESULT_MARKER.length);
   }
+  if (markerOffsets.length !== 1) {
+    fail(`workload ${spec.id} emitted ${markerOffsets.length} benchmark result markers, expected one`);
+  }
+
+  const markerStart = markerOffsets[0] + RESULT_MARKER.length;
+  const lineEnd = output.indexOf("\n", markerStart);
+  const markerJson = output.slice(markerStart, lineEnd === -1 ? undefined : lineEnd).trim();
   let marker;
   try {
-    marker = JSON.parse(markers[0].slice(RESULT_MARKER.length));
+    marker = JSON.parse(markerJson);
   } catch (error) {
     fail(`workload ${spec.id} emitted malformed benchmark JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -695,10 +703,10 @@ function runOneWorkload(executable, context, spec) {
     const started = performance.now();
     const child = spawn(
       "/usr/bin/time",
-      ["-f", `${RSS_MARKER}%M`, executable, spec.test_name, "--exact", "--nocapture", "--test-threads=1"],
+      ["-f", `${RSS_MARKER}%M`, executable, "--exact", "--nocapture", "--test-threads=1", spec.test_name],
       {
         cwd: RUST_ROOT,
-        env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+        env: { ...process.env, LC_ALL: "C", TZ: "UTC", RUST_TEST_NOCAPTURE: "1" },
         stdio: ["ignore", "pipe", "pipe"],
         detached: true,
       },
