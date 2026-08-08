@@ -885,22 +885,84 @@ jobs:
         if: steps.contract.outputs.ready == 'true'
         uses: taiki-e/install-action@nextest
 
+      - name: Calibrate and reject a pending M2 protocol parity fixture
+        if: steps.contract.outputs.ready == 'true'
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture=fixtures/v1/m2-parity/replica-authority-v2-command.json
+          if [[ ! -f "$fixture" ]] || ! grep -q 'PENDING_M2B_01_KERNEL_COMPOSITION' "$fixture"; then
+            echo "M2 protocol parity fixture is frozen; calibration bypass is unavailable."
+            exit 0
+          fi
+
+          mkdir -p ../rust-ci-summary
+          set +e
+          cargo test --locked -p er-wasm --test m2_parity \
+            protocol_fixture_hosted_calibration -- \
+            --ignored --exact --nocapture --test-threads=1 \
+            2>&1 | tee ../rust-ci-summary/m2-parity-calibration.log
+          calibration_status=${PIPESTATUS[0]}
+          set -e
+
+          if ((calibration_status == 0)); then
+            echo "::error::The calibration-only test unexpectedly passed; pending parity must fail closed."
+            exit 1
+          fi
+          test -s ../rust-ci-summary/m2-parity-calibration.json
+          python3 - ../rust-ci-summary/m2-parity-calibration.json <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          value = json.loads(path.read_text(encoding="utf-8"))
+          if value.get("status") != "CALIBRATION_ONLY_NOT_ACCEPTED_PARITY":
+              raise SystemExit(f"{path} has an invalid calibration status")
+          if value.get("accepted_parity") is not False:
+              raise SystemExit(f"{path} must explicitly reject parity acceptance")
+          if value.get("event_count") != 10:
+              raise SystemExit(f"{path} must contain exactly ten observations")
+          observations = value.get("observations")
+          if not isinstance(observations, list) or len(observations) != 10:
+              raise SystemExit(f"{path} observations must contain exactly ten events")
+          PY
+          cat ../rust-ci-summary/m2-parity-calibration.json
+          echo "::error::Pending parity calibration evidence was captured; freeze it before G5 can pass."
+          exit 1
+
       - name: Run nextest CI profile
         if: steps.contract.outputs.ready == 'true'
         working-directory: rust
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p ../rust-ci-summary
           nextest_args=(--workspace --profile ci)
           if [[ ! -e contracts/m1-api.md ]]; then
             nextest_args+=(--no-tests=pass)
           fi
-          cargo nextest run "${nextest_args[@]}"
+          set +e
+          cargo nextest run "${nextest_args[@]}" \
+            2>&1 | tee ../rust-ci-summary/nextest.log
+          nextest_status=${PIPESTATUS[0]}
+          set -e
+          exit "$nextest_status"
 
       - name: Run workspace doctests
-        if: steps.contract.outputs.ready == 'true'
+        if: always() && steps.contract.outputs.ready == 'true'
         working-directory: rust
-        run: cargo test --workspace --doc --locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../rust-ci-summary
+          set +e
+          cargo test --workspace --doc --locked \
+            2>&1 | tee ../rust-ci-summary/doctests.log
+          doctest_status=${PIPESTATUS[0]}
+          set -e
+          exit "$doctest_status"
 
       - name: Write compact job summary and schema hash
         if: always()
@@ -1112,7 +1174,16 @@ jobs:
 
       - name: Install wasm-pack
         if: steps.contract.outputs.ready == 'true'
-        run: cargo install wasm-pack --locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          set +e
+          cargo install wasm-pack --locked \
+            2>&1 | tee rust-ci-summary/wasm-pack-install.log
+          install_status=${PIPESTATUS[0]}
+          set -e
+          exit "$install_status"
 
       - name: Run wasm32 er-wasm tests through Node
         if: steps.contract.outputs.ready == 'true'
@@ -1120,8 +1191,14 @@ jobs:
           CARGO_BUILD_TARGET: wasm32-unknown-unknown
         run: |
           set -euo pipefail
+          mkdir -p rust-ci-summary
           rustup target list --installed | grep -Fx wasm32-unknown-unknown
-          wasm-pack test --node "${{ steps.er-wasm.outputs.directory }}"
+          set +e
+          wasm-pack test --node "${{ steps.er-wasm.outputs.directory }}" \
+            2>&1 | tee rust-ci-summary/wasm-node.log
+          wasm_status=${PIPESTATUS[0]}
+          set -e
+          exit "$wasm_status"
 
       - name: Write compact job summary and schema hash
         if: always()
@@ -1187,7 +1264,7 @@ jobs:
           if-no-files-found: warn
 
   rust-benchmarks:
-    name: Rust kernel benchmark contract (not measured)
+    name: Rust kernel M2 measured benchmarks
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -1203,29 +1280,23 @@ jobs:
         run: |
           set -euo pipefail
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
-          shopt -s nullglob
-          benchmarks=(scripts/benchmark-kernel-*.mjs)
-          manifest=rust/fixtures/v1/baseline-manifest.json
-          baseline=scripts/benchmark-kernel-baseline.mjs
+          benchmark=scripts/benchmark-kernel-m2.mjs
+          manifest=rust/fixtures/v1/m2-benchmark-manifest.json
           feature_present=0
           missing=()
-          if ((${#benchmarks[@]} > 0)) || [[ -e "$manifest" ]]; then
+          if [[ -e "$benchmark" ]] || [[ -e "$manifest" ]]; then
             feature_present=1
           fi
           if ((feature_present == 0)); then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Rust kernel pre-contract: benchmark script milestone is not present yet."
+            echo "::notice::Rust kernel pre-contract: the measured M2 benchmark milestone is not present yet."
             exit 0
           fi
           for path in "${core[@]}"; do
             [[ -e "$path" ]] || missing+=("$path")
           done
-          ((${#benchmarks[@]} > 0)) || missing+=("scripts/benchmark-kernel-*.mjs")
+          [[ -f "$benchmark" ]] || missing+=("$benchmark")
           [[ -e "$manifest" ]] || missing+=("$manifest")
-          [[ -f "$baseline" ]] || missing+=("$baseline")
-          for benchmark in "${benchmarks[@]}"; do
-            [[ "$benchmark" == "$baseline" ]] || missing+=("unsupported benchmark script: $benchmark")
-          done
           if ((${#missing[@]} > 0)); then
             printf '::error::Benchmark contract is partially present; missing: %s\n' "${missing[*]}"
             exit 1
@@ -1314,72 +1385,133 @@ jobs:
           restore-keys: |
             rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
-      - name: Validate benchmark contract and scenario inventory (metadata only)
+      - name: Measure and validate the exact M2 workload inventory
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         env:
           LC_ALL: C
           TZ: UTC
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
+          RUST_KERNEL_M2_ATTESTATION: rust-kernel-m2-v1:measure:github-hosted
         run: |
           set -euo pipefail
-          mkdir -p rust-ci-benchmarks
-          node scripts/benchmark-kernel-baseline.mjs \
-            --mode metadata \
-            --oracle-game-sha "$ORACLE_SHA" \
-            > rust-ci-benchmarks/benchmark-kernel-baseline-metadata.json
-          node --input-type=module - rust-ci-benchmarks/benchmark-kernel-baseline-metadata.json <<'NODE'
+          mkdir -p rust-ci-benchmarks rust-ci-summary
+          output=rust-ci-benchmarks/m2-benchmark.json
+          baseline=rust/fixtures/v1/m2-benchmark-baseline.json
+          benchmark_args=(
+            --mode measure
+            --manifest rust/fixtures/v1/m2-benchmark-manifest.json
+            --oracle-game-sha "$ORACLE_SHA"
+            --output "$output"
+          )
+          expected_regression_status=not_requested
+          if [[ -f "$baseline" ]]; then
+            benchmark_args+=(--baseline "$baseline")
+            expected_regression_status=passed
+          fi
+
+          set +e
+          node scripts/benchmark-kernel-m2.mjs "${benchmark_args[@]}" \
+            2>&1 | tee rust-ci-summary/m2-benchmark-command.log
+          benchmark_status=${PIPESTATUS[0]}
+          set -e
+
+          test -s "$output"
+          cat "$output"
+          node --input-type=module - "$output" "$expected_regression_status" <<'NODE'
           import { readFileSync } from "node:fs";
 
           const file = process.argv[2];
+          const expectedRegressionStatus = process.argv[3];
           const value = JSON.parse(readFileSync(file, "utf8"));
-          const expectedIds = [
-            "authority-v2-node-suite",
-            "authority-v2-protocol-simulator",
-            "headless-single-wave",
-            "headless-ten-wave",
-            "headless-two-engine",
-            "browser-two-context-webrtc",
+          const expected = [
+            { id: "raw-input-menu-transitions", iterations: 1000, schedules: 0, steps: 0 },
+            { id: "proposal-receipt-cycles", iterations: 1000, schedules: 0, steps: 0 },
+            { id: "fault-network-schedules", iterations: 0, schedules: 10000, steps: 0 },
+            { id: "synthetic-pair-campaign", iterations: 0, schedules: 0, steps: 100000 },
           ];
-          if (value.schema_version !== 1) {
-            throw new Error(`${file} schema_version must be 1`);
+          const assert = (condition, message) => {
+            if (!condition) throw new Error(`${file}: ${message}`);
+          };
+          const measuredInteger = (candidate, label, positive = false) => {
+            assert(Number.isSafeInteger(candidate), `${label} must be a safe integer`);
+            assert(positive ? candidate > 0 : candidate >= 0, `${label} is outside its measured range`);
+          };
+
+          assert(value.schema_version === 1, "schema_version must be 1");
+          assert(value.manifest_id === "rust-kernel-m2-bench-v1", "manifest_id mismatch");
+          assert(value.mode === "measure" && value.status === "passed", "measurement did not pass");
+          assert(value.oracle_game_sha === process.env.ORACLE_SHA, "oracle SHA mismatch");
+          assert(value.oracle_branch === "ci/coop/v2-showdown-command-coordinate-20260720", "oracle branch mismatch");
+          assert(value.protocol_version === "er-coop-47", "protocol version mismatch");
+          assert(value.frame_protocol_version === 2, "frame protocol version mismatch");
+          assert(typeof value.manifest_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.manifest_sha256), "manifest digest missing");
+          assert(typeof value.source_lock_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.source_lock_sha256), "source-lock digest missing");
+          assert(typeof value.content_identity?.content_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.content_identity.content_sha256), "content digest missing");
+          assert(value.toolchain?.channel === "1.97.1", "toolchain channel mismatch");
+          assert(value.toolchain?.profile === "minimal", "toolchain profile mismatch");
+          assert(value.toolchain?.package === "er-sim", "toolchain package mismatch");
+          assert(value.toolchain?.bench_target === "m2_benchmark", "bench target mismatch");
+          assert(value.toolchain?.build_profile === "release", "build profile mismatch");
+          assert(value.setup?.status === "passed", "benchmark setup did not pass");
+          measuredInteger(value.setup.elapsed_wall_ms, "setup.elapsed_wall_ms");
+
+          const runner = value.runner;
+          assert(runner?.provider === "github-hosted", "runner provider mismatch");
+          assert(runner?.hosted === true && runner?.github_actions === true, "runner is not attested as hosted Actions");
+          assert(runner?.os === "linux" && runner?.runner_os === "Linux", "runner OS mismatch");
+          assert(runner?.arch === process.arch, "runner architecture mismatch");
+          assert(runner?.runner_arch === process.env.RUNNER_ARCH, "RUNNER_ARCH mismatch");
+          assert(runner?.class === "linux-github-hosted", "runner class mismatch");
+          assert(runner?.peak_rss_method === "gnu-time-%M-kib", "peak RSS method mismatch");
+          const github = runner.github_run;
+          const githubFields = {
+            server_url: "GITHUB_SERVER_URL",
+            repository: "GITHUB_REPOSITORY",
+            workflow: "GITHUB_WORKFLOW",
+            job: "GITHUB_JOB",
+            ref: "GITHUB_REF",
+            sha: "GITHUB_SHA",
+            run_id: "GITHUB_RUN_ID",
+            run_attempt: "GITHUB_RUN_ATTEMPT",
+            run_number: "GITHUB_RUN_NUMBER",
+          };
+          for (const [field, environment] of Object.entries(githubFields)) {
+            assert(github?.[field] === process.env[environment], `runner ${field} mismatch`);
           }
-          if (value.mode !== "metadata" || value.status !== "not_measured") {
-            throw new Error(`${file} must report metadata/not_measured; measured or passed output is invalid`);
-          }
-          if (value.oracle_game_sha !== "3b534099919efae827019d4a3f3c4ab0ecd6d67b") {
-            throw new Error(`${file} oracle_game_sha does not match the pinned oracle`);
-          }
-          if (value.protocol_version !== "er-coop-47") {
-            throw new Error(`${file} protocol_version must be er-coop-47`);
-          }
-          if (!Array.isArray(value.scenarios)) {
-            throw new Error(`${file} scenarios must be an array`);
-          }
-          const actualIds = value.scenarios.map(scenario => scenario.id);
-          if (actualIds.length !== expectedIds.length || expectedIds.some(id => !actualIds.includes(id))) {
-            throw new Error(`${file} scenario inventory mismatch: ${actualIds.join(", ")}`);
-          }
-          for (const scenario of value.scenarios) {
-            if (scenario.status !== "not_measured") {
-              throw new Error(`${file} scenario ${scenario.id} is not marked not_measured`);
+
+          assert(Array.isArray(value.workloads) && value.workloads.length === expected.length, "workload count mismatch");
+          for (const [index, specification] of expected.entries()) {
+            const workload = value.workloads[index];
+            assert(workload?.scenario_id === specification.id, `workload ${index} id/order mismatch`);
+            for (const field of ["iterations", "schedules", "steps"]) {
+              assert(workload[field] === specification[field], `${specification.id} ${field} mismatch`);
             }
-            for (const field of [
-              "sample_count",
-              "attempted_sample_count",
-              "setup_build_ms",
-              "cold_start_ms",
-              "warm_start_ms",
-              "spawn_latency_ms",
-              "execution_ms",
-              "peak_rss_bytes",
-            ]) {
-              if (scenario[field] !== null) {
-                throw new Error(`${file} scenario ${scenario.id} has measured field ${field}`);
-              }
-            }
+            assert(workload.status === "passed" && workload.success === true, `${specification.id} did not pass`);
+            assert(workload.failure === null, `${specification.id} recorded a failure`);
+            measuredInteger(workload.elapsed_wall_ms, `${specification.id}.elapsed_wall_ms`);
+            measuredInteger(workload.peak_rss_bytes, `${specification.id}.peak_rss_bytes`, true);
+            assert(typeof workload.checksum === "string" && /^[0-9a-f]{16}$/u.test(workload.checksum), `${specification.id} checksum missing`);
+            assert(workload.oracle_game_sha === value.oracle_game_sha, `${specification.id} oracle mismatch`);
+            assert(workload.protocol_version === value.protocol_version, `${specification.id} protocol mismatch`);
+            assert(workload.manifest_sha256 === value.manifest_sha256, `${specification.id} manifest mismatch`);
+            assert(workload.source_lock_sha256 === value.source_lock_sha256, `${specification.id} source-lock mismatch`);
+            assert(workload.content_sha256 === value.content_identity.content_sha256, `${specification.id} content mismatch`);
+            assert(workload.runner?.provider === runner.provider, `${specification.id} runner provider mismatch`);
+            assert(workload.runner?.os === runner.os && workload.runner?.arch === runner.arch, `${specification.id} runner platform mismatch`);
+            assert(workload.runner?.class === runner.class, `${specification.id} runner class mismatch`);
+            assert(workload.runner?.github_run?.sha === process.env.GITHUB_SHA, `${specification.id} SHA mismatch`);
+          }
+          const fault = value.workloads.find(workload => workload.scenario_id === "fault-network-schedules");
+          assert(fault.elapsed_wall_ms < 60000, "10,000 fault schedules must complete in under 60 seconds");
+          assert(value.regression_check?.factor === 1.25, "regression factor must be 1.25");
+          assert(value.regression_check?.status === expectedRegressionStatus, "regression status mismatch");
+          if (expectedRegressionStatus === "passed") {
+            assert(Array.isArray(value.regression_check.regressions), "regression list missing");
+            assert(value.regression_check.regressions.length === 0, "wall/RSS regression exceeded 25 percent");
           }
           NODE
+          exit "$benchmark_status"
 
       - name: Write compact job summary and schema hash
         if: always()
@@ -1395,7 +1527,7 @@ jobs:
             echo "sha=$GITHUB_SHA"
             echo "contract_status=${CONTRACT_STATUS:-unknown}"
             echo "job_status=${JOB_STATUS:-unknown}"
-            echo "benchmark_status=not_measured"
+            echo "benchmark_status=measured"
           } > rust-ci-summary/summary.txt
           schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
           if [[ -n "$schema_file" ]]; then
@@ -1405,11 +1537,11 @@ jobs:
           fi
           find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
 
-      - name: Upload compact metadata evidence
+      - name: Upload compact measured evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: rust-kernel-${{ github.job }}-metadata
+          name: rust-kernel-${{ github.job }}-measured
           path: |
             rust-ci-summary/**
             rust-ci-benchmarks/**/*.json
