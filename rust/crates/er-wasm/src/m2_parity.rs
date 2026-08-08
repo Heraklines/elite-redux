@@ -35,27 +35,6 @@ const PROTOCOL_CONTROL_ID: &str = "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42";
 const PROTOCOL_PROPOSAL_LABEL: &str = "command";
 const PROTOCOL_PROPOSAL_WIRE_JSON: &str =
     r#"{"surface":"command","option":"move:first","operation":"operation/m2-parity"}"#;
-#[cfg(not(target_arch = "wasm32"))]
-pub const CALIBRATION_ONLY_STATUS: &str = "CALIBRATION_ONLY_NOT_ACCEPTED_PARITY";
-#[cfg(not(target_arch = "wasm32"))]
-pub const RAW_INPUT_CALIBRATION_PENDING_DIGEST: &str = "PENDING_M2_RAW_INPUT_CALIBRATION";
-#[cfg(not(target_arch = "wasm32"))]
-pub const RAW_INPUT_CALIBRATION_EVENT_COUNT: usize = 23;
-
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_FIXTURE_ID: &str = "game-kernel-raw-input-v1";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_FIXTURE_PATH: &str = "rust/fixtures/v1/m2-parity/game-kernel-raw-input.json";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_PROTOCOL_VERSION: &str = "er-coop-47";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_CONTENT_HASH: &str = "blake3-v1:m2-parity-game-kernel-raw-input";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_RUST_TOOLCHAIN: &str = "1.97.1";
-#[cfg(not(target_arch = "wasm32"))]
-const RAW_INPUT_SEED: u64 = u64::MAX;
 
 /// A decoded parity fixture.  This is an evidence-only wrapper and is not a
 /// public or wire schema.
@@ -114,7 +93,7 @@ pub enum ParityReplayError {
     PendingEvidence { dependency: String },
     Kernel { sequence: SafeU53, reason: String },
     Canonical { field: &'static str, reason: String },
-    Divergence(ParityDivergence),
+    Divergence(Box<ParityDivergence>),
 }
 
 impl fmt::Display for ParityReplayError {
@@ -309,7 +288,7 @@ pub fn replay_fixture(fixture: &ParityFixture) -> Result<ParityReplayReport, Par
         let actual = observe(&kernel, &effects)?;
         let expected_live_resources_digest = live_resources_digest(&event.expected_live_resources)?;
         if !matches_expected(event, &actual, &expected_live_resources_digest) {
-            return Err(ParityReplayError::Divergence(ParityDivergence {
+            return Err(ParityReplayError::Divergence(Box::new(ParityDivergence {
                 seed: seed.clone(),
                 sequence: event.sequence,
                 virtual_time_ms: event.virtual_time_ms,
@@ -323,7 +302,7 @@ pub fn replay_fixture(fixture: &ParityFixture) -> Result<ParityReplayReport, Par
                 actual_live_resources: actual.live_resources.clone(),
                 expected_live_resources_digest,
                 actual_live_resources_digest: actual.live_resources_digest.clone(),
-            }));
+            })));
         }
         observations.push(actual);
     }
@@ -342,231 +321,6 @@ pub fn replay_fixture_json(input: &str) -> Result<String, ParityReplayError> {
     let report = replay_fixture(&fixture)?;
     canonicalize(&report_value(&report)).map_err(|error| ParityReplayError::Canonical {
         field: "replay_report",
-        reason: error.to_string(),
-    })
-}
-
-/// Replay the pending protocol fixture without consulting any expected value.
-///
-/// This native-only path exists solely to capture hosted calibration evidence
-/// after the M2B-01 kernel composition lands.  It rejects accepted/non-protocol
-/// fixtures so it cannot become an alternate parity assertion path.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn calibrate_pending_fixture_json(input: &str) -> Result<String, ParityReplayError> {
-    let fixture = parse_fixture(input)?;
-    let dependency = fixture.expected_evidence_status.as_ref().ok_or_else(|| {
-        ParityReplayError::InvalidFixture(
-            "calibration requires an explicitly pending fixture".to_owned(),
-        )
-    })?;
-    if fixture.protocol_config.is_none() {
-        return Err(ParityReplayError::InvalidFixture(
-            "calibration requires a production protocol configuration".to_owned(),
-        ));
-    }
-    if fixture.trace.events.len() != 10 {
-        return Err(ParityReplayError::InvalidFixture(format!(
-            "protocol calibration requires exactly 10 events, got {}",
-            fixture.trace.events.len()
-        )));
-    }
-    for event in &fixture.trace.events {
-        if !event.expected_effect_digest.starts_with("PENDING_M2B_01")
-            || !event.expected_state_digest.starts_with("PENDING_M2B_01")
-            || !event.expected_ui_digest.starts_with("PENDING_M2B_01")
-        {
-            return Err(ParityReplayError::InvalidFixture(format!(
-                "calibration requires pending expected digests at sequence {}",
-                event.sequence
-            )));
-        }
-    }
-
-    let mut kernel = GameKernel::new(KernelConfig {
-        input_map: fixture.input_map.clone(),
-        initial_ui: fixture.trace.initial_snapshot.ui.clone(),
-        protocol: fixture.protocol_config.clone(),
-    });
-    let initial_snapshot = kernel.snapshot();
-    let initial_ui = kernel.ui_view();
-    let initial_live_resources = kernel.live_resources();
-    let initial = json!({
-        "state": initial_snapshot,
-        "state_digest": kernel.state_digest(),
-        "ui": initial_ui,
-        "ui_digest": ui_digest(&kernel)?,
-        "live_resources": initial_live_resources,
-        "live_resources_digest": live_resources_digest(&kernel.live_resources())?,
-    });
-
-    let seed = fixture.seed.to_string();
-    let mut observations = Vec::with_capacity(fixture.trace.events.len());
-    for event in &fixture.trace.events {
-        let effects =
-            kernel
-                .step(event.input.clone())
-                .map_err(|error| ParityReplayError::Kernel {
-                    sequence: event.sequence,
-                    reason: error.to_string(),
-                })?;
-        let actual = observe(&kernel, &effects)?;
-        observations.push(json!({
-            "seed": seed,
-            "sequence": event.sequence,
-            "virtual_time_ms": event.virtual_time_ms,
-            "input": event.input,
-            "effects": effects,
-            "effect_digest": actual.effect_digest,
-            "state": kernel.snapshot(),
-            "state_digest": actual.state_digest,
-            "ui": kernel.ui_view(),
-            "ui_digest": actual.ui_digest,
-            "live_resources": actual.live_resources,
-            "live_resources_digest": actual.live_resources_digest,
-        }));
-    }
-
-    let artifact = json!({
-        "artifact_version": 1,
-        "status": CALIBRATION_ONLY_STATUS,
-        "accepted_parity": false,
-        "comparison_mode": "BYPASS_PENDING_EXPECTED_VALUES",
-        "dependency": dependency,
-        "seed": seed,
-        "event_count": observations.len(),
-        "initial": initial,
-        "observations": observations,
-    });
-    canonicalize(&artifact).map_err(|error| ParityReplayError::Canonical {
-        field: "calibration_report",
-        reason: error.to_string(),
-    })
-}
-
-/// Replay the pending non-protocol raw-input fixture without consulting any
-/// expected value.
-///
-/// This native-only path is deliberately narrower than the protocol
-/// calibration above: it accepts only the exact raw-input fixture identity,
-/// requires no protocol configuration, and rejects every digest that is not
-/// the explicit temporary marker.  It exists only to capture hosted evidence;
-/// the returned report is never parity acceptance.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn calibrate_raw_input_fixture_json(input: &str) -> Result<String, ParityReplayError> {
-    let fixture = parse_fixture(input)?;
-    let header = &fixture.trace.header;
-    if fixture.seed != RAW_INPUT_SEED {
-        return Err(ParityReplayError::InvalidFixture(
-            "raw-input calibration requires the exact u64 seed".to_owned(),
-        ));
-    }
-    if header.trace_version != KERNEL_TRACE_VERSION
-        || header.schema_version != PARITY_FIXTURE_SCHEMA_VERSION
-        || header.oracle_game_sha != RAW_INPUT_ORACLE_GAME_SHA
-        || header.protocol_version != RAW_INPUT_PROTOCOL_VERSION
-        || header.content_hash != RAW_INPUT_CONTENT_HASH
-        || header.rust_toolchain != RAW_INPUT_RUST_TOOLCHAIN
-    {
-        return Err(ParityReplayError::InvalidFixture(
-            "raw-input calibration requires the exact fixture header".to_owned(),
-        ));
-    }
-    if fixture.protocol_config.is_some() || fixture.expected_evidence_status.is_some() {
-        return Err(ParityReplayError::InvalidFixture(
-            "raw-input calibration does not accept protocol configuration".to_owned(),
-        ));
-    }
-    if fixture.trace.events.len() != RAW_INPUT_CALIBRATION_EVENT_COUNT {
-        return Err(ParityReplayError::InvalidFixture(format!(
-            "raw-input calibration requires exactly {RAW_INPUT_CALIBRATION_EVENT_COUNT} events, got {}",
-            fixture.trace.events.len()
-        )));
-    }
-    for (index, event) in fixture.trace.events.iter().enumerate() {
-        if event.sequence.get() != index as u64 {
-            return Err(ParityReplayError::InvalidFixture(format!(
-                "raw-input calibration requires contiguous sequence {index}, got {}",
-                event.sequence
-            )));
-        }
-        if event.expected_effect_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
-            || event.expected_state_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
-            || event.expected_ui_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
-        {
-            return Err(ParityReplayError::InvalidFixture(format!(
-                "raw-input calibration requires explicit pending digests at sequence {}",
-                event.sequence
-            )));
-        }
-    }
-
-    let mut kernel = GameKernel::new(KernelConfig {
-        input_map: fixture.input_map.clone(),
-        initial_ui: fixture.trace.initial_snapshot.ui.clone(),
-        protocol: None,
-    });
-    if kernel.snapshot() != fixture.trace.initial_snapshot {
-        return Err(ParityReplayError::InvalidFixture(
-            "raw-input calibration initial_snapshot does not match GameKernel construction"
-                .to_owned(),
-        ));
-    }
-
-    let initial_snapshot = kernel.snapshot();
-    let initial_ui = kernel.ui_view();
-    let initial_live_resources = kernel.live_resources();
-    let initial = json!({
-        "state": initial_snapshot,
-        "state_digest": kernel.state_digest(),
-        "ui": initial_ui,
-        "ui_digest": ui_digest(&kernel)?,
-        "live_resources": initial_live_resources,
-        "live_resources_digest": live_resources_digest(&kernel.live_resources())?,
-    });
-
-    let seed = fixture.seed.to_string();
-    let mut observations = Vec::with_capacity(fixture.trace.events.len());
-    for event in &fixture.trace.events {
-        let effects =
-            kernel
-                .step(event.input.clone())
-                .map_err(|error| ParityReplayError::Kernel {
-                    sequence: event.sequence,
-                    reason: error.to_string(),
-                })?;
-        let actual = observe(&kernel, &effects)?;
-        observations.push(json!({
-            "seed": seed,
-            "sequence": event.sequence,
-            "virtual_time_ms": event.virtual_time_ms,
-            "input": event.input,
-            "effects": effects,
-            "effect_digest": actual.effect_digest,
-            "state": kernel.snapshot(),
-            "state_digest": actual.state_digest,
-            "ui": kernel.ui_view(),
-            "ui_digest": actual.ui_digest,
-            "live_resources": actual.live_resources,
-            "live_resources_digest": actual.live_resources_digest,
-        }));
-    }
-
-    let artifact = json!({
-        "artifact_version": 1,
-        "status": CALIBRATION_ONLY_STATUS,
-        "accepted_parity": false,
-        "comparison_mode": "BYPASS_PENDING_EXPECTED_VALUES",
-        "fixture_id": RAW_INPUT_FIXTURE_ID,
-        "fixture_path": RAW_INPUT_FIXTURE_PATH,
-        "fixture_header": fixture.trace.header,
-        "protocol_config": null,
-        "seed": seed,
-        "event_count": observations.len(),
-        "initial": initial,
-        "observations": observations,
-    });
-    canonicalize(&artifact).map_err(|error| ParityReplayError::Canonical {
-        field: "raw_input_calibration_report",
         reason: error.to_string(),
     })
 }
