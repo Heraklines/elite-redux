@@ -16,10 +16,11 @@ use er_sim::{
 };
 use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
-    CommandFrontierControl, ConnectionGeneration, FrameContext, GameButton, InputMap, KeyBinding,
-    FrameType, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState, MembershipRevision,
-    NextControl, OperationId, PhysicalKey, ProposalMessage, Revision, RunId, SafeI53, SafeU53,
-    SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
+    CommandFrontierControl, ConnectionGeneration, FRAME_PROTOCOL_VERSION, FrameContext, FrameType,
+    GameButton, InputMap, KeyBinding, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
+    MembershipRevision, NextControl, OperationId, PhysicalKey, ProposalMessage, Revision, RunId,
+    SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState,
+    UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -517,6 +518,75 @@ fn assert_proposal_effect(
     );
 }
 
+fn assert_authority_local_submission(
+    step: &PairStep,
+    endpoint: SeatId,
+    revision: u64,
+    operation_id: &str,
+    material: &Material,
+    control: &NextControl,
+) -> TestResult {
+    let proposals = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::SendProposal { proposal } => Some(proposal.clone()),
+            _ => None,
+        })
+        .collect::<Vec<ProposalMessage>>();
+    assert_eq!(proposals, Vec::<ProposalMessage>::new());
+
+    assert_material_effect(step, endpoint, revision, operation_id, material);
+    assert_control_effect(step, endpoint, revision, operation_id, control);
+    let local_effect_order = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ApplyAuthorityMaterial {
+                endpoint: effect_endpoint,
+                ..
+            } if *effect_endpoint == endpoint => Some("material"),
+            KernelEffect::ProjectAuthorityControl {
+                endpoint: effect_endpoint,
+                ..
+            } if *effect_endpoint == endpoint => Some("control"),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(local_effect_order, vec!["material", "control"]);
+
+    let mut entries = Vec::new();
+    for effect in &step.generated_effects {
+        if let KernelEffect::SendFrame { from, frame } = effect {
+            if frame.frame_type == FrameType::AuthorityEntry {
+                entries.push((
+                    *from,
+                    frame.version,
+                    frame.context.clone(),
+                    serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?,
+                ));
+            }
+        }
+    }
+    assert_eq!(
+        entries,
+        vec![(
+            endpoint,
+            FRAME_PROTOCOL_VERSION,
+            context(0),
+            AuthorityEntryBody {
+                revision: Revision::new(safe(revision)),
+                operation_id: operation(operation_id),
+                kind: AuthorityEntryKind::TurnCommit,
+                material: material.clone(),
+                next_control: control.clone(),
+                subsumes: Vec::new(),
+            },
+        )]
+    );
+    Ok(())
+}
+
 fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) -> TimerId {
     let timers = step
         .generated_effects
@@ -850,17 +920,17 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         seat(0),
         MenuGeneration::new(safe(2)),
         HOST_OPERATION,
-        &control_id_of(&initial_control()),
+        &control_id_of(&remaining_control()),
         HOST_OPTION,
     );
-    assert_proposal_effect(
+    assert_authority_local_submission(
         &host_submitted,
-        HOST_OPERATION,
-        host_fingerprint(),
         seat(0),
-        seat(1),
-        proposal_payload("host"),
-    );
+        2,
+        HOST_OPERATION,
+        &authority_material(1, "host"),
+        &await_control(),
+    )?;
     steps.push(host_submitted);
     steps.push(pair.key_up(PairEndpoint::Host, PhysicalKey::Enter)?);
 
@@ -1080,24 +1150,14 @@ fn raw_key_command_campaign_covers_projection_progression_and_determinism() -> T
         .collect::<Vec<_>>();
     assert_eq!(
         proposals,
-        vec![
-            ProposalMessage {
-                operation_id: operation(GUEST_OPERATION),
-                fingerprint: guest_b_fingerprint(),
-                from: seat(1),
-                to: seat(0),
-                connection_generation: ConnectionGeneration::ZERO,
-                payload: proposal_payload("b"),
-            },
-            ProposalMessage {
-                operation_id: operation(HOST_OPERATION),
-                fingerprint: host_fingerprint(),
-                from: seat(0),
-                to: seat(1),
-                connection_generation: ConnectionGeneration::ZERO,
-                payload: proposal_payload("host"),
-            },
-        ]
+        vec![ProposalMessage {
+            operation_id: operation(GUEST_OPERATION),
+            fingerprint: guest_b_fingerprint(),
+            from: seat(1),
+            to: seat(0),
+            connection_generation: ConnectionGeneration::ZERO,
+            payload: proposal_payload("b"),
+        }]
     );
     Ok(())
 }
