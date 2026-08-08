@@ -59,7 +59,7 @@ pub enum SchedulerError {
     EmptyPauseReason,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct KernelScheduler {
     timers: BTreeMap<TimerId, ScheduledTimer>,
     pause_reasons: BTreeMap<(SeatId, TimeClass), BTreeSet<String>>,
@@ -189,10 +189,10 @@ impl KernelScheduler {
         time_class: TimeClass,
         reason: &str,
     ) -> Result<Option<SchedulerCommand>, SchedulerError> {
-        self.check_pause_request(reason)?;
         if time_class == TimeClass::Absolute {
             return Ok(None);
         }
+        self.check_pause_request(reason)?;
 
         let reasons = self
             .pause_reasons
@@ -215,10 +215,10 @@ impl KernelScheduler {
         time_class: TimeClass,
         reason: &str,
     ) -> Result<Option<SchedulerCommand>, SchedulerError> {
-        self.check_pause_request(reason)?;
         if time_class == TimeClass::Absolute {
             return Ok(None);
         }
+        self.check_pause_request(reason)?;
 
         let key = (endpoint, time_class);
         let Some(reasons) = self.pause_reasons.get_mut(&key) else {
@@ -304,7 +304,6 @@ impl KernelScheduler {
         }
 
         self.disposed = true;
-        self.pause_reasons.clear();
         let timer_ids = self.timers.keys().copied().collect::<Vec<_>>();
         timer_ids
             .into_iter()
@@ -411,6 +410,42 @@ mod tests {
                 },
             }]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn failed_exhausting_batch_preserves_live_timers_and_cursor() -> Result<(), SchedulerError> {
+        let mut scheduler = KernelScheduler::new();
+        scheduler.schedule_batch(vec![spec("existing")])?;
+        scheduler.next_timer_id = Some(SafeU53::MAX);
+        let live_timers = scheduler.live_timers();
+        let next_timer_id = scheduler.next_timer_id;
+
+        assert_eq!(
+            scheduler.schedule_batch(vec![spec("first"), spec("second")]),
+            Err(SchedulerError::TimerIdExhausted)
+        );
+        assert_eq!(scheduler.live_timers(), live_timers);
+        assert_eq!(scheduler.next_timer_id, next_timer_id);
+        Ok(())
+    }
+
+    #[test]
+    fn clone_preserves_value_state_without_sharing_mutations() -> Result<(), SchedulerError> {
+        let mut scheduler = KernelScheduler::new();
+        scheduler.schedule_batch(vec![spec("clone")])?;
+        scheduler.pause_class(
+            SeatId::new(SafeU53::ZERO),
+            TimeClass::Connected,
+            "clone",
+        )?;
+
+        let mut clone = scheduler.clone();
+        assert_eq!(clone.live_timers(), scheduler.live_timers());
+        assert!(clone.is_class_paused(SeatId::new(SafeU53::ZERO), TimeClass::Connected));
+
+        assert!(clone.cancel(TimerId::new(SafeU53::ZERO)).is_some());
+        assert!(scheduler.timer(TimerId::new(SafeU53::ZERO)).is_some());
         Ok(())
     }
 
