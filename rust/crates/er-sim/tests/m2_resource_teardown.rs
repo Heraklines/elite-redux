@@ -715,6 +715,19 @@ fn has_frame(steps: &[PairStep], frame_type: FrameType) -> bool {
     })
 }
 
+fn frame_count(steps: &[PairStep], frame_type: FrameType) -> usize {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::SendFrame { frame, .. } if frame.frame_type == frame_type
+            )
+        })
+        .count()
+}
+
 fn has_effect<F>(steps: &[PairStep], mut predicate: F) -> bool
 where
     F: FnMut(&KernelEffect) -> bool,
@@ -723,22 +736,6 @@ where
         .iter()
         .flat_map(|step| step.generated_effects.iter())
         .any(&mut predicate)
-}
-
-fn material_effect_count(steps: &[PairStep], endpoint: SeatId) -> usize {
-    steps
-        .iter()
-        .flat_map(|step| step.generated_effects.iter())
-        .filter(|effect| {
-            matches!(
-                effect,
-                KernelEffect::ApplyAuthorityMaterial {
-                    endpoint: effect_endpoint,
-                    ..
-                } if *effect_endpoint == endpoint
-            )
-        })
-        .count()
 }
 
 fn drain_network(pair: &mut SimulatedPair, trace: &mut Vec<PairStep>) -> TestResult {
@@ -829,6 +826,13 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
         effect,
         KernelEffect::ProjectAuthorityControl { .. }
     )));
+    assert!(has_effect(&trace, |effect| {
+        matches!(
+            effect,
+            KernelEffect::ProjectAuthorityControl { control, .. }
+                if control_id_of(control) == fixture.await_control_id
+        )
+    }));
 
     let quiescent = pair.snapshot()?;
     assert_eq!(quiescent.virtual_time_ms, SafeU53::ZERO);
@@ -842,23 +846,13 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
     assert!(quiescent.guest.live_resources.presentations.is_empty());
     assert!(quiescent.host.live_resources.storage_requests.is_empty());
     assert!(quiescent.guest.live_resources.storage_requests.is_empty());
-    assert!(
-        quiescent
-            .host
-            .live_resources
-            .controls
-            .contains(&fixture.await_control_id)
-            || quiescent
-                .guest
-                .live_resources
-                .controls
-                .contains(&fixture.await_control_id)
-    );
-    assert!(
-        !quiescent.host.live_resources.waits.is_empty()
-            || !quiescent.guest.live_resources.waits.is_empty(),
-        "the completed lifecycle must leave the await/control owner observable"
-    );
+    let await_prompt = format!("await/{HOST_OPERATION}");
+    for endpoint in [&quiescent.host, &quiescent.guest] {
+        assert_eq!(endpoint.ui.kind, UiViewKind::Waiting);
+        assert!(!endpoint.ui.actionable);
+        assert!(endpoint.live_resources.controls.is_empty());
+        assert!(endpoint.live_resources.waits.contains(&await_prompt));
+    }
 
     let final_snapshot = pair.teardown("m2b-10 successful lifecycle")?;
     assert_eq!(final_snapshot.seed, seed.to_string());
@@ -937,9 +931,26 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
     assert!(!authority_live.host.live_resources.timers.is_empty());
 
     // The first committed entry exposes the host command through the pair's
-    // raw keyboard surface. Do not release any resulting receipt packets.
+    // raw keyboard surface. The host's second local commit is queued as an
+    // authority entry too; do not release any resulting receipt packets.
     trace.extend(pair.press(PairEndpoint::Host, PhysicalKey::Enter)?);
-    while material_effect_count(&trace, seat(1)) < 2 {
+    assert_eq!(
+        frame_count(&trace, FrameType::AuthorityEntry),
+        2,
+        "both command submissions must produce an authority entry"
+    );
+
+    // FaultControlled intentionally holds the first replica entry at its
+    // presentation boundary. Deliver only until that adapter resource is
+    // observable; the remaining authority/receipt traffic stays queued for
+    // pair teardown to release.
+    while pair
+        .snapshot()?
+        .guest
+        .live_resources
+        .presentations
+        .is_empty()
+    {
         if pair.snapshot()?.network.queued_packet_ids.is_empty() {
             return Err("missing queued authority entry for live-resource coverage".into());
         }
