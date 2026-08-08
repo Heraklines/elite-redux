@@ -842,7 +842,11 @@ fn wrong_endpoint_timer_fire_fails_closed_before_scheduler_consumption() -> Test
     let owner = seat(1);
     let other = seat(2);
     let mut kernel = kernel_with(
-        choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, true),
+        choice_menu(
+            options(&[("one", true, true), ("two", true, true)])?,
+            0,
+            true,
+        ),
         Some(owner),
         true,
     );
@@ -919,7 +923,11 @@ fn dispose_cancels_each_real_input_timer_once_and_reports_zero_resources() -> Te
 fn cloned_game_kernel_keeps_scheduler_state_without_sharing_mutations() -> TestResult {
     let owner = seat(1);
     let mut original = kernel_with(
-        choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, true),
+        choice_menu(
+            options(&[("one", true, true), ("two", true, true)])?,
+            0,
+            true,
+        ),
         Some(owner),
         true,
     );

@@ -89,9 +89,7 @@ impl InputRouter {
                 self.keyboard_down(endpoint, code, printable, scheduler)
             }
             RawInputEvent::KeyUp { code } => self.keyboard_up(code, scheduler),
-            RawInputEvent::GamepadDown { button } => {
-                self.gamepad_down(endpoint, button, scheduler)
-            }
+            RawInputEvent::GamepadDown { button } => self.gamepad_down(endpoint, button, scheduler),
             RawInputEvent::GamepadUp { button } => self.gamepad_up(button, scheduler),
             RawInputEvent::FocusChanged(focus) => {
                 self.focus = focus;
@@ -366,11 +364,7 @@ impl InputRouter {
         }
     }
 
-    pub(crate) fn discard_timer(
-        &mut self,
-        timer_id: TimerId,
-        scheduler: &mut KernelScheduler,
-    ) {
+    pub(crate) fn discard_timer(&mut self, timer_id: TimerId, scheduler: &mut KernelScheduler) {
         let _ = scheduler.cancel(timer_id);
         self.timer_buttons.remove(&timer_id);
         self.printable_timers.remove(&timer_id);
@@ -451,11 +445,7 @@ mod tests {
         }
     }
 
-    fn key_down_for(
-        code: PhysicalKey,
-        printable: bool,
-        focus: InputFocus,
-    ) -> RawInputEvent {
+    fn key_down_for(code: PhysicalKey, printable: bool, focus: InputFocus) -> RawInputEvent {
         RawInputEvent::KeyDown {
             code,
             printable,
@@ -492,9 +482,7 @@ mod tests {
                 }],
             }
         );
-        let fired = scheduler
-            .fired(timer(0))
-            .map_err(InputRouteError::from)?;
+        let fired = scheduler.fired(timer(0)).map_err(InputRouteError::from)?;
         let repeated = router.timer_fired(fired, &mut scheduler)?;
         assert_eq!(
             repeated.timers,
@@ -565,9 +553,7 @@ mod tests {
             Vec::new(),
         ));
         router.handle(endpoint, key_down(), &mut scheduler)?;
-        let mut fired = scheduler
-            .fired(timer(0))
-            .map_err(InputRouteError::from)?;
+        let mut fired = scheduler.fired(timer(0)).map_err(InputRouteError::from)?;
         fired.owner = TimerOwner::new("other", "other/address", "other-reason")
             .map_err(|_| InputRouteError::SchedulerInvariant)?;
 
@@ -611,7 +597,10 @@ mod tests {
             ]
         );
         assert!(scheduler.live_timers().is_empty());
-        assert!(router.replace_map(input_map(Vec::new(), Vec::new()), &mut scheduler).is_empty());
+        assert_eq!(
+            router.replace_map(input_map(Vec::new(), Vec::new()), &mut scheduler),
+            InputRouterOutput::default()
+        );
         Ok(())
     }
 
@@ -671,8 +660,8 @@ mod tests {
     }
 
     #[test]
-    fn replace_map_normalizes_repeat_cadence_and_preserves_bindings()
-    -> Result<(), InputRouteError> {
+    fn replace_map_normalizes_repeat_cadence_and_preserves_bindings() -> Result<(), InputRouteError>
+    {
         let endpoint = SeatId::ZERO;
         let mut scheduler = KernelScheduler::new();
         let mut router = InputRouter::new(input_map(Vec::new(), Vec::new()));
@@ -976,8 +965,8 @@ mod tests {
     }
 
     #[test]
-    fn text_entry_suppression_has_matching_keyup_after_focus_changes()
-    -> Result<(), InputRouteError> {
+    fn text_entry_suppression_has_matching_keyup_after_focus_changes() -> Result<(), InputRouteError>
+    {
         let endpoint = SeatId::ZERO;
         let mut scheduler = KernelScheduler::new();
         let mut router = InputRouter::new(input_map(
@@ -1071,8 +1060,7 @@ mod tests {
     }
 
     #[test]
-    fn unmatched_keyup_is_a_noop_and_does_not_remove_another_lock()
-    -> Result<(), InputRouteError> {
+    fn unmatched_keyup_is_a_noop_and_does_not_remove_another_lock() -> Result<(), InputRouteError> {
         let endpoint = SeatId::ZERO;
         let mut scheduler = KernelScheduler::new();
         let mut router = InputRouter::new(input_map(
@@ -1139,8 +1127,7 @@ mod tests {
     }
 
     #[test]
-    fn scheduler_rejection_is_fail_atomic_for_repeat_reschedule() -> Result<(), InputRouteError>
-    {
+    fn scheduler_rejection_is_fail_atomic_for_repeat_reschedule() -> Result<(), InputRouteError> {
         let endpoint = SeatId::ZERO;
         let mut scheduler = KernelScheduler::new();
         let mut router = InputRouter::new(input_map(

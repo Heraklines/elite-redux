@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use er_canonical::content_digest;
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, ProposalLeaseConfig,
-    KernelScheduler, ScheduledTimer, SchedulerCommand, RecoveryTransactionConfig,
+    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, KernelScheduler,
+    ProposalLeaseConfig, RecoveryTransactionConfig, ScheduledTimer, SchedulerCommand,
 };
 use er_types::{
     ButtonEvent, CancelPolicy, GameButton, InputMap, InputRouterOutput, InputTimerCommand,
@@ -150,7 +150,10 @@ impl GameKernel {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
 
-                let fired = self.scheduler.fired(timer_id).map_err(InputRouteError::from)?;
+                let fired = self
+                    .scheduler
+                    .fired(timer_id)
+                    .map_err(InputRouteError::from)?;
                 self.repeat_timers.remove(&timer_id);
                 let output = match self.input_router.timer_fired(fired, &mut self.scheduler) {
                     Ok(output) => output,
@@ -225,10 +228,7 @@ impl GameKernel {
 
         for command in self.scheduler.dispose() {
             if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
-                effects.push(KernelEffect::CancelTimer {
-                    endpoint,
-                    timer_id,
-                });
+                effects.push(KernelEffect::CancelTimer { endpoint, timer_id });
             }
         }
 

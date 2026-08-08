@@ -1,8 +1,8 @@
 use er_protocol::{
-    LocalPresentationInputProof, control_allows_successor_entry, control_id_of,
+    LocalPresentationInputProof, SuccessorValidator, control_allows_successor_entry, control_id_of,
     control_owner_seat_id, control_owner_seat_ids, controls_equal, is_valid_next_control,
     next_control_issues, partition_control_for_seat, same_control_address, successor_wait_allows,
-    successor_wait_allows_local_presentation_input, validate_next_control, SuccessorValidator,
+    successor_wait_allows_local_presentation_input, validate_next_control,
 };
 use er_types::{
     AuthorityEntry, AuthorityEntryKind, AwaitSuccessorControl, CommandControlTarget,
@@ -294,7 +294,10 @@ fn control_ids_match_the_pinned_next_control_fixture() {
     ];
 
     for (name, raw, expected_id) in fixtures {
-        assert!(next_control_issues(&raw).is_empty(), "{name} fixture must be valid");
+        assert!(
+            next_control_issues(&raw).is_empty(),
+            "{name} fixture must be valid"
+        );
         let control = validate_next_control(&raw).expect("pinned fixture must deserialize");
         assert_eq!(control_id_of(&control), expected_id, "{name} fixture ID");
     }
@@ -352,7 +355,10 @@ fn control_ids_preserve_the_pinned_wildcard_collision() {
         NextControl::AwaitSuccessor(address_literal),
     ] {
         let raw = serde_json::to_value(control).expect("wildcard compatibility control serializes");
-        assert!(is_valid_next_control(&raw), "literal '*' remains a valid opaque ID");
+        assert!(
+            is_valid_next_control(&raw),
+            "literal '*' remains a valid opaque ID"
+        );
     }
 }
 
@@ -510,11 +516,7 @@ fn semantic_validation_rejects_invalid_coordinates_chains_and_closed_surfaces() 
             "successor.operationIds",
         ]
     );
-    assert_eq!(
-        SuccessorValidator::new()
-            .issues(&invalid_shared),
-        issues
-    );
+    assert_eq!(SuccessorValidator::new().issues(&invalid_shared), issues);
     assert_eq!(
         validate_next_control(&invalid_shared)
             .expect_err("invalid shared control must fail")
@@ -560,12 +562,7 @@ fn duplicate_key_diagnostics_match_javascript_string_conversion() {
         ("true", Some(json!(true)), "true", false),
         ("false", Some(json!(false)), "false", false),
         ("fractional number", Some(json!(1.5)), "1.5", false),
-        (
-            "negative zero",
-            Some(json!(-0.0)),
-            "0",
-            false,
-        ),
+        ("negative zero", Some(json!(-0.0)), "0", false),
         (
             "fixed threshold number",
             Some(serde_json::from_str::<Value>("1e-6").expect("number fixture")),
@@ -580,12 +577,7 @@ fn duplicate_key_diagnostics_match_javascript_string_conversion() {
         ),
         ("string", Some(json!("opaque")), "opaque", true),
         ("array", Some(json!([1])), "1", false),
-        (
-            "array with null",
-            Some(json!([null, 1])),
-            ",1",
-            false,
-        ),
+        ("array with null", Some(json!([null, 1])), ",1", false),
         (
             "nested array with null",
             Some(json!([[null], 1])),

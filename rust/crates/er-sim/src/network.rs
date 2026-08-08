@@ -360,11 +360,13 @@ impl FaultNetwork {
     ) -> Result<(SafeU53, SeededRng), FaultNetworkError> {
         let mut next_rng = self.rng.clone();
         let delay_ms = 1 + u64::from(next_rng.next_u32() % 5);
-        let deliver_at = now_ms.get().checked_add(delay_ms).ok_or_else(|| {
-            FaultNetworkError::InvalidFault {
-                reason: "packet delivery time exceeds SafeU53".to_owned(),
-            }
-        })?;
+        let deliver_at =
+            now_ms
+                .get()
+                .checked_add(delay_ms)
+                .ok_or_else(|| FaultNetworkError::InvalidFault {
+                    reason: "packet delivery time exceeds SafeU53".to_owned(),
+                })?;
         let deliver_at_ms =
             SafeU53::new(deliver_at).map_err(|_| FaultNetworkError::InvalidFault {
                 reason: "packet delivery time exceeds SafeU53".to_owned(),

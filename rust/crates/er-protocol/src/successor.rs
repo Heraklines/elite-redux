@@ -1214,7 +1214,11 @@ fn js_number_string(value: &serde_json::Number) -> String {
     } else if decimal_position <= 0 {
         format!("0.{}{}", "0".repeat((-decimal_position) as usize), digits)
     } else if decimal_position as usize >= digits.len() {
-        format!("{}{}", digits, "0".repeat(decimal_position as usize - digits.len()))
+        format!(
+            "{}{}",
+            digits,
+            "0".repeat(decimal_position as usize - digits.len())
+        )
     } else {
         format!(
             "{}.{}",
@@ -1223,11 +1227,7 @@ fn js_number_string(value: &serde_json::Number) -> String {
         )
     };
 
-    if negative {
-        format!("-{body}")
-    } else {
-        body
-    }
+    if negative { format!("-{body}") } else { body }
 }
 
 fn safe_u53_number(value: Option<&Value>) -> Option<u64> {

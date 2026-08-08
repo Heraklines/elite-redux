@@ -370,7 +370,12 @@ fn reconnect_reaps_stale_packets_before_their_deadline_once() -> TestResult {
     assert_eq!(network.reconnect(seat(1)?)?, generation(1)?);
 
     let events = network.deliver_due(safe(0)?)?;
-    assert_eq!(events, vec![NetworkEvent::Dropped { packet_id: old_packet }]);
+    assert_eq!(
+        events,
+        vec![NetworkEvent::Dropped {
+            packet_id: old_packet
+        }]
+    );
     assert!(network.packet(old_packet).is_none());
     assert_eq!(network.diagnostics().dropped_count, safe(1)?);
     assert!(network.deliver_due(deadline)?.is_empty());
@@ -435,13 +440,8 @@ fn failed_near_max_enqueue_preserves_the_next_valid_trace() -> TestResult {
     )?;
 
     let mut fresh = FaultNetwork::new(seed, endpoints()?);
-    let expected_id = fresh.enqueue(
-        seat(1)?,
-        seat(2)?,
-        generation(0)?,
-        valid_payload,
-        valid_now,
-    )?;
+    let expected_id =
+        fresh.enqueue(seat(1)?, seat(2)?, generation(0)?, valid_payload, valid_now)?;
 
     assert_eq!(actual_id, expected_id);
     assert_eq!(after_failure.queued_packets(), fresh.queued_packets());
@@ -519,10 +519,12 @@ fn suspension_is_idempotent_and_does_not_mutate_or_drop_transport() -> TestResul
     let mut network = FaultNetwork::new(19, endpoints()?);
     assert!(network.suspend(seat(2)?));
     assert!(!network.suspend(seat(2)?));
-    assert!(network
-        .diagnostics()
-        .suspended_endpoints
-        .contains(&seat(2)?));
+    assert!(
+        network
+            .diagnostics()
+            .suspended_endpoints
+            .contains(&seat(2)?)
+    );
     let packet_id = network.enqueue(
         seat(1)?,
         seat(2)?,
