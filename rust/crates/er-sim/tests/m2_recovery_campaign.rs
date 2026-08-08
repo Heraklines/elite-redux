@@ -23,8 +23,9 @@ use er_types::{
     CommandFrontierControl, ConnectionGeneration, FrameContext, FrameType, GameButton, InputFocus,
     InputMap, KeyBinding, KernelEffect, LiveResourceSnapshot, Material, MenuGeneration,
     MenuOption, MenuOptionId, MenuState, MembershipRevision, NetworkFrame, NextControl, OperationId,
-    PhysicalKey, ProposalMessage, RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId,
-    TimeClass, UiIntent, UiState, UiViewKind, WaitingMenu,
+    PhysicalKey, ProposalMessage, RawInputEvent, RecoveryFenceState, RecoveryFenceView, Revision,
+    RunId, SafeU53, SeatId, SessionId, TimeClass, TimerId, UiIntent, UiState, UiViewKind,
+    WaitingMenu,
 };
 use serde_json::{Value, json};
 
@@ -136,6 +137,27 @@ fn directional_option(turn: u64) -> Result<MenuOption, Box<dyn Error>> {
         enabled: true,
         visible: true,
     })
+}
+
+fn repeat_probe_option(index: u64) -> Result<MenuOption, Box<dyn Error>> {
+    Ok(MenuOption {
+        id: MenuOptionId::new(format!("repeat-probe-{index}"))?,
+        label_key: format!("repeat.probe.{index}"),
+        enabled: true,
+        visible: true,
+    })
+}
+
+fn repeat_probe_menu() -> Result<MenuState, Box<dyn Error>> {
+    Ok(MenuState::Command(er_types::CommandMenu {
+        operation_id: OperationId::new("repeat-probe-operation")?,
+        control_id: "repeat-probe-control".to_owned(),
+        cursor: SafeU53::ZERO,
+        options: (0..3)
+            .map(repeat_probe_option)
+            .collect::<Result<Vec<_>, _>>()?,
+        cancel: CancelPolicy::Disabled,
+    }))
 }
 
 fn proposal_payload(turn: u64) -> Value {
@@ -315,6 +337,39 @@ fn campaign_config() -> Result<SimulatedPairConfig, Box<dyn Error>> {
             json!({"seed": SEED.to_string(), "purpose": "teardown evidence"}),
         )]),
         event_budget: safe(10_000),
+    })
+}
+
+fn repeat_probe_config() -> Result<SimulatedPairConfig, Box<dyn Error>> {
+    Ok(SimulatedPairConfig {
+        host_kernel: KernelConfig {
+            input_map: input_map(),
+            initial_ui: UiState {
+                generation: MenuGeneration::new(safe(1)),
+                owner_seat: None,
+                actionable: false,
+                stack: vec![MenuState::Waiting(WaitingMenu {
+                    prompt_key: Some("repeat.probe.waiting".to_owned()),
+                })],
+            },
+            protocol: None,
+        },
+        guest_kernel: KernelConfig {
+            input_map: input_map(),
+            initial_ui: UiState {
+                generation: MenuGeneration::new(safe(1)),
+                owner_seat: Some(seat(GUEST_SEAT)),
+                actionable: true,
+                stack: vec![repeat_probe_menu()?],
+            },
+            protocol: None,
+        },
+        host_seat: seat(HOST_SEAT),
+        guest_seat: seat(GUEST_SEAT),
+        seed: SEED ^ 0x250,
+        presenter: PresenterMode::Instant,
+        initial_storage: BTreeMap::new(),
+        event_budget: safe(256),
     })
 }
 
@@ -533,6 +588,53 @@ fn typed_frame_body<T: DeserializeOwned>(frame: &NetworkFrame) -> TestResult<T> 
     Ok(serde_json::from_value(frame.body.clone())?)
 }
 
+fn typed_json_path<T: DeserializeOwned>(root: &Value, path: &[&str]) -> TestResult<T> {
+    let path_label = path.join(".");
+    let mut value = root;
+    for segment in path {
+        value = value
+            .as_object()
+            .and_then(|object| object.get(*segment))
+            .ok_or_else(|| {
+                std::io::Error::other(format!(
+                    "kernel snapshot is missing exact JSON path {path_label}"
+                ))
+            })?;
+    }
+    Ok(serde_json::from_value(value.clone()).map_err(|error| {
+        std::io::Error::other(format!(
+            "kernel snapshot JSON path {path_label} has the wrong type: {error}"
+        ))
+    })?)
+}
+
+fn guest_recovery_fence(step: &PairStep) -> TestResult<RecoveryFenceView> {
+    typed_json_path(
+        &step.snapshot.guest.kernel.state,
+        &["protocol", "recoveryFence"],
+    )
+}
+
+fn assert_held_recovery_fence(view: &RecoveryFenceView) {
+    assert_eq!(view.state, RecoveryFenceState::Held);
+    assert!(view.command_admission_frozen);
+    assert!(view.control_surface_start_frozen);
+    assert!(view.progression_frozen);
+    assert!(view.materialization_frozen);
+    assert!(view.authority_wait_creation_frozen);
+    assert_eq!(view.terminal_reason, None);
+}
+
+fn assert_open_recovery_fence(view: &RecoveryFenceView) {
+    assert_eq!(view.state, RecoveryFenceState::Open);
+    assert!(!view.command_admission_frozen);
+    assert!(!view.control_surface_start_frozen);
+    assert!(!view.progression_frozen);
+    assert!(!view.materialization_frozen);
+    assert!(!view.authority_wait_creation_frozen);
+    assert_eq!(view.terminal_reason, None);
+}
+
 fn expected_tail_entry(expected_revision: u64) -> TestResult<AuthorityEntryBody> {
     Ok(AuthorityEntryBody {
         revision: revision(expected_revision),
@@ -608,8 +710,14 @@ fn assert_no_pair_progression(before: &PairSnapshot, after: &PairSnapshot) -> Te
     assert_eq!(before.guest.ui, after.guest.ui);
     assert_eq!(before.host.live_resources, after.host.live_resources);
     assert_eq!(before.guest.live_resources, after.guest.live_resources);
-    assert_eq!(before.host.live_resources.retained_revisions, after.host.live_resources.retained_revisions);
-    assert_eq!(before.guest.live_resources.proposal_leases, after.guest.live_resources.proposal_leases);
+    assert_eq!(
+        before.host.live_resources.retained_revisions,
+        after.host.live_resources.retained_revisions
+    );
+    assert_eq!(
+        before.guest.live_resources.proposal_leases,
+        after.guest.live_resources.proposal_leases
+    );
     assert_eq!(before.guest.live_resources.controls, after.guest.live_resources.controls);
     assert_eq!(before.network.queued_packet_ids, after.network.queued_packet_ids);
     Ok(())
@@ -635,6 +743,114 @@ fn assert_no_protocol_progression(before: &PairSnapshot, after: &PairSnapshot) -
         after.guest.live_resources.controls
     );
     Ok(())
+}
+
+fn assert_duplicate_delivery_is_idempotent(
+    before: &PairSnapshot,
+    step: &PairStep,
+    delivered_packet_id: SafeU53,
+) -> TestResult {
+    let mut receipt_count = 0_usize;
+    for effect in &step.generated_effects {
+        let KernelEffect::SendFrame { from, frame } = effect else {
+            return Err(std::io::Error::other(format!(
+                "duplicate retry delivery emitted a forbidden effect: {effect:?}"
+            ))
+            .into());
+        };
+        assert_eq!(*from, seat(HOST_SEAT));
+        assert_eq!(frame.frame_type, FrameType::AuthorityReceipt);
+        assert_eq!(frame.context.sender_seat_id, seat(HOST_SEAT));
+        let receipt: AuthorityReceiptBody = typed_frame_body(frame)?;
+        assert_eq!(receipt.revision, revision(4));
+        assert_eq!(receipt.operation_id, operation(4)?);
+        assert_eq!(receipt.stage, AckStage::ControlInstalled);
+        assert_eq!(
+            receipt.control_id,
+            Some(control_id_of(&next_control(4)))
+        );
+        receipt_count += 1;
+    }
+
+    assert_no_protocol_progression(before, &step.snapshot)?;
+    assert_eq!(before.virtual_time_ms, step.snapshot.virtual_time_ms);
+    assert_eq!(before.clock_timers, step.snapshot.clock_timers);
+    assert_eq!(before.host.state_digest, step.snapshot.host.state_digest);
+    assert_eq!(before.guest.state_digest, step.snapshot.guest.state_digest);
+    assert_eq!(before.host.presenter, step.snapshot.host.presenter);
+    assert_eq!(before.guest.presenter, step.snapshot.guest.presenter);
+    assert_eq!(before.presenter, step.snapshot.presenter);
+    assert_eq!(before.storage, step.snapshot.storage);
+    assert_eq!(
+        before.network.disconnected_endpoints,
+        step.snapshot.network.disconnected_endpoints
+    );
+    assert_eq!(
+        before.network.suspended_endpoints,
+        step.snapshot.network.suspended_endpoints
+    );
+    assert_eq!(before.network.dropped_count, step.snapshot.network.dropped_count);
+    assert_eq!(
+        before.network.duplicated_count,
+        step.snapshot.network.duplicated_count
+    );
+    assert_eq!(
+        before.network.corrupted_count,
+        step.snapshot.network.corrupted_count
+    );
+    assert_eq!(before.network.disposed, step.snapshot.network.disposed);
+
+    let mut expected_packet_ids = before.network.queued_packet_ids.clone();
+    assert!(expected_packet_ids.remove(&delivered_packet_id));
+    let added_packet_ids = step
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(&before.network.queued_packet_ids)
+        .count();
+    assert_eq!(added_packet_ids, receipt_count);
+    expected_packet_ids.extend(
+        step.snapshot
+            .network
+            .queued_packet_ids
+            .difference(&before.network.queued_packet_ids)
+            .copied(),
+    );
+    assert_eq!(
+        step.snapshot.network.queued_packet_ids,
+        expected_packet_ids,
+        "duplicate delivery may remove its packet and add only receipt packets"
+    );
+    Ok(())
+}
+
+fn guest_human_input_schedules(step: &PairStep, delay_ms: SafeU53) -> Vec<TimerId> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
+                endpoint,
+                timer_id,
+                delay_ms: scheduled_delay,
+                time_class,
+                ..
+            } if *endpoint == seat(GUEST_SEAT)
+                && *scheduled_delay == delay_ms
+                && *time_class == TimeClass::HumanInput => Some(*timer_id),
+            _ => None,
+        })
+        .collect()
+}
+
+fn guest_timer_cancellations(step: &PairStep) -> Vec<TimerId> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::CancelTimer { endpoint, timer_id }
+                if *endpoint == seat(GUEST_SEAT) => Some(*timer_id),
+            _ => None,
+        })
+        .collect()
 }
 
 fn assert_directional_hold_started(
@@ -669,22 +885,7 @@ fn assert_directional_hold_started(
     assert!(step.snapshot.guest.ui.actionable);
     assert_eq!(step.snapshot.guest.ui.cursor, Some(safe(1)));
 
-    let repeat_timers = step
-        .generated_effects
-        .iter()
-        .filter_map(|effect| match effect {
-            KernelEffect::ScheduleTimer {
-                endpoint,
-                timer_id,
-                delay_ms,
-                time_class,
-                ..
-            } if *endpoint == seat(GUEST_SEAT)
-                && *delay_ms == safe(250)
-                && *time_class == TimeClass::HumanInput => Some(*timer_id),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+    let repeat_timers = guest_human_input_schedules(step, safe(250));
     assert_eq!(repeat_timers.len(), 1);
     assert!(
         step.snapshot
@@ -709,17 +910,6 @@ fn assert_directional_hold_started(
     Ok(())
 }
 
-fn recovery_transaction_is_held(step: &PairStep) -> bool {
-    !step
-        .snapshot
-        .guest
-        .live_resources
-        .recovery_transactions
-        .is_empty()
-        && step.snapshot.guest.ui.kind == UiViewKind::Waiting
-        && !step.snapshot.guest.ui.actionable
-}
-
 fn assert_zero_resources(snapshot: &PairSnapshot) {
     for endpoint in [&snapshot.host, &snapshot.guest] {
         assert!(endpoint.live_resources.timers.is_empty());
@@ -736,6 +926,12 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
     }
     assert_eq!(snapshot.host.live_resources, LiveResourceSnapshot::default());
     assert_eq!(snapshot.guest.live_resources, LiveResourceSnapshot::default());
+    assert!(snapshot.clock_timers.is_empty());
+    for endpoint in [&snapshot.host, &snapshot.guest] {
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
+    }
     assert!(snapshot.network.queued_packet_ids.is_empty());
     assert!(snapshot.network.disconnected_endpoints.is_empty());
     assert!(snapshot.network.suspended_endpoints.is_empty());
@@ -768,6 +964,101 @@ fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
         Err(SimulatedPairError::Disposed)
     ));
     Ok(())
+}
+
+fn run_directional_repeat_probe() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
+    let mut pair = SimulatedPair::new(repeat_probe_config()?)?;
+    let initial = pair.snapshot()?;
+    assert_eq!(initial.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(initial.guest.ui.owner_seat, Some(seat(GUEST_SEAT)));
+    assert!(initial.guest.ui.actionable);
+    assert_eq!(initial.guest.ui.cursor, Some(SafeU53::ZERO));
+    assert_eq!(
+        initial
+            .guest
+            .ui
+            .options
+            .iter()
+            .filter(|option| option.enabled && option.visible)
+            .count(),
+        3
+    );
+
+    let mut trace = Vec::new();
+    let key_down = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowDown,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
+    assert_eq!(key_down.snapshot.guest.ui.cursor, Some(safe(1)));
+    let initial_repeat_timers = guest_human_input_schedules(&key_down, safe(250));
+    assert_eq!(initial_repeat_timers.len(), 1);
+    let initial_repeat_timer = initial_repeat_timers[0];
+    assert!(
+        key_down
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&initial_repeat_timer)
+    );
+    trace.push(key_down);
+
+    let repeat = pair.apply(PairOperation::AdvanceTime {
+        delta_ms: safe(250),
+    })?;
+    assert_eq!(
+        repeat.operation,
+        PairOperation::AdvanceTime {
+            delta_ms: safe(250),
+        }
+    );
+    assert_eq!(repeat.snapshot.virtual_time_ms, safe(250));
+    assert_eq!(repeat.snapshot.guest.ui.cursor, Some(safe(2)));
+    let rearmed_repeat_timers = guest_human_input_schedules(&repeat, safe(250));
+    assert_eq!(rearmed_repeat_timers.len(), 1);
+    let rearmed_repeat_timer = rearmed_repeat_timers[0];
+    assert_ne!(rearmed_repeat_timer, initial_repeat_timer);
+    assert!(
+        !repeat
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&initial_repeat_timer)
+    );
+    assert!(
+        repeat
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&rearmed_repeat_timer)
+    );
+    trace.push(repeat);
+
+    let key_up = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::ArrowDown,
+        },
+    })?;
+    assert_eq!(key_up.snapshot.guest.ui.cursor, Some(safe(2)));
+    assert_eq!(
+        guest_timer_cancellations(&key_up),
+        vec![rearmed_repeat_timer]
+    );
+    assert!(key_up.snapshot.guest.live_resources.timers.is_empty());
+    trace.push(key_up);
+
+    let torn_down = pair.teardown("m2-directional-repeat-probe")?;
+    assert_zero_resources(&torn_down);
+    assert_post_disposal_rejected(&mut pair)?;
+    Ok((trace, torn_down))
 }
 
 fn assert_fresh_guest_command(
@@ -808,6 +1099,45 @@ fn assert_fresh_guest_command(
         }
     }
     Ok(())
+}
+
+fn network_is_quiescent(snapshot: &PairSnapshot) -> bool {
+    snapshot.network.queued_packet_ids.is_empty()
+        && snapshot.network.disconnected_endpoints.is_empty()
+        && snapshot.network.suspended_endpoints.is_empty()
+        && snapshot.host.live_resources.timers.is_empty()
+        && snapshot.guest.live_resources.timers.is_empty()
+        && snapshot.host.live_resources.delivery_leases.is_empty()
+        && snapshot.guest.live_resources.proposal_leases.is_empty()
+        && snapshot.host.live_resources.recovery_transactions.is_empty()
+        && snapshot.guest.live_resources.recovery_transactions.is_empty()
+        && snapshot.presenter.pending_event_ids.is_empty()
+}
+
+fn drain_network_to_quiescence(
+    pair: &mut SimulatedPair,
+    trace: &mut Vec<PairStep>,
+) -> TestResult<PairSnapshot> {
+    for _ in 0..256 {
+        let snapshot = pair.snapshot()?;
+        if network_is_quiescent(&snapshot) {
+            return Ok(snapshot);
+        }
+        let operation = if snapshot.network.queued_packet_ids.is_empty() {
+            PairOperation::AdvanceTime {
+                delta_ms: safe(10),
+            }
+        } else {
+            PairOperation::Fault {
+                operation: FaultOperation::DeliverNext,
+            }
+        };
+        trace.push(pair.apply(operation)?);
+    }
+    Err(std::io::Error::other(
+        "real network did not reach quiescence within 2,560 virtual ms",
+    )
+    .into())
 }
 
 fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
@@ -888,7 +1218,8 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert_eq!(reconnect_step.snapshot.guest.ui.kind, UiViewKind::Waiting);
     assert!(!reconnect_step.snapshot.guest.ui.actionable);
-    assert!(recovery_transaction_is_held(reconnect_step));
+    let reconnect_fence = guest_recovery_fence(reconnect_step)?;
+    assert_held_recovery_fence(&reconnect_fence);
     assert!(has_frame(
         &reconnect_step.generated_effects,
         FrameType::RecoveryRequest
@@ -947,11 +1278,11 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .ok_or_else(|| std::io::Error::other("recovery-fence submit has no preceding step"))?
         .snapshot
         .clone();
-    assert!(recovery_transaction_is_held(
-        trace.last().ok_or_else(|| {
-            std::io::Error::other("recovery-fence step was not retained")
-        })?
-    ));
+    let fence_waiting_step = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("recovery-fence step was not retained"))?;
+    let fence_waiting_view = guest_recovery_fence(fence_waiting_step)?;
+    assert_held_recovery_fence(&fence_waiting_view);
     let fence_waiting_submit = pair.apply(PairOperation::RawInput {
         endpoint: PairEndpoint::Guest,
         event: RawInputEvent::KeyDown {
@@ -1198,7 +1529,8 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         material_index < control_index
             && control_index < control_receipt_index
             && control_receipt_index < applied_index,
-        "recovery must apply material, project control, send the control receipt, then send the applied proof"
+        "recovery must apply material, project control, send the control receipt, \
+         then send the applied proof"
     );
     assert!(
         recovery_effects[..control_index].iter().all(|effect| {
@@ -1222,15 +1554,13 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .iter()
         .position(|step| has_frame(&step.generated_effects, FrameType::RecoveryRequest))
         .ok_or_else(|| std::io::Error::other("recovery request step was not retained"))?;
-    let held_step_index = recovery_trace
-        .iter()
-        .position(recovery_transaction_is_held)
-        .ok_or_else(|| std::io::Error::other("recovery fence was not observed as held"))?;
-    assert!(
-        held_step_index <= request_step_index,
-        "the typed recovery transaction/fence must be held before the request"
-    );
-    assert!(recovery_transaction_is_held(&recovery_trace[request_step_index]));
+    // `recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases` in
+    // er-protocol/tests/authority_v2_properties.rs proves FenceChanged is
+    // action 0 and SendRequest is action 2 of the same start batch. The pair
+    // snapshot therefore checks the exact request step, not an invented prior
+    // external step.
+    let request_fence = guest_recovery_fence(&recovery_trace[request_step_index])?;
+    assert_held_recovery_fence(&request_fence);
     assert!(
         recovery_trace
             .iter()
@@ -1250,25 +1580,23 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             })
         })
         .ok_or_else(|| std::io::Error::other("recovery proof step was not retained in the trace"))?;
-    assert!(
-        recovery_trace[..applied_step_index].iter().all(|step| {
-            recovery_transaction_is_held(step)
-        }),
-        "the recovery transaction/fence and blocked surface must remain live until the applied proof"
-    );
-    let first_released_step = recovery_trace
-        .iter()
-        .position(|step| {
-            step.snapshot
-                .guest
-                .live_resources
-                .recovery_transactions
-                .is_empty()
-        })
-        .ok_or_else(|| std::io::Error::other("recovery transaction was never released"))?;
+    for step in &recovery_trace[..applied_step_index] {
+        let fence = guest_recovery_fence(step)?;
+        assert_held_recovery_fence(&fence);
+    }
+
+    let mut first_released_step = None;
+    for (index, step) in recovery_trace.iter().enumerate() {
+        if guest_recovery_fence(step)?.state == RecoveryFenceState::Open {
+            first_released_step = Some(index);
+            break;
+        }
+    }
+    let first_released_step = first_released_step
+        .ok_or_else(|| std::io::Error::other("recovery fence was never released"))?;
     assert!(
         first_released_step >= applied_step_index,
-        "recovery transaction/fence released before the applied proof"
+        "recovery fence released before the applied proof"
     );
     let first_open_step = recovery_trace
         .iter()
@@ -1278,17 +1606,20 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         first_open_step >= applied_step_index,
         "recovered command surface opened before the applied proof"
     );
+    let mut recovered_command_after_proof = false;
+    for step in &recovery_trace[applied_step_index..] {
+        let fence = guest_recovery_fence(step)?;
+        if fence.state == RecoveryFenceState::Open
+            && step.snapshot.guest.ui.kind == UiViewKind::Command
+            && step.snapshot.guest.ui.actionable
+        {
+            recovered_command_after_proof = true;
+            break;
+        }
+    }
     assert!(
-        recovery_trace[applied_step_index..].iter().any(|step| {
-            step.snapshot
-                .guest
-                .live_resources
-                .recovery_transactions
-                .is_empty()
-                && step.snapshot.guest.ui.kind == UiViewKind::Command
-                && step.snapshot.guest.ui.actionable
-        }),
-        "recovery transaction/fence release must expose the recovered command only after proof"
+        recovered_command_after_proof,
+        "recovery fence release must expose the recovered command only after proof"
     );
 
     let final_step = trace
@@ -1301,14 +1632,8 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert!(final_step.snapshot.guest.ui.actionable);
     assert_ne!(final_step.snapshot.guest.ui.generation, stale_generation);
-    assert!(
-        final_step
-            .snapshot
-            .guest
-            .live_resources
-            .recovery_transactions
-            .is_empty()
-    );
+    let final_fence = guest_recovery_fence(final_step)?;
+    assert_open_recovery_fence(&final_fence);
     assert!(final_step
         .snapshot
         .guest
@@ -1576,9 +1901,31 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         },
     })?);
 
-    let before_retry_delivery = trace
+    let before_retry_duplicate = trace
         .last()
         .ok_or_else(|| std::io::Error::other("retry release was not retained"))?
+        .snapshot
+        .clone();
+    let retry_duplicate = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Duplicate {
+            packet_id: retry_packet_id,
+        },
+    })?;
+    assert!(retry_duplicate.generated_effects.is_empty());
+    let duplicate_packet_ids = retry_duplicate
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(&before_retry_duplicate.network.queued_packet_ids)
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(duplicate_packet_ids.len(), 1);
+    let duplicate_retry_packet_id = duplicate_packet_ids[0];
+    trace.push(retry_duplicate);
+
+    let before_retry_delivery = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("retry duplicate was not retained"))?
         .snapshot
         .clone();
     let retry_delivery = pair.apply(PairOperation::Fault {
@@ -1591,8 +1938,21 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         before_retry_delivery.host.kernel,
         "the retained N+1 identity must execute only after delayed evidence"
     );
-    let retry_material_effects = retry_delivery
-        .generated_effects
+    let before_duplicate_delivery = retry_delivery.snapshot.clone();
+    let duplicate_delivery = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Deliver {
+            packet_id: duplicate_retry_packet_id,
+        },
+    })?;
+    assert_duplicate_delivery_is_idempotent(
+        &before_duplicate_delivery,
+        &duplicate_delivery,
+        duplicate_retry_packet_id,
+    )?;
+
+    let retry_attempt_steps = [retry_delivery.clone(), duplicate_delivery.clone()];
+    let retry_attempt_effects = effects(&retry_attempt_steps);
+    let retry_material_effects = retry_attempt_effects
         .iter()
         .filter_map(|effect| match effect {
             KernelEffect::ApplyAuthorityMaterial {
@@ -1610,8 +1970,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(retry_material_effects[0].0, revision(4));
     assert_eq!(retry_material_effects[0].1, operation(4)?);
     assert_eq!(retry_material_effects[0].2, material(4));
-    let retry_control_effects = retry_delivery
-        .generated_effects
+    let retry_control_effects = retry_attempt_effects
         .iter()
         .filter_map(|effect| match effect {
             KernelEffect::ProjectAuthorityControl {
@@ -1629,17 +1988,36 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(retry_control_effects[0].0, revision(4));
     assert_eq!(retry_control_effects[0].1, operation(4)?);
     assert_eq!(retry_control_effects[0].2, next_control(4));
-    let retry_entry_frames = frame_effects(
-        &retry_delivery.generated_effects,
-        FrameType::AuthorityEntry,
-    );
+    let retry_entry_frames = frame_effects(&retry_attempt_effects, FrameType::AuthorityEntry);
     assert_eq!(retry_entry_frames.len(), 1);
     assert_eq!(retry_entry_frames[0].0, seat(HOST_SEAT));
     let retry_entry: AuthorityEntryBody = typed_frame_body(retry_entry_frames[0].1)?;
     assert_full_tail_entry(&retry_entry, 4)?;
-    trace.push(retry_delivery);
+    trace.extend(retry_attempt_steps);
 
-    let before_teardown = pair.snapshot()?;
+    let before_teardown = drain_network_to_quiescence(&mut pair, &mut trace)?;
+    let host_head: Revision = typed_json_path(
+        &before_teardown.host.kernel.state,
+        &["protocol", "log", "headRevision"],
+    )?;
+    assert_eq!(host_head, revision(4));
+    let guest_received: Revision = typed_json_path(
+        &before_teardown.guest.kernel.state,
+        &["protocol", "replica", "frontier", "received"],
+    )?;
+    let guest_material: Revision = typed_json_path(
+        &before_teardown.guest.kernel.state,
+        &["protocol", "replica", "frontier", "material"],
+    )?;
+    let guest_control: Revision = typed_json_path(
+        &before_teardown.guest.kernel.state,
+        &["protocol", "replica", "frontier", "control"],
+    )?;
+    assert_eq!(
+        (guest_received, guest_material, guest_control),
+        (revision(4), revision(4), revision(4))
+    );
+    assert!(before_teardown.network.queued_packet_ids.is_empty());
     assert!(!before_teardown.storage.keys.is_empty());
     let torn_down = pair.teardown("m2-recovery-campaign")?;
     assert_eq!(torn_down.seed, SEED.to_string());
@@ -1654,6 +2032,16 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
     let first = run_campaign()?;
     let second = run_campaign()?;
     assert_eq!(first, second, "recovery campaign must repeat byte-for-byte");
+    assert_eq!(serde_json::to_vec(&first)?, serde_json::to_vec(&second)?);
     assert!(first.0.iter().all(|step| !step.effects_digest.is_empty()));
+    Ok(())
+}
+
+#[test]
+fn raw_directional_repeat_rearms_and_cancels_on_three_option_menu() -> TestResult {
+    let first = run_directional_repeat_probe()?;
+    let second = run_directional_repeat_probe()?;
+    assert_eq!(first, second, "repeat probe must repeat byte-for-byte");
+    assert_eq!(serde_json::to_vec(&first)?, serde_json::to_vec(&second)?);
     Ok(())
 }
