@@ -490,10 +490,14 @@ fn observe_cycle_step(
             {
                 evidence.proposal_sent = true;
             }
-            KernelEffect::SendFrame { frame, .. } if frame.frame_type == FrameType::AuthorityEntry => {
+            KernelEffect::SendFrame { frame, .. }
+                if frame.frame_type == FrameType::AuthorityEntry =>
+            {
                 evidence.authority_entry_sent = true;
             }
-            KernelEffect::SendFrame { frame, .. } if frame.frame_type == FrameType::AuthorityReceipt => {
+            KernelEffect::SendFrame { frame, .. }
+                if frame.frame_type == FrameType::AuthorityReceipt =>
+            {
                 evidence.receipts_sent += 1;
             }
             KernelEffect::ApplyAuthorityMaterial {

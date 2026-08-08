@@ -159,6 +159,27 @@ function parseArgs(argv) {
   return options;
 }
 
+function recoverOutputPath(argv) {
+  let outputPath = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] !== "--output") {
+      continue;
+    }
+    const value = argv[index + 1];
+    if (value) {
+      outputPath = resolve(process.cwd(), value);
+      index += 1;
+    }
+  }
+  return outputPath;
+}
+
+function failureText(error) {
+  const text = error instanceof Error ? error.message : String(error);
+  const compact = text.replace(/\s+/gu, " ").trim();
+  return (compact.length > 0 ? compact : "unknown failure").slice(0, 4000);
+}
+
 function stableValue(value) {
   if (Array.isArray(value)) {
     return value.map(stableValue);
@@ -873,6 +894,16 @@ async function measureResult(context, options) {
       result.status = "failed";
     }
   }
+  if (result.status === "failed") {
+    const failures = result.workloads
+      .filter(workload => workload.status !== "passed")
+      .map(workload => `${workload.scenario_id}: ${workload.failure ?? "workload failed"}`);
+    if (result.regression_check.status === "failed") {
+      failures.push("baseline regression check failed");
+    }
+    result.failure = failures.join("; ") || "benchmark measurement failed";
+    result.github_sha = process.env.GITHUB_SHA ?? null;
+  }
   return result;
 }
 
@@ -886,23 +917,72 @@ function emit(value, outputPath) {
   writeFileSync(outputPath, compact, "utf8");
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
-    process.stdout.write(`${usage()}\n`);
-    return;
+function failureResult(error, mode) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    mode,
+    status: "failed",
+    failure: failureText(error),
+    runner: runnerIdentity(),
+    github_sha: process.env.GITHUB_SHA ?? null,
+  };
+}
+
+function emitFailure(error, outputPath, mode) {
+  const result = failureResult(error, mode);
+  const compact = `${JSON.stringify(stableValue(result))}\n`;
+  let outputFailure = null;
+  if (outputPath !== null) {
+    try {
+      mkdirSync(dirname(outputPath), { recursive: true });
+      writeFileSync(outputPath, compact, "utf8");
+    } catch (writeError) {
+      outputFailure = writeError;
+    }
   }
-  const context = loadContext(options.manifest, options.oracleGameSha);
-  const result = options.mode === "metadata"
-    ? metadataResult(context)
-    : await measureResult(context, options);
-  emit(result, options.output);
-  if (result.status !== "passed" && options.mode === "measure") {
+  if (outputPath === null || outputFailure !== null) {
+    try {
+      process.stdout.write(compact);
+    } catch (stdoutError) {
+      outputFailure = stdoutError;
+    }
+  }
+  let diagnostic = `benchmark-kernel-m2: ${result.failure}`;
+  if (outputFailure !== null) {
+    diagnostic += `; failure JSON output fallback: ${failureText(outputFailure)}`;
+  }
+  try {
+    process.stderr.write(`${diagnostic}\n`);
+  } catch {
+    // There is no further reliable output channel.
+  }
+}
+
+async function main() {
+  const argv = process.argv.slice(2);
+  const fallbackOutputPath = recoverOutputPath(argv);
+  let options = null;
+  try {
+    options = parseArgs(argv);
+    if (options.help) {
+      process.stdout.write(`${usage()}\n`);
+      return;
+    }
+    const context = loadContext(options.manifest, options.oracleGameSha);
+    const result = options.mode === "metadata"
+      ? metadataResult(context)
+      : await measureResult(context, options);
+    emit(result, options.output);
+    if (result.status !== "passed" && options.mode === "measure") {
+      process.exitCode = 1;
+    }
+  } catch (error) {
+    emitFailure(error, options?.output ?? fallbackOutputPath, options?.mode ?? null);
     process.exitCode = 1;
   }
 }
 
 main().catch(error => {
-  process.stderr.write(`benchmark-kernel-m2: ${error instanceof Error ? error.message : String(error)}\n`);
+  emitFailure(error, recoverOutputPath(process.argv.slice(2)), null);
   process.exitCode = 1;
 });
