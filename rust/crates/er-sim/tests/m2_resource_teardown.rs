@@ -564,25 +564,26 @@ fn assert_terminal_absorbing_path(
     assert_eq!(terminal_snapshot, triggering_snapshot);
     assert_terminal_snapshot(&terminal_snapshot, &terminal)?;
 
-    let mut inert_steps = Vec::new();
-    inert_steps.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?);
-    inert_steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::Enter)?);
-    inert_steps.push(pair.advance_time(safe(10_000))?);
-    inert_steps.push(pair.apply(PairOperation::Fault {
-        operation: FaultOperation::DeliverNext,
-    })?);
-    inert_steps.push(pair.apply(PairOperation::Disconnect {
-        endpoint: PairEndpoint::Guest,
-    })?);
-    inert_steps.push(pair.apply(PairOperation::Reconnect {
-        endpoint: PairEndpoint::Host,
-    })?);
-    inert_steps.push(pair.apply(PairOperation::Suspend {
-        endpoint: PairEndpoint::Host,
-    })?);
-    inert_steps.push(pair.apply(PairOperation::Resume {
-        endpoint: PairEndpoint::Guest,
-    })?);
+    let inert_steps = vec![
+        pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?,
+        pair.key_up(PairEndpoint::Guest, PhysicalKey::Enter)?,
+        pair.advance_time(safe(10_000))?,
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::DeliverNext,
+        })?,
+        pair.apply(PairOperation::Disconnect {
+            endpoint: PairEndpoint::Guest,
+        })?,
+        pair.apply(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        })?,
+        pair.apply(PairOperation::Suspend {
+            endpoint: PairEndpoint::Host,
+        })?,
+        pair.apply(PairOperation::Resume {
+            endpoint: PairEndpoint::Guest,
+        })?,
+    ];
 
     for (index, step) in inert_steps.iter().enumerate() {
         assert_eq!(step.sequence, step.snapshot.sequence);
@@ -1106,7 +1107,7 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
         "recovery must hold its production fence before request completion"
     );
     assert!(!reconnect.snapshot.guest.live_resources.timers.is_empty());
-    assert_timer_metadata(&[reconnect.clone()], &[TimeClass::Recovery])?;
+    assert_timer_metadata(std::slice::from_ref(&reconnect), &[TimeClass::Recovery])?;
 
     // Keep the recovery request and any retained-entry redelivery beyond the
     // request timeout using virtual time only. The recovery fence must then
