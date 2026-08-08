@@ -6,9 +6,9 @@ use er_kernel::{
     ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    AckStage, AuthorityEntryBody, AuthorityLogConfig, AuthorityReceiptBody,
-    AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalFingerprintInput,
-    ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
+    AckStage, AuthorityEntryBody, AuthorityLogConfig, AuthorityReceiptBody, AuthorityReplicaConfig,
+    BackoffPolicy, PeerBinding, ProposalFingerprintInput, ProposalLeaseConfig,
+    RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
@@ -388,7 +388,9 @@ fn only_queued(snapshot: &PairSnapshot, label: &str) -> TestResult<SafeU53> {
         return Err(error(format!("{label}: expected one queued packet")));
     };
     if ids.next().is_some() {
-        return Err(error(format!("{label}: expected exactly one queued packet")));
+        return Err(error(format!(
+            "{label}: expected exactly one queued packet"
+        )));
     }
     Ok(packet_id)
 }
@@ -447,10 +449,7 @@ fn proposal_effects(steps: &[PairStep]) -> Vec<ProposalMessage> {
 
 fn authority_entry_effects(steps: &[PairStep]) -> TestResult<Vec<EntryEvidence>> {
     let mut entries = Vec::new();
-    for effect in steps
-        .iter()
-        .flat_map(|step| step.generated_effects.iter())
-    {
+    for effect in steps.iter().flat_map(|step| step.generated_effects.iter()) {
         let KernelEffect::SendFrame { from, frame } = effect else {
             continue;
         };
@@ -471,10 +470,7 @@ fn authority_entry_effects(steps: &[PairStep]) -> TestResult<Vec<EntryEvidence>>
 
 fn receipt_effects(steps: &[PairStep]) -> TestResult<Vec<ReceiptEvidence>> {
     let mut receipts = Vec::new();
-    for effect in steps
-        .iter()
-        .flat_map(|step| step.generated_effects.iter())
-    {
+    for effect in steps.iter().flat_map(|step| step.generated_effects.iter()) {
         let KernelEffect::SendFrame { from, frame } = effect else {
             continue;
         };
@@ -503,12 +499,7 @@ fn material_effects(steps: &[PairStep]) -> Vec<(SeatId, Revision, OperationId, M
                 revision,
                 operation_id,
                 material,
-            } => Some((
-                *endpoint,
-                *revision,
-                operation_id.clone(),
-                material.clone(),
-            )),
+            } => Some((*endpoint, *revision, operation_id.clone(), material.clone())),
             _ => None,
         })
         .collect()
@@ -524,12 +515,7 @@ fn control_effects(steps: &[PairStep]) -> Vec<(SeatId, Revision, OperationId, Ne
                 revision,
                 operation_id,
                 control,
-            } => Some((
-                *endpoint,
-                *revision,
-                operation_id.clone(),
-                control.clone(),
-            )),
+            } => Some((*endpoint, *revision, operation_id.clone(), control.clone())),
             _ => None,
         })
         .collect()
@@ -693,8 +679,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         AckStage::ControlInstalled,
         Some(&fixture.wait_control_id),
     )?;
-    let presentation_receipt =
-        expected_receipt(&fixture, AckStage::PresentationSettled, None)?;
+    let presentation_receipt = expected_receipt(&fixture, AckStage::PresentationSettled, None)?;
     let expected_replica_frontier = AuthorityFrontier {
         received: fixture.interaction_revision,
         material: fixture.interaction_revision,
@@ -703,7 +688,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
 
     let initial = fixture.pair.snapshot()?;
     assert_eq!(initial.seed, seed.to_string());
-    assert_eq!(actual_replica_frontier(&initial)?, AuthorityFrontier::default());
+    assert_eq!(
+        actual_replica_frontier(&initial)?,
+        AuthorityFrontier::default()
+    );
     assert_eq!(initial.guest.kernel.ui, expected_ui);
     assert_eq!(initial.guest.ui.kind, UiViewKind::Interaction);
     assert_eq!(initial.guest.ui.owner_seat, Some(fixture.guest));
@@ -727,7 +715,9 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_eq!(fixture.pair.snapshot()?.guest.ui, initial.guest.ui);
     trace.extend(host_attempt);
 
-    let guest_press = fixture.pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    let guest_press = fixture
+        .pair
+        .press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     assert_eq!(
         ui_intent_effects(&guest_press),
         vec![(
@@ -741,7 +731,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             },
         )]
     );
-    assert_eq!(proposal_effects(&guest_press), vec![expected_proposal.clone()]);
+    assert_eq!(
+        proposal_effects(&guest_press),
+        vec![expected_proposal.clone()]
+    );
 
     let press_step = guest_press
         .last()
@@ -883,11 +876,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert!(material_effects(std::slice::from_ref(&retry_delivery)).is_empty());
     assert!(control_effects(std::slice::from_ref(&retry_delivery)).is_empty());
     assert!(receipt_effects(std::slice::from_ref(&retry_delivery))?.is_empty());
-    let material_queue_before_duplicate = retry_delivery
-        .snapshot
-        .network
-        .queued_packet_ids
-        .clone();
+    let material_queue_before_duplicate = retry_delivery.snapshot.network.queued_packet_ids.clone();
     trace.push(retry_delivery);
 
     let duplicated_material = fault(
@@ -1016,7 +1005,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         receipt_effects(std::slice::from_ref(&second_material))?,
         vec![control_receipt.clone()]
     );
-    assert_eq!(second_material.snapshot.guest.state_digest, material_state_digest);
+    assert_eq!(
+        second_material.snapshot.guest.state_digest,
+        material_state_digest
+    );
     assert_eq!(second_material.snapshot.guest.ui.kind, UiViewKind::Waiting);
     assert_eq!(
         actual_replica_frontier(&second_material.snapshot)?,
@@ -1027,10 +1019,19 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     let receipt_delivery = fixture.pair.advance_time(safe(10)?)?;
     trace.push(receipt_delivery);
     let settled = fixture.pair.snapshot()?;
-    assert_eq!(actual_replica_frontier(&settled)?, expected_replica_frontier);
+    assert_eq!(
+        actual_replica_frontier(&settled)?,
+        expected_replica_frontier
+    );
     assert!(settled.guest.live_resources.proposal_leases.is_empty());
     assert!(settled.host.live_resources.retained_revisions.is_empty());
-    assert!(settled.guest.live_resources.waits.contains(&fixture.wait_control_id));
+    assert!(
+        settled
+            .guest
+            .live_resources
+            .waits
+            .contains(&fixture.wait_control_id)
+    );
 
     assert_eq!(
         proposal_effects(&trace),
@@ -1113,13 +1114,13 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         Err(SimulatedPairError::Disposed)
     ));
     assert!(matches!(
-        fixture.pair.apply(PairOperation::AdvanceTime { delta_ms: safe(1)? }),
+        fixture
+            .pair
+            .apply(PairOperation::AdvanceTime { delta_ms: safe(1)? }),
         Err(SimulatedPairError::Disposed)
     ));
     assert!(matches!(
-        fixture
-            .pair
-            .press(PairEndpoint::Guest, PhysicalKey::Enter),
+        fixture.pair.press(PairEndpoint::Guest, PhysicalKey::Enter),
         Err(SimulatedPairError::Disposed)
     ));
     Ok(CampaignRun {
@@ -1138,6 +1139,11 @@ fn raw_shared_interaction_campaign_deduplicates_retries_and_material() -> TestRe
     assert_eq!(first_normalized, second_normalized);
     assert_eq!(first.trace, second.trace);
     assert_eq!(first.final_snapshot, second.final_snapshot);
-    assert!(first.trace.iter().all(|step| !step.effects_digest.is_empty()));
+    assert!(
+        first
+            .trace
+            .iter()
+            .all(|step| !step.effects_digest.is_empty())
+    );
     Ok(())
 }

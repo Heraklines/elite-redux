@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use er_kernel::{
-    AuthorityResolutionPlan, ControlMenuPlan, GameKernel, KernelConfig, KernelEffect,
-    KernelError, KernelInput, MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
+    AuthorityResolutionPlan, ControlMenuPlan, GameKernel, KernelConfig, KernelEffect, KernelError,
+    KernelInput, MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
@@ -11,15 +11,14 @@ use er_protocol::{
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceiptBody,
     CancelPolicy, CommandControlTarget, CommandFrontierControl, ConnectionGeneration,
-    ControlProjectionOutcome, FrameContext, FrameType, GameButton, InputFocus, InputMap,
-    InteractionSuccessor, KeyBinding, Material, MaterialApplicationOutcome, MenuGeneration,
-    MenuOption, MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage,
-    RawInputEvent, RecoveryAppliedProof, RecoveryBundleBody, RecoveryRequestBody,
-    ReplacementControl, Revision, RunId, SafeU53, SeatId, SessionId,
-    SharedInteractionControl, TerminalFrameBody, TerminalMenu, TransportState, UiState,
-    WaitingMenu, FRAME_PROTOCOL_VERSION,
+    ControlProjectionOutcome, FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton,
+    InputFocus, InputMap, InteractionSuccessor, KeyBinding, Material, MaterialApplicationOutcome,
+    MenuGeneration, MenuOption, MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey,
+    ProposalMessage, RawInputEvent, RecoveryAppliedProof, RecoveryBundleBody, RecoveryRequestBody,
+    ReplacementControl, Revision, RunId, SafeU53, SeatId, SessionId, SharedInteractionControl,
+    TerminalFrameBody, TerminalMenu, TransportState, UiState, WaitingMenu,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -42,11 +41,7 @@ fn operation(value: &str) -> TestResult<OperationId> {
     Ok(OperationId::new(value.to_owned())?)
 }
 
-fn context(
-    sender: u64,
-    authority: u64,
-    connection_generation: u64,
-) -> TestResult<FrameContext> {
+fn context(sender: u64, authority: u64, connection_generation: u64) -> TestResult<FrameContext> {
     Ok(FrameContext {
         session_id: SessionId::new("m2-kernel-session")?,
         run_id: RunId::new("m2-kernel-run")?,
@@ -247,10 +242,7 @@ fn authority_config(
     })
 }
 
-fn authority_kernel(
-    protocol: ProtocolKernelConfig,
-    initial_ui: UiState,
-) -> GameKernel {
+fn authority_kernel(protocol: ProtocolKernelConfig, initial_ui: UiState) -> GameKernel {
     GameKernel::new(KernelConfig {
         input_map: input_map(),
         initial_ui,
@@ -352,7 +344,11 @@ fn key_up(kernel: &mut GameKernel, seat_id: SeatId) -> Result<Vec<KernelEffect>,
     })
 }
 
-fn network_frame(context: FrameContext, frame_type: FrameType, body: Value) -> er_types::NetworkFrame {
+fn network_frame(
+    context: FrameContext,
+    frame_type: FrameType,
+    body: Value,
+) -> er_types::NetworkFrame {
     er_types::NetworkFrame {
         version: FRAME_PROTOCOL_VERSION,
         frame_type,
@@ -464,30 +460,21 @@ fn configured_protocol_initial_resources_include_wait_and_control() -> TestResul
             false,
         ),
     );
-    assert!(waiting
-        .live_resources()
-        .waits
-        .contains("m2.waiting"));
+    assert!(waiting.live_resources().waits.contains("m2.waiting"));
 
     let control = command_control(0, 42, 1);
     let host = operation("host.command")?;
     let control_id = control_id_of(&control);
     let control_kernel = authority_kernel(
-        authority_config(
-            vec![command_plan(&control, &host, false)?],
-            Vec::new(),
-            &[],
-        )?,
-        ui(
-            initial_command_menu(&control, &host)?,
-            Some(seat(0)),
-            true,
-        ),
+        authority_config(vec![command_plan(&control, &host, false)?], Vec::new(), &[])?,
+        ui(initial_command_menu(&control, &host)?, Some(seat(0)), true),
     );
-    assert!(control_kernel
-        .live_resources()
-        .controls
-        .contains(&control_id));
+    assert!(
+        control_kernel
+            .live_resources()
+            .controls
+            .contains(&control_id)
+    );
     Ok(())
 }
 
@@ -554,15 +541,17 @@ fn local_physical_proposal_projects_distinct_next_command_once() -> TestResult {
     assert_eq!(menu.operation_id, host);
     assert_eq!(menu.control_id, control_id_of(&host_control));
 
-    assert!(kernel
-        .step(KernelInput::ControlProjected {
-            endpoint: seat(0),
-            revision: Revision::new(safe(1)),
-            outcome: ControlProjectionOutcome::AlreadyInstalled {
-                control_id: control_id_of(&host_control),
-            },
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ControlProjected {
+                endpoint: seat(0),
+                revision: Revision::new(safe(1)),
+                outcome: ControlProjectionOutcome::AlreadyInstalled {
+                    control_id: control_id_of(&host_control),
+                },
+            })?
+            .is_empty()
+    );
     Ok(())
 }
 
@@ -728,12 +717,14 @@ fn stale_local_generation_is_inert_but_current_local_proposal_is_admitted() -> T
         )?,
         UiState::default(),
     );
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &guest, "fp", 2),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &guest, "fp", 2),
+            })?
+            .is_empty()
+    );
     assert!(has_apply(
         &kernel.step(KernelInput::ProposalReceived {
             endpoint: seat(0),
@@ -794,23 +785,27 @@ fn deferred_authority_boundaries_block_the_next_revision() -> TestResult {
         &first
     ));
     let unresolved_ui = kernel.ui_state().clone();
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &second, "fp-2", 1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &second, "fp-2", 1),
+            })?
+            .is_empty()
+    );
     kernel.step(KernelInput::MaterialApplied {
         endpoint: seat(0),
         revision: Revision::new(safe(1)),
         outcome: MaterialApplicationOutcome::Deferred,
     })?;
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &second, "fp-2", 1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &second, "fp-2", 1),
+            })?
+            .is_empty()
+    );
     assert_eq!(kernel.ui_state(), &unresolved_ui);
     let project = kernel.step(KernelInput::MaterialApplied {
         endpoint: seat(0),
@@ -818,23 +813,27 @@ fn deferred_authority_boundaries_block_the_next_revision() -> TestResult {
         outcome: MaterialApplicationOutcome::Applied,
     })?;
     assert!(has_project(&project, 1, &first, &first_control));
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &second, "fp-2", 1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &second, "fp-2", 1),
+            })?
+            .is_empty()
+    );
     kernel.step(KernelInput::ControlProjected {
         endpoint: seat(0),
         revision: Revision::new(safe(1)),
         outcome: ControlProjectionOutcome::Deferred,
     })?;
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &second, "fp-2", 1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &second, "fp-2", 1),
+            })?
+            .is_empty()
+    );
     assert_eq!(kernel.ui_state(), &unresolved_ui);
     kernel.step(KernelInput::ControlProjected {
         endpoint: seat(0),
@@ -969,24 +968,30 @@ fn terminal_frame_requires_authenticated_peer_and_absorbs_later_inputs() -> Test
         )?,
         UiState::default(),
     );
-    assert!(kernel
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(2),
-            frame: terminal_frame(context(1, 0, 1)?, "peer-terminal", "peer reason")?,
-        })?
-        .is_empty());
-    assert!(kernel
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(0),
-            frame: terminal_frame(context(1, 0, 2)?, "stale-terminal", "stale reason")?,
-        })?
-        .is_empty());
-    assert!(kernel
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(0),
-            frame: terminal_frame(context(0, 0, 1)?, "wrong-role", "wrong role")?,
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(2),
+                frame: terminal_frame(context(1, 0, 1)?, "peer-terminal", "peer reason")?,
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(0),
+                frame: terminal_frame(context(1, 0, 2)?, "stale-terminal", "stale reason")?,
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(0),
+                frame: terminal_frame(context(0, 0, 1)?, "wrong-role", "wrong role")?,
+            })?
+            .is_empty()
+    );
 
     let committed = kernel.step(KernelInput::ProposalReceived {
         endpoint: seat(0),
@@ -1046,23 +1051,28 @@ fn terminal_frame_requires_authenticated_peer_and_absorbs_later_inputs() -> Test
     assert_eq!(terminal_generation, terminal_ui.generation);
     assert_eq!(kernel.ui_state(), &terminal_ui);
     assert_eq!(kernel.live_resources(), Default::default());
-    assert!(kernel.step(KernelInput::RawInput {
-        seat: seat(0),
-        event: RawInputEvent::KeyDown {
-            code: PhysicalKey::Enter,
-            printable: false,
-            browser_repeat: false,
-            focus: InputFocus::Game,
-        },
-    })?
-    .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::RawInput {
+                seat: seat(0),
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::Enter,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            })?
+            .is_empty()
+    );
     let post_terminal = operation("post-terminal")?;
-    assert!(kernel
-        .step(KernelInput::ProposalReceived {
-            endpoint: seat(0),
-            proposal: proposal(0, &post_terminal, "fp", 1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::ProposalReceived {
+                endpoint: seat(0),
+                proposal: proposal(0, &post_terminal, "fp", 1),
+            })?
+            .is_empty()
+    );
     assert!(kernel
         .step(KernelInput::NetworkFrame {
             endpoint: seat(0),
@@ -1073,18 +1083,22 @@ fn terminal_frame_requires_authenticated_peer_and_absorbs_later_inputs() -> Test
             )?,
         })?
         .is_empty());
-    assert!(kernel
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(0),
-            frame: terminal_frame(context(1, 0, 1)?, "peer-terminal", "peer reason")?,
-        })?
-        .is_empty());
-    assert!(kernel
-        .step(KernelInput::TimerFired {
-            endpoint: seat(0),
-            timer_id: delivery_timer,
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(0),
+                frame: terminal_frame(context(1, 0, 1)?, "peer-terminal", "peer reason")?,
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .step(KernelInput::TimerFired {
+                endpoint: seat(0),
+                timer_id: delivery_timer,
+            })?
+            .is_empty()
+    );
     assert_eq!(*kernel.ui_state(), terminal_ui);
     assert_eq!(kernel.live_resources(), Default::default());
     assert!(kernel.dispose("after terminal").is_empty());
@@ -1260,7 +1274,10 @@ fn exact_terminal_control_and_frame_identity_are_preserved_and_idempotent() -> T
         return Err("terminal control menu was not installed".into());
     };
     assert_eq!(menu.terminal_id, "control-terminal");
-    assert_eq!(menu.prompt_key.as_deref(), Some("terminal control control-terminal"));
+    assert_eq!(
+        menu.prompt_key.as_deref(),
+        Some("terminal control control-terminal")
+    );
     Ok(())
 }
 
@@ -1277,10 +1294,12 @@ fn recovery_request_duplicate_conflict_and_rebind_are_correlated() -> TestResult
         frame: request.clone(),
     })?;
     let response = sent_frame(&first).ok_or("recovery response was not emitted")?;
-    assert!(kernel
-        .live_resources()
-        .recovery_transactions
-        .contains("recovery-1"));
+    assert!(
+        kernel
+            .live_resources()
+            .recovery_transactions
+            .contains("recovery-1")
+    );
     let duplicate = kernel.step(KernelInput::NetworkFrame {
         endpoint: seat(0),
         frame: request,
@@ -1291,9 +1310,11 @@ fn recovery_request_duplicate_conflict_and_rebind_are_correlated() -> TestResult
         endpoint: seat(0),
         frame: recovery_request_frame(peer_context.clone(), "recovery-1", 1, "rejoin")?,
     })?;
-    assert!(conflict
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        conflict
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
 
     let mut rebound = authority_kernel(
         authority_config(Vec::new(), Vec::new(), &[1])?,
@@ -1301,32 +1322,22 @@ fn recovery_request_duplicate_conflict_and_rebind_are_correlated() -> TestResult
     );
     rebound.step(KernelInput::NetworkFrame {
         endpoint: seat(0),
-        frame: recovery_request_frame(
-            peer_context.clone(),
-            "recovery-rebind",
-            0,
-            "rejoin",
-        )?,
+        frame: recovery_request_frame(peer_context.clone(), "recovery-rebind", 0, "rejoin")?,
     })?;
     rebound.step(KernelInput::TransportChanged {
         endpoint: seat(1),
         state: TransportState::Connected,
         generation: generation(2),
     })?;
-    assert!(rebound
-        .live_resources()
-        .recovery_transactions
-        .is_empty());
-    assert!(rebound
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(0),
-            frame: recovery_applied_frame(
-                peer_context,
-                "recovery-rebind",
-                "recovery-empty",
-            )?,
-        })?
-        .is_empty());
+    assert!(rebound.live_resources().recovery_transactions.is_empty());
+    assert!(
+        rebound
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(0),
+                frame: recovery_applied_frame(peer_context, "recovery-rebind", "recovery-empty",)?,
+            })?
+            .is_empty()
+    );
     Ok(())
 }
 
@@ -1339,36 +1350,22 @@ fn recovery_applied_exact_proof_closes_only_its_authenticated_expectation() -> T
     );
     kernel.step(KernelInput::NetworkFrame {
         endpoint: seat(0),
-        frame: recovery_request_frame(
-            peer_context.clone(),
-            "recovery-proof",
-            0,
-            "rejoin",
-        )?,
+        frame: recovery_request_frame(peer_context.clone(), "recovery-proof", 0, "rejoin")?,
     })?;
     let applied = kernel.step(KernelInput::NetworkFrame {
         endpoint: seat(0),
-        frame: recovery_applied_frame(
-            peer_context.clone(),
-            "recovery-proof",
-            "recovery-empty",
-        )?,
+        frame: recovery_applied_frame(peer_context.clone(), "recovery-proof", "recovery-empty")?,
     })?;
     assert!(applied.is_empty());
-    assert!(kernel
-        .live_resources()
-        .recovery_transactions
-        .is_empty());
-    assert!(kernel
-        .step(KernelInput::NetworkFrame {
-            endpoint: seat(0),
-            frame: recovery_applied_frame(
-                peer_context,
-                "recovery-proof",
-                "recovery-empty",
-            )?,
-        })?
-        .is_empty());
+    assert!(kernel.live_resources().recovery_transactions.is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::NetworkFrame {
+                endpoint: seat(0),
+                frame: recovery_applied_frame(peer_context, "recovery-proof", "recovery-empty",)?,
+            })?
+            .is_empty()
+    );
     Ok(())
 }
 
@@ -1441,27 +1438,27 @@ fn authority_staged_reconnect_redelivers_once_when_peer_connects() -> TestResult
         })
         .collect::<Vec<_>>();
     assert_eq!(redeliveries.len(), 1);
-    assert_eq!(
-        redeliveries[0].context.connection_generation,
-        generation(2)
-    );
-    let redelivered: AuthorityEntryBody =
-        serde_json::from_value(redeliveries[0].body.clone())?;
+    assert_eq!(redeliveries[0].context.connection_generation, generation(2));
+    let redelivered: AuthorityEntryBody = serde_json::from_value(redeliveries[0].body.clone())?;
     assert_eq!(redelivered.operation_id, committed_operation);
-    assert!(kernel
-        .step(KernelInput::TransportChanged {
-            endpoint: seat(1),
-            state: TransportState::Connected,
-            generation: generation(2),
-        })?
-        .is_empty());
-    assert!(kernel
-        .step(KernelInput::TransportChanged {
-            endpoint: seat(1),
-            state: TransportState::Connected,
-            generation: generation(1),
-        })?
-        .is_empty());
+    assert!(
+        kernel
+            .step(KernelInput::TransportChanged {
+                endpoint: seat(1),
+                state: TransportState::Connected,
+                generation: generation(2),
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .step(KernelInput::TransportChanged {
+                endpoint: seat(1),
+                state: TransportState::Connected,
+                generation: generation(1),
+            })?
+            .is_empty()
+    );
     Ok(())
 }
 
@@ -1549,8 +1546,7 @@ fn post_rebind_generation_two_raw_proposal_commits_with_exact_context() -> TestR
         })
         .ok_or("generation-two authority entry was not delivered")?;
     assert_eq!(committed_frame.context, context(0, 0, 2)?);
-    let committed_body: AuthorityEntryBody =
-        serde_json::from_value(committed_frame.body.clone())?;
+    let committed_body: AuthorityEntryBody = serde_json::from_value(committed_frame.body.clone())?;
     assert_eq!(committed_body.revision, Revision::new(safe(2)));
     assert_eq!(committed_body.operation_id, second_operation);
     Ok(())
@@ -1633,21 +1629,27 @@ fn replica_staged_reconnect_resends_and_starts_recovery_once() -> TestResult {
                 | KernelEffect::EnterSharedTerminal { .. }
         )
     }));
-    assert!(kernel
-        .live_resources()
-        .recovery_transactions
-        .contains("recovery-2"));
-    assert!(kernel
-        .step(KernelInput::TransportChanged {
-            endpoint: seat(0),
-            state: TransportState::Connected,
-            generation: generation(2),
-        })?
-        .is_empty());
-    assert!(kernel
-        .live_resources()
-        .recovery_transactions
-        .contains("recovery-2"));
+    assert!(
+        kernel
+            .live_resources()
+            .recovery_transactions
+            .contains("recovery-2")
+    );
+    assert!(
+        kernel
+            .step(KernelInput::TransportChanged {
+                endpoint: seat(0),
+                state: TransportState::Connected,
+                generation: generation(2),
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .live_resources()
+            .recovery_transactions
+            .contains("recovery-2")
+    );
     Ok(())
 }
 
@@ -1725,9 +1727,11 @@ fn replica_recovery_fence_snapshot_is_fail_closed_and_truthful() -> TestResult {
             "recovery fence disposed",
         )?,
     })?;
-    assert!(terminal
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        terminal
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
     assert_eq!(
         kernel.snapshot().state["protocol"]["recoveryFence"],
         Value::Null
@@ -1803,12 +1807,7 @@ fn recovery_control_receipt_precedes_proof_and_reopened_ui() -> TestResult {
         revision: Revision::new(safe(1)),
         outcome: MaterialApplicationOutcome::Applied,
     })?;
-    assert!(has_project(
-        &projected,
-        1,
-        &recovered_operation,
-        &control
-    ));
+    assert!(has_project(&projected, 1, &recovered_operation, &control));
 
     let completed = kernel.step(KernelInput::ControlProjected {
         endpoint: seat(1),
@@ -1855,19 +1854,16 @@ fn recovery_control_receipt_precedes_proof_and_reopened_ui() -> TestResult {
     else {
         return Err("receipt effect changed shape".into());
     };
-    let receipt: AuthorityReceiptBody =
-        serde_json::from_value(receipt_frame.body.clone())?;
+    let receipt: AuthorityReceiptBody = serde_json::from_value(receipt_frame.body.clone())?;
     assert_eq!(receipt.stage, AckStage::ControlInstalled);
     assert_eq!(receipt.control_id, Some(control_id.clone()));
     let KernelEffect::SendFrame {
-        frame: proof_frame,
-        ..
+        frame: proof_frame, ..
     } = &completed[proof_index]
     else {
         return Err("proof effect changed shape".into());
     };
-    let proof: RecoveryAppliedProof =
-        serde_json::from_value(proof_frame.body.clone())?;
+    let proof: RecoveryAppliedProof = serde_json::from_value(proof_frame.body.clone())?;
     assert_eq!(proof.request_id, "recovery-2");
     assert_eq!(proof.control_id, Some(control_id.clone()));
     let Some(MenuState::Command(menu)) = kernel.ui_state().stack.last() else {

@@ -4,15 +4,15 @@ use std::error::Error;
 use serde::de::DeserializeOwned;
 
 use er_kernel::{
-    AuthorityResolutionPlan, ControlMenuPlan, KernelConfig, MenuProposalPlan,
-    ProtocolKernelConfig, ProtocolRoleConfig,
+    AuthorityResolutionPlan, ControlMenuPlan, KernelConfig, MenuProposalPlan, ProtocolKernelConfig,
+    ProtocolRoleConfig,
 };
 use er_protocol::{
-    AuthorityEntryBody, AuthorityEntryDraft, AuthorityLogConfig, BackoffPolicy, PeerBinding,
-    ProposalFingerprintInput, ProposalJson, RecoveryAppliedProof, RecoveryBundleBody,
-    RecoveryRequestBody, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
+    AuthorityEntryBody, AuthorityEntryDraft, AuthorityLogConfig, BackoffPolicy,
     DEFAULT_RECOVERY_CONTROL_TIMEOUT_MS, DEFAULT_RECOVERY_PACING_MS,
-    DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS,
+    DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS, PeerBinding, ProposalFingerprintInput, ProposalJson,
+    RecoveryAppliedProof, RecoveryBundleBody, RecoveryRequestBody, RecoveryTransactionConfig,
+    control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
@@ -21,8 +21,8 @@ use er_sim::{
 use er_types::{
     AckStage, AuthorityEntryKind, AuthorityReceiptBody, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FrameContext, FrameType, GameButton, InputFocus,
-    InputMap, KeyBinding, KernelEffect, LiveResourceSnapshot, Material, MenuGeneration,
-    MenuOption, MenuOptionId, MenuState, MembershipRevision, NetworkFrame, NextControl, OperationId,
+    InputMap, KernelEffect, KeyBinding, LiveResourceSnapshot, Material, MembershipRevision,
+    MenuGeneration, MenuOption, MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId,
     PhysicalKey, ProposalMessage, RawInputEvent, RecoveryFenceState, RecoveryFenceView, Revision,
     RunId, SafeU53, SeatId, SessionId, TimeClass, TimerId, UiIntent, UiState, UiViewKind,
     WaitingMenu,
@@ -417,7 +417,11 @@ fn hold_new_packets_after_guest_action(
         },
     })?);
     let proposals = proposal_effects(&trace[action_start..]);
-    assert_eq!(proposals.len(), 1, "guest action must retain one proposal lease");
+    assert_eq!(
+        proposals.len(),
+        1,
+        "guest action must retain one proposal lease"
+    );
     let retained_proposal = proposals[0].clone();
     assert_eq!(retained_proposal.from, seat(GUEST_SEAT));
 
@@ -476,10 +480,7 @@ fn hold_new_packets_after_guest_action(
     for _ in 0..12 {
         let step = pair.advance_time(safe(1))?;
         let current = step.snapshot.network.queued_packet_ids.clone();
-        let added = current
-            .difference(&previous)
-            .copied()
-            .collect::<Vec<_>>();
+        let added = current.difference(&previous).copied().collect::<Vec<_>>();
         let removed = previous.difference(&current).next().is_some();
         trace.push(step);
 
@@ -522,10 +523,7 @@ fn has_frame(effects: &[KernelEffect], frame_type: FrameType) -> bool {
     })
 }
 
-fn frame_effects(
-    effects: &[KernelEffect],
-    frame_type: FrameType,
-) -> Vec<(SeatId, &NetworkFrame)> {
+fn frame_effects(effects: &[KernelEffect], frame_type: FrameType) -> Vec<(SeatId, &NetworkFrame)> {
     effects
         .iter()
         .filter_map(|effect| match effect {
@@ -649,9 +647,15 @@ fn expected_tail_entry(expected_revision: u64) -> TestResult<AuthorityEntryBody>
 fn assert_full_tail_entry(entry: &AuthorityEntryBody, expected_revision: u64) -> TestResult {
     let expected = expected_tail_entry(expected_revision)?;
     assert_eq!(entry, &expected, "recovery tail entry identity drifted");
-    assert_eq!(entry.material.digest, format!("recovery-material-{expected_revision}"));
+    assert_eq!(
+        entry.material.digest,
+        format!("recovery-material-{expected_revision}")
+    );
     assert_eq!(entry.material.payload, material(expected_revision).payload);
-    assert_eq!(control_id_of(&entry.next_control), control_id_of(&expected.next_control));
+    assert_eq!(
+        control_id_of(&entry.next_control),
+        control_id_of(&expected.next_control)
+    );
     Ok(())
 }
 
@@ -672,9 +676,8 @@ fn assert_proposal_identities(
 ) -> TestResult {
     let proposals = proposal_effects(steps);
     assert_eq!(proposals.len(), expected.len());
-    for (proposal, (turn, expected_generation)) in proposals
-        .into_iter()
-        .zip(expected.iter().copied())
+    for (proposal, (turn, expected_generation)) in
+        proposals.into_iter().zip(expected.iter().copied())
     {
         assert_eq!(proposal.operation_id, operation(turn)?);
         assert_eq!(proposal.fingerprint, production_proposal_fingerprint(turn)?);
@@ -718,8 +721,14 @@ fn assert_no_pair_progression(before: &PairSnapshot, after: &PairSnapshot) -> Te
         before.guest.live_resources.proposal_leases,
         after.guest.live_resources.proposal_leases
     );
-    assert_eq!(before.guest.live_resources.controls, after.guest.live_resources.controls);
-    assert_eq!(before.network.queued_packet_ids, after.network.queued_packet_ids);
+    assert_eq!(
+        before.guest.live_resources.controls,
+        after.guest.live_resources.controls
+    );
+    assert_eq!(
+        before.network.queued_packet_ids,
+        after.network.queued_packet_ids
+    );
     Ok(())
 }
 
@@ -765,10 +774,7 @@ fn assert_duplicate_delivery_is_idempotent(
         assert_eq!(receipt.revision, revision(4));
         assert_eq!(receipt.operation_id, operation(4)?);
         assert_eq!(receipt.stage, AckStage::ControlInstalled);
-        assert_eq!(
-            receipt.control_id,
-            Some(control_id_of(&next_control(4)))
-        );
+        assert_eq!(receipt.control_id, Some(control_id_of(&next_control(4))));
         receipt_count += 1;
     }
 
@@ -789,7 +795,10 @@ fn assert_duplicate_delivery_is_idempotent(
         before.network.suspended_endpoints,
         step.snapshot.network.suspended_endpoints
     );
-    assert_eq!(before.network.dropped_count, step.snapshot.network.dropped_count);
+    assert_eq!(
+        before.network.dropped_count,
+        step.snapshot.network.dropped_count
+    );
     assert_eq!(
         before.network.duplicated_count,
         step.snapshot.network.duplicated_count
@@ -817,8 +826,7 @@ fn assert_duplicate_delivery_is_idempotent(
             .copied(),
     );
     assert_eq!(
-        step.snapshot.network.queued_packet_ids,
-        expected_packet_ids,
+        step.snapshot.network.queued_packet_ids, expected_packet_ids,
         "duplicate delivery may remove its packet and add only receipt packets"
     );
     Ok(())
@@ -836,7 +844,10 @@ fn guest_human_input_schedules(step: &PairStep, delay_ms: SafeU53) -> Vec<TimerI
                 ..
             } if *endpoint == seat(GUEST_SEAT)
                 && *scheduled_delay == delay_ms
-                && *time_class == TimeClass::HumanInput => Some(*timer_id),
+                && *time_class == TimeClass::HumanInput =>
+            {
+                Some(*timer_id)
+            }
             _ => None,
         })
         .collect()
@@ -846,17 +857,15 @@ fn guest_timer_cancellations(step: &PairStep) -> Vec<TimerId> {
     step.generated_effects
         .iter()
         .filter_map(|effect| match effect {
-            KernelEffect::CancelTimer { endpoint, timer_id }
-                if *endpoint == seat(GUEST_SEAT) => Some(*timer_id),
+            KernelEffect::CancelTimer { endpoint, timer_id } if *endpoint == seat(GUEST_SEAT) => {
+                Some(*timer_id)
+            }
             _ => None,
         })
         .collect()
 }
 
-fn assert_directional_hold_started(
-    before: &PairSnapshot,
-    step: &PairStep,
-) -> TestResult {
+fn assert_directional_hold_started(before: &PairSnapshot, step: &PairStep) -> TestResult {
     assert_eq!(before.guest.ui.kind, UiViewKind::Command);
     assert_eq!(before.guest.ui.owner_seat, Some(seat(GUEST_SEAT)));
     assert!(before.guest.ui.actionable);
@@ -924,8 +933,14 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
         assert!(endpoint.live_resources.network_packets.is_empty());
         assert_eq!(endpoint.live_resources, LiveResourceSnapshot::default());
     }
-    assert_eq!(snapshot.host.live_resources, LiveResourceSnapshot::default());
-    assert_eq!(snapshot.guest.live_resources, LiveResourceSnapshot::default());
+    assert_eq!(
+        snapshot.host.live_resources,
+        LiveResourceSnapshot::default()
+    );
+    assert_eq!(
+        snapshot.guest.live_resources,
+        LiveResourceSnapshot::default()
+    );
     assert!(snapshot.clock_timers.is_empty());
     for endpoint in [&snapshot.host, &snapshot.guest] {
         assert!(endpoint.presenter.pending_event_ids.is_empty());
@@ -945,10 +960,7 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
 }
 
 fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
-    assert!(matches!(
-        pair.snapshot(),
-        Err(SimulatedPairError::Disposed)
-    ));
+    assert!(matches!(pair.snapshot(), Err(SimulatedPairError::Disposed)));
     assert!(matches!(
         pair.apply(PairOperation::AdvanceTime {
             delta_ms: SafeU53::ZERO,
@@ -1075,7 +1087,11 @@ fn assert_fresh_guest_command(
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(intents.len(), 1, "fresh raw input must emit one guest intent");
+    assert_eq!(
+        intents.len(),
+        1,
+        "fresh raw input must emit one guest intent"
+    );
     match intents[0] {
         UiIntent::CommandSubmitted {
             seat: submitted_seat,
@@ -1109,8 +1125,16 @@ fn network_is_quiescent(snapshot: &PairSnapshot) -> bool {
         && snapshot.guest.live_resources.timers.is_empty()
         && snapshot.host.live_resources.delivery_leases.is_empty()
         && snapshot.guest.live_resources.proposal_leases.is_empty()
-        && snapshot.host.live_resources.recovery_transactions.is_empty()
-        && snapshot.guest.live_resources.recovery_transactions.is_empty()
+        && snapshot
+            .host
+            .live_resources
+            .recovery_transactions
+            .is_empty()
+        && snapshot
+            .guest
+            .live_resources
+            .recovery_transactions
+            .is_empty()
         && snapshot.presenter.pending_event_ids.is_empty()
 }
 
@@ -1124,9 +1148,7 @@ fn drain_network_to_quiescence(
             return Ok(snapshot);
         }
         let operation = if snapshot.network.queued_packet_ids.is_empty() {
-            PairOperation::AdvanceTime {
-                delta_ms: safe(10),
-            }
+            PairOperation::AdvanceTime { delta_ms: safe(10) }
         } else {
             PairOperation::Fault {
                 operation: FaultOperation::DeliverNext,
@@ -1134,10 +1156,10 @@ fn drain_network_to_quiescence(
         };
         trace.push(pair.apply(operation)?);
     }
-    Err(std::io::Error::other(
-        "real network did not reach quiescence within 2,560 virtual ms",
+    Err(
+        std::io::Error::other("real network did not reach quiescence within 2,560 virtual ms")
+            .into(),
     )
-    .into())
 }
 
 fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
@@ -1167,10 +1189,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let pre_recovery_action_start = trace.len();
     let (retained_proposal, stale_packet_id) =
         hold_new_packets_after_guest_action(&mut pair, &mut trace)?;
-    assert_proposal_identities(
-        &trace[pre_recovery_action_start..],
-        &[(2, generation(0))],
-    )?;
+    assert_proposal_identities(&trace[pre_recovery_action_start..], &[(2, generation(0))])?;
 
     let directional_hold_before = trace
         .last()
@@ -1186,15 +1205,18 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             focus: InputFocus::Game,
         },
     })?;
-    assert_eq!(directional_hold.operation, PairOperation::RawInput {
-        endpoint: PairEndpoint::Guest,
-        event: RawInputEvent::KeyDown {
-            code: PhysicalKey::ArrowDown,
-            printable: false,
-            browser_repeat: false,
-            focus: InputFocus::Game,
-        },
-    });
+    assert_eq!(
+        directional_hold.operation,
+        PairOperation::RawInput {
+            endpoint: PairEndpoint::Guest,
+            event: RawInputEvent::KeyDown {
+                code: PhysicalKey::ArrowDown,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+        }
+    );
     assert_directional_hold_started(&directional_hold_before, &directional_hold)?;
     trace.push(directional_hold);
 
@@ -1232,7 +1254,10 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         "reconnect must resend the retained guest proposal exactly once"
     );
     let rebound_proposal = rebound_proposals[0];
-    assert_eq!(rebound_proposal.operation_id, retained_proposal.operation_id);
+    assert_eq!(
+        rebound_proposal.operation_id,
+        retained_proposal.operation_id
+    );
     assert_eq!(rebound_proposal.fingerprint, retained_proposal.fingerprint);
     assert_eq!(rebound_proposal.payload, retained_proposal.payload);
     assert_eq!(rebound_proposal.from, retained_proposal.from);
@@ -1301,10 +1326,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             KernelEffect::UiIntent { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
         )
     }));
-    assert_no_pair_progression(
-        &before_fence_waiting_submit,
-        &fence_waiting_submit.snapshot,
-    )?;
+    assert_no_pair_progression(&before_fence_waiting_submit, &fence_waiting_submit.snapshot)?;
     trace.push(fence_waiting_submit);
     let fence_waiting_release = pair.apply(PairOperation::RawInput {
         endpoint: PairEndpoint::Guest,
@@ -1350,7 +1372,10 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
                             && matches!(
                                 frame.frame_type,
                                 FrameType::AuthorityReceipt | FrameType::RecoveryApplied
-                            ) => Some((packet_id, frame.frame_type)),
+                            ) =>
+                    {
+                        Some((packet_id, frame.frame_type))
+                    }
                     _ => None,
                 })
                 .collect::<Vec<_>>()
@@ -1380,7 +1405,11 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
                     },
                 })?;
                 assert!(
-                    delayed.snapshot.network.queued_packet_ids.contains(&packet_id),
+                    delayed
+                        .snapshot
+                        .network
+                        .queued_packet_ids
+                        .contains(&packet_id),
                     "delayed recovery evidence must remain queued"
                 );
                 trace.push(delayed);
@@ -1579,7 +1608,9 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
                 )
             })
         })
-        .ok_or_else(|| std::io::Error::other("recovery proof step was not retained in the trace"))?;
+        .ok_or_else(|| {
+            std::io::Error::other("recovery proof step was not retained in the trace")
+        })?;
     for step in &recovery_trace[..applied_step_index] {
         let fence = guest_recovery_fence(step)?;
         assert_held_recovery_fence(&fence);
@@ -1634,12 +1665,14 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_ne!(final_step.snapshot.guest.ui.generation, stale_generation);
     let final_fence = guest_recovery_fence(final_step)?;
     assert_open_recovery_fence(&final_fence);
-    assert!(final_step
-        .snapshot
-        .guest
-        .live_resources
-        .controls
-        .contains(&control_id_of(&command_control(4, GUEST_SEAT))));
+    assert!(
+        final_step
+            .snapshot
+            .guest
+            .live_resources
+            .controls
+            .contains(&control_id_of(&command_control(4, GUEST_SEAT)))
+    );
 
     let fresh_menu_generation = final_step.snapshot.guest.ui.generation;
     for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
@@ -1657,7 +1690,9 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let stale_hold_advance = pair.advance_time(safe(250))?;
     assert_eq!(
         stale_hold_advance.operation,
-        PairOperation::AdvanceTime { delta_ms: safe(250) }
+        PairOperation::AdvanceTime {
+            delta_ms: safe(250)
+        }
     );
     assert_eq!(
         stale_hold_advance.snapshot.virtual_time_ms,
@@ -1668,13 +1703,11 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         "the stale held input must not emit a guest intent or old-generation proposal"
     );
     assert_eq!(
-        stale_hold_advance.snapshot.guest.ui,
-        stale_hold_before.guest.ui,
+        stale_hold_advance.snapshot.guest.ui, stale_hold_before.guest.ui,
         "the stale held input must not move the fresh cursor or submit the fresh menu"
     );
     assert_eq!(
-        stale_hold_advance.snapshot.guest.kernel.ui,
-        stale_hold_before.guest.kernel.ui,
+        stale_hold_advance.snapshot.guest.kernel.ui, stale_hold_before.guest.kernel.ui,
         "the stale held input must not mutate the fresh successor surface"
     );
     assert!(stale_hold_advance.generated_effects.iter().all(|effect| {
@@ -1704,7 +1737,10 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .ok_or_else(|| std::io::Error::other("control-pending submit has no preceding step"))?
         .snapshot
         .clone();
-    assert_eq!(before_control_pending_submit.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(
+        before_control_pending_submit.guest.ui.kind,
+        UiViewKind::Command
+    );
     assert_eq!(
         before_control_pending_submit.guest.ui.owner_seat,
         Some(seat(GUEST_SEAT))
@@ -1738,15 +1774,14 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         std::slice::from_ref(&control_pending_submit),
         &[(4, generation(1))],
     )?;
-    let pending_packets = send_effect_packets(
-        &before_control_pending_submit,
-        &control_pending_submit,
-    )?;
+    let pending_packets =
+        send_effect_packets(&before_control_pending_submit, &control_pending_submit)?;
     let pending_proposals = pending_packets
         .iter()
         .filter_map(|(packet_id, effect)| match effect {
-            KernelEffect::SendProposal { proposal }
-                if proposal.from == seat(GUEST_SEAT) => Some((*packet_id, proposal.clone())),
+            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT) => {
+                Some((*packet_id, proposal.clone()))
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -1756,10 +1791,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         "fresh N+1 Submit must queue exactly one retained proposal"
     );
     let (pending_proposal_packet_id, retained_next_proposal) = pending_proposals[0].clone();
-    assert_eq!(
-        retained_next_proposal.connection_generation,
-        generation(1)
-    );
+    assert_eq!(retained_next_proposal.connection_generation, generation(1));
     trace.push(control_pending_submit);
     let control_pending_release = pair.apply(PairOperation::RawInput {
         endpoint: PairEndpoint::Guest,
@@ -1788,20 +1820,13 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             packet_id: pending_proposal_packet_id,
         },
     })?;
-    let mut expected_pending_queue = before_pending_delivery
-        .network
-        .queued_packet_ids
-        .clone();
+    let mut expected_pending_queue = before_pending_delivery.network.queued_packet_ids.clone();
     assert!(expected_pending_queue.remove(&pending_proposal_packet_id));
     assert_eq!(
-        pending_delivery.snapshot.network.queued_packet_ids,
-        expected_pending_queue,
+        pending_delivery.snapshot.network.queued_packet_ids, expected_pending_queue,
         "N+1 delivery must precede, and not consume, delayed control evidence"
     );
-    assert_no_protocol_progression(
-        &before_pending_delivery,
-        &pending_delivery.snapshot,
-    )?;
+    assert_no_protocol_progression(&before_pending_delivery, &pending_delivery.snapshot)?;
     assert!(pending_delivery.generated_effects.iter().all(|effect| {
         !matches!(effect, KernelEffect::SendProposal { .. })
             && !matches!(effect, KernelEffect::ApplyAuthorityMaterial { .. })
@@ -1873,16 +1898,14 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         },
     })?;
     assert_fresh_guest_command(std::slice::from_ref(&retry_submit), fresh_menu_generation)?;
-    assert_proposal_identities(
-        std::slice::from_ref(&retry_submit),
-        &[(4, generation(1))],
-    )?;
+    assert_proposal_identities(std::slice::from_ref(&retry_submit), &[(4, generation(1))])?;
     let retry_packets = send_effect_packets(&before_retry_submit, &retry_submit)?;
     let retry_proposals = retry_packets
         .iter()
         .filter_map(|(packet_id, effect)| match effect {
-            KernelEffect::SendProposal { proposal }
-                if proposal.from == seat(GUEST_SEAT) => Some((*packet_id, proposal.clone())),
+            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT) => {
+                Some((*packet_id, proposal.clone()))
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -1934,8 +1957,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         },
     })?;
     assert_ne!(
-        retry_delivery.snapshot.host.kernel,
-        before_retry_delivery.host.kernel,
+        retry_delivery.snapshot.host.kernel, before_retry_delivery.host.kernel,
         "the retained N+1 identity must execute only after delayed evidence"
     );
     let before_duplicate_delivery = retry_delivery.snapshot.clone();

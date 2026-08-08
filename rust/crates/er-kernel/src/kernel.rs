@@ -14,19 +14,18 @@ use er_protocol::{
     control_id_of, frame_contexts_compatible,
 };
 use er_types::{
-    AuthorityEntry, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice,
-    ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration,
-    ControlProjectionOutcome, FrameContext, FrameType, GameButton, InputMap, InputRouterOutput,
+    AuthorityEntry, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice, ButtonEvent,
+    CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration, ControlProjectionOutcome,
+    FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton, InputMap, InputRouterOutput,
     InputTimerCommand, InteractionMenu, MaterialApplicationOutcome, MenuGeneration, MenuOption,
     MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId, PresentationEvent,
     PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame, RecoveryAppliedProof,
     RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody, ReplacementMenu,
     Revision, SafeU53, SeatId, TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState,
     TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
-    FRAME_PROTOCOL_VERSION,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{InputRouteError, InputRouter, UiReducer};
@@ -284,9 +283,9 @@ impl GameKernel {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
                 let repeat_context = self.repeat_timers.get(&timer_id).copied();
-                if repeat_context.is_some_and(|context| {
-                    !Self::is_input_repeat_timer(&scheduled, context)
-                }) {
+                if repeat_context
+                    .is_some_and(|context| !Self::is_input_repeat_timer(&scheduled, context))
+                {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
                 if let Some(context) = repeat_context {
@@ -715,28 +714,34 @@ impl GameKernel {
     }
 
     fn command_admission_frozen(&self) -> bool {
-        self.protocol.as_ref().is_some_and(|protocol| match protocol {
-            ProtocolState::Authority(authority) => {
-                authority.pending_material.is_some()
-                    || authority.pending_control.is_some()
-                    || authority.authority_rebind_pending
-            }
-            ProtocolState::Replica(replica) => {
-                replica.pending_material.is_some()
-                    || replica.pending_control.is_some()
-                    || replica.staged_authority_rebind.is_some()
-                    || replica
-                        .recovery
-                        .fence()
-                        .is_some_and(|fence| fence.is_command_admission_frozen())
-            }
-        })
+        self.protocol
+            .as_ref()
+            .is_some_and(|protocol| match protocol {
+                ProtocolState::Authority(authority) => {
+                    authority.pending_material.is_some()
+                        || authority.pending_control.is_some()
+                        || authority.authority_rebind_pending
+                }
+                ProtocolState::Replica(replica) => {
+                    replica.pending_material.is_some()
+                        || replica.pending_control.is_some()
+                        || replica.staged_authority_rebind.is_some()
+                        || replica
+                            .recovery
+                            .fence()
+                            .is_some_and(|fence| fence.is_command_admission_frozen())
+                }
+            })
     }
 
     fn protocol_timer_kind(&self, timer_id: TimerId) -> Option<ProtocolTimerKind> {
         match self.protocol.as_ref()? {
             ProtocolState::Authority(authority)
-                if authority.log.diagnostics().delivery_timer_ids.contains(&timer_id) =>
+                if authority
+                    .log
+                    .diagnostics()
+                    .delivery_timer_ids
+                    .contains(&timer_id) =>
             {
                 Some(ProtocolTimerKind::Authority)
             }
@@ -768,7 +773,9 @@ impl GameKernel {
         let batch = match kind {
             ProtocolTimerKind::Authority => {
                 let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
-                    return Err(kernel_protocol_error("authority timer has no authority owner"));
+                    return Err(kernel_protocol_error(
+                        "authority timer has no authority owner",
+                    ));
                 };
                 let actions = authority
                     .log
@@ -840,15 +847,13 @@ impl GameKernel {
                         effects.push(effect);
                     }
                 }
-                AuthorityLogAction::Deliver { entry, .. } => {
-                    match authority_entry_frame(&entry) {
-                        Ok(frame) => effects.push(KernelEffect::SendFrame {
-                            from: entry.context.sender_seat_id,
-                            frame,
-                        }),
-                        Err(reason) => effects.extend(self.enter_terminal(reason)),
-                    }
-                }
+                AuthorityLogAction::Deliver { entry, .. } => match authority_entry_frame(&entry) {
+                    Ok(frame) => effects.push(KernelEffect::SendFrame {
+                        from: entry.context.sender_seat_id,
+                        frame,
+                    }),
+                    Err(reason) => effects.extend(self.enter_terminal(reason)),
+                },
             }
         }
         self.sync_live_resources();
@@ -870,9 +875,9 @@ impl GameKernel {
                 ProposalLeaseAction::Terminalize {
                     operation_id,
                     reason,
-                } => effects.extend(self.enter_terminal(format!(
-                    "proposal {operation_id} terminalized: {reason}"
-                ))),
+                } => effects.extend(
+                    self.enter_terminal(format!("proposal {operation_id} terminalized: {reason}")),
+                ),
             }
         }
         self.sync_live_resources();
@@ -883,15 +888,13 @@ impl GameKernel {
         let mut effects = Vec::new();
         for action in actions {
             match action {
-                ReplicaAction::EmitReceipt { receipt } => {
-                    match receipt_frame(&receipt) {
-                        Ok(frame) => effects.push(KernelEffect::SendFrame {
-                            from: receipt.context.sender_seat_id,
-                            frame,
-                        }),
-                        Err(reason) => effects.extend(self.enter_terminal(reason)),
-                    }
-                }
+                ReplicaAction::EmitReceipt { receipt } => match receipt_frame(&receipt) {
+                    Ok(frame) => effects.push(KernelEffect::SendFrame {
+                        from: receipt.context.sender_seat_id,
+                        frame,
+                    }),
+                    Err(reason) => effects.extend(self.enter_terminal(reason)),
+                },
                 ReplicaAction::ApplyMaterial { entry } => {
                     self.set_pending_material(entry.revision, entry.operation_id.clone());
                     effects.push(KernelEffect::ApplyAuthorityMaterial {
@@ -920,8 +923,7 @@ impl GameKernel {
                 }
                 ReplicaAction::ProbePresentation { entry } => {
                     let event_id = PresentationEventId::new(entry.revision.get());
-                    self.pending_presentations
-                        .insert(event_id, entry.revision);
+                    self.pending_presentations.insert(event_id, entry.revision);
                     effects.push(KernelEffect::Present {
                         endpoint: self.local_endpoint(),
                         event: PresentationEvent {
@@ -1012,7 +1014,12 @@ impl GameKernel {
                     owner_seat_id,
                     operation_id,
                     ..
-                } => (MenuSubmissionKind::Command, control_id, owner_seat_id, operation_id),
+                } => (
+                    MenuSubmissionKind::Command,
+                    control_id,
+                    owner_seat_id,
+                    operation_id,
+                ),
                 ControlMenuPlan::Replacement {
                     control_id,
                     owner_seat_id,
@@ -1082,10 +1089,9 @@ impl GameKernel {
             ProposalLeaseStart::AlreadyCommitted => Vec::new(),
             ProposalLeaseStart::Conflict
             | ProposalLeaseStart::Invalid
-            | ProposalLeaseStart::Disposed => self.enter_terminal(format!(
-                "proposal lease rejected with {:?}",
-                outcome.result
-            )),
+            | ProposalLeaseStart::Disposed => {
+                self.enter_terminal(format!("proposal lease rejected with {:?}", outcome.result))
+            }
         };
         Ok(effects)
     }
@@ -1161,10 +1167,7 @@ impl GameKernel {
         Ok(self.map_authority_commit(outcome))
     }
 
-    fn map_authority_commit(
-        &mut self,
-        outcome: er_protocol::CommitOutcome,
-    ) -> Vec<KernelEffect> {
+    fn map_authority_commit(&mut self, outcome: er_protocol::CommitOutcome) -> Vec<KernelEffect> {
         let entry = outcome.entry;
         self.set_pending_authority_entry(entry.clone());
         let mut effects = self.map_authority_actions(outcome.actions);
@@ -1369,10 +1372,9 @@ impl GameKernel {
             .required_tail
             .iter()
             .filter_map(|entry| {
-                authority_entry_frame(entry).ok().map(|frame| KernelEffect::SendFrame {
-                    from,
-                    frame,
-                })
+                authority_entry_frame(entry)
+                    .ok()
+                    .map(|frame| KernelEffect::SendFrame { from, frame })
             })
             .collect();
         Ok(effects)
@@ -1430,10 +1432,7 @@ impl GameKernel {
                         reason: body.reason,
                         frontier: slice.frontier,
                         material_digest: recovery_material_digest(&slice),
-                        control_id: slice
-                            .next_control
-                            .as_ref()
-                            .map(control_id_of),
+                        control_id: slice.next_control.as_ref().map(control_id_of),
                         response_frame: frame,
                     },
                 );
@@ -1445,10 +1444,7 @@ impl GameKernel {
             ));
         }
         if let Some(frame) = duplicate_response.or(response) {
-            return Ok(vec![KernelEffect::SendFrame {
-                from,
-                frame,
-            }]);
+            return Ok(vec![KernelEffect::SendFrame { from, frame }]);
         }
         Ok(Vec::new())
     }
@@ -1566,7 +1562,10 @@ impl GameKernel {
                         effects.push(effect);
                     }
                 }
-                RecoveryAction::ApplyMaterial { request_id, material } => {
+                RecoveryAction::ApplyMaterial {
+                    request_id,
+                    material,
+                } => {
                     let Some((endpoint, frontier, operation_id)) = (|| {
                         let Some(ProtocolState::Replica(replica)) = self.protocol.as_ref() else {
                             return None;
@@ -1724,12 +1723,9 @@ impl GameKernel {
             }
             match &outcome {
                 MaterialApplicationOutcome::Applied => {
-                    let entry = authority
-                        .pending_material
-                        .take()
-                        .ok_or_else(|| {
-                            kernel_protocol_error("authority material pending state disappeared")
-                        })?;
+                    let entry = authority.pending_material.take().ok_or_else(|| {
+                        kernel_protocol_error("authority material pending state disappeared")
+                    })?;
                     let expected_control_id = control_id_of(&entry.next_control);
                     authority.pending_control = Some(PendingControl {
                         revision: entry.revision,
@@ -2026,8 +2022,7 @@ impl GameKernel {
         if generation < current_generation {
             return Ok(Vec::new());
         }
-        if generation == current_generation
-            && self.protocol_endpoint_state(endpoint) == Some(state)
+        if generation == current_generation && self.protocol_endpoint_state(endpoint) == Some(state)
         {
             return Ok(Vec::new());
         }
@@ -2082,8 +2077,7 @@ impl GameKernel {
                         .map_err(kernel_protocol_error)?
                         .actions;
                     authority.staged_peer_rebinds.remove(&endpoint);
-                    authority.authority_rebind_pending =
-                        !authority.staged_peer_rebinds.is_empty();
+                    authority.authority_rebind_pending = !authority.staged_peer_rebinds.is_empty();
                     if let Some(entry) = authority.pending_material.as_mut() {
                         entry.context = authority.context.clone();
                     }
@@ -2151,9 +2145,7 @@ impl GameKernel {
             self.pending_presentations.clear();
         }
         effects.extend(self.map_authority_actions(authority_actions));
-        effects.extend(Self::map_rebind_recovery_cleanup(
-            recovery_cleanup_actions,
-        )?);
+        effects.extend(Self::map_rebind_recovery_cleanup(recovery_cleanup_actions)?);
         effects.extend(self.map_proposal_actions(proposal_actions));
         effects.extend(self.apply_recovery_actions(recovery_actions)?);
         self.sync_live_resources();
@@ -2297,8 +2289,8 @@ impl GameKernel {
             else {
                 return None;
             };
-            let selected_target = target.owner_seat_id == *owner_seat_id
-                && target.field_index == *field_index;
+            let selected_target =
+                target.owner_seat_id == *owner_seat_id && target.field_index == *field_index;
             (control_id == &pending.expected_control_id && selected_target).then(|| {
                 (
                     *owner_seat_id,
@@ -2541,10 +2533,14 @@ impl GameKernel {
                 )],
                 ProtocolState::Replica(replica) => vec![
                     ProtocolActionBatch::Recovery(
-                        replica.recovery.dispose(&terminal.reason, &mut self.scheduler),
+                        replica
+                            .recovery
+                            .dispose(&terminal.reason, &mut self.scheduler),
                     ),
                     ProtocolActionBatch::Proposal(
-                        replica.leases.dispose(&terminal.reason, &mut self.scheduler),
+                        replica
+                            .leases
+                            .dispose(&terminal.reason, &mut self.scheduler),
                     ),
                 ],
             }
@@ -2683,11 +2679,8 @@ impl GameKernel {
                 let diagnostics = authority.log.diagnostics();
                 self.live_resources.delivery_leases = diagnostics.delivery_owner_ids;
                 self.live_resources.retained_revisions = diagnostics.retained_revisions;
-                self.live_resources.recovery_transactions = authority
-                    .pending_recoveries
-                    .keys()
-                    .cloned()
-                    .collect();
+                self.live_resources.recovery_transactions =
+                    authority.pending_recoveries.keys().cloned().collect();
             }
             Some(ProtocolState::Replica(replica)) => {
                 let lease_diagnostics = replica.leases.diagnostics();
@@ -2717,7 +2710,9 @@ impl GameKernel {
                     self.live_resources.waits.insert(wait);
                 }
                 MenuState::Command(command) => {
-                    self.live_resources.controls.insert(command.control_id.clone());
+                    self.live_resources
+                        .controls
+                        .insert(command.control_id.clone());
                 }
                 MenuState::Replacement(replacement) => {
                     self.live_resources
@@ -2778,8 +2773,10 @@ impl ProtocolState {
                 let peer_bindings = log.peer_bindings.clone();
                 let log = AuthorityLog::new(log.clone())
                     .map_err(|error| format!("authority log initialization failed: {error}"))?;
-                let proposals = ProposalAdmissionLedger::new(*proposal_capacity)
-                    .map_err(|error| format!("proposal admission initialization failed: {error}"))?;
+                let proposals =
+                    ProposalAdmissionLedger::new(*proposal_capacity).map_err(|error| {
+                        format!("proposal admission initialization failed: {error}")
+                    })?;
                 let mut transports = BTreeMap::new();
                 transports.insert(context.sender_seat_id, TransportState::Connected);
                 for peer in &peer_bindings {
@@ -2938,9 +2935,7 @@ fn pending_control_snapshot(pending: Option<&PendingControl>) -> Value {
     }
 }
 
-fn pending_recoveries_snapshot(
-    pending: &BTreeMap<String, PendingRecoveryExpectation>,
-) -> Value {
+fn pending_recoveries_snapshot(pending: &BTreeMap<String, PendingRecoveryExpectation>) -> Value {
     let mut snapshot = serde_json::Map::new();
     for (request_id, expectation) in pending {
         snapshot.insert(
@@ -2977,8 +2972,7 @@ fn authority_entry_frame(entry: &AuthorityEntry) -> Result<NetworkFrame, String>
     network_frame(
         &entry.context,
         FrameType::AuthorityEntry,
-        serde_json::to_value(AuthorityEntryBody::from(entry))
-            .map_err(|error| error.to_string())?,
+        serde_json::to_value(AuthorityEntryBody::from(entry)).map_err(|error| error.to_string())?,
     )
 }
 
@@ -3245,7 +3239,10 @@ mod tests {
             .iter()
             .filter_map(|effect| match effect {
                 KernelEffect::SendFrame { frame, .. }
-                    if frame.frame_type == FrameType::AuthorityEntry => Some(frame),
+                    if frame.frame_type == FrameType::AuthorityEntry =>
+                {
+                    Some(frame)
+                }
                 _ => None,
             })
             .collect::<Vec<_>>();

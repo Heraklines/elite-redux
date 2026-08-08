@@ -309,11 +309,10 @@ impl SimulatedPair {
             )?;
         }
 
-        let effects_digest = content_digest(&generated_effects).map_err(|error| {
-            SimulatedPairError::Adapter {
+        let effects_digest =
+            content_digest(&generated_effects).map_err(|error| SimulatedPairError::Adapter {
                 reason: format!("effects could not be canonicalized: {error}"),
-            }
-        })?;
+            })?;
         self.advance_sequence()?;
 
         Ok(PairStep {
@@ -332,10 +331,7 @@ impl SimulatedPair {
         printable: bool,
     ) -> Result<PairStep, SimulatedPairError> {
         let event = self.keyboard(endpoint).key_down(code, printable);
-        self.apply(PairOperation::RawInput {
-            endpoint,
-            event,
-        })
+        self.apply(PairOperation::RawInput { endpoint, event })
     }
 
     pub fn key_up(
@@ -379,7 +375,9 @@ impl SimulatedPair {
             endpoint,
             event: key_down,
         })?;
-        let advance = self.apply(PairOperation::AdvanceTime { delta_ms: duration_ms })?;
+        let advance = self.apply(PairOperation::AdvanceTime {
+            delta_ms: duration_ms,
+        })?;
         let key_up = self.apply(PairOperation::RawInput {
             endpoint,
             event: key_up,
@@ -399,10 +397,7 @@ impl SimulatedPair {
     ) -> Result<PairStep, SimulatedPairError> {
         let mut next_keyboard = self.keyboard(endpoint).clone();
         let event = next_keyboard.focus(focus);
-        let step = self.apply(PairOperation::RawInput {
-            endpoint,
-            event,
-        })?;
+        let step = self.apply(PairOperation::RawInput { endpoint, event })?;
         if self.shared_terminal.is_none() {
             *self.keyboard_mut(endpoint) = next_keyboard;
         }
@@ -487,12 +482,7 @@ impl SimulatedPair {
                     generated_events,
                     Some(event_budget),
                 )?;
-                self.drain_due_clock(
-                    work,
-                    generated_effects,
-                    generated_events,
-                    event_budget,
-                )?;
+                self.drain_due_clock(work, generated_effects, generated_events, event_budget)?;
             }
             PairOperation::Disconnect { endpoint } => {
                 self.disconnect(endpoint, work)?;
@@ -615,12 +605,7 @@ impl SimulatedPair {
         if self.shared_terminal.is_some() {
             return Ok(());
         }
-        self.drain_due_clock(
-            work,
-            generated_effects,
-            generated_events,
-            event_budget,
-        )?;
+        self.drain_due_clock(work, generated_effects, generated_events, event_budget)?;
         if self.shared_terminal.is_some() {
             return Ok(());
         }
@@ -637,12 +622,7 @@ impl SimulatedPair {
             generated_events,
             Some(event_budget),
         )?;
-        self.drain_due_clock(
-            work,
-            generated_effects,
-            generated_events,
-            event_budget,
-        )
+        self.drain_due_clock(work, generated_effects, generated_events, event_budget)
     }
 
     fn next_network_deadline_delta(&self) -> Option<u64> {
@@ -748,11 +728,7 @@ impl SimulatedPair {
         }
 
         let generation = self.network.reconnect(seat).map_err(network_error)?;
-        let link_connected = self
-            .network
-            .diagnostics()
-            .disconnected_endpoints
-            .is_empty();
+        let link_connected = self.network.diagnostics().disconnected_endpoints.is_empty();
         if link_connected {
             self.set_shared_connected_clock(true)?;
         }
@@ -816,10 +792,7 @@ impl SimulatedPair {
         inputs
     }
 
-    fn set_shared_connected_clock(
-        &mut self,
-        connected: bool,
-    ) -> Result<(), SimulatedPairError> {
+    fn set_shared_connected_clock(&mut self, connected: bool) -> Result<(), SimulatedPairError> {
         let commands = [self.host_seat, self.guest_seat]
             .into_iter()
             .map(|endpoint| {
@@ -936,9 +909,7 @@ impl SimulatedPair {
             *generated_events += 1;
         }
 
-        self.kernel_mut(endpoint)
-            .step(input)
-            .map_err(kernel_error)
+        self.kernel_mut(endpoint).step(input).map_err(kernel_error)
     }
 
     fn consume_effect(
@@ -950,11 +921,10 @@ impl SimulatedPair {
             KernelEffect::SendFrame { from, frame } => {
                 self.require_seat(from)?;
                 let to = self.peer_seat(from)?;
-                let raw = serde_json::to_value(&frame).map_err(|error| {
-                    SimulatedPairError::Network {
+                let raw =
+                    serde_json::to_value(&frame).map_err(|error| SimulatedPairError::Network {
                         reason: format!("frame could not be serialized for transport: {error}"),
-                    }
-                })?;
+                    })?;
                 self.network
                     .enqueue(
                         from,
@@ -1004,16 +974,12 @@ impl SimulatedPair {
                     .apply(SchedulerCommand::Cancel { endpoint, timer_id })
                     .map_err(clock_error)?;
             }
-            KernelEffect::UiChanged { endpoint, .. }
-            | KernelEffect::UiIntent { endpoint, .. } => {
+            KernelEffect::UiChanged { endpoint, .. } | KernelEffect::UiIntent { endpoint, .. } => {
                 self.require_seat(endpoint)?;
             }
             KernelEffect::Present { endpoint, event } => {
                 let seat = self.require_seat(endpoint)?;
-                let completions = self
-                    .presenter
-                    .present(seat, event)
-                    .map_err(adapter_error)?;
+                let completions = self.presenter.present(seat, event).map_err(adapter_error)?;
                 self.queue_presentation_completions(
                     self.endpoint_for_seat(seat)?,
                     completions,
@@ -1034,9 +1000,7 @@ impl SimulatedPair {
                 });
             }
             KernelEffect::ApplyAuthorityMaterial {
-                endpoint,
-                revision,
-                ..
+                endpoint, revision, ..
             } => {
                 let seat = self.require_seat(endpoint)?;
                 work.push_front(PairWork::Input {
@@ -1171,10 +1135,7 @@ impl SimulatedPair {
             let pair_endpoint = self.endpoint_for_seat(endpoint)?;
             work.push_front(PairWork::Input {
                 endpoint: pair_endpoint,
-                input: KernelInput::TimerFired {
-                    endpoint,
-                    timer_id,
-                },
+                input: KernelInput::TimerFired { endpoint, timer_id },
             });
         }
         Ok(())
@@ -1513,10 +1474,7 @@ mod tests {
         Ok(pair_config)
     }
 
-    fn protocol_context(
-        sender_seat: u64,
-        connection_generation: u64,
-    ) -> TestResult<FrameContext> {
+    fn protocol_context(sender_seat: u64, connection_generation: u64) -> TestResult<FrameContext> {
         Ok(FrameContext {
             session_id: SessionId::new("pair-rebind-session")?,
             run_id: RunId::new("pair-rebind-run")?,
@@ -1683,10 +1641,7 @@ mod tests {
         })
     }
 
-    fn protocol_pair_config(
-        seed: u64,
-        resolve_proposals: bool,
-    ) -> TestResult<SimulatedPairConfig> {
+    fn protocol_pair_config(seed: u64, resolve_proposals: bool) -> TestResult<SimulatedPairConfig> {
         Ok(SimulatedPairConfig {
             host_kernel: authority_kernel_config(resolve_proposals)?,
             guest_kernel: replica_kernel_config()?,
@@ -1773,7 +1728,10 @@ mod tests {
                     from: effect_from,
                     frame,
                 } if *effect_from == from
-                    && frame.context.connection_generation == expected_generation => Some(()),
+                    && frame.context.connection_generation == expected_generation =>
+                {
+                    Some(())
+                }
                 _ => None,
             })
             .count()
@@ -1809,8 +1767,14 @@ mod tests {
     }
 
     fn assert_zero_pair_resources(pair: &SimulatedPair, snapshot: &PairSnapshot) {
-        assert_eq!(snapshot.host.live_resources, LiveResourceSnapshot::default());
-        assert_eq!(snapshot.guest.live_resources, LiveResourceSnapshot::default());
+        assert_eq!(
+            snapshot.host.live_resources,
+            LiveResourceSnapshot::default()
+        );
+        assert_eq!(
+            snapshot.guest.live_resources,
+            LiveResourceSnapshot::default()
+        );
         assert!(pair.clock.pending_timers().is_empty());
         assert!(snapshot.clock_timers.is_empty());
         assert!(snapshot.network.queued_packet_ids.is_empty());
@@ -1948,11 +1912,7 @@ mod tests {
     #[test]
     fn hold_for_large_advance_fires_every_exact_repeat_boundary() -> TestResult {
         let mut pair = SimulatedPair::new(repeat_pair_config(0x250)?)?;
-        let steps = pair.hold_for(
-            PairEndpoint::Host,
-            PhysicalKey::ArrowDown,
-            safe(1_000),
-        )?;
+        let steps = pair.hold_for(PairEndpoint::Host, PhysicalKey::ArrowDown, safe(1_000))?;
         assert_eq!(steps.len(), 3);
         assert!(matches!(
             &steps[0].operation,
@@ -2044,8 +2004,8 @@ mod tests {
         for delta_ms in [250, 500, 1_000, 2_000] {
             let step = incremental.advance_time(safe(delta_ms))?;
             incremental_proposals.extend(sent_proposals(&step));
-            incremental_delays.extend(step.generated_effects.iter().filter_map(|effect| {
-                match effect {
+            incremental_delays.extend(step.generated_effects.iter().filter_map(
+                |effect| match effect {
                     KernelEffect::ScheduleTimer {
                         endpoint,
                         delay_ms,
@@ -2053,22 +2013,32 @@ mod tests {
                         ..
                     } if *endpoint == test_seat(TEST_GUEST_SEAT) => Some(*delay_ms),
                     _ => None,
-                }
-            }));
+                },
+            ));
         }
 
         assert_eq!(large_proposals.len(), 4);
         assert_eq!(large_proposals, incremental_proposals);
-        assert_eq!(large_delays, vec![safe(500), safe(1_000), safe(2_000), safe(4_000)]);
+        assert_eq!(
+            large_delays,
+            vec![safe(500), safe(1_000), safe(2_000), safe(4_000)]
+        );
         assert_eq!(large_delays, incremental_delays);
         assert_eq!(large.clock.now(), incremental.clock.now());
-        assert_eq!(large.clock.pending_timers(), incremental.clock.pending_timers());
-        assert_eq!(large.network.queued_packets(), incremental.network.queued_packets());
+        assert_eq!(
+            large.clock.pending_timers(),
+            incremental.clock.pending_timers()
+        );
+        assert_eq!(
+            large.network.queued_packets(),
+            incremental.network.queued_packets()
+        );
         Ok(())
     }
 
     #[test]
-    fn environment_orders_earlier_packets_before_timers_and_timers_first_when_equal() -> TestResult {
+    fn environment_orders_earlier_packets_before_timers_and_timers_first_when_equal() -> TestResult
+    {
         let mut earlier = SimulatedPair::new(repeat_pair_config(0x200)?)?;
         let earlier_packet_id = queue_probe_packet_at(&mut earlier, 200)?;
         earlier.key_down(PairEndpoint::Host, PhysicalKey::ArrowDown, false)?;
@@ -2120,9 +2090,11 @@ mod tests {
 
         pair.reconnect(PairEndpoint::Guest, &mut work)?;
 
-        let batch = work.pop_front().ok_or_else(|| SimulatedPairError::Adapter {
-            reason: "reconnect must queue a transport batch".to_owned(),
-        })?;
+        let batch = work
+            .pop_front()
+            .ok_or_else(|| SimulatedPairError::Adapter {
+                reason: "reconnect must queue a transport batch".to_owned(),
+            })?;
         let inputs = match batch {
             PairWork::InputBatch(inputs) => inputs,
             _ => {
@@ -2148,12 +2120,7 @@ mod tests {
                     }));
                 }
             };
-            actual.push((
-                *kernel_endpoint,
-                observed_endpoint,
-                state,
-                input_generation,
-            ));
+            actual.push((*kernel_endpoint, observed_endpoint, state, input_generation));
         }
 
         let mut expected = Vec::with_capacity(8);
@@ -2192,8 +2159,8 @@ mod tests {
     }
 
     #[test]
-    fn either_endpoint_reconnect_rebinds_both_protocol_contexts_and_drops_old_packets()
-    -> TestResult {
+    fn either_endpoint_reconnect_rebinds_both_protocol_contexts_and_drops_old_packets() -> TestResult
+    {
         for reconnected_endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             let mut pair = SimulatedPair::new(protocol_pair_config(0xcafe_0001, true)?)?;
             let original = raw_press_proposal(&mut pair)?;
@@ -2223,11 +2190,13 @@ mod tests {
             assert_eq!(rebound.to, original.to);
             assert_eq!(rebound.connection_generation, generation(1));
             assert_eq!(
-                pair.network.connection_generation(test_seat(TEST_HOST_SEAT)),
+                pair.network
+                    .connection_generation(test_seat(TEST_HOST_SEAT)),
                 generation(1)
             );
             assert_eq!(
-                pair.network.connection_generation(test_seat(TEST_GUEST_SEAT)),
+                pair.network
+                    .connection_generation(test_seat(TEST_GUEST_SEAT)),
                 generation(1)
             );
 
@@ -2359,29 +2328,23 @@ mod tests {
         assert_eq!(rebound.payload, original.payload);
         assert_eq!(rebound.connection_generation, generation(1));
         assert_eq!(
-            frame_count_from(
-                &reconnect,
-                test_seat(TEST_HOST_SEAT),
-                generation(1)
-            ),
+            frame_count_from(&reconnect, test_seat(TEST_HOST_SEAT), generation(1)),
             1,
             "authority rebind must redeliver each retained entry exactly once"
         );
         assert_eq!(
-            frame_count_from(
-                &reconnect,
-                test_seat(TEST_GUEST_SEAT),
-                generation(1)
-            ),
+            frame_count_from(&reconnect, test_seat(TEST_GUEST_SEAT), generation(1)),
             1,
             "replica reconnect must start exactly one recovery request"
         );
-        assert!(!reconnect
-            .snapshot
-            .guest
-            .live_resources
-            .recovery_transactions
-            .is_empty());
+        assert!(
+            !reconnect
+                .snapshot
+                .guest
+                .live_resources
+                .recovery_transactions
+                .is_empty()
+        );
         assert!(has_frame_from(
             &reconnect,
             test_seat(TEST_HOST_SEAT),
@@ -2409,9 +2372,11 @@ mod tests {
             test_seat(TEST_HOST_SEAT),
             generation(1)
         ));
-        assert!(connected_timer_state(&pair)
-            .values()
-            .all(|(remaining, is_paused)| *remaining == safe(1) && !*is_paused));
+        assert!(
+            connected_timer_state(&pair)
+                .values()
+                .all(|(remaining, is_paused)| *remaining == safe(1) && !*is_paused)
+        );
 
         let retry = pair.advance_time(safe(1))?;
         let retried_proposal = sent_proposals(&retry)
@@ -2481,14 +2446,20 @@ mod tests {
         let first = pair.snapshot()?;
         assert_ne!(first.host.ui.generation, before.host.ui.generation);
         assert_eq!(first.guest.ui.generation, before.guest.ui.generation);
-        assert_eq!(first.terminal_reason.as_deref(), Some(terminal.reason.as_str()));
+        assert_eq!(
+            first.terminal_reason.as_deref(),
+            Some(terminal.reason.as_str())
+        );
         for endpoint in [&first.host, &first.guest] {
             assert_eq!(endpoint.kernel.ui.owner_seat, None);
             assert!(!endpoint.kernel.ui.actionable);
             assert_eq!(endpoint.kernel.ui.stack, vec![expected_menu.clone()]);
             assert_eq!(endpoint.ui.kind, UiViewKind::Terminal);
             assert!(!endpoint.ui.actionable);
-            assert_eq!(endpoint.ui.prompt_key.as_deref(), Some(terminal.reason.as_str()));
+            assert_eq!(
+                endpoint.ui.prompt_key.as_deref(),
+                Some(terminal.reason.as_str())
+            );
         }
 
         pair.consume_effect(effect, &mut work)?;
@@ -2531,11 +2502,13 @@ mod tests {
         assert!(work.is_empty());
 
         let armed = pair.snapshot()?;
-        assert!(armed
-            .guest
-            .live_resources
-            .proposal_leases
-            .contains(&proposal.operation_id));
+        assert!(
+            armed
+                .guest
+                .live_resources
+                .proposal_leases
+                .contains(&proposal.operation_id)
+        );
         assert!(!armed.guest.live_resources.timers.is_empty());
         assert!(!pair.clock.pending_timers().is_empty());
         assert!(!armed.network.queued_packet_ids.is_empty());
@@ -2554,14 +2527,20 @@ mod tests {
         assert!(pair.guest_kernel.is_disposed());
         assert!(pair.last_boundary_order.is_empty());
         assert_zero_pair_resources(&pair, &absorbed);
-        assert_eq!(absorbed.terminal_reason.as_deref(), Some(terminal.reason.as_str()));
+        assert_eq!(
+            absorbed.terminal_reason.as_deref(),
+            Some(terminal.reason.as_str())
+        );
         for endpoint in [&absorbed.host, &absorbed.guest] {
             assert_eq!(endpoint.kernel.ui.owner_seat, None);
             assert!(!endpoint.kernel.ui.actionable);
             assert_eq!(endpoint.kernel.ui.stack, vec![expected_menu.clone()]);
             assert_eq!(endpoint.ui.kind, UiViewKind::Terminal);
             assert!(!endpoint.ui.actionable);
-            assert_eq!(endpoint.ui.prompt_key.as_deref(), Some(terminal.reason.as_str()));
+            assert_eq!(
+                endpoint.ui.prompt_key.as_deref(),
+                Some(terminal.reason.as_str())
+            );
         }
 
         let mut inert_steps = Vec::new();
@@ -2662,21 +2641,46 @@ mod tests {
             event_id,
             outcome: PresentationOutcome::Settled,
         })?;
-        assert!(settled_step.snapshot.host.presenter.pending_event_ids.is_empty());
-        assert!(settled_step
-            .snapshot
-            .host
-            .presenter
-            .settled_event_ids
-            .contains(&event_id));
-        assert!(settled_step
-            .snapshot
-            .host
-            .live_resources
-            .presentations
-            .is_empty());
-        assert!(settled_step.snapshot.guest.presenter.pending_event_ids.is_empty());
-        assert!(settled_step.snapshot.guest.presenter.settled_event_ids.is_empty());
+        assert!(
+            settled_step
+                .snapshot
+                .host
+                .presenter
+                .pending_event_ids
+                .is_empty()
+        );
+        assert!(
+            settled_step
+                .snapshot
+                .host
+                .presenter
+                .settled_event_ids
+                .contains(&event_id)
+        );
+        assert!(
+            settled_step
+                .snapshot
+                .host
+                .live_resources
+                .presentations
+                .is_empty()
+        );
+        assert!(
+            settled_step
+                .snapshot
+                .guest
+                .presenter
+                .pending_event_ids
+                .is_empty()
+        );
+        assert!(
+            settled_step
+                .snapshot
+                .guest
+                .presenter
+                .settled_event_ids
+                .is_empty()
+        );
 
         let encoded = serde_json::to_value(&settled_step.snapshot)?;
         assert_eq!(
@@ -2687,11 +2691,13 @@ mod tests {
             Some(settled_step.snapshot.clock_timers.len())
         );
         for endpoint in ["host", "guest"] {
-            assert!(encoded
-                .get(endpoint)
-                .and_then(Value::as_object)
-                .and_then(|snapshot| snapshot.get("presenter"))
-                .is_some());
+            assert!(
+                encoded
+                    .get(endpoint)
+                    .and_then(Value::as_object)
+                    .and_then(|snapshot| snapshot.get("presenter"))
+                    .is_some()
+            );
         }
         let decoded: PairSnapshot = serde_json::from_value(encoded)?;
         assert_eq!(decoded, settled_step.snapshot);
@@ -2704,8 +2710,7 @@ mod tests {
     #[test]
     fn pair_snapshot_seed_round_trips_the_complete_u64_spelling() -> TestResult {
         let above_js_safe = 9_007_199_254_740_993_u64;
-        let above_js_safe_pair =
-            SimulatedPair::new(config(above_js_safe, SafeU53::new(8)?))?;
+        let above_js_safe_pair = SimulatedPair::new(config(above_js_safe, SafeU53::new(8)?))?;
         let above_js_safe_snapshot = above_js_safe_pair.snapshot()?;
         let above_js_safe_encoded = serde_json::to_value(&above_js_safe_snapshot)?;
         assert_eq!(
@@ -2720,14 +2725,15 @@ mod tests {
             Some(above_js_safe_snapshot.clock_timers.len())
         );
         for endpoint in ["host", "guest"] {
-            assert!(above_js_safe_encoded
-                .get(endpoint)
-                .and_then(Value::as_object)
-                .and_then(|snapshot| snapshot.get("presenter"))
-                .is_some());
+            assert!(
+                above_js_safe_encoded
+                    .get(endpoint)
+                    .and_then(Value::as_object)
+                    .and_then(|snapshot| snapshot.get("presenter"))
+                    .is_some()
+            );
         }
-        let above_js_safe_decoded: PairSnapshot =
-            serde_json::from_value(above_js_safe_encoded)?;
+        let above_js_safe_decoded: PairSnapshot = serde_json::from_value(above_js_safe_encoded)?;
         assert_eq!(above_js_safe_decoded, above_js_safe_snapshot);
 
         let pair = SimulatedPair::new(config(u64::MAX, SafeU53::new(8)?))?;

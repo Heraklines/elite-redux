@@ -370,7 +370,8 @@ mod tests {
 
         host.key_down(PhysicalKey::ArrowDown, false)
             .expect("host keydown should reach the raw kernel boundary");
-        guest.key_down(PhysicalKey::ArrowDown, false)
+        guest
+            .key_down(PhysicalKey::ArrowDown, false)
             .expect("guest keydown should reach the raw kernel boundary");
         assert!(host.held_keys.contains(&PhysicalKey::ArrowDown));
         assert!(guest.held_keys.contains(&PhysicalKey::ArrowDown));
@@ -387,7 +388,8 @@ mod tests {
         assert!(host.held_keys.is_empty());
         assert!(guest.held_keys.contains(&PhysicalKey::ArrowDown));
 
-        guest.key_up(PhysicalKey::ArrowDown)
+        guest
+            .key_up(PhysicalKey::ArrowDown)
             .expect("guest keyup should reach the raw kernel boundary");
         assert!(guest.held_keys.is_empty());
     }

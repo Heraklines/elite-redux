@@ -7,8 +7,8 @@ use er_kernel::{
 };
 use er_protocol::{
     AckStage, AuthorityEntryBody, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLogConfig,
-    AuthorityReceiptBody, AuthorityReplicaConfig, BackoffPolicy, FrameContext, FrameType,
-    Material, PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    AuthorityReceiptBody, AuthorityReplicaConfig, BackoffPolicy, FrameContext, FrameType, Material,
+    PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
     RecoveryTransactionConfig, SafeI53, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
@@ -17,8 +17,8 @@ use er_sim::{
 };
 use er_types::{
     AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, GameButton, InputFocus, InputMap,
-    KeyBinding, LiveResourceSnapshot, MenuGeneration, MenuOption, MenuOptionId, MenuState,
-    MembershipRevision, NextControl, OperationId, PhysicalKey, ProposalMessage, RawInputEvent,
+    KeyBinding, LiveResourceSnapshot, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId,
+    MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage, RawInputEvent,
     ReplacementControl, ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId,
     SessionId, TimeClass, TimerOwner, UiIntent, UiState, UiViewKind,
 };
@@ -611,10 +611,10 @@ fn assert_replacement_menu(
     assert!(endpoint_snapshot.kernel.ui.actionable);
     let stack = endpoint_snapshot.kernel.ui.stack.as_slice();
     let [MenuState::Replacement(menu)] = stack else {
-        return Err(
-            std::io::Error::other(format!("expected one replacement menu, found {stack:?}"))
-                .into(),
-        );
+        return Err(std::io::Error::other(format!(
+            "expected one replacement menu, found {stack:?}"
+        ))
+        .into());
     };
     let enabled_visible_options = menu
         .options
@@ -702,15 +702,13 @@ fn assert_replacement_intent(
         .collect::<Vec<_>>();
     assert_eq!(
         intents,
-        vec![
-            (
-                expected.endpoint,
-                expected.menu.generation,
-                expected.menu.operation_id.clone(),
-                expected.menu.control_id.to_owned(),
-                expected.menu.option_id.clone(),
-            )
-        ],
+        vec![(
+            expected.endpoint,
+            expected.menu.generation,
+            expected.menu.operation_id.clone(),
+            expected.menu.control_id.to_owned(),
+            expected.menu.option_id.clone(),
+        )],
         "raw replacement submission lost its seat/menu/operation/control/party identity"
     );
     Ok(())
@@ -718,15 +716,18 @@ fn assert_replacement_intent(
 
 fn assert_no_replacement_submission(steps: &[PairStep], endpoint: SeatId, reason: &str) {
     assert!(
-        steps.iter().flat_map(|step| step.generated_effects.iter()).all(|effect| {
-            !matches!(
-                effect,
-                KernelEffect::UiIntent {
-                    endpoint: effect_endpoint,
-                    intent: UiIntent::ReplacementSubmitted { .. },
-                } if *effect_endpoint == endpoint
-            )
-        }),
+        steps
+            .iter()
+            .flat_map(|step| step.generated_effects.iter())
+            .all(|effect| {
+                !matches!(
+                    effect,
+                    KernelEffect::UiIntent {
+                        endpoint: effect_endpoint,
+                        intent: UiIntent::ReplacementSubmitted { .. },
+                    } if *effect_endpoint == endpoint
+                )
+            }),
         "{reason}"
     );
 }
@@ -940,17 +941,19 @@ fn assert_authority_chain(
         .map(|receipt| receipt.body.stage)
         .collect::<Vec<_>>();
     assert!(
-        stages == vec![
-            AckStage::Admitted,
-            AckStage::MaterialApplied,
-            AckStage::ControlInstalled,
-        ] || stages
+        stages
             == vec![
                 AckStage::Admitted,
                 AckStage::MaterialApplied,
                 AckStage::ControlInstalled,
-                AckStage::PresentationSettled,
-            ],
+            ]
+            || stages
+                == vec![
+                    AckStage::Admitted,
+                    AckStage::MaterialApplied,
+                    AckStage::ControlInstalled,
+                    AckStage::PresentationSettled,
+                ],
         "replacement receipt stages were not an exact admitted/materialApplied/controlInstalled chain: {stages:?}"
     );
     let expected_receipts = [
@@ -1107,10 +1110,7 @@ fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
         pair.teardown("replacement campaign repeated teardown"),
         Err(SimulatedPairError::Disposed)
     ));
-    assert!(matches!(
-        pair.snapshot(),
-        Err(SimulatedPairError::Disposed)
-    ));
+    assert!(matches!(pair.snapshot(), Err(SimulatedPairError::Disposed)));
     assert!(matches!(
         pair.apply(PairOperation::AdvanceTime {
             delta_ms: SafeU53::ZERO,
@@ -1142,7 +1142,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_eq!(initial.host.ui.kind, UiViewKind::Replacement);
     assert_eq!(initial.host.ui.owner_seat, Some(ids.guest));
     assert_eq!(initial.guest.ui.owner_seat, Some(ids.guest));
-    assert_eq!(selected_option(&initial, PairEndpoint::Guest).as_deref(), Some("party:disabled"));
+    assert_eq!(
+        selected_option(&initial, PairEndpoint::Guest).as_deref(),
+        Some("party:disabled")
+    );
     assert_replacement_menu(
         &initial,
         &ReplacementMenuExpectation {
@@ -1158,12 +1161,20 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     )?;
 
     let wrong_seat = pair.press(PairEndpoint::Host, PhysicalKey::Enter)?;
-    assert_no_ui_intent(&wrong_seat, ids.host, "non-owner host input must be rejected");
+    assert_no_ui_intent(
+        &wrong_seat,
+        ids.host,
+        "non-owner host input must be rejected",
+    );
     trace.extend(wrong_seat.iter().cloned());
     assert_eq!(pair.snapshot()?.host.ui, initial.host.ui);
 
     let disabled = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
-    assert_no_ui_intent(&disabled, ids.guest, "disabled party input must be rejected");
+    assert_no_ui_intent(
+        &disabled,
+        ids.guest,
+        "disabled party input must be rejected",
+    );
     trace.extend(disabled.iter().cloned());
     assert_eq!(pair.snapshot()?.guest.ui, initial.guest.ui);
 
@@ -1189,11 +1200,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         },
     )?;
     assert_eq!(
-        selected_option(
-            &first_move_snapshot,
-            PairEndpoint::Guest,
-        )
-            .as_deref(),
+        selected_option(&first_move_snapshot, PairEndpoint::Guest,).as_deref(),
         Some("party:gamma")
     );
 
@@ -1241,7 +1248,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
                 time_class: TimeClass::HumanInput,
             } if *endpoint == ids.guest
                 && owner == &expected_repeat_owner
-                && *delay_ms == safe(250) => Some(*timer_id),
+                && *delay_ms == safe(250) =>
+            {
+                Some(*timer_id)
+            }
             _ => None,
         })
         .ok_or_else(|| {
@@ -1516,7 +1526,10 @@ fn delayed_asymmetric_replacement_campaign_is_raw_and_deterministically_converge
     let first = run_campaign(0x5eed_cafe)?;
     for execution in 1..DETERMINISTIC_EXECUTIONS {
         let repeated = run_campaign(0x5eed_cafe)?;
-        assert_eq!(repeated.trace, first.trace, "deterministic execution {execution} diverged");
+        assert_eq!(
+            repeated.trace, first.trace,
+            "deterministic execution {execution} diverged"
+        );
         assert_eq!(
             repeated.final_snapshot, first.final_snapshot,
             "deterministic final snapshot {execution} diverged"

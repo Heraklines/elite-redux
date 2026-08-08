@@ -15,13 +15,11 @@ use std::{
 use serde_json::Value;
 
 const PAIR_SOURCE: &str = include_str!("../src/pair.rs");
-const KEYBOARD_DRIVER_SOURCE: &str =
-    include_str!("../../er-testkit/src/keyboard_driver.rs");
+const KEYBOARD_DRIVER_SOURCE: &str = include_str!("../../er-testkit/src/keyboard_driver.rs");
 const SOURCE_LOCK: &str = include_str!("../../../source-lock.toml");
 const M2_API: &str = include_str!("../../../contracts/m2-api.md");
 const M2_OWNERSHIP: &str = include_str!("../../../contracts/m2-ownership.toml");
-const TEST_MAP_SOURCE: &str =
-    include_str!("../../../fixtures/v1/authority-v2-test-map.json");
+const TEST_MAP_SOURCE: &str = include_str!("../../../fixtures/v1/authority-v2-test-map.json");
 
 const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
@@ -160,7 +158,10 @@ type AuditResult = Result<(), String>;
 fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
     let pair_impl = impl_body(&mask_non_code(PAIR_SOURCE), "SimulatedPair")?;
     let pair_methods = public_methods(&pair_impl);
-    let pair_names: Vec<&str> = pair_methods.iter().map(|method| method.name.as_str()).collect();
+    let pair_names: Vec<&str> = pair_methods
+        .iter()
+        .map(|method| method.name.as_str())
+        .collect();
     require(
         pair_names
             == [
@@ -180,7 +181,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
     )?;
 
     for method in &pair_methods {
-        reject_semantic_surface(&format!("SimulatedPair::{}", method.name), &method.signature)?;
+        reject_semantic_surface(
+            &format!("SimulatedPair::{}", method.name),
+            &method.signature,
+        )?;
         for forbidden in [
             "GameKernel",
             "UiReducer",
@@ -195,7 +199,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
         ] {
             require(
                 !compact(&method.signature).contains(forbidden),
-                format!("SimulatedPair::{} exposes forbidden {forbidden}", method.name),
+                format!(
+                    "SimulatedPair::{} exposes forbidden {forbidden}",
+                    method.name
+                ),
             )?;
         }
     }
@@ -211,8 +218,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
     require_signature_type(&pair_methods, "snapshot", "PairSnapshot")?;
     require_signature_type(&pair_methods, "teardown", "PairSnapshot")?;
 
-    let detached_impl =
-        impl_body(&mask_non_code(KEYBOARD_DRIVER_SOURCE), "DetachedKeyboardDriver")?;
+    let detached_impl = impl_body(
+        &mask_non_code(KEYBOARD_DRIVER_SOURCE),
+        "DetachedKeyboardDriver",
+    )?;
     let detached_methods = public_methods(&detached_impl);
     let detached_names: Vec<&str> = detached_methods
         .iter()
@@ -257,7 +266,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
     )?;
 
     for method in detached_methods.iter().chain(driver_methods.iter()) {
-        reject_semantic_surface(&format!("keyboard driver::{}", method.name), &method.signature)?;
+        reject_semantic_surface(
+            &format!("keyboard driver::{}", method.name),
+            &method.signature,
+        )?;
         for forbidden in [
             "UiIntent",
             "UiReducer",
@@ -269,7 +281,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
         ] {
             require(
                 !compact(&method.signature).contains(forbidden),
-                format!("keyboard driver::{} exposes forbidden {forbidden}", method.name),
+                format!(
+                    "keyboard driver::{} exposes forbidden {forbidden}",
+                    method.name
+                ),
             )?;
         }
     }
@@ -284,7 +299,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
             .to_owned(),
     )?;
     require(
-        compact(&constructor.signature).matches("GameKernel").count() == 1,
+        compact(&constructor.signature)
+            .matches("GameKernel")
+            .count()
+            == 1,
         "KeyboardDriver::new may expose only its one construction-time GameKernel borrow"
             .to_owned(),
     )?;
@@ -300,7 +318,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
             !compact(&method.signature).contains("GameKernel")
                 && !compact(&method.signature).contains("&mutGameKernel")
                 && !compact(&method.signature).contains("&GameKernel"),
-            format!("KeyboardDriver::{} exposes a GameKernel handle", method.name),
+            format!(
+                "KeyboardDriver::{} exposes a GameKernel handle",
+                method.name
+            ),
         )?;
     }
 
@@ -349,7 +370,9 @@ fn pair_operation_is_the_raw_environment_union() -> AuditResult {
         "Menu",
     ]) {
         require(
-            !identifiers(&body).iter().any(|(identifier, _)| identifier == forbidden),
+            !identifiers(&body)
+                .iter()
+                .any(|(identifier, _)| identifier == forbidden),
             format!("PairOperation accepts forbidden semantic input {forbidden}"),
         )?;
     }
@@ -410,13 +433,20 @@ fn production_core_has_no_escape_hatches_or_test_transition_branches() -> AuditR
     let root = repository_root();
     let mut source_files = Vec::new();
     for crate_name in ["er-kernel", "er-protocol", "er-sim"] {
-        let source_root = root.join("rust").join("crates").join(crate_name).join("src");
+        let source_root = root
+            .join("rust")
+            .join("crates")
+            .join(crate_name)
+            .join("src");
         collect_rust_sources(&source_root, &mut source_files)?;
     }
     source_files.sort();
     require(
         source_files.len() >= 18,
-        format!("production source inventory unexpectedly small: {} files", source_files.len()),
+        format!(
+            "production source inventory unexpectedly small: {} files",
+            source_files.len()
+        ),
     )?;
 
     for path in source_files {
@@ -428,7 +458,11 @@ fn production_core_has_no_escape_hatches_or_test_transition_branches() -> AuditR
         assert_no_forbidden_production_tokens(&production_code, &path)?;
     }
 
-    let benchmark_root = root.join("rust").join("crates").join("er-sim").join("benches");
+    let benchmark_root = root
+        .join("rust")
+        .join("crates")
+        .join("er-sim")
+        .join("benches");
     if benchmark_root.is_dir() {
         let mut benchmark_files = Vec::new();
         collect_rust_sources(&benchmark_root, &mut benchmark_files)?;
@@ -458,7 +492,10 @@ fn source_lock_ownership_and_contract_map_are_frozen() -> AuditResult {
         ("input_repeat_delay_ms".to_owned(), "250".to_owned()),
         ("input_repeat_interval_ms".to_owned(), "250".to_owned()),
     ]);
-    require(lock == expected_lock, format!("source-lock drifted: {lock:?}"))?;
+    require(
+        lock == expected_lock,
+        format!("source-lock drifted: {lock:?}"),
+    )?;
 
     require(
         M2_OWNERSHIP.contains("schema_version = 6")
@@ -503,8 +540,7 @@ fn source_lock_ownership_and_contract_map_are_frozen() -> AuditResult {
     let simulator_nodes: Vec<&Value> = nodes
         .iter()
         .filter(|node| {
-            node.get("implementation_kind").and_then(Value::as_str)
-                == Some("reference-simulator")
+            node.get("implementation_kind").and_then(Value::as_str) == Some("reference-simulator")
         })
         .collect();
     require(
@@ -545,13 +581,15 @@ fn later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions() -> Audi
     )?;
     let normalized_api = M2_API.split_whitespace().collect::<Vec<_>>().join(" ");
     require(
-        normalized_api.contains(
-            "The ten required campaigns use only the raw-input/environment surface",
-        ),
-        "M2 API contract lost the five-file/ten-scenario raw-only campaign requirement"
-            .to_owned(),
+        normalized_api
+            .contains("The ten required campaigns use only the raw-input/environment surface"),
+        "M2 API contract lost the five-file/ten-scenario raw-only campaign requirement".to_owned(),
     )?;
-    let campaign_root = repository_root().join("rust").join("crates").join("er-sim").join("tests");
+    let campaign_root = repository_root()
+        .join("rust")
+        .join("crates")
+        .join("er-sim")
+        .join("tests");
     for file_name in CAMPAIGN_FILES {
         let path = campaign_root.join(file_name);
         require(
@@ -575,7 +613,9 @@ fn later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions() -> Audi
             "UiReducer",
         ]) {
             require(
-                !identifiers(&masked).iter().any(|(identifier, _)| identifier == forbidden),
+                !identifiers(&masked)
+                    .iter()
+                    .any(|(identifier, _)| identifier == forbidden),
                 format!(
                     "{} contains forbidden semantic/lower-level identifier {forbidden}",
                     path.display()
@@ -641,9 +681,7 @@ fn assert_no_campaign_pair_operation_semantics(code: &str, path: &Path) -> Audit
             let body = &code[next + 1..close];
             for forbidden in FORBIDDEN_CAMPAIGN_PAIR_OPERATION_VARIANTS {
                 require(
-                    !identifiers(body)
-                        .iter()
-                        .any(|(name, _)| name == forbidden),
+                    !identifiers(body).iter().any(|(name, _)| name == forbidden),
                     format!(
                         "{} constructs PairOperation with forbidden semantic field {forbidden}",
                         path.display()
@@ -687,11 +725,7 @@ fn repository_root() -> PathBuf {
 }
 
 fn require(condition: bool, message: String) -> AuditResult {
-    if condition {
-        Ok(())
-    } else {
-        Err(message)
-    }
+    if condition { Ok(()) } else { Err(message) }
 }
 
 fn identifiers(source: &str) -> Vec<(String, usize)> {
@@ -722,7 +756,10 @@ fn is_identifier_continue(byte: u8) -> bool {
 }
 
 fn compact(source: &str) -> String {
-    source.chars().filter(|character| !character.is_whitespace()).collect()
+    source
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect()
 }
 
 fn mask_range(output: &mut [u8], source: &[u8], start: usize, end: usize) {
@@ -774,9 +811,7 @@ fn mask_non_code(source: &str) -> String {
             continue;
         }
         if bytes[index] == b'"'
-            || (bytes[index] == b'b'
-                && index + 1 < bytes.len()
-                && bytes[index + 1] == b'"')
+            || (bytes[index] == b'b' && index + 1 < bytes.len() && bytes[index + 1] == b'"')
         {
             let start = index;
             if bytes[index] == b'b' {
@@ -955,8 +990,7 @@ fn public_methods(body: &str) -> Vec<PublicMethod> {
     let tokens = identifiers(body);
     let mut methods = Vec::new();
     for (index, (identifier, position)) in tokens.iter().enumerate() {
-        if identifier != "pub"
-            || tokens.get(index + 1).map(|token| token.0.as_str()) != Some("fn")
+        if identifier != "pub" || tokens.get(index + 1).map(|token| token.0.as_str()) != Some("fn")
         {
             continue;
         }
@@ -1012,9 +1046,7 @@ fn enum_variants(body: &str) -> Vec<&str> {
                 return None;
             }
             let end = trimmed
-                .find(|character: char| {
-                    !character.is_ascii_alphanumeric() && character != '_'
-                })
+                .find(|character: char| !character.is_ascii_alphanumeric() && character != '_')
                 .unwrap_or(trimmed.len());
             let variant = &trimmed[..end];
             variant
@@ -1034,14 +1066,20 @@ fn assert_no_forbidden_production_tokens(code: &str, path: &Path) -> AuditResult
     for forbidden in FORBIDDEN_PRODUCTION_IDENTIFIERS {
         require(
             !token_set.contains(*forbidden),
-            format!("{} contains forbidden production identifier {forbidden}", path.display()),
+            format!(
+                "{} contains forbidden production identifier {forbidden}",
+                path.display()
+            ),
         )?;
     }
     let compact_code = compact(code);
     for forbidden in FORBIDDEN_PRODUCTION_QUALIFIERS {
         require(
             !compact_code.contains(forbidden),
-            format!("{} contains forbidden production qualifier {forbidden}", path.display()),
+            format!(
+                "{} contains forbidden production qualifier {forbidden}",
+                path.display()
+            ),
         )?;
     }
     assert_no_wall_clock_uses(code, path)?;
@@ -1095,7 +1133,10 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
     ] {
         require(
             !compact_code.contains(qualified),
-            format!("{} contains forbidden wall-clock type {qualified}", path.display()),
+            format!(
+                "{} contains forbidden wall-clock type {qualified}",
+                path.display()
+            ),
         )?;
     }
 
@@ -1117,14 +1158,22 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
                 !identifiers(statement)
                     .iter()
                     .any(|(name, _)| name == imported),
-                format!("{} imports forbidden wall-clock type {imported}", path.display()),
+                format!(
+                    "{} imports forbidden wall-clock type {imported}",
+                    path.display()
+                ),
             )?;
         }
         require(
             !flattened.contains("std::time::*") && !flattened.contains("core::time::*"),
             format!("{} wildcard-imports a wall-clock namespace", path.display()),
         )?;
-        for marker in ["std::timeas", "core::timeas", "std::time::selfas", "core::time::selfas"] {
+        for marker in [
+            "std::timeas",
+            "core::timeas",
+            "std::time::selfas",
+            "core::time::selfas",
+        ] {
             if let Some(alias_start) = flattened.find(marker) {
                 let alias_tail = &flattened[alias_start + marker.len()..];
                 let alias_end = alias_tail
@@ -1140,7 +1189,10 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
         for wall_clock in ["Instant", "SystemTime"] {
             require(
                 !compact_code.contains(&format!("{alias}::{wall_clock}")),
-                format!("{} uses wall-clock alias {alias}::{wall_clock}", path.display()),
+                format!(
+                    "{} uses wall-clock alias {alias}::{wall_clock}",
+                    path.display()
+                ),
             )?;
         }
     }
@@ -1155,7 +1207,10 @@ fn assert_no_forbidden_benchmark_tokens(code: &str, path: &Path) -> AuditResult 
     for forbidden in FORBIDDEN_BENCHMARK_IDENTIFIERS {
         require(
             !token_set.contains(*forbidden),
-            format!("{} contains forbidden benchmark escape hatch {forbidden}", path.display()),
+            format!(
+                "{} contains forbidden benchmark escape hatch {forbidden}",
+                path.display()
+            ),
         )?;
     }
     for forbidden in [
@@ -1169,7 +1224,10 @@ fn assert_no_forbidden_benchmark_tokens(code: &str, path: &Path) -> AuditResult 
     ] {
         require(
             !compact(code).contains(forbidden),
-            format!("{} contains forbidden benchmark qualifier {forbidden}", path.display()),
+            format!(
+                "{} contains forbidden benchmark qualifier {forbidden}",
+                path.display()
+            ),
         )?;
     }
     Ok(())
@@ -1185,7 +1243,10 @@ fn assert_cfg_policy(masked: &str, path: &Path) -> AuditResult {
         let attribute = compact(&masked[start..=close]);
         require(
             attribute == "#[cfg(test)]",
-            format!("{} contains non-test cfg attribute {attribute}", path.display()),
+            format!(
+                "{} contains non-test cfg attribute {attribute}",
+                path.display()
+            ),
         )?;
         let mut next = close + 1;
         loop {
@@ -1195,7 +1256,10 @@ fn assert_cfg_policy(masked: &str, path: &Path) -> AuditResult {
             {
                 next += 1;
             }
-            if bytes.get(next..).is_some_and(|rest| rest.starts_with(b"#[")) {
+            if bytes
+                .get(next..)
+                .is_some_and(|rest| rest.starts_with(b"#["))
+            {
                 let attribute_end = matching_square(masked, next + 1)?;
                 next = attribute_end + 1;
             } else {
@@ -1218,7 +1282,10 @@ fn assert_cfg_policy(masked: &str, path: &Path) -> AuditResult {
     }
     require(
         !masked.contains("cfg_attr") && !compact(masked).contains("cfg!("),
-        format!("{} contains cfg_attr/cfg! executable branching", path.display()),
+        format!(
+            "{} contains cfg_attr/cfg! executable branching",
+            path.display()
+        ),
     )
 }
 
@@ -1241,7 +1308,10 @@ fn strip_test_modules(masked: &str, path: &Path) -> Result<String, String> {
             {
                 next += 1;
             }
-            if bytes.get(next..).is_some_and(|rest| rest.starts_with(b"#[")) {
+            if bytes
+                .get(next..)
+                .is_some_and(|rest| rest.starts_with(b"#["))
+            {
                 let attribute_end = matching_square(masked, next + 1)?;
                 next = attribute_end + 1;
             } else {
@@ -1280,8 +1350,12 @@ fn strip_test_modules(masked: &str, path: &Path) -> Result<String, String> {
 }
 
 fn collect_rust_sources(root: &Path, files: &mut Vec<PathBuf>) -> AuditResult {
-    let entries = fs::read_dir(root)
-        .map_err(|error| format!("read production source directory {}: {error}", root.display()))?;
+    let entries = fs::read_dir(root).map_err(|error| {
+        format!(
+            "read production source directory {}: {error}",
+            root.display()
+        )
+    })?;
     for entry in entries {
         let entry = entry.map_err(|error| format!("read production source entry: {error}"))?;
         let path = entry.path();
@@ -1328,14 +1402,12 @@ fn parse_flat_assignments(source: &str) -> Result<BTreeMap<String, String>, Stri
                 line_number + 1
             ),
         )?;
-        let value = if raw_value.starts_with('"')
-            && raw_value.ends_with('"')
-            && raw_value.len() >= 2
-        {
-            raw_value[1..raw_value.len() - 1].to_owned()
-        } else {
-            raw_value.to_owned()
-        };
+        let value =
+            if raw_value.starts_with('"') && raw_value.ends_with('"') && raw_value.len() >= 2 {
+                raw_value[1..raw_value.len() - 1].to_owned()
+            } else {
+                raw_value.to_owned()
+            };
         require(
             assignments.insert(key.to_owned(), value).is_none(),
             format!("source-lock.toml repeats key {key}"),
@@ -1370,7 +1442,10 @@ fn audit_contract_array(
     let contracts = required_array(object, field)?;
     require(
         contracts.len() == expected,
-        format!("{field} has {} entries, expected {expected}", contracts.len()),
+        format!(
+            "{field} has {} entries, expected {expected}",
+            contracts.len()
+        ),
     )?;
     let mut ids = BTreeSet::new();
     for contract in contracts {
@@ -1378,7 +1453,10 @@ fn audit_contract_array(
             .get("id")
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{field} contains a contract without an id"))?;
-        require(ids.insert(id.to_owned()), format!("{field} repeats id {id}"))?;
+        require(
+            ids.insert(id.to_owned()),
+            format!("{field} repeats id {id}"),
+        )?;
         for required in [
             "typescript_source",
             "parity_fixture",
@@ -1394,11 +1472,9 @@ fn audit_contract_array(
             .ok_or_else(|| format!("{field}:{id} rust_equivalent is not an array"))?;
         require(
             !rust_equivalent.is_empty()
-                && rust_equivalent.iter().all(|value| {
-                    value
-                        .as_str()
-                        .is_some_and(|text| !text.trim().is_empty())
-                }),
+                && rust_equivalent
+                    .iter()
+                    .all(|value| value.as_str().is_some_and(|text| !text.trim().is_empty())),
             format!("{field}:{id} has no Rust equivalent evidence"),
         )?;
         if source_lock {

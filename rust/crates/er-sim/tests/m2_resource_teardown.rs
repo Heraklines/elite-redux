@@ -19,8 +19,8 @@ use er_sim::{
 use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FrameContext, GameButton, InputMap, KeyBinding,
-    LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
-    MembershipRevision, NextControl, OperationId, PhysicalKey, SafeI53, SafeU53, SeatId, SessionId,
+    LiveResourceSnapshot, Material, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId,
+    MenuState, NextControl, OperationId, PhysicalKey, SafeI53, SafeU53, SeatId, SessionId,
     TerminalState, TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
@@ -310,20 +310,8 @@ fn command_fixture(seed: u64, presenter: PresenterMode) -> TestResult<CommandFix
             "a",
             remaining.clone(),
         ),
-        authority_resolution(
-            guest_operation,
-            &guest_b_fingerprint,
-            0,
-            "b",
-            remaining,
-        ),
-        authority_resolution(
-            host_operation,
-            &host_fingerprint,
-            1,
-            "host",
-            awaiting,
-        ),
+        authority_resolution(guest_operation, &guest_b_fingerprint, 0, "b", remaining),
+        authority_resolution(host_operation, &host_fingerprint, 1, "host", awaiting),
     ];
 
     let host_kernel = KernelConfig {
@@ -489,8 +477,7 @@ fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) -
     assert!(!snapshot.host.kernel.ui.actionable);
     assert!(!snapshot.guest.kernel.ui.actionable);
     assert_eq!(
-        snapshot.host.kernel.ui.stack,
-        snapshot.guest.kernel.ui.stack,
+        snapshot.host.kernel.ui.stack, snapshot.guest.kernel.ui.stack,
         "host and guest terminal kernel UI must be symmetric"
     );
     for (endpoint_name, endpoint) in [("host", &snapshot.host), ("guest", &snapshot.guest)] {
@@ -516,7 +503,10 @@ fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) -
         assert!(!endpoint.ui.actionable);
         assert_eq!(endpoint.ui.cursor, None);
         assert!(endpoint.ui.options.is_empty());
-        assert_eq!(endpoint.ui.prompt_key.as_deref(), Some(terminal.reason.as_str()));
+        assert_eq!(
+            endpoint.ui.prompt_key.as_deref(),
+            Some(terminal.reason.as_str())
+        );
     }
     Ok(())
 }
@@ -542,9 +532,9 @@ fn assert_terminal_trace(steps: &[PairStep]) -> TestResult<(TerminalState, PairS
     let triggering_step = steps
         .iter()
         .find(|step| {
-            step.generated_effects.iter().any(|effect| {
-                matches!(effect, KernelEffect::EnterSharedTerminal { .. })
-            })
+            step.generated_effects
+                .iter()
+                .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
         })
         .ok_or("terminal effect was not associated with a triggering step")?;
     assert_terminal_snapshot(&triggering_step.snapshot, &terminal)?;
@@ -622,10 +612,7 @@ fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
         pair.teardown("repeated teardown"),
         Err(SimulatedPairError::Disposed)
     ));
-    assert!(matches!(
-        pair.snapshot(),
-        Err(SimulatedPairError::Disposed)
-    ));
+    assert!(matches!(pair.snapshot(), Err(SimulatedPairError::Disposed)));
     assert!(matches!(
         pair.apply(PairOperation::AdvanceTime {
             delta_ms: SafeU53::ZERO,
@@ -651,7 +638,10 @@ fn assert_resource_identifiers(snapshot: &PairSnapshot) {
             );
         }
         for transaction in &endpoint.live_resources.recovery_transactions {
-            assert!(!transaction.is_empty(), "recovery transaction metadata is empty");
+            assert!(
+                !transaction.is_empty(),
+                "recovery transaction metadata is empty"
+            );
         }
         for wait in &endpoint.live_resources.waits {
             assert!(!wait.is_empty(), "wait address metadata is empty");
@@ -797,11 +787,7 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
     assert!(!initial.storage.keys.is_empty());
 
     let mut trace = Vec::new();
-    trace.push(pair.key_down(
-        PairEndpoint::Guest,
-        PhysicalKey::ArrowDown,
-        false,
-    )?);
+    trace.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowDown, false)?);
     trace.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowDown)?);
     trace.extend(pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?);
     drain_network(&mut pair, &mut trace)?;
@@ -903,11 +889,7 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
 
     // Keep an input-repeat timer live while the two kernels progress through
     // two real command/proposal/entry/control transitions.
-    trace.push(pair.key_down(
-        PairEndpoint::Guest,
-        PhysicalKey::ArrowDown,
-        false,
-    )?);
+    trace.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowDown, false)?);
     trace.extend(pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?);
     assert_timer_metadata(
         &trace,
@@ -921,7 +903,11 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
     let proposal_live = pair.snapshot()?;
     assert_resource_identifiers(&proposal_live);
     assert!(
-        !proposal_live.guest.live_resources.proposal_leases.is_empty(),
+        !proposal_live
+            .guest
+            .live_resources
+            .proposal_leases
+            .is_empty(),
         "proposal lease must be nonzero before teardown"
     );
     assert!(!proposal_live.guest.live_resources.timers.is_empty());
@@ -934,8 +920,20 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
         operation: FaultOperation::DeliverNext,
     })?);
     let authority_live = pair.snapshot()?;
-    assert!(!authority_live.host.live_resources.delivery_leases.is_empty());
-    assert!(!authority_live.host.live_resources.retained_revisions.is_empty());
+    assert!(
+        !authority_live
+            .host
+            .live_resources
+            .delivery_leases
+            .is_empty()
+    );
+    assert!(
+        !authority_live
+            .host
+            .live_resources
+            .retained_revisions
+            .is_empty()
+    );
     assert!(!authority_live.host.live_resources.timers.is_empty());
 
     // The first committed entry exposes the host command through the pair's
@@ -964,13 +962,11 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
             || !live.guest.live_resources.controls.is_empty()
     );
     assert!(
-        !live.host.live_resources.waits.is_empty()
-            || !live.guest.live_resources.waits.is_empty(),
+        !live.host.live_resources.waits.is_empty() || !live.guest.live_resources.waits.is_empty(),
         "await state must be represented before teardown"
     );
     assert!(
-        !live.host.live_resources.timers.is_empty()
-            || !live.guest.live_resources.timers.is_empty()
+        !live.host.live_resources.timers.is_empty() || !live.guest.live_resources.timers.is_empty()
     );
     assert!(
         !live.host.live_resources.network_packets.is_empty()
@@ -1016,7 +1012,13 @@ fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
         operation: FaultOperation::DeliverNext,
     })?;
     trace.push(delivered_proposal.clone());
-    assert!(!delivered_proposal.snapshot.network.queued_packet_ids.is_empty());
+    assert!(
+        !delivered_proposal
+            .snapshot
+            .network
+            .queued_packet_ids
+            .is_empty()
+    );
     let entry_packet = delivered_proposal
         .snapshot
         .network
@@ -1034,7 +1036,13 @@ fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
         },
     })?;
     trace.push(corrupted.clone());
-    assert!(corrupted.snapshot.network.queued_packet_ids.contains(&entry_packet));
+    assert!(
+        corrupted
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&entry_packet)
+    );
     let terminal = pair.apply(PairOperation::Fault {
         operation: FaultOperation::Deliver {
             packet_id: entry_packet,
@@ -1055,7 +1063,14 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
         operation: FaultOperation::DeliverNext,
     })?;
     trace.push(after_proposal.clone());
-    assert!(!after_proposal.snapshot.host.live_resources.delivery_leases.is_empty());
+    assert!(
+        !after_proposal
+            .snapshot
+            .host
+            .live_resources
+            .delivery_leases
+            .is_empty()
+    );
 
     let disconnected = pair.apply(PairOperation::Disconnect {
         endpoint: PairEndpoint::Guest,
@@ -1098,12 +1113,15 @@ fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult
     let mut pair = SimulatedPair::new(fixture.config)?;
 
     let mut trace = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
-    assert_timer_metadata(
-        &trace,
-        &[TimeClass::Connected, TimeClass::Absolute],
-    )?;
+    assert_timer_metadata(&trace, &[TimeClass::Connected, TimeClass::Absolute])?;
     let proposal_live = pair.snapshot()?;
-    assert!(!proposal_live.guest.live_resources.proposal_leases.is_empty());
+    assert!(
+        !proposal_live
+            .guest
+            .live_resources
+            .proposal_leases
+            .is_empty()
+    );
     let proposal_packet = proposal_live
         .network
         .queued_packet_ids
@@ -1126,13 +1144,16 @@ fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult
         terminal.snapshot.virtual_time_ms,
         safe(ABSOLUTE_PROPOSAL_CEILING_MS)
     );
-    assert!(terminal.snapshot.guest.live_resources.proposal_leases.is_empty());
+    assert!(
+        terminal
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .is_empty()
+    );
     assert!(terminal.snapshot.guest.live_resources.timers.is_empty());
-    assert_terminal_absorbing_path(
-        &mut pair,
-        &trace,
-        "m2b-10 absolute proposal terminal",
-    )?;
+    assert_terminal_absorbing_path(&mut pair, &trace, "m2b-10 absolute proposal terminal")?;
     Ok(())
 }
 
@@ -1159,9 +1180,6 @@ fn secondary_virtual_clock_disposal_proves_pending_timer_zero_and_fail_closed_us
     clock.dispose();
     clock.dispose();
     assert!(clock.pending_timers().is_empty());
-    assert_eq!(
-        clock.advance(safe(1)),
-        Err(VirtualClockError::Disposed)
-    );
+    assert_eq!(clock.advance(safe(1)), Err(VirtualClockError::Disposed));
     Ok(())
 }

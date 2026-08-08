@@ -17,9 +17,9 @@ use er_protocol::{
     RecoveryTransactionConfig, proposal_fingerprint,
 };
 use er_types::{
-    ConnectionGeneration, FrameContext, InputMap, KernelEffect, KernelTrace, KernelTraceEvent,
-    LiveResourceSnapshot, MembershipRevision, MenuOption, MenuOptionId, OperationId, RunId,
-    SafeI53, SafeU53, SeatId, SessionId, KERNEL_TRACE_VERSION,
+    ConnectionGeneration, FrameContext, InputMap, KERNEL_TRACE_VERSION, KernelEffect, KernelTrace,
+    KernelTraceEvent, LiveResourceSnapshot, MembershipRevision, MenuOption, MenuOptionId,
+    OperationId, RunId, SafeI53, SafeU53, SeatId, SessionId,
 };
 use serde_json::{Value, json};
 
@@ -101,13 +101,18 @@ pub enum ParityReplayError {
 impl fmt::Display for ParityReplayError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidFixture(reason) => write!(formatter, "invalid M2 parity fixture: {reason}"),
+            Self::InvalidFixture(reason) => {
+                write!(formatter, "invalid M2 parity fixture: {reason}")
+            }
             Self::PendingEvidence { dependency } => write!(
                 formatter,
                 "M2 protocol parity evidence is pending dependency: {dependency}"
             ),
             Self::Kernel { sequence, reason } => {
-                write!(formatter, "GameKernel rejected parity event {sequence}: {reason}")
+                write!(
+                    formatter,
+                    "GameKernel rejected parity event {sequence}: {reason}"
+                )
             }
             Self::Canonical { field, reason } => {
                 write!(formatter, "could not canonicalize parity {field}: {reason}")
@@ -156,8 +161,8 @@ pub fn parse_seed_text(seed: &str) -> Result<u64, String> {
 
 /// Deserialize a seed from JSON while rejecting numeric JSON values.
 pub fn deserialize_seed_json(input: &str) -> Result<u64, String> {
-    let value: Value = serde_json::from_str(input)
-        .map_err(|error| format!("seed JSON is invalid: {error}"))?;
+    let value: Value =
+        serde_json::from_str(input).map_err(|error| format!("seed JSON is invalid: {error}"))?;
     let Some(seed) = value.as_str() else {
         return Err("seed must be a JSON string".to_owned());
     };
@@ -193,9 +198,7 @@ pub fn parse_fixture(input: &str) -> Result<ParityFixture, ParityReplayError> {
     let seed = seed_value
         .as_str()
         .ok_or_else(|| ParityReplayError::InvalidFixture("seed must be a JSON string".to_owned()))
-        .and_then(|value| {
-            parse_seed_text(value).map_err(ParityReplayError::InvalidFixture)
-        })?;
+        .and_then(|value| parse_seed_text(value).map_err(ParityReplayError::InvalidFixture))?;
 
     let input_map_value = root.get("input_map").ok_or_else(|| {
         ParityReplayError::InvalidFixture("fixture is missing input_map".to_owned())
@@ -208,9 +211,7 @@ pub fn parse_fixture(input: &str) -> Result<ParityFixture, ParityReplayError> {
         None => None,
         Some(value) => {
             let fixture_id = value.as_str().ok_or_else(|| {
-                ParityReplayError::InvalidFixture(
-                    "protocol_fixture must be a string".to_owned(),
-                )
+                ParityReplayError::InvalidFixture("protocol_fixture must be a string".to_owned())
             })?;
             if fixture_id != PROTOCOL_FIXTURE_ID {
                 return Err(ParityReplayError::InvalidFixture(format!(
@@ -279,12 +280,13 @@ pub fn replay_fixture(fixture: &ParityFixture) -> Result<ParityReplayReport, Par
     let seed = fixture.seed.to_string();
     let mut observations = Vec::with_capacity(fixture.trace.events.len());
     for event in &fixture.trace.events {
-        let effects = kernel
-            .step(event.input.clone())
-            .map_err(|error| ParityReplayError::Kernel {
-                sequence: event.sequence,
-                reason: error.to_string(),
-            })?;
+        let effects =
+            kernel
+                .step(event.input.clone())
+                .map_err(|error| ParityReplayError::Kernel {
+                    sequence: event.sequence,
+                    reason: error.to_string(),
+                })?;
         let actual = observe(&kernel, &effects)?;
         let expected_live_resources_digest = live_resources_digest(&event.expected_live_resources)?;
         if !matches_expected(event, &actual, &expected_live_resources_digest) {
@@ -333,14 +335,11 @@ pub fn replay_fixture_json(input: &str) -> Result<String, ParityReplayError> {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn calibrate_pending_fixture_json(input: &str) -> Result<String, ParityReplayError> {
     let fixture = parse_fixture(input)?;
-    let dependency = fixture
-        .expected_evidence_status
-        .as_ref()
-        .ok_or_else(|| {
-            ParityReplayError::InvalidFixture(
-                "calibration requires an explicitly pending fixture".to_owned(),
-            )
-        })?;
+    let dependency = fixture.expected_evidence_status.as_ref().ok_or_else(|| {
+        ParityReplayError::InvalidFixture(
+            "calibration requires an explicitly pending fixture".to_owned(),
+        )
+    })?;
     if fixture.protocol_config.is_none() {
         return Err(ParityReplayError::InvalidFixture(
             "calibration requires a production protocol configuration".to_owned(),
@@ -384,12 +383,13 @@ pub fn calibrate_pending_fixture_json(input: &str) -> Result<String, ParityRepla
     let seed = fixture.seed.to_string();
     let mut observations = Vec::with_capacity(fixture.trace.events.len());
     for event in &fixture.trace.events {
-        let effects = kernel
-            .step(event.input.clone())
-            .map_err(|error| ParityReplayError::Kernel {
-                sequence: event.sequence,
-                reason: error.to_string(),
-            })?;
+        let effects =
+            kernel
+                .step(event.input.clone())
+                .map_err(|error| ParityReplayError::Kernel {
+                    sequence: event.sequence,
+                    reason: error.to_string(),
+                })?;
         let actual = observe(&kernel, &effects)?;
         observations.push(json!({
             "seed": seed,
@@ -480,8 +480,8 @@ fn protocol_config_for_fixture() -> Result<ProtocolKernelConfig, ParityReplayErr
             "protocol proposal wire JSON is invalid: {error}"
         ))
     })?;
-    let proposal_payload: Value = serde_json::from_str(PROTOCOL_PROPOSAL_WIRE_JSON)
-        .map_err(|error| {
+    let proposal_payload: Value =
+        serde_json::from_str(PROTOCOL_PROPOSAL_WIRE_JSON).map_err(|error| {
             ParityReplayError::InvalidFixture(format!(
                 "protocol proposal payload is invalid: {error}"
             ))

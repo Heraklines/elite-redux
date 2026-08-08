@@ -2,8 +2,8 @@
 mod m2_parity;
 
 use m2_parity::{
-    ParityReplayError, deserialize_seed_json, parse_fixture, replay_fixture,
-    replay_fixture_json, serialize_seed_json,
+    ParityReplayError, deserialize_seed_json, parse_fixture, replay_fixture, replay_fixture_json,
+    serialize_seed_json,
 };
 use serde_json::{Value, json};
 
@@ -19,7 +19,10 @@ fn native_replay_checks_every_frozen_event_boundary() -> Result<(), Box<dyn std:
     let fixture = parse_fixture(RAW_INPUT_FIXTURE)?;
 
     assert_eq!(report_value["seed"], json!("18446744073709551615"));
-    assert_eq!(report_value["replayed_events"], json!(fixture.trace.events.len()));
+    assert_eq!(
+        report_value["replayed_events"],
+        json!(fixture.trace.events.len())
+    );
     let observations = report_value["observations"]
         .as_array()
         .ok_or("replay report observations are not an array")?;
@@ -32,20 +35,26 @@ fn native_replay_checks_every_frozen_event_boundary() -> Result<(), Box<dyn std:
             "live_resources",
             "live_resources_digest",
         ] {
-            assert!(observation.get(field).is_some(), "missing per-event {field}");
+            assert!(
+                observation.get(field).is_some(),
+                "missing per-event {field}"
+            );
         }
     }
     Ok(())
 }
 
 #[test]
-fn divergence_reports_first_sequence_seed_and_virtual_time() -> Result<(), Box<dyn std::error::Error>> {
+fn divergence_reports_first_sequence_seed_and_virtual_time()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut fixture: Value = serde_json::from_str(RAW_INPUT_FIXTURE)?;
     fixture["events"][2]["expected_effect_digest"] = json!("intentionally-divergent");
     let mutated = serde_json::to_string(&fixture)?;
 
     let result = replay_fixture_json(&mutated);
-    let error = result.err().ok_or("mutated fixture unexpectedly replayed")?;
+    let error = result
+        .err()
+        .ok_or("mutated fixture unexpectedly replayed")?;
     match error {
         ParityReplayError::Divergence(divergence) => {
             assert_eq!(divergence.sequence.get(), 2);
@@ -110,8 +119,8 @@ fn seed_boundary_is_lossless_and_numeric_json_is_rejected() {
 }
 
 #[test]
-fn protocol_fixture_pins_m2_boundaries_until_kernel_commit() -> Result<(), Box<dyn std::error::Error>>
-{
+fn protocol_fixture_pins_m2_boundaries_until_kernel_commit()
+-> Result<(), Box<dyn std::error::Error>> {
     let fixture = parse_fixture(PROTOCOL_FIXTURE)?;
     assert_eq!(fixture.seed, u64::MAX);
     assert!(fixture.protocol_config.is_some());
@@ -288,7 +297,9 @@ fn wasm32_node_replay_uses_the_same_frozen_fixture() -> Result<(), Box<dyn std::
         json!(fixture.trace.events.len())
     );
     assert_eq!(
-        report_value["observations"].as_array().map(|events| events.len()),
+        report_value["observations"]
+            .as_array()
+            .map(|events| events.len()),
         Some(fixture.trace.events.len())
     );
     Ok(())
@@ -296,8 +307,8 @@ fn wasm32_node_replay_uses_the_same_frozen_fixture() -> Result<(), Box<dyn std::
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
-fn wasm32_node_protocol_fixture_uses_the_same_pending_boundary_shape(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn wasm32_node_protocol_fixture_uses_the_same_pending_boundary_shape()
+-> Result<(), Box<dyn std::error::Error>> {
     let fixture = parse_fixture(PROTOCOL_FIXTURE)?;
     assert_eq!(fixture.seed, u64::MAX);
     assert_eq!(fixture.trace.events.len(), 10);

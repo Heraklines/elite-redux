@@ -17,9 +17,9 @@ use er_sim::{
 use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FRAME_PROTOCOL_VERSION, FrameContext, FrameType,
-    GameButton, InputMap, KeyBinding, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
-    MembershipRevision, NextControl, OperationId, PhysicalKey, ProposalMessage, Revision, RunId,
-    SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState,
+    GameButton, InputMap, KeyBinding, Material, MembershipRevision, MenuGeneration, MenuOption,
+    MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage, Revision,
+    RunId, SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState,
     UiViewKind,
 };
 use serde_json::{Value, json};
@@ -606,9 +606,7 @@ fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) ->
                 owner,
                 delay_ms,
                 time_class,
-            } if *effect_endpoint == endpoint => {
-                Some((*timer_id, owner, *delay_ms, *time_class))
-            }
+            } if *effect_endpoint == endpoint => Some((*timer_id, owner, *delay_ms, *time_class)),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -648,15 +646,17 @@ fn assert_material_effect(
                 revision: effect_revision,
                 operation_id: effect_operation,
                 material: effect_material,
-            } if *effect_endpoint == endpoint => Some((
-                *effect_revision,
-                effect_operation,
-                effect_material,
-            )),
+            } if *effect_endpoint == endpoint => {
+                Some((*effect_revision, effect_operation, effect_material))
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(effects.len(), 1, "expected one material effect for {operation_id}");
+    assert_eq!(
+        effects.len(),
+        1,
+        "expected one material effect for {operation_id}"
+    );
     let (effect_revision, effect_operation, effect_material) = effects[0];
     assert_eq!(effect_revision, Revision::new(safe(revision)));
     assert_eq!(effect_operation.as_str(), operation_id);
@@ -691,15 +691,17 @@ fn assert_control_effect(
                 revision: effect_revision,
                 operation_id: effect_operation,
                 control: effect_control,
-            } if *effect_endpoint == endpoint => Some((
-                *effect_revision,
-                effect_operation,
-                effect_control,
-            )),
+            } if *effect_endpoint == endpoint => {
+                Some((*effect_revision, effect_operation, effect_control))
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(effects.len(), 1, "expected one control effect for {operation_id}");
+    assert_eq!(
+        effects.len(),
+        1,
+        "expected one control effect for {operation_id}"
+    );
     let (effect_revision, effect_operation, effect_control) = effects[0];
     assert_eq!(effect_revision, Revision::new(safe(revision)));
     assert_eq!(effect_operation.as_str(), operation_id);
@@ -712,11 +714,12 @@ fn authority_receipts(step: &PairStep) -> Vec<(SeatId, FrameContext, AuthorityRe
         .iter()
         .filter_map(|effect| match effect {
             KernelEffect::SendFrame { from, frame }
-                if frame.frame_type == FrameType::AuthorityReceipt => {
-                    let body = serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())
-                        .expect("authorityReceipt body must match the typed protocol body");
-                    Some((*from, frame.context.clone(), body))
-                }
+                if frame.frame_type == FrameType::AuthorityReceipt =>
+            {
+                let body = serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())
+                    .expect("authorityReceipt body must match the typed protocol body");
+                Some((*from, frame.context.clone(), body))
+            }
             _ => None,
         })
         .collect()
@@ -740,12 +743,7 @@ fn expected_receipt(
     )
 }
 
-fn assert_exact_receipts(
-    step: &PairStep,
-    revision: u64,
-    operation_id: &str,
-    control_id: &str,
-) {
+fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, control_id: &str) {
     let mut expected = vec![
         expected_receipt(revision, operation_id, AckStage::Admitted, None),
         expected_receipt(revision, operation_id, AckStage::MaterialApplied, None),
@@ -776,13 +774,14 @@ fn authority_entry_revisions(step: &PairStep) -> Vec<Revision> {
         .iter()
         .filter_map(|effect| match effect {
             KernelEffect::SendFrame { frame, .. }
-                if frame.frame_type == FrameType::AuthorityEntry => {
-                    Some(
-                        serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())
-                            .expect("authorityEntry body must match the typed protocol body")
-                            .revision,
-                    )
-                }
+                if frame.frame_type == FrameType::AuthorityEntry =>
+            {
+                Some(
+                    serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())
+                        .expect("authorityEntry body must match the typed protocol body")
+                        .revision,
+                )
+            }
             _ => None,
         })
         .collect()
@@ -874,12 +873,7 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
 
     let moved = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowDown, false)?;
     assert_eq!(moved.snapshot.guest.ui.cursor, Some(safe(1)));
-    assert_cursor_intent(
-        &moved,
-        seat(1),
-        MenuGeneration::new(safe(1)),
-        safe(1),
-    );
+    assert_cursor_intent(&moved, seat(1), MenuGeneration::new(safe(1)), safe(1));
     steps.push(moved);
     steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowDown)?);
 
@@ -953,16 +947,23 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let second_entry_packet = queued_entries[1];
 
     let before_n_plus_one = pair.snapshot()?;
-    assert_eq!(replica_frontier_from_snapshot(&before_n_plus_one), Some((0, 0, 0)));
-    assert!(before_n_plus_one
-        .network
-        .queued_packet_ids
-        .contains(&second_entry_packet));
-    assert!(before_n_plus_one
-        .host
-        .live_resources
-        .retained_revisions
-        .contains(&Revision::new(safe(2))));
+    assert_eq!(
+        replica_frontier_from_snapshot(&before_n_plus_one),
+        Some((0, 0, 0))
+    );
+    assert!(
+        before_n_plus_one
+            .network
+            .queued_packet_ids
+            .contains(&second_entry_packet)
+    );
+    assert!(
+        before_n_plus_one
+            .host
+            .live_resources
+            .retained_revisions
+            .contains(&Revision::new(safe(2)))
+    );
     steps.push(pair.apply(PairOperation::Fault {
         operation: FaultOperation::Reorder {
             packet_ids: vec![second_entry_packet],
@@ -975,16 +976,20 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let before_n_plus_one_packets = before_n_plus_one.network.queued_packet_ids.clone();
     assert_eq!(blocked.snapshot.network.queued_packet_ids.len(), 2);
     assert_eq!(replica_frontier(&blocked), Some((0, 0, 0)));
-    assert!(blocked
-        .snapshot
-        .network
-        .queued_packet_ids
-        .contains(&first_entry_packet));
-    assert!(!blocked
-        .snapshot
-        .network
-        .queued_packet_ids
-        .contains(&second_entry_packet));
+    assert!(
+        blocked
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&first_entry_packet)
+    );
+    assert!(
+        !blocked
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&second_entry_packet)
+    );
     let tail_request_packets = blocked
         .snapshot
         .network
@@ -995,31 +1000,30 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(tail_request_packets.len(), 1);
     assert_eq!(tail_request_effect_count(&blocked), 1);
     assert!(has_guest_tail_request_effect(&blocked));
-    assert!(blocked
-        .snapshot
-        .host
-        .live_resources
-        .retained_revisions
-        .contains(&Revision::new(safe(2))));
+    assert!(
+        blocked
+            .snapshot
+            .host
+            .live_resources
+            .retained_revisions
+            .contains(&Revision::new(safe(2)))
+    );
     assert!(!has_material_effect(&blocked, HOST_OPERATION));
     assert!(!has_control_effect(&blocked, HOST_OPERATION));
     let tail_request_packet = tail_request_packets[0];
     steps.push(blocked);
 
     let stale_input = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
-    assert_cursor_intent(
-        &stale_input,
-        seat(1),
-        MenuGeneration::new(safe(1)),
-        safe(0),
-    );
+    assert_cursor_intent(&stale_input, seat(1), MenuGeneration::new(safe(1)), safe(0));
     let repeat_timer_id = assert_repeat_timer(&stale_input, seat(1), GameButton::Up);
-    assert!(stale_input
-        .snapshot
-        .guest
-        .live_resources
-        .timers
-        .contains(&repeat_timer_id));
+    assert!(
+        stale_input
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&repeat_timer_id)
+    );
     steps.push(stale_input);
 
     let first_entry = pair.apply(PairOperation::Fault {
@@ -1027,7 +1031,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             packet_id: first_entry_packet,
         },
     })?;
-    assert_ne!(first_entry.snapshot.guest.ui.generation, before_n_plus_one.guest.ui.generation);
+    assert_ne!(
+        first_entry.snapshot.guest.ui.generation,
+        before_n_plus_one.guest.ui.generation
+    );
     assert!(!first_entry.snapshot.guest.ui.actionable);
     assert_eq!(replica_frontier(&first_entry), Some((1, 1, 1)));
     assert_material_effect(
@@ -1067,14 +1074,15 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         },
     })?;
     assert_eq!(replica_frontier(&replay_requested), Some((1, 1, 1)));
-    assert!(authority_entry_revisions(&replay_requested)
-        .contains(&Revision::new(safe(2))));
+    assert!(authority_entry_revisions(&replay_requested).contains(&Revision::new(safe(2))));
     assert!(replay_requested.snapshot.network.queued_packet_ids.len() >= 2);
-    assert!(!replay_requested
-        .snapshot
-        .network
-        .queued_packet_ids
-        .is_empty());
+    assert!(
+        !replay_requested
+            .snapshot
+            .network
+            .queued_packet_ids
+            .is_empty()
+    );
     let replay_start = steps.len();
     steps.push(replay_requested);
 
@@ -1106,12 +1114,27 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         &control_id_of(&await_control()),
     );
     let before_teardown = pair.snapshot()?;
-    assert_eq!(replica_frontier_from_snapshot(&before_teardown), Some((2, 2, 2)));
+    assert_eq!(
+        replica_frontier_from_snapshot(&before_teardown),
+        Some((2, 2, 2))
+    );
     assert_eq!(before_teardown.guest.ui.kind, UiViewKind::Waiting);
     assert!(!before_teardown.guest.ui.actionable);
     assert!(before_teardown.network.queued_packet_ids.is_empty());
-    assert!(before_teardown.host.live_resources.delivery_leases.is_empty());
-    assert!(before_teardown.guest.live_resources.proposal_leases.is_empty());
+    assert!(
+        before_teardown
+            .host
+            .live_resources
+            .delivery_leases
+            .is_empty()
+    );
+    assert!(
+        before_teardown
+            .guest
+            .live_resources
+            .proposal_leases
+            .is_empty()
+    );
     assert!(before_teardown.host.live_resources.timers.is_empty());
     assert!(before_teardown.guest.live_resources.timers.is_empty());
 
@@ -1155,7 +1178,11 @@ fn raw_key_command_campaign_covers_projection_progression_and_determinism() -> T
 
     assert_eq!(first_steps, second_steps);
     assert_eq!(first_final, second_final);
-    assert!(first_steps.iter().all(|step| !step.effects_digest.is_empty()));
+    assert!(
+        first_steps
+            .iter()
+            .all(|step| !step.effects_digest.is_empty())
+    );
     let proposals = first_steps
         .iter()
         .flat_map(|step| step.generated_effects.iter())

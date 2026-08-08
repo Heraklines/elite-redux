@@ -7,8 +7,8 @@ use er_kernel::{
     MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy,
-    FrameValidator, PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, FrameValidator,
+    PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
     RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
@@ -485,9 +485,7 @@ fn observe_cycle_step(
             } if *endpoint == seat(1) && submitted_operation == operation_id => {
                 evidence.command_submitted = true;
             }
-            KernelEffect::SendProposal { proposal }
-                if proposal.operation_id == *operation_id =>
-            {
+            KernelEffect::SendProposal { proposal } if proposal.operation_id == *operation_id => {
                 evidence.proposal_sent = true;
             }
             KernelEffect::SendFrame { frame, .. }
@@ -558,12 +556,7 @@ fn m2_proposal_receipt_cycles() -> TestResult {
         observe_cycle_step(&released, &operation_id, &mut evidence, &mut checksum)?;
         pair_steps += 1;
 
-        pair_steps += drain_pair_network(
-            &mut pair,
-            &operation_id,
-            &mut evidence,
-            &mut checksum,
-        )?;
+        pair_steps += drain_pair_network(&mut pair, &operation_id, &mut evidence, &mut checksum)?;
         let snapshot = pair.snapshot()?;
         assert!(snapshot.network.queued_packet_ids.is_empty());
         assert_eq!(snapshot.guest.ui.kind, UiViewKind::Command);
@@ -579,9 +572,27 @@ fn m2_proposal_receipt_cycles() -> TestResult {
     let final_snapshot = pair.teardown("m2 benchmark proposal teardown")?;
     assert!(final_snapshot.host.live_resources.timers.is_empty());
     assert!(final_snapshot.guest.live_resources.timers.is_empty());
-    assert!(final_snapshot.host.live_resources.delivery_leases.is_empty());
-    assert!(final_snapshot.host.live_resources.retained_revisions.is_empty());
-    assert!(final_snapshot.guest.live_resources.proposal_leases.is_empty());
+    assert!(
+        final_snapshot
+            .host
+            .live_resources
+            .delivery_leases
+            .is_empty()
+    );
+    assert!(
+        final_snapshot
+            .host
+            .live_resources
+            .retained_revisions
+            .is_empty()
+    );
+    assert!(
+        final_snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .is_empty()
+    );
     assert!(final_snapshot.clock_timers.is_empty());
     for endpoint in [&final_snapshot.host, &final_snapshot.guest] {
         assert!(endpoint.presenter.pending_event_ids.is_empty());

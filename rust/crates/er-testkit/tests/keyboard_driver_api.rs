@@ -93,7 +93,9 @@ fn keyboard_driver_public_surface_stays_on_raw_input_and_read_only_state() {
         assert!(
             public_signatures
                 .iter()
-                .filter_map(|signature| signature.split_once(") ->").map(|(_, return_type)| return_type))
+                .filter_map(|signature| signature
+                    .split_once(") ->")
+                    .map(|(_, return_type)| return_type))
                 .all(|return_type| !return_type.contains(forbidden)),
             "public KeyboardDriver methods must not return {forbidden} handles or state"
         );
@@ -327,9 +329,7 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
     assert_human_input_schedule(&first_down, seat, first_timer, GameButton::Down);
     assert_ui_cursor(&first_down, seat, safe(1));
     assert_eq!(driver.ui_view().cursor, Some(safe(1)));
-    assert!(
-        driver.live_resources().timers.contains(&first_timer)
-    );
+    assert!(driver.live_resources().timers.contains(&first_timer));
 
     let first_up = driver.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancels(&first_up), 1);
