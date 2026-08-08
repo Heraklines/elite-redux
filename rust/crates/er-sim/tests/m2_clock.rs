@@ -92,12 +92,7 @@ fn equal_deadlines_order_by_endpoint_then_id_and_remove_before_return() -> TestR
     let events = clock.advance(safe(6)?)?;
     assert_eq!(
         events,
-        vec![
-            fired(1, 2)?,
-            fired(1, 3)?,
-            fired(1, 20)?,
-            fired(2, 1)?,
-        ]
+        vec![fired(1, 2)?, fired(1, 3)?, fired(1, 20)?, fired(2, 1)?,]
     );
     assert_eq!(clock.now(), safe(10)?);
     assert!(clock.pending_timers().is_empty());
@@ -238,12 +233,7 @@ fn disconnect_and_suspend_pause_mechanical_classes_but_absolute_always_advances(
 
     assert_eq!(
         clock.advance(safe(1)?)?,
-        vec![
-            fired(1, 0)?,
-            fired(1, 1)?,
-            fired(1, 2)?,
-            fired(1, 3)?,
-        ]
+        vec![fired(1, 0)?, fired(1, 1)?, fired(1, 2)?, fired(1, 3)?,]
     );
     assert!(clock.pending_timers().is_empty());
     Ok(())
@@ -346,10 +336,7 @@ fn disposal_is_idempotent_and_leaves_zero_live_timers() -> TestResult {
         clock.apply(schedule(1, 12, 1, TimeClass::Absolute)?),
         Err(VirtualClockError::Disposed)
     );
-    assert_eq!(
-        clock.advance(safe(1)?),
-        Err(VirtualClockError::Disposed)
-    );
+    assert_eq!(clock.advance(safe(1)?), Err(VirtualClockError::Disposed));
     assert_eq!(clock.sync(), Err(VirtualClockError::Disposed));
     Ok(())
 }
@@ -357,14 +344,8 @@ fn disposal_is_idempotent_and_leaves_zero_live_timers() -> TestResult {
 #[test]
 fn absolute_pause_is_a_noop_but_mechanical_empty_reasons_are_rejected() -> TestResult {
     let mut clock = VirtualClock::new();
-    assert_eq!(
-        clock.apply(pause(1, TimeClass::Absolute, "")?),
-        Ok(())
-    );
-    assert_eq!(
-        clock.apply(resume(1, TimeClass::Absolute, "")?),
-        Ok(())
-    );
+    assert_eq!(clock.apply(pause(1, TimeClass::Absolute, "")?), Ok(()));
+    assert_eq!(clock.apply(resume(1, TimeClass::Absolute, "")?), Ok(()));
     assert!(!clock.is_class_paused(seat(1)?, TimeClass::Absolute));
 
     assert_eq!(
@@ -395,11 +376,13 @@ fn safe_u53_boundary_is_preserved_and_max_plus_one_is_rejected() -> TestResult {
     );
 
     let mut clock = VirtualClock::new();
-    clock.apply(schedule(maximum.get(), maximum.get(), 0, TimeClass::Absolute)?)?;
-    assert_eq!(
-        clock.sync()?,
-        vec![fired(maximum.get(), maximum.get())?]
-    );
+    clock.apply(schedule(
+        maximum.get(),
+        maximum.get(),
+        0,
+        TimeClass::Absolute,
+    )?)?;
+    assert_eq!(clock.sync()?, vec![fired(maximum.get(), maximum.get())?]);
     assert!(clock.pending_timers().is_empty());
     Ok(())
 }
@@ -427,10 +410,7 @@ fn scheduling_while_paused_defers_zero_delay_and_orders_equal_deadlines() -> Tes
 
     clock.apply(resume(1, TimeClass::Connected, "hold")?)?;
     assert_eq!(clock.next_deadline_delta(), Some(safe(0)?));
-    assert_eq!(
-        clock.sync()?,
-        vec![fired(1, 2)?, fired(1, 5)?]
-    );
+    assert_eq!(clock.sync()?, vec![fired(1, 2)?, fired(1, 5)?]);
     assert!(clock.pending_timers().is_empty());
     assert!(clock.sync()?.is_empty());
     Ok(())
@@ -555,12 +535,7 @@ fn schedule_overflow_does_not_mutate_existing_clock_state() -> TestResult {
     clock.advance(safe(3)?)?;
 
     assert_eq!(
-        clock.apply(schedule(
-            2,
-            2,
-            SafeU53::MAX.get(),
-            TimeClass::Absolute,
-        )?),
+        clock.apply(schedule(2, 2, SafeU53::MAX.get(), TimeClass::Absolute,)?),
         Err(VirtualClockError::TimeOverflow)
     );
     assert_eq!(clock.now(), safe(3)?);

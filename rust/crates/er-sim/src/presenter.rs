@@ -128,20 +128,14 @@ impl Presenter for InstantPresenter {
     fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         self.settled
             .keys()
-            .filter_map(|(key_endpoint, event_id)| {
-                (*key_endpoint == endpoint).then_some(*event_id)
-            })
+            .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
             .collect()
     }
 
     fn diagnostics(&self) -> PresenterDiagnostics {
         PresenterDiagnostics {
             pending_event_ids: BTreeSet::new(),
-            settled_event_ids: self
-                .settled
-                .keys()
-                .map(|(_, event_id)| *event_id)
-                .collect(),
+            settled_event_ids: self.settled.keys().map(|(_, event_id)| *event_id).collect(),
             disposed: self.disposed,
         }
     }
@@ -224,33 +218,21 @@ impl Presenter for FaultPresenter {
     fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         self.pending
             .iter()
-            .filter_map(|(key_endpoint, event_id)| {
-                (*key_endpoint == endpoint).then_some(*event_id)
-            })
+            .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
             .collect()
     }
 
     fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         self.settled
             .keys()
-            .filter_map(|(key_endpoint, event_id)| {
-                (*key_endpoint == endpoint).then_some(*event_id)
-            })
+            .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
             .collect()
     }
 
     fn diagnostics(&self) -> PresenterDiagnostics {
         PresenterDiagnostics {
-            pending_event_ids: self
-                .pending
-                .iter()
-                .map(|(_, event_id)| *event_id)
-                .collect(),
-            settled_event_ids: self
-                .settled
-                .keys()
-                .map(|(_, event_id)| *event_id)
-                .collect(),
+            pending_event_ids: self.pending.iter().map(|(_, event_id)| *event_id).collect(),
+            settled_event_ids: self.settled.keys().map(|(_, event_id)| *event_id).collect(),
             disposed: self.disposed,
         }
     }

@@ -6,8 +6,8 @@ use er_sim::{
     StorageAdapterError,
 };
 use er_types::{
-    PresentationEvent, PresentationEventId, PresentationOutcome, SafeU53, SafeU53Error,
-    SeatId, StorageRequest, StorageResult,
+    PresentationEvent, PresentationEventId, PresentationOutcome, SafeU53, SafeU53Error, SeatId,
+    StorageRequest, StorageResult,
 };
 use serde_json::{Value, json};
 
@@ -143,15 +143,27 @@ fn fault_presenter_keeps_endpoint_local_pending_and_settled_tombstones() -> Test
     let mut presenter = FaultPresenter::new();
 
     assert!(presenter.present(host, shared_event.clone())?.is_empty());
-    assert!(presenter.present(guest, event(7, "guest-held")?)?.is_empty());
-    assert!(presenter.present(host, event(7, "duplicate-pending")?)?.is_empty());
+    assert!(
+        presenter
+            .present(guest, event(7, "guest-held")?)?
+            .is_empty()
+    );
+    assert!(
+        presenter
+            .present(host, event(7, "duplicate-pending")?)?
+            .is_empty()
+    );
     assert_eq!(presenter.pending_event_ids(host), ids(&[7])?);
     assert_eq!(presenter.pending_event_ids(guest), ids(&[7])?);
     assert!(presenter.settled_event_ids(host).is_empty());
     assert!(presenter.settled_event_ids(guest).is_empty());
 
     assert_eq!(
-        presenter.settle(unrelated_endpoint, shared_event_id, PresentationOutcome::Settled),
+        presenter.settle(
+            unrelated_endpoint,
+            shared_event_id,
+            PresentationOutcome::Settled
+        ),
         Err(PresenterError::UnknownEvent {
             event_id: shared_event_id,
         })

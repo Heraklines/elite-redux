@@ -95,11 +95,7 @@ impl VirtualClock {
                         Some(value) => value,
                         None => current_now,
                     };
-                    counter_updates.push((
-                        *endpoint,
-                        time_class,
-                        add_time(counter, delta_ms)?,
-                    ));
+                    counter_updates.push((*endpoint, time_class, add_time(counter, delta_ms)?));
                 }
             }
         }
@@ -120,13 +116,12 @@ impl VirtualClock {
 
         let mut timer_updates = Vec::with_capacity(self.timers.len());
         for (timer_key, timer) in &self.timers {
-            let remaining_active_ms = if paused_classes
-                .contains(&(timer.timer.endpoint, timer.timer.time_class))
-            {
-                timer.remaining_active_ms
-            } else {
-                subtract_or_zero(timer.remaining_active_ms, delta_ms)?
-            };
+            let remaining_active_ms =
+                if paused_classes.contains(&(timer.timer.endpoint, timer.timer.time_class)) {
+                    timer.remaining_active_ms
+                } else {
+                    subtract_or_zero(timer.remaining_active_ms, delta_ms)?
+                };
             timer_updates.push((*timer_key, remaining_active_ms));
         }
 
@@ -279,9 +274,7 @@ impl VirtualClock {
             })
             .map(|timer| {
                 add_time(self.now_ms, timer.remaining_active_ms)
-                    .map(|deadline_ms| {
-                        ((timer.timer.endpoint, timer.timer.timer_id), deadline_ms)
-                    })
+                    .map(|deadline_ms| ((timer.timer.endpoint, timer.timer.timer_id), deadline_ms))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
