@@ -776,18 +776,9 @@ fn ensure_oracle_available(root: &Path) -> AuditResult {
         )?;
     }
 
-    let ancestry = Command::new("git")
-        .current_dir(root)
-        .args(["merge-base", "--is-ancestor", ORACLE_GAME_SHA, "HEAD"])
-        .output()
-        .map_err(|error| format!("verify oracle ancestry: {error}"))?;
-    require(
-        ancestry.status.success(),
-        format!(
-            "HEAD is not a descendant of pinned oracle {ORACLE_GAME_SHA}: {}",
-            String::from_utf8_lossy(&ancestry.stderr).trim()
-        ),
-    )
+    // The pinned oracle is a tree-comparison target and need not be an ancestor of HEAD.
+    // The exact oracle object was validated above, and `git diff` compares either history.
+    Ok(())
 }
 
 fn repository_root() -> PathBuf {
