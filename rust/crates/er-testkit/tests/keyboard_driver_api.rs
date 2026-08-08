@@ -96,6 +96,18 @@ fn scheduled_timer(effects: &[KernelEffect]) -> Option<(SeatId, er_types::TimerI
     })
 }
 
+fn scheduled_timers(effects: &[KernelEffect]) -> Vec<(SeatId, er_types::TimerId)> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
+                endpoint, timer_id, ..
+            } => Some((*endpoint, *timer_id)),
+            _ => None,
+        })
+        .collect()
+}
+
 fn assert_human_input_schedule(
     effects: &[KernelEffect],
     endpoint: SeatId,
@@ -192,14 +204,19 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
     let held = driver.hold_for(PhysicalKey::ArrowDown, safe(250))?;
     assert_eq!(schedules(&held), 2);
     assert_eq!(cancels(&held), 1);
-    let held_timer = scheduled_timer(&held)
-        .map(|(endpoint, timer_id)| {
-            assert_eq!(endpoint, seat);
-            timer_id
-        })
-        .ok_or_else(|| std::io::Error::other("raw hold did not schedule a timer"))?;
+    let held_timers = scheduled_timers(&held);
+    assert_eq!(held_timers.len(), 2, "raw hold must schedule two timers");
+    let (held_endpoint, held_timer) = held_timers[0];
+    let (repeat_endpoint, repeat_timer) = held_timers[1];
+    assert_eq!(held_endpoint, seat);
+    assert_eq!(repeat_endpoint, seat);
+    assert_ne!(
+        held_timer, repeat_timer,
+        "repeats must receive fresh timer IDs"
+    );
     assert_human_input_schedule(&held, seat, held_timer, GameButton::Down);
-    assert_cancel(&held, seat, held_timer);
+    assert_human_input_schedule(&held, seat, repeat_timer, GameButton::Down);
+    assert_cancel(&held, seat, repeat_timer);
     assert_ui_cursor(&held, seat, safe(0));
     assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
     assert!(driver.kernel().live_resources().timers.is_empty());
