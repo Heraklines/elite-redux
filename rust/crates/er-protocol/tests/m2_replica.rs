@@ -1425,12 +1425,12 @@ fn recovery_staging_seam_requires_full_entry_before_staged_signal() -> TestResul
 
 #[test]
 fn recovery_zero_equal_and_complete_terminal_cases_are_atomic() -> TestResult {
-    let mut replica = replica()?;
-    let zero_before = replica.diagnostics();
-    replica.adopt_frontier(Revision::ZERO, None)?;
-    assert_eq!(replica.diagnostics(), zero_before);
+    let mut recovery_replica = replica()?;
+    let zero_before = recovery_replica.diagnostics();
+    recovery_replica.adopt_frontier(Revision::ZERO, None)?;
+    assert_eq!(recovery_replica.diagnostics(), zero_before);
     assert!(matches!(
-        replica.adopt_frontier(
+        recovery_replica.adopt_frontier(
             Revision::ZERO,
             Some(RecoveredFrontierTerminal {
                 operation_id: OperationId::new("op-zero-proof")?,
@@ -1439,7 +1439,7 @@ fn recovery_zero_equal_and_complete_terminal_cases_are_atomic() -> TestResult {
         ),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
-    assert_eq!(replica.diagnostics(), zero_before);
+    assert_eq!(recovery_replica.diagnostics(), zero_before);
 
     let mut admitted_frontier = replica()?;
     let admitted_entry = entry(1, "op-admitted-terminal-only")?;
@@ -1487,12 +1487,12 @@ fn recovery_zero_equal_and_complete_terminal_cases_are_atomic() -> TestResult {
     ));
     assert_eq!(equal_frontier.diagnostics(), equal_terminal_before);
 
-    let before_proof = replica.diagnostics();
+    let before_proof = recovery_replica.diagnostics();
     assert!(matches!(
-        replica.adopt_frontier(revision(7), None),
+        recovery_replica.adopt_frontier(revision(7), None),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
-    assert_eq!(replica.diagnostics(), before_proof);
+    assert_eq!(recovery_replica.diagnostics(), before_proof);
 
     let recovered = entry(7, "op-exact-recovery")?;
     let terminal = RecoveredFrontierTerminal {
@@ -1500,56 +1500,56 @@ fn recovery_zero_equal_and_complete_terminal_cases_are_atomic() -> TestResult {
         next_control: recovered.next_control.clone(),
     };
     assert!(matches!(
-        replica.adopt_frontier(revision(7), Some(terminal.clone())),
+        recovery_replica.adopt_frontier(revision(7), Some(terminal.clone())),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
-    assert_eq!(replica.diagnostics(), before_proof);
+    assert_eq!(recovery_replica.diagnostics(), before_proof);
 
-    let staged = replica.stage_recovered_frontier(recovered.clone())?;
+    let staged = recovery_replica.stage_recovered_frontier(recovered.clone())?;
     assert!(has_project_control(&staged));
     assert_eq!(
-        replica.frontier(),
+        recovery_replica.frontier(),
         AuthorityFrontier {
             received: revision(7),
             material: revision(7),
             control: revision(6),
         }
     );
-    let exact_staging = replica.diagnostics();
-    replica.adopt_frontier(revision(7), Some(terminal.clone()))?;
-    assert_eq!(replica.diagnostics(), exact_staging);
+    let exact_staging = recovery_replica.diagnostics();
+    recovery_replica.adopt_frontier(revision(7), Some(terminal.clone()))?;
+    assert_eq!(recovery_replica.diagnostics(), exact_staging);
 
     let conflicting_terminal = RecoveredFrontierTerminal {
         operation_id: OperationId::new("op-conflicting-proof")?,
         next_control: recovered.next_control.clone(),
     };
     assert!(matches!(
-        replica.adopt_frontier(revision(7), Some(conflicting_terminal)),
+        recovery_replica.adopt_frontier(revision(7), Some(conflicting_terminal)),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
-    assert_eq!(replica.diagnostics(), exact_staging);
-    assert_eq!(replica.pending_entry(), Some(&recovered));
+    assert_eq!(recovery_replica.diagnostics(), exact_staging);
+    assert_eq!(recovery_replica.pending_entry(), Some(&recovered));
 
     let mut conflicting_entry = recovered.clone();
     conflicting_entry.material.payload = json!({"epoch": 1, "revision": 7, "turn": 99});
-    let before_conflict = replica.diagnostics();
-    let pending_before_conflict = replica.pending_entry().cloned();
+    let before_conflict = recovery_replica.diagnostics();
+    let pending_before_conflict = recovery_replica.pending_entry().cloned();
     assert!(matches!(
-        replica.stage_recovered_frontier(conflicting_entry),
+        recovery_replica.stage_recovered_frontier(conflicting_entry),
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
-    assert_eq!(replica.diagnostics(), before_conflict);
-    assert_eq!(replica.pending_entry(), pending_before_conflict.as_ref());
+    assert_eq!(recovery_replica.diagnostics(), before_conflict);
+    assert_eq!(recovery_replica.pending_entry(), pending_before_conflict.as_ref());
 
-    let duplicate_stage = replica.stage_recovered_frontier(recovered.clone())?;
+    let duplicate_stage = recovery_replica.stage_recovered_frontier(recovered.clone())?;
     assert!(has_project_control(&duplicate_stage));
-    assert_eq!(replica.diagnostics(), before_conflict);
+    assert_eq!(recovery_replica.diagnostics(), before_conflict);
     let control_id = control_id_of(&recovered.next_control);
-    replica.control_result(
+    recovery_replica.control_result(
         revision(7),
         ControlProjectionOutcome::Installed { control_id },
     )?;
-    assert_eq!(replica.frontier().control, revision(7));
+    assert_eq!(recovery_replica.frontier().control, revision(7));
     Ok(())
 }
 

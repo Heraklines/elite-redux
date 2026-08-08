@@ -1023,7 +1023,7 @@ fn same_entry_identity(left: &AuthorityEntry, right: &AuthorityEntry) -> bool {
 }
 
 fn installed_matches_entry(installed: &InstalledControl, entry: &AuthorityEntry) -> bool {
-    &installed.identity == &EntryIdentity::from_entry(entry)
+    installed.identity == EntryIdentity::from_entry(entry)
 }
 
 fn is_valid_entry(entry: &AuthorityEntry) -> bool {
