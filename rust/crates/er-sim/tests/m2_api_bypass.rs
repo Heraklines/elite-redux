@@ -236,7 +236,10 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
 
     let driver_impl = impl_body(&mask_non_code(KEYBOARD_DRIVER_SOURCE), "KeyboardDriver")?;
     let driver_methods = public_methods(&driver_impl);
-    let driver_names: Vec<&str> = driver_methods.iter().map(|method| method.name.as_str()).collect();
+    let driver_names: Vec<&str> = driver_methods
+        .iter()
+        .map(|method| method.name.as_str())
+        .collect();
     require(
         driver_names
             == [
@@ -277,11 +280,13 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
         constructor_signature.contains("&mutGameKernel")
             || (constructor_signature.contains("&'")
                 && constructor_signature.contains("mutGameKernel")),
-        "KeyboardDriver::new must be the explicit low-level mutable-borrow adapter boundary".to_owned(),
+        "KeyboardDriver::new must be the explicit low-level mutable-borrow adapter boundary"
+            .to_owned(),
     )?;
     require(
         compact(&constructor.signature).matches("GameKernel").count() == 1,
-        "KeyboardDriver::new may expose only its one construction-time GameKernel borrow".to_owned(),
+        "KeyboardDriver::new may expose only its one construction-time GameKernel borrow"
+            .to_owned(),
     )?;
     require(
         !driver_methods.iter().any(|method| method.name == "kernel"),
@@ -461,7 +466,8 @@ fn source_lock_ownership_and_contract_map_are_frozen() -> AuditResult {
             && M2_OWNERSHIP.contains("production_typescript_read_only = true")
             && M2_OWNERSHIP.contains("local_rust_execution = false")
             && M2_OWNERSHIP.contains("local_coop_vitest = false"),
-        "M2 ownership manifest no longer records schema revision 6 and the local execution boundary".to_owned(),
+        "M2 ownership manifest no longer records schema revision 6 and the local execution boundary"
+            .to_owned(),
     )?;
     for owned_path in [
         "rust/crates/er-sim/tests/m2_api_bypass.rs",
@@ -496,11 +502,17 @@ fn source_lock_ownership_and_contract_map_are_frozen() -> AuditResult {
     let nodes = required_array(&map, "node_contracts")?;
     let simulator_nodes: Vec<&Value> = nodes
         .iter()
-        .filter(|node| node.get("implementation_kind").and_then(Value::as_str) == Some("reference-simulator"))
+        .filter(|node| {
+            node.get("implementation_kind").and_then(Value::as_str)
+                == Some("reference-simulator")
+        })
         .collect();
     require(
         simulator_nodes.len() == 1,
-        format!("expected one visibly distinct reference simulator, found {}", simulator_nodes.len()),
+        format!(
+            "expected one visibly distinct reference simulator, found {}",
+            simulator_nodes.len()
+        ),
     )?;
     let simulator = simulator_nodes[0];
     require(
@@ -508,16 +520,19 @@ fn source_lock_ownership_and_contract_map_are_frozen() -> AuditResult {
             && simulator
                 .get("typescript_source")
                 .and_then(Value::as_str)
-                .map_or(false, |source| source.ends_with("authority-v2-simulator.test.ts")),
+                .is_some_and(|source| source.ends_with("authority-v2-simulator.test.ts")),
         "reference simulator is not visibly distinct in the node contract map".to_owned(),
     )?;
     require(
         nodes
             .iter()
-            .filter(|node| node.get("implementation_kind").and_then(Value::as_str) == Some("production"))
+            .filter(|node| {
+                node.get("implementation_kind").and_then(Value::as_str) == Some("production")
+            })
             .count()
             == 28,
-        "node contract map must contain 28 production contracts plus one reference simulator".to_owned(),
+        "node contract map must contain 28 production contracts plus one reference simulator"
+            .to_owned(),
     )?;
     Ok(())
 }
@@ -561,7 +576,10 @@ fn later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions() -> Audi
         ]) {
             require(
                 !identifiers(&masked).iter().any(|(identifier, _)| identifier == forbidden),
-                format!("{} contains forbidden semantic/lower-level identifier {forbidden}", path.display()),
+                format!(
+                    "{} contains forbidden semantic/lower-level identifier {forbidden}",
+                    path.display()
+                ),
             )?;
         }
         assert_no_campaign_pair_operation_semantics(&masked, &path)?;
@@ -575,7 +593,10 @@ fn later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions() -> Audi
         ] {
             require(
                 !compact(&masked).contains(forbidden),
-                format!("{} directly calls forbidden transition surface {forbidden}", path.display()),
+                format!(
+                    "{} directly calls forbidden transition surface {forbidden}",
+                    path.display()
+                ),
             )?;
         }
     }
@@ -610,7 +631,10 @@ fn assert_no_campaign_pair_operation_semantics(code: &str, path: &Path) -> Audit
             let variant = &code[variant_start..variant_end];
             require(
                 !FORBIDDEN_CAMPAIGN_PAIR_OPERATION_VARIANTS.contains(&variant),
-                format!("{} constructs forbidden semantic PairOperation::{variant}", path.display()),
+                format!(
+                    "{} constructs forbidden semantic PairOperation::{variant}",
+                    path.display()
+                ),
             )?;
         } else if code.as_bytes().get(next) == Some(&b'{') {
             let close = matching_delimiter(code, next, b'{', b'}')?;
@@ -731,7 +755,10 @@ fn mask_non_code(source: &str) -> String {
                 if index + 1 < bytes.len() && bytes[index] == b'/' && bytes[index + 1] == b'*' {
                     depth += 1;
                     index += 2;
-                } else if index + 1 < bytes.len() && bytes[index] == b'*' && bytes[index + 1] == b'/' {
+                } else if index + 1 < bytes.len()
+                    && bytes[index] == b'*'
+                    && bytes[index + 1] == b'/'
+                {
                     depth -= 1;
                     index += 2;
                 } else {
@@ -746,7 +773,11 @@ fn mask_non_code(source: &str) -> String {
             index = end;
             continue;
         }
-        if bytes[index] == b'"' || (bytes[index] == b'b' && index + 1 < bytes.len() && bytes[index + 1] == b'"') {
+        if bytes[index] == b'"'
+            || (bytes[index] == b'b'
+                && index + 1 < bytes.len()
+                && bytes[index + 1] == b'"')
+        {
             let start = index;
             if bytes[index] == b'b' {
                 index += 1;
@@ -1173,11 +1204,15 @@ fn assert_cfg_policy(masked: &str, path: &Path) -> AuditResult {
         }
         let is_test_module =
             masked[next..].starts_with("mod ") || masked[next..].starts_with("mod\n");
-        let is_scheduler_helper = path.file_name().and_then(|name| name.to_str()) == Some("scheduler.rs")
+        let is_scheduler_helper = path.file_name().and_then(|name| name.to_str())
+            == Some("scheduler.rs")
             && masked[next..].starts_with("pub(crate) fn set_next_timer_id_for_test");
         require(
             is_test_module || is_scheduler_helper,
-            format!("{} uses #[cfg(test)] outside a test module or the documented scheduler helper", path.display()),
+            format!(
+                "{} uses #[cfg(test)] outside a test module or the documented scheduler helper",
+                path.display()
+            ),
         )?;
         cursor = close + 1;
     }
@@ -1215,7 +1250,8 @@ fn strip_test_modules(masked: &str, path: &Path) -> Result<String, String> {
         }
         let is_test_module =
             masked[next..].starts_with("mod ") || masked[next..].starts_with("mod\n");
-        let is_scheduler_helper = path.file_name().and_then(|name| name.to_str()) == Some("scheduler.rs")
+        let is_scheduler_helper = path.file_name().and_then(|name| name.to_str())
+            == Some("scheduler.rs")
             && masked[next..].starts_with("pub(crate) fn set_next_timer_id_for_test");
         if is_scheduler_helper {
             let Some(open_offset) = masked[next..].find('{') else {
@@ -1320,7 +1356,7 @@ fn required_nonempty_string(object: &Value, field: &str) -> AuditResult {
         object
             .get(field)
             .and_then(Value::as_str)
-            .map_or(false, |value| !value.trim().is_empty()),
+            .is_some_and(|value| !value.trim().is_empty()),
         format!("contract map object lacks non-empty {field}"),
     )
 }
@@ -1361,7 +1397,7 @@ fn audit_contract_array(
                 && rust_equivalent.iter().all(|value| {
                     value
                         .as_str()
-                        .map_or(false, |text| !text.trim().is_empty())
+                        .is_some_and(|text| !text.trim().is_empty())
                 }),
             format!("{field}:{id} has no Rust equivalent evidence"),
         )?;
