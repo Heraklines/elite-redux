@@ -6,8 +6,9 @@ use er_kernel::{
     ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
-    ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of,
+    AckStage, AuthorityEntryBody, AuthorityEntryDraft, AuthorityLogConfig, AuthorityReceiptBody,
+    AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalFingerprintInput, ProposalJson,
+    ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
@@ -17,10 +18,10 @@ use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FrameContext, GameButton, InputMap, KeyBinding,
     FrameType, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState, MembershipRevision,
-    NextControl, OperationId, PhysicalKey, RunId, SafeU53, SeatId, SessionId, TimeClass, UiIntent,
-    UiState, UiViewKind,
+    NextControl, OperationId, PhysicalKey, ProposalMessage, Revision, RunId, SafeI53, SafeU53,
+    SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
 };
-use serde_json::json;
+use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -29,6 +30,13 @@ const HOST_OPERATION: &str = "turn/host";
 const GUEST_OPTION_A: &str = "command:guest:a";
 const GUEST_OPTION_B: &str = "command:guest:b";
 const HOST_OPTION: &str = "command:host";
+
+const GUEST_A_WIRE: &str = r#"{"choice":"a"}"#;
+const GUEST_B_WIRE: &str = r#"{"choice":"b"}"#;
+const HOST_WIRE: &str = r#"{"choice":"host"}"#;
+const GUEST_A_REWARD: &str = r#"{"surface":"guest-command","slot":0}"#;
+const GUEST_B_REWARD: &str = r#"{"surface":"guest-command","slot":1}"#;
+const HOST_REWARD: &str = r#"{"surface":"host-command","slot":1}"#;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("campaign value must fit SafeU53")
@@ -40,6 +48,41 @@ fn seat(value: u64) -> SeatId {
 
 fn operation(value: &str) -> OperationId {
     OperationId::new(value).expect("campaign operation must be non-empty")
+}
+
+fn ordinary_fingerprint(
+    sequence: u64,
+    label: &str,
+    choice: i64,
+    wire: &str,
+    reward_surface: &str,
+) -> String {
+    proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(sequence),
+        label: label.to_owned(),
+        choice: SafeI53::new(choice).expect("campaign choice must fit SafeI53"),
+        wire: Some(ProposalJson::new(wire).expect("campaign wire must be valid JSON")),
+        reward_surface: Some(
+            ProposalJson::new(reward_surface).expect("campaign reward surface must be valid JSON"),
+        ),
+    })
+    .expect("campaign proposal fingerprint must be valid")
+}
+
+fn guest_a_fingerprint() -> String {
+    ordinary_fingerprint(1, "turnCommand", 0, GUEST_A_WIRE, GUEST_A_REWARD)
+}
+
+fn guest_b_fingerprint() -> String {
+    ordinary_fingerprint(1, "turnCommand", 1, GUEST_B_WIRE, GUEST_B_REWARD)
+}
+
+fn host_fingerprint() -> String {
+    ordinary_fingerprint(2, "turnCommand", 0, HOST_WIRE, HOST_REWARD)
+}
+
+fn proposal_payload(choice: &str) -> Value {
+    json!({"choice": choice})
 }
 
 fn menu_option(value: &str) -> MenuOption {
@@ -179,19 +222,23 @@ fn authority_resolution(
             context: context(0),
             operation_id,
             kind: AuthorityEntryKind::TurnCommit,
-            material: Material {
-                digest: format!("digest:{choice}"),
-                payload: json!({
-                    "epoch": 1,
-                    "wave": 1,
-                    "turn": 1,
-                    "fieldIndex": field_index,
-                    "choice": choice,
-                }),
-            },
+            material: authority_material(field_index, choice),
             next_control,
             subsumes: Vec::new(),
         },
+    }
+}
+
+fn authority_material(field_index: u64, choice: &str) -> Material {
+    Material {
+        digest: format!("digest:{choice}"),
+        payload: json!({
+            "epoch": 1,
+            "wave": 1,
+            "turn": 1,
+            "fieldIndex": field_index,
+            "choice": choice,
+        }),
     }
 }
 
@@ -244,22 +291,25 @@ fn kernel_pair(seed: u64) -> TestResult<SimulatedPair> {
 
     let guest_options = vec![menu_option(GUEST_OPTION_A), menu_option(GUEST_OPTION_B)];
     let host_options = vec![menu_option(HOST_OPTION)];
+    let guest_a_fingerprint_value = guest_a_fingerprint();
+    let guest_b_fingerprint_value = guest_b_fingerprint();
+    let host_fingerprint_value = host_fingerprint();
     let guest_proposals = vec![
         MenuProposalPlan {
             option_id: guest_options[0].id.clone(),
-            fingerprint: "fingerprint:guest:a".to_owned(),
-            payload: json!({"choice": "a"}),
+            fingerprint: guest_a_fingerprint_value.clone(),
+            payload: proposal_payload("a"),
         },
         MenuProposalPlan {
             option_id: guest_options[1].id.clone(),
-            fingerprint: "fingerprint:guest:b".to_owned(),
-            payload: json!({"choice": "b"}),
+            fingerprint: guest_b_fingerprint_value.clone(),
+            payload: proposal_payload("b"),
         },
     ];
     let host_proposals = vec![MenuProposalPlan {
         option_id: host_options[0].id.clone(),
-        fingerprint: "fingerprint:host".to_owned(),
-        payload: json!({"choice": "host"}),
+        fingerprint: host_fingerprint_value.clone(),
+        payload: proposal_payload("host"),
     }];
 
     let menu_plans = vec![
@@ -292,21 +342,21 @@ fn kernel_pair(seed: u64) -> TestResult<SimulatedPair> {
     let resolutions = vec![
         authority_resolution(
             guest_operation.clone(),
-            "fingerprint:guest:a",
+            &guest_a_fingerprint_value,
             0,
             "a",
             remaining.clone(),
         ),
         authority_resolution(
             guest_operation,
-            "fingerprint:guest:b",
+            &guest_b_fingerprint_value,
             0,
             "b",
             remaining,
         ),
         authority_resolution(
             host_operation,
-            "fingerprint:host",
+            &host_fingerprint_value,
             1,
             "host",
             await_control(),
@@ -364,39 +414,132 @@ fn kernel_pair(seed: u64) -> TestResult<SimulatedPair> {
     })?)
 }
 
-fn endpoint_seat(endpoint: PairEndpoint) -> SeatId {
-    match endpoint {
-        PairEndpoint::Host => seat(0),
-        PairEndpoint::Guest => seat(1),
-    }
+fn command_intents(step: &PairStep, endpoint: SeatId) -> Vec<UiIntent> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::UiIntent {
+                endpoint: effect_endpoint,
+                intent: intent @ UiIntent::CommandSubmitted { .. },
+            } if *effect_endpoint == endpoint => Some(intent.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
-fn has_command_intent(step: &PairStep, endpoint: PairEndpoint, operation_id: &str) -> bool {
-    step.generated_effects.iter().any(|effect| {
-        matches!(
+fn cursor_intents(step: &PairStep, endpoint: SeatId) -> Vec<UiIntent> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::UiIntent {
+                endpoint: effect_endpoint,
+                intent: intent @ UiIntent::CursorChanged { .. },
+            } if *effect_endpoint == endpoint => Some(intent.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_command_intent(
+    step: &PairStep,
+    endpoint: SeatId,
+    generation: MenuGeneration,
+    operation_id: &str,
+    control_id: &str,
+    option_id: &str,
+) {
+    assert_eq!(
+        command_intents(step, endpoint),
+        vec![UiIntent::CommandSubmitted {
+            seat: endpoint,
+            generation,
+            operation_id: operation(operation_id),
+            control_id: control_id.to_owned(),
+            option_id: MenuOptionId::new(option_id).expect("campaign option must be non-empty"),
+        }]
+    );
+}
+
+fn assert_cursor_intent(
+    step: &PairStep,
+    endpoint: SeatId,
+    generation: MenuGeneration,
+    cursor: SafeU53,
+) {
+    assert_eq!(
+        cursor_intents(step, endpoint),
+        vec![UiIntent::CursorChanged {
+            seat: endpoint,
+            generation,
+            cursor,
+        }]
+    );
+}
+
+fn assert_no_command_or_cursor_intent(step: &PairStep, endpoint: SeatId) {
+    assert!(step.generated_effects.iter().all(|effect| {
+        !matches!(
             effect,
             KernelEffect::UiIntent {
                 endpoint: effect_endpoint,
-                intent: UiIntent::CommandSubmitted {
-                    operation_id: submitted_operation,
-                    ..
-                },
-            } if *effect_endpoint == endpoint_seat(endpoint)
-                && submitted_operation.as_str() == operation_id
+                intent: UiIntent::CommandSubmitted { .. } | UiIntent::CursorChanged { .. },
+            } if *effect_endpoint == endpoint
         )
-    })
+    }));
 }
 
-fn has_cursor_intent(step: &PairStep, endpoint: PairEndpoint) -> bool {
-    step.generated_effects.iter().any(|effect| {
-        matches!(
-            effect,
-            KernelEffect::UiIntent {
+fn assert_proposal_effect(
+    step: &PairStep,
+    operation_id: &str,
+    fingerprint: String,
+    from: SeatId,
+    to: SeatId,
+    payload: Value,
+) {
+    let proposals = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::SendProposal { proposal } => Some(proposal.clone()),
+            _ => None,
+        })
+        .collect::<Vec<ProposalMessage>>();
+    assert_eq!(
+        proposals,
+        vec![ProposalMessage {
+            operation_id: operation(operation_id),
+            fingerprint,
+            from,
+            to,
+            connection_generation: ConnectionGeneration::ZERO,
+            payload,
+        }]
+    );
+}
+
+fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) -> TimerId {
+    let timers = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
                 endpoint: effect_endpoint,
-                intent: UiIntent::CursorChanged { .. },
-            } if *effect_endpoint == endpoint_seat(endpoint)
-        )
-    })
+                timer_id,
+                owner,
+                delay_ms,
+                time_class,
+            } if *effect_endpoint == endpoint => {
+                Some((*timer_id, owner, *delay_ms, *time_class))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(timers.len(), 1, "expected one repeat timer for {button:?}");
+    let (timer_id, owner, delay_ms, time_class) = timers[0];
+    assert_eq!(owner, &TimerOwner::input_repeat(button));
+    assert_eq!(delay_ms, safe(250));
+    assert_eq!(time_class, TimeClass::HumanInput);
+    timer_id
 }
 
 fn has_material_effect(step: &PairStep, operation_id: &str) -> bool {
@@ -411,6 +554,37 @@ fn has_material_effect(step: &PairStep, operation_id: &str) -> bool {
     })
 }
 
+fn assert_material_effect(
+    step: &PairStep,
+    endpoint: SeatId,
+    revision: u64,
+    operation_id: &str,
+    material: &Material,
+) {
+    let effects = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ApplyAuthorityMaterial {
+                endpoint: effect_endpoint,
+                revision: effect_revision,
+                operation_id: effect_operation,
+                material: effect_material,
+            } if *effect_endpoint == endpoint => Some((
+                *effect_revision,
+                effect_operation,
+                effect_material,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(effects.len(), 1, "expected one material effect for {operation_id}");
+    let (effect_revision, effect_operation, effect_material) = effects[0];
+    assert_eq!(effect_revision, Revision::new(safe(revision)));
+    assert_eq!(effect_operation.as_str(), operation_id);
+    assert_eq!(effect_material, material);
+}
+
 fn has_control_effect(step: &PairStep, operation_id: &str) -> bool {
     step.generated_effects.iter().any(|effect| {
         matches!(
@@ -421,6 +595,144 @@ fn has_control_effect(step: &PairStep, operation_id: &str) -> bool {
             } if effect_operation.as_str() == operation_id
         )
     })
+}
+
+fn assert_control_effect(
+    step: &PairStep,
+    endpoint: SeatId,
+    revision: u64,
+    operation_id: &str,
+    control: &NextControl,
+) {
+    let effects = step
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ProjectAuthorityControl {
+                endpoint: effect_endpoint,
+                revision: effect_revision,
+                operation_id: effect_operation,
+                control: effect_control,
+            } if *effect_endpoint == endpoint => Some((
+                *effect_revision,
+                effect_operation,
+                effect_control,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(effects.len(), 1, "expected one control effect for {operation_id}");
+    let (effect_revision, effect_operation, effect_control) = effects[0];
+    assert_eq!(effect_revision, Revision::new(safe(revision)));
+    assert_eq!(effect_operation.as_str(), operation_id);
+    assert_eq!(effect_control, control);
+    assert_eq!(control_id_of(effect_control), control_id_of(control));
+}
+
+fn authority_receipts(step: &PairStep) -> Vec<(SeatId, FrameContext, AuthorityReceiptBody)> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::SendFrame { from, frame }
+                if frame.frame_type == FrameType::AuthorityReceipt => {
+                    let body = serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())
+                        .expect("authorityReceipt body must match the typed protocol body");
+                    Some((*from, frame.context.clone(), body))
+                }
+            _ => None,
+        })
+        .collect()
+}
+
+fn expected_receipt(
+    revision: u64,
+    operation_id: &str,
+    stage: AckStage,
+    control_id: Option<&str>,
+) -> (SeatId, FrameContext, AuthorityReceiptBody) {
+    (
+        seat(1),
+        context(1),
+        AuthorityReceiptBody {
+            revision: Revision::new(safe(revision)),
+            operation_id: operation(operation_id),
+            stage,
+            control_id: control_id.map(str::to_owned),
+        },
+    )
+}
+
+fn assert_exact_receipts(
+    step: &PairStep,
+    revision: u64,
+    operation_id: &str,
+    control_id: &str,
+) {
+    let mut expected = vec![
+        expected_receipt(revision, operation_id, AckStage::Admitted, None),
+        expected_receipt(revision, operation_id, AckStage::MaterialApplied, None),
+        expected_receipt(
+            revision,
+            operation_id,
+            AckStage::ControlInstalled,
+            Some(control_id),
+        ),
+    ];
+    if step
+        .generated_effects
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::Present { .. }))
+    {
+        expected.push(expected_receipt(
+            revision,
+            operation_id,
+            AckStage::PresentationSettled,
+            None,
+        ));
+    }
+    assert_eq!(authority_receipts(step), expected);
+}
+
+fn authority_entry_revisions(step: &PairStep) -> Vec<Revision> {
+    step.generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::SendFrame { frame, .. }
+                if frame.frame_type == FrameType::AuthorityEntry => {
+                    Some(
+                        serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())
+                            .expect("authorityEntry body must match the typed protocol body")
+                            .revision,
+                    )
+                }
+            _ => None,
+        })
+        .collect()
+}
+
+fn find_frontier(value: &Value) -> Option<(u64, u64, u64)> {
+    match value {
+        Value::Object(object) => {
+            if let (Some(received), Some(material), Some(control)) = (
+                object.get("received").and_then(Value::as_u64),
+                object.get("material").and_then(Value::as_u64),
+                object.get("control").and_then(Value::as_u64),
+            ) {
+                return Some((received, material, control));
+            }
+            object.values().find_map(find_frontier)
+        }
+        Value::Array(values) => values.iter().find_map(find_frontier),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
+    }
+}
+
+fn replica_frontier(step: &PairStep) -> Option<(u64, u64, u64)> {
+    find_frontier(&step.snapshot.guest.kernel.state)
+}
+
+fn replica_frontier_from_snapshot(snapshot: &PairSnapshot) -> Option<(u64, u64, u64)> {
+    find_frontier(&snapshot.guest.kernel.state)
 }
 
 fn tail_request_effect_count(step: &PairStep) -> usize {
@@ -473,36 +785,52 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(initial.host.ui.owner_seat, Some(seat(1)));
     assert!(initial.host.ui.actionable);
     assert!(initial.guest.ui.options[0].selected);
+    assert_eq!(replica_frontier_from_snapshot(&initial), Some((0, 0, 0)));
 
     let wrong_seat = pair.key_down(PairEndpoint::Host, PhysicalKey::Enter, false)?;
     assert_eq!(wrong_seat.snapshot.host.ui, initial.host.ui);
     assert!(wrong_seat.snapshot.network.queued_packet_ids.is_empty());
-    assert!(!has_command_intent(
-        &wrong_seat,
-        PairEndpoint::Host,
-        GUEST_OPERATION
-    ));
-    assert!(!has_cursor_intent(&wrong_seat, PairEndpoint::Host));
+    assert_no_command_or_cursor_intent(&wrong_seat, seat(0));
     steps.push(wrong_seat);
     steps.push(pair.key_up(PairEndpoint::Host, PhysicalKey::Enter)?);
 
     let moved = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowDown, false)?;
     assert_eq!(moved.snapshot.guest.ui.cursor, Some(safe(1)));
-    assert!(has_cursor_intent(&moved, PairEndpoint::Guest));
+    assert_cursor_intent(
+        &moved,
+        seat(1),
+        MenuGeneration::new(safe(1)),
+        safe(1),
+    );
     steps.push(moved);
     steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowDown)?);
 
     let guest_submitted = pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?;
-    assert!(has_command_intent(
+    assert_command_intent(
         &guest_submitted,
-        PairEndpoint::Guest,
-        GUEST_OPERATION
-    ));
+        seat(1),
+        MenuGeneration::new(safe(1)),
+        GUEST_OPERATION,
+        &control_id_of(&initial_control()),
+        GUEST_OPTION_B,
+    );
+    assert_proposal_effect(
+        &guest_submitted,
+        GUEST_OPERATION,
+        guest_b_fingerprint(),
+        seat(1),
+        seat(0),
+        proposal_payload("b"),
+    );
     steps.push(guest_submitted);
     steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::Enter)?);
 
     let after_guest_proposal = pair.snapshot()?;
     assert_eq!(after_guest_proposal.network.queued_packet_ids.len(), 1);
+    assert_eq!(
+        replica_frontier_from_snapshot(&after_guest_proposal),
+        Some((0, 0, 0))
+    );
     steps.push(pair.apply(PairOperation::Fault {
         operation: FaultOperation::DeliverNext,
     })?);
@@ -511,13 +839,28 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(after_first_commit.host.ui.kind, UiViewKind::Command);
     assert_eq!(after_first_commit.host.ui.owner_seat, Some(seat(0)));
     assert!(after_first_commit.host.ui.actionable);
+    assert_eq!(
+        after_first_commit.host.ui.generation,
+        MenuGeneration::new(safe(2))
+    );
 
     let host_submitted = pair.key_down(PairEndpoint::Host, PhysicalKey::Enter, false)?;
-    assert!(has_command_intent(
+    assert_command_intent(
         &host_submitted,
-        PairEndpoint::Host,
-        HOST_OPERATION
-    ));
+        seat(0),
+        MenuGeneration::new(safe(2)),
+        HOST_OPERATION,
+        &control_id_of(&initial_control()),
+        HOST_OPTION,
+    );
+    assert_proposal_effect(
+        &host_submitted,
+        HOST_OPERATION,
+        host_fingerprint(),
+        seat(0),
+        seat(1),
+        proposal_payload("host"),
+    );
     steps.push(host_submitted);
     steps.push(pair.key_up(PairEndpoint::Host, PhysicalKey::Enter)?);
 
@@ -532,6 +875,16 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let second_entry_packet = queued_entries[1];
 
     let before_n_plus_one = pair.snapshot()?;
+    assert_eq!(replica_frontier_from_snapshot(&before_n_plus_one), Some((0, 0, 0)));
+    assert!(before_n_plus_one
+        .network
+        .queued_packet_ids
+        .contains(&second_entry_packet));
+    assert!(before_n_plus_one
+        .host
+        .live_resources
+        .retained_revisions
+        .contains(&Revision::new(safe(2))));
     steps.push(pair.apply(PairOperation::Fault {
         operation: FaultOperation::Reorder {
             packet_ids: vec![second_entry_packet],
@@ -543,6 +896,7 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(blocked.snapshot.guest.ui, before_n_plus_one.guest.ui);
     let before_n_plus_one_packets = before_n_plus_one.network.queued_packet_ids.clone();
     assert_eq!(blocked.snapshot.network.queued_packet_ids.len(), 2);
+    assert_eq!(replica_frontier(&blocked), Some((0, 0, 0)));
     assert!(blocked
         .snapshot
         .network
@@ -563,13 +917,31 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(tail_request_packets.len(), 1);
     assert_eq!(tail_request_effect_count(&blocked), 1);
     assert!(has_guest_tail_request_effect(&blocked));
+    assert!(blocked
+        .snapshot
+        .host
+        .live_resources
+        .retained_revisions
+        .contains(&Revision::new(safe(2))));
     assert!(!has_material_effect(&blocked, HOST_OPERATION));
     assert!(!has_control_effect(&blocked, HOST_OPERATION));
     let tail_request_packet = tail_request_packets[0];
     steps.push(blocked);
 
     let stale_input = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
-    assert!(has_cursor_intent(&stale_input, PairEndpoint::Guest));
+    assert_cursor_intent(
+        &stale_input,
+        seat(1),
+        MenuGeneration::new(safe(1)),
+        safe(0),
+    );
+    let repeat_timer_id = assert_repeat_timer(&stale_input, seat(1), GameButton::Up);
+    assert!(stale_input
+        .snapshot
+        .guest
+        .live_resources
+        .timers
+        .contains(&repeat_timer_id));
     steps.push(stale_input);
 
     let first_entry = pair.apply(PairOperation::Fault {
@@ -579,12 +951,35 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     })?;
     assert_ne!(first_entry.snapshot.guest.ui.generation, before_n_plus_one.guest.ui.generation);
     assert!(!first_entry.snapshot.guest.ui.actionable);
+    assert_eq!(replica_frontier(&first_entry), Some((1, 1, 1)));
+    assert_material_effect(
+        &first_entry,
+        seat(1),
+        1,
+        GUEST_OPERATION,
+        &authority_material(0, "b"),
+    );
+    assert_control_effect(
+        &first_entry,
+        seat(1),
+        1,
+        GUEST_OPERATION,
+        &remaining_control(),
+    );
+    assert_exact_receipts(
+        &first_entry,
+        1,
+        GUEST_OPERATION,
+        &control_id_of(&remaining_control()),
+    );
     let first_entry_ui = first_entry.snapshot.guest.ui.clone();
     steps.push(first_entry);
 
     let stale_repeat = pair.advance_time(safe(250))?;
     assert_eq!(stale_repeat.snapshot.guest.ui, first_entry_ui);
-    assert!(!has_cursor_intent(&stale_repeat, PairEndpoint::Guest));
+    assert_eq!(replica_frontier(&stale_repeat), Some((1, 1, 1)));
+    assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
+    assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
     steps.push(stale_repeat);
     steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?);
 
@@ -593,15 +988,47 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             packet_id: tail_request_packet,
         },
     })?;
+    assert_eq!(replica_frontier(&replay_requested), Some((1, 1, 1)));
+    assert!(authority_entry_revisions(&replay_requested)
+        .contains(&Revision::new(safe(2))));
+    assert!(replay_requested.snapshot.network.queued_packet_ids.len() >= 2);
     assert!(!replay_requested
         .snapshot
         .network
         .queued_packet_ids
         .is_empty());
+    let replay_start = steps.len();
     steps.push(replay_requested);
 
     drain_network(&mut pair, &mut steps)?;
+    let replay_steps = &steps[replay_start..];
+    let second_entry_step = replay_steps
+        .iter()
+        .find(|step| has_material_effect(step, HOST_OPERATION))
+        .expect("replayed N+1 must apply authority material through Pair");
+    assert_eq!(replica_frontier(second_entry_step), Some((2, 2, 2)));
+    assert_material_effect(
+        second_entry_step,
+        seat(1),
+        2,
+        HOST_OPERATION,
+        &authority_material(1, "host"),
+    );
+    assert_control_effect(
+        second_entry_step,
+        seat(1),
+        2,
+        HOST_OPERATION,
+        &await_control(),
+    );
+    assert_exact_receipts(
+        second_entry_step,
+        2,
+        HOST_OPERATION,
+        &control_id_of(&await_control()),
+    );
     let before_teardown = pair.snapshot()?;
+    assert_eq!(replica_frontier_from_snapshot(&before_teardown), Some((2, 2, 2)));
     assert_eq!(before_teardown.guest.ui.kind, UiViewKind::Waiting);
     assert!(!before_teardown.guest.ui.actionable);
     assert!(before_teardown.network.queued_packet_ids.is_empty());
@@ -625,18 +1052,52 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
 
 #[test]
 fn raw_key_command_campaign_covers_projection_progression_and_determinism() -> TestResult {
+    assert_eq!(
+        guest_a_fingerprint(),
+        r#"[1,"turnCommand",0,{"choice":"a"},{"surface":"guest-command","slot":0}]"#
+    );
+    assert_eq!(
+        guest_b_fingerprint(),
+        r#"[1,"turnCommand",1,{"choice":"b"},{"surface":"guest-command","slot":1}]"#
+    );
+    assert_eq!(
+        host_fingerprint(),
+        r#"[2,"turnCommand",0,{"choice":"host"},{"surface":"host-command","slot":1}]"#
+    );
     let (first_steps, first_final) = run_campaign(0x4d_3242_3034)?;
     let (second_steps, second_final) = run_campaign(0x4d_3242_3034)?;
 
     assert_eq!(first_steps, second_steps);
     assert_eq!(first_final, second_final);
     assert!(first_steps.iter().all(|step| !step.effects_digest.is_empty()));
-    assert!(first_steps
+    let proposals = first_steps
         .iter()
-        .any(|step| step.generated_effects.iter().any(|effect| {
-            matches!(effect, KernelEffect::SendProposal { .. })
-        })));
-    assert!(first_steps.iter().any(|step| has_material_effect(step, GUEST_OPERATION)));
-    assert!(first_steps.iter().any(|step| has_material_effect(step, HOST_OPERATION)));
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::SendProposal { proposal } => Some(proposal.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        proposals,
+        vec![
+            ProposalMessage {
+                operation_id: operation(GUEST_OPERATION),
+                fingerprint: guest_b_fingerprint(),
+                from: seat(1),
+                to: seat(0),
+                connection_generation: ConnectionGeneration::ZERO,
+                payload: proposal_payload("b"),
+            },
+            ProposalMessage {
+                operation_id: operation(HOST_OPERATION),
+                fingerprint: host_fingerprint(),
+                from: seat(0),
+                to: seat(1),
+                connection_generation: ConnectionGeneration::ZERO,
+                payload: proposal_payload("host"),
+            },
+        ]
+    );
     Ok(())
 }
