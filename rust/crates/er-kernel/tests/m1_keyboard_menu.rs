@@ -961,3 +961,26 @@ fn no_protocol_snapshot_and_resources_retain_the_frozen_m1_shape() -> TestResult
     assert!(resources.recovery_transactions.is_empty());
     Ok(())
 }
+
+#[test]
+fn replace_menu_is_inert_after_dispose() -> TestResult {
+    let owner = seat(1);
+    let mut kernel = kernel_with(
+        command_menu(options(&[("command", true, true)])?)?,
+        Some(owner),
+        true,
+    );
+    let before_ui = kernel.ui_state().clone();
+
+    kernel.dispose("replace-menu test");
+    let generation = kernel.replace_menu(
+        Some(owner),
+        true,
+        replacement_menu(options(&[("replacement", true, true)])?)?,
+    );
+
+    assert_eq!(generation, before_ui.generation);
+    assert_eq!(kernel.ui_state(), &before_ui);
+    assert_eq!(kernel.live_resources(), Default::default());
+    Ok(())
+}

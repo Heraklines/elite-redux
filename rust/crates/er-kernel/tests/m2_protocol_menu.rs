@@ -5,8 +5,8 @@ use er_kernel::{
     KernelError, KernelInput, MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    control_id_of, AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig,
-    BackoffPolicy, PeerBinding, ProposalLeaseConfig, RecoveryTransactionConfig,
+    AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
+    ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of,
 };
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceiptBody,
@@ -1036,6 +1036,16 @@ fn terminal_frame_requires_authenticated_peer_and_absorbs_later_inputs() -> Test
     assert_eq!(terminal_id, "peer-terminal");
     assert_eq!(prompt_key.as_deref(), Some("peer reason"));
     let terminal_ui = kernel.ui_state().clone();
+    let post_terminal_operation = operation("post-terminal-menu")?;
+    let post_terminal_control = command_control(0, 51, 1);
+    let terminal_generation = kernel.replace_menu(
+        Some(seat(0)),
+        true,
+        initial_command_menu(&post_terminal_control, &post_terminal_operation)?,
+    );
+    assert_eq!(terminal_generation, terminal_ui.generation);
+    assert_eq!(kernel.ui_state(), &terminal_ui);
+    assert_eq!(kernel.live_resources(), Default::default());
     assert!(kernel.step(KernelInput::RawInput {
         seat: seat(0),
         event: RawInputEvent::KeyDown {
@@ -1079,6 +1089,122 @@ fn terminal_frame_requires_authenticated_peer_and_absorbs_later_inputs() -> Test
     assert_eq!(kernel.live_resources(), Default::default());
     assert!(kernel.dispose("after terminal").is_empty());
     assert!(kernel.dispose("again").is_empty());
+    Ok(())
+}
+
+#[test]
+fn recovery_bundle_error_keeps_phase_and_pending_state_atomic() -> TestResult {
+    let initial_operation = operation("recovery.atomic.initial")?;
+    let initial_control = command_control(1, 74, 1);
+    let initial_entry = AuthorityEntry {
+        context: context(0, 0, 1)?,
+        revision: Revision::new(safe(1)),
+        operation_id: initial_operation.clone(),
+        kind: AuthorityEntryKind::TurnCommit,
+        material: Material {
+            digest: "recovery-atomic-initial".to_owned(),
+            payload: turn_payload(),
+        },
+        next_control: initial_control.clone(),
+        subsumes: Vec::new(),
+    };
+    let initial_bundle = RecoveryBundleBody {
+        request_id: "recovery-before-start".to_owned(),
+        material: initial_entry.material.clone(),
+        frontier: initial_entry.revision,
+        frontier_operation_id: Some(initial_operation),
+        membership_revision: initial_entry.context.membership_revision,
+        next_control: Some(initial_control),
+        required_tail: vec![AuthorityEntryBody::from(&initial_entry)],
+    };
+    let mut kernel = replica_kernel(replica_config(Vec::new())?, UiState::default());
+    let before = kernel.snapshot();
+    let rejected = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: network_frame(
+            context(0, 0, 1)?,
+            FrameType::RecoveryBundle,
+            serde_json::to_value(initial_bundle)?,
+        ),
+    });
+    assert!(matches!(
+        rejected,
+        Err(KernelError::Canonical { reason })
+            if reason.contains("recovery transition is invalid")
+    ));
+    assert_eq!(kernel.snapshot(), before);
+    assert!(kernel.live_resources().recovery_transactions.is_empty());
+
+    let recovered_operation = operation("recovery.atomic.accepted")?;
+    let recovered_control = command_control(1, 75, 2);
+    let recovered_entry = AuthorityEntry {
+        context: context(0, 0, 2)?,
+        revision: Revision::new(safe(1)),
+        operation_id: recovered_operation.clone(),
+        kind: AuthorityEntryKind::TurnCommit,
+        material: Material {
+            digest: "recovery-atomic-accepted".to_owned(),
+            payload: turn_payload(),
+        },
+        next_control: recovered_control.clone(),
+        subsumes: Vec::new(),
+    };
+    let recovered_bundle = RecoveryBundleBody {
+        request_id: "recovery-2".to_owned(),
+        material: recovered_entry.material.clone(),
+        frontier: recovered_entry.revision,
+        frontier_operation_id: Some(recovered_operation.clone()),
+        membership_revision: recovered_entry.context.membership_revision,
+        next_control: Some(recovered_control),
+        required_tail: vec![AuthorityEntryBody::from(&recovered_entry)],
+    };
+
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["recovery"]["phase"],
+        json!("requested")
+    );
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["pendingRecovery"],
+        Value::Null
+    );
+
+    let accepted = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: network_frame(
+            context(0, 0, 2)?,
+            FrameType::RecoveryBundle,
+            serde_json::to_value(recovered_bundle)?,
+        ),
+    })?;
+    assert!(has_apply(&accepted, 1, &recovered_operation));
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["recovery"]["phase"],
+        json!("validated")
+    );
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["pendingRecovery"]["requestId"],
+        json!("recovery-2")
+    );
     Ok(())
 }
 
@@ -1336,6 +1462,97 @@ fn authority_staged_reconnect_redelivers_once_when_peer_connects() -> TestResult
             generation: generation(1),
         })?
         .is_empty());
+    Ok(())
+}
+
+#[test]
+fn post_rebind_generation_two_raw_proposal_commits_with_exact_context() -> TestResult {
+    let first_operation = operation("authority.rebind.first")?;
+    let second_operation = operation("authority.rebind.generation-two")?;
+    let first_control = command_control(0, 71, 1);
+    let second_control = command_control(0, 72, 1);
+    let mut kernel = authority_kernel(
+        authority_config(
+            Vec::new(),
+            vec![
+                AuthorityResolutionPlan {
+                    operation_id: first_operation.clone(),
+                    fingerprint: "fp-first".to_owned(),
+                    draft: draft(
+                        &first_operation,
+                        AuthorityEntryKind::TurnCommit,
+                        turn_payload(),
+                        first_control.clone(),
+                    )?,
+                },
+                AuthorityResolutionPlan {
+                    operation_id: second_operation.clone(),
+                    fingerprint: "fp-generation-two".to_owned(),
+                    draft: draft(
+                        &second_operation,
+                        AuthorityEntryKind::TurnCommit,
+                        turn_payload(),
+                        second_control,
+                    )?,
+                },
+            ],
+            &[1],
+        )?,
+        UiState::default(),
+    );
+
+    assert!(has_apply(
+        &kernel.step(KernelInput::ProposalReceived {
+            endpoint: seat(0),
+            proposal: proposal(0, &first_operation, "fp-first", 1),
+        })?,
+        1,
+        &first_operation,
+    ));
+    project_successor(&mut kernel, &first_operation, &first_control)?;
+
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+
+    let committed = kernel.step(KernelInput::ProposalReceived {
+        endpoint: seat(0),
+        proposal: proposal(0, &second_operation, "fp-generation-two", 2),
+    })?;
+    assert!(has_apply(&committed, 2, &second_operation));
+    let committed_frame = committed
+        .iter()
+        .find_map(|effect| match effect {
+            KernelEffect::SendFrame { frame, .. }
+                if frame.frame_type == FrameType::AuthorityEntry =>
+            {
+                Some(frame)
+            }
+            _ => None,
+        })
+        .ok_or("generation-two authority entry was not delivered")?;
+    assert_eq!(committed_frame.context, context(0, 0, 2)?);
+    let committed_body: AuthorityEntryBody =
+        serde_json::from_value(committed_frame.body.clone())?;
+    assert_eq!(committed_body.revision, Revision::new(safe(2)));
+    assert_eq!(committed_body.operation_id, second_operation);
     Ok(())
 }
 
