@@ -4,8 +4,8 @@ use er_kernel::{GameKernel, KernelConfig, KernelEffect, KernelError, KernelInput
 use er_types::{
     CancelPolicy, ChoiceListMenu, CommandMenu, GameButton, InputFocus, InputMap, InteractionMenu,
     KeyBinding, MenuGeneration, MenuOption, MenuOptionId, MenuState, OperationId, PhysicalKey,
-    RawInputEvent, ReplacementMenu, SafeU53, SeatId, TimeClass, TimerId, TimerOwner, UiState,
-    UiViewKind, UiViewModel,
+    RawInputEvent, ReplacementMenu, SafeU53, SeatId, TimeClass, TimerId, TimerOwner, UiIntent,
+    UiState, UiViewKind, UiViewModel,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -240,6 +240,40 @@ fn assert_no_ui_change(effects: &[KernelEffect], endpoint: SeatId) {
     assert!(ui_changed_view(effects, endpoint).is_none());
 }
 
+fn assert_ui_intent(effects: &[KernelEffect], endpoint: SeatId, expected: UiIntent) {
+    assert!(effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::UiIntent {
+                endpoint: effect_endpoint,
+                intent,
+            } if *effect_endpoint == endpoint && intent == &expected
+        )
+    }));
+}
+
+fn assert_terminal(kernel: &GameKernel, effects: &[KernelEffect], reason: &str) {
+    assert!(effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::EnterSharedTerminal { terminal }
+                if terminal.terminal_id == "authority-v2-terminal"
+                    && terminal.reason.as_str() == reason
+        )
+    }));
+    let view = kernel.ui_view();
+    assert_eq!(view.kind, UiViewKind::Terminal);
+    assert!(!view.actionable);
+    assert_eq!(view.prompt_key.as_deref(), Some(reason));
+    assert!(matches!(
+        kernel.ui_state().stack.last(),
+        Some(MenuState::Terminal(menu))
+            if menu.terminal_id == "authority-v2-terminal"
+                && menu.prompt_key.as_deref() == Some(reason)
+    ));
+    assert_eq!(kernel.live_resources(), Default::default());
+}
+
 #[test]
 fn raw_keydown_keyup_moves_cursor_and_dispatches_command_submit() -> TestResult {
     let owner = seat(1);
@@ -282,20 +316,27 @@ fn raw_keydown_keyup_moves_cursor_and_dispatches_command_submit() -> TestResult 
         false,
         InputFocus::Game,
     )?;
-    assert_eq!(scheduled_delay(&submitted, timer(1)), Some(safe(250)));
-    assert_scheduled(&submitted, owner, timer(1), GameButton::Submit);
     assert_ui_changed(&submitted, owner, &submit_view);
-    assert_eq!(kernel.ui_view(), submit_view);
-    assert!(matches!(
-        kernel.ui_state().stack.last(),
-        Some(MenuState::Command(menu))
-            if menu.operation_id.as_str() == "op.command"
-                && menu.control_id == "control.command"
-    ));
+    assert_ui_intent(
+        &submitted,
+        owner,
+        UiIntent::CommandSubmitted {
+            seat: owner,
+            generation: submit_view.generation,
+            operation_id: OperationId::new("op.command")?,
+            control_id: "control.command".to_owned(),
+            option_id: MenuOptionId::new("command-a")?,
+        },
+    );
+    assert!(scheduled_delay(&submitted, timer(1)).is_none());
+    assert_terminal(
+        &kernel,
+        &submitted,
+        "missing exact menu proposal plan for op.command / command-a",
+    );
 
     let submit_released = key_up(&mut kernel, owner, PhysicalKey::Enter)?;
-    assert!(cancelled(&submit_released, timer(1)));
-    assert!(kernel.live_resources().timers.is_empty());
+    assert!(submit_released.is_empty());
     Ok(())
 }
 
@@ -327,6 +368,8 @@ fn raw_submit_dispatches_replacement_and_interaction_paths() -> TestResult {
     for (menu, expected_kind, expected_operation, expected_control) in menus {
         let mut kernel = kernel_with(menu, Some(owner), true);
         let before = kernel.snapshot();
+        let before_view = kernel.ui_view();
+        assert_eq!(before_view.kind, expected_kind);
         let submitted = key_down(
             &mut kernel,
             owner,
@@ -335,31 +378,40 @@ fn raw_submit_dispatches_replacement_and_interaction_paths() -> TestResult {
             false,
             InputFocus::Game,
         )?;
-        assert_eq!(kernel.ui_view().kind, expected_kind);
-        assert_ui_changed(&submitted, owner, &kernel.ui_view());
-        assert_eq!(kernel.snapshot().ui, before.ui);
-        assert!(
-            matches!(
-                kernel.ui_state().stack.last(),
-                Some(MenuState::Command(menu))
-                    if menu.operation_id.as_str() == expected_operation
-                        && menu.control_id == expected_control
-            ) || matches!(
-                kernel.ui_state().stack.last(),
-                Some(MenuState::Replacement(menu))
-                    if menu.operation_id.as_str() == expected_operation
-                        && menu.control_id == expected_control
-            ) || matches!(
-                kernel.ui_state().stack.last(),
-                Some(MenuState::Interaction(menu))
-                    if menu.operation_id.as_str() == expected_operation
-                        && menu.control_id == expected_control
-            )
+        assert_ui_changed(&submitted, owner, &before_view);
+        let expected_intent = match expected_kind {
+            UiViewKind::Command => UiIntent::CommandSubmitted {
+                seat: owner,
+                generation: before_view.generation,
+                operation_id: OperationId::new(expected_operation)?,
+                control_id: expected_control.to_owned(),
+                option_id: MenuOptionId::new("selected")?,
+            },
+            UiViewKind::Replacement => UiIntent::ReplacementSubmitted {
+                seat: owner,
+                generation: before_view.generation,
+                operation_id: OperationId::new(expected_operation)?,
+                control_id: expected_control.to_owned(),
+                option_id: MenuOptionId::new("selected")?,
+            },
+            UiViewKind::Interaction => UiIntent::InteractionSubmitted {
+                seat: owner,
+                generation: before_view.generation,
+                operation_id: OperationId::new(expected_operation)?,
+                control_id: expected_control.to_owned(),
+                option_id: MenuOptionId::new("selected")?,
+            },
+            other => return Err(format!("unexpected menu kind in test: {other:?}").into()),
+        };
+        assert_ui_intent(&submitted, owner, expected_intent);
+        let terminal_reason = format!(
+            "missing exact menu proposal plan for {expected_operation} / selected"
         );
+        assert_terminal(&kernel, &submitted, &terminal_reason);
+        assert_ne!(kernel.snapshot().ui, before.ui);
 
         let released = key_up(&mut kernel, owner, PhysicalKey::Enter)?;
-        assert!(cancelled(&released, timer(0)));
-        assert!(kernel.live_resources().timers.is_empty());
+        assert!(released.is_empty());
     }
     Ok(())
 }
@@ -781,6 +833,7 @@ fn ui_rejected_initial_press_rolls_back_scheduler_without_clock_effects() -> Tes
         true,
         command_menu(options(&[("command", true, true)])?)?,
     );
+    let command_view = kernel.ui_view();
     let accepted = key_down(
         &mut kernel,
         owner,
@@ -789,12 +842,26 @@ fn ui_rejected_initial_press_rolls_back_scheduler_without_clock_effects() -> Tes
         false,
         InputFocus::Game,
     )?;
-    assert_eq!(scheduled_delay(&accepted, timer(1)), Some(safe(250)));
     assert!(scheduled_delay(&accepted, timer(0)).is_none());
-    assert!(cancelled(
-        &key_up(&mut kernel, owner, PhysicalKey::Enter)?,
-        timer(1)
-    ));
+    assert!(scheduled_delay(&accepted, timer(1)).is_none());
+    assert_ui_changed(&accepted, owner, &command_view);
+    assert_ui_intent(
+        &accepted,
+        owner,
+        UiIntent::CommandSubmitted {
+            seat: owner,
+            generation: command_view.generation,
+            operation_id: OperationId::new("op.command")?,
+            control_id: "control.command".to_owned(),
+            option_id: MenuOptionId::new("command")?,
+        },
+    );
+    assert_terminal(
+        &kernel,
+        &accepted,
+        "missing exact menu proposal plan for op.command / command",
+    );
+    assert!(key_up(&mut kernel, owner, PhysicalKey::Enter)?.is_empty());
     Ok(())
 }
 
