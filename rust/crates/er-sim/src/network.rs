@@ -804,10 +804,7 @@ mod tests {
     }
 
     fn endpoints() -> [SeatId; 2] {
-        [
-            SeatId::new(safe(1)),
-            SeatId::new(safe(2)),
-        ]
+        [SeatId::new(safe(1)), SeatId::new(safe(2))]
     }
 
     fn safe(value: u64) -> SafeU53 {
@@ -826,24 +823,20 @@ mod tests {
     fn network_with_packets() -> Result<(FaultNetwork, [SafeU53; 2]), FaultNetworkError> {
         let endpoints = endpoints();
         let mut network = FaultNetwork::new(73, endpoints);
-        let first = network
-            .enqueue(
-                endpoints[0],
-                endpoints[1],
-                ConnectionGeneration::ZERO,
-                frame(serde_json::json!({"id": 0})),
-                SafeU53::ZERO,
-            )
-            ?;
-        let second = network
-            .enqueue(
-                endpoints[1],
-                endpoints[0],
-                ConnectionGeneration::ZERO,
-                frame(serde_json::json!({"id": 1})),
-                SafeU53::ZERO,
-            )
-            ?;
+        let first = network.enqueue(
+            endpoints[0],
+            endpoints[1],
+            ConnectionGeneration::ZERO,
+            frame(serde_json::json!({"id": 0})),
+            SafeU53::ZERO,
+        )?;
+        let second = network.enqueue(
+            endpoints[1],
+            endpoints[0],
+            ConnectionGeneration::ZERO,
+            frame(serde_json::json!({"id": 1})),
+            SafeU53::ZERO,
+        )?;
         Ok((network, [first, second]))
     }
 
@@ -862,7 +855,8 @@ mod tests {
     }
 
     #[test]
-    fn mulberry32_matches_the_pinned_cross_language_u32_vectors() -> Result<(), Box<dyn std::error::Error>> {
+    fn mulberry32_matches_the_pinned_cross_language_u32_vectors()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture: Value = serde_json::from_str(include_str!(
             "../../../fixtures/v1/m2-network-rng-golden.json"
         ))?;
@@ -890,19 +884,18 @@ mod tests {
     }
 
     #[test]
-    fn packet_id_exhaustion_is_fail_atomic_after_the_last_valid_id() -> Result<(), FaultNetworkError> {
+    fn packet_id_exhaustion_is_fail_atomic_after_the_last_valid_id() -> Result<(), FaultNetworkError>
+    {
         let endpoints = endpoints();
         let mut network = FaultNetwork::new(79, endpoints);
         network.next_packet_id = SafeU53::MAX.get();
-        let last_id = network
-            .enqueue(
-                endpoints[0],
-                endpoints[1],
-                ConnectionGeneration::ZERO,
-                frame(serde_json::json!({"last": true})),
-                SafeU53::ZERO,
-            )
-            ?;
+        let last_id = network.enqueue(
+            endpoints[0],
+            endpoints[1],
+            ConnectionGeneration::ZERO,
+            frame(serde_json::json!({"last": true})),
+            SafeU53::ZERO,
+        )?;
         assert_eq!(last_id, SafeU53::MAX);
 
         let before = mechanical_state(&network);
@@ -933,8 +926,7 @@ mod tests {
 
     #[test]
     fn generation_exhaustion_is_fail_atomic_for_connection_and_queued_state()
-        -> Result<(), FaultNetworkError>
-    {
+    -> Result<(), FaultNetworkError> {
         let (mut network, _) = network_with_packets()?;
         let endpoints = network.endpoints;
         let maximum = ConnectionGeneration::new(SafeU53::MAX);
@@ -954,8 +946,7 @@ mod tests {
 
     #[test]
     fn delay_deadline_overflow_is_fail_atomic_for_rng_ids_order_and_diagnostics()
-        -> Result<(), FaultNetworkError>
-    {
+    -> Result<(), FaultNetworkError> {
         let (mut network, [packet_id, _]) = network_with_packets()?;
         network.queue[0].packet.deliver_at_ms = SafeU53::MAX;
         let before = mechanical_state(&network);
@@ -983,38 +974,29 @@ mod tests {
         packet_ids: [SafeU53; 2],
     ) -> Result<(), FaultNetworkError> {
         let endpoints = network.endpoints;
-        network
-            .duplicate_packet(packet_ids[0])
-            ?;
-        network
-            .corrupt_packet(
-                packet_ids[1],
-                FrameCorruption::Replace {
-                    value: RawFrame::JsonValue(serde_json::json!({"corrupted": true})),
-                },
-            )
-            ?;
-        network
-            .drop_packet(packet_ids[1])
-            ?;
+        network.duplicate_packet(packet_ids[0])?;
+        network.corrupt_packet(
+            packet_ids[1],
+            FrameCorruption::Replace {
+                value: RawFrame::JsonValue(serde_json::json!({"corrupted": true})),
+            },
+        )?;
+        network.drop_packet(packet_ids[1])?;
         assert!(network.disconnect(endpoints[0]));
         assert_eq!(network.reconnect(endpoints[0]), Ok(generation(1)));
-        network
-            .enqueue(
-                endpoints[0],
-                endpoints[1],
-                generation(1),
-                frame(serde_json::json!({"afterReconnect": true})),
-                SafeU53::ZERO,
-            )
-            ?;
+        network.enqueue(
+            endpoints[0],
+            endpoints[1],
+            generation(1),
+            frame(serde_json::json!({"afterReconnect": true})),
+            SafeU53::ZERO,
+        )?;
         Ok(())
     }
 
     #[test]
     fn diagnostic_counter_saturation_is_isolated_from_mechanical_state()
-        -> Result<(), FaultNetworkError>
-    {
+    -> Result<(), FaultNetworkError> {
         let (mut maxed, maxed_ids) = network_with_packets()?;
         let (mut near_max, near_max_ids) = network_with_packets()?;
         let one_below_two = safe(SafeU53::MAX.get() - 2);

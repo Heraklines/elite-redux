@@ -12,8 +12,7 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const ORACLE_RNG_FIXTURE: &str =
-    include_str!("../../../fixtures/v1/m2-network-rng-golden.json");
+const ORACLE_RNG_FIXTURE: &str = include_str!("../../../fixtures/v1/m2-network-rng-golden.json");
 
 fn safe(value: u64) -> Result<SafeU53, SafeU53Error> {
     SafeU53::new(value)
@@ -164,8 +163,7 @@ fn oracle_vector(seed: u64) -> Result<(Vec<u32>, Vec<u64>), Box<dyn Error>> {
             .as_u64()
             .ok_or_else(|| missing("oracle fixture u32 sample is not an integer"))?;
         expected_samples.push(
-            u32::try_from(value)
-                .map_err(|_| missing("oracle fixture u32 sample exceeds u32"))?,
+            u32::try_from(value).map_err(|_| missing("oracle fixture u32 sample exceeds u32"))?,
         );
     }
     let mut expected_delays = Vec::with_capacity(delays.len());
@@ -197,15 +195,25 @@ fn seed_replays_queue_timing_and_event_order_exactly() -> TestResult {
 #[test]
 fn queue_timing_matches_the_independent_oracle_mulberry32_fixture() -> TestResult {
     let fixture: Value = serde_json::from_str(ORACLE_RNG_FIXTURE)?;
-    assert_eq!(fixture["oracle"]["gameSha"], json!("3b534099919efae827019d4a3f3c4ab0ecd6d67b"));
-    assert_eq!(fixture["oracle"]["source"], json!("test/tools/coop-authority-v2-simulator.ts"));
+    assert_eq!(
+        fixture["oracle"]["gameSha"],
+        json!("3b534099919efae827019d4a3f3c4ab0ecd6d67b")
+    );
+    assert_eq!(
+        fixture["oracle"]["source"],
+        json!("test/tools/coop-authority-v2-simulator.ts")
+    );
     assert_eq!(fixture["oracle"]["function"], json!("makeRng"));
     assert_eq!(fixture["oracle"]["algorithm"], json!("mulberry32"));
     assert_eq!(fixture["oracle"]["seedCoercion"], json!("seed >>> 0"));
 
     let seed_zero = fixture["vectors"]
         .as_array()
-        .and_then(|vectors| vectors.iter().find(|vector| vector["seed"].as_str() == Some("0")))
+        .and_then(|vectors| {
+            vectors
+                .iter()
+                .find(|vector| vector["seed"].as_str() == Some("0"))
+        })
         .ok_or_else(|| missing("oracle fixture is missing seed zero"))?;
     assert_eq!(seed_zero["u32"][0], json!(0x4434_B462_u32));
     assert_eq!(seed_zero["u32"][0], json!(1_144_304_738_u32));
@@ -266,8 +274,10 @@ fn diagnostics_default_and_deserialization_reject_noncanonical_seed_strings() ->
     }
     wire["seed"] = json!(1);
     assert!(serde_json::from_value::<FaultNetworkDiagnostics>(wire.clone()).is_err());
-    let mut invalid = FaultNetworkDiagnostics::default();
-    invalid.seed = "01".to_owned();
+    let invalid = FaultNetworkDiagnostics {
+        seed: "01".to_owned(),
+        ..FaultNetworkDiagnostics::default()
+    };
     assert!(serde_json::to_value(invalid).is_err());
     wire["seed"] = json!("0");
     let decoded: FaultNetworkDiagnostics = serde_json::from_value(wire)?;
@@ -451,7 +461,10 @@ fn reconnect_advances_generation_and_drops_old_queued_packets() -> TestResult {
         safe(0)?,
     )?;
     let new_packet_wire = serde_json::to_value(packet(&network, new_packet)?)?;
-    assert_eq!(new_packet_wire.as_object().map(|fields| fields.len()), Some(6));
+    assert_eq!(
+        new_packet_wire.as_object().map(|fields| fields.len()),
+        Some(6)
+    );
     assert!(new_packet_wire.get("sourceGeneration").is_none());
     assert!(new_packet_wire.get("destinationGeneration").is_none());
     let delivered = network.apply(
@@ -527,7 +540,8 @@ fn reconnect_reaps_stale_packets_before_their_deadline_once() -> TestResult {
 #[test]
 fn enqueue_uses_the_drawn_delay_at_safe_integer_boundaries() -> TestResult {
     let boundary = safe(SafeU53::MAX.get() - 1)?;
-    let mut succeeds = FaultNetwork::new(3, endpoints()?);
+    // Seed 7's first pinned mulberry32 draw is an exact 1 ms delay.
+    let mut succeeds = FaultNetwork::new(7, endpoints()?);
     let packet_id = succeeds.enqueue(
         seat(1)?,
         seat(2)?,
@@ -537,7 +551,8 @@ fn enqueue_uses_the_drawn_delay_at_safe_integer_boundaries() -> TestResult {
     )?;
     assert_eq!(packet(&succeeds, packet_id)?.deliver_at_ms, SafeU53::MAX);
 
-    let mut overflows = FaultNetwork::new(5, endpoints()?);
+    // Golden seed 0 starts with a 2 ms delay, so the same boundary must fail atomically.
+    let mut overflows = FaultNetwork::new(0, endpoints()?);
     assert!(matches!(
         overflows.enqueue(
             seat(1)?,
