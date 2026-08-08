@@ -1,6 +1,6 @@
 # PokéRogue Redux Rust kernel M2 contract
 
-Status: frozen for Milestone 2 implementation after the contract gate is green.
+Status: revised before G4 by approved CR-0001, CR-0006, and CR-0007; frozen again at the revision commit recorded by worker task cards.
 
 Source baseline:
 
@@ -10,7 +10,7 @@ Source baseline:
 - protocol compatibility identifier: `er-coop-47`
 - frame protocol: `2`
 - source-lock/schema version: `1`
-- M2 ownership-manifest version: `2`
+- M2 ownership-manifest version: `3`
 
 Every M2A branch starts from the exact hosted-green bootstrap commit that contains this document, the ownership manifest, shared DTOs, manifests/lockfile, crate-root exports, and compileable public stubs for every M2A lane. The literal SHA is supplied in each worker task card because a commit cannot contain its own hash. Cross-lane imports bind only to those frozen bootstrap types; workers do not wait for another lane's implementation.
 
@@ -18,7 +18,7 @@ Every M2A branch starts from the exact hosted-green bootstrap commit that contai
 
 ## Change control
 
-The public items committed with this document are frozen through G5. An implementation lane may change function bodies, private fields, private helpers, and its exclusively owned tests. It may not rename, remove, or change the type of a public item, add a dependency, alter serialization, or introduce a private wire message. A missing public capability is a contract request to the integration owner; affected lanes restart from a revised gate SHA if the request is approved.
+The public items committed with this document are frozen through G5 after the approved pre-G4 revision. An implementation lane may change function bodies, private fields, private helpers, and its exclusively owned tests. It may not rename, remove, or change the type of a public item, add a dependency, alter serialization, or introduce a private wire message. A missing public capability is a contract request to the integration owner; affected lanes restart from a revised gate SHA if the request is approved.
 
 The integration owner alone changes manifests, lockfiles, crate roots, shared DTOs, contracts, the source lock, the integration branch, and the complete hosted gate. Production TypeScript remains read-only.
 
@@ -80,6 +80,14 @@ Boundary shape validation is deliberately separate from role/state admission. It
 
 Known-body validation accepts unknown object properties. It preserves the oracle's layered rules: a receipt revision may be zero at the structural boundary even though no committed entry has revision zero; generic material accepts `payload: null`; semantic admission and material adapters apply narrower rules later.
 
+Opaque shared string IDs are non-empty-only. The AuthorityLog semantic entry
+and receipt boundary alone applies the 256-JavaScript-UTF-16-unit C0/DEL-free
+operation-token rule; its material digest uses the same UTF-16 bound without a
+control-character ban. Safe signed and unsigned integers accept every finite
+integral JSON number form accepted by `Number.isSafeInteger`, normalize negative
+zero to zero, and serialize as integer tokens. Rust's explicit UTF-8 carrier
+rejects JavaScript lone surrogates.
+
 ## Successor and control identity
 
 `SuccessorValidator` is pure. It exposes structural issue collection, one-error validation, exact `control_id_of`, control equality/address equality, wait authorization, and predecessor-control successor authorization.
@@ -98,7 +106,10 @@ The five controls retain their existing DTOs. M2 adds their semantic validation:
 
 ## Scheduler and timer ownership
 
-`KernelScheduler` allocates and owns timer registrations. Every timer records:
+Each independent `GameKernel` owns one `KernelScheduler`, which is the only
+allocator and owner of its timer registrations. Producers synchronously call
+that scheduler; they never construct a scheduler command or choose an ID.
+Every timer records:
 
 - endpoint;
 - timer ID;
@@ -112,7 +123,21 @@ M2 time classes are exactly `connected`, `recovery`, `renderer`, `humanInput`, a
 
 Removing a due timer happens before its event is returned. `cancel`, `cancel_owner`, and `dispose` are idempotent. Disposal rejects new schedules and leaves no live timer registration. The scheduler never invokes a callback and never reads time.
 
-`VirtualClock` owns the one monotonic virtual time used by both endpoints, all time classes, the fault network, traces, and campaigns. It preserves remaining active time across pauses, orders equal deadlines deterministically by timer ID, and exposes only arithmetic advancement; it never sleeps.
+`TimerSpec` carries endpoint, owner, delay, and class. `schedule_batch` validates
+the complete batch and ID capacity before mutation, then allocates atomically in
+input order; proposal arm uses it for its absolute and retry registrations.
+Schedule state and producer state are complete, and schedule actions precede
+any send/deliver/project action that can cause synchronous loopback. A fired
+registration is consumed once by `GameKernel` and routed as the exact removed
+`ScheduledTimer` to its owner.
+
+`TimerId` is unique for one scheduler lifetime. At the shared simulator clock
+boundary, registration identity is `(endpoint, timerId)`, allowing two
+independent kernels to use the same numeric ID. `VirtualClock` owns the one
+monotonic virtual time used by both endpoints, all time classes, the fault
+network, traces, and campaigns. It preserves remaining active time across
+pauses, orders equal deadlines by deadline, endpoint, then timer ID, and exposes
+only arithmetic advancement; it never sleeps.
 
 ## Authority log
 
@@ -123,6 +148,12 @@ Commit validates the complete entry draft before consuming a revision. Revisions
 Delivery sends immediately, then redelivery starts after 250 ms of connected time, doubles to 5 s, and stops only on mechanical quorum, subsumption, disposal, or the configured inert attempt ceiling. Receipt intake requires the exact retained revision/operation, receiving non-authority peer, current generation, monotonic stage, and exact control ID at `controlInstalled`. Duplicate stage evidence is idempotent.
 
 Recovery slices come from the same retained log. A lower captured frontier requires a dense contiguous retained tail. An equal nonzero frontier returns the latest entry as a one-entry control reconstruction proof. Recovery proof intake closes only its correlated recovery-bundle lease and never retires authority entries.
+
+Connection rebind validates and prepares the complete replacement before
+mutation. `AuthorityRebindOutcome` reports retained lease count and carries one
+immediate existing `Deliver` action per retained entry and authenticated peer.
+An unchanged binding yields zero/no actions; failure is atomic. Existing lease
+timers, attempts, delays, stages, and identities are preserved.
 
 ## Authority replica
 
@@ -152,6 +183,10 @@ Ordinary proposal fingerprints are the exact JavaScript `JSON.stringify` result 
 
 `ProposalLeaseManager` retains an opaque, already-defined outbound proposal value. It emits resend commands but does not invent an Authority V2 frame type. New leases send immediately. Re-arming the same live ID/fingerprint refreshes and immediately resends; a conflicting fingerprint fails closed; a committed tombstone returns already-committed. Connected-time retries begin at 250 ms and cap at 5 s. A separate 20-minute absolute ceiling terminalizes the lease exactly once. Rebind to a new current generation triggers an immediate resend of every retained lease with the same proposal identity. Observation of the exact committed operation creates a session-lifetime tombstone even before a lease exists and cancels both timers. Disposal clears timers, leases, and tombstones and is idempotent.
 
+Proposal absolute/retry timers are allocated atomically by the kernel scheduler
+and owned by the sending endpoint (`proposal.from`). Destination/generation
+rebind updates retained egress but never moves the sender-local timer endpoint.
+
 ## Recovery transaction
 
 Recovery is a fenced transaction, not a second log. The phase order is exactly:
@@ -176,6 +211,16 @@ Bundle validation correlates request/context/membership, classifies lower fronti
 
 After material application, recovery stages received/material at R and control at R-1. It sends `recoveryApplied` only after exact control installation and releases the fence only after that proof is emitted. Request timeout is 300 s recovery time, control-install timeout is 30 s recovery time, and pacing is 16 ms recovery time.
 
+`RecoveryLiveState` carries a fresh frontier and frame context into every
+continuation after a deferred boundary and is never retained. Exact
+`RecoveryFrontierStagingOutcome` reports whether the replica accepted revision
+R. All timer transitions use the owning kernel scheduler and receive the exact
+removed `ScheduledTimer`. Operational failures return `Ok(actions)` containing
+all cancellations, terminal fence change, and exactly one shared terminal
+effect; only disposed state, unknown injected timers, and impossible caller
+phase misuse return `Err`. One transaction owns one fence and one kernel owns
+one transaction per endpoint.
+
 ## Deterministic adapters
 
 `Presenter` and `StorageAdapter` are synchronous environment boundaries. They retain no kernel callback.
@@ -191,6 +236,11 @@ Every adapter exposes a live-resource snapshot and idempotent disposal.
 `KernelInput` has explicit raw-frame, opaque-proposal, material-result, and control-projection-result boundaries. `KernelEffect` has explicit send-proposal, apply-material, project-control, UI-intent, timer, presentation, storage, and terminal values. These are data, not callbacks. A successful raw-key menu transition may emit a `UiIntent`; campaign code cannot inject one as input.
 
 `GameKernel::dispose` is idempotent, rejects later transitions, and releases every protocol and input resource. The initial M1 compatibility implementation already drains input-repeat timers; the G5 owner extends the same method to every protocol owner without changing its signature.
+
+Input repeat uses the same scheduler allocation domain as protocol timers. The
+router keeps no private timer counter; its scheduler-aware transitions return an
+effect-facing view of commands already registered or cancelled in scheduler
+state. Disposal cancels all owners before disposing the scheduler.
 
 ## Fault network
 

@@ -1,6 +1,8 @@
 //! Typed Authority V2 bodies and recovery state shared by the protocol kernel.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
+
+use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -42,8 +44,64 @@ impl<'de> Deserialize<'de> for SafeI53 {
     where
         D: Deserializer<'de>,
     {
-        let value = i64::deserialize(deserializer)?;
-        Self::new(value).map_err(serde::de::Error::custom)
+        deserializer.deserialize_any(SafeI53Visitor)
+    }
+}
+
+struct SafeI53Visitor;
+
+impl<'de> de::Visitor<'de> for SafeI53Visitor {
+    type Value = SafeI53;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a signed JavaScript-safe integer")
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        SafeI53::new(value).map_err(E::custom)
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = i64::try_from(value).map_err(E::custom)?;
+        self.visit_i64(value)
+    }
+
+    fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = i64::try_from(value).map_err(E::custom)?;
+        self.visit_i64(value)
+    }
+
+    fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = i64::try_from(value).map_err(E::custom)?;
+        self.visit_i64(value)
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let safe_bound = JS_MAX_SAFE_SIGNED_INTEGER as f64;
+        if !value.is_finite()
+            || value.fract() != 0.0
+            || !(-safe_bound..=safe_bound).contains(&value)
+        {
+            return Err(E::custom(format_args!(
+                "{value} is not a signed JavaScript-safe integer"
+            )));
+        }
+        self.visit_i64(value as i64)
     }
 }
 
@@ -311,4 +369,44 @@ where
     T: Deserialize<'de>,
 {
     T::deserialize(deserializer).map(Some)
+}
+
+#[cfg(test)]
+mod safe_i53_tests {
+    use super::*;
+
+    #[test]
+    fn serde_accepts_javascript_integral_number_forms() -> Result<(), serde_json::Error> {
+        for (input, expected) in [
+            ("-9007199254740991", -JS_MAX_SAFE_SIGNED_INTEGER),
+            ("-9007199254740991.0", -JS_MAX_SAFE_SIGNED_INTEGER),
+            ("-1e0", -1),
+            ("-0.0", 0),
+            ("0.0", 0),
+            ("1e0", 1),
+            ("9007199254740991.0", JS_MAX_SAFE_SIGNED_INTEGER),
+        ] {
+            let decoded: SafeI53 = serde_json::from_str(input)?;
+            assert_eq!(decoded.get(), expected);
+            assert_eq!(serde_json::to_string(&decoded)?, expected.to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn serde_rejects_non_integral_and_out_of_range_numbers() {
+        for input in [
+            "-9007199254740992",
+            "9007199254740992",
+            "1.5",
+            "1e400",
+            "\"1\"",
+            "null",
+        ] {
+            assert!(
+                serde_json::from_str::<SafeI53>(input).is_err(),
+                "accepted {input}"
+            );
+        }
+    }
 }

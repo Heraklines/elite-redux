@@ -563,21 +563,11 @@ impl TimerOwner {
 pub enum TimerOwnerError {
     #[error("timer owner {field} must not be empty")]
     Empty { field: &'static str },
-    #[error("timer owner {field} must not exceed 256 UTF-8 bytes")]
-    TooLong { field: &'static str },
-    #[error("timer owner {field} must not contain ASCII control characters")]
-    AsciiControl { field: &'static str },
 }
 
 fn validate_timer_owner_field(field: &'static str, value: &str) -> Result<(), TimerOwnerError> {
     if value.is_empty() {
         return Err(TimerOwnerError::Empty { field });
-    }
-    if value.len() > 256 {
-        return Err(TimerOwnerError::TooLong { field });
-    }
-    if value.bytes().any(|byte| byte.is_ascii_control()) {
-        return Err(TimerOwnerError::AsciiControl { field });
     }
     Ok(())
 }
@@ -1186,5 +1176,25 @@ mod tests {
             }))
             .is_err()
         );
+    }
+
+    #[test]
+    fn timer_owner_fields_are_non_empty_opaque_strings() {
+        assert_eq!(
+            TimerOwner::new("", "address", "reason"),
+            Err(TimerOwnerError::Empty { field: "ownerId" })
+        );
+        assert_eq!(
+            TimerOwner::new("owner", "", "reason"),
+            Err(TimerOwnerError::Empty { field: "address" })
+        );
+        assert_eq!(
+            TimerOwner::new("owner", "address", ""),
+            Err(TimerOwnerError::Empty { field: "reason" })
+        );
+
+        let long = "\u{1f642}".repeat(512);
+        let with_control = "owner\u{0000}opaque";
+        assert!(TimerOwner::new(&long, with_control, &long).is_ok());
     }
 }

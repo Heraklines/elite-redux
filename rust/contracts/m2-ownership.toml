@@ -1,4 +1,4 @@
-schema_version = 2
+schema_version = 3
 milestone = "M2"
 project = "PokéRogue Redux"
 bootstrap_parent_sha = "87eb36290675378b7b08c20a09f6cdd757ae9515"
@@ -199,9 +199,12 @@ paths = [
   "rust/Cargo.lock",
   "rust/crates/*/Cargo.toml",
   "rust/crates/er-types/src/authority.rs",
+  "rust/crates/er-types/src/ids.rs",
+  "rust/crates/er-types/src/input.rs",
   "rust/crates/er-types/src/lib.rs",
   "rust/crates/er-types/src/protocol.rs",
   "rust/crates/er-types/src/trace.rs",
+  "rust/crates/er-kernel/src/input_router.rs",
   "rust/crates/er-protocol/src/lib.rs",
   "rust/crates/er-sim/src/lib.rs",
   "rust/crates/er-kernel/src/lib.rs",

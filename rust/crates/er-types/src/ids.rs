@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use thiserror::Error;
 
 /// Largest integer represented exactly by JavaScript's `Number` type.
@@ -59,8 +59,63 @@ impl<'de> Deserialize<'de> for SafeU53 {
     where
         D: Deserializer<'de>,
     {
-        let value = u64::deserialize(deserializer)?;
-        Self::new(value).map_err(serde::de::Error::custom)
+        deserializer.deserialize_any(SafeU53Visitor)
+    }
+}
+
+struct SafeU53Visitor;
+
+impl<'de> de::Visitor<'de> for SafeU53Visitor {
+    type Value = SafeU53;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a non-negative JavaScript-safe integer")
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        SafeU53::new(value).map_err(E::custom)
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = u64::try_from(value).map_err(E::custom)?;
+        self.visit_u64(value)
+    }
+
+    fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = u64::try_from(value).map_err(E::custom)?;
+        self.visit_u64(value)
+    }
+
+    fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let value = u64::try_from(value).map_err(E::custom)?;
+        self.visit_u64(value)
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if !value.is_finite()
+            || value.fract() != 0.0
+            || !(0.0..=JS_MAX_SAFE_INTEGER as f64).contains(&value)
+        {
+            return Err(E::custom(format_args!(
+                "{value} is not a non-negative JavaScript-safe integer"
+            )));
+        }
+        self.visit_u64(value as u64)
     }
 }
 
@@ -74,23 +129,49 @@ pub struct SafeU53Error {
 pub enum StringIdError {
     #[error("identifier must not be empty")]
     Empty,
-    #[error("identifier must not exceed 256 UTF-8 bytes")]
-    TooLong,
-    #[error("identifier must not contain ASCII control characters")]
-    AsciiControl,
 }
-
-const MAX_STRING_ID_BYTES: usize = 256;
 
 fn validate_string_id(value: &str) -> Result<(), StringIdError> {
     if value.is_empty() {
         return Err(StringIdError::Empty);
     }
-    if value.len() > MAX_STRING_ID_BYTES {
-        return Err(StringIdError::TooLong);
+    Ok(())
+}
+
+/// JavaScript source bound for Authority V2 operation IDs and material digests.
+pub const AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS: usize = 256;
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum AuthorityWireStringError {
+    #[error("authority wire string must not be empty")]
+    Empty,
+    #[error("authority wire string must not exceed 256 UTF-16 code units")]
+    TooLong,
+    #[error("authority operation ID must not contain C0 or DEL control characters")]
+    AsciiControl,
+}
+
+pub fn validate_authority_operation_id(value: &str) -> Result<(), AuthorityWireStringError> {
+    validate_authority_wire_length(value)?;
+    if value
+        .chars()
+        .any(|character| character <= '\u{001f}' || character == '\u{007f}')
+    {
+        return Err(AuthorityWireStringError::AsciiControl);
     }
-    if value.bytes().any(|byte| byte.is_ascii_control()) {
-        return Err(StringIdError::AsciiControl);
+    Ok(())
+}
+
+pub fn validate_authority_material_digest(value: &str) -> Result<(), AuthorityWireStringError> {
+    validate_authority_wire_length(value)
+}
+
+fn validate_authority_wire_length(value: &str) -> Result<(), AuthorityWireStringError> {
+    if value.is_empty() {
+        return Err(AuthorityWireStringError::Empty);
+    }
+    if value.encode_utf16().count() > AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS {
+        return Err(AuthorityWireStringError::TooLong);
     }
     Ok(())
 }
@@ -253,28 +334,17 @@ mod tests {
     {
         for constructor in constructors {
             assert_eq!(constructor(String::new()), Err(StringIdError::Empty));
-            assert_eq!(
-                constructor("a".repeat(MAX_STRING_ID_BYTES + 1)),
-                Err(StringIdError::TooLong)
-            );
-
-            let at_byte_limit = "é".repeat(MAX_STRING_ID_BYTES / 2);
-            assert_eq!(at_byte_limit.len(), MAX_STRING_ID_BYTES);
-            assert!(constructor(at_byte_limit).is_ok());
-
-            let over_byte_limit = "é".repeat((MAX_STRING_ID_BYTES / 2) + 1);
-            assert!(over_byte_limit.len() > MAX_STRING_ID_BYTES);
-            assert_eq!(constructor(over_byte_limit), Err(StringIdError::TooLong));
+            assert!(constructor("a".repeat(4_096)).is_ok());
 
             for byte in 0_u8..=31 {
                 let control = char::from(byte);
                 let value = format!("a{control}b");
-                assert_eq!(constructor(value), Err(StringIdError::AsciiControl));
+                assert!(constructor(value).is_ok());
             }
 
             let control = char::from(127_u8);
             let value = format!("a{control}b");
-            assert_eq!(constructor(value), Err(StringIdError::AsciiControl));
+            assert!(constructor(value).is_ok());
         }
     }
 
@@ -286,13 +356,9 @@ mod tests {
         let decoded: T = serde_json::from_str(&encoded)?;
         assert_eq!(decoded, value);
 
-        let at_byte_limit = "é".repeat(MAX_STRING_ID_BYTES / 2);
-        let at_limit_json = serde_json::to_string(&at_byte_limit)?;
-        assert!(serde_json::from_str::<T>(&at_limit_json).is_ok());
-
-        let over_byte_limit = "é".repeat((MAX_STRING_ID_BYTES / 2) + 1);
-        let over_limit_json = serde_json::to_string(&over_byte_limit)?;
-        assert!(serde_json::from_str::<T>(&over_limit_json).is_err());
+        let long_value = "\u{00e9}".repeat(4_096);
+        let long_json = serde_json::to_string(&long_value)?;
+        assert!(serde_json::from_str::<T>(&long_json).is_ok());
 
         let empty_json = serde_json::to_string("")?;
         assert!(serde_json::from_str::<T>(&empty_json).is_err());
@@ -301,13 +367,13 @@ mod tests {
             let control = char::from(byte);
             let raw = format!("a{control}b");
             let json = serde_json::to_string(&raw)?;
-            assert!(serde_json::from_str::<T>(&json).is_err());
+            assert!(serde_json::from_str::<T>(&json).is_ok());
         }
 
         let control = char::from(127_u8);
         let raw = format!("a{control}b");
         let json = serde_json::to_string(&raw)?;
-        assert!(serde_json::from_str::<T>(&json).is_err());
+        assert!(serde_json::from_str::<T>(&json).is_ok());
 
         Ok(())
     }
@@ -346,9 +412,16 @@ mod tests {
 
     #[test]
     fn safe_u53_serde_checks_boundaries_and_types() -> Result<(), serde_json::Error> {
-        for (input, expected) in [("0", SafeU53::ZERO), ("9007199254740991", SafeU53::MAX)] {
+        for (input, expected) in [
+            ("0", 0),
+            ("0.0", 0),
+            ("-0.0", 0),
+            ("1e0", 1),
+            ("9007199254740991", JS_MAX_SAFE_INTEGER),
+            ("9007199254740991.0", JS_MAX_SAFE_INTEGER),
+        ] {
             let decoded: SafeU53 = serde_json::from_str(input)?;
-            assert_eq!(decoded, expected);
+            assert_eq!(decoded.get(), expected);
         }
 
         for input in OVERFLOW_JSON {
@@ -359,6 +432,40 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn authority_wire_helpers_use_javascript_utf16_layers() {
+        let astral_at_limit = "\u{1f642}".repeat(AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS / 2);
+        let astral_over_limit =
+            "\u{1f642}".repeat((AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS / 2) + 1);
+        assert_eq!(astral_at_limit.encode_utf16().count(), 256);
+        assert_eq!(astral_over_limit.encode_utf16().count(), 258);
+
+        assert_eq!(
+            validate_authority_operation_id(""),
+            Err(AuthorityWireStringError::Empty)
+        );
+        assert!(validate_authority_operation_id(&astral_at_limit).is_ok());
+        assert_eq!(
+            validate_authority_operation_id(&astral_over_limit),
+            Err(AuthorityWireStringError::TooLong)
+        );
+        assert_eq!(
+            validate_authority_operation_id("a\u{0000}b"),
+            Err(AuthorityWireStringError::AsciiControl)
+        );
+        assert_eq!(
+            validate_authority_operation_id("a\u{007f}b"),
+            Err(AuthorityWireStringError::AsciiControl)
+        );
+
+        assert!(validate_authority_material_digest(&astral_at_limit).is_ok());
+        assert!(validate_authority_material_digest("a\u{0000}b").is_ok());
+        assert_eq!(
+            validate_authority_material_digest(&astral_over_limit),
+            Err(AuthorityWireStringError::TooLong)
+        );
     }
 
     #[test]

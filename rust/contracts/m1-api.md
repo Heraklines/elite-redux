@@ -32,11 +32,16 @@ er-wasm        -> er-types, er-canonical, er-kernel, wasm-bindgen
 er-sim         -> er-types, er-canonical, er-kernel, er-protocol (M2)
 ```
 
-`er-kernel` does not depend on `er-protocol`. JSON boundary DTOs required by both trace and kernel live in `er-types::protocol`; `er-kernel::kernel` re-exports the kernel-facing names. Production crates never depend on `er-testkit`, `er-sim`, or `er-wasm`.
+At the G3 boundary `er-kernel` did not depend on `er-protocol`. The approved M2
+composition revision adds that one-way dependency so the production InputRouter
+and protocol owners share one `KernelScheduler`. JSON boundary DTOs required by
+both trace and kernel remain in `er-types::protocol`; `er-kernel::kernel`
+re-exports the kernel-facing names. Production crates never depend on
+`er-testkit`, `er-sim`, or `er-wasm`.
 
 ## IDs and safe integers
 
-`SafeU53` accepts only `0..=9_007_199_254_740_991` and validates on construction and deserialization. JSON-facing counters use it directly or through numeric newtypes.
+`SafeU53` accepts only `0..=9_007_199_254_740_991` and validates on construction and deserialization. JSON integer tokens and finite integral number forms such as `1.0`, `1e0`, and `-0.0` follow JavaScript `Number.isSafeInteger`; deserialization normalizes them to the stored integer and serialization emits an integer token. JSON-facing counters use it directly or through numeric newtypes.
 
 Numeric newtypes:
 
@@ -50,11 +55,19 @@ Numeric newtypes:
 
 Opaque string newtypes:
 
-- `OperationId` (non-empty, at most 256 bytes, no ASCII control character)
+- `OperationId`
 - `SessionId`
 - `RunId`
 - `OwnerId`
 - `MenuOptionId`
+
+These five are non-empty opaque UTF-8 string newtypes. They do not trim,
+normalize, parse, length-bound, or reject control characters globally. A source
+layer applies any narrower semantic rule it owns. AuthorityLog entry/receipt
+operation IDs are non-empty, at most 256 JavaScript UTF-16 code units, and
+contain neither C0 nor DEL. Material digests are non-empty and at most 256
+UTF-16 units but may contain controls. JavaScript lone surrogates are not UTF-8
+strings and are rejected at Rust JSON decoding.
 
 Every newtype exposes checked `new`, a borrowed/value accessor, and `into_inner`. `Revision::ZERO` is representable for frontier snapshots even though committed authority entries start at one.
 
@@ -68,7 +81,7 @@ Every newtype exposes checked `new`, a borrowed/value accessor, and `into_inner`
 - `GameButton`: Up, Down, Left, Right, Submit, Action, Cancel, Menu, Stats, CycleShiny, CycleForm, CycleGender, CycleAbility, CycleNature, CycleTera, SpeedUp, SlowDown, DevCustom.
 - `InputMap`, `KeyBinding`, `GamepadBinding`, `ButtonEvent`, `InputTimerCommand`, and `InputRouterOutput`.
 
-`InputRouter` owns mapping, logical-button locks, the physical keys whose printable keydown was suppressed, timer allocation, repeat scheduling, keyup symmetry, and blur cleanup. `handle` processes raw events and `timer_fired` processes only router-owned timers. Browser repeat flags never create a second canonical press. Initial repeat delay and interval are both 250 ms. Blur cancels locks/timers and does not synthesize releases, matching the oracle cleanup boundary.
+`InputRouter` owns mapping, logical-button locks, the physical keys whose printable keydown was suppressed, repeat intent/state, keyup symmetry, and blur cleanup. At M2 its production transitions use the owning `GameKernel`'s sole scheduler for allocation, rescheduling, and cancellation; it has no private timer-ID counter. `handle` processes raw events and `timer_fired` processes only exact router-owned scheduled timers. Browser repeat flags never create a second canonical press. Initial repeat delay and interval are both 250 ms. Blur cancels locks/timers and does not synthesize releases, matching the oracle cleanup boundary.
 
 ## Logical UI
 
