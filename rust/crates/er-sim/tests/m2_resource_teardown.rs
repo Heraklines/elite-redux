@@ -426,6 +426,9 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
         assert!(endpoint.live_resources.retained_revisions.is_empty());
         assert!(endpoint.live_resources.controls.is_empty());
         assert!(endpoint.live_resources.network_packets.is_empty());
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
     }
     assert_eq!(
         snapshot.host.live_resources,
@@ -437,6 +440,7 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
         LiveResourceSnapshot::default(),
         "guest retained live resources after teardown"
     );
+    assert!(snapshot.clock_timers.is_empty());
     assert!(snapshot.network.queued_packet_ids.is_empty());
     assert!(snapshot.network.disconnected_endpoints.is_empty());
     assert!(snapshot.network.suspended_endpoints.is_empty());
@@ -551,6 +555,7 @@ fn assert_terminal_trace(steps: &[PairStep]) -> TestResult<(TerminalState, PairS
 fn assert_absorbed_state(actual: &PairSnapshot, expected: &PairSnapshot) {
     assert_eq!(actual.seed, expected.seed);
     assert_eq!(actual.virtual_time_ms, expected.virtual_time_ms);
+    assert_eq!(actual.clock_timers, expected.clock_timers);
     assert_eq!(actual.host, expected.host);
     assert_eq!(actual.guest, expected.guest);
     assert_eq!(actual.network, expected.network);
@@ -1133,9 +1138,8 @@ fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult
 
 #[test]
 fn secondary_virtual_clock_disposal_proves_pending_timer_zero_and_fail_closed_use() -> TestResult {
-    // PairSnapshot intentionally has no clock diagnostics member. The
-    // end-to-end tests above prove pair-boundary rejection after teardown;
-    // this narrow secondary check records the frozen VirtualClock seam itself.
+    // PairSnapshot teardown evidence covers pair-owned clock timers; this
+    // narrow secondary check records the frozen VirtualClock seam itself.
     let mut clock = VirtualClock::new();
     let owner = TimerOwner::new(
         "m2b-10:secondary-clock",
