@@ -11,10 +11,7 @@ use er_types::{
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn safe(value: u64) -> SafeU53 {
-    match SafeU53::new(value) {
-        Ok(value) => value,
-        Err(_) => SafeU53::ZERO,
-    }
+    SafeU53::new(value).expect("M1 test value must fit in SafeU53")
 }
 
 fn seat(value: u64) -> SeatId {
@@ -398,15 +395,15 @@ fn repeat_uses_virtual_250ms_timer_and_keyup_cancels_it() -> TestResult {
     assert_eq!(kernel.ui_view().cursor, Some(safe(1)));
 
     let repeated = timer_fired(&mut kernel, owner, timer(0))?;
-    assert_eq!(scheduled_delay(&repeated, timer(0)), Some(safe(250)));
-    assert_scheduled(&repeated, owner, timer(0), GameButton::Down);
-    assert!(kernel.live_resources().timers.contains(&timer(0)));
+    assert_eq!(scheduled_delay(&repeated, timer(1)), Some(safe(250)));
+    assert_scheduled(&repeated, owner, timer(1), GameButton::Down);
+    assert!(kernel.live_resources().timers.contains(&timer(1)));
     assert_eq!(kernel.ui_view().cursor, Some(safe(2)));
     let repeated_view = kernel.ui_view();
     assert_ui_changed(&repeated, owner, &repeated_view);
 
     let released = key_up(&mut kernel, owner, PhysicalKey::ArrowDown)?;
-    assert!(cancelled(&released, timer(0)));
+    assert!(cancelled(&released, timer(1)));
     assert!(kernel.live_resources().timers.is_empty());
     assert!(matches!(
         timer_fired(&mut kernel, owner, timer(0)),
@@ -499,12 +496,12 @@ fn focus_suppresses_printable_keys_and_preserves_matching_keyup() -> TestResult 
     assert!(focus_changed(&mut kernel, owner, InputFocus::TextEntry)?.is_empty());
     let suppressed_repeat = timer_fired(&mut kernel, owner, timer(0))?;
     assert_eq!(
-        scheduled_delay(&suppressed_repeat, timer(0)),
+        scheduled_delay(&suppressed_repeat, timer(1)),
         Some(safe(250))
     );
     assert_no_ui_change(&suppressed_repeat, owner);
     let accepted_release = key_up(&mut kernel, owner, PhysicalKey::KeyA)?;
-    assert!(cancelled(&accepted_release, timer(0)));
+    assert!(cancelled(&accepted_release, timer(1)));
     assert!(kernel.live_resources().timers.is_empty());
     Ok(())
 }
@@ -751,5 +748,205 @@ fn ui_view_is_an_immutable_cloned_projection() -> TestResult {
     }
     assert_eq!(kernel.ui_view(), before_view);
     assert_eq!(kernel.snapshot().ui, before_state.ui);
+    Ok(())
+}
+
+#[test]
+fn ui_rejected_initial_press_rolls_back_scheduler_without_clock_effects() -> TestResult {
+    let owner = seat(1);
+    let mut kernel = kernel_with(
+        choice_menu(
+            options(&[("valid", true, true), ("disabled", false, true)])?,
+            1,
+            false,
+        ),
+        Some(owner),
+        true,
+    );
+
+    let rejected = key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::Enter,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+    assert!(rejected.is_empty());
+    assert!(kernel.live_resources().timers.is_empty());
+    assert!(key_up(&mut kernel, owner, PhysicalKey::Enter)?.is_empty());
+
+    kernel.replace_menu(
+        Some(owner),
+        true,
+        command_menu(options(&[("command", true, true)])?)?,
+    );
+    let accepted = key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::Enter,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+    assert_eq!(scheduled_delay(&accepted, timer(1)), Some(safe(250)));
+    assert!(scheduled_delay(&accepted, timer(0)).is_none());
+    assert!(cancelled(
+        &key_up(&mut kernel, owner, PhysicalKey::Enter)?,
+        timer(1)
+    ));
+    Ok(())
+}
+
+#[test]
+fn ui_rejected_repeat_rolls_back_fresh_timer_without_cancel_effect() -> TestResult {
+    let owner = seat(1);
+    let mut kernel = kernel_with(
+        choice_menu(
+            options(&[("one", true, true), ("two", true, true)])?,
+            0,
+            true,
+        ),
+        Some(owner),
+        true,
+    );
+
+    let initial = key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::ArrowDown,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+    assert_eq!(scheduled_delay(&initial, timer(0)), Some(safe(250)));
+
+    kernel.replace_menu(
+        Some(owner),
+        false,
+        choice_menu(options(&[("replacement", true, true)])?, 0, false),
+    );
+    let rejected = timer_fired(&mut kernel, owner, timer(0))?;
+    assert!(rejected.is_empty());
+    assert!(kernel.live_resources().timers.is_empty());
+    assert!(key_up(&mut kernel, owner, PhysicalKey::ArrowDown)?.is_empty());
+    assert!(matches!(
+        timer_fired(&mut kernel, owner, timer(1)),
+        Err(KernelError::Input(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn wrong_endpoint_timer_fire_fails_closed_before_scheduler_consumption() -> TestResult {
+    let owner = seat(1);
+    let other = seat(2);
+    let mut kernel = kernel_with(
+        choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, true),
+        Some(owner),
+        true,
+    );
+    key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::ArrowDown,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+
+    assert!(matches!(
+        timer_fired(&mut kernel, other, timer(0)),
+        Err(KernelError::Input(_))
+    ));
+    let repeated = timer_fired(&mut kernel, owner, timer(0))?;
+    assert_eq!(scheduled_delay(&repeated, timer(1)), Some(safe(250)));
+    Ok(())
+}
+
+#[test]
+fn dispose_cancels_each_real_input_timer_once_and_reports_zero_resources() -> TestResult {
+    let owner = seat(1);
+    let mut kernel = kernel_with(
+        choice_menu(
+            options(&[("one", true, true), ("two", true, true)])?,
+            0,
+            true,
+        ),
+        Some(owner),
+        true,
+    );
+    key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::ArrowDown,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+    key_down(
+        &mut kernel,
+        owner,
+        PhysicalKey::ArrowUp,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+
+    let disposed = kernel.dispose("test");
+    assert_eq!(
+        disposed
+            .iter()
+            .filter(|effect| matches!(effect, KernelEffect::CancelTimer { .. }))
+            .count(),
+        2
+    );
+    assert!(cancelled(&disposed, timer(0)));
+    assert!(cancelled(&disposed, timer(1)));
+    assert_eq!(kernel.live_resources(), Default::default());
+    assert!(kernel.dispose("again").is_empty());
+    assert!(matches!(
+        kernel.step(KernelInput::RawInput {
+            seat: owner,
+            event: RawInputEvent::WindowFocused,
+        }),
+        Err(KernelError::Disposed)
+    ));
+    Ok(())
+}
+
+#[test]
+fn cloned_game_kernel_keeps_scheduler_state_without_sharing_mutations() -> TestResult {
+    let owner = seat(1);
+    let mut original = kernel_with(
+        choice_menu(options(&[("one", true, true), ("two", true, true)])?, 0, true),
+        Some(owner),
+        true,
+    );
+    key_down(
+        &mut original,
+        owner,
+        PhysicalKey::ArrowDown,
+        false,
+        false,
+        InputFocus::Game,
+    )?;
+
+    let mut clone = original.clone();
+    assert!(original.live_resources().timers.contains(&timer(0)));
+    assert!(clone.live_resources().timers.contains(&timer(0)));
+
+    assert!(cancelled(
+        &key_up(&mut original, owner, PhysicalKey::ArrowDown)?,
+        timer(0)
+    ));
+    assert!(original.live_resources().timers.is_empty());
+    assert!(clone.live_resources().timers.contains(&timer(0)));
+
+    assert!(cancelled(
+        &key_up(&mut clone, owner, PhysicalKey::ArrowDown)?,
+        timer(0)
+    ));
+    assert!(clone.live_resources().timers.is_empty());
     Ok(())
 }

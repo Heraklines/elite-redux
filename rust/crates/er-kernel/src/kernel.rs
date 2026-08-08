@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use er_canonical::content_digest;
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, ProposalLeaseConfig,
-    RecoveryTransactionConfig,
+    KernelScheduler, ScheduledTimer, SchedulerCommand, RecoveryTransactionConfig,
 };
 use er_types::{
     ButtonEvent, CancelPolicy, GameButton, InputMap, InputRouterOutput, InputTimerCommand,
@@ -99,6 +99,7 @@ pub enum ControlMenuPlan {
 pub struct GameKernel {
     input_router: InputRouter,
     ui_reducer: UiReducer,
+    scheduler: KernelScheduler,
     repeat_timers: BTreeMap<TimerId, RepeatContext>,
     live_resources: LiveResourceSnapshot,
     protocol_config: Option<ProtocolKernelConfig>,
@@ -117,6 +118,7 @@ impl GameKernel {
         Self {
             input_router: InputRouter::new(config.input_map),
             ui_reducer: UiReducer::new(config.initial_ui),
+            scheduler: KernelScheduler::new(),
             repeat_timers: BTreeMap::new(),
             live_resources: LiveResourceSnapshot::default(),
             protocol_config: config.protocol,
@@ -131,18 +133,35 @@ impl GameKernel {
         match input {
             KernelInput::RawInput { seat, event } => {
                 let generation = self.ui_reducer.state().generation;
-                let output = self.input_router.handle(event)?;
+                let output = self.input_router.handle(seat, event, &mut self.scheduler)?;
                 Ok(self.apply_raw_input_output(seat, generation, output))
             }
             KernelInput::TimerFired { endpoint, timer_id } => {
+                let Some(scheduled) = self.scheduler.timer(timer_id).cloned() else {
+                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                };
+                if scheduled.endpoint != endpoint {
+                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                }
                 let Some(context) = self.repeat_timers.get(&timer_id).copied() else {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 };
-                if context.endpoint != endpoint || !self.live_resources.timers.contains(&timer_id) {
+                if !Self::is_input_repeat_timer(&scheduled, context) {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
-                let output = self.input_router.timer_fired(timer_id)?;
-                Ok(self.apply_timer_output(timer_id, context, output))
+
+                let fired = self.scheduler.fired(timer_id).map_err(InputRouteError::from)?;
+                self.repeat_timers.remove(&timer_id);
+                let output = match self.input_router.timer_fired(fired, &mut self.scheduler) {
+                    Ok(output) => output,
+                    Err(error) => {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
+                        self.sync_live_timers();
+                        return Err(error.into());
+                    }
+                };
+                Ok(self.apply_timer_output(context, output))
             }
             KernelInput::NetworkFrame { .. }
             | KernelInput::RawNetworkFrame { .. }
@@ -187,16 +206,33 @@ impl GameKernel {
         if self.disposed {
             return Vec::new();
         }
-        self.disposed = true;
-        let effects = self
-            .repeat_timers
-            .iter()
-            .map(|(timer_id, context)| KernelEffect::CancelTimer {
-                endpoint: context.endpoint,
-                timer_id: *timer_id,
-            })
-            .collect();
+
+        let contexts = self.repeat_timers.clone();
+        let output = self.input_router.clear(&mut self.scheduler);
+        let mut effects = Vec::new();
+        for timer in output.timers {
+            let InputTimerCommand::Cancel { timer_id } = timer else {
+                continue;
+            };
+            if let Some(context) = contexts.get(&timer_id) {
+                effects.push(KernelEffect::CancelTimer {
+                    endpoint: context.endpoint,
+                    timer_id,
+                });
+            }
+        }
         self.repeat_timers.clear();
+
+        for command in self.scheduler.dispose() {
+            if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
+                effects.push(KernelEffect::CancelTimer {
+                    endpoint,
+                    timer_id,
+                });
+            }
+        }
+
+        self.disposed = true;
         self.live_resources = LiveResourceSnapshot::default();
         effects
     }
@@ -230,18 +266,30 @@ impl GameKernel {
             match timer {
                 InputTimerCommand::Schedule { timer_id, delay_ms } => {
                     let Some((button, accepted)) = pressed else {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
                         continue;
                     };
-                    let context = RepeatContext {
-                        endpoint,
-                        generation,
-                        button,
-                    };
-                    self.repeat_timers.insert(timer_id, context);
                     if !accepted {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
                         continue;
                     }
-                    self.live_resources.timers.insert(timer_id);
+
+                    if !self.is_live_input_timer(timer_id, endpoint, button, delay_ms) {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
+                        continue;
+                    }
+
+                    self.repeat_timers.insert(
+                        timer_id,
+                        RepeatContext {
+                            endpoint,
+                            generation,
+                            button,
+                        },
+                    );
                     effects.push(KernelEffect::ScheduleTimer {
                         endpoint,
                         timer_id,
@@ -251,13 +299,9 @@ impl GameKernel {
                     });
                 }
                 InputTimerCommand::Cancel { timer_id } => {
-                    let cancel_endpoint = self
-                        .repeat_timers
-                        .remove(&timer_id)
-                        .map_or(endpoint, |context| context.endpoint);
-                    if self.live_resources.timers.remove(&timer_id) {
+                    if let Some(context) = self.repeat_timers.remove(&timer_id) {
                         effects.push(KernelEffect::CancelTimer {
-                            endpoint: cancel_endpoint,
+                            endpoint: context.endpoint,
                             timer_id,
                         });
                     }
@@ -265,12 +309,12 @@ impl GameKernel {
             }
         }
 
+        self.sync_live_timers();
         effects
     }
 
     fn apply_timer_output(
         &mut self,
-        fired_timer_id: TimerId,
         context: RepeatContext,
         output: InputRouterOutput,
     ) -> Vec<KernelEffect> {
@@ -281,30 +325,46 @@ impl GameKernel {
             Some((button, accepted)) => button == context.button && accepted,
         };
 
-        self.live_resources.timers.remove(&fired_timer_id);
         for timer in output.timers {
             match timer {
-                InputTimerCommand::Schedule { timer_id, delay_ms }
-                    if timer_id == fired_timer_id && repeat_is_accepted =>
-                {
-                    self.live_resources.timers.insert(timer_id);
-                    effects.push(KernelEffect::ScheduleTimer {
-                        endpoint: context.endpoint,
+                InputTimerCommand::Schedule { timer_id, delay_ms } => {
+                    if !self.is_live_input_timer(
                         timer_id,
-                        owner: TimerOwner::input_repeat(context.button),
+                        context.endpoint,
+                        context.button,
                         delay_ms,
-                        time_class: TimeClass::HumanInput,
-                    });
+                    ) {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
+                        continue;
+                    }
+
+                    self.repeat_timers.insert(
+                        timer_id,
+                        RepeatContext {
+                            endpoint: context.endpoint,
+                            generation: context.generation,
+                            button: context.button,
+                        },
+                    );
+                    if repeat_is_accepted {
+                        effects.push(KernelEffect::ScheduleTimer {
+                            endpoint: context.endpoint,
+                            timer_id,
+                            owner: TimerOwner::input_repeat(context.button),
+                            delay_ms,
+                            time_class: TimeClass::HumanInput,
+                        });
+                    } else {
+                        self.input_router
+                            .discard_timer(timer_id, &mut self.scheduler);
+                        self.repeat_timers.remove(&timer_id);
+                    }
                 }
-                InputTimerCommand::Schedule { .. } => {}
                 InputTimerCommand::Cancel { timer_id } => {
-                    let cancel_endpoint = self
-                        .repeat_timers
-                        .remove(&timer_id)
-                        .map_or(context.endpoint, |timer_context| timer_context.endpoint);
-                    if self.live_resources.timers.remove(&timer_id) {
+                    if let Some(timer_context) = self.repeat_timers.remove(&timer_id) {
                         effects.push(KernelEffect::CancelTimer {
-                            endpoint: cancel_endpoint,
+                            endpoint: timer_context.endpoint,
                             timer_id,
                         });
                     }
@@ -312,7 +372,38 @@ impl GameKernel {
             }
         }
 
+        self.sync_live_timers();
         effects
+    }
+
+    fn is_input_repeat_timer(timer: &ScheduledTimer, context: RepeatContext) -> bool {
+        timer.endpoint == context.endpoint
+            && timer.owner == TimerOwner::input_repeat(context.button)
+            && timer.time_class == TimeClass::HumanInput
+    }
+
+    fn is_live_input_timer(
+        &self,
+        timer_id: TimerId,
+        endpoint: SeatId,
+        button: GameButton,
+        delay_ms: SafeU53,
+    ) -> bool {
+        self.scheduler.timer(timer_id).is_some_and(|timer| {
+            timer.endpoint == endpoint
+                && timer.owner == TimerOwner::input_repeat(button)
+                && timer.delay_ms == delay_ms
+                && timer.time_class == TimeClass::HumanInput
+        })
+    }
+
+    fn sync_live_timers(&mut self) {
+        self.live_resources.timers = self
+            .scheduler
+            .live_timers()
+            .into_iter()
+            .map(|timer| timer.timer_id)
+            .collect();
     }
 
     fn reduce_button_events(
