@@ -344,7 +344,7 @@ fn control_ids_preserve_the_pinned_wildcard_collision() {
         .operation_id = Some(operation("*"));
     assert_eq!(
         control_id_of(&NextControl::AwaitSuccessor(address_wildcard)),
-        control_id_of(&NextControl::AwaitSuccessor(address_literal)),
+        control_id_of(&NextControl::AwaitSuccessor(address_literal.clone())),
         "null and literal '*' control-address IDs retain the legacy collision"
     );
 

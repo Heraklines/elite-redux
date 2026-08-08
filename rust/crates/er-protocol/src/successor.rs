@@ -1199,7 +1199,7 @@ fn js_number_string(value: &serde_json::Number) -> String {
     }
 
     let absolute = value_as_f64.abs();
-    let body = if absolute >= 1e21 || absolute < 1e-6 {
+    let body = if !(1e-6..1e21).contains(&absolute) {
         let exponent = decimal_position - 1;
         let mantissa = if digits.len() == 1 {
             digits.clone()
