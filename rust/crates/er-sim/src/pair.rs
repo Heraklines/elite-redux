@@ -1075,6 +1075,11 @@ impl SimulatedPair {
         self.terminal_reason = Some(terminal.reason.clone());
         self.shared_terminal = Some(terminal.clone());
 
+        // Install the exact shared value while the kernels are still live.
+        // GameKernel::replace_menu is inert after disposal, while the pair
+        // contract requires both endpoint projections to retain this value.
+        self.project_shared_terminal(&terminal);
+
         // Shared terminal is the absorbing mechanical boundary. Kernel
         // disposal clears every internal timer/protocol owner; disposing the
         // pair adapters then releases their corresponding registrations and
@@ -1086,11 +1091,6 @@ impl SimulatedPair {
         self.presenter.dispose();
         self.storage.dispose();
         self.last_boundary_order.clear();
-
-        // Install the exact shared value after disposal so no cleanup path can
-        // replace it. GameKernel::replace_menu is the frozen value projection
-        // surface and remains available on a disposed kernel.
-        self.project_shared_terminal(&terminal);
         Ok(())
     }
 
@@ -1654,6 +1654,23 @@ mod tests {
         })
     }
 
+    fn retry_pair_config(seed: u64) -> TestResult<SimulatedPairConfig> {
+        let mut pair_config = protocol_pair_config(seed, false)?;
+        // Keep the authority's required remote-peer binding intact, but make
+        // the replica's cached authority generation stale. The fault network
+        // drops every proposal carrying that generation before authority
+        // admission, isolating lease retries from exact-resolution handling.
+        let Some(ProtocolKernelConfig {
+            role: ProtocolRoleConfig::Replica { replica, .. },
+            ..
+        }) = pair_config.guest_kernel.protocol.as_mut()
+        else {
+            return Err(std::io::Error::other("retry fixture must use a replica guest").into());
+        };
+        replica.authority_connection_generation = generation(1);
+        Ok(pair_config)
+    }
+
     fn sent_proposals(step: &PairStep) -> Vec<ProposalMessage> {
         step.generated_effects
             .iter()
@@ -1976,9 +1993,9 @@ mod tests {
 
     #[test]
     fn one_large_advance_matches_four_incremental_exponential_retries() -> TestResult {
-        let seed = 0x5eed_250;
-        let mut large = SimulatedPair::new(protocol_pair_config(seed, false)?)?;
-        let mut incremental = SimulatedPair::new(protocol_pair_config(seed, false)?)?;
+        let seed = 0x05ee_d250;
+        let mut large = SimulatedPair::new(retry_pair_config(seed)?)?;
+        let mut incremental = SimulatedPair::new(retry_pair_config(seed)?)?;
         let large_original = raw_press_proposal(&mut large)?;
         let incremental_original = raw_press_proposal(&mut incremental)?;
         assert_eq!(large_original, incremental_original);
@@ -2543,37 +2560,38 @@ mod tests {
             );
         }
 
-        let mut inert_steps = Vec::new();
-        inert_steps.push(pair.advance_time(safe(10_000))?);
-        inert_steps.push(pair.apply(PairOperation::Fault {
-            operation: FaultOperation::DeliverNext,
-        })?);
-        inert_steps.push(pair.apply(PairOperation::Disconnect {
-            endpoint: PairEndpoint::Guest,
-        })?);
-        inert_steps.push(pair.apply(PairOperation::Reconnect {
-            endpoint: PairEndpoint::Host,
-        })?);
-        inert_steps.push(pair.apply(PairOperation::PresentationSettled {
-            endpoint: PairEndpoint::Guest,
-            event_id: presentation_id,
-            outcome: PresentationOutcome::Failed {
-                reason: "must be inert".to_owned(),
-            },
-        })?);
-        inert_steps.push(pair.apply(PairOperation::StorageResult {
-            endpoint: PairEndpoint::Host,
-            request_id: safe(92),
-            result: StorageResult::Persisted,
-        })?);
-        inert_steps.push(pair.apply(PairOperation::Suspend {
-            endpoint: PairEndpoint::Host,
-        })?);
-        inert_steps.push(pair.apply(PairOperation::Resume {
-            endpoint: PairEndpoint::Guest,
-        })?);
-        inert_steps.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?);
-        inert_steps.push(pair.focus(PairEndpoint::Host, InputFocus::TextEntry)?);
+        let inert_steps = vec![
+            pair.advance_time(safe(10_000))?,
+            pair.apply(PairOperation::Fault {
+                operation: FaultOperation::DeliverNext,
+            })?,
+            pair.apply(PairOperation::Disconnect {
+                endpoint: PairEndpoint::Guest,
+            })?,
+            pair.apply(PairOperation::Reconnect {
+                endpoint: PairEndpoint::Host,
+            })?,
+            pair.apply(PairOperation::PresentationSettled {
+                endpoint: PairEndpoint::Guest,
+                event_id: presentation_id,
+                outcome: PresentationOutcome::Failed {
+                    reason: "must be inert".to_owned(),
+                },
+            })?,
+            pair.apply(PairOperation::StorageResult {
+                endpoint: PairEndpoint::Host,
+                request_id: safe(92),
+                result: StorageResult::Persisted,
+            })?,
+            pair.apply(PairOperation::Suspend {
+                endpoint: PairEndpoint::Host,
+            })?,
+            pair.apply(PairOperation::Resume {
+                endpoint: PairEndpoint::Guest,
+            })?,
+            pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?,
+            pair.focus(PairEndpoint::Host, InputFocus::TextEntry)?,
+        ];
 
         for (index, step) in inert_steps.iter().enumerate() {
             assert_eq!(
