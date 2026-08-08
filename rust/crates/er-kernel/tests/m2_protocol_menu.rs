@@ -451,7 +451,7 @@ fn sent_frame(effects: &[KernelEffect]) -> Option<er_types::NetworkFrame> {
 #[test]
 fn configured_protocol_initial_resources_include_wait_and_control() -> TestResult {
     let waiting = authority_kernel(
-        authority_config(Vec::new(), Vec::new(), &[])?,
+        authority_config(Vec::new(), Vec::new(), &[1])?,
         ui(
             MenuState::Waiting(WaitingMenu {
                 prompt_key: Some("m2.waiting".to_owned()),
@@ -466,7 +466,7 @@ fn configured_protocol_initial_resources_include_wait_and_control() -> TestResul
     let host = operation("host.command")?;
     let control_id = control_id_of(&control);
     let control_kernel = authority_kernel(
-        authority_config(vec![command_plan(&control, &host, false)?], Vec::new(), &[])?,
+        authority_config(vec![command_plan(&control, &host, false)?], Vec::new(), &[1])?,
         ui(initial_command_menu(&control, &host)?, Some(seat(0)), true),
     );
     assert!(
@@ -499,7 +499,7 @@ fn local_physical_proposal_projects_distinct_next_command_once() -> TestResult {
                 host_control.clone(),
             )?,
         }],
-        &[],
+        &[1],
     )?;
     let mut kernel = authority_kernel(
         protocol,
@@ -610,7 +610,7 @@ fn multi_target_command_frontier_selects_the_local_canonical_target() -> TestRes
                     multi_target.clone(),
                 )?,
             }],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -713,7 +713,7 @@ fn stale_local_generation_is_inert_but_current_local_proposal_is_admitted() -> T
                     control,
                 )?,
             }],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -772,7 +772,7 @@ fn deferred_authority_boundaries_block_the_next_revision() -> TestResult {
                     )?,
                 },
             ],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -892,7 +892,7 @@ fn replacement_and_interaction_successors_install_their_embedded_operation_ids()
                     replacement.clone(),
                 )?,
             }],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -926,7 +926,7 @@ fn replacement_and_interaction_successors_install_their_embedded_operation_ids()
                     interaction.clone(),
                 )?,
             }],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -1241,7 +1241,7 @@ fn exact_terminal_control_and_frame_identity_are_preserved_and_idempotent() -> T
                     terminal_control,
                 )?,
             }],
-            &[],
+            &[1],
         )?,
         UiState::default(),
     );
@@ -1470,7 +1470,7 @@ fn post_rebind_generation_two_raw_proposal_commits_with_exact_context() -> TestR
     let second_control = command_control(0, 72, 1);
     let mut kernel = authority_kernel(
         authority_config(
-            Vec::new(),
+            vec![command_plan(&first_control, &second_operation, false)?],
             vec![
                 AuthorityResolutionPlan {
                     operation_id: first_operation.clone(),
