@@ -815,7 +815,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert_eq!(
         material_effects(std::slice::from_ref(&first_proposal_delivery)),
-        vec![expected_host_material.clone()]
+        vec![
+            expected_host_material.clone(),
+            expected_guest_material.clone(),
+        ]
     );
     assert_eq!(
         control_effects(std::slice::from_ref(&first_proposal_delivery)),
