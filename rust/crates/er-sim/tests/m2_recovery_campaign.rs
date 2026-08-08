@@ -1,30 +1,33 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 
+use serde::de::DeserializeOwned;
+
 use er_kernel::{
     AuthorityResolutionPlan, ControlMenuPlan, KernelConfig, MenuProposalPlan,
     ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityLogConfig, BackoffPolicy, PeerBinding,
-    RecoveryTransactionConfig, control_id_of,
+    AuthorityEntryBody, AuthorityEntryDraft, AuthorityLogConfig, BackoffPolicy, PeerBinding,
+    ProposalFingerprintInput, ProposalJson, RecoveryAppliedProof, RecoveryBundleBody,
+    RecoveryRequestBody, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
     DEFAULT_RECOVERY_CONTROL_TIMEOUT_MS, DEFAULT_RECOVERY_PACING_MS,
     DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS,
 };
 use er_sim::{
-    FaultOperation, PairEndpoint, PairOperation, PairStep, PresenterMode, SimulatedPair,
-    SimulatedPairConfig,
+    FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
+    SimulatedPair, SimulatedPairConfig, SimulatedPairError,
 };
 use er_types::{
     AuthorityEntryKind, CancelPolicy, CommandControlTarget, CommandFrontierControl,
-    ConnectionGeneration, FrameContext, FrameType, GameButton, InputMap, KeyBinding,
-    KernelEffect, LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId,
-    MenuState, MembershipRevision, NextControl, OperationId, PhysicalKey, RunId, SafeU53, SeatId,
-    SessionId, TerminalControl, UiIntent, UiState, UiViewKind, WaitingMenu,
+    ConnectionGeneration, FrameContext, FrameType, GameButton, InputMap, KeyBinding, KernelEffect,
+    LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
+    MembershipRevision, NetworkFrame, NextControl, OperationId, PhysicalKey, ProposalMessage,
+    Revision, RunId, SafeU53, SeatId, SessionId, UiIntent, UiState, UiViewKind, WaitingMenu,
 };
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const SEED: u64 = 0x0123_4567_dead_beef;
 const HOST_SEAT: u64 = 0;
@@ -45,11 +48,22 @@ fn generation(value: u64) -> ConnectionGeneration {
     ConnectionGeneration::new(safe(value))
 }
 
+fn revision(value: u64) -> Revision {
+    Revision::new(safe(value))
+}
+
 fn operation(value: u64) -> Result<OperationId, Box<dyn Error>> {
     Ok(OperationId::new(format!("recovery-operation-{value}"))?)
 }
 
 fn context(sender_seat_id: u64) -> Result<FrameContext, Box<dyn Error>> {
+    context_at(sender_seat_id, 0)
+}
+
+fn context_at(
+    sender_seat_id: u64,
+    connection_generation: u64,
+) -> Result<FrameContext, Box<dyn Error>> {
     Ok(FrameContext {
         session_id: SessionId::new("m2-recovery-campaign")?,
         run_id: RunId::new("m2-recovery-run")?,
@@ -58,7 +72,7 @@ fn context(sender_seat_id: u64) -> Result<FrameContext, Box<dyn Error>> {
         membership_revision: MembershipRevision::new(safe(1)),
         sender_seat_id: seat(sender_seat_id),
         authority_seat_id: seat(HOST_SEAT),
-        connection_generation: generation(0),
+        connection_generation: generation(connection_generation),
     })
 }
 
@@ -98,9 +112,8 @@ fn next_control(turn: u64) -> NextControl {
         1 => command_control(2, GUEST_SEAT),
         2 => command_control(3, HOST_SEAT),
         3 => command_control(4, GUEST_SEAT),
-        _ => NextControl::Terminal(TerminalControl {
-            terminal_id: "recovery-campaign-complete".to_owned(),
-        }),
+        4 => command_control(5, HOST_SEAT),
+        _ => command_control(turn + 1, HOST_SEAT),
     }
 }
 
@@ -114,8 +127,34 @@ fn option(turn: u64) -> Result<MenuOption, Box<dyn Error>> {
     })
 }
 
-fn fingerprint(turn: u64) -> String {
-    format!("recovery-fingerprint-{turn}")
+fn proposal_payload(turn: u64) -> Value {
+    json!({
+        "surface": "m2-recovery-campaign",
+        "turn": turn,
+    })
+}
+
+fn production_proposal_fingerprint(turn: u64) -> Result<String, Box<dyn Error>> {
+    let wire = ProposalJson::new(serde_json::to_string(&proposal_payload(turn))?)?;
+    Ok(proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(turn),
+        label: format!("recovery.action.{turn}"),
+        choice: er_types::SafeI53::ZERO,
+        wire: Some(wire),
+        reward_surface: None,
+    })?)
+}
+
+fn material(turn: u64) -> Material {
+    Material {
+        digest: format!("recovery-material-{turn}"),
+        payload: json!({
+            "epoch": 1,
+            "wave": 1,
+            "turn": turn,
+            "material": "full-entry",
+        }),
+    }
 }
 
 fn command_menu(turn: u64, owner_seat_id: u64) -> Result<MenuState, Box<dyn Error>> {
@@ -140,11 +179,8 @@ fn command_plan(turn: u64, owner_seat_id: u64) -> Result<ControlMenuPlan, Box<dy
         options: vec![option.clone()],
         proposals: vec![MenuProposalPlan {
             option_id: option.id,
-            fingerprint: fingerprint(turn),
-            payload: json!({
-                "surface": "m2-recovery-campaign",
-                "turn": turn,
-            }),
+            fingerprint: production_proposal_fingerprint(turn)?,
+            payload: proposal_payload(turn),
         }],
         cancel: CancelPolicy::Disabled,
     })
@@ -157,20 +193,12 @@ fn resolution_plan(
     let operation_id = operation(turn)?;
     Ok(AuthorityResolutionPlan {
         operation_id: operation_id.clone(),
-        fingerprint: fingerprint(turn),
+        fingerprint: production_proposal_fingerprint(turn)?,
         draft: AuthorityEntryDraft {
             context: authority_context.clone(),
             operation_id,
             kind: AuthorityEntryKind::TurnCommit,
-            material: Material {
-                digest: format!("recovery-material-{turn}"),
-                payload: json!({
-                    "epoch": 1,
-                    "wave": 1,
-                    "turn": turn,
-                    "material": "full-entry",
-                }),
-            },
+            material: material(turn),
             next_control: next_control(turn),
             subsumes: Vec::new(),
         },
@@ -271,7 +299,10 @@ fn campaign_config() -> Result<SimulatedPairConfig, Box<dyn Error>> {
         guest_seat: seat(GUEST_SEAT),
         seed: SEED,
         presenter: PresenterMode::Instant,
-        initial_storage: BTreeMap::new(),
+        initial_storage: BTreeMap::from([(
+            "m2-recovery-campaign".to_owned(),
+            json!({"seed": SEED.to_string(), "purpose": "teardown evidence"}),
+        )]),
         event_budget: safe(10_000),
     })
 }
@@ -348,75 +379,6 @@ fn hold_new_packets_after_guest_action(
     .into())
 }
 
-fn find_frontier(value: &Value) -> Option<(u64, u64, u64)> {
-    match value {
-        Value::Object(object) => {
-            if let (Some(received), Some(material), Some(control)) = (
-                object.get("received").and_then(Value::as_u64),
-                object.get("material").and_then(Value::as_u64),
-                object.get("control").and_then(Value::as_u64),
-            ) {
-                return Some((received, material, control));
-            }
-            object.values().find_map(find_frontier)
-        }
-        Value::Array(values) => values.iter().find_map(find_frontier),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
-    }
-}
-
-fn guest_frontier(step: &PairStep) -> Option<(u64, u64, u64)> {
-    find_frontier(&step.snapshot.guest.kernel.state)
-}
-
-fn recovery_fence_is_held(value: &Value) -> bool {
-    match value {
-        Value::Object(object) => {
-            let frozen_fields = [
-                "commandAdmissionFrozen",
-                "controlSurfaceStartFrozen",
-                "progressionFrozen",
-                "materializationFrozen",
-                "authorityWaitCreationFrozen",
-            ];
-            if object.get("state").and_then(Value::as_str) == Some("held")
-                && frozen_fields
-                    .iter()
-                    .all(|field| object.contains_key(*field))
-            {
-                return true;
-            }
-            object.values().any(recovery_fence_is_held)
-        }
-        Value::Array(values) => values.iter().any(recovery_fence_is_held),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
-    }
-}
-
-fn recovery_fence_is_open(value: &Value) -> bool {
-    match value {
-        Value::Object(object) => {
-            let frozen_fields = [
-                "commandAdmissionFrozen",
-                "controlSurfaceStartFrozen",
-                "progressionFrozen",
-                "materializationFrozen",
-                "authorityWaitCreationFrozen",
-            ];
-            if object.get("state").and_then(Value::as_str) == Some("open")
-                && frozen_fields
-                    .iter()
-                    .all(|field| object.get(*field) == Some(&Value::Bool(false)))
-            {
-                return true;
-            }
-            object.values().any(recovery_fence_is_open)
-        }
-        Value::Array(values) => values.iter().any(recovery_fence_is_open),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
-    }
-}
-
 fn effects(steps: &[PairStep]) -> Vec<KernelEffect> {
     steps
         .iter()
@@ -433,52 +395,186 @@ fn has_frame(effects: &[KernelEffect], frame_type: FrameType) -> bool {
     })
 }
 
-fn recovery_bundle_bodies(steps: &[PairStep]) -> Vec<Value> {
-    steps
+fn frame_effects<'a>(
+    effects: &'a [KernelEffect],
+    frame_type: FrameType,
+) -> Vec<(SeatId, &'a NetworkFrame)> {
+    effects
         .iter()
-        .flat_map(|step| step.generated_effects.iter())
         .filter_map(|effect| match effect {
-            KernelEffect::SendFrame { frame, .. }
-                if frame.frame_type == FrameType::RecoveryBundle =>
-            {
-                Some(frame.body.clone())
+            KernelEffect::SendFrame { from, frame } if frame.frame_type == frame_type => {
+                Some((*from, frame))
             }
             _ => None,
         })
         .collect()
 }
 
-fn assert_full_tail_entry(entry: &Value, expected_revision: u64) {
-    for field in [
-        "revision",
-        "operationId",
-        "kind",
-        "material",
-        "nextControl",
-        "subsumes",
-    ] {
-        assert!(entry.get(field).is_some(), "recovery tail lacks {field}");
-    }
-    assert_eq!(entry["revision"], json!(expected_revision));
-    assert_eq!(entry["operationId"], json!(format!("recovery-operation-{expected_revision}")));
-    assert!(entry["material"].is_object());
-    assert!(entry["nextControl"].is_object());
+fn typed_frame_body<T: DeserializeOwned>(frame: &NetworkFrame) -> TestResult<T> {
+    Ok(serde_json::from_value(frame.body.clone())?)
 }
 
-fn guest_submitted_command(effects: &[KernelEffect]) -> bool {
+fn expected_tail_entry(expected_revision: u64) -> TestResult<AuthorityEntryBody> {
+    Ok(AuthorityEntryBody {
+        revision: revision(expected_revision),
+        operation_id: operation(expected_revision)?,
+        kind: AuthorityEntryKind::TurnCommit,
+        material: material(expected_revision),
+        next_control: next_control(expected_revision),
+        subsumes: Vec::new(),
+    })
+}
+
+fn assert_full_tail_entry(entry: &AuthorityEntryBody, expected_revision: u64) -> TestResult {
+    let expected = expected_tail_entry(expected_revision)?;
+    assert_eq!(entry, &expected, "recovery tail entry identity drifted");
+    assert_eq!(entry.material.digest, format!("recovery-material-{expected_revision}"));
+    assert_eq!(entry.material.payload, material(expected_revision).payload);
+    assert_eq!(control_id_of(&entry.next_control), control_id_of(&expected.next_control));
+    Ok(())
+}
+
+fn proposal_effects(steps: &[PairStep]) -> Vec<&ProposalMessage> {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::SendProposal { proposal } => Some(proposal),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_proposal_identities(
+    steps: &[PairStep],
+    expected: &[(u64, ConnectionGeneration)],
+) -> TestResult {
+    let proposals = proposal_effects(steps);
+    assert_eq!(proposals.len(), expected.len());
+    for (proposal, (turn, expected_generation)) in proposals
+        .into_iter()
+        .zip(expected.iter().copied())
+    {
+        assert_eq!(proposal.operation_id, operation(turn)?);
+        assert_eq!(proposal.fingerprint, production_proposal_fingerprint(turn)?);
+        assert_eq!(proposal.from, seat(GUEST_SEAT));
+        assert_eq!(proposal.to, seat(HOST_SEAT));
+        assert_eq!(proposal.connection_generation, expected_generation);
+        assert_eq!(proposal.payload, proposal_payload(turn));
+    }
+    Ok(())
+}
+
+fn has_guest_stale_effect(effects: &[KernelEffect]) -> bool {
     effects.iter().any(|effect| {
         matches!(
             effect,
-            KernelEffect::UiIntent {
-                endpoint,
-                intent: UiIntent::CommandSubmitted { .. },
-            } if *endpoint == seat(GUEST_SEAT)
+            KernelEffect::UiIntent { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
+        ) || matches!(
+            effect,
+            KernelEffect::SendProposal { proposal } if proposal.from == seat(GUEST_SEAT)
         )
     })
 }
 
-#[test]
-fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestResult {
+fn recovery_transaction_is_held(step: &PairStep) -> bool {
+    !step
+        .snapshot
+        .guest
+        .live_resources
+        .recovery_transactions
+        .is_empty()
+        && step.snapshot.guest.ui.kind == UiViewKind::Waiting
+        && !step.snapshot.guest.ui.actionable
+}
+
+fn assert_zero_resources(snapshot: &PairSnapshot) {
+    for endpoint in [&snapshot.host, &snapshot.guest] {
+        assert!(endpoint.live_resources.timers.is_empty());
+        assert!(endpoint.live_resources.presentations.is_empty());
+        assert!(endpoint.live_resources.storage_requests.is_empty());
+        assert!(endpoint.live_resources.delivery_leases.is_empty());
+        assert!(endpoint.live_resources.proposal_leases.is_empty());
+        assert!(endpoint.live_resources.recovery_transactions.is_empty());
+        assert!(endpoint.live_resources.waits.is_empty());
+        assert!(endpoint.live_resources.retained_revisions.is_empty());
+        assert!(endpoint.live_resources.controls.is_empty());
+        assert!(endpoint.live_resources.network_packets.is_empty());
+        assert_eq!(endpoint.live_resources, LiveResourceSnapshot::default());
+    }
+    assert_eq!(snapshot.host.live_resources, LiveResourceSnapshot::default());
+    assert_eq!(snapshot.guest.live_resources, LiveResourceSnapshot::default());
+    assert!(snapshot.network.queued_packet_ids.is_empty());
+    assert!(snapshot.network.disconnected_endpoints.is_empty());
+    assert!(snapshot.network.suspended_endpoints.is_empty());
+    assert!(snapshot.network.disposed);
+    assert!(snapshot.presenter.pending_event_ids.is_empty());
+    assert!(snapshot.presenter.settled_event_ids.is_empty());
+    assert!(snapshot.presenter.disposed);
+    assert!(snapshot.storage.pending_request_ids.is_empty());
+    assert!(snapshot.storage.keys.is_empty());
+    assert!(snapshot.storage.disposed);
+}
+
+fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
+    assert!(matches!(
+        pair.snapshot(),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.apply(PairOperation::AdvanceTime {
+            delta_ms: SafeU53::ZERO,
+        }),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.teardown("m2-recovery-campaign repeated teardown"),
+        Err(SimulatedPairError::Disposed)
+    ));
+    Ok(())
+}
+
+fn assert_fresh_guest_command(
+    steps: &[PairStep],
+    expected_generation: MenuGeneration,
+) -> TestResult {
+    let intents = steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::UiIntent { endpoint, intent } if *endpoint == seat(GUEST_SEAT) => {
+                Some(intent)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(intents.len(), 1, "fresh raw input must emit one guest intent");
+    match intents[0] {
+        UiIntent::CommandSubmitted {
+            seat: submitted_seat,
+            generation,
+            operation_id,
+            control_id,
+            option_id,
+        } => {
+            assert_eq!(submitted_seat, &seat(GUEST_SEAT));
+            assert_eq!(generation, &expected_generation);
+            assert_eq!(operation_id, &operation(4)?);
+            assert_eq!(control_id, &control_id_of(&command_control(4, GUEST_SEAT)));
+            let expected_option_id = option(4)?.id;
+            assert_eq!(option_id, &expected_option_id);
+        }
+        intent => panic!("fresh raw input emitted the wrong typed intent: {intent:?}"),
+    }
+    Ok(())
+}
+
+fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
+    assert!(matches!(next_control(4), NextControl::CommandFrontier(_)));
     let mut pair = SimulatedPair::new(campaign_config()?)?;
     let mut trace = Vec::new();
 
@@ -491,7 +587,6 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
         .ok_or_else(|| std::io::Error::other("first entry did not produce a campaign step"))?;
     assert_eq!(after_first_entry.snapshot.seed, SEED.to_string());
     assert_eq!(after_first_entry.snapshot.network.seed, SEED.to_string());
-    assert_eq!(guest_frontier(after_first_entry), Some((1, 1, 1)));
     assert_eq!(
         after_first_entry.snapshot.guest.ui.kind,
         UiViewKind::Command
@@ -502,12 +597,17 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
     );
     let stale_generation = after_first_entry.snapshot.guest.ui.generation;
 
+    let pre_recovery_action_start = trace.len();
     trace.push(pair.key_down(
         PairEndpoint::Guest,
         PhysicalKey::ArrowDown,
         false,
     )?);
     hold_new_packets_after_guest_action(&mut pair, &mut trace)?;
+    assert_proposal_identities(
+        &trace[pre_recovery_action_start..],
+        &[(2, generation(0))],
+    )?;
 
     trace.extend(pair.press(PairEndpoint::Host, PhysicalKey::Enter)?);
     let disconnect_step = pair.apply(PairOperation::Disconnect {
@@ -529,91 +629,161 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
     );
     assert_eq!(reconnect_step.snapshot.guest.ui.kind, UiViewKind::Waiting);
     assert!(!reconnect_step.snapshot.guest.ui.actionable);
-    assert!(
-        !reconnect_step
-            .snapshot
-            .guest
-            .live_resources
-            .recovery_transactions
-            .is_empty(),
-        "recovery must retain a live transaction while its request is in flight"
-    );
-    assert!(
-        recovery_fence_is_held(&reconnect_step.snapshot.guest.kernel.state),
-        "the recovery fence must be held before the request is emitted"
-    );
+    assert!(recovery_transaction_is_held(reconnect_step));
     assert!(has_frame(
         &reconnect_step.generated_effects,
         FrameType::RecoveryRequest
     ));
 
+    let reconnect_time = reconnect_step.snapshot.virtual_time_ms;
+    let held_advance = pair.advance_time(safe(250))?;
+    assert_eq!(
+        held_advance.operation,
+        PairOperation::AdvanceTime { delta_ms: safe(250) }
+    );
+    assert_eq!(
+        held_advance.snapshot.virtual_time_ms,
+        safe(reconnect_time.get() + 250)
+    );
+    assert!(
+        !has_guest_stale_effect(&held_advance.generated_effects),
+        "the held pre-recovery input must not emit a stale intent or proposal"
+    );
+    trace.push(held_advance);
+
     for _ in 0..48 {
         let step = pair.advance_time(safe(10))?;
+        let recovery_released = step
+            .snapshot
+            .guest
+            .live_resources
+            .recovery_transactions
+            .is_empty()
+            && has_frame(&step.generated_effects, FrameType::RecoveryApplied);
         trace.push(step);
-        let Some(last) = trace.last() else {
-            return Err(std::io::Error::other("recovery trace unexpectedly became empty").into());
-        };
-        if guest_frontier(last) == Some((3, 3, 3))
-            && last
-                .snapshot
-                .guest
-                .live_resources
-                .recovery_transactions
-                .is_empty()
-        {
+        if recovery_released {
             break;
         }
     }
 
     let recovery_trace = &trace[recovery_start..];
     let recovery_effects = effects(recovery_trace);
-    assert!(has_frame(&recovery_effects, FrameType::RecoveryRequest));
-    assert!(has_frame(&recovery_effects, FrameType::RecoveryBundle));
+    let request_frames = frame_effects(&recovery_effects, FrameType::RecoveryRequest);
+    assert_eq!(request_frames.len(), 1);
+    let (request_from, request_frame) = request_frames[0];
+    assert_eq!(request_from, seat(GUEST_SEAT));
+    assert_eq!(request_frame.context, context_at(GUEST_SEAT, 1)?);
+    assert_eq!(request_frame.context.sender_seat_id, seat(GUEST_SEAT));
+    assert_eq!(request_frame.context.connection_generation, generation(1));
+    let request: RecoveryRequestBody = typed_frame_body(request_frame)?;
+    assert!(!request.request_id.is_empty());
+    assert_eq!(request.captured_frontier, revision(1));
+    assert_eq!(request.reason, "reconnect");
 
-    let bundles = recovery_bundle_bodies(recovery_trace);
-    assert_eq!(bundles.len(), 1);
-    let bundle = &bundles[0];
-    assert_eq!(bundle["frontier"], json!(3));
-    assert_eq!(
-        bundle["frontierOperationId"],
-        json!("recovery-operation-3")
-    );
-    let tail = bundle["requiredTail"]
-        .as_array()
-        .ok_or_else(|| std::io::Error::other("recovery bundle did not contain a required tail"))?;
+    let bundle_frames = frame_effects(&recovery_effects, FrameType::RecoveryBundle);
+    assert_eq!(bundle_frames.len(), 1);
+    let (bundle_from, bundle_frame) = bundle_frames[0];
+    assert_eq!(bundle_from, seat(HOST_SEAT));
+    assert_eq!(bundle_frame.context, context_at(HOST_SEAT, 1)?);
+    assert_eq!(bundle_frame.context.sender_seat_id, seat(HOST_SEAT));
+    assert_eq!(bundle_frame.context.connection_generation, generation(1));
+    let bundle: RecoveryBundleBody = typed_frame_body(bundle_frame)?;
+    assert_eq!(bundle.request_id, request.request_id);
+    assert_eq!(bundle.material, material(3));
+    assert_eq!(bundle.frontier, revision(3));
+    assert_eq!(bundle.frontier_operation_id, Some(operation(3)?));
+    assert_eq!(bundle.membership_revision, MembershipRevision::new(safe(1)));
+    assert_eq!(bundle.next_control, Some(next_control(3)));
+    let tail = &bundle.required_tail;
     assert_eq!(tail.len(), 2);
-    assert_full_tail_entry(&tail[0], 2);
-    assert_full_tail_entry(&tail[1], 3);
+    assert_full_tail_entry(&tail[0], 2)?;
+    assert_full_tail_entry(&tail[1], 3)?;
+    let final_entry = tail[1].clone().with_context(bundle_frame.context.clone());
+    let expected_final_entry = expected_tail_entry(3)?.with_context(bundle_frame.context.clone());
+    assert_eq!(final_entry, expected_final_entry);
+    assert_eq!(final_entry.context, context_at(HOST_SEAT, 1)?);
+    assert_eq!(tail[1].revision, revision(3));
+    assert_eq!(tail[1].operation_id, operation(3)?);
+    assert_eq!(tail[1].material.digest, material(3).digest);
+    assert_eq!(tail[1].next_control, next_control(3));
 
-    let material_index = recovery_effects.iter().position(|effect| {
-        matches!(
-            effect,
-            KernelEffect::ApplyAuthorityMaterial { endpoint, .. }
-                if *endpoint == seat(GUEST_SEAT)
-        )
-    });
-    let control_index = recovery_effects.iter().position(|effect| {
-        matches!(
-            effect,
-            KernelEffect::ProjectAuthorityControl { endpoint, .. }
-                if *endpoint == seat(GUEST_SEAT)
-        )
-    });
-    let applied_index = recovery_effects.iter().position(|effect| {
-        matches!(
-            effect,
-            KernelEffect::SendFrame { frame, .. }
-                if frame.frame_type == FrameType::RecoveryApplied
-        )
-    });
-    let (Some(material_index), Some(control_index), Some(applied_index)) =
-        (material_index, control_index, applied_index)
-    else {
-        return Err(std::io::Error::other(
-            "recovery did not emit material, control, and applied-proof effects",
-        )
-        .into());
-    };
+    let material_effects = recovery_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ApplyAuthorityMaterial {
+                endpoint,
+                revision,
+                operation_id,
+                material,
+            } if *endpoint == seat(GUEST_SEAT) => {
+                Some((*endpoint, *revision, operation_id.clone(), material.clone()))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(material_effects.len(), 1);
+    let (material_endpoint, material_revision, material_operation, applied_material) =
+        &material_effects[0];
+    assert_eq!(material_endpoint, &seat(GUEST_SEAT));
+    assert_eq!(material_revision, &revision(3));
+    assert_eq!(material_operation, &operation(3)?);
+    assert_eq!(applied_material, &material(3));
+
+    let control_effects = recovery_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ProjectAuthorityControl {
+                endpoint,
+                revision,
+                operation_id,
+                control,
+            } if *endpoint == seat(GUEST_SEAT) => {
+                Some((*endpoint, *revision, operation_id.clone(), control.clone()))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(control_effects.len(), 1);
+    let (control_endpoint, control_revision, control_operation, projected_control) =
+        &control_effects[0];
+    let expected_control_id = control_id_of(&next_control(3));
+    assert_eq!(control_endpoint, &seat(GUEST_SEAT));
+    assert_eq!(control_revision, &revision(3));
+    assert_eq!(control_operation, &operation(3)?);
+    assert_eq!(projected_control, &next_control(3));
+    assert_eq!(control_id_of(projected_control), expected_control_id);
+
+    let applied_frames = frame_effects(&recovery_effects, FrameType::RecoveryApplied);
+    assert_eq!(applied_frames.len(), 1);
+    let (applied_from, applied_frame) = applied_frames[0];
+    assert_eq!(applied_from, seat(GUEST_SEAT));
+    assert_eq!(applied_frame.context, context_at(GUEST_SEAT, 1)?);
+    assert_eq!(applied_frame.context.sender_seat_id, seat(GUEST_SEAT));
+    assert_eq!(applied_frame.context.connection_generation, generation(1));
+    let proof: RecoveryAppliedProof = typed_frame_body(applied_frame)?;
+    assert_eq!(proof.request_id, request.request_id);
+    assert_eq!(proof.frontier, revision(3));
+    assert_eq!(proof.material_digest, material(3).digest);
+    assert_eq!(proof.control_id, Some(expected_control_id.clone()));
+
+    let material_index = recovery_effects
+        .iter()
+        .position(|effect| matches!(effect, KernelEffect::ApplyAuthorityMaterial { .. }))
+        .ok_or_else(|| std::io::Error::other("material effect was not emitted"))?;
+    let control_index = recovery_effects
+        .iter()
+        .position(|effect| matches!(effect, KernelEffect::ProjectAuthorityControl { .. }))
+        .ok_or_else(|| std::io::Error::other("control effect was not emitted"))?;
+    let applied_index = recovery_effects
+        .iter()
+        .position(|effect| {
+            matches!(
+                effect,
+                KernelEffect::SendFrame { frame, .. }
+                    if frame.frame_type == FrameType::RecoveryApplied
+            )
+        })
+        .ok_or_else(|| std::io::Error::other("recovery proof effect was not emitted"))?;
     assert!(
         material_index < control_index && control_index < applied_index,
         "recovery must apply material, project control, then send the applied proof"
@@ -634,6 +804,26 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
         "N+1 must remain blocked while the recovered control is pending"
     );
 
+    let request_step_index = recovery_trace
+        .iter()
+        .position(|step| has_frame(&step.generated_effects, FrameType::RecoveryRequest))
+        .ok_or_else(|| std::io::Error::other("recovery request step was not retained"))?;
+    let held_step_index = recovery_trace
+        .iter()
+        .position(recovery_transaction_is_held)
+        .ok_or_else(|| std::io::Error::other("recovery fence was not observed as held"))?;
+    assert!(
+        held_step_index <= request_step_index,
+        "the typed recovery transaction/fence must be held before the request"
+    );
+    assert!(recovery_transaction_is_held(&recovery_trace[request_step_index]));
+    assert!(
+        recovery_trace
+            .iter()
+            .all(|step| !has_guest_stale_effect(&step.generated_effects)),
+        "the held pre-recovery input must not emit stale UiIntent or proposal effects"
+    );
+
     let applied_step_index = recovery_trace
         .iter()
         .position(|step| {
@@ -648,15 +838,31 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
         .ok_or_else(|| std::io::Error::other("recovery proof step was not retained in the trace"))?;
     assert!(
         recovery_trace[..applied_step_index].iter().all(|step| {
-            !step
-                .snapshot
+            recovery_transaction_is_held(step)
+        }),
+        "the recovery transaction/fence and blocked surface must remain live until the applied proof"
+    );
+    let first_released_step = recovery_trace
+        .iter()
+        .position(|step| {
+            step.snapshot
                 .guest
                 .live_resources
                 .recovery_transactions
                 .is_empty()
-                && recovery_fence_is_held(&step.snapshot.guest.kernel.state)
-        }),
-        "the recovery transaction and fence must remain live until the applied proof"
+        })
+        .ok_or_else(|| std::io::Error::other("recovery transaction was never released"))?;
+    assert!(
+        first_released_step >= applied_step_index,
+        "recovery transaction/fence released before the applied proof"
+    );
+    let first_open_step = recovery_trace
+        .iter()
+        .position(|step| step.snapshot.guest.ui.actionable)
+        .ok_or_else(|| std::io::Error::other("recovered command surface was never opened"))?;
+    assert!(
+        first_open_step >= applied_step_index,
+        "recovered command surface opened before the applied proof"
     );
     assert!(
         recovery_trace[applied_step_index..].iter().any(|step| {
@@ -665,21 +871,22 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
                 .live_resources
                 .recovery_transactions
                 .is_empty()
-                && recovery_fence_is_open(&step.snapshot.guest.kernel.state)
+                && step.snapshot.guest.ui.kind == UiViewKind::Command
+                && step.snapshot.guest.ui.actionable
         }),
-        "the recovery transaction and fence may release only after the applied proof"
+        "recovery transaction/fence release must expose the recovered command only after proof"
     );
 
     let final_step = trace
         .last()
         .ok_or_else(|| std::io::Error::other("recovery trace did not produce a final step"))?;
-    assert_eq!(guest_frontier(final_step), Some((3, 3, 3)));
     assert_eq!(final_step.snapshot.guest.ui.kind, UiViewKind::Command);
     assert_eq!(
         final_step.snapshot.guest.ui.owner_seat,
         Some(seat(GUEST_SEAT))
     );
     assert!(final_step.snapshot.guest.ui.actionable);
+    assert_ne!(final_step.snapshot.guest.ui.generation, stale_generation);
     assert!(
         final_step
             .snapshot
@@ -695,19 +902,31 @@ fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestRe
         .controls
         .contains(&control_id_of(&command_control(4, GUEST_SEAT))));
 
+    let fresh_menu_generation = final_step.snapshot.guest.ui.generation;
     trace.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowDown)?);
     let post_rejoin_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
-    assert!(guest_submitted_command(&effects(&post_rejoin_steps)));
+    assert_fresh_guest_command(&post_rejoin_steps, fresh_menu_generation)?;
+    assert_proposal_identities(
+        &post_rejoin_steps,
+        &[(4, generation(1))],
+    )?;
     trace.extend(post_rejoin_steps);
 
+    let before_teardown = pair.snapshot()?;
+    assert!(!before_teardown.storage.keys.is_empty());
     let torn_down = pair.teardown("m2-recovery-campaign")?;
     assert_eq!(torn_down.seed, SEED.to_string());
     assert_eq!(torn_down.network.seed, SEED.to_string());
-    assert_eq!(torn_down.host.live_resources, LiveResourceSnapshot::default());
-    assert_eq!(
-        torn_down.guest.live_resources,
-        LiveResourceSnapshot::default()
-    );
-    assert!(torn_down.network.queued_packet_ids.is_empty());
+    assert_zero_resources(&torn_down);
+    assert_post_disposal_rejected(&mut pair)?;
+    Ok((trace, torn_down))
+}
+
+#[test]
+fn recovery_campaign_fences_dense_tail_and_rejoins_on_physical_input() -> TestResult {
+    let first = run_campaign()?;
+    let second = run_campaign()?;
+    assert_eq!(first, second, "recovery campaign must repeat byte-for-byte");
+    assert!(first.0.iter().all(|step| !step.effects_digest.is_empty()));
     Ok(())
 }
