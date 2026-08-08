@@ -1652,6 +1652,90 @@ fn replica_staged_reconnect_resends_and_starts_recovery_once() -> TestResult {
 }
 
 #[test]
+fn replica_recovery_fence_snapshot_is_fail_closed_and_truthful() -> TestResult {
+    let mut kernel = replica_kernel(replica_config(Vec::new())?, UiState::default());
+    let idle_snapshot = kernel.snapshot();
+    let idle_fence = &idle_snapshot.state["protocol"]["recoveryFence"];
+    assert_eq!(
+        idle_fence,
+        &json!({
+            "state": "open",
+            "commandAdmissionFrozen": false,
+            "controlSurfaceStartFrozen": false,
+            "progressionFrozen": false,
+            "materializationFrozen": false,
+            "authorityWaitCreationFrozen": false,
+        })
+    );
+    assert!(idle_fence.get("terminalReason").is_none());
+
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Disconnected,
+        generation: generation(2),
+    })?;
+    let recovery_request = kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(0),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+    assert!(recovery_request.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::SendFrame { frame, .. }
+                if frame.frame_type == FrameType::RecoveryRequest
+        )
+    }));
+
+    let held_snapshot = kernel.snapshot();
+    let held_fence = &held_snapshot.state["protocol"]["recoveryFence"];
+    assert_eq!(
+        held_fence,
+        &json!({
+            "state": "held",
+            "commandAdmissionFrozen": true,
+            "controlSurfaceStartFrozen": true,
+            "progressionFrozen": true,
+            "materializationFrozen": true,
+            "authorityWaitCreationFrozen": true,
+        })
+    );
+    assert!(held_fence.get("terminalReason").is_none());
+
+    kernel.step(KernelInput::TransportChanged {
+        endpoint: seat(1),
+        state: TransportState::Connected,
+        generation: generation(2),
+    })?;
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["recoveryFence"],
+        *held_fence
+    );
+
+    let terminal = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: terminal_frame(
+            context(0, 0, 2)?,
+            "recovery-fence-disposed",
+            "recovery fence disposed",
+        )?,
+    })?;
+    assert!(terminal
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert_eq!(
+        kernel.snapshot().state["protocol"]["recoveryFence"],
+        Value::Null
+    );
+    Ok(())
+}
+
+#[test]
 fn recovery_control_receipt_precedes_proof_and_reopened_ui() -> TestResult {
     let recovered_operation = operation("authority.recovered.commit")?;
     let menu_operation = operation("replica.recovered.command")?;

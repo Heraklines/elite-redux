@@ -2651,6 +2651,7 @@ impl GameKernel {
                 "replica": replica.replica.diagnostics(),
                 "leases": replica.leases.diagnostics(),
                 "recovery": replica.recovery.diagnostics(),
+                "recoveryFence": replica.recovery.fence_view(),
                 "pendingMaterial": pending_material_snapshot(replica.pending_material.as_ref()),
                 "pendingControl": pending_control_snapshot(replica.pending_control.as_ref()),
                 "pendingRecovery": replica.pending_recovery,
@@ -3203,7 +3204,8 @@ mod tests {
     }
 
     #[test]
-    fn authority_resolution_refreshes_cached_context_at_generation_two() -> Result<(), Box<dyn Error>> {
+    fn authority_resolution_refreshes_cached_context_at_generation_two()
+    -> Result<(), Box<dyn Error>> {
         let operation_id = OperationId::new("kernel.unit.generation-two")?;
         let mut kernel = generation_two_authority_kernel(&operation_id)?;
 
