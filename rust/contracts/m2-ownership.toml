@@ -1,4 +1,4 @@
-schema_version = 5
+schema_version = 6
 milestone = "M2"
 project = "PokéRogue Redux"
 bootstrap_parent_sha = "87eb36290675378b7b08c20a09f6cdd757ae9515"
@@ -20,6 +20,14 @@ production_typescript_read_only = true
 local_rust_execution = false
 local_coop_vitest = false
 
+[[integration_exceptions]]
+lane = "M2-05"
+path = "rust/crates/er-protocol/src/scheduler.rs"
+symbol = "KernelScheduler::set_next_timer_id_for_test"
+scope = "cfg(test)-only proposal allocator rollback evidence"
+production_access = false
+approved_by = "integration owner"
+
 [[lanes]]
 id = "M2-01"
 target_generation = "G4"
@@ -33,6 +41,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-02"
 paths = ["rust/crates/er-protocol/src/validation.rs", "rust/crates/er-protocol/tests/m2_validation.rs"]
 deliverable = "Raw-first frame/context/body classification"
+contract_dependencies = ["CR-0008 raw-first typed validation boundary"]
 
 [[lanes]]
 id = "M2-03"
@@ -48,6 +57,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-04"
 paths = ["rust/crates/er-protocol/src/replica.rs", "rust/crates/er-protocol/tests/m2_replica.rs"]
 deliverable = "Receive/material/control frontiers, duplicate and gap handling"
+contract_dependencies = ["CR-0011 full recovered-entry staging boundary"]
 
 [[lanes]]
 id = "M2-05"
@@ -63,6 +73,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-06"
 paths = ["rust/crates/er-protocol/src/successor.rs", "rust/crates/er-protocol/tests/m2_successor.rs"]
 deliverable = "Exact control identity and successor authorization"
+contract_dependencies = ["CR-0002 shared successor boundary"]
 
 [[lanes]]
 id = "M2-07"
@@ -117,6 +128,7 @@ target_generation = "G5"
 branch = "codex/rust-kernel-m2b-01"
 paths = ["rust/crates/er-kernel/src/kernel.rs", "rust/crates/er-kernel/tests/m1_keyboard_menu.rs", "rust/crates/er-kernel/tests/m2_protocol_menu.rs"]
 deliverable = "Production protocol, menu, input, and effect integration"
+contract_dependencies = ["CR-0011 full-entry recovery dispatch"]
 
 [[lanes]]
 id = "M2B-02"
@@ -189,6 +201,7 @@ target_generation = "G5"
 branch = "codex/rust-kernel-m2b-11"
 paths = ["rust/crates/er-sim/benches/**", "rust/fixtures/v1/m2-benchmark-manifest.json", "scripts/benchmark-kernel-m2.mjs"]
 deliverable = "Four measured M2 benchmark workloads and baseline metadata"
+contract_dependencies = ["CR-0010 lossless diagnostic and snapshot seeds"]
 
 [[lanes]]
 id = "M2B-12"

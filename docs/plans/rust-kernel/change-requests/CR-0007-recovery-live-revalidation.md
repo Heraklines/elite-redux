@@ -6,7 +6,7 @@ Owner: integration owner
 
 Base: `c477388d2c857350c7a9657338a82e33056e337d`
 
-Resolves: M2-07 `CR-0005-recovery-result-and-scheduler-seams.md`
+Resolves: M2-07 recovery result delivery and scheduler seams.
 
 ## Request
 

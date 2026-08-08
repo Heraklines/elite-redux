@@ -80,8 +80,10 @@ redelivery effects.
    genuinely independent kernels without a shared mutable allocator.
 8. A proposal lease timer is owned by `proposal.from`, not `proposal.to`.
    Destination/generation rebind changes the retained send target but never
-   changes where its local retry clock fires. Owner identities need only be
-   unique within their kernel scheduler.
+   changes where its local retry clock fires. Re-arming an existing proposal
+   requires the same `proposal.from`; a sender change at equal or newer
+   generation fails closed atomically. Owner identities need only be unique
+   within their kernel scheduler.
 9. Add `AuthorityRebindOutcome { retained_count, actions }` and change
    `AuthorityLog::rebind_connection` to return
    `Result<AuthorityRebindOutcome, AuthorityLogError>`. An unchanged binding

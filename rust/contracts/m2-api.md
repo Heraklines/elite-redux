@@ -1,6 +1,6 @@
 # PokéRogue Redux Rust kernel M2 contract
 
-Status: revised before G4 by approved CR-0001, CR-0006, CR-0007, CR-0009, and CR-0010; frozen again at the revision commit recorded by worker task cards.
+Status: revised before G4 by approved CR-0001, CR-0002, CR-0006, CR-0007, CR-0008, CR-0009, CR-0010, and CR-0011; frozen again at the revision commit recorded by worker task cards.
 
 Source baseline:
 
@@ -10,7 +10,7 @@ Source baseline:
 - protocol compatibility identifier: `er-coop-47`
 - frame protocol: `2`
 - source-lock/schema version: `1`
-- M2 ownership-manifest version: `5`
+- M2 ownership-manifest version: `6`
 
 Every M2A branch starts from the exact hosted-green bootstrap commit that contains this document, the ownership manifest, shared DTOs, manifests/lockfile, crate-root exports, and compileable public stubs for every M2A lane. The literal SHA is supplied in each worker task card because a commit cannot contain its own hash. Cross-lane imports bind only to those frozen bootstrap types; workers do not wait for another lane's implementation.
 
@@ -70,7 +70,7 @@ The existing M1 `NetworkFrame.body: serde_json::Value` remains intact for lossle
 
 `FrameValidator` is total over `RawFrame::JsonText` and `RawFrame::JsonValue`. It returns exactly one of:
 
-- `InboundFrameResult::Valid(ValidatedFrame)`
+- `InboundFrameResult::Valid { frame: Box<ValidatedFrame> }`
 - `InboundFrameResult::CosmeticDrop { reason }`
 - `InboundFrameResult::ProtocolViolation { frame_type, issues }`
 
@@ -189,7 +189,13 @@ admit entry
   -> optional presentationSettled receipt
 ```
 
-Recovery adoption sets received and material to the proven frontier while leaving control one revision behind and retaining the exact final entry pending. Ordinary control installation then advances control. Disposal is idempotent and clears pending entry, tail request, controls, and tombstones.
+Fresh positive recovery validates and atomically stages the complete final
+`AuthorityEntry`: received/material become `R`, control becomes `R - 1`, and
+the exact material-applied entry remains pending for ordinary control
+installation. Terminal-only `adopt_frontier` cannot establish a fresh positive
+identity; it is idempotent only for an already complete matching pending
+recovery identity. Revision zero remains the empty-frontier no-op. Disposal is
+idempotent and clears pending entry, tail request, controls, and tombstones.
 
 ## Proposal admission and leases
 
@@ -197,7 +203,7 @@ Recovery adoption sets received and material to the proven frontier while leavin
 
 Ordinary proposal fingerprints are the exact JavaScript `JSON.stringify` result of `[sequence, label, choice, wire ?? null, rewardSurface ?? null]`. Biome-shop fingerprints use the pinned sequence plus 7,000,000 and the same five-slot form. Bargain fingerprints use the pinned sequence plus 7,500,000 and `[sequence, "bargain", outcome]`. These strings are not sorted canonical JSON or hashes; raw array order and Bargain outcome object insertion order are load-bearing. The fingerprint is not a material digest and does not assign a revision.
 
-`ProposalLeaseManager` retains an opaque, already-defined outbound proposal value. It emits resend commands but does not invent an Authority V2 frame type. New leases send immediately. Re-arming the same live ID/fingerprint refreshes and immediately resends; a conflicting fingerprint fails closed; a committed tombstone returns already-committed. Connected-time retries begin at 250 ms and cap at 5 s. A separate 20-minute absolute ceiling terminalizes the lease exactly once. Rebind to a new current generation triggers an immediate resend of every retained lease with the same proposal identity. Observation of the exact committed operation creates a session-lifetime tombstone even before a lease exists and cancels both timers. Disposal clears timers, leases, and tombstones and is idempotent.
+`ProposalLeaseManager` retains an opaque, already-defined outbound proposal value. It emits resend commands but does not invent an Authority V2 frame type. New leases send immediately. Re-arming the same live ID/fingerprint from the same `proposal.from` refreshes and immediately resends; a sender change or conflicting fingerprint fails closed atomically at every generation; a committed tombstone returns already-committed. Connected-time retries begin at 250 ms and cap at 5 s. A separate 20-minute absolute ceiling terminalizes the lease exactly once. Rebind to a new current generation triggers an immediate resend of every retained lease with the same proposal identity. Observation of the exact committed operation creates a session-lifetime tombstone even before a lease exists and cancels both timers. Disposal clears timers, leases, and tombstones and is idempotent.
 
 Proposal absolute/retry timers are allocated atomically by the kernel scheduler
 and owned by the sending endpoint (`proposal.from`). Destination/generation
@@ -312,11 +318,22 @@ Corruption operates on the raw envelope so malformed known mechanical frames and
 Every serialized diagnostic or pair-snapshot seed is the canonical unsigned
 decimal string produced from that `u64`; it is never emitted as a JSON number.
 This preserves all 64 seed bits across native, wasm32, JavaScript, and fixture
-boundaries. Diagnostic counters remain `SafeU53` and deliberately saturate at
+boundaries. Serialization and deserialization of `PairSnapshot.seed` apply the
+same canonical rule; empty, signed, padded, exponential, whitespace-bearing,
+overflowing, and numeric JSON forms fail closed.
+
+The network RNG is the pinned `mulberry32` oracle. It truncates only the RNG
+state to the low 32 seed bits (`seed >>> 0`), preserves the full `u64` seed in
+diagnostics/snapshots, and samples inclusive actions as
+`min + floor(next() * (max - min + 1))`. Each packet captures both source and
+destination endpoint generations at enqueue, so either endpoint reconnect can
+make it stale without changing its public wire shape. Diagnostic counters
+remain `SafeU53` and deliberately saturate at
 `SafeU53::MAX`. They are observational only: saturation cannot alter RNG state,
 packet ordering, delivery, connection state, or any protocol outcome. Packet
-IDs, queue-order IDs, deadlines, and other mechanical cursors do not saturate;
-their exhaustion is an explicit fail-atomic error.
+IDs, queue-order IDs, deadlines, endpoint generations, and other mechanical
+cursors do not saturate; overflow/exhaustion is an explicit fail-atomic error
+that leaves RNG, queue, connection, and diagnostic state unchanged.
 
 ## Simulated pair and raw-input rule
 
