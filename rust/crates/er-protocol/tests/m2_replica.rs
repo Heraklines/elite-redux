@@ -958,6 +958,7 @@ fn invalid_stage_transitions_fail_closed_without_frontier_mutation() -> TestResu
     let mut replica = replica()?;
     let first = entry(1, "op-invalid")?;
     replica.admit(first.clone());
+    let before_control = replica.diagnostics();
 
     let control_before_material = replica.control_result(
         revision(1),
@@ -966,7 +967,7 @@ fn invalid_stage_transitions_fail_closed_without_frontier_mutation() -> TestResu
         },
     );
     assert!(control_before_material.is_err());
-    assert_eq!(replica.frontier(), AuthorityFrontier::default());
+    assert_eq!(replica.diagnostics(), before_control);
 
     replica.material_result(revision(1), MaterialApplicationOutcome::Applied)?;
     let duplicate_material =
@@ -1539,7 +1540,10 @@ fn recovery_zero_equal_and_complete_terminal_cases_are_atomic() -> TestResult {
         Err(AuthorityReplicaError::InvalidRecoveryFrontier { .. })
     ));
     assert_eq!(recovery_replica.diagnostics(), before_conflict);
-    assert_eq!(recovery_replica.pending_entry(), pending_before_conflict.as_ref());
+    assert_eq!(
+        recovery_replica.pending_entry(),
+        pending_before_conflict.as_ref()
+    );
 
     let duplicate_stage = recovery_replica.stage_recovered_frontier(recovered.clone())?;
     assert!(has_project_control(&duplicate_stage));
