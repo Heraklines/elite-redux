@@ -22,6 +22,8 @@ const M2_OWNERSHIP: &str = include_str!("../../../contracts/m2-ownership.toml");
 const TEST_MAP_SOURCE: &str = include_str!("../../../fixtures/v1/authority-v2-test-map.json");
 
 const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const ORACLE_BRANCH: &str = "ci/coop/v2-showdown-command-coordinate-20260720";
+const PRODUCTION_TYPESCRIPT_PATHSPEC: &str = ":(glob)src/**/*.ts";
 
 const SEMANTIC_BYPASS_NAMES: &[&str] = &[
     "select_command",
@@ -695,16 +697,20 @@ fn assert_no_campaign_pair_operation_semantics(code: &str, path: &Path) -> Audit
 
 #[test]
 fn no_production_typescript_path_changed_since_the_oracle() -> AuditResult {
+    let root = repository_root();
+    ensure_oracle_available(&root)?;
+
     let output = Command::new("git")
-        .current_dir(repository_root())
+        .current_dir(&root)
         .args([
             "diff",
             "--name-only",
+            "--no-ext-diff",
             ORACLE_GAME_SHA,
             "HEAD",
             "--",
-            ":(glob)**/*.ts",
         ])
+        .arg(PRODUCTION_TYPESCRIPT_PATHSPEC)
         .output()
         .map_err(|error| format!("run oracle TypeScript diff audit: {error}"))?;
     require(
@@ -718,6 +724,72 @@ fn no_production_typescript_path_changed_since_the_oracle() -> AuditResult {
         format!("production TypeScript paths changed from oracle:\n{changed}"),
     )?;
     Ok(())
+}
+
+fn ensure_oracle_available(root: &Path) -> AuditResult {
+    let oracle_object = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "-e"])
+        .arg(format!("{ORACLE_GAME_SHA}^{{commit}}"))
+        .output()
+        .map_err(|error| format!("run oracle object probe: {error}"))?;
+    if !oracle_object.status.success() {
+        let oracle_ref = format!(
+            "refs/heads/{ORACLE_BRANCH}:refs/remotes/origin/{ORACLE_BRANCH}"
+        );
+        let fetch = Command::new("git")
+            .current_dir(root)
+            .args(["fetch", "--no-tags", "origin"])
+            .arg(oracle_ref)
+            .output()
+            .map_err(|error| format!("fetch pinned oracle branch: {error}"))?;
+        require(
+            fetch.status.success(),
+            format!(
+                "fetch pinned oracle branch failed with {}: {}",
+                fetch.status,
+                String::from_utf8_lossy(&fetch.stderr).trim()
+            ),
+        )?;
+
+        let fetched_ref = format!("refs/remotes/origin/{ORACLE_BRANCH}");
+        let reference = Command::new("git")
+            .current_dir(root)
+            .args(["rev-parse"])
+            .arg(&fetched_ref)
+            .output()
+            .map_err(|error| format!("resolve fetched oracle branch: {error}"))?;
+        require(
+            reference.status.success(),
+            format!(
+                "resolve fetched oracle branch failed with {}: {}",
+                reference.status,
+                String::from_utf8_lossy(&reference.stderr).trim()
+            ),
+        )?;
+        let resolved_ref = String::from_utf8(reference.stdout)
+            .map_err(|error| format!("fetched oracle ref was not UTF-8: {error}"))?;
+        require(
+            resolved_ref.trim() == ORACLE_GAME_SHA,
+            format!(
+                "fetched oracle branch {ORACLE_BRANCH} resolved to {}, expected {ORACLE_GAME_SHA}",
+                resolved_ref.trim()
+            ),
+        )?;
+    }
+
+    let ancestry = Command::new("git")
+        .current_dir(root)
+        .args(["merge-base", "--is-ancestor", ORACLE_GAME_SHA, "HEAD"])
+        .output()
+        .map_err(|error| format!("verify oracle ancestry: {error}"))?;
+    require(
+        ancestry.status.success(),
+        format!(
+            "HEAD is not a descendant of pinned oracle {ORACLE_GAME_SHA}: {}",
+            String::from_utf8_lossy(&ancestry.stderr).trim()
+        ),
+    )
 }
 
 fn repository_root() -> PathBuf {
