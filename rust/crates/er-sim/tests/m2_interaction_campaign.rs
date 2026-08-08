@@ -1094,6 +1094,12 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert!(torn_down.network.queued_packet_ids.is_empty());
     assert!(torn_down.network.disconnected_endpoints.is_empty());
     assert!(torn_down.network.suspended_endpoints.is_empty());
+    assert!(torn_down.clock_timers.is_empty());
+    for endpoint in [&torn_down.host, &torn_down.guest] {
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
+    }
     assert!(torn_down.presenter.pending_event_ids.is_empty());
     assert!(torn_down.presenter.settled_event_ids.is_empty());
     assert!(torn_down.storage.pending_request_ids.is_empty());
