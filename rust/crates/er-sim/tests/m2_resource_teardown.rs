@@ -21,7 +21,7 @@ use er_types::{
     CommandFrontierControl, ConnectionGeneration, FrameContext, GameButton, InputMap, KeyBinding,
     LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
     MembershipRevision, NextControl, OperationId, PhysicalKey, SafeI53, SafeU53, SeatId, SessionId,
-    TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
+    TerminalState, TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -449,12 +449,166 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
     assert!(snapshot.storage.disposed);
 }
 
-fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
-    match pair.teardown("repeated teardown") {
-        Ok(snapshot) => assert_zero_resources(&snapshot),
-        Err(SimulatedPairError::Disposed) => {}
-        Err(error) => return Err(error.into()),
+fn assert_terminal_snapshot(snapshot: &PairSnapshot, terminal: &TerminalState) {
+    assert!(!terminal.terminal_id.is_empty());
+    assert!(!terminal.reason.is_empty());
+    assert_eq!(
+        snapshot.terminal_reason.as_deref(),
+        Some(terminal.reason.as_str()),
+        "pair terminal reason must preserve the exact terminal effect"
+    );
+
+    assert_eq!(snapshot.host.ui.kind, UiViewKind::Terminal);
+    assert_eq!(snapshot.guest.ui.kind, UiViewKind::Terminal);
+    assert_eq!(snapshot.host.ui.kind, snapshot.guest.ui.kind);
+    assert_eq!(snapshot.host.ui.owner_seat, None);
+    assert_eq!(snapshot.guest.ui.owner_seat, None);
+    assert_eq!(snapshot.host.ui.owner_seat, snapshot.guest.ui.owner_seat);
+    assert!(!snapshot.host.ui.actionable);
+    assert!(!snapshot.guest.ui.actionable);
+    assert_eq!(snapshot.host.ui.actionable, snapshot.guest.ui.actionable);
+    assert_eq!(
+        snapshot.host.ui.prompt_key.as_deref(),
+        Some(terminal.reason.as_str())
+    );
+    assert_eq!(
+        snapshot.guest.ui.prompt_key.as_deref(),
+        Some(terminal.reason.as_str())
+    );
+    assert_eq!(
+        snapshot.host.ui.prompt_key, snapshot.guest.ui.prompt_key,
+        "host and guest terminal view models must be symmetric"
+    );
+
+    assert_eq!(snapshot.host.kernel.ui.owner_seat, None);
+    assert_eq!(snapshot.guest.kernel.ui.owner_seat, None);
+    assert!(!snapshot.host.kernel.ui.actionable);
+    assert!(!snapshot.guest.kernel.ui.actionable);
+    assert_eq!(
+        snapshot.host.kernel.ui.stack,
+        snapshot.guest.kernel.ui.stack,
+        "host and guest terminal kernel UI must be symmetric"
+    );
+    for endpoint in [&snapshot.host, &snapshot.guest] {
+        assert_eq!(endpoint.kernel.ui.owner_seat, None);
+        assert!(!endpoint.kernel.ui.actionable);
+        assert_eq!(endpoint.kernel.ui.stack.len(), 1);
+        match endpoint.kernel.ui.stack.first() {
+            Some(MenuState::Terminal(menu)) => {
+                assert_eq!(menu.terminal_id, terminal.terminal_id);
+                assert_eq!(menu.prompt_key.as_deref(), Some(terminal.reason.as_str()));
+            }
+            other => panic!("terminal kernel UI was not projected: {other:?}"),
+        }
+        assert_eq!(endpoint.ui.kind, UiViewKind::Terminal);
+        assert_eq!(endpoint.ui.owner_seat, None);
+        assert!(!endpoint.ui.actionable);
+        assert_eq!(endpoint.ui.cursor, None);
+        assert!(endpoint.ui.options.is_empty());
+        assert_eq!(endpoint.ui.prompt_key.as_deref(), Some(terminal.reason.as_str()));
     }
+}
+
+fn assert_terminal_trace(steps: &[PairStep]) -> TestResult<(TerminalState, PairSnapshot)> {
+    let terminal_effects = steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::EnterSharedTerminal { terminal } => Some(terminal.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        terminal_effects.len(),
+        1,
+        "triggering trace must enter the shared terminal exactly once"
+    );
+    let terminal = terminal_effects
+        .into_iter()
+        .next()
+        .expect("exactly one terminal effect was asserted");
+    let triggering_step = steps
+        .iter()
+        .find(|step| {
+            step.generated_effects.iter().any(|effect| {
+                matches!(effect, KernelEffect::EnterSharedTerminal { .. })
+            })
+        })
+        .ok_or("terminal effect was not associated with a triggering step")?;
+    assert_terminal_snapshot(&triggering_step.snapshot, &terminal);
+    assert_zero_resources(&triggering_step.snapshot);
+    Ok((terminal, triggering_step.snapshot.clone()))
+}
+
+fn assert_absorbed_state(actual: &PairSnapshot, expected: &PairSnapshot) {
+    assert_eq!(actual.seed, expected.seed);
+    assert_eq!(actual.virtual_time_ms, expected.virtual_time_ms);
+    assert_eq!(actual.host, expected.host);
+    assert_eq!(actual.guest, expected.guest);
+    assert_eq!(actual.network, expected.network);
+    assert_eq!(actual.presenter, expected.presenter);
+    assert_eq!(actual.storage, expected.storage);
+    assert_eq!(actual.terminal_reason, expected.terminal_reason);
+}
+
+fn assert_terminal_absorbing_path(
+    pair: &mut SimulatedPair,
+    trace: &[PairStep],
+    teardown_reason: &str,
+) -> TestResult {
+    let (terminal, triggering_snapshot) = assert_terminal_trace(trace)?;
+    let terminal_snapshot = pair.snapshot()?;
+    assert_eq!(terminal_snapshot, triggering_snapshot);
+    assert_terminal_snapshot(&terminal_snapshot, &terminal);
+
+    let mut inert_steps = Vec::new();
+    inert_steps.push(pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?);
+    inert_steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::Enter)?);
+    inert_steps.push(pair.advance_time(safe(10_000))?);
+    inert_steps.push(pair.apply(PairOperation::Fault {
+        operation: FaultOperation::DeliverNext,
+    })?);
+    inert_steps.push(pair.apply(PairOperation::Disconnect {
+        endpoint: PairEndpoint::Guest,
+    })?);
+    inert_steps.push(pair.apply(PairOperation::Reconnect {
+        endpoint: PairEndpoint::Host,
+    })?);
+    inert_steps.push(pair.apply(PairOperation::Suspend {
+        endpoint: PairEndpoint::Host,
+    })?);
+    inert_steps.push(pair.apply(PairOperation::Resume {
+        endpoint: PairEndpoint::Guest,
+    })?);
+
+    for (index, step) in inert_steps.iter().enumerate() {
+        assert_eq!(step.sequence, step.snapshot.sequence);
+        assert_eq!(
+            step.sequence.get(),
+            triggering_snapshot.sequence.get() + u64::try_from(index + 1)?
+        );
+        assert!(step.generated_effects.is_empty());
+        assert_absorbed_state(&step.snapshot, &terminal_snapshot);
+        assert_terminal_snapshot(&step.snapshot, &terminal);
+        assert_zero_resources(&step.snapshot);
+    }
+
+    let before_teardown = pair.snapshot()?;
+    let first_teardown = pair.teardown(teardown_reason)?;
+    assert_eq!(first_teardown, Ok(before_teardown.clone()));
+    let final_snapshot = first_teardown?;
+    assert_eq!(final_snapshot, before_teardown);
+    assert_terminal_snapshot(&final_snapshot, &terminal);
+    assert_zero_resources(&final_snapshot);
+    assert_post_disposal_rejected(pair)?;
+    Ok(())
+}
+
+fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
+    assert!(matches!(
+        pair.teardown("repeated teardown"),
+        Err(SimulatedPairError::Disposed)
+    ));
     assert!(matches!(
         pair.snapshot(),
         Err(SimulatedPairError::Disposed)
@@ -596,7 +750,11 @@ fn drain_network(pair: &mut SimulatedPair, trace: &mut Vec<PairStep>) -> TestRes
     Err("resource teardown pair did not drain its deterministic network".into())
 }
 
-fn delay_all_queued(pair: &mut SimulatedPair, additional_ms: SafeU53) -> TestResult {
+fn delay_all_queued(
+    pair: &mut SimulatedPair,
+    additional_ms: SafeU53,
+    trace: &mut Vec<PairStep>,
+) -> TestResult {
     let packet_ids = pair
         .snapshot()?
         .network
@@ -604,12 +762,12 @@ fn delay_all_queued(pair: &mut SimulatedPair, additional_ms: SafeU53) -> TestRes
         .into_iter()
         .collect::<Vec<_>>();
     for packet_id in packet_ids {
-        pair.apply(PairOperation::Fault {
+        trace.push(pair.apply(PairOperation::Fault {
             operation: FaultOperation::Delay {
                 packet_id,
                 additional_ms,
             },
-        })?;
+        })?);
     }
     Ok(())
 }
@@ -840,10 +998,11 @@ fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
 
     // Submit through physical input, deliver the opaque proposal, then
     // corrupt the actual authority-entry frame before the guest sees it.
-    let _ = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    let mut trace = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     let delivered_proposal = pair.apply(PairOperation::Fault {
         operation: FaultOperation::DeliverNext,
     })?;
+    trace.push(delivered_proposal.clone());
     assert!(!delivered_proposal.snapshot.network.queued_packet_ids.is_empty());
     let entry_packet = delivered_proposal
         .snapshot
@@ -861,20 +1020,15 @@ fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
             },
         },
     })?;
+    trace.push(corrupted.clone());
     assert!(corrupted.snapshot.network.queued_packet_ids.contains(&entry_packet));
     let terminal = pair.apply(PairOperation::Fault {
         operation: FaultOperation::Deliver {
             packet_id: entry_packet,
         },
     })?;
-    assert!(
-        terminal.snapshot.terminal_reason.is_some(),
-        "malformed known frame must take the pair through its terminal path"
-    );
-
-    let final_snapshot = pair.teardown("m2b-10 protocol violation")?;
-    assert_zero_resources(&final_snapshot);
-    assert_post_disposal_rejected(&mut pair)?;
+    trace.push(terminal.clone());
+    assert_terminal_absorbing_path(&mut pair, &trace, "m2b-10 protocol violation")?;
     Ok(())
 }
 
@@ -883,18 +1037,21 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
     let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
 
-    let _ = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    let mut trace = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     let after_proposal = pair.apply(PairOperation::Fault {
         operation: FaultOperation::DeliverNext,
     })?;
+    trace.push(after_proposal.clone());
     assert!(!after_proposal.snapshot.host.live_resources.delivery_leases.is_empty());
 
-    let _ = pair.apply(PairOperation::Disconnect {
+    let disconnected = pair.apply(PairOperation::Disconnect {
         endpoint: PairEndpoint::Guest,
     })?;
+    trace.push(disconnected);
     let reconnect = pair.apply(PairOperation::Reconnect {
         endpoint: PairEndpoint::Guest,
     })?;
+    trace.push(reconnect.clone());
     assert!(
         !reconnect
             .snapshot
@@ -915,16 +1072,10 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
     // Keep the recovery request and any retained-entry redelivery beyond the
     // request timeout using virtual time only. The recovery fence must then
     // take the production pair through its terminal failure path.
-    delay_all_queued(&mut pair, safe(1_000_000))?;
+    delay_all_queued(&mut pair, safe(1_000_000), &mut trace)?;
     let timed_out = pair.advance_time(safe(RECOVERY_REQUEST_TIMEOUT_MS))?;
-    assert!(
-        timed_out.snapshot.terminal_reason.is_some(),
-        "recovery timeout must enter the terminal path"
-    );
-
-    let final_snapshot = pair.teardown("m2b-10 recovery timeout")?;
-    assert_zero_resources(&final_snapshot);
-    assert_post_disposal_rejected(&mut pair)?;
+    trace.push(timed_out.clone());
+    assert_terminal_absorbing_path(&mut pair, &trace, "m2b-10 recovery timeout")?;
     Ok(())
 }
 
@@ -933,9 +1084,9 @@ fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult
     let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
 
-    let proposal_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    let mut trace = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     assert_timer_metadata(
-        &proposal_steps,
+        &trace,
         &[TimeClass::Connected, TimeClass::Absolute],
     )?;
     let proposal_live = pair.snapshot()?;
@@ -947,30 +1098,28 @@ fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult
         .next()
         .copied()
         .ok_or("proposal packet was not queued")?;
-    let _ = pair.apply(PairOperation::Fault {
+    trace.push(pair.apply(PairOperation::Fault {
         operation: FaultOperation::Drop {
             packet_id: proposal_packet,
         },
-    })?;
-    let _ = pair.apply(PairOperation::Disconnect {
+    })?);
+    trace.push(pair.apply(PairOperation::Disconnect {
         endpoint: PairEndpoint::Guest,
-    })?;
+    })?);
 
     let terminal = pair.advance_time(safe(ABSOLUTE_PROPOSAL_CEILING_MS))?;
+    trace.push(terminal.clone());
     assert_eq!(
         terminal.snapshot.virtual_time_ms,
         safe(ABSOLUTE_PROPOSAL_CEILING_MS)
     );
-    assert!(
-        terminal.snapshot.terminal_reason.is_some(),
-        "absolute proposal safety deadline must terminalize the pair"
-    );
     assert!(terminal.snapshot.guest.live_resources.proposal_leases.is_empty());
     assert!(terminal.snapshot.guest.live_resources.timers.is_empty());
-
-    let final_snapshot = pair.teardown("m2b-10 absolute proposal terminal")?;
-    assert_zero_resources(&final_snapshot);
-    assert_post_disposal_rejected(&mut pair)?;
+    assert_terminal_absorbing_path(
+        &mut pair,
+        &trace,
+        "m2b-10 absolute proposal terminal",
+    )?;
     Ok(())
 }
 
