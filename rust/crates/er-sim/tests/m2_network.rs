@@ -12,6 +12,9 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+const ORACLE_RNG_FIXTURE: &str =
+    include_str!("../../../fixtures/v1/m2-network-rng-golden.json");
+
 fn safe(value: u64) -> Result<SafeU53, SafeU53Error> {
     SafeU53::new(value)
 }
@@ -140,6 +143,42 @@ fn seeded_delivery_trace(seed: u64) -> Result<Vec<SafeU53>, Box<dyn Error>> {
         .collect())
 }
 
+fn oracle_vector(seed: u64) -> Result<(Vec<u32>, Vec<u64>), Box<dyn Error>> {
+    let fixture: Value = serde_json::from_str(ORACLE_RNG_FIXTURE)?;
+    let seed_text = seed.to_string();
+    let vector = fixture["vectors"]
+        .as_array()
+        .ok_or_else(|| missing("oracle fixture has no vector array"))?
+        .iter()
+        .find(|vector| vector["seed"].as_str() == Some(seed_text.as_str()))
+        .ok_or_else(|| missing("oracle fixture is missing the requested seed"))?;
+    let samples = vector["u32"]
+        .as_array()
+        .ok_or_else(|| missing("oracle fixture vector has no u32 samples"))?;
+    let delays = vector["delayMs"]
+        .as_array()
+        .ok_or_else(|| missing("oracle fixture vector has no delay samples"))?;
+    let mut expected_samples = Vec::with_capacity(samples.len());
+    for sample in samples {
+        let value = sample
+            .as_u64()
+            .ok_or_else(|| missing("oracle fixture u32 sample is not an integer"))?;
+        expected_samples.push(
+            u32::try_from(value)
+                .map_err(|_| missing("oracle fixture u32 sample exceeds u32"))?,
+        );
+    }
+    let mut expected_delays = Vec::with_capacity(delays.len());
+    for delay in delays {
+        expected_delays.push(
+            delay
+                .as_u64()
+                .ok_or_else(|| missing("oracle fixture delay is not an integer"))?,
+        );
+    }
+    Ok((expected_samples, expected_delays))
+}
+
 #[test]
 fn seed_replays_queue_timing_and_event_order_exactly() -> TestResult {
     let first = seeded_trace(0xdecafbad)?;
@@ -152,6 +191,50 @@ fn seed_replays_queue_timing_and_event_order_exactly() -> TestResult {
             NetworkEvent::Delivered { .. } | NetworkEvent::Dropped { .. }
         )
     }));
+    Ok(())
+}
+
+#[test]
+fn queue_timing_matches_the_independent_oracle_mulberry32_fixture() -> TestResult {
+    let fixture: Value = serde_json::from_str(ORACLE_RNG_FIXTURE)?;
+    assert_eq!(fixture["oracle"]["gameSha"], json!("3b534099919efae827019d4a3f3c4ab0ecd6d67b"));
+    assert_eq!(fixture["oracle"]["source"], json!("test/tools/coop-authority-v2-simulator.ts"));
+    assert_eq!(fixture["oracle"]["function"], json!("makeRng"));
+    assert_eq!(fixture["oracle"]["algorithm"], json!("mulberry32"));
+    assert_eq!(fixture["oracle"]["seedCoercion"], json!("seed >>> 0"));
+
+    let seed_zero = fixture["vectors"]
+        .as_array()
+        .and_then(|vectors| vectors.iter().find(|vector| vector["seed"].as_str() == Some("0")))
+        .ok_or_else(|| missing("oracle fixture is missing seed zero"))?;
+    assert_eq!(seed_zero["u32"][0], json!(0x4434_B462_u32));
+    assert_eq!(seed_zero["u32"][0], json!(1_144_304_738_u32));
+    assert_eq!(seed_zero["delayMs"][0], json!(2_u64));
+
+    for vector in fixture["vectors"]
+        .as_array()
+        .ok_or_else(|| missing("oracle fixture has no vectors"))?
+    {
+        let seed = vector["seed"]
+            .as_str()
+            .ok_or_else(|| missing("oracle fixture seed is not a string"))?
+            .parse::<u64>()?;
+        let (samples, expected_delays) = oracle_vector(seed)?;
+        assert_eq!(samples.len(), expected_delays.len());
+        for (sample, expected_delay) in samples.iter().zip(&expected_delays) {
+            assert_eq!(
+                1 + (u64::from(*sample) * 5) / 4_294_967_296,
+                *expected_delay
+            );
+        }
+
+        let actual_delays: Vec<u64> = seeded_delivery_trace(seed)?
+            .into_iter()
+            .take(expected_delays.len())
+            .map(|deadline| deadline.get() - 100)
+            .collect();
+        assert_eq!(actual_delays, expected_delays, "seed {seed}");
+    }
     Ok(())
 }
 
@@ -170,14 +253,37 @@ fn diagnostics_preserve_u64_max_seed_as_canonical_decimal_string() -> TestResult
 }
 
 #[test]
-fn both_seed_halves_change_multi_packet_traces() -> TestResult {
+fn diagnostics_default_and_deserialization_reject_noncanonical_seed_strings() -> TestResult {
+    assert_eq!(FaultNetworkDiagnostics::default().seed, "0");
+    let mut wire = serde_json::to_value(FaultNetworkDiagnostics::default())?;
+    assert_eq!(wire["seed"], json!("0"));
+    for invalid in ["", "00", "+1", " 1", "1 ", "1e3", "18446744073709551616"] {
+        wire["seed"] = json!(invalid);
+        assert!(
+            serde_json::from_value::<FaultNetworkDiagnostics>(wire.clone()).is_err(),
+            "seed {invalid:?} must be rejected"
+        );
+    }
+    wire["seed"] = json!(1);
+    assert!(serde_json::from_value::<FaultNetworkDiagnostics>(wire.clone()).is_err());
+    let mut invalid = FaultNetworkDiagnostics::default();
+    invalid.seed = "01".to_owned();
+    assert!(serde_json::to_value(invalid).is_err());
+    wire["seed"] = json!("0");
+    let decoded: FaultNetworkDiagnostics = serde_json::from_value(wire)?;
+    assert_eq!(decoded.seed, "0");
+    Ok(())
+}
+
+#[test]
+fn only_the_low_32_seed_bits_change_mulberry32_packet_timing() -> TestResult {
     let baseline = seeded_delivery_trace(0x0123_4567_dead_beef)?;
     let high_changed = seeded_delivery_trace(0x89ab_cdef_dead_beef)?;
     let low_changed = seeded_delivery_trace(0x0123_4567_feed_face)?;
     assert_eq!(baseline.len(), 16);
     assert_eq!(high_changed.len(), 16);
     assert_eq!(low_changed.len(), 16);
-    assert_ne!(baseline, high_changed);
+    assert_eq!(baseline, high_changed);
     assert_ne!(baseline, low_changed);
     Ok(())
 }
@@ -327,6 +433,7 @@ fn reconnect_advances_generation_and_drops_old_queued_packets() -> TestResult {
     let next_generation = network.reconnect(seat(1)?)?;
     assert_eq!(next_generation, generation(1)?);
     assert_eq!(network.connection_generation(seat(1)?), generation(1)?);
+    assert_eq!(network.connection_generation(seat(2)?), generation(1)?);
     let stale = network.apply(
         FaultOperation::Deliver {
             packet_id: old_packet,
@@ -343,6 +450,10 @@ fn reconnect_advances_generation_and_drops_old_queued_packets() -> TestResult {
         frame(json!({"generation":1})),
         safe(0)?,
     )?;
+    let new_packet_wire = serde_json::to_value(packet(&network, new_packet)?)?;
+    assert_eq!(new_packet_wire.as_object().map(|fields| fields.len()), Some(6));
+    assert!(new_packet_wire.get("sourceGeneration").is_none());
+    assert!(new_packet_wire.get("destinationGeneration").is_none());
     let delivered = network.apply(
         FaultOperation::Deliver {
             packet_id: new_packet,
@@ -350,6 +461,36 @@ fn reconnect_advances_generation_and_drops_old_queued_packets() -> TestResult {
         safe(0)?,
     )?;
     assert_eq!(delivered_id(&delivered)?, new_packet);
+
+    let stale_reverse = network.enqueue(
+        seat(2)?,
+        seat(1)?,
+        generation(0)?,
+        frame(json!({"generation":0,"direction":"reverse"})),
+        safe(0)?,
+    )?;
+    let stale_reverse_events = network.apply(
+        FaultOperation::Deliver {
+            packet_id: stale_reverse,
+        },
+        safe(0)?,
+    )?;
+    assert_eq!(dropped_id(&stale_reverse_events)?, stale_reverse);
+
+    let fresh_reverse = network.enqueue(
+        seat(2)?,
+        seat(1)?,
+        generation(1)?,
+        frame(json!({"generation":1,"direction":"reverse"})),
+        safe(0)?,
+    )?;
+    let fresh_reverse_events = network.apply(
+        FaultOperation::Deliver {
+            packet_id: fresh_reverse,
+        },
+        safe(0)?,
+    )?;
+    assert_eq!(delivered_id(&fresh_reverse_events)?, fresh_reverse);
     Ok(())
 }
 
@@ -396,7 +537,7 @@ fn enqueue_uses_the_drawn_delay_at_safe_integer_boundaries() -> TestResult {
     )?;
     assert_eq!(packet(&succeeds, packet_id)?.deliver_at_ms, SafeU53::MAX);
 
-    let mut overflows = FaultNetwork::new(1, endpoints()?);
+    let mut overflows = FaultNetwork::new(5, endpoints()?);
     assert!(matches!(
         overflows.enqueue(
             seat(1)?,
@@ -413,8 +554,36 @@ fn enqueue_uses_the_drawn_delay_at_safe_integer_boundaries() -> TestResult {
 }
 
 #[test]
+fn delay_overflow_is_fail_atomic_for_public_network_state() -> TestResult {
+    let mut network = FaultNetwork::new(5, endpoints()?);
+    let packet_id = network.enqueue(
+        seat(1)?,
+        seat(2)?,
+        generation(0)?,
+        frame(json!({"overflow":"delay"})),
+        safe(0)?,
+    )?;
+    let before_packets = network.queued_packets();
+    let before_diagnostics = network.diagnostics();
+    assert!(matches!(
+        network.apply(
+            FaultOperation::Delay {
+                packet_id,
+                additional_ms: SafeU53::MAX,
+            },
+            safe(0)?,
+        ),
+        Err(FaultNetworkError::InvalidFault { reason })
+            if reason == "packet delay exceeds SafeU53"
+    ));
+    assert_eq!(network.queued_packets(), before_packets);
+    assert_eq!(network.diagnostics(), before_diagnostics);
+    Ok(())
+}
+
+#[test]
 fn failed_near_max_enqueue_preserves_the_next_valid_trace() -> TestResult {
-    let seed = 1;
+    let seed = 5;
     let boundary = safe(SafeU53::MAX.get() - 1)?;
     let valid_now = safe(10)?;
     let valid_payload = frame(json!({"boundary":"allow-after-reject"}));
@@ -773,6 +942,8 @@ fn dispose_is_idempotent_and_drains_queued_packets() -> TestResult {
     let diagnostics = network.diagnostics();
     assert!(diagnostics.disposed);
     assert!(diagnostics.queued_packet_ids.is_empty());
+    assert!(diagnostics.disconnected_endpoints.is_empty());
+    assert!(diagnostics.suspended_endpoints.is_empty());
     assert!(network.packet(packet_id).is_none());
     assert!(matches!(
         network.enqueue(

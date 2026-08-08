@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_types::{ConnectionGeneration, NetworkPayload, RawFrame, SafeU53, SeatId};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Error as SerdeDeError, ser::Error as SerdeSerError};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -62,8 +62,7 @@ pub enum NetworkEvent {
 
 /// Public diagnostics are observational state. Counter fields intentionally
 /// saturate at `SafeU53::MAX` and never feed back into simulation behavior.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FaultNetworkDiagnostics {
     /// Canonical unsigned decimal representation of the internal `u64` seed.
     pub seed: String,
@@ -74,6 +73,74 @@ pub struct FaultNetworkDiagnostics {
     pub duplicated_count: SafeU53,
     pub corrupted_count: SafeU53,
     pub disposed: bool,
+}
+
+impl Default for FaultNetworkDiagnostics {
+    fn default() -> Self {
+        Self {
+            seed: "0".to_owned(),
+            queued_packet_ids: BTreeSet::new(),
+            disconnected_endpoints: BTreeSet::new(),
+            suspended_endpoints: BTreeSet::new(),
+            dropped_count: SafeU53::ZERO,
+            duplicated_count: SafeU53::ZERO,
+            corrupted_count: SafeU53::ZERO,
+            disposed: false,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FaultNetworkDiagnosticsWire {
+    seed: String,
+    queued_packet_ids: BTreeSet<SafeU53>,
+    disconnected_endpoints: BTreeSet<SeatId>,
+    suspended_endpoints: BTreeSet<SeatId>,
+    dropped_count: SafeU53,
+    duplicated_count: SafeU53,
+    corrupted_count: SafeU53,
+    disposed: bool,
+}
+
+impl Serialize for FaultNetworkDiagnostics {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        parse_canonical_seed(&self.seed).map_err(S::Error::custom)?;
+        FaultNetworkDiagnosticsWire {
+            seed: self.seed.clone(),
+            queued_packet_ids: self.queued_packet_ids.clone(),
+            disconnected_endpoints: self.disconnected_endpoints.clone(),
+            suspended_endpoints: self.suspended_endpoints.clone(),
+            dropped_count: self.dropped_count,
+            duplicated_count: self.duplicated_count,
+            corrupted_count: self.corrupted_count,
+            disposed: self.disposed,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for FaultNetworkDiagnostics {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = FaultNetworkDiagnosticsWire::deserialize(deserializer)?;
+        parse_canonical_seed(&wire.seed).map_err(D::Error::custom)?;
+        Ok(Self {
+            seed: wire.seed,
+            queued_packet_ids: wire.queued_packet_ids,
+            disconnected_endpoints: wire.disconnected_endpoints,
+            suspended_endpoints: wire.suspended_endpoints,
+            dropped_count: wire.dropped_count,
+            duplicated_count: wire.duplicated_count,
+            corrupted_count: wire.corrupted_count,
+            disposed: wire.disposed,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -151,6 +218,8 @@ impl FaultNetwork {
             return Err(FaultNetworkError::Disconnected { endpoint: to });
         }
 
+        let source_generation = self.connection_generation(from);
+        let destination_generation = self.connection_generation(to);
         let (deliver_at_ms, next_rng) = self.next_delivery_time(now_ms)?;
         let packet_id = self.allocate_packet_id()?;
         self.queue.push(QueuedPacket {
@@ -162,7 +231,12 @@ impl FaultNetwork {
                 payload,
                 deliver_at_ms,
             },
-            stale: false,
+            source_generation,
+            destination_generation,
+            // Retain an explicitly stale send for deterministic drop/reap behavior, but never
+            // allow it to cross either endpoint's current incarnation boundary.
+            stale: connection_generation != source_generation
+                || connection_generation != destination_generation,
         });
         self.rng = next_rng;
         Ok(packet_id)
@@ -254,7 +328,8 @@ impl FaultNetwork {
                 queued.stale = true;
             }
         }
-        self.generations.insert(endpoint, next);
+        self.generations.insert(self.endpoints[0], next);
+        self.generations.insert(self.endpoints[1], next);
         self.disconnected.remove(&endpoint);
         Ok(next)
     }
@@ -359,7 +434,9 @@ impl FaultNetwork {
         now_ms: SafeU53,
     ) -> Result<(SafeU53, SeededRng), FaultNetworkError> {
         let mut next_rng = self.rng.clone();
-        let delay_ms = 1 + u64::from(next_rng.next_u32() % 5);
+        // This is oracle `int(1, 5)`: floor((u32 / 2^32) * 5) + 1. Integer
+        // arithmetic preserves the exact boundary behavior without a float.
+        let delay_ms = next_rng.next_int_inclusive(1, 5);
         let deliver_at =
             now_ms
                 .get()
@@ -481,10 +558,15 @@ impl FaultNetwork {
     }
 
     fn packet_is_stale(&self, queued: &QueuedPacket) -> bool {
+        let source_generation = self.connection_generation(queued.packet.from);
+        let destination_generation = self.connection_generation(queued.packet.to);
         queued.stale
             || self.disconnected.contains(&queued.packet.from)
             || self.disconnected.contains(&queued.packet.to)
-            || queued.packet.connection_generation != self.connection_generation(queued.packet.from)
+            || queued.source_generation != source_generation
+            || queued.destination_generation != destination_generation
+            || queued.packet.connection_generation != source_generation
+            || queued.packet.connection_generation != destination_generation
     }
 
     fn next_reordered_due_index(&self, now_ms: SafeU53) -> Option<usize> {
@@ -526,29 +608,57 @@ impl FaultNetwork {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct QueuedPacket {
     packet: NetworkPacket,
+    source_generation: ConnectionGeneration,
+    destination_generation: ConnectionGeneration,
     stale: bool,
 }
 
 #[derive(Clone, Debug)]
 struct SeededRng {
-    state: u64,
+    state: u32,
 }
 
 impl SeededRng {
     fn new(seed: u64) -> Self {
-        Self { state: seed }
+        Self { state: seed as u32 }
     }
 
     fn next_u32(&mut self) -> u32 {
-        self.state = self.state.wrapping_add(0x9e37_79b9_7f4a_7c15);
-        let mut value = self.state;
-        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        (value ^ (value >> 31)) as u32
+        // Exact oracle makeRng/mulberry32 semantics. Every intermediate stays
+        // in the JavaScript bitwise 32-bit domain (`| 0`, Math.imul, `>>> 0`).
+        let a = self.state.wrapping_add(0x6d2b_79f5);
+        self.state = a;
+        let mut t = (a ^ (a >> 15)).wrapping_mul(1 | a);
+        t ^= t.wrapping_add((t ^ (t >> 7)).wrapping_mul(61 | t));
+        t ^ (t >> 14)
     }
+
+    fn next_int_inclusive(&mut self, min: u64, max: u64) -> u64 {
+        let span = max - min + 1;
+        min + (u64::from(self.next_u32()) * span) / 4_294_967_296
+    }
+}
+
+fn parse_canonical_seed(seed: &str) -> Result<u64, String> {
+    if seed.is_empty() {
+        return Err("seed must be a canonical unsigned decimal string".to_owned());
+    }
+    if seed.len() > 1 && seed.starts_with('0') {
+        return Err("seed must not contain redundant leading zeroes".to_owned());
+    }
+    if !seed.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("seed must be a canonical unsigned decimal string".to_owned());
+    }
+    let value = seed
+        .parse::<u64>()
+        .map_err(|_| "seed is outside the u64 range".to_owned())?;
+    if value.to_string() != seed {
+        return Err("seed must be a canonical unsigned decimal string".to_owned());
+    }
+    Ok(value)
 }
 
 // Diagnostic-only mutation: saturation is intentional, and this helper has no
@@ -674,4 +784,282 @@ fn parse_array_index(token: &str, pointer: &str) -> Result<usize, String> {
     token
         .parse::<usize>()
         .map_err(|_| format!("JSON pointer {pointer} has an invalid array index"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct MechanicalState {
+        rng_state: u32,
+        endpoints: [SeatId; 2],
+        generations: BTreeMap<SeatId, ConnectionGeneration>,
+        queue: Vec<QueuedPacket>,
+        reordered_packet_ids: BTreeSet<SafeU53>,
+        next_packet_id: u64,
+        disconnected: BTreeSet<SeatId>,
+        suspended: BTreeSet<SeatId>,
+        disposed: bool,
+    }
+
+    fn endpoints() -> [SeatId; 2] {
+        [
+            SeatId::new(safe(1)),
+            SeatId::new(safe(2)),
+        ]
+    }
+
+    fn safe(value: u64) -> SafeU53 {
+        assert!(value <= SafeU53::MAX.get());
+        SafeU53::new(value).unwrap_or(SafeU53::ZERO)
+    }
+
+    fn generation(value: u64) -> ConnectionGeneration {
+        ConnectionGeneration::new(safe(value))
+    }
+
+    fn frame(value: serde_json::Value) -> NetworkPayload {
+        NetworkPayload::Frame(RawFrame::JsonValue(value))
+    }
+
+    fn network_with_packets() -> Result<(FaultNetwork, [SafeU53; 2]), FaultNetworkError> {
+        let endpoints = endpoints();
+        let mut network = FaultNetwork::new(73, endpoints);
+        let first = network
+            .enqueue(
+                endpoints[0],
+                endpoints[1],
+                ConnectionGeneration::ZERO,
+                frame(serde_json::json!({"id": 0})),
+                SafeU53::ZERO,
+            )
+            ?;
+        let second = network
+            .enqueue(
+                endpoints[1],
+                endpoints[0],
+                ConnectionGeneration::ZERO,
+                frame(serde_json::json!({"id": 1})),
+                SafeU53::ZERO,
+            )
+            ?;
+        Ok((network, [first, second]))
+    }
+
+    fn mechanical_state(network: &FaultNetwork) -> MechanicalState {
+        MechanicalState {
+            rng_state: network.rng.state,
+            endpoints: network.endpoints,
+            generations: network.generations.clone(),
+            queue: network.queue.clone(),
+            reordered_packet_ids: network.reordered_packet_ids.clone(),
+            next_packet_id: network.next_packet_id,
+            disconnected: network.disconnected.clone(),
+            suspended: network.suspended.clone(),
+            disposed: network.disposed,
+        }
+    }
+
+    #[test]
+    fn mulberry32_matches_the_pinned_cross_language_u32_vectors() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/v1/m2-network-rng-golden.json"
+        ))?;
+        for vector in fixture["vectors"]
+            .as_array()
+            .ok_or_else(|| std::io::Error::other("oracle fixture has no vectors"))?
+        {
+            let seed = vector["seed"]
+                .as_str()
+                .ok_or_else(|| std::io::Error::other("oracle fixture seed is not a string"))?
+                .parse::<u64>()?;
+            let samples = vector["u32"]
+                .as_array()
+                .ok_or_else(|| std::io::Error::other("oracle fixture has no u32 samples"))?;
+            let mut rng = SeededRng::new(seed);
+            for sample in samples {
+                let expected = sample
+                    .as_u64()
+                    .ok_or_else(|| std::io::Error::other("oracle sample is not an integer"))?;
+                let expected = u32::try_from(expected)?;
+                assert_eq!(rng.next_u32(), expected, "seed {seed}");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn packet_id_exhaustion_is_fail_atomic_after_the_last_valid_id() -> Result<(), FaultNetworkError> {
+        let endpoints = endpoints();
+        let mut network = FaultNetwork::new(79, endpoints);
+        network.next_packet_id = SafeU53::MAX.get();
+        let last_id = network
+            .enqueue(
+                endpoints[0],
+                endpoints[1],
+                ConnectionGeneration::ZERO,
+                frame(serde_json::json!({"last": true})),
+                SafeU53::ZERO,
+            )
+            ?;
+        assert_eq!(last_id, SafeU53::MAX);
+
+        let before = mechanical_state(&network);
+        let before_diagnostics = network.diagnostics();
+        assert_eq!(
+            network.enqueue(
+                endpoints[0],
+                endpoints[1],
+                ConnectionGeneration::ZERO,
+                frame(serde_json::json!({"after": false})),
+                SafeU53::ZERO,
+            ),
+            Err(FaultNetworkError::PacketIdExhausted)
+        );
+        assert_eq!(mechanical_state(&network), before);
+        assert_eq!(network.diagnostics(), before_diagnostics);
+
+        let before_duplicate = mechanical_state(&network);
+        let before_duplicate_diagnostics = network.diagnostics();
+        assert_eq!(
+            network.duplicate_packet(last_id),
+            Err(FaultNetworkError::PacketIdExhausted)
+        );
+        assert_eq!(mechanical_state(&network), before_duplicate);
+        assert_eq!(network.diagnostics(), before_duplicate_diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn generation_exhaustion_is_fail_atomic_for_connection_and_queued_state()
+        -> Result<(), FaultNetworkError>
+    {
+        let (mut network, _) = network_with_packets()?;
+        let endpoints = network.endpoints;
+        let maximum = ConnectionGeneration::new(SafeU53::MAX);
+        network.generations.insert(endpoints[0], maximum);
+        network.generations.insert(endpoints[1], maximum);
+        let before = mechanical_state(&network);
+        let before_diagnostics = network.diagnostics();
+
+        assert_eq!(
+            network.reconnect(endpoints[0]),
+            Err(FaultNetworkError::GenerationExhausted)
+        );
+        assert_eq!(mechanical_state(&network), before);
+        assert_eq!(network.diagnostics(), before_diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn delay_deadline_overflow_is_fail_atomic_for_rng_ids_order_and_diagnostics()
+        -> Result<(), FaultNetworkError>
+    {
+        let (mut network, [packet_id, _]) = network_with_packets()?;
+        network.queue[0].packet.deliver_at_ms = SafeU53::MAX;
+        let before = mechanical_state(&network);
+        let before_diagnostics = network.diagnostics();
+
+        assert_eq!(
+            network.apply(
+                FaultOperation::Delay {
+                    packet_id,
+                    additional_ms: safe(1),
+                },
+                SafeU53::ZERO,
+            ),
+            Err(FaultNetworkError::InvalidFault {
+                reason: "packet delay exceeds SafeU53".to_owned(),
+            })
+        );
+        assert_eq!(mechanical_state(&network), before);
+        assert_eq!(network.diagnostics(), before_diagnostics);
+        Ok(())
+    }
+
+    fn apply_counter_sequence(
+        network: &mut FaultNetwork,
+        packet_ids: [SafeU53; 2],
+    ) -> Result<(), FaultNetworkError> {
+        let endpoints = network.endpoints;
+        network
+            .duplicate_packet(packet_ids[0])
+            ?;
+        network
+            .corrupt_packet(
+                packet_ids[1],
+                FrameCorruption::Replace {
+                    value: RawFrame::JsonValue(serde_json::json!({"corrupted": true})),
+                },
+            )
+            ?;
+        network
+            .drop_packet(packet_ids[1])
+            ?;
+        assert!(network.disconnect(endpoints[0]));
+        assert_eq!(network.reconnect(endpoints[0]), Ok(generation(1)));
+        network
+            .enqueue(
+                endpoints[0],
+                endpoints[1],
+                generation(1),
+                frame(serde_json::json!({"afterReconnect": true})),
+                SafeU53::ZERO,
+            )
+            ?;
+        Ok(())
+    }
+
+    #[test]
+    fn diagnostic_counter_saturation_is_isolated_from_mechanical_state()
+        -> Result<(), FaultNetworkError>
+    {
+        let (mut maxed, maxed_ids) = network_with_packets()?;
+        let (mut near_max, near_max_ids) = network_with_packets()?;
+        let one_below_two = safe(SafeU53::MAX.get() - 2);
+        maxed.dropped_count = SafeU53::MAX;
+        maxed.duplicated_count = SafeU53::MAX;
+        maxed.corrupted_count = SafeU53::MAX;
+        near_max.dropped_count = one_below_two;
+        near_max.duplicated_count = one_below_two;
+        near_max.corrupted_count = one_below_two;
+
+        apply_counter_sequence(&mut maxed, maxed_ids)?;
+        apply_counter_sequence(&mut near_max, near_max_ids)?;
+
+        assert_eq!(mechanical_state(&maxed), mechanical_state(&near_max));
+        let maxed_diagnostics = maxed.diagnostics();
+        let near_max_diagnostics = near_max.diagnostics();
+        assert_eq!(maxed_diagnostics.seed, near_max_diagnostics.seed);
+        assert_eq!(
+            maxed_diagnostics.queued_packet_ids,
+            near_max_diagnostics.queued_packet_ids
+        );
+        assert_eq!(
+            maxed_diagnostics.disconnected_endpoints,
+            near_max_diagnostics.disconnected_endpoints
+        );
+        assert_eq!(
+            maxed_diagnostics.suspended_endpoints,
+            near_max_diagnostics.suspended_endpoints
+        );
+        assert_eq!(maxed_diagnostics.disposed, near_max_diagnostics.disposed);
+        assert_eq!(maxed_diagnostics.dropped_count, SafeU53::MAX);
+        assert_eq!(maxed_diagnostics.duplicated_count, SafeU53::MAX);
+        assert_eq!(maxed_diagnostics.corrupted_count, SafeU53::MAX);
+        assert_eq!(
+            near_max_diagnostics.dropped_count,
+            safe(SafeU53::MAX.get() - 1)
+        );
+        assert_eq!(
+            near_max_diagnostics.duplicated_count,
+            safe(SafeU53::MAX.get() - 1)
+        );
+        assert_eq!(
+            near_max_diagnostics.corrupted_count,
+            safe(SafeU53::MAX.get() - 1)
+        );
+        Ok(())
+    }
 }
