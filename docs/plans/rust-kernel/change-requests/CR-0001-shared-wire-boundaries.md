@@ -70,11 +70,15 @@ oracle parity.
      permits controls.
    AuthorityLog applies these helpers to committed entries and receipts.
    Other layers retain their own non-empty-only rules.
-3. Implement `SafeU53` and `SafeI53` deserialization with visitors that accept
-   integer tokens and finite integral `f64` tokens within the JavaScript-safe
-   bounds. `-0.0` normalizes to integer zero. Fractional, non-finite,
-   out-of-range, string, boolean, and null values remain rejected. Serialization
-   remains a normalized integer JSON token.
+3. Enable `serde_json`'s `float_roundtrip` parser and implement `SafeU53` and
+   `SafeI53` deserialization with visitors that accept integer tokens and finite
+   `f64` values for which JavaScript `Number.isSafeInteger` is true. The default
+   best-effort decimal parser is insufficient at the safe-integer boundary: it
+   parses `9007199254740991.0` one unit low. Precise float parsing also preserves
+   JavaScript rounding before the predicate is applied. `-0.0` normalizes to
+   integer zero. Non-finite, non-integral after binary64 parsing, out-of-range,
+   string, boolean, and null values remain rejected. Serialization remains a
+   normalized integer JSON token.
 4. `TimerOwner::new` validates each field as non-empty only. Owner, address, and
    reason remain opaque and are never parsed as identities.
 5. Rust `String` deliberately remains a Unicode-scalar/UTF-8 carrier. A lone

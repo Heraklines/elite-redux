@@ -417,8 +417,8 @@ mod tests {
     #[test]
     fn allocation_crossing_maximum_boundary_uses_each_id_once() -> Result<(), SchedulerError> {
         let mut scheduler = KernelScheduler::new();
-        let before_max = SafeU53::new(SafeU53::MAX.get() - 1)
-            .map_err(|_| SchedulerError::TimerIdExhausted)?;
+        let before_max =
+            SafeU53::new(SafeU53::MAX.get() - 1).map_err(|_| SchedulerError::TimerIdExhausted)?;
         scheduler.next_timer_id = Some(before_max);
 
         let commands = scheduler.schedule_batch(vec![spec("before-max"), spec("maximum")])?;
@@ -430,10 +430,7 @@ mod tests {
                     _ => None,
                 })
                 .collect::<Vec<_>>(),
-            vec![
-                TimerId::new(before_max),
-                TimerId::new(SafeU53::MAX),
-            ]
+            vec![TimerId::new(before_max), TimerId::new(SafeU53::MAX),]
         );
         assert_eq!(
             scheduler.schedule_batch(vec![spec("after-max")]),

@@ -1,6 +1,4 @@
-use er_protocol::{
-    KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError, TimerSpec,
-};
+use er_protocol::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError, TimerSpec};
 use er_types::{SafeU53, SeatId, TimeClass, TimerId, TimerOwner};
 use serde_json::json;
 

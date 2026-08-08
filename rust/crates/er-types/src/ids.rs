@@ -417,11 +417,14 @@ mod tests {
             ("0.0", 0),
             ("-0.0", 0),
             ("1e0", 1),
+            ("9007199254740990.5", JS_MAX_SAFE_INTEGER - 1),
+            ("9007199254740991.1", JS_MAX_SAFE_INTEGER),
             ("9007199254740991", JS_MAX_SAFE_INTEGER),
             ("9007199254740991.0", JS_MAX_SAFE_INTEGER),
+            ("9.007199254740991e15", JS_MAX_SAFE_INTEGER),
         ] {
             let decoded: SafeU53 = serde_json::from_str(input)?;
-            assert_eq!(decoded.get(), expected);
+            assert_eq!(decoded.get(), expected, "input: {input}");
         }
 
         for input in OVERFLOW_JSON {
@@ -437,8 +440,7 @@ mod tests {
     #[test]
     fn authority_wire_helpers_use_javascript_utf16_layers() {
         let astral_at_limit = "\u{1f642}".repeat(AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS / 2);
-        let astral_over_limit =
-            "\u{1f642}".repeat((AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS / 2) + 1);
+        let astral_over_limit = "\u{1f642}".repeat((AUTHORITY_WIRE_STRING_MAX_UTF16_UNITS / 2) + 1);
         assert_eq!(astral_at_limit.encode_utf16().count(), 256);
         assert_eq!(astral_over_limit.encode_utf16().count(), 258);
 

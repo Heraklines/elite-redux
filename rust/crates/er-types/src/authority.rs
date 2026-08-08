@@ -378,16 +378,21 @@ mod safe_i53_tests {
     #[test]
     fn serde_accepts_javascript_integral_number_forms() -> Result<(), serde_json::Error> {
         for (input, expected) in [
+            ("-9.007199254740991e15", -JS_MAX_SAFE_SIGNED_INTEGER),
             ("-9007199254740991", -JS_MAX_SAFE_SIGNED_INTEGER),
             ("-9007199254740991.0", -JS_MAX_SAFE_SIGNED_INTEGER),
+            ("-9007199254740991.1", -JS_MAX_SAFE_SIGNED_INTEGER),
             ("-1e0", -1),
             ("-0.0", 0),
             ("0.0", 0),
             ("1e0", 1),
+            ("9007199254740990.5", JS_MAX_SAFE_SIGNED_INTEGER - 1),
+            ("9007199254740991.1", JS_MAX_SAFE_SIGNED_INTEGER),
             ("9007199254740991.0", JS_MAX_SAFE_SIGNED_INTEGER),
+            ("9.007199254740991e15", JS_MAX_SAFE_SIGNED_INTEGER),
         ] {
             let decoded: SafeI53 = serde_json::from_str(input)?;
-            assert_eq!(decoded.get(), expected);
+            assert_eq!(decoded.get(), expected, "input: {input}");
             assert_eq!(serde_json::to_string(&decoded)?, expected.to_string());
         }
         Ok(())
