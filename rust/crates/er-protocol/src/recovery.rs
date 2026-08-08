@@ -638,7 +638,7 @@ pub enum RecoveryFrontierStagingOutcome {
 
 /// Callback-free shared fence owned by the recovery transaction and consulted
 /// synchronously by the kernel's admission/progression boundaries.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RecoveryFence {
     state: RecoveryFenceState,
     control_projection_allowed: bool,
@@ -789,7 +789,7 @@ fn pacing_delay(delay_ms: SafeU53) -> SafeU53 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RecoveryTransaction {
     config: RecoveryTransactionConfig,
     fence: RecoveryFence,

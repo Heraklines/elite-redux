@@ -197,7 +197,7 @@ struct DeliveryLease {
     subsumption_done: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AuthorityLog {
     local_context: FrameContext,
     peer_bindings: BTreeMap<SeatId, ConnectionGeneration>,

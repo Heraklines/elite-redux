@@ -131,7 +131,7 @@ pub enum AuthorityReplicaError {
     InvalidRecoveryFrontier { reason: String },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AuthorityReplica {
     receipt_context: FrameContext,
     authority_seat_id: SeatId,

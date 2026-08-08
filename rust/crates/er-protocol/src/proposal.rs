@@ -767,7 +767,7 @@ pub struct ProposalAdmissionDiagnostics {
     pub disposed: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProposalAdmissionLedger {
     capacity: SafeU53,
     fingerprints: BTreeMap<OperationId, String>,
@@ -956,7 +956,7 @@ struct ProposalTimerTarget {
     time_class: TimeClass,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProposalLeaseManager {
     config: ProposalLeaseConfig,
     leases: BTreeMap<OperationId, ActiveProposalLease>,
