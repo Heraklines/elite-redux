@@ -124,7 +124,7 @@ pub struct GameKernel {
 
 #[derive(Clone, Debug)]
 enum ProtocolState {
-    Authority(AuthorityKernelState),
+    Authority(Box<AuthorityKernelState>),
     Replica(Box<ReplicaKernelState>),
 }
 
@@ -2779,7 +2779,7 @@ impl ProtocolState {
                 for peer in &peer_bindings {
                     transports.insert(peer.seat_id, TransportState::Connected);
                 }
-                Ok(Self::Authority(AuthorityKernelState {
+                Ok(Self::Authority(Box::new(AuthorityKernelState {
                     context,
                     peer_bindings,
                     log,
@@ -2792,7 +2792,7 @@ impl ProtocolState {
                     authority_rebind_pending: false,
                     staged_peer_rebinds: BTreeMap::new(),
                     transports,
-                }))
+                })))
             }
             ProtocolRoleConfig::Replica {
                 replica,
