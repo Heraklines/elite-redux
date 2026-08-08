@@ -57,10 +57,7 @@ const GOLDEN_REPLICA_CONTROL_ID: &str = "COMMAND_FRONTIER/e3/w4/t1/f0:s1:p42";
 const GOLDEN_MAX_CONTROL_ID: &str = "COMMAND_FRONTIER/e9007199254740991/w9007199254740991/t9007199254740991/f9007199254740991:s9007199254740991:p9007199254740991";
 
 fn missing(message: impl Into<String>) -> Box<dyn Error> {
-    Box::new(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        message.into(),
-    ))
+    Box::new(std::io::Error::other(message.into()))
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -740,6 +737,8 @@ fn stage_recovered_entry(
     Ok(frontier.received)
 }
 
+// Keeping each independently asserted protocol field explicit makes replay failures actionable.
+#[allow(clippy::too_many_arguments)]
 fn assert_recovery_schedule(
     action: &RecoveryAction,
     expected_timer_id: u64,
@@ -2256,16 +2255,11 @@ fn m2_8_seeded_virtual_clock_and_fault_network_state_machine_is_endpoint_qualifi
             safe(1),
             "seed={seed} operation=network second packet ID"
         );
-        let delayed_initial = replay(
+        replay(
             seed,
             "network-delay-initial",
             network.delay(first_packet, safe(2)),
         )?;
-        assert_eq!(
-            delayed_initial,
-            (),
-            "seed={seed} operation=network delay mutation result"
-        );
         let duplicate_packet = replay(
             seed,
             "network-duplicate-initial",
@@ -4826,9 +4820,7 @@ fn malformed_raw_cases() -> Vec<(String, RawCaseExpectation)> {
             },
         ),
         (
-            format!(
-                r#"{{"v":2,"t":"terminal","ctx":{{"sessionId":"\uD800","runId":"run-1","sessionEpoch":3,"seatMapId":"seat-map-1","membershipRevision":2,"senderSeatId":1,"authoritySeatId":0,"connectionGeneration":2}},"body":{{"terminalId":"terminal-1","reason":"protocol"}}}}"#
-            ),
+            r#"{"v":2,"t":"terminal","ctx":{"sessionId":"\uD800","runId":"run-1","sessionEpoch":3,"seatMapId":"seat-map-1","membershipRevision":2,"senderSeatId":1,"authoritySeatId":0,"connectionGeneration":2},"body":{"terminalId":"terminal-1","reason":"protocol"}}"#.to_owned(),
             RawCaseExpectation::Violation {
                 frame_type: None,
                 issues: vec!["malformed JSON"],

@@ -381,7 +381,7 @@ fn recovery_validation_applies_distinct_operation_and_material_digest_rules() {
     ));
 
     let mut control_character_digest = bundle(10, 12);
-    control_character_digest.material.digest = "digest-\u{0000}";
+    control_character_digest.material.digest = "digest-\u{0000}".to_owned();
     assert!(matches!(
         validate_recovery_bundle(&context, &control_character_digest),
         RecoveryBundleValidation::Valid { .. }
@@ -434,9 +434,7 @@ fn staged_frontier_is_exact_and_rejects_stale_or_advanced_live_state() {
     assert!(matches!(
         actions.as_slice(),
         [
-            RecoveryAction::FenceChanged { view }
-                if view.state == RecoveryFenceState::Held
-                    && !view.control_surface_start_frozen,
+            RecoveryAction::FenceChanged { view },
             RecoveryAction::Scheduler {
                 command: SchedulerCommand::Schedule { timer: _timer }
             },
@@ -445,7 +443,9 @@ fn staged_frontier_is_exact_and_rejects_stale_or_advanced_live_state() {
                 expected_control_id,
                 control,
             }
-        ] if *revision == Revision::new(safe(12))
+        ] if view.state == RecoveryFenceState::Held
+            && !view.control_surface_start_frozen
+            && *revision == Revision::new(safe(12))
             && *expected_control_id == control_id_of(control)
     ));
     assert_eq!(positive.phase(), Some(RecoveryPhase::FrontierInstalled));
@@ -668,9 +668,7 @@ fn material_success_stages_the_exact_full_entry_before_staged_signal_and_control
     assert!(matches!(
         staged_actions.as_slice(),
         [
-            RecoveryAction::FenceChanged { view }
-                if view.state == RecoveryFenceState::Held
-                    && !view.control_surface_start_frozen,
+            RecoveryAction::FenceChanged { view },
             RecoveryAction::Scheduler {
                 command: SchedulerCommand::Schedule { timer }
             },
@@ -679,7 +677,9 @@ fn material_success_stages_the_exact_full_entry_before_staged_signal_and_control
                 control,
                 expected_control_id,
             }
-        ] if *revision == expected_entry.revision
+        ] if view.state == RecoveryFenceState::Held
+            && !view.control_surface_start_frozen
+            && *revision == expected_entry.revision
             && timer.timer_id == TimerId::new(safe(1))
             && timer.time_class == TimeClass::Recovery
             && *control == expected_entry.next_control
