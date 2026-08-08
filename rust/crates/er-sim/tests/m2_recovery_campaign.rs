@@ -1221,9 +1221,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let directional_repeat_timer = guest_human_input_schedules(&directional_hold, safe(250))
         .first()
         .copied()
-        .ok_or_else(|| {
-            std::io::Error::other("directional hold repeat timer was not scheduled")
-        })?;
+        .ok_or_else(|| std::io::Error::other("directional hold repeat timer was not scheduled"))?;
     trace.push(directional_hold);
 
     trace.extend(pair.press(PairEndpoint::Host, PhysicalKey::Enter)?);

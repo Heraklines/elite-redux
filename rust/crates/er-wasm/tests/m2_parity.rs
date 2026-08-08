@@ -25,12 +25,8 @@ fn assert_report_matches_fixture(
         .ok_or("replay report observations are not an array")?;
     assert_eq!(observations.len(), event_count);
 
-    for (sequence, (event, observation)) in fixture
-        .trace
-        .events
-        .iter()
-        .zip(observations)
-        .enumerate()
+    for (sequence, (event, observation)) in
+        fixture.trace.events.iter().zip(observations).enumerate()
     {
         assert_eq!(event.sequence.get(), sequence as u64);
         assert_eq!(
@@ -167,8 +163,7 @@ fn seed_boundary_is_lossless_and_numeric_json_is_rejected() {
 }
 
 #[test]
-fn protocol_fixture_accepts_frozen_m2_boundaries()
--> Result<(), Box<dyn std::error::Error>> {
+fn protocol_fixture_accepts_frozen_m2_boundaries() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = parse_fixture(PROTOCOL_FIXTURE)?;
     assert_eq!(fixture.seed, u64::MAX);
     assert_eq!(fixture.trace.events.len(), 10);
@@ -237,10 +232,8 @@ fn protocol_fixture_accepts_frozen_m2_boundaries()
         .as_array()
         .ok_or("protocol fixture events are not an array")?;
     assert_eq!(raw_events.len(), 10);
-    for (sequence, (raw_event, parsed_event)) in raw_events
-        .iter()
-        .zip(&fixture.trace.events)
-        .enumerate()
+    for (sequence, (raw_event, parsed_event)) in
+        raw_events.iter().zip(&fixture.trace.events).enumerate()
     {
         assert_eq!(raw_event["sequence"], json!(sequence));
         assert_eq!(
@@ -274,8 +267,7 @@ fn wasm32_node_raw_input_fixture_accepts_all_frozen_events()
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
-fn wasm32_node_protocol_fixture_accepts_frozen_replay()
--> Result<(), Box<dyn std::error::Error>> {
+fn wasm32_node_protocol_fixture_accepts_frozen_replay() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = parse_fixture(PROTOCOL_FIXTURE)?;
     assert_eq!(fixture.seed, u64::MAX);
     assert_eq!(fixture.trace.events.len(), 10);
