@@ -734,9 +734,7 @@ fn ensure_oracle_available(root: &Path) -> AuditResult {
         .output()
         .map_err(|error| format!("run oracle object probe: {error}"))?;
     if !oracle_object.status.success() {
-        let oracle_ref = format!(
-            "refs/heads/{ORACLE_BRANCH}:refs/remotes/origin/{ORACLE_BRANCH}"
-        );
+        let oracle_ref = format!("refs/heads/{ORACLE_BRANCH}:refs/remotes/origin/{ORACLE_BRANCH}");
         let fetch = Command::new("git")
             .current_dir(root)
             .args(["fetch", "--no-tags", "origin"])

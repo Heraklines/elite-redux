@@ -1110,11 +1110,13 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     let disconnected_advance = pair.advance_time(safe(10_000))?;
     assert_eq!(disconnected_advance.snapshot.virtual_time_ms, safe(70_250));
     assert_eq!(network_send_count(&disconnected_advance), 0);
-    assert!(disconnected_advance
-        .snapshot
-        .network
-        .queued_packet_ids
-        .is_empty());
+    assert!(
+        disconnected_advance
+            .snapshot
+            .network
+            .queued_packet_ids
+            .is_empty()
+    );
     assert_eq!(
         disconnected_advance.snapshot.network.dropped_count,
         safe(

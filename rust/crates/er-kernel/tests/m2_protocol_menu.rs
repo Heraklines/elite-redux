@@ -466,7 +466,11 @@ fn configured_protocol_initial_resources_include_wait_and_control() -> TestResul
     let host = operation("host.command")?;
     let control_id = control_id_of(&control);
     let control_kernel = authority_kernel(
-        authority_config(vec![command_plan(&control, &host, false)?], Vec::new(), &[1])?,
+        authority_config(
+            vec![command_plan(&control, &host, false)?],
+            Vec::new(),
+            &[1],
+        )?,
         ui(initial_command_menu(&control, &host)?, Some(seat(0)), true),
     );
     assert!(

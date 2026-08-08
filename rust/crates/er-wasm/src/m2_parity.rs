@@ -527,12 +527,13 @@ pub fn calibrate_raw_input_fixture_json(input: &str) -> Result<String, ParityRep
     let seed = fixture.seed.to_string();
     let mut observations = Vec::with_capacity(fixture.trace.events.len());
     for event in &fixture.trace.events {
-        let effects = kernel
-            .step(event.input.clone())
-            .map_err(|error| ParityReplayError::Kernel {
-                sequence: event.sequence,
-                reason: error.to_string(),
-            })?;
+        let effects =
+            kernel
+                .step(event.input.clone())
+                .map_err(|error| ParityReplayError::Kernel {
+                    sequence: event.sequence,
+                    reason: error.to_string(),
+                })?;
         let actual = observe(&kernel, &effects)?;
         observations.push(json!({
             "seed": seed,

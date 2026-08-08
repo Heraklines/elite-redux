@@ -332,7 +332,10 @@ fn raw_input_fixture_hosted_calibration() -> Result<(), Box<dyn std::error::Erro
         json!(m2_parity::CALIBRATION_ONLY_STATUS)
     );
     assert_eq!(artifact_value["accepted_parity"], json!(false));
-    assert_eq!(artifact_value["fixture_id"], json!("game-kernel-raw-input-v1"));
+    assert_eq!(
+        artifact_value["fixture_id"],
+        json!("game-kernel-raw-input-v1")
+    );
     assert_eq!(
         artifact_value["fixture_path"],
         json!("rust/fixtures/v1/m2-parity/game-kernel-raw-input.json")

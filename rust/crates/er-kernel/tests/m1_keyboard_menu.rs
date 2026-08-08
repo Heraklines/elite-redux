@@ -404,9 +404,8 @@ fn raw_submit_dispatches_replacement_and_interaction_paths() -> TestResult {
             other => return Err(format!("unexpected menu kind in test: {other:?}").into()),
         };
         assert_ui_intent(&submitted, owner, expected_intent);
-        let terminal_reason = format!(
-            "missing exact menu proposal plan for {expected_operation} / selected"
-        );
+        let terminal_reason =
+            format!("missing exact menu proposal plan for {expected_operation} / selected");
         assert_terminal(&kernel, &submitted, &terminal_reason);
         assert_ne!(kernel.snapshot().ui, before.ui);
 
