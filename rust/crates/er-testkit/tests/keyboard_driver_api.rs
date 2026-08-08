@@ -155,10 +155,10 @@ fn public_signatures(implementation: &str) -> Vec<String> {
             continue;
         }
 
-        if line.contains('{') {
-            if let Some(signature) = current.take() {
-                signatures.push(signature);
-            }
+        if line.contains('{')
+            && let Some(signature) = current.take()
+        {
+            signatures.push(signature);
         }
     }
 
