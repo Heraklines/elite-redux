@@ -4,15 +4,14 @@ use std::collections::BTreeMap;
 
 use er_canonical::content_digest;
 use er_protocol::{
-    control_id_of, AuthorityEntryDraft, AuthorityEntryBody, AuthorityLog, AuthorityLogAction,
-    AuthorityLogConfig, AuthorityReplica, AuthorityReplicaConfig, FrameValidator,
-    InboundFrameResult, KernelScheduler, ProposalAdmission, ProposalAdmissionLedger,
-    ProposalIdentity, ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager,
-    ProposalLeaseSpec, ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome,
-    RecoveryLiveState, RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig,
-    ReplicaAction, ReplicaAdmission, ScheduledTimer, SchedulerCommand, ValidatedFrame,
-    ValidatedFrameBody, frame_contexts_compatible,
-    PresentationProbeOutcome,
+    AuthorityEntryBody, AuthorityEntryDraft, AuthorityLog, AuthorityLogAction, AuthorityLogConfig,
+    AuthorityReplica, AuthorityReplicaConfig, FrameValidator, InboundFrameResult, KernelScheduler,
+    PresentationProbeOutcome, ProposalAdmission, ProposalAdmissionLedger, ProposalIdentity,
+    ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager, ProposalLeaseSpec,
+    ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome, RecoveryLiveState,
+    RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig, ReplicaAction,
+    ReplicaAdmission, ScheduledTimer, SchedulerCommand, ValidatedFrame, ValidatedFrameBody,
+    control_id_of, frame_contexts_compatible,
 };
 use er_types::{
     AuthorityEntry, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice,
@@ -21,10 +20,10 @@ use er_types::{
     InputTimerCommand, InteractionMenu, MaterialApplicationOutcome, MenuGeneration, MenuOption,
     MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId, PresentationEvent,
     PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame, RecoveryAppliedProof,
-    RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody, Revision, SafeU53,
-    SeatId, TerminalFrameBody, TerminalMenu, TerminalState, TailRequestBody,
+    RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody, ReplacementMenu,
+    Revision, SafeU53, SeatId, TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState,
     TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
-    ReplacementMenu, FRAME_PROTOCOL_VERSION,
+    FRAME_PROTOCOL_VERSION,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use serde_json::{json, Value};
@@ -109,7 +108,7 @@ pub enum ControlMenuPlan {
     },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct GameKernel {
     input_router: InputRouter,
     ui_reducer: UiReducer,
@@ -124,13 +123,13 @@ pub struct GameKernel {
     disposed: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum ProtocolState {
     Authority(AuthorityKernelState),
     Replica(ReplicaKernelState),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct AuthorityKernelState {
     context: FrameContext,
     peer_bindings: Vec<er_protocol::PeerBinding>,
@@ -146,7 +145,7 @@ struct AuthorityKernelState {
     transports: BTreeMap<SeatId, TransportState>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ReplicaKernelState {
     context: FrameContext,
     authority_seat_id: SeatId,
@@ -284,11 +283,13 @@ impl GameKernel {
                 if scheduled.endpoint != endpoint {
                     return Err(InputRouteError::UnknownTimer { timer_id }.into());
                 }
-                if let Some(context) = self.repeat_timers.get(&timer_id).copied() {
-                    if !Self::is_input_repeat_timer(&scheduled, context) {
-                        return Err(InputRouteError::UnknownTimer { timer_id }.into());
-                    }
-
+                let repeat_context = self.repeat_timers.get(&timer_id).copied();
+                if repeat_context.is_some_and(|context| {
+                    !Self::is_input_repeat_timer(&scheduled, context)
+                }) {
+                    return Err(InputRouteError::UnknownTimer { timer_id }.into());
+                }
+                if let Some(context) = repeat_context {
                     let fired = self
                         .scheduler
                         .fired(timer_id)
@@ -502,6 +503,9 @@ impl GameKernel {
         actionable: bool,
         menu: MenuState,
     ) -> MenuGeneration {
+        if self.disposed || self.terminal.is_some() {
+            return self.ui_reducer.state().generation;
+        }
         let generation = self.ui_reducer.replace_menu(owner_seat, actionable, menu);
         self.sync_live_resources();
         generation
@@ -1119,14 +1123,19 @@ impl GameKernel {
             return Ok(Vec::new());
         }
 
-        let Some(resolution) = authority.resolutions.iter().find(|resolution| {
-            resolution.operation_id == proposal.operation_id
-                && resolution.fingerprint == proposal.fingerprint
-        }) else {
-            return Err(format!(
-                "no exact authority resolution for {}",
-                proposal.operation_id
-            ));
+        let authority_context = authority.context.clone();
+        let draft = {
+            let Some(resolution) = authority.resolutions.iter_mut().find(|resolution| {
+                resolution.operation_id == proposal.operation_id
+                    && resolution.fingerprint == proposal.fingerprint
+            }) else {
+                return Err(format!(
+                    "no exact authority resolution for {}",
+                    proposal.operation_id
+                ));
+            };
+            resolution.draft.context = authority_context;
+            resolution.draft.clone()
         };
         let identity = ProposalIdentity {
             operation_id: proposal.operation_id.clone(),
@@ -1147,7 +1156,7 @@ impl GameKernel {
 
         let outcome = authority
             .log
-            .commit(resolution.draft.clone(), &mut self.scheduler)
+            .commit(draft, &mut self.scheduler)
             .map_err(|error| format!("authority proposal commit failed: {error}"))?;
         Ok(self.map_authority_commit(outcome))
     }
@@ -1494,15 +1503,15 @@ impl GameKernel {
             return Ok(Vec::new());
         }
         let bundle = body.with_context(context);
-        replica.pending_recovery = Some(bundle.clone());
         let live = RecoveryLiveState {
             frontier: replica.replica.frontier(),
             context: replica.recovery_context.clone(),
         };
         let actions = replica
             .recovery
-            .accept_bundle(bundle, live, &mut self.scheduler)
+            .accept_bundle(bundle.clone(), live, &mut self.scheduler)
             .map_err(kernel_protocol_error)?;
+        replica.pending_recovery = Some(bundle);
         self.apply_recovery_actions(actions)
     }
 
@@ -1795,10 +1804,10 @@ impl GameKernel {
                     .map_err(kernel_protocol_error)?
             };
             let effects = self.apply_recovery_actions(actions)?;
-            if !matches!(outcome, MaterialApplicationOutcome::Deferred) {
-                if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
-                    replica.pending_material = None;
-                }
+            if !matches!(outcome, MaterialApplicationOutcome::Deferred)
+                && let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
+            {
+                replica.pending_material = None;
             }
             return Ok(effects);
         }
@@ -1813,10 +1822,10 @@ impl GameKernel {
                 .map_err(kernel_protocol_error)?
         };
         let effects = self.map_replica_actions(actions);
-        if !matches!(outcome, MaterialApplicationOutcome::Deferred) {
-            if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
-                replica.pending_material = None;
-            }
+        if !matches!(outcome, MaterialApplicationOutcome::Deferred)
+            && let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
+        {
+            replica.pending_material = None;
         }
         Ok(effects)
     }
@@ -1848,10 +1857,13 @@ impl GameKernel {
             match outcome {
                 ControlProjectionOutcome::Installed { control_id }
                 | ControlProjectionOutcome::AlreadyInstalled { control_id } => {
-                    if control_id != pending.expected_control_id {
-                        if let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() {
-                            authority.pending_control = None;
-                        }
+                    let control_mismatch = control_id != pending.expected_control_id;
+                    if control_mismatch
+                        && let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut()
+                    {
+                        authority.pending_control = None;
+                    }
+                    if control_mismatch {
                         return Ok(self.enter_terminal(format!(
                             "authority control projection proved {control_id}, expected {}",
                             pending.expected_control_id
@@ -1925,10 +1937,10 @@ impl GameKernel {
             if successful {
                 effects.extend(self.install_pending_control());
             }
-            if successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }) {
-                if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
-                    replica.pending_control = None;
-                }
+            if (successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }))
+                && let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
+            {
+                replica.pending_control = None;
             }
             return Ok(effects);
         }
@@ -1949,10 +1961,10 @@ impl GameKernel {
         if successful {
             effects.extend(self.install_pending_control());
         }
-        if successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }) {
-            if let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() {
-                replica.pending_control = None;
-            }
+        if (successful || matches!(&outcome, ControlProjectionOutcome::Rejected { .. }))
+            && let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
+        {
+            replica.pending_control = None;
         }
         Ok(effects)
     }
@@ -2407,13 +2419,13 @@ impl GameKernel {
         let output = self.input_router.clear(&mut self.scheduler);
         let mut effects = Vec::new();
         for timer in output.timers {
-            if let InputTimerCommand::Cancel { timer_id } = timer {
-                if let Some(context) = contexts.get(&timer_id) {
-                    effects.push(KernelEffect::CancelTimer {
-                        endpoint: context.endpoint,
-                        timer_id,
-                    });
-                }
+            if let InputTimerCommand::Cancel { timer_id } = timer
+                && let Some(context) = contexts.get(&timer_id)
+            {
+                effects.push(KernelEffect::CancelTimer {
+                    endpoint: context.endpoint,
+                    timer_id,
+                });
             }
         }
         self.repeat_timers.clear();
@@ -2680,13 +2692,13 @@ impl GameKernel {
                 let lease_diagnostics = replica.leases.diagnostics();
                 self.live_resources.proposal_leases = lease_diagnostics.live_operation_ids;
                 let recovery_diagnostics = replica.recovery.diagnostics();
-                if let Some(request_id) = recovery_diagnostics.request_id {
-                    if !matches!(
+                if let Some(request_id) = recovery_diagnostics.request_id
+                    && !matches!(
                         recovery_diagnostics.phase,
                         Some(RecoveryPhase::Released | RecoveryPhase::Terminalized)
-                    ) {
-                        self.live_resources.recovery_transactions.insert(request_id);
-                    }
+                    )
+                {
+                    self.live_resources.recovery_transactions.insert(request_id);
                 }
             }
             None => {}
@@ -3097,4 +3109,207 @@ pub enum KernelError {
     Canonical { reason: String },
     #[error("kernel is disposed")]
     Disposed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    use er_protocol::{BackoffPolicy, PeerBinding};
+    use er_types::{
+        AuthorityEntryKind, FrameContext, FrameType, Material, MembershipRevision, NextControl,
+        OperationId, RunId, SessionId, TerminalControl, TransportState, WaitingMenu,
+    };
+
+    fn safe(value: u64) -> SafeU53 {
+        match SafeU53::new(value) {
+            Ok(value) => value,
+            Err(_) => SafeU53::MAX,
+        }
+    }
+
+    fn seat(value: u64) -> SeatId {
+        SeatId::new(safe(value))
+    }
+
+    fn generation(value: u64) -> ConnectionGeneration {
+        ConnectionGeneration::new(safe(value))
+    }
+
+    fn context(connection_generation: u64) -> Result<FrameContext, Box<dyn Error>> {
+        Ok(FrameContext {
+            session_id: SessionId::new("kernel-unit-session")?,
+            run_id: RunId::new("kernel-unit-run")?,
+            session_epoch: safe(1),
+            seat_map_id: "kernel-unit-seat-map".to_owned(),
+            membership_revision: MembershipRevision::new(safe(1)),
+            sender_seat_id: seat(0),
+            authority_seat_id: seat(0),
+            connection_generation: generation(connection_generation),
+        })
+    }
+
+    fn generation_two_authority_kernel(
+        operation_id: &OperationId,
+    ) -> Result<GameKernel, Box<dyn Error>> {
+        let initial_context = context(1)?;
+        let next_control = NextControl::Terminal(TerminalControl {
+            terminal_id: "kernel-unit-terminal".to_owned(),
+        });
+        let protocol = ProtocolKernelConfig {
+            role: ProtocolRoleConfig::Authority {
+                log: AuthorityLogConfig {
+                    local_context: initial_context.clone(),
+                    peer_bindings: vec![PeerBinding {
+                        seat_id: seat(1),
+                        connection_generation: generation(1),
+                    }],
+                    owner_id: "kernel-unit-authority".to_owned(),
+                    retain_capacity: safe(8),
+                    delivery_backoff: BackoffPolicy {
+                        initial_ms: safe(1),
+                        maximum_ms: safe(8),
+                        factor_numerator: safe(2),
+                        factor_denominator: safe(1),
+                    },
+                    delivery_time_class: TimeClass::Connected,
+                    max_delivery_attempts: None,
+                },
+                proposal_capacity: safe(8),
+                resolutions: vec![AuthorityResolutionPlan {
+                    operation_id: operation_id.clone(),
+                    fingerprint: "generation-2".to_owned(),
+                    draft: AuthorityEntryDraft {
+                        context: initial_context,
+                        operation_id: operation_id.clone(),
+                        kind: AuthorityEntryKind::TerminalCommit,
+                        material: Material {
+                            digest: "kernel-unit-generation-2".to_owned(),
+                            payload: Value::Null,
+                        },
+                        next_control,
+                        subsumes: Vec::new(),
+                    },
+                }],
+            },
+            menu_plans: Vec::new(),
+        };
+        Ok(GameKernel::new(KernelConfig {
+            input_map: InputMap::default(),
+            initial_ui: UiState::default(),
+            protocol: Some(protocol),
+        }))
+    }
+
+    #[test]
+    fn authority_resolution_refreshes_cached_context_at_generation_two() -> Result<(), Box<dyn Error>> {
+        let operation_id = OperationId::new("kernel.unit.generation-two")?;
+        let mut kernel = generation_two_authority_kernel(&operation_id)?;
+
+        kernel.step(KernelInput::TransportChanged {
+            endpoint: seat(0),
+            state: TransportState::Disconnected,
+            generation: generation(2),
+        })?;
+        kernel.step(KernelInput::TransportChanged {
+            endpoint: seat(1),
+            state: TransportState::Disconnected,
+            generation: generation(2),
+        })?;
+        kernel.step(KernelInput::TransportChanged {
+            endpoint: seat(0),
+            state: TransportState::Connected,
+            generation: generation(2),
+        })?;
+        kernel.step(KernelInput::TransportChanged {
+            endpoint: seat(1),
+            state: TransportState::Connected,
+            generation: generation(2),
+        })?;
+
+        let effects = kernel.step(KernelInput::ProposalReceived {
+            endpoint: seat(0),
+            proposal: ProposalMessage {
+                operation_id,
+                fingerprint: "generation-2".to_owned(),
+                from: seat(0),
+                to: seat(0),
+                connection_generation: generation(2),
+                payload: Value::Null,
+            },
+        })?;
+        let frames = effects
+            .iter()
+            .filter_map(|effect| match effect {
+                KernelEffect::SendFrame { frame, .. }
+                    if frame.frame_type == FrameType::AuthorityEntry => Some(frame),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].context.connection_generation, generation(2));
+        assert_eq!(frames[0].context, context(2)?);
+        Ok(())
+    }
+
+    #[test]
+    fn replace_menu_is_inert_after_terminal() {
+        let mut kernel = GameKernel::default();
+        let _ = kernel.enter_terminal("kernel-unit-terminal".to_owned());
+        let before = kernel.snapshot();
+
+        let generation = kernel.replace_menu(None, true, MenuState::None);
+
+        assert_eq!(generation, before.ui.generation);
+        assert_eq!(kernel.snapshot(), before);
+    }
+
+    #[test]
+    fn replace_menu_is_inert_after_dispose() {
+        let mut kernel = GameKernel::default();
+        let _ = kernel.dispose("kernel-unit-dispose");
+        let before = kernel.snapshot();
+
+        let generation = kernel.replace_menu(
+            Some(seat(1)),
+            true,
+            MenuState::Waiting(WaitingMenu {
+                prompt_key: Some("should-not-install".to_owned()),
+            }),
+        );
+
+        assert_eq!(generation, before.ui.generation);
+        assert_eq!(kernel.snapshot(), before);
+    }
+
+    #[test]
+    fn clone_preserves_state_and_evolves_independently() {
+        let mut original = GameKernel::default();
+        let mut cloned = original.clone();
+
+        assert_eq!(original.snapshot(), cloned.snapshot());
+        assert_eq!(original.state_digest(), cloned.state_digest());
+
+        let original_generation = original.replace_menu(None, false, MenuState::None);
+        let cloned_generation = cloned.replace_menu(None, false, MenuState::None);
+        assert_eq!(original_generation, cloned_generation);
+        assert_eq!(original.snapshot(), cloned.snapshot());
+
+        let cloned_before_divergence = cloned.snapshot();
+        original.replace_menu(
+            None,
+            false,
+            MenuState::Waiting(WaitingMenu {
+                prompt_key: Some("original-only".to_owned()),
+            }),
+        );
+        assert_eq!(cloned.snapshot(), cloned_before_divergence);
+        assert_ne!(original.snapshot(), cloned.snapshot());
+
+        let _ = original.dispose("original-only-dispose");
+        assert!(original.is_disposed());
+        assert!(!cloned.is_disposed());
+        assert_eq!(cloned.snapshot(), cloned_before_divergence);
+    }
 }
