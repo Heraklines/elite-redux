@@ -16,13 +16,15 @@ use er_sim::{
 };
 use er_types::{
     AckStage, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceiptBody,
-    AwaitSuccessorControl, CancelPolicy, CommandControlTarget, CommandFrontierControl,
-    CommandMenu, ConnectionGeneration, FRAME_PROTOCOL_VERSION, FrameContext, FrameType,
-    GameButton, InputMap, KernelEffect, KeyBinding, LiveResourceSnapshot, Material,
-    MembershipRevision, MenuGeneration, MenuOption, MenuOptionId, MenuState, NextControl,
-    PhysicalKey, ProposalMessage, Revision, RunId, SafeI53, SafeU53, SeatId, SessionId,
-    TimeClass, TimerId, UiIntent, UiState, UiViewKind, WaitingMenu,
+    AuthorityFrontier, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
+    CommandFrontierControl, CommandMenu, ConnectionGeneration, FRAME_PROTOCOL_VERSION,
+    FrameContext, FrameType, GameButton, InputMap, KernelEffect, KeyBinding,
+    LiveResourceSnapshot, Material, MembershipRevision, MenuGeneration, MenuOption,
+    MenuOptionId, MenuState, NextControl, PhysicalKey, ProposalMessage, Revision, RunId,
+    SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, UiIntent, UiState, UiViewKind,
+    UiViewModel, WaitingMenu,
 };
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -42,8 +44,52 @@ const EXPECTED_PRODUCTION_FINGERPRINT: &str = concat!(
     r#"{"campaign":"m2b-08","surface":"suspend-reconnect","version":1}]"#,
 );
 const ABSOLUTE_PROPOSAL_CEILING_MS: u64 = 1_200_000;
+const RECOVERY_REQUEST_TIMEOUT_MS: u64 = 300_000;
 const EXPECTED_ABSOLUTE_TERMINAL_REASON: &str =
     "proposal m2b-08/reconnect terminalized: v2 proposal absolute ceiling";
+const EXPECTED_RECOVERY_TERMINAL_REASON: &str = "recovery request timeout exceeded";
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorityStateSnapshot {
+    protocol: AuthorityProtocolSnapshot,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorityProtocolSnapshot {
+    role: String,
+    context: FrameContext,
+    peer_bindings: Vec<PeerBinding>,
+    log: AuthorityLogSnapshot,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorityLogSnapshot {
+    head_revision: Revision,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplicaStateSnapshot {
+    protocol: ReplicaProtocolSnapshot,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplicaProtocolSnapshot {
+    role: String,
+    context: FrameContext,
+    authority_generation: ConnectionGeneration,
+    replica: ReplicaSnapshot,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplicaSnapshot {
+    frontier: AuthorityFrontier,
+}
 
 fn safe(value: u64) -> SafeU53 {
     assert!(value <= SafeU53::MAX.get());
@@ -219,7 +265,7 @@ fn proposal_leases() -> ProposalLeaseConfig {
 fn recovery_config() -> TestResult<RecoveryTransactionConfig> {
     Ok(RecoveryTransactionConfig {
         local_context: replica_context()?,
-        request_timeout_ms: safe(300_000),
+        request_timeout_ms: safe(RECOVERY_REQUEST_TIMEOUT_MS),
         control_timeout_ms: safe(30_000),
         pacing_ms: safe(16),
         timer_owner_id: "m2b-08:recovery".to_owned(),
@@ -452,78 +498,116 @@ fn assert_timers_live(snapshot: &PairSnapshot, timer_ids: &BTreeSet<TimerId>) {
     );
 }
 
-fn contains_json_value(value: &Value, expected: &Value) -> bool {
-    if value == expected {
-        return true;
-    }
-    match value {
-        Value::Object(object) => object
-            .values()
-            .any(|candidate| contains_json_value(candidate, expected)),
-        Value::Array(values) => values
-            .iter()
-            .any(|candidate| contains_json_value(candidate, expected)),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
-    }
+fn authority_state(snapshot: &PairSnapshot) -> TestResult<AuthorityStateSnapshot> {
+    Ok(serde_json::from_value(snapshot.host.kernel.state.clone())?)
 }
 
-fn contains_named_u64(value: &Value, field: &str, expected: u64) -> bool {
-    match value {
-        Value::Object(object) => {
-            object.get(field).and_then(Value::as_u64) == Some(expected)
-                || object
-                    .values()
-                    .any(|candidate| contains_named_u64(candidate, field, expected))
-        }
-        Value::Array(values) => values
-            .iter()
-            .any(|candidate| contains_named_u64(candidate, field, expected)),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
-    }
-}
-
-fn find_frontier(value: &Value) -> Option<(u64, u64, u64)> {
-    match value {
-        Value::Object(object) => {
-            if let (Some(received), Some(material), Some(control)) = (
-                object.get("received").and_then(Value::as_u64),
-                object.get("material").and_then(Value::as_u64),
-                object.get("control").and_then(Value::as_u64),
-            ) {
-                return Some((received, material, control));
-            }
-            object.values().find_map(find_frontier)
-        }
-        Value::Array(values) => values.iter().find_map(find_frontier),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
-    }
+fn replica_state(snapshot: &PairSnapshot) -> TestResult<ReplicaStateSnapshot> {
+    Ok(serde_json::from_value(snapshot.guest.kernel.state.clone())?)
 }
 
 fn assert_snapshot_bindings(snapshot: &PairSnapshot, expected_generation: u64) -> TestResult {
-    let authority_context = serde_json::to_value(context(HOST_SEAT, expected_generation)?)?;
-    let peer_binding = serde_json::to_value(PeerBinding {
-        seat_id: seat(GUEST_SEAT),
-        connection_generation: generation(expected_generation),
-    })?;
-    let replica_context = serde_json::to_value(context(GUEST_SEAT, expected_generation)?)?;
+    let authority = authority_state(snapshot)?;
+    assert_eq!(authority.protocol.role, "authority");
+    assert_eq!(
+        authority.protocol.context,
+        context(HOST_SEAT, expected_generation)?
+    );
+    assert_eq!(
+        authority.protocol.peer_bindings,
+        vec![PeerBinding {
+            seat_id: seat(GUEST_SEAT),
+            connection_generation: generation(expected_generation),
+        }]
+    );
 
-    assert!(contains_json_value(
-        &snapshot.host.kernel.state,
-        &authority_context
-    ));
-    assert!(contains_json_value(
-        &snapshot.host.kernel.state,
-        &peer_binding
-    ));
-    assert!(contains_json_value(
-        &snapshot.guest.kernel.state,
-        &replica_context
-    ));
-    assert!(contains_named_u64(
-        &snapshot.guest.kernel.state,
-        "authorityGeneration",
-        expected_generation
-    ));
+    let replica = replica_state(snapshot)?;
+    assert_eq!(replica.protocol.role, "replica");
+    assert_eq!(
+        replica.protocol.context,
+        context(GUEST_SEAT, expected_generation)?
+    );
+    assert_eq!(
+        replica.protocol.authority_generation,
+        generation(expected_generation)
+    );
+    Ok(())
+}
+
+fn assert_authority_head_revision(snapshot: &PairSnapshot, expected_revision: u64) -> TestResult {
+    let authority = authority_state(snapshot)?;
+    assert_eq!(
+        authority.protocol.log.head_revision,
+        Revision::new(safe(expected_revision))
+    );
+    Ok(())
+}
+
+fn assert_replica_frontier(
+    snapshot: &PairSnapshot,
+    expected_received: u64,
+    expected_material: u64,
+    expected_control: u64,
+) -> TestResult {
+    let replica = replica_state(snapshot)?;
+    assert_eq!(
+        replica.protocol.replica.frontier,
+        AuthorityFrontier {
+            received: Revision::new(safe(expected_received)),
+            material: Revision::new(safe(expected_material)),
+            control: Revision::new(safe(expected_control)),
+        }
+    );
+    Ok(())
+}
+
+fn capture_guest_actionable_menu(
+    snapshot: &PairSnapshot,
+) -> TestResult<(UiState, UiViewModel, SeatId, String, SafeU53)> {
+    assert!(snapshot.guest.kernel.ui.actionable);
+    assert!(snapshot.guest.ui.actionable);
+    let owner = snapshot
+        .guest
+        .kernel
+        .ui
+        .owner_seat
+        .ok_or("actionable guest menu has no owner")?;
+    let Some(MenuState::Command(menu)) = snapshot.guest.kernel.ui.stack.last() else {
+        return Err("actionable guest menu is not a command menu".into());
+    };
+    assert_eq!(snapshot.guest.ui.owner_seat, Some(owner));
+    assert_eq!(snapshot.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(snapshot.guest.ui.cursor, Some(menu.cursor));
+    Ok((
+        snapshot.guest.kernel.ui.clone(),
+        snapshot.guest.ui.clone(),
+        owner,
+        menu.control_id.clone(),
+        menu.cursor,
+    ))
+}
+
+fn assert_guest_menu_unchanged(
+    snapshot: &PairSnapshot,
+    expected_kernel_ui: &UiState,
+    expected_view: &UiViewModel,
+    expected_owner: SeatId,
+    expected_control_id: &str,
+    expected_cursor: SafeU53,
+) -> TestResult {
+    assert_eq!(&snapshot.guest.kernel.ui, expected_kernel_ui);
+    assert_eq!(&snapshot.guest.ui, expected_view);
+    assert!(snapshot.guest.kernel.ui.actionable);
+    assert!(snapshot.guest.ui.actionable);
+    assert_eq!(snapshot.guest.kernel.ui.owner_seat, Some(expected_owner));
+    assert_eq!(snapshot.guest.ui.owner_seat, Some(expected_owner));
+    let Some(MenuState::Command(menu)) = snapshot.guest.kernel.ui.stack.last() else {
+        return Err("guest menu changed away from the captured command menu".into());
+    };
+    assert_eq!(menu.control_id.as_str(), expected_control_id);
+    assert_eq!(menu.cursor, expected_cursor);
+    assert_eq!(snapshot.guest.ui.kind, UiViewKind::Command);
+    assert_eq!(snapshot.guest.ui.cursor, Some(expected_cursor));
     Ok(())
 }
 
@@ -588,7 +672,7 @@ fn new_protocol_pair(seed: u64) -> TestResult<SimulatedPair> {
     assert_eq!(initial.guest.ui.kind, UiViewKind::Command);
     assert_eq!(initial.guest.ui.owner_seat, Some(seat(GUEST_SEAT)));
     assert!(initial.guest.ui.actionable);
-    assert_eq!(find_frontier(&initial.guest.kernel.state), Some((0, 0, 0)));
+    assert_replica_frontier(&initial, 0, 0, 0)?;
     assert_snapshot_bindings(&initial, INITIAL_GENERATION)?;
     Ok(pair)
 }
@@ -907,7 +991,15 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     assert_timers_live(&submission.snapshot, &human_timer_ids);
 
     delay_all_queued(&mut pair, &mut steps, safe(2_000_000))?;
-    let queue_before_suspend = pair.snapshot()?.network.queued_packet_ids;
+    let before_suspend = pair.snapshot()?;
+    let queue_before_suspend = before_suspend.network.queued_packet_ids.clone();
+    let (
+        guest_kernel_ui_before_suspend,
+        guest_view_before_suspend,
+        guest_owner_before_suspend,
+        guest_control_before_suspend,
+        guest_cursor_before_suspend,
+    ) = capture_guest_actionable_menu(&before_suspend)?;
     let suspend_step = pair.apply(PairOperation::Suspend {
         endpoint: PairEndpoint::Guest,
     })?;
@@ -918,6 +1010,14 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
             .suspended_endpoints
             .contains(&seat(GUEST_SEAT))
     );
+    assert_guest_menu_unchanged(
+        &suspend_step.snapshot,
+        &guest_kernel_ui_before_suspend,
+        &guest_view_before_suspend,
+        guest_owner_before_suspend,
+        &guest_control_before_suspend,
+        guest_cursor_before_suspend,
+    )?;
     record_step(&mut steps, suspend_step);
 
     let suspended_advance = pair.advance_time(safe(60_000))?;
@@ -931,6 +1031,14 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     assert_timers_live(&suspended_advance.snapshot, &connected_timer_ids);
     assert_timers_live(&suspended_advance.snapshot, &absolute_timer_ids);
     assert_eq!(terminal_effect_count(&suspended_advance), 0);
+    assert_guest_menu_unchanged(
+        &suspended_advance.snapshot,
+        &guest_kernel_ui_before_suspend,
+        &guest_view_before_suspend,
+        guest_owner_before_suspend,
+        &guest_control_before_suspend,
+        guest_cursor_before_suspend,
+    )?;
     assert!(
         suspended_advance
             .snapshot
@@ -945,6 +1053,14 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
         endpoint: PairEndpoint::Guest,
     })?;
     assert!(resume_step.snapshot.network.suspended_endpoints.is_empty());
+    assert_guest_menu_unchanged(
+        &resume_step.snapshot,
+        &guest_kernel_ui_before_suspend,
+        &guest_view_before_suspend,
+        guest_owner_before_suspend,
+        &guest_control_before_suspend,
+        guest_cursor_before_suspend,
+    )?;
     record_step(&mut steps, resume_step);
 
     let before_deadline = pair.advance_time(safe(249))?;
@@ -1060,6 +1176,244 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     Ok(())
 }
 
+fn delayed_recovery_pair(
+    seed: u64,
+) -> TestResult<(
+    SimulatedPair,
+    Vec<PairStep>,
+    BTreeSet<TimerId>,
+    SafeU53,
+    SafeU53,
+)> {
+    let (mut pair, mut steps, proposal) = initial_protocol_pair(seed)?;
+    delay_all_queued(&mut pair, &mut steps, safe(2_000_000))?;
+
+    let disconnect_step = pair.apply(PairOperation::Disconnect {
+        endpoint: PairEndpoint::Guest,
+    })?;
+    assert!(
+        disconnect_step
+            .snapshot
+            .network
+            .disconnected_endpoints
+            .contains(&seat(GUEST_SEAT))
+    );
+    record_step(&mut steps, disconnect_step);
+
+    let disconnected_advance = pair.advance_time(safe(10_000))?;
+    assert_eq!(disconnected_advance.snapshot.virtual_time_ms, safe(10_000));
+    assert_eq!(terminal_effect_count(&disconnected_advance), 0);
+    record_step(&mut steps, disconnected_advance);
+
+    let before_reconnect = pair.snapshot()?;
+    let reconnect_step = pair.apply(PairOperation::Reconnect {
+        endpoint: PairEndpoint::Guest,
+    })?;
+    let rebound = proposals_in(&reconnect_step)
+        .into_iter()
+        .find(|candidate| candidate.operation_id == proposal.operation_id)
+        .ok_or("reconnect did not rebind the retained proposal")?;
+    assert_stable_proposal_identity(&proposal, &rebound);
+    assert_complete_proposal(&rebound, RECONNECTED_GENERATION)?;
+    let recovery_timer_ids = live_timer_ids_for_class(&reconnect_step, TimeClass::Recovery);
+    assert!(!recovery_timer_ids.is_empty());
+    assert_eq!(
+        timer_delays_for_class(&reconnect_step, TimeClass::Recovery),
+        vec![safe(RECOVERY_REQUEST_TIMEOUT_MS)]
+    );
+    let recovery_request_packet_ids = packet_ids_for_sends(
+        &before_reconnect.network.queued_packet_ids,
+        &reconnect_step,
+        |effect| {
+            matches!(
+                effect,
+                KernelEffect::SendFrame { frame, .. }
+                    if frame.frame_type == FrameType::RecoveryRequest
+            )
+        },
+    )?;
+    assert_eq!(recovery_request_packet_ids.len(), 1);
+    assert_snapshot_bindings(&reconnect_step.snapshot, RECONNECTED_GENERATION)?;
+    let recovery_start_time = reconnect_step.snapshot.virtual_time_ms;
+    let recovery_request_packet_id = recovery_request_packet_ids
+        .first()
+        .copied()
+        .ok_or("recovery request packet id was not retained")?;
+    record_step(&mut steps, reconnect_step);
+
+    delay_all_queued(&mut pair, &mut steps, safe(2_000_000))?;
+    assert!(
+        pair.snapshot()?
+            .network
+            .queued_packet_ids
+            .contains(&recovery_request_packet_id)
+    );
+    Ok((
+        pair,
+        steps,
+        recovery_timer_ids,
+        recovery_request_packet_id,
+        recovery_start_time,
+    ))
+}
+
+#[test]
+fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -> TestResult {
+    let (
+        mut pair,
+        mut steps,
+        recovery_timer_ids,
+        recovery_request_packet_id,
+        recovery_start_time,
+    ) = delayed_recovery_pair(0x2468_ace0)?;
+    let suspended_virtual_ms = 60_000_u64;
+    let before_suspend = pair.snapshot()?;
+    let active_recovery_before_suspend = before_suspend
+        .virtual_time_ms
+        .get()
+        .checked_sub(recovery_start_time.get())
+        .ok_or("recovery start time was after the suspension point")?;
+    assert_eq!(active_recovery_before_suspend, 0);
+    assert_eq!(before_suspend.virtual_time_ms, recovery_start_time);
+    assert_timers_live(&before_suspend, &recovery_timer_ids);
+    assert!(
+        before_suspend
+            .network
+            .queued_packet_ids
+            .contains(&recovery_request_packet_id)
+    );
+
+    let suspend_step = pair.apply(PairOperation::Suspend {
+        endpoint: PairEndpoint::Guest,
+    })?;
+    assert!(
+        suspend_step
+            .snapshot
+            .network
+            .suspended_endpoints
+            .contains(&seat(GUEST_SEAT))
+    );
+    assert_timers_live(&suspend_step.snapshot, &recovery_timer_ids);
+    assert_eq!(terminal_effect_count(&suspend_step), 0);
+    record_step(&mut steps, suspend_step);
+
+    let suspended_advance = pair.advance_time(safe(suspended_virtual_ms))?;
+    assert_eq!(
+        suspended_advance.snapshot.virtual_time_ms,
+        safe(recovery_start_time.get() + suspended_virtual_ms)
+    );
+    assert_eq!(terminal_effect_count(&suspended_advance), 0);
+    assert!(suspended_advance.snapshot.terminal_reason.is_none());
+    assert_timers_live(&suspended_advance.snapshot, &recovery_timer_ids);
+    assert!(
+        suspended_advance
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&recovery_request_packet_id)
+    );
+    record_step(&mut steps, suspended_advance);
+
+    let resume_step = pair.apply(PairOperation::Resume {
+        endpoint: PairEndpoint::Guest,
+    })?;
+    assert!(resume_step.snapshot.network.suspended_endpoints.is_empty());
+    assert_eq!(
+        resume_step.snapshot.virtual_time_ms,
+        safe(recovery_start_time.get() + suspended_virtual_ms)
+    );
+    assert_eq!(terminal_effect_count(&resume_step), 0);
+    assert_timers_live(&resume_step.snapshot, &recovery_timer_ids);
+    assert!(
+        resume_step
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&recovery_request_packet_id)
+    );
+    let elapsed_virtual_ms = resume_step
+        .snapshot
+        .virtual_time_ms
+        .get()
+        .checked_sub(recovery_start_time.get())
+        .ok_or("recovery start time was after resume")?;
+    assert_eq!(elapsed_virtual_ms, suspended_virtual_ms);
+    let recovery_active_after_resume = elapsed_virtual_ms
+        .checked_sub(suspended_virtual_ms)
+        .ok_or("suspended time exceeded elapsed recovery time")?;
+    assert_eq!(
+        recovery_active_after_resume,
+        active_recovery_before_suspend
+    );
+    let recovery_timeout_ms = safe(RECOVERY_REQUEST_TIMEOUT_MS);
+    let remaining_recovery_ms = recovery_timeout_ms
+        .get()
+        .checked_sub(recovery_active_after_resume)
+        .ok_or("recovery timeout was already exceeded before resume")?;
+    assert_eq!(remaining_recovery_ms, RECOVERY_REQUEST_TIMEOUT_MS);
+    record_step(&mut steps, resume_step);
+
+    let before_timeout = pair.advance_time(safe(remaining_recovery_ms - 1))?;
+    assert_eq!(
+        before_timeout.snapshot.virtual_time_ms,
+        safe(recovery_start_time.get() + suspended_virtual_ms + remaining_recovery_ms - 1)
+    );
+    assert_eq!(terminal_effect_count(&before_timeout), 0);
+    assert!(before_timeout.snapshot.terminal_reason.is_none());
+    assert_timers_live(&before_timeout.snapshot, &recovery_timer_ids);
+    assert!(
+        before_timeout
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&recovery_request_packet_id)
+    );
+    record_step(&mut steps, before_timeout);
+
+    let terminal_step = pair.advance_time(safe(1))?;
+    assert_eq!(
+        terminal_step.snapshot.virtual_time_ms,
+        safe(recovery_start_time.get() + suspended_virtual_ms + remaining_recovery_ms)
+    );
+    assert_eq!(terminal_effect_count(&terminal_step), 1);
+    assert_eq!(
+        terminal_step.snapshot.terminal_reason.as_deref(),
+        Some(EXPECTED_RECOVERY_TERMINAL_REASON)
+    );
+    assert_eq!(terminal_step.snapshot.host.ui.kind, UiViewKind::Terminal);
+    assert_eq!(terminal_step.snapshot.guest.ui.kind, UiViewKind::Terminal);
+    assert_eq!(terminal_step.snapshot.host.ui, terminal_step.snapshot.guest.ui);
+    assert_eq!(
+        terminal_step.snapshot.host.kernel.ui,
+        terminal_step.snapshot.guest.kernel.ui
+    );
+    assert!(!terminal_step.snapshot.host.ui.actionable);
+    assert!(!terminal_step.snapshot.guest.ui.actionable);
+    assert_eq!(terminal_step.snapshot.host.ui.owner_seat, None);
+    assert_eq!(terminal_step.snapshot.guest.ui.owner_seat, None);
+    assert_eq!(
+        terminal_step.snapshot.host.ui.prompt_key.as_deref(),
+        Some(EXPECTED_RECOVERY_TERMINAL_REASON)
+    );
+    let terminal_host_kernel = terminal_step.snapshot.host.kernel.clone();
+    let terminal_guest_kernel = terminal_step.snapshot.guest.kernel.clone();
+    let terminal_reason = terminal_step.snapshot.terminal_reason.clone();
+    record_step(&mut steps, terminal_step);
+
+    let repeated_timer_step = pair.advance_time(SafeU53::ZERO)?;
+    assert_eq!(terminal_effect_count(&repeated_timer_step), 0);
+    assert_eq!(repeated_timer_step.snapshot.terminal_reason, terminal_reason);
+    assert_eq!(repeated_timer_step.snapshot.host.kernel, terminal_host_kernel);
+    assert_eq!(repeated_timer_step.snapshot.guest.kernel, terminal_guest_kernel);
+    record_step(&mut steps, repeated_timer_step);
+
+    let final_snapshot = pair.teardown("m2b-08 recovery timeout campaign complete")?;
+    assert_zero_resources(&final_snapshot);
+    assert_eq!(final_snapshot.terminal_reason, terminal_reason);
+    assert_post_disposal_rejected(&mut pair);
+    Ok(())
+}
+
 fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let (mut pair, mut steps, original_proposal) = initial_protocol_pair(seed)?;
     let old_packet_ids = pair.snapshot()?.network.queued_packet_ids;
@@ -1089,10 +1443,7 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
     assert_stable_proposal_identity(&original_proposal, &rebound);
     assert_complete_proposal(&rebound, RECONNECTED_GENERATION)?;
     assert!(reconnect_step.snapshot.network.disconnected_endpoints.is_empty());
-    assert_eq!(
-        find_frontier(&reconnect_step.snapshot.guest.kernel.state),
-        Some((0, 0, 0))
-    );
+    assert_replica_frontier(&reconnect_step.snapshot, 0, 0, 0)?;
     assert_snapshot_bindings(&reconnect_step.snapshot, RECONNECTED_GENERATION)?;
     let fresh_proposal_packet_ids = packet_ids_for_sends(
         &before_reconnect_ids,
@@ -1138,10 +1489,7 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
             Some(stale_step.snapshot.network.dropped_count.get())
         );
         assert!(stale_step.generated_effects.is_empty());
-        assert_eq!(
-            find_frontier(&stale_step.snapshot.guest.kernel.state),
-            Some((0, 0, 0))
-        );
+        assert_replica_frontier(&stale_step.snapshot, 0, 0, 0)?;
         assert!(
             stale_step
                 .snapshot
@@ -1166,15 +1514,8 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
     );
     assert_exact_authority_entry(&fresh_proposal_step, RECONNECTED_GENERATION)?;
     assert_exact_material_and_control(&fresh_proposal_step, seat(HOST_SEAT))?;
-    assert_eq!(
-        find_frontier(&fresh_proposal_step.snapshot.guest.kernel.state),
-        Some((0, 0, 0))
-    );
-    assert!(contains_named_u64(
-        &fresh_proposal_step.snapshot.host.kernel.state,
-        "headRevision",
-        1
-    ));
+    assert_replica_frontier(&fresh_proposal_step.snapshot, 0, 0, 0)?;
+    assert_authority_head_revision(&fresh_proposal_step.snapshot, 1)?;
     let authority_entry_packet_ids = packet_ids_for_sends(
         &before_fresh_proposal,
         &fresh_proposal_step,
@@ -1205,10 +1546,7 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
     );
     assert_exact_material_and_control(&authority_entry_step, seat(GUEST_SEAT))?;
     assert_exact_receipts(&authority_entry_step)?;
-    assert_eq!(
-        find_frontier(&authority_entry_step.snapshot.guest.kernel.state),
-        Some((1, 1, 1))
-    );
+    assert_replica_frontier(&authority_entry_step.snapshot, 1, 1, 1)?;
     assert!(
         !authority_entry_step
             .snapshot
@@ -1243,10 +1581,7 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
             dropped_after_stale
         );
         assert_snapshot_bindings(&receipt_step.snapshot, RECONNECTED_GENERATION)?;
-        assert_eq!(
-            find_frontier(&receipt_step.snapshot.guest.kernel.state),
-            Some((1, 1, 1))
-        );
+        assert_replica_frontier(&receipt_step.snapshot, 1, 1, 1)?;
         if index < 2 {
             assert!(
                 receipt_step
@@ -1286,12 +1621,8 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
     }
 
     let accepted = pair.snapshot()?;
-    assert_eq!(find_frontier(&accepted.guest.kernel.state), Some((1, 1, 1)));
-    assert!(contains_named_u64(
-        &accepted.host.kernel.state,
-        "headRevision",
-        1
-    ));
+    assert_replica_frontier(&accepted, 1, 1, 1)?;
+    assert_authority_head_revision(&accepted, 1)?;
     let successor_wait = format!("await/{OPERATION_ID}");
     for endpoint in [&accepted.host, &accepted.guest] {
         assert_eq!(endpoint.ui.kind, UiViewKind::Waiting);
@@ -1395,6 +1726,7 @@ fn raw_absolute_proposal_ceiling_enters_symmetric_terminal_once() -> TestResult 
     record_step(&mut steps, repeated_timer_step);
 
     let rejected_input_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    assert!(!rejected_input_steps.is_empty());
     assert!(
         rejected_input_steps
             .iter()
