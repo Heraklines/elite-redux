@@ -6,26 +6,27 @@ use er_kernel::{
     ProtocolKernelConfig, ProtocolRoleConfig,
 };
 use er_protocol::{
-    AuthorityEntryDraft, AuthorityEntryKind, AuthorityLogConfig, AuthorityReplicaConfig,
-    BackoffPolicy, FrameContext, Material, PeerBinding, ProposalLeaseConfig,
-    RecoveryTransactionConfig, control_id_of,
+    AckStage, AuthorityEntryBody, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLogConfig,
+    AuthorityReceiptBody, AuthorityReplicaConfig, BackoffPolicy, FrameContext, FrameType,
+    Material, PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    RecoveryTransactionConfig, SafeI53, proposal_fingerprint, control_id_of,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
-    SimulatedPair, SimulatedPairConfig,
+    SimulatedPair, SimulatedPairConfig, SimulatedPairError,
 };
 use er_types::{
     AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, InputMap, KeyBinding,
-    MenuGeneration, MenuOption, MenuOptionId, MenuState, MembershipRevision, OperationId,
-    PhysicalKey, ReplacementControl, ReplacementControlAddress, ReplacementMenu, SafeU53, SeatId,
-    SessionId, TimeClass, UiIntent, UiState, UiViewKind,
+    LiveResourceSnapshot, MenuGeneration, MenuOption, MenuOptionId, MenuState, MembershipRevision,
+    NextControl, OperationId, PhysicalKey, ProposalMessage, ReplacementControl,
+    ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId, SessionId, TimeClass,
+    UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const HEAD_FINGERPRINT: &str = "replacement/head/party-beta";
-const TAIL_FINGERPRINT: &str = "replacement/tail/party-alpha";
+const DETERMINISTIC_EXECUTIONS: usize = 250;
 
 #[derive(Clone, Debug)]
 struct ReplacementIds {
@@ -35,6 +36,14 @@ struct ReplacementIds {
     tail_operation: OperationId,
     head_control_id: String,
     tail_control_id: String,
+    await_control_id: String,
+    head_fingerprint: String,
+    tail_fingerprint: String,
+    head_proposal_payload: Value,
+    head_material: Material,
+    tail_material: Material,
+    head_next_control: NextControl,
+    tail_next_control: NextControl,
     head_choice: MenuOptionId,
     tail_choice: MenuOptionId,
 }
@@ -61,6 +70,28 @@ fn generation(value: u64) -> ConnectionGeneration {
 
 fn operation(value: &str) -> TestResult<OperationId> {
     Ok(OperationId::new(value.to_owned())?)
+}
+
+fn replacement_fingerprints() -> TestResult<(String, String)> {
+    let head = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(1),
+        label: "replacement/head".to_owned(),
+        choice: SafeI53::new(1)?,
+        wire: Some(ProposalJson::new(r#"{"party":"party:beta"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:beta","surface":"replacement"}"#,
+        )?),
+    })?;
+    let tail = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(2),
+        label: "replacement/tail".to_owned(),
+        choice: SafeI53::ZERO,
+        wire: Some(ProposalJson::new(r#"{"party":"party:alpha"}"#)?),
+        reward_surface: Some(ProposalJson::new(
+            r#"{"party":"party:alpha","surface":"replacement"}"#,
+        )?),
+    })?;
+    Ok((head, tail))
 }
 
 fn option(id: &str, enabled: bool) -> TestResult<MenuOption> {
@@ -216,6 +247,7 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
 
     let head_control_id = control_id_of(&head_control);
     let tail_control_id = control_id_of(&tail_control);
+    let await_control_id = control_id_of(&await_control);
 
     let head_options = vec![
         option("party:alpha", true)?,
@@ -226,6 +258,9 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
     let tail_options = vec![option("party:alpha", true)?, option("party:beta", true)?];
     let head_choice = head_options[1].id.clone();
     let tail_choice = tail_options[0].id.clone();
+    let (head_fingerprint, tail_fingerprint) = replacement_fingerprints()?;
+    let head_proposal_payload = json!({"party": "party:beta"});
+    let tail_proposal_payload = json!({"party": "party:alpha"});
 
     let head_plans = vec![
         MenuProposalPlan {
@@ -235,8 +270,8 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
         },
         MenuProposalPlan {
             option_id: head_options[1].id.clone(),
-            fingerprint: HEAD_FINGERPRINT.to_owned(),
-            payload: json!({"party": "party:beta"}),
+            fingerprint: head_fingerprint.clone(),
+            payload: head_proposal_payload.clone(),
         },
         MenuProposalPlan {
             option_id: head_options[2].id.clone(),
@@ -252,8 +287,8 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
     let tail_plans = vec![
         MenuProposalPlan {
             option_id: tail_options[0].id.clone(),
-            fingerprint: TAIL_FINGERPRINT.to_owned(),
-            payload: json!({"party": "party:alpha"}),
+            fingerprint: tail_fingerprint.clone(),
+            payload: tail_proposal_payload.clone(),
         },
         MenuProposalPlan {
             option_id: tail_options[1].id.clone(),
@@ -280,14 +315,19 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
 
     let authority_context = context(host)?;
     let replica_context = context(guest)?;
+    let head_material = Material {
+        digest: "replacement-material/head".to_owned(),
+        payload: replacement_payload(&head_operation, guest, 0, "party:beta"),
+    };
+    let tail_material = Material {
+        digest: "replacement-material/tail".to_owned(),
+        payload: replacement_payload(&tail_operation, host, 1, "party:alpha"),
+    };
     let head_draft = AuthorityEntryDraft {
         context: authority_context.clone(),
         operation_id: head_operation.clone(),
         kind: AuthorityEntryKind::ReplacementCommit,
-        material: Material {
-            digest: "replacement-material/head".to_owned(),
-            payload: replacement_payload(&head_operation, guest, 0, "party:beta"),
-        },
+        material: head_material.clone(),
         next_control: tail_control.clone(),
         subsumes: Vec::new(),
     };
@@ -295,11 +335,8 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
         context: authority_context.clone(),
         operation_id: tail_operation.clone(),
         kind: AuthorityEntryKind::ReplacementCommit,
-        material: Material {
-            digest: "replacement-material/tail".to_owned(),
-            payload: replacement_payload(&tail_operation, host, 1, "party:alpha"),
-        },
-        next_control: await_control,
+        material: tail_material.clone(),
+        next_control: await_control.clone(),
         subsumes: Vec::new(),
     };
 
@@ -337,12 +374,12 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
                 resolutions: vec![
                     AuthorityResolutionPlan {
                         operation_id: head_operation.clone(),
-                        fingerprint: HEAD_FINGERPRINT.to_owned(),
+                        fingerprint: head_fingerprint.clone(),
                         draft: head_draft,
                     },
                     AuthorityResolutionPlan {
                         operation_id: tail_operation.clone(),
-                        fingerprint: TAIL_FINGERPRINT.to_owned(),
+                        fingerprint: tail_fingerprint.clone(),
                         draft: tail_draft,
                     },
                 ],
@@ -402,6 +439,14 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
             tail_operation,
             head_control_id,
             tail_control_id,
+            await_control_id,
+            head_fingerprint,
+            tail_fingerprint,
+            head_proposal_payload,
+            head_material,
+            tail_material,
+            head_next_control: tail_control,
+            tail_next_control: await_control,
             head_choice,
             tail_choice,
         },
@@ -443,37 +488,428 @@ fn assert_no_ui_intent(steps: &[PairStep], endpoint: SeatId, reason: &str) {
     );
 }
 
-fn assert_replacement_intent(
-    steps: &[PairStep],
-    endpoint: SeatId,
+fn assert_replacement_menu(
+    snapshot: &PairSnapshot,
+    endpoint: PairEndpoint,
+    owner: SeatId,
+    generation: MenuGeneration,
     operation_id: &OperationId,
     control_id: &str,
+    field_index: SafeU53,
+    cursor: SafeU53,
     option_id: &MenuOptionId,
 ) {
-    assert!(
-        steps.iter().any(|step| {
-            step.generated_effects.iter().any(|effect| {
-                matches!(
-                    effect,
-                    KernelEffect::UiIntent {
-                        endpoint: effect_endpoint,
-                        intent: UiIntent::ReplacementSubmitted {
-                            seat,
-                            operation_id: intent_operation,
-                            control_id: intent_control,
-                            option_id: intent_option,
-                            ..
-                        },
-                    } if *effect_endpoint == endpoint
-                        && *seat == endpoint
-                        && intent_operation.as_str() == operation_id.as_str()
-                        && intent_control.as_str() == control_id
-                        && intent_option == option_id
-                )
-            })
-        }),
-        "raw replacement submission lost its operation/control/party identity"
+    let endpoint_snapshot = endpoint_snapshot(snapshot, endpoint);
+    assert_eq!(endpoint_snapshot.kernel.ui.generation, generation);
+    assert_eq!(endpoint_snapshot.kernel.ui.owner_seat, Some(owner));
+    assert!(endpoint_snapshot.kernel.ui.actionable);
+    match endpoint_snapshot.kernel.ui.stack.as_slice() {
+        [MenuState::Replacement(menu)] => {
+            assert_eq!(&menu.operation_id, operation_id);
+            assert_eq!(&menu.control_id, control_id);
+            assert_eq!(menu.field_index, field_index);
+            assert_eq!(menu.cursor, cursor);
+            assert_eq!(&menu.options[cursor.get() as usize].id, option_id);
+        }
+        stack => panic!("expected one replacement menu, found {stack:?}"),
+    }
+}
+
+fn assert_cursor_intent(
+    steps: &[PairStep],
+    endpoint: SeatId,
+    generation: MenuGeneration,
+    cursor: SafeU53,
+) {
+    let intents = steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::UiIntent {
+                endpoint: effect_endpoint,
+                intent:
+                    UiIntent::CursorChanged {
+                        seat,
+                        generation: intent_generation,
+                        cursor: intent_cursor,
+                    },
+            } if *effect_endpoint == endpoint => Some((*seat, *intent_generation, *intent_cursor)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        intents,
+        vec![(endpoint, generation, cursor)],
+        "cursor intent lost seat, menu generation, or cursor identity"
     );
+}
+
+fn assert_replacement_intent(
+    steps: &[PairStep],
+    pre_submission: &PairSnapshot,
+    menu_endpoint: PairEndpoint,
+    endpoint: SeatId,
+    generation: MenuGeneration,
+    operation_id: &OperationId,
+    control_id: &str,
+    field_index: SafeU53,
+    cursor: SafeU53,
+    option_id: &MenuOptionId,
+) {
+    assert_replacement_menu(
+        pre_submission,
+        menu_endpoint,
+        endpoint,
+        generation,
+        operation_id,
+        control_id,
+        field_index,
+        cursor,
+        option_id,
+    );
+
+    let intents = steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::UiIntent {
+                endpoint: effect_endpoint,
+                intent:
+                    UiIntent::ReplacementSubmitted {
+                        seat,
+                        generation: intent_generation,
+                        operation_id: intent_operation,
+                        control_id: intent_control,
+                        option_id: intent_option,
+                    },
+            } if *effect_endpoint == endpoint => Some((
+                *seat,
+                *intent_generation,
+                intent_operation.clone(),
+                intent_control.clone(),
+                intent_option.clone(),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        intents,
+        vec![
+            (
+                endpoint,
+                generation,
+                operation_id.clone(),
+                control_id.to_owned(),
+                option_id.clone(),
+            )
+        ],
+        "raw replacement submission lost its seat/menu/operation/control/party identity"
+    );
+}
+
+fn assert_no_replacement_submission(steps: &[PairStep], endpoint: SeatId, reason: &str) {
+    assert!(
+        steps.iter().flat_map(|step| step.generated_effects.iter()).all(|effect| {
+            !matches!(
+                effect,
+                KernelEffect::UiIntent {
+                    endpoint: effect_endpoint,
+                    intent: UiIntent::ReplacementSubmitted { .. },
+                } if *effect_endpoint == endpoint
+            )
+        }),
+        "{reason}"
+    );
+}
+
+fn proposal_effects(steps: &[PairStep]) -> Vec<ProposalMessage> {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter_map(|effect| match effect {
+            KernelEffect::SendProposal { proposal } => Some(proposal.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn effect_locations<F>(steps: &[PairStep], mut predicate: F) -> Vec<(usize, usize)>
+where
+    F: FnMut(&KernelEffect) -> bool,
+{
+    steps
+        .iter()
+        .enumerate()
+        .flat_map(|(step_index, step)| {
+            step.generated_effects
+                .iter()
+                .enumerate()
+                .filter_map(|(effect_index, effect)| {
+                    predicate(effect).then_some((step_index, effect_index))
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+#[derive(Clone, Debug)]
+struct ReceiptEvent {
+    step_index: usize,
+    effect_index: usize,
+    from: SeatId,
+    context: FrameContext,
+    body: AuthorityReceiptBody,
+}
+
+fn receipt_events(
+    steps: &[PairStep],
+    revision: Revision,
+    operation_id: &OperationId,
+) -> TestResult<Vec<ReceiptEvent>> {
+    let mut receipts = Vec::new();
+    for (step_index, step) in steps.iter().enumerate() {
+        for (effect_index, effect) in step.generated_effects.iter().enumerate() {
+            let KernelEffect::SendFrame { from, frame } = effect else {
+                continue;
+            };
+            if frame.frame_type != FrameType::AuthorityReceipt {
+                continue;
+            }
+            let body = serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())?;
+            if body.revision == revision && &body.operation_id == operation_id {
+                receipts.push(ReceiptEvent {
+                    step_index,
+                    effect_index,
+                    from: *from,
+                    context: frame.context.clone(),
+                    body,
+                });
+            }
+        }
+    }
+    Ok(receipts)
+}
+
+fn find_frontier(value: &Value) -> Option<(u64, u64, u64)> {
+    match value {
+        Value::Object(object) => {
+            if let (Some(received), Some(material), Some(control)) = (
+                object.get("received").and_then(Value::as_u64),
+                object.get("material").and_then(Value::as_u64),
+                object.get("control").and_then(Value::as_u64),
+            ) {
+                return Some((received, material, control));
+            }
+            object.values().find_map(find_frontier)
+        }
+        Value::Array(values) => values.iter().find_map(find_frontier),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
+    }
+}
+
+fn guest_frontier(step: &PairStep) -> TestResult<(u64, u64, u64)> {
+    find_frontier(&step.snapshot.guest.kernel.state).ok_or_else(|| {
+        std::io::Error::other("replica frontier was not retained in the step snapshot").into()
+    })
+}
+
+fn assert_authority_chain(
+    steps: &[PairStep],
+    operation_id: &OperationId,
+    revision_value: u64,
+    material: &Material,
+    next_control: &NextControl,
+    expected_control_id: &str,
+    authority_context: &FrameContext,
+    replica_context: &FrameContext,
+    authority_seat: SeatId,
+    replica_seat: SeatId,
+    prior_frontier: (u64, u64, u64),
+) -> TestResult {
+    let revision = Revision::new(safe(revision_value));
+    let expected_entry = AuthorityEntryBody {
+        revision,
+        operation_id: operation_id.clone(),
+        kind: AuthorityEntryKind::ReplacementCommit,
+        material: material.clone(),
+        next_control: next_control.clone(),
+        subsumes: Vec::new(),
+    };
+
+    let entry_candidates = effect_locations(steps, |effect| {
+        matches!(
+            effect,
+            KernelEffect::SendFrame { from, frame }
+                if *from == authority_seat && frame.frame_type == FrameType::AuthorityEntry
+        )
+    });
+    let mut entry_locations = Vec::new();
+    for location in entry_candidates {
+        let effect = &steps[location.0].generated_effects[location.1];
+        let KernelEffect::SendFrame { frame, .. } = effect else {
+            continue;
+        };
+        let body = serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?;
+        if &frame.context == authority_context && &body == &expected_entry {
+            entry_locations.push(location);
+        }
+    }
+    assert_eq!(
+        entry_locations.len(),
+        1,
+        "authority did not emit exactly one fully identified replacement entry"
+    );
+    let entry_location = entry_locations[0];
+    assert_eq!(guest_frontier(&steps[entry_location.0])?, prior_frontier);
+
+    let material_locations = effect_locations(steps, |effect| {
+        matches!(
+            effect,
+            KernelEffect::ApplyAuthorityMaterial {
+                endpoint,
+                revision: effect_revision,
+                operation_id: effect_operation,
+                material: effect_material,
+            } if *endpoint == replica_seat
+                && *effect_revision == revision
+                && effect_operation == operation_id
+                && effect_material == material
+        )
+    });
+    assert_eq!(
+        material_locations.len(),
+        1,
+        "replacement material identity was not applied exactly once"
+    );
+    let material_location = material_locations[0];
+
+    let control_locations = effect_locations(steps, |effect| {
+        matches!(
+            effect,
+            KernelEffect::ProjectAuthorityControl {
+                endpoint,
+                revision: effect_revision,
+                operation_id: effect_operation,
+                control: effect_control,
+            } if *endpoint == replica_seat
+                && *effect_revision == revision
+                && effect_operation == operation_id
+                && effect_control == next_control
+        )
+    });
+    assert_eq!(
+        control_locations.len(),
+        1,
+        "replacement control identity was not projected exactly once"
+    );
+    let control_location = control_locations[0];
+    let control_effect = &steps[control_location.0].generated_effects[control_location.1];
+    let KernelEffect::ProjectAuthorityControl { control, .. } = control_effect else {
+        unreachable!("control location did not point to ProjectAuthorityControl")
+    };
+    assert_eq!(control_id_of(control), expected_control_id);
+
+    let receipts = receipt_events(steps, revision, operation_id)?;
+    assert!(
+        receipts.len() >= 3,
+        "replacement receipt chain is missing one or more mechanical receipts"
+    );
+    for receipt in &receipts {
+        assert_eq!(receipt.from, replica_seat);
+        assert_eq!(&receipt.context, replica_context);
+        assert_eq!(receipt.context.sender_seat_id, replica_seat);
+        assert_eq!(receipt.context.authority_seat_id, authority_seat);
+        assert_eq!(receipt.context.connection_generation, generation(0));
+    }
+
+    let stages = receipts
+        .iter()
+        .map(|receipt| receipt.body.stage)
+        .collect::<Vec<_>>();
+    assert!(
+        stages == vec![
+            AckStage::Admitted,
+            AckStage::MaterialApplied,
+            AckStage::ControlInstalled,
+        ] || stages
+            == vec![
+                AckStage::Admitted,
+                AckStage::MaterialApplied,
+                AckStage::ControlInstalled,
+                AckStage::PresentationSettled,
+            ],
+        "replacement receipt stages were not an exact admitted/materialApplied/controlInstalled chain: {stages:?}"
+    );
+    let expected_receipts = [
+        AuthorityReceiptBody {
+            revision,
+            operation_id: operation_id.clone(),
+            stage: AckStage::Admitted,
+            control_id: None,
+        },
+        AuthorityReceiptBody {
+            revision,
+            operation_id: operation_id.clone(),
+            stage: AckStage::MaterialApplied,
+            control_id: None,
+        },
+        AuthorityReceiptBody {
+            revision,
+            operation_id: operation_id.clone(),
+            stage: AckStage::ControlInstalled,
+            control_id: Some(expected_control_id.to_owned()),
+        },
+    ];
+    for (receipt, expected) in receipts.iter().take(3).zip(expected_receipts.iter()) {
+        assert_eq!(&receipt.body, expected);
+    }
+    if let Some(receipt) = receipts.get(3) {
+        assert_eq!(
+            receipt.body,
+            AuthorityReceiptBody {
+                revision,
+                operation_id: operation_id.clone(),
+                stage: AckStage::PresentationSettled,
+                control_id: None,
+            }
+        );
+    }
+
+    let admitted_location = (receipts[0].step_index, receipts[0].effect_index);
+    let material_receipt_location = (receipts[1].step_index, receipts[1].effect_index);
+    let control_receipt_location = (receipts[2].step_index, receipts[2].effect_index);
+    assert!(entry_location < admitted_location);
+    assert!(admitted_location < material_location);
+    assert!(material_location < material_receipt_location);
+    assert!(material_receipt_location < control_location);
+    assert!(control_location < control_receipt_location);
+
+    for (boundary, location) in [
+        ("admitted", admitted_location),
+        ("material", material_location),
+        ("materialApplied", material_receipt_location),
+        ("control", control_location),
+        ("controlInstalled", control_receipt_location),
+    ] {
+        let frontier = guest_frontier(&steps[location.0])?;
+        assert_eq!(
+            frontier.0, revision_value,
+            "replica received frontier diverged at {boundary}"
+        );
+        assert!(
+            frontier.0 >= frontier.1 && frontier.1 >= frontier.2,
+            "replica frontier order broke at {boundary}: {frontier:?}"
+        );
+        assert!(frontier.1 >= prior_frontier.1);
+        assert!(frontier.2 >= prior_frontier.2);
+    }
+    assert_eq!(
+        guest_frontier(&steps[control_receipt_location.0])?,
+        (revision_value, revision_value, revision_value),
+        "replica frontier did not reach the installed replacement control"
+    );
+
+    Ok(())
 }
 
 fn delay_queued_packets(
@@ -523,16 +959,84 @@ fn deliver_all_queued(pair: &mut SimulatedPair, trace: &mut Vec<PairStep>) -> Te
     Err("replacement campaign did not quiesce while delivering queued packets".into())
 }
 
+fn assert_zero_resources(snapshot: &PairSnapshot) {
+    for endpoint in [&snapshot.host, &snapshot.guest] {
+        assert!(endpoint.live_resources.timers.is_empty());
+        assert!(endpoint.live_resources.presentations.is_empty());
+        assert!(endpoint.live_resources.storage_requests.is_empty());
+        assert!(endpoint.live_resources.delivery_leases.is_empty());
+        assert!(endpoint.live_resources.proposal_leases.is_empty());
+        assert!(endpoint.live_resources.recovery_transactions.is_empty());
+        assert!(endpoint.live_resources.waits.is_empty());
+        assert!(endpoint.live_resources.retained_revisions.is_empty());
+        assert!(endpoint.live_resources.controls.is_empty());
+        assert!(endpoint.live_resources.network_packets.is_empty());
+        assert_eq!(endpoint.live_resources, LiveResourceSnapshot::default());
+    }
+    assert!(snapshot.network.queued_packet_ids.is_empty());
+    assert!(snapshot.network.disconnected_endpoints.is_empty());
+    assert!(snapshot.network.suspended_endpoints.is_empty());
+    assert!(snapshot.network.disposed);
+    assert!(snapshot.presenter.pending_event_ids.is_empty());
+    assert!(snapshot.presenter.settled_event_ids.is_empty());
+    assert!(snapshot.presenter.disposed);
+    assert!(snapshot.storage.keys.is_empty());
+    assert!(snapshot.storage.pending_request_ids.is_empty());
+    assert!(snapshot.storage.disposed);
+}
+
+fn assert_post_disposal_rejected(pair: &mut SimulatedPair) -> TestResult {
+    assert!(matches!(
+        pair.teardown("replacement campaign repeated teardown"),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.snapshot(),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.apply(PairOperation::AdvanceTime {
+            delta_ms: SafeU53::ZERO,
+        }),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.advance_time(SafeU53::ZERO),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false),
+        Err(SimulatedPairError::Disposed)
+    ));
+    assert!(matches!(
+        pair.press(PairEndpoint::Host, PhysicalKey::Enter),
+        Err(SimulatedPairError::Disposed)
+    ));
+    Ok(())
+}
+
 fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     let (config, ids) = campaign_config(seed)?;
     let mut pair = SimulatedPair::new(config)?;
     let mut trace = Vec::new();
 
     let initial = pair.snapshot()?;
+    let initial_generation = initial.guest.ui.generation;
     assert_eq!(initial.host.ui.kind, UiViewKind::Replacement);
     assert_eq!(initial.host.ui.owner_seat, Some(ids.guest));
     assert_eq!(initial.guest.ui.owner_seat, Some(ids.guest));
     assert_eq!(selected_option(&initial, PairEndpoint::Guest).as_deref(), Some("party:disabled"));
+    assert_replacement_menu(
+        &initial,
+        PairEndpoint::Guest,
+        ids.guest,
+        initial_generation,
+        &ids.head_operation,
+        &ids.head_control_id,
+        safe(0),
+        safe(3),
+        &MenuOptionId::new("party:disabled".to_owned())?,
+    );
 
     let wrong_seat = pair.press(PairEndpoint::Host, PhysicalKey::Enter)?;
     assert_no_ui_intent(&wrong_seat, ids.host, "non-owner host input must be rejected");
@@ -545,13 +1049,27 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_eq!(pair.snapshot()?.guest.ui, initial.guest.ui);
 
     let first_move = pair.press(PairEndpoint::Guest, PhysicalKey::ArrowUp)?;
+    assert_cursor_intent(&first_move, ids.guest, initial_generation, safe(2));
     trace.extend(first_move.iter().cloned());
+    let first_move_snapshot = first_move
+        .last()
+        .ok_or_else(|| std::io::Error::other("missing move"))?
+        .snapshot
+        .clone();
+    assert_replacement_menu(
+        &first_move_snapshot,
+        PairEndpoint::Guest,
+        ids.guest,
+        initial_generation,
+        &ids.head_operation,
+        &ids.head_control_id,
+        safe(0),
+        safe(2),
+        &MenuOptionId::new("party:gamma".to_owned())?,
+    );
     assert_eq!(
         selected_option(
-            &first_move
-                .last()
-                .ok_or_else(|| std::io::Error::other("missing move"))?
-                .snapshot,
+            &first_move_snapshot,
             PairEndpoint::Guest,
         )
             .as_deref(),
@@ -561,16 +1079,49 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     // Keep the physical key held so its repeat carries the old menu generation
     // across the delayed control transition and is rejected as stale.
     let held_move = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
+    assert_cursor_intent(&[held_move.clone()], ids.guest, initial_generation, safe(1));
     trace.push(held_move.clone());
-    assert_eq!(selected_option(&held_move.snapshot, PairEndpoint::Guest).as_deref(), Some("party:beta"));
+    assert_replacement_menu(
+        &held_move.snapshot,
+        PairEndpoint::Guest,
+        ids.guest,
+        initial_generation,
+        &ids.head_operation,
+        &ids.head_control_id,
+        safe(0),
+        safe(1),
+        &ids.head_choice,
+    );
+    assert_eq!(
+        selected_option(&held_move.snapshot, PairEndpoint::Guest).as_deref(),
+        Some("party:beta")
+    );
 
+    let before_head_submit = pair.snapshot()?;
     let head_submit = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     assert_replacement_intent(
         &head_submit,
+        &before_head_submit,
+        PairEndpoint::Guest,
         ids.guest,
+        before_head_submit.guest.ui.generation,
         &ids.head_operation,
         &ids.head_control_id,
+        safe(0),
+        safe(1),
         &ids.head_choice,
+    );
+    assert_eq!(
+        proposal_effects(&head_submit),
+        vec![ProposalMessage {
+            operation_id: ids.head_operation.clone(),
+            fingerprint: ids.head_fingerprint.clone(),
+            from: ids.guest,
+            to: ids.host,
+            connection_generation: generation(0),
+            payload: ids.head_proposal_payload.clone(),
+        }],
+        "head replacement emitted an incomplete or non-canonical proposal identity"
     );
     trace.extend(head_submit.iter().cloned());
     delay_queued_packets(&mut pair, &mut trace, safe(1_000))?;
@@ -587,15 +1138,46 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         selected_option(&tail_ready, PairEndpoint::Host).as_deref(),
         Some("party:alpha")
     );
+    assert_replacement_menu(
+        &tail_ready,
+        PairEndpoint::Host,
+        ids.host,
+        tail_ready.host.ui.generation,
+        &ids.tail_operation,
+        &ids.tail_control_id,
+        safe(0),
+        safe(0),
+        &ids.tail_choice,
+    );
+    assert_replacement_menu(
+        &tail_ready,
+        PairEndpoint::Guest,
+        ids.host,
+        tail_ready.guest.ui.generation,
+        &ids.tail_operation,
+        &ids.tail_control_id,
+        safe(0),
+        safe(0),
+        &ids.tail_choice,
+    );
 
     let before_stale = pair.snapshot()?;
     let stale_repeat = pair.advance_time(safe(250))?;
     trace.push(stale_repeat.clone());
     assert_eq!(stale_repeat.snapshot.guest.ui, before_stale.guest.ui);
+    assert_eq!(
+        stale_repeat.snapshot.virtual_time_ms.get(),
+        before_stale.virtual_time_ms.get() + 250
+    );
     assert_no_ui_intent(
         std::slice::from_ref(&stale_repeat),
         ids.guest,
         "a repeat from the pre-control menu must not create a UI intent",
+    );
+    assert_no_replacement_submission(
+        std::slice::from_ref(&stale_repeat),
+        ids.guest,
+        "a stale repeat must not create a replacement submission",
     );
 
     let released = pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?;
@@ -609,13 +1191,23 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     trace.extend(tail_wrong_seat.iter().cloned());
 
+    let before_tail_submit = pair.snapshot()?;
     let tail_submit = pair.press(PairEndpoint::Host, PhysicalKey::Enter)?;
     assert_replacement_intent(
         &tail_submit,
+        &before_tail_submit,
+        PairEndpoint::Host,
         ids.host,
+        before_tail_submit.host.ui.generation,
         &ids.tail_operation,
         &ids.tail_control_id,
+        safe(0),
+        safe(0),
         &ids.tail_choice,
+    );
+    assert!(
+        proposal_effects(&tail_submit).is_empty(),
+        "authority-local replacement must not emit a self-signed proposal"
     );
     trace.extend(tail_submit.iter().cloned());
     delay_queued_packets(&mut pair, &mut trace, safe(1_000))?;
@@ -629,12 +1221,38 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert_eq!(converged.host.ui.owner_seat, None);
     assert!(converged.network.queued_packet_ids.is_empty());
 
+    let authority_context = context(ids.host)?;
+    let replica_context = context(ids.guest)?;
+    assert_authority_chain(
+        &trace,
+        &ids.head_operation,
+        1,
+        &ids.head_material,
+        &ids.head_next_control,
+        &ids.tail_control_id,
+        &authority_context,
+        &replica_context,
+        ids.host,
+        ids.guest,
+        (0, 0, 0),
+    )?;
+    assert_authority_chain(
+        &trace,
+        &ids.tail_operation,
+        2,
+        &ids.tail_material,
+        &ids.tail_next_control,
+        &ids.await_control_id,
+        &authority_context,
+        &replica_context,
+        ids.host,
+        ids.guest,
+        (1, 1, 1),
+    )?;
+
     let final_snapshot = pair.teardown("replacement campaign complete")?;
-    assert!(final_snapshot.network.queued_packet_ids.is_empty());
-    assert!(final_snapshot.host.live_resources.timers.is_empty());
-    assert!(final_snapshot.guest.live_resources.timers.is_empty());
-    assert!(final_snapshot.host.live_resources.proposal_leases.is_empty());
-    assert!(final_snapshot.guest.live_resources.proposal_leases.is_empty());
+    assert_zero_resources(&final_snapshot);
+    assert_post_disposal_rejected(&mut pair)?;
 
     Ok(CampaignRun {
         trace,
@@ -645,9 +1263,13 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
 #[test]
 fn delayed_asymmetric_replacement_campaign_is_raw_and_deterministically_convergent() -> TestResult {
     let first = run_campaign(0x5eed_cafe)?;
-    let second = run_campaign(0x5eed_cafe)?;
-
-    assert_eq!(first.trace, second.trace);
-    assert_eq!(first.final_snapshot, second.final_snapshot);
+    for execution in 1..DETERMINISTIC_EXECUTIONS {
+        let repeated = run_campaign(0x5eed_cafe)?;
+        assert_eq!(repeated.trace, first.trace, "deterministic execution {execution} diverged");
+        assert_eq!(
+            repeated.final_snapshot, first.final_snapshot,
+            "deterministic final snapshot {execution} diverged"
+        );
+    }
     Ok(())
 }
