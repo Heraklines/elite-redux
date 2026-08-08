@@ -8,7 +8,8 @@ use er_kernel::{
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy,
-    FrameValidator, PeerBinding, ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of,
+    FrameValidator, PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultNetwork, FaultOperation, FrameCorruption, NetworkEvent, PairEndpoint, PairOperation,
@@ -17,9 +18,9 @@ use er_sim::{
 use er_types::{
     AuthorityEntryKind, CancelPolicy, CommandControlTarget, CommandFrontierControl,
     ConnectionGeneration, FrameContext, FrameType, GameButton, InputFocus, InputMap, KeyBinding,
-    Material, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId, MenuState, NextControl,
-    OperationId, PhysicalKey, RawFrame, RawInputEvent, SafeU53, SeatId, SessionId, TimeClass,
-    UiIntent, UiState, UiViewKind, NetworkPayload,
+    Material, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId, MenuState,
+    NetworkPayload, NextControl, OperationId, PhysicalKey, RawFrame, RawInputEvent, SafeI53,
+    SafeU53, SeatId, SessionId, TimeClass, UiIntent, UiState, UiViewKind,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -281,6 +282,17 @@ fn command_plan(
     }
 }
 
+fn benchmark_proposal_fingerprint(index: u64) -> TestResult<String> {
+    let wire = ProposalJson::new(format!(r#"{{"choice":{index}}}"#))?;
+    Ok(proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(index + 1),
+        label: "turnCommand".to_owned(),
+        choice: SafeI53::ZERO,
+        wire: Some(wire),
+        reward_surface: None,
+    })?)
+}
+
 fn authority_resolution(
     index: u64,
     operation_id: OperationId,
@@ -350,6 +362,15 @@ fn recovery_config() -> TestResult<RecoveryTransactionConfig> {
 }
 
 fn protocol_pair(seed: u64) -> TestResult<SimulatedPair> {
+    assert_eq!(
+        benchmark_proposal_fingerprint(0)?,
+        r#"[1,"turnCommand",0,{"choice":0},null]"#,
+    );
+    assert_eq!(
+        benchmark_proposal_fingerprint(PROPOSAL_CYCLES)?,
+        r#"[1001,"turnCommand",0,{"choice":1000},null]"#,
+    );
+
     let mut menu_plans = Vec::with_capacity((PROPOSAL_CYCLES + 1) as usize);
     let mut resolutions = Vec::with_capacity(PROPOSAL_CYCLES as usize);
     for index in 0..=PROPOSAL_CYCLES {
@@ -357,7 +378,7 @@ fn protocol_pair(seed: u64) -> TestResult<SimulatedPair> {
         let operation_id = operation(format!("turn/benchmark/{index}"))?;
         let control = command_control(index);
         let control_id = control_id_of(&control);
-        let fingerprint = format!("m2-benchmark-fingerprint-{index}");
+        let fingerprint = benchmark_proposal_fingerprint(index)?;
         menu_plans.push(command_plan(
             index,
             control_id,
