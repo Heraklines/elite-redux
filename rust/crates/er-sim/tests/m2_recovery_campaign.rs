@@ -568,7 +568,12 @@ fn assert_fresh_guest_command(
             let expected_option_id = option(4)?.id;
             assert_eq!(option_id, &expected_option_id);
         }
-        intent => panic!("fresh raw input emitted the wrong typed intent: {intent:?}"),
+        intent => {
+            return Err(std::io::Error::other(format!(
+                "fresh raw input emitted the wrong typed intent: {intent:?}"
+            ))
+            .into());
+        }
     }
     Ok(())
 }
