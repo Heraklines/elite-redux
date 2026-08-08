@@ -1085,7 +1085,11 @@ fn assert_zero_resources(snapshot: &PairSnapshot) {
         assert!(endpoint.live_resources.controls.is_empty());
         assert!(endpoint.live_resources.network_packets.is_empty());
         assert_eq!(endpoint.live_resources, LiveResourceSnapshot::default());
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
     }
+    assert!(snapshot.clock_timers.is_empty());
     assert!(snapshot.network.queued_packet_ids.is_empty());
     assert!(snapshot.network.disconnected_endpoints.is_empty());
     assert!(snapshot.network.suspended_endpoints.is_empty());
