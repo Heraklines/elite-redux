@@ -6038,7 +6038,7 @@ fn recovery_seeded_bundles_and_fences_fail_closed_with_ordered_phases() -> TestR
         live_recovery_state(2)?,
         &mut control_live_stale_scheduler,
     )?;
-    assert_recovery_terminalized(&control_live_stale_actions, &[], 0, "recovery-control-live");
+    assert_recovery_terminalized(&control_live_stale_actions, &[1], 0, "recovery-control-live");
     assert!(control_live_stale_scheduler.live_timers().is_empty());
     control_live_stale_replica.dispose("control live stale teardown");
 
