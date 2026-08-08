@@ -24,7 +24,6 @@ use er_types::{
     SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, UiIntent, UiState, UiViewKind,
     UiViewModel, WaitingMenu,
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -48,48 +47,6 @@ const RECOVERY_REQUEST_TIMEOUT_MS: u64 = 300_000;
 const EXPECTED_ABSOLUTE_TERMINAL_REASON: &str =
     "proposal m2b-08/reconnect terminalized: v2 proposal absolute ceiling";
 const EXPECTED_RECOVERY_TERMINAL_REASON: &str = "recovery request timeout exceeded";
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthorityStateSnapshot {
-    protocol: AuthorityProtocolSnapshot,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthorityProtocolSnapshot {
-    role: String,
-    context: FrameContext,
-    peer_bindings: Vec<PeerBinding>,
-    log: AuthorityLogSnapshot,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthorityLogSnapshot {
-    head_revision: Revision,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReplicaStateSnapshot {
-    protocol: ReplicaProtocolSnapshot,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReplicaProtocolSnapshot {
-    role: String,
-    context: FrameContext,
-    authority_generation: ConnectionGeneration,
-    replica: ReplicaSnapshot,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReplicaSnapshot {
-    frontier: AuthorityFrontier,
-}
 
 fn safe(value: u64) -> SafeU53 {
     assert!(value <= SafeU53::MAX.get());
@@ -498,46 +455,95 @@ fn assert_timers_live(snapshot: &PairSnapshot, timer_ids: &BTreeSet<TimerId>) {
     );
 }
 
-fn authority_state(snapshot: &PairSnapshot) -> TestResult<AuthorityStateSnapshot> {
-    Ok(serde_json::from_value(snapshot.host.kernel.state.clone())?)
+fn exact_state_path<'a>(
+    state: &'a Value,
+    endpoint: &str,
+    path: &[&str],
+) -> TestResult<&'a Value> {
+    let mut value = state;
+    let mut traversed = format!("{endpoint}.kernel.state");
+    for field in path {
+        let object = value
+            .as_object()
+            .ok_or_else(|| format!("{traversed} must be an object"))?;
+        value = object
+            .get(*field)
+            .ok_or_else(|| format!("{traversed}.{field} is missing"))?;
+        traversed.push('.');
+        traversed.push_str(field);
+    }
+    Ok(value)
 }
 
-fn replica_state(snapshot: &PairSnapshot) -> TestResult<ReplicaStateSnapshot> {
-    Ok(serde_json::from_value(snapshot.guest.kernel.state.clone())?)
+fn exact_state_leaf<T>(state: &Value, endpoint: &str, path: &[&str]) -> TestResult<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    Ok(serde_json::from_value(
+        exact_state_path(state, endpoint, path)?.clone(),
+    )?)
+}
+
+fn assert_protocol_role(state: &Value, endpoint: &str, expected_role: &str) -> TestResult {
+    let role: String = exact_state_leaf(state, endpoint, &["protocol", "role"])?;
+    if role != expected_role {
+        return Err(format!(
+            "{endpoint}.kernel.state.protocol.role was {role:?}, expected {expected_role:?}"
+        )
+        .into());
+    }
+    Ok(())
 }
 
 fn assert_snapshot_bindings(snapshot: &PairSnapshot, expected_generation: u64) -> TestResult {
-    let authority = authority_state(snapshot)?;
-    assert_eq!(authority.protocol.role, "authority");
+    let authority_state = &snapshot.host.kernel.state;
+    assert_protocol_role(authority_state, "host", "authority")?;
+    let authority_context: FrameContext =
+        exact_state_leaf(authority_state, "host", &["protocol", "context"])?;
     assert_eq!(
-        authority.protocol.context,
+        authority_context,
         context(HOST_SEAT, expected_generation)?
     );
+    let peer_bindings: Vec<PeerBinding> =
+        exact_state_leaf(authority_state, "host", &["protocol", "peerBindings"])?;
     assert_eq!(
-        authority.protocol.peer_bindings,
+        peer_bindings,
         vec![PeerBinding {
             seat_id: seat(GUEST_SEAT),
             connection_generation: generation(expected_generation),
         }]
     );
 
-    let replica = replica_state(snapshot)?;
-    assert_eq!(replica.protocol.role, "replica");
+    let replica_state = &snapshot.guest.kernel.state;
+    assert_protocol_role(replica_state, "guest", "replica")?;
+    let replica_context: FrameContext =
+        exact_state_leaf(replica_state, "guest", &["protocol", "context"])?;
     assert_eq!(
-        replica.protocol.context,
+        replica_context,
         context(GUEST_SEAT, expected_generation)?
     );
+    let authority_generation: ConnectionGeneration = exact_state_leaf(
+        replica_state,
+        "guest",
+        &["protocol", "authorityGeneration"],
+    )?;
     assert_eq!(
-        replica.protocol.authority_generation,
+        authority_generation,
         generation(expected_generation)
     );
     Ok(())
 }
 
 fn assert_authority_head_revision(snapshot: &PairSnapshot, expected_revision: u64) -> TestResult {
-    let authority = authority_state(snapshot)?;
+    let authority_state = &snapshot.host.kernel.state;
+    assert_protocol_role(authority_state, "host", "authority")?;
+    let head_revision: Revision = exact_state_leaf(
+        authority_state,
+        "host",
+        &["protocol", "log", "headRevision"],
+    )?;
     assert_eq!(
-        authority.protocol.log.head_revision,
+        head_revision,
         Revision::new(safe(expected_revision))
     );
     Ok(())
@@ -549,9 +555,15 @@ fn assert_replica_frontier(
     expected_material: u64,
     expected_control: u64,
 ) -> TestResult {
-    let replica = replica_state(snapshot)?;
+    let replica_state = &snapshot.guest.kernel.state;
+    assert_protocol_role(replica_state, "guest", "replica")?;
+    let frontier: AuthorityFrontier = exact_state_leaf(
+        replica_state,
+        "guest",
+        &["protocol", "replica", "frontier"],
+    )?;
     assert_eq!(
-        replica.protocol.replica.frontier,
+        frontier,
         AuthorityFrontier {
             received: Revision::new(safe(expected_received)),
             material: Revision::new(safe(expected_material)),
@@ -559,6 +571,17 @@ fn assert_replica_frontier(
         }
     );
     Ok(())
+}
+
+fn assert_absorbed_snapshot_unchanged(expected: &PairSnapshot, actual: &PairSnapshot) {
+    assert_eq!(actual.seed, expected.seed);
+    assert_eq!(actual.virtual_time_ms, expected.virtual_time_ms);
+    assert_eq!(actual.host, expected.host);
+    assert_eq!(actual.guest, expected.guest);
+    assert_eq!(actual.network, expected.network);
+    assert_eq!(actual.presenter, expected.presenter);
+    assert_eq!(actual.storage, expected.storage);
+    assert_eq!(actual.terminal_reason, expected.terminal_reason);
 }
 
 fn capture_guest_actionable_menu(
@@ -1395,17 +1418,30 @@ fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -
         terminal_step.snapshot.host.ui.prompt_key.as_deref(),
         Some(EXPECTED_RECOVERY_TERMINAL_REASON)
     );
-    let terminal_host_kernel = terminal_step.snapshot.host.kernel.clone();
-    let terminal_guest_kernel = terminal_step.snapshot.guest.kernel.clone();
+    let terminal_snapshot = terminal_step.snapshot.clone();
     let terminal_reason = terminal_step.snapshot.terminal_reason.clone();
     record_step(&mut steps, terminal_step);
 
     let repeated_timer_step = pair.advance_time(SafeU53::ZERO)?;
     assert_eq!(terminal_effect_count(&repeated_timer_step), 0);
-    assert_eq!(repeated_timer_step.snapshot.terminal_reason, terminal_reason);
-    assert_eq!(repeated_timer_step.snapshot.host.kernel, terminal_host_kernel);
-    assert_eq!(repeated_timer_step.snapshot.guest.kernel, terminal_guest_kernel);
+    assert_absorbed_snapshot_unchanged(&terminal_snapshot, &repeated_timer_step.snapshot);
     record_step(&mut steps, repeated_timer_step);
+
+    let rejected_input_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
+    assert!(!rejected_input_steps.is_empty());
+    assert!(
+        rejected_input_steps
+            .iter()
+            .all(|step| step.generated_effects.is_empty())
+    );
+    for step in &rejected_input_steps {
+        assert_absorbed_snapshot_unchanged(&terminal_snapshot, &step.snapshot);
+    }
+    record_steps(&mut steps, rejected_input_steps);
+    assert_eq!(
+        steps.iter().map(terminal_effect_count).sum::<usize>(),
+        1
+    );
 
     let final_snapshot = pair.teardown("m2b-08 recovery timeout campaign complete")?;
     assert_zero_resources(&final_snapshot);
@@ -1713,16 +1749,13 @@ fn raw_absolute_proposal_ceiling_enters_symmetric_terminal_once() -> TestResult 
             .proposal_leases
             .contains(&proposal.operation_id)
     );
-    let terminal_host_kernel = terminal_step.snapshot.host.kernel.clone();
-    let terminal_guest_kernel = terminal_step.snapshot.guest.kernel.clone();
+    let terminal_snapshot = terminal_step.snapshot.clone();
     let terminal_reason = terminal_step.snapshot.terminal_reason.clone();
     record_step(&mut steps, terminal_step);
 
     let repeated_timer_step = pair.advance_time(SafeU53::ZERO)?;
     assert_eq!(terminal_effect_count(&repeated_timer_step), 0);
-    assert_eq!(repeated_timer_step.snapshot.terminal_reason, terminal_reason);
-    assert_eq!(repeated_timer_step.snapshot.host.kernel, terminal_host_kernel);
-    assert_eq!(repeated_timer_step.snapshot.guest.kernel, terminal_guest_kernel);
+    assert_absorbed_snapshot_unchanged(&terminal_snapshot, &repeated_timer_step.snapshot);
     record_step(&mut steps, repeated_timer_step);
 
     let rejected_input_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
@@ -1732,11 +1765,9 @@ fn raw_absolute_proposal_ceiling_enters_symmetric_terminal_once() -> TestResult 
             .iter()
             .all(|step| step.generated_effects.is_empty())
     );
-    assert!(rejected_input_steps.iter().all(|step| {
-        step.snapshot.host.kernel == terminal_host_kernel
-            && step.snapshot.guest.kernel == terminal_guest_kernel
-            && step.snapshot.terminal_reason == terminal_reason
-    }));
+    for step in &rejected_input_steps {
+        assert_absorbed_snapshot_unchanged(&terminal_snapshot, &step.snapshot);
+    }
     record_steps(&mut steps, rejected_input_steps);
     assert_eq!(
         steps.iter().map(terminal_effect_count).sum::<usize>(),
