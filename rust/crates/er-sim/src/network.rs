@@ -63,7 +63,7 @@ pub enum NetworkEvent {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FaultNetworkDiagnostics {
-    pub seed: u64,
+    pub seed: String,
     pub queued_packet_ids: BTreeSet<SafeU53>,
     pub disconnected_endpoints: BTreeSet<SeatId>,
     pub suspended_endpoints: BTreeSet<SeatId>,

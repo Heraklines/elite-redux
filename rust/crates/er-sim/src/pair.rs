@@ -86,7 +86,7 @@ pub struct EndpointSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct PairSnapshot {
     pub sequence: SafeU53,
-    pub seed: u64,
+    pub seed: String,
     pub virtual_time_ms: SafeU53,
     pub host: EndpointSnapshot,
     pub guest: EndpointSnapshot,

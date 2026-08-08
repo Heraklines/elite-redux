@@ -1,6 +1,6 @@
 # PokéRogue Redux Rust kernel M2 contract
 
-Status: revised before G4 by approved CR-0001, CR-0006, and CR-0007; frozen again at the revision commit recorded by worker task cards.
+Status: revised before G4 by approved CR-0001, CR-0006, CR-0007, CR-0009, and CR-0010; frozen again at the revision commit recorded by worker task cards.
 
 Source baseline:
 
@@ -10,7 +10,7 @@ Source baseline:
 - protocol compatibility identifier: `er-coop-47`
 - frame protocol: `2`
 - source-lock/schema version: `1`
-- M2 ownership-manifest version: `3`
+- M2 ownership-manifest version: `5`
 
 Every M2A branch starts from the exact hosted-green bootstrap commit that contains this document, the ownership manifest, shared DTOs, manifests/lockfile, crate-root exports, and compileable public stubs for every M2A lane. The literal SHA is supplied in each worker task card because a commit cannot contain its own hash. Cross-lane imports bind only to those frozen bootstrap types; workers do not wait for another lane's implementation.
 
@@ -270,7 +270,23 @@ continuation validates the complete removed registration before any mutation.
 
 `Presenter` and `StorageAdapter` are synchronous environment boundaries. They retain no kernel callback.
 
-`InstantPresenter` settles immediately. `FaultPresenter` may hold, settle, cancel, fail, reorder, or duplicate completion attempts by presentation event identity; it cannot mutate protocol state. `MemoryStorage` returns explicit load/persist outcomes and applies a recovery update atomically or fails without a partial write.
+Presentation identity is `(endpoint, eventId)`, not the numeric event ID alone.
+`present`, `settle`, duplicate-completion injection, and authoritative live
+queries are endpoint-qualified. Equal numeric event IDs may be live or settled
+independently at both endpoints. `diagnostics_for(endpoint)` and the
+endpoint-qualified pending/settled query methods are the live evidence. The
+legacy aggregate `diagnostics()` ID sets are only a convenience projection:
+they may collapse an equal ID from two endpoints and therefore must never be
+used as a live-resource count. Settled IDs are tombstones, not live resources.
+
+`InstantPresenter` settles immediately. `FaultPresenter` may hold, settle,
+cancel, fail, reorder, or duplicate completion attempts by endpoint-qualified
+presentation identity; it cannot mutate protocol state. `MemoryStorage`
+returns explicit load/persist outcomes and applies a recovery update atomically
+or fails without a partial write. Its injected atomic-write rejection is
+one-shot, is consumed only by the next live atomic recovery write, and leaves
+the complete value map unchanged. Synchronous request IDs may be reused after
+`execute` returns because pending ownership ends before the result is exposed.
 
 Every adapter exposes a live-resource snapshot and idempotent disposal.
 
@@ -289,9 +305,18 @@ state. Disposal cancels all owners before disposing the scheduler.
 
 ## Fault network
 
-`FaultNetwork` transports raw existing frame values and opaque proposal envelopes between endpoint seats. It owns deterministic packet identities and a seed. It supports enqueue, deliver, drop, duplicate, delay, reorder, corrupt, disconnect, reconnect with a strictly newer connection generation, and endpoint suspend/resume. Frame corruption rejects opaque proposal packets instead of inventing a proposal wire format.
+`FaultNetwork` transports raw existing frame values and opaque proposal envelopes between endpoint seats. It owns deterministic packet identities and an internal `u64` seed. It supports enqueue, deliver, drop, duplicate, delay, reorder, corrupt, disconnect, reconnect with a strictly newer connection generation, and endpoint suspend/resume. Frame corruption rejects opaque proposal packets instead of inventing a proposal wire format.
 
 Corruption operates on the raw envelope so malformed known mechanical frames and unknown cosmetic types reach `FrameValidator`. Delivery never bypasses the receiving kernel's frame boundary. Packets retain their send generation; a packet from an old generation remains stale after reconnect. Equal-time delivery order is deterministic. The network never chooses protocol outcomes.
+
+Every serialized diagnostic or pair-snapshot seed is the canonical unsigned
+decimal string produced from that `u64`; it is never emitted as a JSON number.
+This preserves all 64 seed bits across native, wasm32, JavaScript, and fixture
+boundaries. Diagnostic counters remain `SafeU53` and deliberately saturate at
+`SafeU53::MAX`. They are observational only: saturation cannot alter RNG state,
+packet ordering, delivery, connection state, or any protocol outcome. Packet
+IDs, queue-order IDs, deadlines, and other mechanical cursors do not saturate;
+their exhaustion is an explicit fail-atomic error.
 
 ## Simulated pair and raw-input rule
 

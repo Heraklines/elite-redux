@@ -1,4 +1,4 @@
-schema_version = 4
+schema_version = 5
 milestone = "M2"
 project = "PokéRogue Redux"
 bootstrap_parent_sha = "87eb36290675378b7b08c20a09f6cdd757ae9515"
@@ -86,6 +86,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-09"
 paths = ["rust/crates/er-sim/src/network.rs", "rust/crates/er-sim/tests/m2_network.rs"]
 deliverable = "Seeded loss, duplicate, delay, reorder, reconnect, and corruption"
+contract_dependencies = ["CR-0010 lossless diagnostic seeds and saturating observational counters"]
 
 [[lanes]]
 id = "M2-10"
@@ -93,6 +94,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-10"
 paths = ["rust/crates/er-sim/src/presenter.rs", "rust/crates/er-sim/src/storage.rs", "rust/crates/er-sim/tests/m2_adapters.rs"]
 deliverable = "Deterministic presenter and atomic memory storage adapters"
+contract_dependencies = ["CR-0009 endpoint-qualified presentation and one-shot storage faults"]
 
 [[lanes]]
 id = "M2-11"
@@ -122,6 +124,7 @@ target_generation = "G5"
 branch = "codex/rust-kernel-m2b-02"
 paths = ["rust/crates/er-sim/src/pair.rs"]
 deliverable = "Two-kernel effect-only orchestrator"
+contract_dependencies = ["CR-0009 endpoint-qualified presentation", "CR-0010 lossless snapshot seeds"]
 
 [[lanes]]
 id = "M2B-03"
@@ -171,6 +174,7 @@ target_generation = "G5"
 branch = "codex/rust-kernel-m2b-09"
 paths = ["rust/crates/er-wasm/src/m2_parity.rs", "rust/crates/er-wasm/tests/**", "rust/fixtures/v1/m2-parity/**"]
 deliverable = "Independent native/Wasm event-by-event trace parity"
+contract_dependencies = ["CR-0010 lossless diagnostic and snapshot seeds"]
 
 [[lanes]]
 id = "M2B-10"
