@@ -599,25 +599,24 @@ fn receipt_frontier_chain(receipts: &[ReceiptEvidence]) -> TestResult<Vec<Author
     Ok(chain)
 }
 
-fn find_replica_frontier(value: &Value) -> Option<&Value> {
-    match value {
-        Value::Object(fields) => {
-            if let Some(frontier) = fields
-                .get("replica")
-                .and_then(|replica| replica.get("frontier"))
-            {
-                return Some(frontier);
-            }
-            fields.values().find_map(find_replica_frontier)
-        }
-        Value::Array(values) => values.iter().find_map(find_replica_frontier),
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
-    }
-}
-
 fn actual_replica_frontier(snapshot: &PairSnapshot) -> TestResult<AuthorityFrontier> {
-    let frontier = find_replica_frontier(&snapshot.guest.kernel.state)
-        .ok_or_else(|| error("guest kernel state has no replica frontier"))?;
+    let protocol = snapshot
+        .guest
+        .kernel
+        .state
+        .get("protocol")
+        .ok_or_else(|| error("guest kernel state has no protocol diagnostics"))?;
+    assert_eq!(
+        protocol.get("role").and_then(Value::as_str),
+        Some("replica"),
+        "guest kernel protocol diagnostics are not for a replica"
+    );
+    let replica = protocol
+        .get("replica")
+        .ok_or_else(|| error("guest kernel protocol diagnostics have no replica state"))?;
+    let frontier = replica
+        .get("frontier")
+        .ok_or_else(|| error("guest kernel replica state has no frontier"))?;
     Ok(serde_json::from_value(frontier.clone())?)
 }
 
