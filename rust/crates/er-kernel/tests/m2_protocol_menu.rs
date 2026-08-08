@@ -1240,7 +1240,7 @@ fn exact_terminal_control_and_frame_identity_are_preserved_and_idempotent() -> T
                 fingerprint: "fp".to_owned(),
                 draft: draft(
                     &guest,
-                    AuthorityEntryKind::TurnCommit,
+                    AuthorityEntryKind::TerminalCommit,
                     turn_payload(),
                     terminal_control,
                 )?,

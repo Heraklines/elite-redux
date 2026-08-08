@@ -2488,7 +2488,7 @@ mod tests {
     #[test]
     fn shared_terminal_absorbs_peer_resources_and_every_later_operation() -> TestResult {
         let terminal = TerminalState {
-            terminal_id: "terminal:absorbing".to_owned(),
+            terminal_id: "authority-v2-terminal".to_owned(),
             reason: "shared terminal is absorbing".to_owned(),
         };
         let expected_menu = MenuState::Terminal(TerminalMenu {
