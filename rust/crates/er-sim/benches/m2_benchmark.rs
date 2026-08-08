@@ -544,16 +544,14 @@ fn drain_pair_network(
     evidence: &mut CycleEvidence,
     checksum: &mut u64,
 ) -> TestResult<u64> {
-    let mut steps = 0_u64;
-    for _ in 0..256 {
+    for (steps, _) in (0..256).enumerate() {
         if pair.snapshot()?.network.queued_packet_ids.is_empty() {
-            return Ok(steps);
+            return Ok(steps as u64);
         }
         let step = pair.apply(PairOperation::Fault {
             operation: FaultOperation::DeliverNext,
         })?;
         observe_cycle_step(&step, operation_id, evidence, checksum)?;
-        steps += 1;
     }
     Err("proposal benchmark pair did not quiesce".into())
 }
@@ -838,7 +836,7 @@ fn synthetic_pair_kernel(owner: SeatId) -> TestResult<KernelConfig> {
 }
 
 fn synthetic_operation(index: u64) -> PairOperation {
-    let endpoint = if (index / 2) % 2 == 0 {
+    let endpoint = if (index / 2).is_multiple_of(2) {
         PairEndpoint::Host
     } else {
         PairEndpoint::Guest
