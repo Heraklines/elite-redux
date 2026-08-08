@@ -1218,6 +1218,12 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         }
     );
     assert_directional_hold_started(&directional_hold_before, &directional_hold)?;
+    let directional_repeat_timer = guest_human_input_schedules(&directional_hold, safe(250))
+        .first()
+        .copied()
+        .ok_or_else(|| {
+            std::io::Error::other("directional hold repeat timer was not scheduled")
+        })?;
     trace.push(directional_hold);
 
     trace.extend(pair.press(PairEndpoint::Host, PhysicalKey::Enter)?);
@@ -1242,6 +1248,10 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert!(!reconnect_step.snapshot.guest.ui.actionable);
     let reconnect_fence = guest_recovery_fence(reconnect_step)?;
     assert_held_recovery_fence(&reconnect_fence);
+    assert!(
+        guest_timer_cancellations(reconnect_step).contains(&directional_repeat_timer),
+        "reconnect fencing must cancel the live directional repeat timer"
+    );
     assert!(has_frame(
         &reconnect_step.generated_effects,
         FrameType::RecoveryRequest
@@ -1687,30 +1697,25 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     }
 
     let stale_hold_before = final_step.snapshot.clone();
-    let stale_hold_advance = pair.advance_time(safe(250))?;
+    let stale_hold_release = pair.apply(PairOperation::RawInput {
+        endpoint: PairEndpoint::Guest,
+        event: RawInputEvent::KeyUp {
+            code: PhysicalKey::ArrowDown,
+        },
+    })?;
     assert_eq!(
-        stale_hold_advance.operation,
-        PairOperation::AdvanceTime {
-            delta_ms: safe(250)
-        }
+        stale_hold_release.snapshot.guest.ui, stale_hold_before.guest.ui,
+        "the fenced stale release must not move the fresh cursor or submit the fresh menu"
     );
     assert_eq!(
-        stale_hold_advance.snapshot.virtual_time_ms,
-        safe(stale_hold_before.virtual_time_ms.get() + 250)
+        stale_hold_release.snapshot.guest.kernel.ui, stale_hold_before.guest.kernel.ui,
+        "the fenced stale release must not mutate the fresh successor surface"
     );
     assert!(
-        !has_guest_stale_effect(&stale_hold_advance.generated_effects, generation(1)),
-        "the stale held input must not emit a guest intent or old-generation proposal"
+        !has_guest_stale_effect(&stale_hold_release.generated_effects, generation(1)),
+        "the fenced stale release must not emit a guest intent or old-generation proposal"
     );
-    assert_eq!(
-        stale_hold_advance.snapshot.guest.ui, stale_hold_before.guest.ui,
-        "the stale held input must not move the fresh cursor or submit the fresh menu"
-    );
-    assert_eq!(
-        stale_hold_advance.snapshot.guest.kernel.ui, stale_hold_before.guest.kernel.ui,
-        "the stale held input must not mutate the fresh successor surface"
-    );
-    assert!(stale_hold_advance.generated_effects.iter().all(|effect| {
+    assert!(stale_hold_release.generated_effects.iter().all(|effect| {
         !matches!(
             effect,
             KernelEffect::UiChanged { endpoint, .. } if *endpoint == seat(GUEST_SEAT)
@@ -1724,13 +1729,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
                 if *endpoint == seat(GUEST_SEAT)
         )
     }));
-    trace.push(stale_hold_advance);
-    trace.push(pair.apply(PairOperation::RawInput {
-        endpoint: PairEndpoint::Guest,
-        event: RawInputEvent::KeyUp {
-            code: PhysicalKey::ArrowDown,
-        },
-    })?);
+    trace.push(stale_hold_release);
 
     let before_control_pending_submit = trace
         .last()
