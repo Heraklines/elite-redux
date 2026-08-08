@@ -560,7 +560,7 @@ fn assert_authority_local_submission(
         .collect::<Vec<_>>();
     assert_eq!(
         authority_effect_order,
-        vec!["material", "control", "authorityEntry"]
+        vec!["material", "authorityEntry", "control"]
     );
 
     let mut entries = Vec::new();
