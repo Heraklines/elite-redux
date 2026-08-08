@@ -2,8 +2,8 @@
 mod m2_parity;
 
 use m2_parity::{
-    ParityReplayError, deserialize_seed_json, parse_fixture, replay_fixture, replay_fixture_json,
-    serialize_seed_json,
+    ParityReplayError, deserialize_seed_json, parse_fixture, replay_fixture,
+    replay_fixture_json, serialize_seed_json,
 };
 use serde_json::{Value, json};
 
@@ -123,6 +123,18 @@ fn protocol_fixture_pins_m2_boundaries_until_kernel_commit() -> Result<(), Box<d
         fixture.expected_evidence_status.as_deref(),
         Some("M2B-01 er-kernel protocol composition commit")
     );
+    let Some(er_kernel::ControlMenuPlan::Command { proposals, .. }) = fixture
+        .protocol_config
+        .as_ref()
+        .and_then(|config| config.menu_plans.first())
+    else {
+        return Err("protocol fixture is missing its command menu proposal".into());
+    };
+    assert_eq!(proposals.len(), 1);
+    assert_eq!(
+        proposals[0].fingerprint,
+        r#"[0,"command",0,{"surface":"command","option":"move:first","operation":"operation/m2-parity"},null]"#
+    );
 
     let kernel = er_kernel::GameKernel::new(er_kernel::KernelConfig {
         input_map: fixture.input_map.clone(),
@@ -199,6 +211,69 @@ fn protocol_fixture_pins_m2_boundaries_until_kernel_commit() -> Result<(), Box<d
         other => return Err(format!("expected pending protocol evidence, got {other:?}").into()),
     }
     Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+#[ignore = "CALIBRATION ONLY: writes evidence and intentionally fails non-acceptance"]
+fn protocol_fixture_hosted_calibration() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = parse_fixture(PROTOCOL_FIXTURE)?;
+    assert_eq!(fixture.trace.events.len(), 10);
+    assert_eq!(
+        fixture.expected_evidence_status.as_deref(),
+        Some("M2B-01 er-kernel protocol composition commit")
+    );
+
+    let artifact = m2_parity::calibrate_pending_fixture_json(PROTOCOL_FIXTURE)?;
+    let artifact_value: Value = serde_json::from_str(&artifact)?;
+    assert_eq!(
+        artifact_value["status"],
+        json!(m2_parity::CALIBRATION_ONLY_STATUS)
+    );
+    assert_eq!(artifact_value["accepted_parity"], json!(false));
+    assert_eq!(artifact_value["seed"], json!("18446744073709551615"));
+    assert_eq!(artifact_value["event_count"], json!(10));
+    let observations = artifact_value["observations"]
+        .as_array()
+        .ok_or("calibration observations are not an array")?;
+    assert_eq!(observations.len(), 10);
+    for (sequence, observation) in observations.iter().enumerate() {
+        assert_eq!(observation["seed"], json!("18446744073709551615"));
+        assert_eq!(observation["sequence"], json!(sequence));
+        assert_eq!(
+            observation["virtual_time_ms"],
+            json!(fixture.trace.events[sequence].virtual_time_ms)
+        );
+        for field in [
+            "effects",
+            "effect_digest",
+            "state",
+            "state_digest",
+            "ui",
+            "ui_digest",
+            "live_resources",
+            "live_resources_digest",
+        ] {
+            assert!(
+                observation.get(field).is_some(),
+                "calibration observation {sequence} is missing {field}"
+            );
+        }
+    }
+
+    let output_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join("rust-ci-summary");
+    std::fs::create_dir_all(&output_dir)?;
+    let output_path = output_dir.join("m2-parity-calibration.json");
+    std::fs::write(&output_path, format!("{artifact}\n"))?;
+
+    Err(format!(
+        "{}: wrote 10 observations to {}; this hosted calibration intentionally fails and is not parity acceptance",
+        m2_parity::CALIBRATION_ONLY_STATUS,
+        output_path.display()
+    )
+    .into())
 }
 
 #[cfg(target_arch = "wasm32")]

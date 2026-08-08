@@ -12,11 +12,14 @@ use er_kernel::{
     ControlMenuPlan, GameKernel, KernelConfig, MenuProposalPlan, ProtocolKernelConfig,
     ProtocolRoleConfig,
 };
-use er_protocol::{AuthorityReplicaConfig, ProposalLeaseConfig, RecoveryTransactionConfig};
+use er_protocol::{
+    AuthorityReplicaConfig, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    RecoveryTransactionConfig, proposal_fingerprint,
+};
 use er_types::{
     ConnectionGeneration, FrameContext, InputMap, KernelEffect, KernelTrace, KernelTraceEvent,
     LiveResourceSnapshot, MembershipRevision, MenuOption, MenuOptionId, OperationId, RunId,
-    SafeU53, SeatId, SessionId, KERNEL_TRACE_VERSION,
+    SafeI53, SafeU53, SeatId, SessionId, KERNEL_TRACE_VERSION,
 };
 use serde_json::{Value, json};
 
@@ -29,6 +32,11 @@ const PROTOCOL_SEAT_MAP_ID: &str = "m2-parity-seat-map";
 const PROTOCOL_OPERATION_ID: &str = "operation/m2-parity";
 const PROTOCOL_OPTION_ID: &str = "move:first";
 const PROTOCOL_CONTROL_ID: &str = "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42";
+const PROTOCOL_PROPOSAL_LABEL: &str = "command";
+const PROTOCOL_PROPOSAL_WIRE_JSON: &str =
+    r#"{"surface":"command","option":"move:first","operation":"operation/m2-parity"}"#;
+#[cfg(not(target_arch = "wasm32"))]
+pub const CALIBRATION_ONLY_STATUS: &str = "CALIBRATION_ONLY_NOT_ACCEPTED_PARITY";
 
 /// A decoded parity fixture.  This is an evidence-only wrapper and is not a
 /// public or wire schema.
@@ -317,6 +325,105 @@ pub fn replay_fixture_json(input: &str) -> Result<String, ParityReplayError> {
     })
 }
 
+/// Replay the pending protocol fixture without consulting any expected value.
+///
+/// This native-only path exists solely to capture hosted calibration evidence
+/// after the M2B-01 kernel composition lands.  It rejects accepted/non-protocol
+/// fixtures so it cannot become an alternate parity assertion path.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn calibrate_pending_fixture_json(input: &str) -> Result<String, ParityReplayError> {
+    let fixture = parse_fixture(input)?;
+    let dependency = fixture
+        .expected_evidence_status
+        .as_ref()
+        .ok_or_else(|| {
+            ParityReplayError::InvalidFixture(
+                "calibration requires an explicitly pending fixture".to_owned(),
+            )
+        })?;
+    if fixture.protocol_config.is_none() {
+        return Err(ParityReplayError::InvalidFixture(
+            "calibration requires a production protocol configuration".to_owned(),
+        ));
+    }
+    if fixture.trace.events.len() != 10 {
+        return Err(ParityReplayError::InvalidFixture(format!(
+            "protocol calibration requires exactly 10 events, got {}",
+            fixture.trace.events.len()
+        )));
+    }
+    for event in &fixture.trace.events {
+        if !event.expected_effect_digest.starts_with("PENDING_M2B_01")
+            || !event.expected_state_digest.starts_with("PENDING_M2B_01")
+            || !event.expected_ui_digest.starts_with("PENDING_M2B_01")
+        {
+            return Err(ParityReplayError::InvalidFixture(format!(
+                "calibration requires pending expected digests at sequence {}",
+                event.sequence
+            )));
+        }
+    }
+
+    let mut kernel = GameKernel::new(KernelConfig {
+        input_map: fixture.input_map.clone(),
+        initial_ui: fixture.trace.initial_snapshot.ui.clone(),
+        protocol: fixture.protocol_config.clone(),
+    });
+    let initial_snapshot = kernel.snapshot();
+    let initial_ui = kernel.ui_view();
+    let initial_live_resources = kernel.live_resources();
+    let initial = json!({
+        "state": initial_snapshot,
+        "state_digest": kernel.state_digest(),
+        "ui": initial_ui,
+        "ui_digest": ui_digest(&kernel)?,
+        "live_resources": initial_live_resources,
+        "live_resources_digest": live_resources_digest(&kernel.live_resources())?,
+    });
+
+    let seed = fixture.seed.to_string();
+    let mut observations = Vec::with_capacity(fixture.trace.events.len());
+    for event in &fixture.trace.events {
+        let effects = kernel
+            .step(event.input.clone())
+            .map_err(|error| ParityReplayError::Kernel {
+                sequence: event.sequence,
+                reason: error.to_string(),
+            })?;
+        let actual = observe(&kernel, &effects)?;
+        observations.push(json!({
+            "seed": seed,
+            "sequence": event.sequence,
+            "virtual_time_ms": event.virtual_time_ms,
+            "input": event.input,
+            "effects": effects,
+            "effect_digest": actual.effect_digest,
+            "state": kernel.snapshot(),
+            "state_digest": actual.state_digest,
+            "ui": kernel.ui_view(),
+            "ui_digest": actual.ui_digest,
+            "live_resources": actual.live_resources,
+            "live_resources_digest": actual.live_resources_digest,
+        }));
+    }
+
+    let artifact = json!({
+        "artifact_version": 1,
+        "status": CALIBRATION_ONLY_STATUS,
+        "accepted_parity": false,
+        "comparison_mode": "BYPASS_PENDING_EXPECTED_VALUES",
+        "dependency": dependency,
+        "seed": seed,
+        "event_count": observations.len(),
+        "initial": initial,
+        "observations": observations,
+    });
+    canonicalize(&artifact).map_err(|error| ParityReplayError::Canonical {
+        field: "calibration_report",
+        reason: error.to_string(),
+    })
+}
+
 fn validate_trace(trace: &KernelTrace) -> Result<(), ParityReplayError> {
     if trace.header.trace_version != KERNEL_TRACE_VERSION {
         return Err(ParityReplayError::InvalidFixture(format!(
@@ -368,6 +475,29 @@ fn protocol_config_for_fixture() -> Result<ProtocolKernelConfig, ParityReplayErr
     let option_id = MenuOptionId::new(PROTOCOL_OPTION_ID).map_err(|error| {
         ParityReplayError::InvalidFixture(format!("protocol option ID is invalid: {error}"))
     })?;
+    let proposal_wire = ProposalJson::new(PROTOCOL_PROPOSAL_WIRE_JSON).map_err(|error| {
+        ParityReplayError::InvalidFixture(format!(
+            "protocol proposal wire JSON is invalid: {error}"
+        ))
+    })?;
+    let proposal_payload: Value = serde_json::from_str(PROTOCOL_PROPOSAL_WIRE_JSON)
+        .map_err(|error| {
+            ParityReplayError::InvalidFixture(format!(
+                "protocol proposal payload is invalid: {error}"
+            ))
+        })?;
+    let proposal_identity = proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(0)?,
+        label: PROTOCOL_PROPOSAL_LABEL.to_owned(),
+        choice: SafeI53::ZERO,
+        wire: Some(proposal_wire),
+        reward_surface: None,
+    })
+    .map_err(|error| {
+        ParityReplayError::InvalidFixture(format!(
+            "protocol proposal fingerprint is invalid: {error}"
+        ))
+    })?;
     let local_context = FrameContext {
         session_id,
         run_id,
@@ -391,12 +521,8 @@ fn protocol_config_for_fixture() -> Result<ProtocolKernelConfig, ParityReplayErr
         }],
         proposals: vec![MenuProposalPlan {
             option_id,
-            fingerprint: "m2-parity:proposal-v1".to_owned(),
-            payload: json!({
-                "surface": "command",
-                "option": PROTOCOL_OPTION_ID,
-                "operation": PROTOCOL_OPERATION_ID,
-            }),
+            fingerprint: proposal_identity,
+            payload: proposal_payload,
         }],
         cancel: er_types::CancelPolicy::Disabled,
     };
