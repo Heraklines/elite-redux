@@ -1128,9 +1128,9 @@ fn validate_coverage_categories(value: &Value, fixtures: &[Value]) -> TestResult
             .ok_or_else(|| failure(format!("{category} must be a JSON array")))?;
         assert_exact_strings(actual, category, expected_references)?;
         let mut references = BTreeSet::new();
-        for reference in expected_references {
+        for &reference in *expected_references {
             assert!(
-                references.insert(*reference),
+                references.insert(reference),
                 "duplicate expected coverage reference: {reference}"
             );
             let _ = coverage_case(fixtures, reference)?;

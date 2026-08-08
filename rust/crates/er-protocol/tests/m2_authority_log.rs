@@ -3,12 +3,12 @@ use std::error::Error;
 use er_protocol::{
     AckStage, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLog, AuthorityLogAction,
     AuthorityLogConfig, AuthorityLogError, AuthorityReceiptVerdict, BackoffPolicy, FrameContext,
-    KernelScheduler, Material, NextControl, PeerBinding, ReceiptRejectReason, SafeU53,
-    SchedulerCommand, TimeClass, control_id_of,
+    KernelScheduler, Material, NextControl, PeerBinding, ReceiptRejectReason, SchedulerCommand,
+    TimeClass, control_id_of,
 };
 use er_types::{
     CommandControlTarget, CommandFrontierControl, ConnectionGeneration, OperationId, Revision,
-    RunId, SeatId, SessionId, TimerId, TimerOwner,
+    RunId, SafeU53, SeatId, SessionId, TimerId, TimerOwner,
 };
 use serde_json::json;
 
@@ -188,7 +188,7 @@ fn timer_owner_uses_the_shared_nonempty_opaque_boundary() -> TestResult {
         "redeliver revision 1 until mechanical quorum"
     );
 
-    let empty = AuthorityLog::new(config_with_owner_and_attempts(8, &[(1, 1)], "", None));
+    let empty = AuthorityLog::new(config_with_owner_and_attempts(8, &[(1, 1)], "", None)?);
     assert!(matches!(
         empty,
         Err(AuthorityLogError::InvalidConfig { .. })
