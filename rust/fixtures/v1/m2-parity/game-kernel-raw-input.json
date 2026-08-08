@@ -1,0 +1,380 @@
+{
+  "parity_fixture_schema_version": 1,
+  "seed": "18446744073709551615",
+  "input_map": {
+    "keyboard": [
+      {"key": {"kind": "ARROW_UP"}, "button": "UP"},
+      {"key": {"kind": "ARROW_DOWN"}, "button": "DOWN"},
+      {"key": {"kind": "ENTER"}, "button": "SUBMIT"},
+      {"key": {"kind": "ESCAPE"}, "button": "CANCEL"},
+      {"key": {"kind": "KEY_A"}, "button": "ACTION"}
+    ],
+    "gamepad": [],
+    "initial_repeat_delay_ms": 250,
+    "repeat_interval_ms": 250
+  },
+  "header": {
+    "trace_version": 1,
+    "schema_version": 1,
+    "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+    "protocol_version": "er-coop-47",
+    "content_hash": "blake3-v1:m2-parity-game-kernel-raw-input",
+    "rust_toolchain": "1.97.1"
+  },
+  "initial_snapshot": {
+    "ui": {
+      "generation": 1,
+      "owner_seat": 1,
+      "actionable": true,
+      "stack": [
+        {
+          "kind": "COMMAND",
+          "menu": {
+            "operation_id": "turn/e1/w1/t1",
+            "control_id": "control/e1/w1/t1",
+            "cursor": 0,
+            "options": [
+              {"id": "move:first", "label_key": "menu.move.first", "enabled": true, "visible": true},
+              {"id": "move:second", "label_key": "menu.move.second", "enabled": true, "visible": true},
+              {"id": "move:third", "label_key": "menu.move.third", "enabled": true, "visible": true}
+            ],
+            "cancel": {"kind": "DISABLED"}
+          }
+        }
+      ]
+    },
+    "state": {}
+  },
+  "events": [
+    {
+      "sequence": 0,
+      "virtual_time_ms": 0,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ARROW_DOWN"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "33f92091c070d48b9bca260b52904472c09032a11b132f9bf2324530535efbdb",
+      "expected_state_digest": "582e6d8bc2e06ed3edad59aa10530660ee95688c025fccacd28839a8ee563bcd",
+      "expected_ui_digest": "4f776a578629e49f803b1c666b04b565c47d09a25644019532c541a896d3c56e",
+      "expected_live_resources": {"timers": [0], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 1,
+      "virtual_time_ms": 100,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ARROW_DOWN"},
+            "printable": false,
+            "browser_repeat": true,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "582e6d8bc2e06ed3edad59aa10530660ee95688c025fccacd28839a8ee563bcd",
+      "expected_ui_digest": "4f776a578629e49f803b1c666b04b565c47d09a25644019532c541a896d3c56e",
+      "expected_live_resources": {"timers": [0], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 2,
+      "virtual_time_ms": 250,
+      "input": {"kind": "TIMER_FIRED", "endpoint": 1, "timer_id": 0},
+      "expected_effect_digest": "1d0159d6deb7046cbb9455fff13d53620d96bd1858cfe3fe8a3e0428ef0be65c",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [1], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 3,
+      "virtual_time_ms": 500,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "ARROW_DOWN"}}}
+      },
+      "expected_effect_digest": "d74ec07bdb846daccec7bd4091b6e02726b6bef45f737da97cf2ad79c981f6c6",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 4,
+      "virtual_time_ms": 750,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ENTER"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "d9468eb4f966b3e8d8b0c96f51cdf8242a83ff53d64bc9d6f2fd7faa0d6b3a3f",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [2], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 5,
+      "virtual_time_ms": 1000,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "ENTER"}}}
+      },
+      "expected_effect_digest": "8b09fdd6740696946e546f78490e83f64b332c32c3c678db077c412d63d6b735",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 6,
+      "virtual_time_ms": 1250,
+      "input": {"kind": "RAW_INPUT", "seat": 1, "event": {"kind": "FOCUS_CHANGED", "data": "TEXT_ENTRY"}},
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 7,
+      "virtual_time_ms": 1500,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "KEY_A"},
+            "printable": true,
+            "browser_repeat": false,
+            "focus": "TEXT_ENTRY"
+          }
+        }
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 8,
+      "virtual_time_ms": 1750,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "KEY_A"}}}
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 9,
+      "virtual_time_ms": 2000,
+      "input": {"kind": "RAW_INPUT", "seat": 1, "event": {"kind": "FOCUS_CHANGED", "data": "GAME"}},
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 10,
+      "virtual_time_ms": 2250,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "KEY_A"},
+            "printable": true,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "437f58d548d1789656a825730455fed4ab2cff4932af5321fc98ce0d54142125",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [3], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 11,
+      "virtual_time_ms": 2500,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "KEY_A"}}}
+      },
+      "expected_effect_digest": "346a919a20b1a62268281d3740607a6b8c5b4e5b1036d55cd69d8912fbf6139c",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 12,
+      "virtual_time_ms": 2750,
+      "input": {"kind": "RAW_INPUT", "seat": 1, "event": {"kind": "WINDOW_BLURRED"}},
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 13,
+      "virtual_time_ms": 3000,
+      "input": {
+        "kind": "PRESENTATION_SETTLED",
+        "endpoint": 1,
+        "event_id": 99,
+        "outcome": {"kind": "FAILED", "reason": "m2-parity-boundary"}
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 14,
+      "virtual_time_ms": 3250,
+      "input": {
+        "kind": "TRANSPORT_CHANGED",
+        "endpoint": 1,
+        "state": "CONNECTED",
+        "generation": 1
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 15,
+      "virtual_time_ms": 3500,
+      "input": {
+        "kind": "STORAGE_RESULT",
+        "endpoint": 1,
+        "request_id": 4,
+        "result": {"kind": "LOADED", "value": null}
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 16,
+      "virtual_time_ms": 3750,
+      "input": {"kind": "SUSPEND", "endpoint": 1},
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 17,
+      "virtual_time_ms": 4000,
+      "input": {"kind": "RESUME", "endpoint": 1},
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "a6c7f5c6e137e9fb8cf1078800719655c76beab01bc10dcb5cfc1465a4bd447d",
+      "expected_ui_digest": "7b7d937b49b81245699daf60724ddc87e0aaf679bc7ac99dc146b5079067adac",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 18,
+      "virtual_time_ms": 4250,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ARROW_UP"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "6687db5a03a2279b8d414d26947b07af5d386041c34461f44e02dd1bf7993548",
+      "expected_state_digest": "582e6d8bc2e06ed3edad59aa10530660ee95688c025fccacd28839a8ee563bcd",
+      "expected_ui_digest": "4f776a578629e49f803b1c666b04b565c47d09a25644019532c541a896d3c56e",
+      "expected_live_resources": {"timers": [4], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 19,
+      "virtual_time_ms": 4500,
+      "input": {"kind": "TIMER_FIRED", "endpoint": 1, "timer_id": 4},
+      "expected_effect_digest": "3483c3974a69219e752c879ab89a7df6cd6a06adb9b759d4a27f5d84f6eef698",
+      "expected_state_digest": "d0bd067916fff040a66d007d2fb7befac2133fee76de24f3f1aa7a65e1addff6",
+      "expected_ui_digest": "62abaea011a854943ca017e61356ab218735b5133e6567fc75cfa5f933fff37e",
+      "expected_live_resources": {"timers": [5], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 20,
+      "virtual_time_ms": 4750,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "ARROW_UP"}}}
+      },
+      "expected_effect_digest": "1d96ec4b9f62f6615c2fadde40b3c037f1e3ae71c4b29d76d558e45640d0891b",
+      "expected_state_digest": "d0bd067916fff040a66d007d2fb7befac2133fee76de24f3f1aa7a65e1addff6",
+      "expected_ui_digest": "62abaea011a854943ca017e61356ab218735b5133e6567fc75cfa5f933fff37e",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 21,
+      "virtual_time_ms": 5000,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ESCAPE"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "d0bd067916fff040a66d007d2fb7befac2133fee76de24f3f1aa7a65e1addff6",
+      "expected_ui_digest": "62abaea011a854943ca017e61356ab218735b5133e6567fc75cfa5f933fff37e",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    },
+    {
+      "sequence": 22,
+      "virtual_time_ms": 5250,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {"kind": "KEY_UP", "data": {"code": {"kind": "ESCAPE"}}}
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "d0bd067916fff040a66d007d2fb7befac2133fee76de24f3f1aa7a65e1addff6",
+      "expected_ui_digest": "62abaea011a854943ca017e61356ab218735b5133e6567fc75cfa5f933fff37e",
+      "expected_live_resources": {"timers": [], "presentations": [], "storage_requests": []}
+    }
+  ]
+}

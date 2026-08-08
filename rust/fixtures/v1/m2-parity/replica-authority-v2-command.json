@@ -1,0 +1,359 @@
+{
+  "parity_fixture_schema_version": 1,
+  "seed": "18446744073709551615",
+  "protocol_fixture": "replica-authority-v2-command-v1",
+  "expected_evidence_status": "M2B-01 er-kernel protocol composition commit",
+  "protocol_environment": {
+    "role": "replica",
+    "session_id": "m2-parity-session",
+    "run_id": "m2-parity-run",
+    "seat_map_id": "m2-parity-seat-map",
+    "local_seat": 1,
+    "authority_seat": 0,
+    "connection_generation": 1,
+    "operation_id": "operation/m2-parity",
+    "option_id": "move:first",
+    "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+  },
+  "input_map": {
+    "keyboard": [
+      {"key": {"kind": "ENTER"}, "button": "SUBMIT"}
+    ],
+    "gamepad": [],
+    "initial_repeat_delay_ms": 250,
+    "repeat_interval_ms": 250
+  },
+  "header": {
+    "trace_version": 1,
+    "schema_version": 1,
+    "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+    "protocol_version": "er-coop-47",
+    "content_hash": "blake3-v1:m2-parity-replica-authority-v2-command",
+    "rust_toolchain": "1.97.1"
+  },
+  "initial_snapshot": {
+    "ui": {
+      "generation": 1,
+      "owner_seat": 1,
+      "actionable": true,
+      "stack": [
+        {
+          "kind": "COMMAND",
+          "menu": {
+            "operation_id": "operation/m2-parity",
+            "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42",
+            "cursor": 0,
+            "options": [
+              {
+                "id": "move:first",
+                "label_key": "menu.move.first",
+                "enabled": true,
+                "visible": true
+              }
+            ],
+            "cancel": {"kind": "DISABLED"}
+          }
+        }
+      ]
+    },
+    "state": {}
+  },
+  "events": [
+    {
+      "sequence": 0,
+      "virtual_time_ms": 0,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ENTER"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 1,
+      "virtual_time_ms": 50,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_UP",
+          "data": {"code": {"kind": "ENTER"}}
+        }
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 2,
+      "virtual_time_ms": 250,
+      "input": {
+        "kind": "TIMER_FIRED",
+        "endpoint": 1,
+        "timer_id": 2
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 3,
+      "virtual_time_ms": 500,
+      "input": {
+        "kind": "NETWORK_FRAME",
+        "endpoint": 1,
+        "frame": {
+          "v": 2,
+          "t": "authorityEntry",
+          "ctx": {
+            "sessionId": "m2-parity-session",
+            "runId": "m2-parity-run",
+            "sessionEpoch": 1,
+            "seatMapId": "m2-parity-seat-map",
+            "membershipRevision": 1,
+            "senderSeatId": 0,
+            "authoritySeatId": 0,
+            "connectionGeneration": 1
+          },
+          "body": {
+            "revision": 1,
+            "operationId": "operation/m2-parity",
+            "kind": "TURN_COMMIT",
+            "material": {
+              "digest": "material/m2-parity",
+              "payload": {
+                "operation": "operation/m2-parity",
+                "epoch": 1,
+                "wave": 1,
+                "turn": 1
+              }
+            },
+            "nextControl": {
+              "kind": "COMMAND_FRONTIER",
+              "epoch": 1,
+              "wave": 1,
+              "turn": 1,
+              "commands": [
+                {"ownerSeatId": 1, "pokemonId": 42, "fieldIndex": 0}
+              ]
+            },
+            "subsumes": []
+          }
+        }
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 4,
+      "virtual_time_ms": 750,
+      "input": {
+        "kind": "MATERIAL_APPLIED",
+        "endpoint": 1,
+        "revision": 1,
+        "outcome": {"kind": "applied"}
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 5,
+      "virtual_time_ms": 1000,
+      "input": {
+        "kind": "CONTROL_PROJECTED",
+        "endpoint": 1,
+        "revision": 1,
+        "outcome": {
+          "kind": "installed",
+          "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        }
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 6,
+      "virtual_time_ms": 1250,
+      "input": {
+        "kind": "PRESENTATION_SETTLED",
+        "endpoint": 1,
+        "event_id": 1,
+        "outcome": {"kind": "SETTLED"}
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 7,
+      "virtual_time_ms": 1500,
+      "input": {
+        "kind": "TRANSPORT_CHANGED",
+        "endpoint": 0,
+        "state": "DISCONNECTED",
+        "generation": 1
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 8,
+      "virtual_time_ms": 1750,
+      "input": {
+        "kind": "TRANSPORT_CHANGED",
+        "endpoint": 0,
+        "state": "CONNECTED",
+        "generation": 2
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    },
+    {
+      "sequence": 9,
+      "virtual_time_ms": 2000,
+      "input": {
+        "kind": "TIMER_FIRED",
+        "endpoint": 1,
+        "timer_id": 4
+      },
+      "expected_effect_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_state_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_ui_digest": "PENDING_M2B_01_KERNEL_COMPOSITION",
+      "expected_live_resources": {
+        "timers": [],
+        "presentations": [],
+        "storage_requests": [],
+        "delivery_leases": [],
+        "proposal_leases": [],
+        "recovery_transactions": [],
+        "waits": [],
+        "retained_revisions": [],
+        "controls": [],
+        "network_packets": []
+      }
+    }
+  ]
+}
