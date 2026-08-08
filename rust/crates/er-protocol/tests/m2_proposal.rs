@@ -348,6 +348,7 @@ fn arm_scheduler_failure_maps_error_and_rolls_back_proposal_state() -> TestResul
     assert_eq!(manager.retained_count(), SafeU53::ZERO);
     assert!(manager.diagnostics().timer_ids.is_empty());
     assert!(scheduler.live_timers().is_empty());
+    Ok(())
 }
 
 #[test]
@@ -807,7 +808,7 @@ fn disposal_is_idempotent_and_clears_only_owned_scheduler_timers() -> TestResult
     let first = proposal("OP/first", "intent-a", 2, 1)?;
     manager.arm(
         ProposalLeaseSpec {
-            proposal: first,
+            proposal: first.clone(),
             absolute_ceiling_ms: None,
         },
         &mut scheduler,

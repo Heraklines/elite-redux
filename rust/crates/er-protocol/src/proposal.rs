@@ -1341,12 +1341,12 @@ impl ProposalLeaseManager {
                         delay_ms: retry_target.delay_ms,
                         time_class: retry_target.time_class,
                     };
-                    if let Some(live_retry) = scheduler.timer(retry_id) {
-                        if live_retry != &retry_timer {
-                            return Err(invalid_registration(
-                                "scheduler retry timer metadata does not match proposal state",
-                            ));
-                        }
+                    if let Some(live_retry) = scheduler.timer(retry_id)
+                        && live_retry != &retry_timer
+                    {
+                        return Err(invalid_registration(
+                            "scheduler retry timer metadata does not match proposal state",
+                        ));
                     }
                     scheduler.cancel(retry_id)
                 } else {
@@ -1658,7 +1658,12 @@ mod tests {
         )?;
         let max_timer = match max_command {
             SchedulerCommand::Schedule { timer } => timer,
-            other => panic!("expected MAX timer allocation, got {other:?}"),
+            other => {
+                return Err(std::io::Error::other(format!(
+                    "expected MAX timer allocation, got {other:?}"
+                ))
+                .into());
+            }
         };
         assert_eq!(max_timer.timer_id, TimerId::new(SafeU53::MAX));
         assert_eq!(scheduler.live_timers(), vec![max_timer.clone()]);

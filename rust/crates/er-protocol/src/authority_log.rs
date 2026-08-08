@@ -942,11 +942,7 @@ impl AuthorityLog {
                 reason: "entry kind and successor control are incompatible".to_owned(),
             });
         }
-        if entry
-            .subsumes
-            .iter()
-            .any(|revision| *revision == Revision::ZERO)
-        {
+        if entry.subsumes.contains(&Revision::ZERO) {
             return Err(AuthorityLogError::InvalidEntry {
                 reason: "subsumed revisions must be positive".to_owned(),
             });
@@ -1033,10 +1029,10 @@ impl AuthorityLog {
             .min()
             .unwrap_or(STAGE_NONE);
         self.record_retired_stage(lease.entry.operation_id.clone(), quorum_stage);
-        if let Some(timer_id) = lease.timer_id {
-            if let Some(command) = scheduler.cancel(timer_id) {
-                actions.push(AuthorityLogAction::Scheduler { command });
-            }
+        if let Some(timer_id) = lease.timer_id
+            && let Some(command) = scheduler.cancel(timer_id)
+        {
+            actions.push(AuthorityLogAction::Scheduler { command });
         }
         true
     }
