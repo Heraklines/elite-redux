@@ -538,7 +538,10 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "cutover-interaction",
         source: "test/node/authority-v2-cutover-interaction.test.ts",
-        symbols: &["CoopV2InteractionEnvelopeMaterial", "CoopV2InteractionProjectionPlan"],
+        symbols: &[
+            "CoopV2InteractionEnvelopeMaterial",
+            "CoopV2InteractionProjectionPlan",
+        ],
         semantic_class: "adapter-cutover",
         case_ids: &["closed-interaction-envelope"],
     },
@@ -559,7 +562,10 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "cutover-wave",
         source: "test/node/authority-v2-cutover-wave.test.ts",
-        symbols: &["CoopWaveTransitionMaterialV2|CoopTerminalMaterialV2", "TerminalControl"],
+        symbols: &[
+            "CoopWaveTransitionMaterialV2|CoopTerminalMaterialV2",
+            "TerminalControl",
+        ],
         semantic_class: "adapter-cutover",
         case_ids: &["wave-terminal-commit"],
     },
@@ -584,7 +590,11 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "frames",
         source: "test/node/authority-v2-frames.test.ts",
-        symbols: &["CoopFrameContextV2", "CoopFrameV2", "CoopInboundFrameResultV2"],
+        symbols: &[
+            "CoopFrameContextV2",
+            "CoopFrameV2",
+            "CoopInboundFrameResultV2",
+        ],
         semantic_class: "raw-frame-boundary",
         case_ids: &["mandatory-context-and-classification"],
     },
@@ -629,7 +639,10 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "log",
         source: "test/node/authority-v2-log.test.ts",
-        symbols: &["CoopAuthorityEntry", "AuthorityLedger + BoundedRevisionWindow"],
+        symbols: &[
+            "CoopAuthorityEntry",
+            "AuthorityLedger + BoundedRevisionWindow",
+        ],
         semantic_class: "authority-log",
         case_ids: &["revision-retention-quorum"],
     },
@@ -671,7 +684,10 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "replacement",
         source: "test/node/authority-v2-replacement.test.ts",
-        symbols: &["ReplacementProposal|ReplacementCommitImage", "CoopReplacementControlAddress"],
+        symbols: &[
+            "ReplacementProposal|ReplacementCommitImage",
+            "CoopReplacementControlAddress",
+        ],
         semantic_class: "replacement-material-and-control",
         case_ids: &["ordered-replacement-chain"],
     },
@@ -710,14 +726,22 @@ const EXPECTED_FIXTURES: &[ExpectedFixture] = &[
     ExpectedFixture {
         id: "simulator",
         source: "test/node/authority-v2-simulator.test.ts",
-        symbols: &["CoopAuthorityEntry", "CoopNextControl", "CoopRecoveryBundle"],
+        symbols: &[
+            "CoopAuthorityEntry",
+            "CoopNextControl",
+            "CoopRecoveryBundle",
+        ],
         semantic_class: "reference-simulator",
         case_ids: &["seeded-fault-oracle"],
     },
     ExpectedFixture {
         id: "turn",
         source: "test/node/authority-v2-turn.test.ts",
-        symbols: &["TurnResolutionImage", "CoopAuthorityEntry", "CoopAuthoritativeMaterial"],
+        symbols: &[
+            "TurnResolutionImage",
+            "CoopAuthorityEntry",
+            "CoopAuthoritativeMaterial",
+        ],
         semantic_class: "turn-material-and-progression",
         case_ids: &["turn-entry-stages"],
     },
@@ -745,15 +769,18 @@ fn expected_fixture_source(id: &str) -> Result<&'static str, Box<dyn Error>> {
 const EXPECTED_COVERAGE_CATEGORIES: &[(&str, &[&str])] = &[
     (
         "absent-null",
-        &["interactions-learn#family-nullability", "recovery#revision-zero-nullability"],
+        &[
+            "interactions-learn#family-nullability",
+            "recovery#revision-zero-nullability",
+        ],
     ),
-    (
-        "enum-tag",
-        &["wave#terminal-freeze-and-subsumption"],
-    ),
+    ("enum-tag", &["wave#terminal-freeze-and-subsumption"]),
     (
         "timer-owner",
-        &["runtime#timer-metadata-and-disposal", "scheduler-clock-seam#connected-time-retry"],
+        &[
+            "runtime#timer-metadata-and-disposal",
+            "scheduler-clock-seam#connected-time-retry",
+        ],
     ),
     (
         "canonicalization",
@@ -808,7 +835,11 @@ const EXPECTED_FUTURE_M2B_OWNERS: &[(&str, &str, &str)] = &[
     ("source_lock_contract", "control-open-material", "M2B-01"),
     ("source_lock_contract", "interaction-envelope", "M2B-06"),
     ("source_lock_contract", "interaction-material", "M2B-06"),
-    ("source_lock_contract", "interaction-projection-plan", "M2B-06"),
+    (
+        "source_lock_contract",
+        "interaction-projection-plan",
+        "M2B-06",
+    ),
     ("source_lock_contract", "control-install-result", "M2B-06"),
     ("source_lock_contract", "session-identity", "M2B-08"),
     ("node_contract", "cutover-interaction", "M2B-06"),
@@ -867,10 +898,7 @@ fn fixture_id(reference: &str) -> Result<&str, Box<dyn Error>> {
             "fixture reference has no fragment: {reference}"
         )));
     };
-    if path != PARITY_FIXTURE_PATH.trim_end_matches('#')
-        || id.is_empty()
-        || id.contains('#')
-    {
+    if path != PARITY_FIXTURE_PATH.trim_end_matches('#') || id.is_empty() || id.contains('#') {
         return Err(failure(format!(
             "fixture reference has the wrong path: {reference}"
         )));
@@ -896,11 +924,7 @@ fn expected_evidence_path(prefix: &str, id: &str) -> String {
     format!("{EVIDENCE_PATH}{prefix}_{}", id.replace('-', "_"))
 }
 
-fn assert_exact_string_array(
-    value: &Value,
-    field: &str,
-    expected: &[&str],
-) -> TestResult {
+fn assert_exact_string_array(value: &Value, field: &str, expected: &[&str]) -> TestResult {
     let actual = array(value, field)?;
     assert_exact_strings(actual, field, expected)
 }
@@ -925,10 +949,7 @@ fn assert_unique_field(records: &[Value], field: &str) -> TestResult {
     let mut values = BTreeSet::new();
     for record in records {
         let value = string_field(record, field)?;
-        assert!(
-            values.insert(value),
-            "duplicate {field} entry: {value}"
-        );
+        assert!(values.insert(value), "duplicate {field} entry: {value}");
     }
     Ok(())
 }
@@ -1036,7 +1057,9 @@ fn validate_source_lock() -> TestResult {
             continue;
         }
         let Some((key, raw_value)) = line.split_once('=') else {
-            return Err(failure(format!("source-lock line is not a key/value: {line}")));
+            return Err(failure(format!(
+                "source-lock line is not a key/value: {line}"
+            )));
         };
         let key = key.trim();
         let raw_value = raw_value.trim();
@@ -1052,19 +1075,24 @@ fn validate_source_lock() -> TestResult {
             .unwrap_or(raw_value);
         assert_eq!(value, expected_value, "source-lock value drifted: {key}");
     }
-    assert_eq!(seen.len(), expected.len(), "source-lock fields are incomplete");
+    assert_eq!(
+        seen.len(),
+        expected.len(),
+        "source-lock fields are incomplete"
+    );
     Ok(())
 }
 
-fn coverage_case<'a>(
-    fixtures: &'a [Value],
-    reference: &str,
-) -> Result<&'a Value, Box<dyn Error>> {
+fn coverage_case<'a>(fixtures: &'a [Value], reference: &str) -> Result<&'a Value, Box<dyn Error>> {
     let Some((fixture_id, case_id)) = reference.split_once('#') else {
-        return Err(failure(format!("coverage reference has no case: {reference}")));
+        return Err(failure(format!(
+            "coverage reference has no case: {reference}"
+        )));
     };
     if fixture_id.is_empty() || case_id.is_empty() || case_id.contains('#') {
-        return Err(failure(format!("coverage reference is malformed: {reference}")));
+        return Err(failure(format!(
+            "coverage reference is malformed: {reference}"
+        )));
     }
     let fixture = fixture_record(fixtures, fixture_id)?;
     let cases = array(fixture, "cases")?;
@@ -1074,9 +1102,7 @@ fn coverage_case<'a>(
             continue;
         }
         if found.is_some() {
-            return Err(failure(format!(
-                "duplicate coverage case: {reference}"
-            )));
+            return Err(failure(format!("duplicate coverage case: {reference}")));
         }
         found = Some(case);
     }
@@ -1124,9 +1150,7 @@ fn validate_coverage_categories(value: &Value, fixtures: &[Value]) -> TestResult
 fn expected_future_owner(scope: &str, id: &str) -> Option<&'static str> {
     EXPECTED_FUTURE_M2B_OWNERS
         .iter()
-        .find(|(expected_scope, expected_id, _)| {
-            *expected_scope == scope && *expected_id == id
-        })
+        .find(|(expected_scope, expected_id, _)| *expected_scope == scope && *expected_id == id)
         .map(|(_, _, owner)| *owner)
 }
 
@@ -1176,8 +1200,8 @@ fn validate_future_m2b_owners(
         let id = string_field(contract, "id")?;
         let status = string_field(contract, "status")?;
         let expected_owner = expected_future_owner("node_contract", id);
-        let future_status = status.starts_with("boundary-")
-            || status.starts_with("reference-only-");
+        let future_status =
+            status.starts_with("boundary-") || status.starts_with("reference-only-");
         assert_eq!(
             expected_owner.is_some(),
             future_status,
@@ -1192,10 +1216,7 @@ fn validate_fixture_payload(map: &Value, fixture_root: &Value) -> TestResult {
         fixture_root.get("schema_version").and_then(Value::as_u64),
         Some(SOURCE_SCHEMA_VERSION)
     );
-    assert_eq!(
-        string_field(fixture_root, "project_name")?,
-        PROJECT_NAME
-    );
+    assert_eq!(string_field(fixture_root, "project_name")?, PROJECT_NAME);
     assert_eq!(
         string_field(fixture_root, "fixture_kind")?,
         "authority-v2-contract-evidence-v1"
@@ -1240,11 +1261,7 @@ fn validate_fixture_payload(map: &Value, fixture_root: &Value) -> TestResult {
 
     let node_contracts = array(map, "node_contracts")?;
     assert_eq!(node_contracts.len(), EXPECTED_FIXTURES.len());
-    for ((node, fixture), expected) in node_contracts
-        .iter()
-        .zip(fixtures)
-        .zip(EXPECTED_FIXTURES)
-    {
+    for ((node, fixture), expected) in node_contracts.iter().zip(fixtures).zip(EXPECTED_FIXTURES) {
         assert_eq!(string_field(node, "id")?, expected.id);
         assert_eq!(string_field(node, "typescript_source")?, expected.source);
         let expected_fixture = format!("{PARITY_FIXTURE_PATH}{}", expected.id);
@@ -1253,10 +1270,7 @@ fn validate_fixture_payload(map: &Value, fixture_root: &Value) -> TestResult {
             expected_fixture.as_str()
         );
         assert_eq!(string_field(fixture, "fixture_id")?, expected.id);
-        assert_eq!(
-            string_field(fixture, "typescript_source")?,
-            expected.source
-        );
+        assert_eq!(string_field(fixture, "typescript_source")?, expected.source);
         assert_eq!(
             string_field(fixture, "semantic_class")?,
             expected.semantic_class
@@ -1288,11 +1302,7 @@ fn validate_fixture_payload(map: &Value, fixture_root: &Value) -> TestResult {
     Ok(())
 }
 
-fn validate_source_lock_contracts(
-    map: &Value,
-    oracle: &Value,
-    fixtures: &[Value],
-) -> TestResult {
+fn validate_source_lock_contracts(map: &Value, oracle: &Value, fixtures: &[Value]) -> TestResult {
     let contracts = array(map, "source_lock_contracts")?;
     let schemas = array(oracle, "schemas")?;
     assert_eq!(contracts.len(), EXPECTED_SOURCE_CONTRACTS.len());
@@ -1302,19 +1312,32 @@ fn validate_source_lock_contracts(
     let mut symbols = BTreeSet::new();
     let mut sources = BTreeSet::new();
     let mut evidence = BTreeSet::new();
-    for ((contract, schema), expected) in contracts
-        .iter()
-        .zip(schemas)
-        .zip(EXPECTED_SOURCE_CONTRACTS)
+    for ((contract, schema), expected) in
+        contracts.iter().zip(schemas).zip(EXPECTED_SOURCE_CONTRACTS)
     {
         let id = string_field(contract, "id")?;
         let symbol = string_field(contract, "source_lock_symbol")?;
         let source = string_field(contract, "typescript_source")?;
-        assert_eq!(id, expected.id, "source-lock contract ID is stale or reordered");
-        assert_eq!(symbol, expected.symbol, "source-lock symbol is stale or reordered");
-        assert_eq!(source, expected.source, "source-lock path is stale or reordered");
-        assert_eq!(string_field(contract, "target_layer")?, expected.target_layer);
-        assert_eq!(string_field(contract, "semantic_class")?, expected.semantic_class);
+        assert_eq!(
+            id, expected.id,
+            "source-lock contract ID is stale or reordered"
+        );
+        assert_eq!(
+            symbol, expected.symbol,
+            "source-lock symbol is stale or reordered"
+        );
+        assert_eq!(
+            source, expected.source,
+            "source-lock path is stale or reordered"
+        );
+        assert_eq!(
+            string_field(contract, "target_layer")?,
+            expected.target_layer
+        );
+        assert_eq!(
+            string_field(contract, "semantic_class")?,
+            expected.semantic_class
+        );
         assert!(ids.insert(id), "duplicate source-lock ID: {id}");
         assert!(
             symbols.insert(symbol),
@@ -1340,10 +1363,7 @@ fn validate_source_lock_contracts(
         );
         let fixture = string_field(contract, "parity_fixture")?;
         let expected_fixture = format!("{PARITY_FIXTURE_PATH}{}", expected.fixture_id);
-        assert_eq!(
-            fixture,
-            expected_fixture.as_str()
-        );
+        assert_eq!(fixture, expected_fixture.as_str());
         assert_eq!(fixture_id(fixture)?, expected.fixture_id);
         let fixture = fixture_record(fixtures, expected.fixture_id)?;
         assert_eq!(
@@ -1387,16 +1407,20 @@ fn validate_node_contracts(map: &Value, oracle: &Value) -> TestResult {
     let mut parity_fixtures = BTreeSet::new();
     let mut production = 0;
     let mut simulator = 0;
-    for ((contract, oracle_test), expected) in contracts
-        .iter()
-        .zip(tests)
-        .zip(EXPECTED_NODE_CONTRACTS)
+    for ((contract, oracle_test), expected) in
+        contracts.iter().zip(tests).zip(EXPECTED_NODE_CONTRACTS)
     {
         let id = string_field(contract, "id")?;
         let source = string_field(contract, "typescript_source")?;
         assert_eq!(id, expected.id, "node contract ID is stale or reordered");
-        assert_eq!(source, expected.source, "node source path is stale or reordered");
-        assert_eq!(string_field(contract, "semantic_class")?, expected.semantic_class);
+        assert_eq!(
+            source, expected.source,
+            "node source path is stale or reordered"
+        );
+        assert_eq!(
+            string_field(contract, "semantic_class")?,
+            expected.semantic_class
+        );
         assert_eq!(
             string_field(contract, "implementation_kind")?,
             expected.implementation_kind
@@ -1458,7 +1482,10 @@ fn validate_node_contracts(map: &Value, oracle: &Value) -> TestResult {
         );
         let fixture = string_field(contract, "parity_fixture")?;
         assert_eq!(fixture_id(fixture)?, expected.fixture_id);
-        assert!(parity_fixtures.insert(fixture), "duplicate node fixture: {fixture}");
+        assert!(
+            parity_fixtures.insert(fixture),
+            "duplicate node fixture: {fixture}"
+        );
         assert_static_status(contract, "status")?;
         let status = string_field(contract, "status")?;
         if expected_future_owner("node_contract", expected.id).is_some() {
@@ -1500,7 +1527,10 @@ fn validate_map() -> TestResult {
     assert_eq!(string_field(&map, "oracle_game_sha")?, ORACLE_GAME_SHA);
     assert_eq!(string_field(&map, "oracle_branch")?, ORACLE_BRANCH);
     assert_eq!(string_field(&map, "protocol_version")?, PROTOCOL_VERSION);
-    assert_eq!(string_field(&map, "authority_contract")?, AUTHORITY_CONTRACT);
+    assert_eq!(
+        string_field(&map, "authority_contract")?,
+        AUTHORITY_CONTRACT
+    );
     assert_eq!(
         map.get("frame_protocol_version").and_then(Value::as_u64),
         Some(FRAME_PROTOCOL_VERSION)
@@ -1551,12 +1581,13 @@ fn validate_map() -> TestResult {
     assert_eq!(string_field(&oracle, "oracle_branch")?, ORACLE_BRANCH);
     assert_eq!(string_field(&oracle, "protocol_version")?, PROTOCOL_VERSION);
     assert_eq!(
-        oracle
-            .get("frame_protocol_version")
-            .and_then(Value::as_u64),
+        oracle.get("frame_protocol_version").and_then(Value::as_u64),
         Some(FRAME_PROTOCOL_VERSION)
     );
-    assert_eq!(string_field(&oracle, "authority_contract")?, AUTHORITY_CONTRACT);
+    assert_eq!(
+        string_field(&oracle, "authority_contract")?,
+        AUTHORITY_CONTRACT
+    );
 
     let source_lock = map
         .get("source_lock")
@@ -1566,9 +1597,15 @@ fn validate_map() -> TestResult {
         source_lock.get("schema_version").and_then(Value::as_u64),
         Some(SOURCE_SCHEMA_VERSION)
     );
-    assert_eq!(string_field(source_lock, "oracle_game_sha")?, ORACLE_GAME_SHA);
+    assert_eq!(
+        string_field(source_lock, "oracle_game_sha")?,
+        ORACLE_GAME_SHA
+    );
     assert_eq!(string_field(source_lock, "oracle_branch")?, ORACLE_BRANCH);
-    assert_eq!(string_field(source_lock, "protocol_version")?, PROTOCOL_VERSION);
+    assert_eq!(
+        string_field(source_lock, "protocol_version")?,
+        PROTOCOL_VERSION
+    );
 
     let source_files = array(&oracle, "source_files")?;
     assert_eq!(source_files.len(), EXPECTED_SOURCE_FILE_COUNT);
@@ -1629,8 +1666,7 @@ macro_rules! source_contract_test {
             let contract = contracts
                 .iter()
                 .find(|record| {
-                    record.get("rust_evidence").and_then(Value::as_str)
-                        == Some(evidence.as_str())
+                    record.get("rust_evidence").and_then(Value::as_str) == Some(evidence.as_str())
                 })
                 .ok_or_else(|| {
                     failure(format!("source contract evidence is missing: {evidence}"))
@@ -1668,12 +1704,9 @@ macro_rules! node_contract_test {
             let contract = contracts
                 .iter()
                 .find(|record| {
-                    record.get("rust_evidence").and_then(Value::as_str)
-                        == Some(evidence.as_str())
+                    record.get("rust_evidence").and_then(Value::as_str) == Some(evidence.as_str())
                 })
-                .ok_or_else(|| {
-                    failure(format!("node contract evidence is missing: {evidence}"))
-                })?;
+                .ok_or_else(|| failure(format!("node contract evidence is missing: {evidence}")))?;
             let id = string_field(contract, "id")?;
             assert_eq!(string_field(contract, "rust_evidence")?, evidence);
             let fixture = fixture_record(fixtures, id)?;

@@ -11,8 +11,8 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
+use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 
 pub const DEFAULT_RETAIN_CAPACITY: u64 = 512;
 pub const DEFAULT_DELIVERY_INITIAL_MS: u64 = 250;
@@ -454,7 +454,8 @@ impl AuthorityLog {
         if receipt.context.membership_revision != lease.entry.context.membership_revision {
             return rejected_receipt(ReceiptRejectReason::MembershipMismatch);
         }
-        let Some(binding_generation) = self.peer_bindings.get(&receipt.context.sender_seat_id) else {
+        let Some(binding_generation) = self.peer_bindings.get(&receipt.context.sender_seat_id)
+        else {
             return rejected_receipt(ReceiptRejectReason::UnboundPeer);
         };
         let Some(peer_binding) = lease.peer_stages.get(&receipt.context.sender_seat_id) else {
@@ -602,10 +603,9 @@ impl AuthorityLog {
         if self.disposed {
             return Err(AuthorityLogError::Disposed);
         }
-        let revision = self
-            .retained
-            .iter()
-            .find_map(|(revision, lease)| (lease.timer_id == Some(fired.timer_id)).then_some(*revision));
+        let revision = self.retained.iter().find_map(|(revision, lease)| {
+            (lease.timer_id == Some(fired.timer_id)).then_some(*revision)
+        });
         let Some(revision) = revision else {
             return Err(AuthorityLogError::InvalidEntry {
                 reason: format!("delivery timer {} is not live", fired.timer_id),
@@ -626,7 +626,10 @@ impl AuthorityLog {
             || fired.time_class != self.delivery_time_class
         {
             return Err(AuthorityLogError::InvalidEntry {
-                reason: format!("delivery timer {} identity does not match its lease", fired.timer_id),
+                reason: format!(
+                    "delivery timer {} identity does not match its lease",
+                    fired.timer_id
+                ),
             });
         }
 
@@ -712,8 +715,8 @@ impl AuthorityLog {
         }
 
         let mut required_tail = Vec::new();
-        let start = captured_frontier.get().checked_add(1)?;
-        let end = self.head_revision.get();
+        let start = captured_frontier.get().get().checked_add(1)?;
+        let end = self.head_revision.get().get();
         let mut revision = start;
         while revision <= end {
             let revision_id = Revision::new(SafeU53::new(revision).ok()?);
@@ -789,16 +792,14 @@ impl AuthorityLog {
                 reason: "rebind cannot occur while a commit is prepared".to_owned(),
             });
         }
-        let retained_count = u64::try_from(self.retained.len()).map_err(|_| {
-            AuthorityLogError::InvalidConfig {
+        let retained_count =
+            u64::try_from(self.retained.len()).map_err(|_| AuthorityLogError::InvalidConfig {
                 reason: "retained entry count exceeds SafeU53".to_owned(),
-            }
-        })?;
-        let retained_count = SafeU53::new(retained_count).map_err(|_| {
-            AuthorityLogError::InvalidConfig {
+            })?;
+        let retained_count =
+            SafeU53::new(retained_count).map_err(|_| AuthorityLogError::InvalidConfig {
                 reason: "retained entry count exceeds SafeU53".to_owned(),
-            }
-        })?;
+            })?;
 
         // All validation and fallible conversion is complete before replacing the authenticated binding.
         // Rebind intentionally does not touch the scheduler: existing timer registrations, IDs, attempts,
@@ -941,7 +942,11 @@ impl AuthorityLog {
                 reason: "entry kind and successor control are incompatible".to_owned(),
             });
         }
-        if entry.subsumes.iter().any(|revision| *revision == Revision::ZERO) {
+        if entry
+            .subsumes
+            .iter()
+            .any(|revision| *revision == Revision::ZERO)
+        {
             return Err(AuthorityLogError::InvalidEntry {
                 reason: "subsumed revisions must be positive".to_owned(),
             });
@@ -950,7 +955,11 @@ impl AuthorityLog {
             if matches!(previous.next_control, NextControl::Terminal(_)) {
                 return Err(AuthorityLogError::TerminalPredecessor);
             }
-            if !control_allows_successor_entry(&previous.next_control, &previous.operation_id, entry) {
+            if !control_allows_successor_entry(
+                &previous.next_control,
+                &previous.operation_id,
+                entry,
+            ) {
                 return Err(AuthorityLogError::SuccessorRejected);
             }
         }
@@ -962,7 +971,9 @@ impl AuthorityLog {
     }
 
     fn needs_delivery_timer(&self) -> bool {
-        !self.max_delivery_attempts.is_some_and(|maximum| maximum.get() == 0)
+        !self
+            .max_delivery_attempts
+            .is_some_and(|maximum| maximum.get() == 0)
     }
 
     fn delivery_actions(&self, lease: &DeliveryLease) -> Vec<AuthorityLogAction> {
@@ -1126,7 +1137,9 @@ fn validate_peer_bindings(
     let mut peers = BTreeMap::new();
     for peer in bindings {
         if peer.seat_id == local_context.sender_seat_id
-            || peers.insert(peer.seat_id, peer.connection_generation).is_some()
+            || peers
+                .insert(peer.seat_id, peer.connection_generation)
+                .is_some()
         {
             return Err(AuthorityLogError::InvalidConfig {
                 reason: "peer bindings must be unique and non-local".to_owned(),

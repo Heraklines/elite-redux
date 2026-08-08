@@ -4,7 +4,7 @@ use er_protocol::{
     KernelScheduler, ProposalAdmission, ProposalAdmissionLedger, ProposalFingerprintError,
     ProposalFingerprintInput, ProposalIdentity, ProposalJson, ProposalLeaseAction,
     ProposalLeaseConfig, ProposalLeaseError, ProposalLeaseManager, ProposalLeaseSpec,
-    ProposalLeaseStart, SchedulerCommand, SchedulerError, ScheduledTimer, fingerprint_bargain,
+    ProposalLeaseStart, ScheduledTimer, SchedulerCommand, SchedulerError, fingerprint_bargain,
     fingerprint_biome_shop_buy, fingerprint_biome_shop_leave, fingerprint_reward,
     proposal_fingerprint,
 };
@@ -258,7 +258,10 @@ fn arm_uses_scheduler_ids_and_schedules_before_immediate_send() -> TestResult {
     assert_eq!(retry.endpoint, retained.from);
     assert_eq!(absolute.time_class, TimeClass::Absolute);
     assert_eq!(retry.time_class, TimeClass::Connected);
-    assert_eq!(absolute.owner, timer_owner("OP/1", "v2 proposal absolute ceiling"));
+    assert_eq!(
+        absolute.owner,
+        timer_owner("OP/1", "v2 proposal absolute ceiling")
+    );
     assert_eq!(retry.owner, timer_owner("OP/1", "v2 proposal retry"));
     assert_eq!(sent_proposal(&outcome.actions[2]), Some(&retained));
     assert_eq!(
@@ -338,7 +341,10 @@ fn arm_scheduler_failure_maps_error_and_rolls_back_proposal_state() -> TestResul
             &mut scheduler,
         )
         .expect_err("disposed scheduler must fail");
-    assert_eq!(error, ProposalLeaseError::Scheduler(SchedulerError::Disposed));
+    assert_eq!(
+        error,
+        ProposalLeaseError::Scheduler(SchedulerError::Disposed)
+    );
     assert_eq!(manager.retained_count(), SafeU53::ZERO);
     assert!(manager.diagnostics().timer_ids.is_empty());
     assert!(scheduler.live_timers().is_empty());
@@ -465,7 +471,12 @@ fn stale_and_duplicate_observations_are_tombstoned_once_and_cancel_live_timers()
     let (settled, actions) = manager.observe_committed(&operation_id, &mut scheduler);
     assert!(!settled);
     assert!(actions.is_empty());
-    assert!(manager.diagnostics().committed_tombstones.contains(&operation_id));
+    assert!(
+        manager
+            .diagnostics()
+            .committed_tombstones
+            .contains(&operation_id)
+    );
     let duplicate = manager.observe_committed(&operation_id, &mut scheduler);
     assert_eq!(duplicate, (false, Vec::new()));
 
@@ -644,16 +655,16 @@ fn rebind_resends_monotonically_without_moving_sender_local_timers() -> TestResu
         .collect::<BTreeSet<_>>();
     let before_timers = scheduler.live_timers();
 
-    let (count, actions) = manager.rebind(
-        retained.to,
-        ConnectionGeneration::new(safe_u(2)?),
-    )?;
+    let (count, actions) = manager.rebind(retained.to, ConnectionGeneration::new(safe_u(2)?))?;
     assert_eq!(count, safe_u(1)?);
     assert_eq!(actions.len(), 1);
     let rebound = sent_proposal(&actions[0]).expect("rebind resend");
     assert_eq!(rebound.to, retained.to);
     assert_eq!(rebound.from, retained.from);
-    assert_eq!(rebound.connection_generation, ConnectionGeneration::new(safe_u(2)?));
+    assert_eq!(
+        rebound.connection_generation,
+        ConnectionGeneration::new(safe_u(2)?)
+    );
     assert_eq!(scheduler.live_timers(), before_timers);
     assert_eq!(
         scheduler
@@ -663,15 +674,15 @@ fn rebind_resends_monotonically_without_moving_sender_local_timers() -> TestResu
             .collect::<BTreeSet<_>>(),
         timer_ids,
     );
-    assert!(scheduler
-        .live_timers()
-        .iter()
-        .all(|timer| timer.endpoint == retained.from));
+    assert!(
+        scheduler
+            .live_timers()
+            .iter()
+            .all(|timer| timer.endpoint == retained.from)
+    );
 
-    let (stale_count, stale_actions) = manager.rebind(
-        retained.to,
-        ConnectionGeneration::new(safe_u(1)?),
-    )?;
+    let (stale_count, stale_actions) =
+        manager.rebind(retained.to, ConnectionGeneration::new(safe_u(1)?))?;
     assert_eq!(stale_count, SafeU53::ZERO);
     assert!(stale_actions.is_empty());
 
@@ -729,8 +740,7 @@ fn rearm_refreshes_destination_without_moving_sender_owned_timers() -> TestResul
     )?;
     assert_eq!(stale.result, ProposalLeaseStart::Invalid);
     assert!(stale.actions.is_empty());
-    let (settled, actions) =
-        manager.observe_committed(&refreshed.operation_id, &mut scheduler);
+    let (settled, actions) = manager.observe_committed(&refreshed.operation_id, &mut scheduler);
     assert!(settled);
     assert_eq!(
         actions
@@ -837,9 +847,6 @@ fn disposal_is_idempotent_and_clears_only_owned_scheduler_timers() -> TestResult
     assert!(diagnostics.committed_tombstones.is_empty());
     assert!(diagnostics.timer_ids.is_empty());
     assert_eq!(manager.retained_count(), SafeU53::ZERO);
-    assert_eq!(
-        manager.resend_retained(),
-        (SafeU53::ZERO, Vec::new())
-    );
+    assert_eq!(manager.resend_retained(), (SafeU53::ZERO, Vec::new()));
     Ok(())
 }

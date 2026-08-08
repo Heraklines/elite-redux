@@ -3,8 +3,8 @@ use std::error::Error;
 use er_protocol::{
     AckStage, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLog, AuthorityLogAction,
     AuthorityLogConfig, AuthorityLogError, AuthorityReceiptVerdict, BackoffPolicy, FrameContext,
-    KernelScheduler, Material, NextControl, PeerBinding, ReceiptRejectReason, SchedulerCommand,
-    SafeU53, TimeClass, control_id_of,
+    KernelScheduler, Material, NextControl, PeerBinding, ReceiptRejectReason, SafeU53,
+    SchedulerCommand, TimeClass, control_id_of,
 };
 use er_types::{
     CommandControlTarget, CommandFrontierControl, ConnectionGeneration, OperationId, Revision,
@@ -82,9 +82,7 @@ fn config_with_owner_and_attempts(
             factor_denominator: safe(1)?,
         },
         delivery_time_class: TimeClass::Connected,
-        max_delivery_attempts: max_delivery_attempts
-            .map(safe)
-            .transpose()?,
+        max_delivery_attempts: max_delivery_attempts.map(safe).transpose()?,
     })
 }
 
@@ -137,7 +135,8 @@ fn scheduled_timer_id(actions: &[AuthorityLogAction]) -> Option<TimerId> {
         } => Some(timer.timer_id),
         AuthorityLogAction::Deliver { .. }
         | AuthorityLogAction::Scheduler {
-            command: SchedulerCommand::Cancel { .. }
+            command:
+                SchedulerCommand::Cancel { .. }
                 | SchedulerCommand::PauseClass { .. }
                 | SchedulerCommand::ResumeClass { .. },
         } => None,
@@ -249,9 +248,18 @@ fn malformed_entry_boundaries_fail_before_revision_token_or_timer_consumption() 
     boundary.material.digest = "🙂".repeat(128);
     let boundary_commit = boundary_log.commit(boundary, &mut boundary_scheduler)?;
     assert_eq!(boundary_commit.entry.revision, Revision::new(safe(1)?));
-    assert_eq!(boundary_commit.entry.operation_id.as_str(), boundary_operation);
-    assert_eq!(boundary_commit.entry.material.digest.encode_utf16().count(), 256);
-    assert_eq!(scheduled_timer_id(&boundary_commit.actions), Some(TimerId::new(SafeU53::ZERO)));
+    assert_eq!(
+        boundary_commit.entry.operation_id.as_str(),
+        boundary_operation
+    );
+    assert_eq!(
+        boundary_commit.entry.material.digest.encode_utf16().count(),
+        256
+    );
+    assert_eq!(
+        scheduled_timer_id(&boundary_commit.actions),
+        Some(TimerId::new(SafeU53::ZERO))
+    );
 
     let mut control_bearing_digest = draft("control-bearing-digest")?;
     control_bearing_digest.material.digest = "digest\u{0000}\u{001f}\u{007f}\u{0080}".to_owned();
@@ -261,7 +269,10 @@ fn malformed_entry_boundaries_fail_before_revision_token_or_timer_consumption() 
         committed.entry.material.digest,
         "digest\u{0000}\u{001f}\u{007f}\u{0080}"
     );
-    assert_eq!(scheduled_timer_id(&committed.actions), Some(TimerId::new(SafeU53::ZERO)));
+    assert_eq!(
+        scheduled_timer_id(&committed.actions),
+        Some(TimerId::new(SafeU53::ZERO))
+    );
     Ok(())
 }
 
@@ -294,7 +305,10 @@ fn commit_uses_scheduler_id_zero_and_schedules_before_delivery() -> TestResult {
     let mut log = AuthorityLog::new(config(8, &[(1, 1)])?)?;
 
     let outcome = log.commit(draft("first")?, &mut scheduler)?;
-    assert_eq!(scheduled_timer_id(&outcome.actions), Some(TimerId::new(SafeU53::ZERO)));
+    assert_eq!(
+        scheduled_timer_id(&outcome.actions),
+        Some(TimerId::new(SafeU53::ZERO))
+    );
     assert!(matches!(
         outcome.actions.first(),
         Some(AuthorityLogAction::Scheduler {
@@ -319,7 +333,9 @@ fn disposed_scheduler_failure_is_atomic_and_does_not_burn_revision_or_timer_id()
 
     assert!(matches!(
         log.commit(draft("scheduler-failure")?, &mut scheduler),
-        Err(AuthorityLogError::Scheduler(er_protocol::SchedulerError::Disposed))
+        Err(AuthorityLogError::Scheduler(
+            er_protocol::SchedulerError::Disposed
+        ))
     ));
     assert_eq!(log.diagnostics(), before);
     assert_eq!(scheduler.live_timers(), Vec::new());
@@ -327,7 +343,10 @@ fn disposed_scheduler_failure_is_atomic_and_does_not_burn_revision_or_timer_id()
     let mut fresh_scheduler = KernelScheduler::new();
     let retry = log.commit(draft("scheduler-retry")?, &mut fresh_scheduler)?;
     assert_eq!(retry.entry.revision, Revision::new(safe(1)?));
-    assert_eq!(scheduled_timer_id(&retry.actions), Some(TimerId::new(SafeU53::ZERO)));
+    assert_eq!(
+        scheduled_timer_id(&retry.actions),
+        Some(TimerId::new(SafeU53::ZERO))
+    );
     Ok(())
 }
 
@@ -343,7 +362,10 @@ fn fired_timer_is_exactly_once_and_allocates_nonreused_ids() -> TestResult {
     let second_id = scheduled_timer_id(&retry_actions).ok_or("missing second timer")?;
     assert_eq!(first_id, TimerId::new(SafeU53::ZERO));
     assert_eq!(second_id, TimerId::new(safe(1)?));
-    assert_eq!(scheduler.timer(second_id).map(|timer| timer.delay_ms), Some(safe(500)?));
+    assert_eq!(
+        scheduler.timer(second_id).map(|timer| timer.delay_ms),
+        Some(safe(500)?)
+    );
     assert!(matches!(
         log.timer_fired(first_fired, &mut scheduler),
         Err(AuthorityLogError::InvalidEntry { .. })
@@ -351,7 +373,10 @@ fn fired_timer_is_exactly_once_and_allocates_nonreused_ids() -> TestResult {
 
     let second_fired = scheduler.fired(second_id)?;
     let third_actions = log.timer_fired(second_fired, &mut scheduler)?;
-    assert_eq!(scheduled_timer_id(&third_actions), Some(TimerId::new(safe(2)?)));
+    assert_eq!(
+        scheduled_timer_id(&third_actions),
+        Some(TimerId::new(safe(2)?))
+    );
     Ok(())
 }
 
@@ -367,7 +392,9 @@ fn retry_scheduler_disposal_terminalizes_without_publishing_attempt_or_delay() -
     let result = log.timer_fired(fired.clone(), &mut scheduler);
     assert!(matches!(
         result,
-        Err(AuthorityLogError::Scheduler(er_protocol::SchedulerError::Disposed))
+        Err(AuthorityLogError::Scheduler(
+            er_protocol::SchedulerError::Disposed
+        ))
     ));
     assert_eq!(log.head_revision(), committed.entry.revision);
     assert_eq!(
@@ -392,7 +419,10 @@ fn retry_scheduler_disposal_terminalizes_without_publishing_attempt_or_delay() -
     )?;
     assert_eq!(deliver_count(&rebound.actions), 1);
     assert!(scheduler.live_timers().is_empty());
-    assert!(log.dispose("scheduler-already-disposed", &mut scheduler).is_empty());
+    assert!(
+        log.dispose("scheduler-already-disposed", &mut scheduler)
+            .is_empty()
+    );
     assert!(log.diagnostics().disposed);
     assert!(log.retained().is_empty());
     assert!(log.dispose("idempotent", &mut scheduler).is_empty());
@@ -413,10 +443,16 @@ fn maximum_attempt_exhaustion_is_a_stopped_final_delivery_without_new_timer() ->
     let first_fired = scheduler.fired(first_id)?;
 
     let first_retry = log.timer_fired(first_fired.clone(), &mut scheduler)?;
-    assert_eq!(scheduled_timer_id(&first_retry), Some(TimerId::new(safe(1)?)));
+    assert_eq!(
+        scheduled_timer_id(&first_retry),
+        Some(TimerId::new(safe(1)?))
+    );
     assert_eq!(deliver_count(&first_retry), 1);
     let second_id = scheduled_timer_id(&first_retry).ok_or("missing second timer")?;
-    assert_eq!(scheduler.timer(second_id).map(|timer| timer.delay_ms), Some(safe(500)?));
+    assert_eq!(
+        scheduler.timer(second_id).map(|timer| timer.delay_ms),
+        Some(safe(500)?)
+    );
     let second_fired = scheduler.fired(second_id)?;
 
     let terminal_actions = log.timer_fired(second_fired, &mut scheduler)?;
@@ -446,7 +482,10 @@ fn malformed_removed_timer_is_rejected_before_authority_mutation() -> TestResult
         Err(AuthorityLogError::InvalidEntry { .. })
     ));
     assert_eq!(log.diagnostics(), before);
-    assert_eq!(log.retained_entry(committed.entry.revision), Some(&committed.entry));
+    assert_eq!(
+        log.retained_entry(committed.entry.revision),
+        Some(&committed.entry)
+    );
     Ok(())
 }
 
@@ -462,10 +501,7 @@ fn receipt_duplicates_and_stale_continuations_are_idempotent_or_rejected() -> Te
     );
     assert!(matches!(
         admitted.verdict,
-        AuthorityReceiptVerdict::Advanced {
-            retired: false,
-            ..
-        }
+        AuthorityReceiptVerdict::Advanced { retired: false, .. }
     ));
     let duplicate = log.accept_receipt_detailed(
         receipt(&committed.entry, 1, 1, AckStage::Admitted)?,
@@ -489,7 +525,8 @@ fn receipt_duplicates_and_stale_continuations_are_idempotent_or_rejected() -> Te
     ));
     let stale_generation = receipt(&committed.entry, 1, 0, AckStage::Admitted)?;
     assert!(matches!(
-        log.accept_receipt_detailed(stale_generation, &mut scheduler).verdict,
+        log.accept_receipt_detailed(stale_generation, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::ConnectionGenerationMismatch
         }
@@ -498,7 +535,8 @@ fn receipt_duplicates_and_stale_continuations_are_idempotent_or_rejected() -> Te
 }
 
 #[test]
-fn receipt_authentication_checks_role_context_generation_revision_operation_and_control_id() -> TestResult {
+fn receipt_authentication_checks_role_context_generation_revision_operation_and_control_id()
+-> TestResult {
     let mut scheduler = KernelScheduler::new();
     let mut log = AuthorityLog::new(config(8, &[(1, 1)])?)?;
     let committed = log.commit(draft("receipt-auth-all")?, &mut scheduler)?;
@@ -507,7 +545,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut malformed = admitted.clone();
     malformed.revision = Revision::ZERO;
     assert!(matches!(
-        log.accept_receipt_detailed(malformed, &mut scheduler).verdict,
+        log.accept_receipt_detailed(malformed, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::InvalidReceipt
         }
@@ -516,7 +555,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut malformed_operation = admitted.clone();
     malformed_operation.operation_id = OperationId::new("bad\u{0001}")?;
     assert!(matches!(
-        log.accept_receipt_detailed(malformed_operation, &mut scheduler).verdict,
+        log.accept_receipt_detailed(malformed_operation, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::InvalidReceipt
         }
@@ -525,7 +565,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut malformed_context = admitted.clone();
     malformed_context.context.seat_map_id.clear();
     assert!(matches!(
-        log.accept_receipt_detailed(malformed_context, &mut scheduler).verdict,
+        log.accept_receipt_detailed(malformed_context, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::InvalidContext
         }
@@ -534,7 +575,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut session_mismatch = admitted.clone();
     session_mismatch.context.session_id = SessionId::new("other-session")?;
     assert!(matches!(
-        log.accept_receipt_detailed(session_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(session_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::SessionMismatch
         }
@@ -543,7 +585,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut epoch_mismatch = admitted.clone();
     epoch_mismatch.context.session_epoch = safe(2)?;
     assert!(matches!(
-        log.accept_receipt_detailed(epoch_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(epoch_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::StaleEpoch
         }
@@ -552,7 +595,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut revision_mismatch = admitted.clone();
     revision_mismatch.revision = Revision::new(safe(2)?);
     assert!(matches!(
-        log.accept_receipt_detailed(revision_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(revision_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::RevisionMismatch
         }
@@ -561,7 +605,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut operation_mismatch = admitted.clone();
     operation_mismatch.operation_id = OperationId::new("other-operation")?;
     assert!(matches!(
-        log.accept_receipt_detailed(operation_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(operation_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::OperationMismatch
         }
@@ -570,7 +615,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut authority_mismatch = admitted.clone();
     authority_mismatch.context.authority_seat_id = seat(9)?;
     assert!(matches!(
-        log.accept_receipt_detailed(authority_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(authority_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::AuthorityMismatch
         }
@@ -579,7 +625,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut self_signed = admitted.clone();
     self_signed.context.sender_seat_id = seat(0)?;
     assert!(matches!(
-        log.accept_receipt_detailed(self_signed, &mut scheduler).verdict,
+        log.accept_receipt_detailed(self_signed, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::SelfSigned
         }
@@ -588,17 +635,18 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut unbound_peer = admitted.clone();
     unbound_peer.context.sender_seat_id = seat(9)?;
     assert!(matches!(
-        log.accept_receipt_detailed(unbound_peer, &mut scheduler).verdict,
+        log.accept_receipt_detailed(unbound_peer, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::UnboundPeer
         }
     ));
 
     let mut membership_mismatch = admitted.clone();
-    membership_mismatch.context.membership_revision =
-        er_types::MembershipRevision::new(safe(2)?);
+    membership_mismatch.context.membership_revision = er_types::MembershipRevision::new(safe(2)?);
     assert!(matches!(
-        log.accept_receipt_detailed(membership_mismatch, &mut scheduler).verdict,
+        log.accept_receipt_detailed(membership_mismatch, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::MembershipMismatch
         }
@@ -606,7 +654,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
 
     let stale_generation = receipt(&committed.entry, 1, 0, AckStage::Admitted)?;
     assert!(matches!(
-        log.accept_receipt_detailed(stale_generation, &mut scheduler).verdict,
+        log.accept_receipt_detailed(stale_generation, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::ConnectionGenerationMismatch
         }
@@ -615,7 +664,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut unexpected_control_id = admitted.clone();
     unexpected_control_id.control_id = Some("unexpected-control".to_owned());
     assert!(matches!(
-        log.accept_receipt_detailed(unexpected_control_id, &mut scheduler).verdict,
+        log.accept_receipt_detailed(unexpected_control_id, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::UnexpectedControlId
         }
@@ -624,7 +674,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut presentation_first = admitted.clone();
     presentation_first.stage = AckStage::PresentationSettled;
     assert!(matches!(
-        log.accept_receipt_detailed(presentation_first, &mut scheduler).verdict,
+        log.accept_receipt_detailed(presentation_first, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::PresentationBeforeMechanical
         }
@@ -634,7 +685,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     wrong_control_id.stage = AckStage::ControlInstalled;
     wrong_control_id.control_id = Some("wrong-control".to_owned());
     assert!(matches!(
-        log.accept_receipt_detailed(wrong_control_id, &mut scheduler).verdict,
+        log.accept_receipt_detailed(wrong_control_id, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::ControlIdMismatch
         }
@@ -642,7 +694,8 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
     let mut missing_control_id = admitted.clone();
     missing_control_id.stage = AckStage::ControlInstalled;
     assert!(matches!(
-        log.accept_receipt_detailed(missing_control_id, &mut scheduler).verdict,
+        log.accept_receipt_detailed(missing_control_id, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::ControlIdMismatch
         }
@@ -666,11 +719,9 @@ fn receipt_authentication_checks_role_context_generation_revision_operation_and_
 
     let material = receipt(&committed.entry, 1, 1, AckStage::MaterialApplied)?;
     assert!(matches!(
-        log.accept_receipt_detailed(material, &mut scheduler).verdict,
-        AuthorityReceiptVerdict::Advanced {
-            retired: false,
-            ..
-        }
+        log.accept_receipt_detailed(material, &mut scheduler)
+            .verdict,
+        AuthorityReceiptVerdict::Advanced { retired: false, .. }
     ));
     let control = receipt(&committed.entry, 1, 1, AckStage::ControlInstalled)?;
     assert_eq!(control.control_id.as_deref(), Some(control_id()));
@@ -759,7 +810,13 @@ fn admitted_subsuming_entry_retires_only_the_subsumed_lease_and_cancels_its_time
             .count(),
         1
     );
-    assert_eq!(log.retained().iter().map(|entry| entry.revision).collect::<Vec<_>>(), vec![second.entry.revision]);
+    assert_eq!(
+        log.retained()
+            .iter()
+            .map(|entry| entry.revision)
+            .collect::<Vec<_>>(),
+        vec![second.entry.revision]
+    );
     assert_eq!(scheduler.timer(first_timer), None);
     assert!(scheduler.timer(second_timer).is_some());
     assert!(!log.peer_stage_quorum(&first.entry.operation_id, AckStage::Admitted));
@@ -782,14 +839,22 @@ fn recovery_slices_are_dense_and_equal_frontier_reconstructs_the_latest_entry() 
 
     let first = log.commit(draft("recovery-first")?, &mut scheduler)?;
     let second = log.commit(draft("recovery-second")?, &mut scheduler)?;
-    let from_zero = log.recovery_slice(Revision::ZERO).ok_or("missing dense slice")?;
+    let from_zero = log
+        .recovery_slice(Revision::ZERO)
+        .ok_or("missing dense slice")?;
     assert_eq!(from_zero.frontier, second.entry.revision);
     assert_eq!(
         from_zero.frontier_operation_id,
         Some(second.entry.operation_id.clone())
     );
-    assert_eq!(from_zero.next_control, Some(second.entry.next_control.clone()));
-    assert_eq!(from_zero.required_tail, vec![first.entry.clone(), second.entry.clone()]);
+    assert_eq!(
+        from_zero.next_control,
+        Some(second.entry.next_control.clone())
+    );
+    assert_eq!(
+        from_zero.required_tail,
+        vec![first.entry.clone(), second.entry.clone()]
+    );
 
     let from_first = log
         .recovery_slice(first.entry.revision)
@@ -804,11 +869,12 @@ fn recovery_slices_are_dense_and_equal_frontier_reconstructs_the_latest_entry() 
     // Retirement removes the old lease, so a lower request is no longer dense, while the equal frontier
     // remains a valid one-entry reconstruction proof from latest_committed.
     for entry in [&first.entry, &second.entry] {
-        for stage in [AckStage::Admitted, AckStage::MaterialApplied, AckStage::ControlInstalled] {
-            let outcome = log.accept_receipt_detailed(
-                receipt(entry, 1, 1, stage)?,
-                &mut scheduler,
-            );
+        for stage in [
+            AckStage::Admitted,
+            AckStage::MaterialApplied,
+            AckStage::ControlInstalled,
+        ] {
+            let outcome = log.accept_receipt_detailed(receipt(entry, 1, 1, stage)?, &mut scheduler);
             if stage == AckStage::ControlInstalled {
                 assert!(matches!(
                     outcome.verdict,
@@ -821,7 +887,10 @@ fn recovery_slices_are_dense_and_equal_frontier_reconstructs_the_latest_entry() 
     let equal_after_retirement = log
         .recovery_slice(second.entry.revision)
         .ok_or("missing equal proof after retirement")?;
-    assert_eq!(equal_after_retirement.required_tail, vec![second.entry.clone()]);
+    assert_eq!(
+        equal_after_retirement.required_tail,
+        vec![second.entry.clone()]
+    );
     Ok(())
 }
 
@@ -870,7 +939,8 @@ fn rebind_preserves_live_timer_and_replays_each_retained_entry_to_each_peer() ->
         AckStage::Admitted,
     )?;
     assert!(matches!(
-        log.accept_receipt_detailed(old_generation, &mut scheduler).verdict,
+        log.accept_receipt_detailed(old_generation, &mut scheduler)
+            .verdict,
         AuthorityReceiptVerdict::Rejected {
             reason: ReceiptRejectReason::ConnectionGenerationMismatch
         }
@@ -887,7 +957,10 @@ fn rebind_preserves_retry_timer_delay_attempt_progress_and_peer_stage() -> TestR
     let first_fired = scheduler.fired(first_id)?;
     let retry_actions = log.timer_fired(first_fired, &mut scheduler)?;
     let retry_id = scheduled_timer_id(&retry_actions).ok_or("missing retry timer")?;
-    let retry_timer_before = scheduler.timer(retry_id).cloned().ok_or("retry timer not live")?;
+    let retry_timer_before = scheduler
+        .timer(retry_id)
+        .cloned()
+        .ok_or("retry timer not live")?;
     assert_eq!(retry_timer_before.delay_ms, safe(500)?);
 
     let admitted = log.accept_receipt_detailed(
@@ -916,7 +989,10 @@ fn rebind_preserves_retry_timer_delay_attempt_progress_and_peer_stage() -> TestR
     assert!(scheduler_commands(&rebound.actions).is_empty());
     assert_eq!(scheduler.timer(retry_id), Some(&retry_timer_before));
     let after_rebind = log.diagnostics();
-    assert_eq!(after_rebind.delivery_timer_ids, before_rebind.delivery_timer_ids);
+    assert_eq!(
+        after_rebind.delivery_timer_ids,
+        before_rebind.delivery_timer_ids
+    );
     assert_eq!(
         after_rebind.peer_stages[&committed.entry.revision][&peer_one],
         AckStage::Admitted
@@ -945,9 +1021,15 @@ fn invalid_rebind_is_atomic_and_unchanged_rebind_is_a_noop() -> TestResult {
             connection_generation: generation(1)?,
         }],
     );
-    assert!(matches!(invalid, Err(AuthorityLogError::InvalidConfig { .. })));
+    assert!(matches!(
+        invalid,
+        Err(AuthorityLogError::InvalidConfig { .. })
+    ));
     assert_eq!(log.diagnostics(), before_diagnostics);
-    assert_eq!(log.retained_entry(before_entry.revision), Some(&before_entry));
+    assert_eq!(
+        log.retained_entry(before_entry.revision),
+        Some(&before_entry)
+    );
     assert_eq!(scheduler.timer(timer_id), Some(&before_timer));
 
     let unchanged = log.rebind_connection(

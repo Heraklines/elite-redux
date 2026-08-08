@@ -1056,10 +1056,7 @@ impl ProposalLeaseManager {
 
         let timer_endpoint = proposal.from;
         let retry_delay = self.retry_delay(0);
-        let absolute_owner = self.timer_owner(
-            &proposal,
-            "v2 proposal absolute ceiling",
-        )?;
+        let absolute_owner = self.timer_owner(&proposal, "v2 proposal absolute ceiling")?;
         let retry_owner = self.timer_owner(&proposal, "v2 proposal retry")?;
         let specs = vec![
             TimerSpec {
@@ -1323,11 +1320,8 @@ impl ProposalLeaseManager {
                             "proposal absolute and retry timer identities overlap",
                         ));
                     }
-                    let retry_target = self
-                        .timer_targets
-                        .get(&retry_id)
-                        .cloned()
-                        .ok_or_else(|| {
+                    let retry_target =
+                        self.timer_targets.get(&retry_id).cloned().ok_or_else(|| {
                             invalid_registration(
                                 "proposal retry timer target is missing at absolute expiry",
                             )
@@ -1589,9 +1583,7 @@ fn invalid_registration(reason: &str) -> ProposalLeaseError {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ProposalLeaseConfig, ProposalLeaseError, ProposalLeaseManager, ProposalLeaseSpec,
-    };
+    use super::{ProposalLeaseConfig, ProposalLeaseError, ProposalLeaseManager, ProposalLeaseSpec};
     use crate::scheduler::{KernelScheduler, SchedulerCommand, SchedulerError};
     use er_types::{
         ConnectionGeneration, OperationId, ProposalMessage, SafeU53, SeatId, TimeClass, TimerId,
@@ -1625,8 +1617,8 @@ mod tests {
     }
 
     #[test]
-    fn two_timer_id_exhaustion_rolls_back_proposal_and_preserves_allocator_cursor(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn two_timer_id_exhaustion_rolls_back_proposal_and_preserves_allocator_cursor()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut scheduler = KernelScheduler::new();
         scheduler.set_next_timer_id_for_test(SafeU53::MAX);
         assert!(scheduler.live_timers().is_empty());
