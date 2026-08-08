@@ -125,7 +125,7 @@ pub struct GameKernel {
 #[derive(Clone, Debug)]
 enum ProtocolState {
     Authority(AuthorityKernelState),
-    Replica(ReplicaKernelState),
+    Replica(Box<ReplicaKernelState>),
 }
 
 #[derive(Clone, Debug)]
@@ -2263,7 +2263,7 @@ impl GameKernel {
             ProtocolState::Authority(authority) => &authority.menu_plans,
             ProtocolState::Replica(replica) => &replica.menu_plans,
         };
-        let Some(target) = control
+        let target = control
             .commands
             .iter()
             .filter(|target| target.owner_seat_id == local_endpoint)
@@ -2272,10 +2272,7 @@ impl GameKernel {
                     .cmp(&right.field_index)
                     .then_with(|| left.owner_seat_id.cmp(&right.owner_seat_id))
                     .then_with(|| left.pokemon_id.cmp(&right.pokemon_id))
-            })
-        else {
-            return None;
-        };
+            })?;
         let matches = plans.iter().filter_map(|plan| {
             let ControlMenuPlan::Command {
                 control_id,
@@ -2815,7 +2812,7 @@ impl ProtocolState {
                 let mut transports = BTreeMap::new();
                 transports.insert(context.sender_seat_id, TransportState::Connected);
                 transports.insert(authority_seat_id, TransportState::Connected);
-                Ok(Self::Replica(ReplicaKernelState {
+                Ok(Self::Replica(Box::new(ReplicaKernelState {
                     context,
                     authority_seat_id,
                     authority_generation,
@@ -2830,7 +2827,7 @@ impl ProtocolState {
                     pending_recovery: None,
                     staged_authority_rebind: None,
                     transports,
-                }))
+                })))
             }
         }
     }
