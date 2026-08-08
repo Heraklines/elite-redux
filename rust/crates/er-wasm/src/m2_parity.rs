@@ -37,6 +37,25 @@ const PROTOCOL_PROPOSAL_WIRE_JSON: &str =
     r#"{"surface":"command","option":"move:first","operation":"operation/m2-parity"}"#;
 #[cfg(not(target_arch = "wasm32"))]
 pub const CALIBRATION_ONLY_STATUS: &str = "CALIBRATION_ONLY_NOT_ACCEPTED_PARITY";
+#[cfg(not(target_arch = "wasm32"))]
+pub const RAW_INPUT_CALIBRATION_PENDING_DIGEST: &str = "PENDING_M2_RAW_INPUT_CALIBRATION";
+#[cfg(not(target_arch = "wasm32"))]
+pub const RAW_INPUT_CALIBRATION_EVENT_COUNT: usize = 23;
+
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_FIXTURE_ID: &str = "game-kernel-raw-input-v1";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_FIXTURE_PATH: &str = "rust/fixtures/v1/m2-parity/game-kernel-raw-input.json";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_PROTOCOL_VERSION: &str = "er-coop-47";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_CONTENT_HASH: &str = "blake3-v1:m2-parity-game-kernel-raw-input";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_RUST_TOOLCHAIN: &str = "1.97.1";
+#[cfg(not(target_arch = "wasm32"))]
+const RAW_INPUT_SEED: u64 = u64::MAX;
 
 /// A decoded parity fixture.  This is an evidence-only wrapper and is not a
 /// public or wire schema.
@@ -420,6 +439,133 @@ pub fn calibrate_pending_fixture_json(input: &str) -> Result<String, ParityRepla
     });
     canonicalize(&artifact).map_err(|error| ParityReplayError::Canonical {
         field: "calibration_report",
+        reason: error.to_string(),
+    })
+}
+
+/// Replay the pending non-protocol raw-input fixture without consulting any
+/// expected value.
+///
+/// This native-only path is deliberately narrower than the protocol
+/// calibration above: it accepts only the exact raw-input fixture identity,
+/// requires no protocol configuration, and rejects every digest that is not
+/// the explicit temporary marker.  It exists only to capture hosted evidence;
+/// the returned report is never parity acceptance.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn calibrate_raw_input_fixture_json(input: &str) -> Result<String, ParityReplayError> {
+    let fixture = parse_fixture(input)?;
+    let header = &fixture.trace.header;
+    if fixture.seed != RAW_INPUT_SEED {
+        return Err(ParityReplayError::InvalidFixture(
+            "raw-input calibration requires the exact u64 seed".to_owned(),
+        ));
+    }
+    if header.trace_version != KERNEL_TRACE_VERSION
+        || header.schema_version != PARITY_FIXTURE_SCHEMA_VERSION
+        || header.oracle_game_sha != RAW_INPUT_ORACLE_GAME_SHA
+        || header.protocol_version != RAW_INPUT_PROTOCOL_VERSION
+        || header.content_hash != RAW_INPUT_CONTENT_HASH
+        || header.rust_toolchain != RAW_INPUT_RUST_TOOLCHAIN
+    {
+        return Err(ParityReplayError::InvalidFixture(
+            "raw-input calibration requires the exact fixture header".to_owned(),
+        ));
+    }
+    if fixture.protocol_config.is_some() || fixture.expected_evidence_status.is_some() {
+        return Err(ParityReplayError::InvalidFixture(
+            "raw-input calibration does not accept protocol configuration".to_owned(),
+        ));
+    }
+    if fixture.trace.events.len() != RAW_INPUT_CALIBRATION_EVENT_COUNT {
+        return Err(ParityReplayError::InvalidFixture(format!(
+            "raw-input calibration requires exactly {RAW_INPUT_CALIBRATION_EVENT_COUNT} events, got {}",
+            fixture.trace.events.len()
+        )));
+    }
+    for (index, event) in fixture.trace.events.iter().enumerate() {
+        if event.sequence.get() != index as u64 {
+            return Err(ParityReplayError::InvalidFixture(format!(
+                "raw-input calibration requires contiguous sequence {index}, got {}",
+                event.sequence
+            )));
+        }
+        if event.expected_effect_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
+            || event.expected_state_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
+            || event.expected_ui_digest != RAW_INPUT_CALIBRATION_PENDING_DIGEST
+        {
+            return Err(ParityReplayError::InvalidFixture(format!(
+                "raw-input calibration requires explicit pending digests at sequence {}",
+                event.sequence
+            )));
+        }
+    }
+
+    let mut kernel = GameKernel::new(KernelConfig {
+        input_map: fixture.input_map.clone(),
+        initial_ui: fixture.trace.initial_snapshot.ui.clone(),
+        protocol: None,
+    });
+    if kernel.snapshot() != fixture.trace.initial_snapshot {
+        return Err(ParityReplayError::InvalidFixture(
+            "raw-input calibration initial_snapshot does not match GameKernel construction"
+                .to_owned(),
+        ));
+    }
+
+    let initial_snapshot = kernel.snapshot();
+    let initial_ui = kernel.ui_view();
+    let initial_live_resources = kernel.live_resources();
+    let initial = json!({
+        "state": initial_snapshot,
+        "state_digest": kernel.state_digest(),
+        "ui": initial_ui,
+        "ui_digest": ui_digest(&kernel)?,
+        "live_resources": initial_live_resources,
+        "live_resources_digest": live_resources_digest(&kernel.live_resources())?,
+    });
+
+    let seed = fixture.seed.to_string();
+    let mut observations = Vec::with_capacity(fixture.trace.events.len());
+    for event in &fixture.trace.events {
+        let effects = kernel
+            .step(event.input.clone())
+            .map_err(|error| ParityReplayError::Kernel {
+                sequence: event.sequence,
+                reason: error.to_string(),
+            })?;
+        let actual = observe(&kernel, &effects)?;
+        observations.push(json!({
+            "seed": seed,
+            "sequence": event.sequence,
+            "virtual_time_ms": event.virtual_time_ms,
+            "input": event.input,
+            "effects": effects,
+            "effect_digest": actual.effect_digest,
+            "state": kernel.snapshot(),
+            "state_digest": actual.state_digest,
+            "ui": kernel.ui_view(),
+            "ui_digest": actual.ui_digest,
+            "live_resources": actual.live_resources,
+            "live_resources_digest": actual.live_resources_digest,
+        }));
+    }
+
+    let artifact = json!({
+        "artifact_version": 1,
+        "status": CALIBRATION_ONLY_STATUS,
+        "accepted_parity": false,
+        "comparison_mode": "BYPASS_PENDING_EXPECTED_VALUES",
+        "fixture_id": RAW_INPUT_FIXTURE_ID,
+        "fixture_path": RAW_INPUT_FIXTURE_PATH,
+        "fixture_header": fixture.trace.header,
+        "protocol_config": null,
+        "seed": seed,
+        "event_count": observations.len(),
+        "initial": initial,
+        "observations": observations,
+    });
+    canonicalize(&artifact).map_err(|error| ParityReplayError::Canonical {
+        field: "raw_input_calibration_report",
         reason: error.to_string(),
     })
 }

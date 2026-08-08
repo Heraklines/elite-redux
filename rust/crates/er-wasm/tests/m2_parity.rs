@@ -285,6 +285,118 @@ fn protocol_fixture_hosted_calibration() -> Result<(), Box<dyn std::error::Error
     .into())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+#[ignore = "CALIBRATION ONLY: writes raw-input evidence and intentionally fails non-acceptance"]
+fn raw_input_fixture_hosted_calibration() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = parse_fixture(RAW_INPUT_FIXTURE)?;
+    assert_eq!(
+        fixture.trace.events.len(),
+        m2_parity::RAW_INPUT_CALIBRATION_EVENT_COUNT
+    );
+    assert_eq!(fixture.seed, u64::MAX);
+    assert!(fixture.protocol_config.is_none());
+    assert!(fixture.expected_evidence_status.is_none());
+    assert_eq!(fixture.trace.header.trace_version, 1);
+    assert_eq!(fixture.trace.header.schema_version, 1);
+    assert_eq!(
+        fixture.trace.header.oracle_game_sha,
+        "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+    );
+    assert_eq!(fixture.trace.header.protocol_version, "er-coop-47");
+    assert_eq!(
+        fixture.trace.header.content_hash,
+        "blake3-v1:m2-parity-game-kernel-raw-input"
+    );
+    assert_eq!(fixture.trace.header.rust_toolchain, "1.97.1");
+    for (sequence, event) in fixture.trace.events.iter().enumerate() {
+        assert_eq!(event.sequence.get(), sequence as u64);
+        assert_eq!(
+            event.expected_effect_digest,
+            m2_parity::RAW_INPUT_CALIBRATION_PENDING_DIGEST
+        );
+        assert_eq!(
+            event.expected_state_digest,
+            m2_parity::RAW_INPUT_CALIBRATION_PENDING_DIGEST
+        );
+        assert_eq!(
+            event.expected_ui_digest,
+            m2_parity::RAW_INPUT_CALIBRATION_PENDING_DIGEST
+        );
+    }
+
+    let artifact = m2_parity::calibrate_raw_input_fixture_json(RAW_INPUT_FIXTURE)?;
+    let artifact_value: Value = serde_json::from_str(&artifact)?;
+    assert_eq!(
+        artifact_value["status"],
+        json!(m2_parity::CALIBRATION_ONLY_STATUS)
+    );
+    assert_eq!(artifact_value["accepted_parity"], json!(false));
+    assert_eq!(artifact_value["fixture_id"], json!("game-kernel-raw-input-v1"));
+    assert_eq!(
+        artifact_value["fixture_path"],
+        json!("rust/fixtures/v1/m2-parity/game-kernel-raw-input.json")
+    );
+    assert!(artifact_value["protocol_config"].is_null());
+    assert_eq!(artifact_value["seed"], json!("18446744073709551615"));
+    assert_eq!(artifact_value["event_count"], json!(23));
+
+    for field in [
+        "state",
+        "state_digest",
+        "ui",
+        "ui_digest",
+        "live_resources",
+        "live_resources_digest",
+    ] {
+        assert!(
+            artifact_value["initial"].get(field).is_some(),
+            "calibration initial observation is missing {field}"
+        );
+    }
+    let observations = artifact_value["observations"]
+        .as_array()
+        .ok_or("raw-input calibration observations are not an array")?;
+    assert_eq!(observations.len(), 23);
+    for (sequence, observation) in observations.iter().enumerate() {
+        assert_eq!(observation["seed"], json!("18446744073709551615"));
+        assert_eq!(observation["sequence"], json!(sequence));
+        assert_eq!(
+            observation["virtual_time_ms"],
+            json!(fixture.trace.events[sequence].virtual_time_ms)
+        );
+        for field in [
+            "effects",
+            "effect_digest",
+            "state",
+            "state_digest",
+            "ui",
+            "ui_digest",
+            "live_resources",
+            "live_resources_digest",
+        ] {
+            assert!(
+                observation.get(field).is_some(),
+                "raw-input calibration observation {sequence} is missing {field}"
+            );
+        }
+    }
+
+    let output_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join("rust-ci-summary");
+    std::fs::create_dir_all(&output_dir)?;
+    let output_path = output_dir.join("m2-raw-input-calibration.json");
+    std::fs::write(&output_path, format!("{artifact}\n"))?;
+
+    Err(format!(
+        "{}: wrote 23 observations to {}; this hosted calibration intentionally fails and is not parity acceptance",
+        m2_parity::CALIBRATION_ONLY_STATUS,
+        output_path.display()
+    )
+    .into())
+}
+
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
 fn wasm32_node_replay_uses_the_same_frozen_fixture() -> Result<(), Box<dyn std::error::Error>> {
