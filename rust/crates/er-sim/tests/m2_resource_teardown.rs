@@ -7,8 +7,9 @@ use er_kernel::{
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, FrameType,
-    PeerBinding, ProposalLeaseConfig, RecoveryTransactionConfig, ScheduledTimer, SchedulerCommand,
-    control_id_of,
+    PeerBinding, ProposalFingerprintInput, ProposalJson, ProposalLeaseConfig,
+    RecoveryTransactionConfig, ScheduledTimer, SchedulerCommand, control_id_of,
+    proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, FrameCorruption, PairEndpoint, PairOperation, PairSnapshot, PairStep,
@@ -19,7 +20,7 @@ use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FrameContext, GameButton, InputMap, KeyBinding,
     LiveResourceSnapshot, Material, MenuGeneration, MenuOption, MenuOptionId, MenuState,
-    MembershipRevision, NextControl, OperationId, PhysicalKey, SafeU53, SeatId, SessionId,
+    MembershipRevision, NextControl, OperationId, PhysicalKey, SafeI53, SafeU53, SeatId, SessionId,
     TimeClass, TimerId, TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
@@ -35,6 +36,12 @@ const HOST_OPERATION: &str = "teardown/host";
 const GUEST_OPTION_A: &str = "command:teardown:a";
 const GUEST_OPTION_B: &str = "command:teardown:b";
 const HOST_OPTION: &str = "command:teardown:host";
+const GUEST_A_WIRE: &str = r#"{"choice":"a"}"#;
+const GUEST_B_WIRE: &str = r#"{"choice":"b"}"#;
+const HOST_WIRE: &str = r#"{"choice":"host"}"#;
+const GUEST_A_REWARD: &str = r#"{"surface":"guest-command","slot":0}"#;
+const GUEST_B_REWARD: &str = r#"{"surface":"guest-command","slot":1}"#;
+const HOST_REWARD: &str = r#"{"surface":"host-command","slot":1}"#;
 
 #[derive(Clone, Debug)]
 struct CommandFixture {
@@ -52,6 +59,21 @@ fn seat(value: u64) -> SeatId {
 
 fn operation(value: &str) -> OperationId {
     OperationId::new(value).expect("resource teardown operation must be non-empty")
+}
+
+fn ordinary_fingerprint(
+    sequence: u64,
+    choice: i64,
+    wire: &str,
+    reward_surface: &str,
+) -> TestResult<String> {
+    Ok(proposal_fingerprint(&ProposalFingerprintInput::Ordinary {
+        sequence: safe(sequence),
+        label: "turnCommand".to_owned(),
+        choice: SafeI53::new(choice)?,
+        wire: Some(ProposalJson::new(wire)?),
+        reward_surface: Some(ProposalJson::new(reward_surface)?),
+    })?)
 }
 
 fn menu_option(value: &str) -> MenuOption {
@@ -208,7 +230,7 @@ fn authority_resolution(
     }
 }
 
-fn command_fixture(seed: u64, presenter: PresenterMode) -> CommandFixture {
+fn command_fixture(seed: u64, presenter: PresenterMode) -> TestResult<CommandFixture> {
     let initial = initial_control();
     let remaining = remaining_control();
     let awaiting = await_control();
@@ -220,21 +242,36 @@ fn command_fixture(seed: u64, presenter: PresenterMode) -> CommandFixture {
 
     let guest_options = vec![menu_option(GUEST_OPTION_A), menu_option(GUEST_OPTION_B)];
     let host_options = vec![menu_option(HOST_OPTION)];
+    let guest_a_fingerprint = ordinary_fingerprint(1, 0, GUEST_A_WIRE, GUEST_A_REWARD)?;
+    let guest_b_fingerprint = ordinary_fingerprint(1, 1, GUEST_B_WIRE, GUEST_B_REWARD)?;
+    let host_fingerprint = ordinary_fingerprint(2, 0, HOST_WIRE, HOST_REWARD)?;
+    assert_eq!(
+        guest_a_fingerprint,
+        r#"[1,"turnCommand",0,{"choice":"a"},{"surface":"guest-command","slot":0}]"#
+    );
+    assert_eq!(
+        guest_b_fingerprint,
+        r#"[1,"turnCommand",1,{"choice":"b"},{"surface":"guest-command","slot":1}]"#
+    );
+    assert_eq!(
+        host_fingerprint,
+        r#"[2,"turnCommand",0,{"choice":"host"},{"surface":"host-command","slot":1}]"#
+    );
     let guest_proposals = vec![
         MenuProposalPlan {
             option_id: guest_options[0].id.clone(),
-            fingerprint: "teardown:fingerprint:guest:a".to_owned(),
+            fingerprint: guest_a_fingerprint.clone(),
             payload: json!({"choice": "a"}),
         },
         MenuProposalPlan {
             option_id: guest_options[1].id.clone(),
-            fingerprint: "teardown:fingerprint:guest:b".to_owned(),
+            fingerprint: guest_b_fingerprint.clone(),
             payload: json!({"choice": "b"}),
         },
     ];
     let host_proposals = vec![MenuProposalPlan {
         option_id: host_options[0].id.clone(),
-        fingerprint: "teardown:fingerprint:host".to_owned(),
+        fingerprint: host_fingerprint.clone(),
         payload: json!({"choice": "host"}),
     }];
 
@@ -268,21 +305,21 @@ fn command_fixture(seed: u64, presenter: PresenterMode) -> CommandFixture {
     let resolutions = vec![
         authority_resolution(
             guest_operation.clone(),
-            "teardown:fingerprint:guest:a",
+            &guest_a_fingerprint,
             0,
             "a",
             remaining.clone(),
         ),
         authority_resolution(
             guest_operation,
-            "teardown:fingerprint:guest:b",
+            &guest_b_fingerprint,
             0,
             "b",
             remaining,
         ),
         authority_resolution(
             host_operation,
-            "teardown:fingerprint:host",
+            &host_fingerprint,
             1,
             "host",
             awaiting,
@@ -362,7 +399,7 @@ fn command_fixture(seed: u64, presenter: PresenterMode) -> CommandFixture {
         json!({"seed": seed.to_string(), "purpose": "teardown evidence"}),
     );
 
-    CommandFixture {
+    Ok(CommandFixture {
         config: SimulatedPairConfig {
             host_kernel,
             guest_kernel,
@@ -374,7 +411,7 @@ fn command_fixture(seed: u64, presenter: PresenterMode) -> CommandFixture {
             event_budget: safe(32_768),
         },
         await_control_id,
-    }
+    })
 }
 
 fn assert_zero_resources(snapshot: &PairSnapshot) {
@@ -482,7 +519,7 @@ fn recovery_fence_is_held(value: &Value) -> bool {
     }
 }
 
-fn assert_timer_metadata(steps: &[PairStep], expected_classes: &[TimeClass]) {
+fn assert_timer_metadata(steps: &[PairStep], expected_classes: &[TimeClass]) -> TestResult {
     for expected_class in expected_classes {
         let timer = steps
             .iter()
@@ -496,14 +533,18 @@ fn assert_timer_metadata(steps: &[PairStep], expected_classes: &[TimeClass]) {
                 } if time_class == expected_class => Some((owner, *delay_ms)),
                 _ => None,
             })
-            .unwrap_or_else(|| {
-                panic!("missing scheduled timer metadata for {expected_class:?}")
-            });
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("missing scheduled timer metadata for {expected_class:?}"),
+                )
+            })?;
         assert!(timer.1 > SafeU53::ZERO);
         assert!(!timer.0.owner_id.is_empty());
         assert!(!timer.0.address.is_empty());
         assert!(!timer.0.reason.is_empty());
     }
+    Ok(())
 }
 
 fn has_frame(steps: &[PairStep], frame_type: FrameType) -> bool {
@@ -574,7 +615,7 @@ fn delay_all_queued(pair: &mut SimulatedPair, additional_ms: SafeU53) -> TestRes
 }
 
 fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
-    let fixture = command_fixture(seed, PresenterMode::Instant);
+    let fixture = command_fixture(seed, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
     let initial = pair.snapshot()?;
     assert_eq!(initial.seed, seed.to_string());
@@ -607,7 +648,7 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
             TimeClass::Connected,
             TimeClass::Absolute,
         ],
-    );
+    )?;
     assert!(has_effect(&trace, |effect| {
         matches!(
             effect,
@@ -680,7 +721,7 @@ fn successful_two_kernel_lifecycle_is_deterministic_and_tears_down_to_zero() -> 
 
 #[test]
 fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown() -> TestResult {
-    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::FaultControlled);
+    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::FaultControlled)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
     let mut trace = Vec::new();
 
@@ -704,7 +745,7 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
             TimeClass::Connected,
             TimeClass::Absolute,
         ],
-    );
+    )?;
 
     let proposal_live = pair.snapshot()?;
     assert_resource_identifiers(&proposal_live);
@@ -782,7 +823,7 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
             TimeClass::Connected,
             TimeClass::Absolute,
         ],
-    );
+    )?;
 
     let final_snapshot = pair.teardown("m2b-10 live owners")?;
     assert_eq!(final_snapshot.seed, RESOURCE_SEED.to_string());
@@ -794,7 +835,7 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
 
 #[test]
 fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
-    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant);
+    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
 
     // Submit through physical input, deliver the opaque proposal, then
@@ -839,7 +880,7 @@ fn protocol_violation_path_tears_down_all_live_resources() -> TestResult {
 
 #[test]
 fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
-    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant);
+    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
 
     let _ = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
@@ -869,7 +910,7 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
         "recovery must hold its production fence before request completion"
     );
     assert!(!reconnect.snapshot.guest.live_resources.timers.is_empty());
-    assert_timer_metadata(&[reconnect.clone()], &[TimeClass::Recovery]);
+    assert_timer_metadata(&[reconnect.clone()], &[TimeClass::Recovery])?;
 
     // Keep the recovery request and any retained-entry redelivery beyond the
     // request timeout using virtual time only. The recovery fence must then
@@ -889,14 +930,14 @@ fn recovery_timeout_path_releases_fence_transaction_and_timers() -> TestResult {
 
 #[test]
 fn absolute_proposal_terminal_releases_retry_and_absolute_leases() -> TestResult {
-    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant);
+    let fixture = command_fixture(RESOURCE_SEED, PresenterMode::Instant)?;
     let mut pair = SimulatedPair::new(fixture.config)?;
 
     let proposal_steps = pair.press(PairEndpoint::Guest, PhysicalKey::Enter)?;
     assert_timer_metadata(
         &proposal_steps,
         &[TimeClass::Connected, TimeClass::Absolute],
-    );
+    )?;
     let proposal_live = pair.snapshot()?;
     assert!(!proposal_live.guest.live_resources.proposal_leases.is_empty());
     let proposal_packet = proposal_live
