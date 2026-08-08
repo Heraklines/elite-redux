@@ -1,3 +1,6 @@
+#![allow(clippy::panic)]
+// Explicit variant-mismatch panics are test assertions, never production paths.
+
 use er_protocol::{
     FrameValidator, InboundFrameResult, ValidatedFrame, ValidatedFrameBody, frame_context_issues,
     frame_contexts_compatible, frame_contexts_equal, validate_inbound_frame,
@@ -608,7 +611,7 @@ fn duplicate_keys_use_json_parse_last_value_semantics() {
         &["body.fromRevision"],
     );
 
-    let invalid_version = format!(r#"{{"v":2,"v":1e400,"t":"tailRequest"}}"#);
+    let invalid_version = r#"{"v":2,"v":1e400,"t":"tailRequest"}"#.to_owned();
     assert_violation(
         validate_inbound_frame(&RawFrame::JsonText(invalid_version)),
         None,
@@ -850,11 +853,7 @@ fn overflowing_checked_fields_inside_authority_tail_keep_nested_issue_paths() {
             r#"{{"requestId":"request","material":{{"digest":"digest","payload":null}},"frontier":0,"frontierOperationId":null,"membershipRevision":2,"nextControl":null,"requiredTail":[{tail}]}}"#
         );
         assert_violation(
-            validate_inbound_frame(&text_envelope(
-                "recoveryBundle",
-                context_text(),
-                &body,
-            )),
+            validate_inbound_frame(&text_envelope("recoveryBundle", context_text(), &body)),
             Some("recoveryBundle"),
             &[expected_issue],
         );
@@ -889,20 +888,17 @@ fn overflowing_number_in_an_unknown_property_does_not_add_issues() {
     };
     assert_eq!(body.from_revision.get().get(), 0);
 
-    let mut marker_like_body = entry_body_text_with_payload(
-        r#"{"\u0000er-protocol-non-finite-0":"Infinity"}"#,
-    );
+    let mut marker_like_body =
+        entry_body_text_with_payload(r#"{"\u0000er-protocol-non-finite-0":"Infinity"}"#);
     assert_eq!(
-        marker_like_body.pop().expect("entry body must end with an object brace"),
+        marker_like_body
+            .pop()
+            .expect("entry body must end with an object brace"),
         '}'
     );
     marker_like_body.push_str(r#","futureMetric":1e400}"#);
     let frame = valid_frame(
-        text_envelope(
-            "authorityEntry",
-            context_text(),
-            &marker_like_body,
-        ),
+        text_envelope("authorityEntry", context_text(), &marker_like_body),
         "authorityEntry",
     );
     let ValidatedFrameBody::AuthorityEntry(body) = &frame.body else {
@@ -917,11 +913,7 @@ fn overflowing_material_payload_fails_closed_instead_of_becoming_semantic_json()
     for payload in ["1e400", r#"{"nested":[null,-1e400]}"#] {
         let body = entry_body_text_with_payload(payload);
         assert_violation(
-            validate_inbound_frame(&text_envelope(
-                "authorityEntry",
-                context_text(),
-                &body,
-            )),
+            validate_inbound_frame(&text_envelope("authorityEntry", context_text(), &body)),
             Some("authorityEntry"),
             &["body.material.payload: non-finite JSON number"],
         );

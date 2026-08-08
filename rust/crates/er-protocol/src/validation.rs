@@ -379,10 +379,7 @@ fn overflowing_number_sign(token: &str) -> Option<bool> {
                 .find('e')
                 .or_else(|| token.find('E'))
                 .map_or(token, |index| &token[..index]);
-            if !mantissa
-                .bytes()
-                .any(|byte| matches!(byte, b'1'..=b'9'))
-            {
+            if !mantissa.bytes().any(|byte| matches!(byte, b'1'..=b'9')) {
                 return None;
             }
             let negative_exponent = token
@@ -519,10 +516,7 @@ fn js_f64_to_string(value: f64) -> String {
 
 fn decimal_digits_and_exponent(raw: &str) -> Option<(String, i32)> {
     let (mantissa, explicit_exponent) = match raw.find('e').or_else(|| raw.find('E')) {
-        Some(index) => (
-            &raw[..index],
-            raw[index + 1..].parse::<i32>().ok()?,
-        ),
+        Some(index) => (&raw[..index], raw[index + 1..].parse::<i32>().ok()?),
         None => (raw, 0),
     };
     let decimal_position = mantissa.find('.').unwrap_or(mantissa.len()) as i32;
@@ -926,10 +920,7 @@ fn material_issues(value: Option<&Value>, marker: Option<&str>) -> Vec<String> {
     issues
 }
 
-fn command_frontier_issues(
-    control: &Map<String, Value>,
-    marker: Option<&str>,
-) -> Vec<String> {
+fn command_frontier_issues(control: &Map<String, Value>, marker: Option<&str>) -> Vec<String> {
     let mut issues = Vec::new();
     if !is_positive_safe_integer(control.get("epoch")) {
         issues.push("epoch".to_owned());
@@ -985,10 +976,7 @@ fn interaction_issues(control: &Map<String, Value>) -> Vec<String> {
     issues
 }
 
-fn replacement_control_issues(
-    control: &Map<String, Value>,
-    marker: Option<&str>,
-) -> Vec<String> {
+fn replacement_control_issues(control: &Map<String, Value>, marker: Option<&str>) -> Vec<String> {
     let mut issues = interaction_issues(control);
     if !is_positive_safe_integer(control.get("epoch")) {
         issues.push("epoch".to_owned());
@@ -1070,10 +1058,7 @@ fn replacement_control_issues(
     issues
 }
 
-fn shared_interaction_issues(
-    control: &Map<String, Value>,
-    marker: Option<&str>,
-) -> Vec<String> {
+fn shared_interaction_issues(control: &Map<String, Value>, marker: Option<&str>) -> Vec<String> {
     let mut issues = interaction_issues(control);
     if !is_positive_safe_integer(control.get("epoch")) {
         issues.push("epoch".to_owned());
@@ -1165,10 +1150,7 @@ fn allowed_kinds_include(value: Option<&Value>, expected: &str) -> bool {
         .is_some_and(|values| values.iter().any(|value| value.as_str() == Some(expected)))
 }
 
-fn successor_wait_issues(
-    control: &Map<String, Value>,
-    marker: Option<&str>,
-) -> Vec<String> {
+fn successor_wait_issues(control: &Map<String, Value>, marker: Option<&str>) -> Vec<String> {
     let mut issues = Vec::new();
     if !is_non_empty_string(control.get("afterOperationId")) {
         issues.push("afterOperationId".to_owned());
@@ -1253,11 +1235,7 @@ fn successor_wait_address_issues(
                         interaction_surface_matches_kind(kind, surface)
                     })
                     && is_non_negative_safe_integer(candidate.get("wave"))
-                    && json_values_strict_equal(
-                        candidate.get("wave"),
-                        control.get("wave"),
-                        marker,
-                    )
+                    && json_values_strict_equal(candidate.get("wave"), control.get("wave"), marker)
                     && is_non_negative_safe_integer(candidate.get("turn"));
                 if !valid {
                     issues.push(format!("allowedInteractionAddresses[{index}]"));
