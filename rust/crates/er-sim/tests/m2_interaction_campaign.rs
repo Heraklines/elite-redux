@@ -7,8 +7,8 @@ use er_kernel::{
 };
 use er_protocol::{
     AckStage, AuthorityEntryBody, AuthorityLogConfig, AuthorityReceiptBody,
-    AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalLeaseConfig,
-    ProposalFingerprintInput, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
+    AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalFingerprintInput,
+    ProposalLeaseConfig, RecoveryTransactionConfig, control_id_of, proposal_fingerprint,
 };
 use er_sim::{
     FaultOperation, PairEndpoint, PairOperation, PairSnapshot, PairStep, PresenterMode,
@@ -109,7 +109,10 @@ fn operation(value: &str) -> TestResult<OperationId> {
     Ok(OperationId::new(value)?)
 }
 
-fn context(sender: SeatId, connection_generation: ConnectionGeneration) -> TestResult<FrameContext> {
+fn context(
+    sender: SeatId,
+    connection_generation: ConnectionGeneration,
+) -> TestResult<FrameContext> {
     Ok(FrameContext {
         session_id: er_types::SessionId::new("m2b-06-interaction-session")?,
         run_id: er_types::RunId::new("m2b-06-interaction-run")?,
@@ -596,6 +599,28 @@ fn receipt_frontier_chain(receipts: &[ReceiptEvidence]) -> TestResult<Vec<Author
     Ok(chain)
 }
 
+fn find_replica_frontier(value: &Value) -> Option<&Value> {
+    match value {
+        Value::Object(fields) => {
+            if let Some(frontier) = fields
+                .get("replica")
+                .and_then(|replica| replica.get("frontier"))
+            {
+                return Some(frontier);
+            }
+            fields.values().find_map(find_replica_frontier)
+        }
+        Value::Array(values) => values.iter().find_map(find_replica_frontier),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
+    }
+}
+
+fn actual_replica_frontier(snapshot: &PairSnapshot) -> TestResult<AuthorityFrontier> {
+    let frontier = find_replica_frontier(&snapshot.guest.kernel.state)
+        .ok_or_else(|| error("guest kernel state has no replica frontier"))?;
+    Ok(serde_json::from_value(frontier.clone())?)
+}
+
 fn assert_zero_live_resources(snapshot: &er_types::LiveResourceSnapshot) {
     assert_eq!(snapshot, &er_types::LiveResourceSnapshot::default());
 }
@@ -659,9 +684,15 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     )?;
     let presentation_receipt =
         expected_receipt(&fixture, AckStage::PresentationSettled, None)?;
+    let expected_replica_frontier = AuthorityFrontier {
+        received: fixture.interaction_revision,
+        material: fixture.interaction_revision,
+        control: fixture.interaction_revision,
+    };
 
     let initial = fixture.pair.snapshot()?;
     assert_eq!(initial.seed, seed.to_string());
+    assert_eq!(actual_replica_frontier(&initial)?, AuthorityFrontier::default());
     assert_eq!(initial.guest.kernel.ui, expected_ui);
     assert_eq!(initial.guest.ui.kind, UiViewKind::Interaction);
     assert_eq!(initial.guest.ui.owner_seat, Some(fixture.guest));
@@ -941,6 +972,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             .proposal_leases
             .is_empty()
     );
+    assert_eq!(
+        actual_replica_frontier(&first_material.snapshot)?,
+        expected_replica_frontier
+    );
     let material_state_digest = first_material.snapshot.guest.state_digest.clone();
     trace.push(first_material);
 
@@ -960,11 +995,16 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert_eq!(second_material.snapshot.guest.state_digest, material_state_digest);
     assert_eq!(second_material.snapshot.guest.ui.kind, UiViewKind::Waiting);
+    assert_eq!(
+        actual_replica_frontier(&second_material.snapshot)?,
+        expected_replica_frontier
+    );
     trace.push(second_material);
 
     let receipt_delivery = fixture.pair.advance_time(safe(10)?)?;
     trace.push(receipt_delivery);
     let settled = fixture.pair.snapshot()?;
+    assert_eq!(actual_replica_frontier(&settled)?, expected_replica_frontier);
     assert!(settled.guest.live_resources.proposal_leases.is_empty());
     assert!(settled.host.live_resources.retained_revisions.is_empty());
     assert!(settled.guest.live_resources.waits.contains(&fixture.wait_control_id));
