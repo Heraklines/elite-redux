@@ -414,9 +414,14 @@ mod tests {
     fn safe_u53_serde_checks_boundaries_and_types() -> Result<(), serde_json::Error> {
         for (input, expected) in [
             ("0", 0),
+            ("-0", 0),
             ("0.0", 0),
             ("-0.0", 0),
+            ("0e0", 0),
+            ("1.0", 1),
             ("1e0", 1),
+            ("1e-400", 0),
+            ("-1e-400", 0),
             ("9007199254740990.5", JS_MAX_SAFE_INTEGER - 1),
             ("9007199254740991.1", JS_MAX_SAFE_INTEGER),
             ("9007199254740991", JS_MAX_SAFE_INTEGER),
@@ -428,6 +433,19 @@ mod tests {
         }
 
         for input in OVERFLOW_JSON {
+            assert!(
+                serde_json::from_str::<SafeU53>(input).is_err(),
+                "accepted {input}"
+            );
+        }
+
+        for input in [
+            "9007199254740991.5",
+            "1e400",
+            "true",
+            "[]",
+            "{}",
+        ] {
             assert!(
                 serde_json::from_str::<SafeU53>(input).is_err(),
                 "accepted {input}"

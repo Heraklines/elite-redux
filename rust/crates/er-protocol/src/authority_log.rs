@@ -10,7 +10,7 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::SchedulerCommand;
+use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 
 pub const DEFAULT_RETAIN_CAPACITY: u64 = 512;
 pub const DEFAULT_DELIVERY_INITIAL_MS: u64 = 250;
@@ -78,6 +78,13 @@ pub enum AuthorityLogAction {
 #[serde(rename_all = "camelCase")]
 pub struct CommitOutcome {
     pub entry: AuthorityEntry,
+    pub actions: Vec<AuthorityLogAction>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorityRebindOutcome {
+    pub retained_count: SafeU53,
     pub actions: Vec<AuthorityLogAction>,
 }
 
@@ -160,6 +167,8 @@ pub enum AuthorityLogError {
     RevisionExhausted,
     #[error("prepared commit {token} is not live")]
     UnknownPreparedCommit { token: SafeU53 },
+    #[error(transparent)]
+    Scheduler(#[from] SchedulerError),
 }
 
 #[derive(Debug)]
@@ -184,6 +193,7 @@ impl AuthorityLog {
     pub fn publish_prepared(
         &mut self,
         _token: SafeU53,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<CommitOutcome, AuthorityLogError> {
         Err(AuthorityLogError::Disposed)
     }
@@ -195,11 +205,16 @@ impl AuthorityLog {
     pub fn commit(
         &mut self,
         _draft: AuthorityEntryDraft,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<CommitOutcome, AuthorityLogError> {
         Err(AuthorityLogError::Disposed)
     }
 
-    pub fn accept_receipt_detailed(&mut self, _receipt: AuthorityReceipt) -> ReceiptOutcome {
+    pub fn accept_receipt_detailed(
+        &mut self,
+        _receipt: AuthorityReceipt,
+        _scheduler: &mut KernelScheduler,
+    ) -> ReceiptOutcome {
         ReceiptOutcome {
             verdict: AuthorityReceiptVerdict::Rejected {
                 reason: ReceiptRejectReason::Disposed,
@@ -211,6 +226,7 @@ impl AuthorityLog {
     pub fn accept_receipt(
         &mut self,
         _receipt: AuthorityReceipt,
+        _scheduler: &mut KernelScheduler,
     ) -> (bool, Vec<AuthorityLogAction>) {
         (false, Vec::new())
     }
@@ -221,7 +237,8 @@ impl AuthorityLog {
 
     pub fn timer_fired(
         &mut self,
-        _timer_id: TimerId,
+        _fired: ScheduledTimer,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<AuthorityLogAction>, AuthorityLogError> {
         Err(AuthorityLogError::Disposed)
     }
@@ -234,7 +251,7 @@ impl AuthorityLog {
         &mut self,
         _local_context: FrameContext,
         _peer_bindings: Vec<PeerBinding>,
-    ) -> Result<SafeU53, AuthorityLogError> {
+    ) -> Result<AuthorityRebindOutcome, AuthorityLogError> {
         Err(AuthorityLogError::Disposed)
     }
 
@@ -254,7 +271,11 @@ impl AuthorityLog {
         AuthorityLogDiagnostics::default()
     }
 
-    pub fn dispose(&mut self, _reason: &str) -> Vec<AuthorityLogAction> {
+    pub fn dispose(
+        &mut self,
+        _reason: &str,
+        _scheduler: &mut KernelScheduler,
+    ) -> Vec<AuthorityLogAction> {
         Vec::new()
     }
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::SchedulerCommand;
+use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 
 pub const DEFAULT_PROPOSAL_CAPACITY: u64 = 8_192;
 pub const DEFAULT_PROPOSAL_RETRY_INITIAL_MS: u64 = 250;
@@ -249,6 +249,8 @@ pub enum ProposalLeaseError {
     UnknownTimer { timer_id: TimerId },
     #[error("proposal lease is invalid: {reason}")]
     InvalidProposal { reason: String },
+    #[error(transparent)]
+    Scheduler(#[from] SchedulerError),
 }
 
 #[derive(Debug)]
@@ -261,16 +263,21 @@ impl ProposalLeaseManager {
         Err(ProposalLeaseError::Disposed)
     }
 
-    pub fn arm(&mut self, _spec: ProposalLeaseSpec) -> ProposalLeaseOutcome {
-        ProposalLeaseOutcome {
+    pub fn arm(
+        &mut self,
+        _spec: ProposalLeaseSpec,
+        _scheduler: &mut KernelScheduler,
+    ) -> Result<ProposalLeaseOutcome, ProposalLeaseError> {
+        Ok(ProposalLeaseOutcome {
             result: ProposalLeaseStart::Disposed,
             actions: Vec::new(),
-        }
+        })
     }
 
     pub fn observe_committed(
         &mut self,
         _operation_id: &OperationId,
+        _scheduler: &mut KernelScheduler,
     ) -> (bool, Vec<ProposalLeaseAction>) {
         (false, Vec::new())
     }
@@ -289,9 +296,12 @@ impl ProposalLeaseManager {
 
     pub fn timer_fired(
         &mut self,
-        timer_id: TimerId,
+        fired: ScheduledTimer,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<ProposalLeaseAction>, ProposalLeaseError> {
-        Err(ProposalLeaseError::UnknownTimer { timer_id })
+        Err(ProposalLeaseError::UnknownTimer {
+            timer_id: fired.timer_id,
+        })
     }
 
     pub fn diagnostics(&self) -> ProposalLeaseDiagnostics {
@@ -302,7 +312,11 @@ impl ProposalLeaseManager {
         SafeU53::ZERO
     }
 
-    pub fn dispose(&mut self, _reason: &str) -> Vec<ProposalLeaseAction> {
+    pub fn dispose(
+        &mut self,
+        _reason: &str,
+        _scheduler: &mut KernelScheduler,
+    ) -> Vec<ProposalLeaseAction> {
         Vec::new()
     }
 }

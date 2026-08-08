@@ -10,7 +10,7 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::SchedulerCommand;
+use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 
 pub const DEFAULT_RECOVERY_REQUEST_TIMEOUT_MS: u64 = 300_000;
 pub const DEFAULT_RECOVERY_CONTROL_TIMEOUT_MS: u64 = 30_000;
@@ -58,6 +58,13 @@ pub struct RecoveryTransactionConfig {
     pub timer_owner_id: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryLiveState {
+    pub frontier: AuthorityFrontier,
+    pub context: FrameContext,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecoveryAction {
@@ -96,6 +103,13 @@ pub enum RecoveryMaterialOutcome {
     Applied,
     Deferred,
     Rejected,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RecoveryFrontierStagingOutcome {
+    Staged { revision: Revision },
+    Rejected { reason: String },
 }
 
 /// Callback-free shared fence owned by the recovery transaction and consulted
@@ -195,6 +209,8 @@ pub enum RecoveryError {
     BundleMismatch { issues: Vec<String> },
     #[error("recovery transaction terminalized: {reason}")]
     Terminalized { reason: String },
+    #[error(transparent)]
+    Scheduler(#[from] SchedulerError),
 }
 
 #[derive(Debug)]
@@ -212,6 +228,7 @@ impl RecoveryTransaction {
         _request_id: String,
         _captured: AuthorityFrontier,
         _reason: String,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
@@ -219,8 +236,8 @@ impl RecoveryTransaction {
     pub fn accept_bundle(
         &mut self,
         _bundle: RecoveryBundle,
-        _live_frontier: AuthorityFrontier,
-        _live_context: &FrameContext,
+        _live: RecoveryLiveState,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
@@ -228,15 +245,17 @@ impl RecoveryTransaction {
     pub fn material_result(
         &mut self,
         _outcome: RecoveryMaterialOutcome,
-        _live_frontier: AuthorityFrontier,
-        _live_context: &FrameContext,
+        _live: RecoveryLiveState,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
 
     pub fn recovered_frontier_staged(
         &mut self,
-        _revision: Revision,
+        _outcome: RecoveryFrontierStagingOutcome,
+        _live: RecoveryLiveState,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
@@ -244,18 +263,26 @@ impl RecoveryTransaction {
     pub fn control_result(
         &mut self,
         _outcome: ControlProjectionOutcome,
+        _live: RecoveryLiveState,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
 
     pub fn timer_fired(
         &mut self,
-        _timer_id: TimerId,
+        _fired: ScheduledTimer,
+        _live: RecoveryLiveState,
+        _scheduler: &mut KernelScheduler,
     ) -> Result<Vec<RecoveryAction>, RecoveryError> {
         Err(RecoveryError::Disposed)
     }
 
-    pub fn abort(&mut self, _reason: String) -> Vec<RecoveryAction> {
+    pub fn abort(
+        &mut self,
+        _reason: String,
+        _scheduler: &mut KernelScheduler,
+    ) -> Vec<RecoveryAction> {
         Vec::new()
     }
 
@@ -275,7 +302,11 @@ impl RecoveryTransaction {
         RecoveryDiagnostics::default()
     }
 
-    pub fn dispose(&mut self, _reason: &str) -> Vec<RecoveryAction> {
+    pub fn dispose(
+        &mut self,
+        _reason: &str,
+        _scheduler: &mut KernelScheduler,
+    ) -> Vec<RecoveryAction> {
         Vec::new()
     }
 }

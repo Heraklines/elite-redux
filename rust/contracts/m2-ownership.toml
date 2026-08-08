@@ -1,4 +1,4 @@
-schema_version = 3
+schema_version = 4
 milestone = "M2"
 project = "PokéRogue Redux"
 bootstrap_parent_sha = "87eb36290675378b7b08c20a09f6cdd757ae9515"
@@ -40,7 +40,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-03"
 paths = ["rust/crates/er-protocol/src/authority_log.rs", "rust/crates/er-protocol/tests/m2_authority_log.rs"]
 deliverable = "Global revisions, bounded retention, receipts, leases, and recovery slices"
-contract_dependencies = ["M2-01 SchedulerCommand bootstrap stub"]
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 sole scheduler and rebind outcome"]
 
 [[lanes]]
 id = "M2-04"
@@ -55,7 +55,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-05"
 paths = ["rust/crates/er-protocol/src/proposal.rs", "rust/crates/er-protocol/tests/m2_proposal.rs"]
 deliverable = "Proposal admission fingerprints and resend leases"
-contract_dependencies = ["M2-01 SchedulerCommand bootstrap stub"]
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 sole scheduler"]
 
 [[lanes]]
 id = "M2-06"
@@ -70,7 +70,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-07"
 paths = ["rust/crates/er-protocol/src/recovery.rs", "rust/crates/er-protocol/tests/m2_recovery.rs"]
 deliverable = "Recovery bundle validation, fence, and transaction"
-contract_dependencies = ["M2-01 SchedulerCommand bootstrap stub"]
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0007 live recovery continuations"]
 
 [[lanes]]
 id = "M2-08"
@@ -78,7 +78,7 @@ target_generation = "G4"
 branch = "codex/rust-kernel-m2-08"
 paths = ["rust/crates/er-sim/src/clock.rs", "rust/crates/er-sim/tests/m2_clock.rs"]
 deliverable = "One deterministic virtual clock and pause-class semantics"
-contract_dependencies = ["M2-01 SchedulerCommand bootstrap stub"]
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 endpoint-qualified timer identity"]
 
 [[lanes]]
 id = "M2-09"

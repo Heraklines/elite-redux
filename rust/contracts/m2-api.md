@@ -155,6 +155,22 @@ immediate existing `Deliver` action per retained entry and authenticated peer.
 An unchanged binding yields zero/no actions; failure is atomic. Existing lease
 timers, attempts, delays, stages, and identities are preserved.
 
+The corrected scheduler-facing authority signatures are frozen as:
+
+```rust
+publish_prepared(token, scheduler) -> Result<CommitOutcome, AuthorityLogError>
+commit(draft, scheduler) -> Result<CommitOutcome, AuthorityLogError>
+accept_receipt_detailed(receipt, scheduler) -> ReceiptOutcome
+accept_receipt(receipt, scheduler) -> (bool, Vec<AuthorityLogAction>)
+timer_fired(fired: ScheduledTimer, scheduler) -> Result<Vec<AuthorityLogAction>, AuthorityLogError>
+rebind_connection(local_context, peer_bindings) -> Result<AuthorityRebindOutcome, AuthorityLogError>
+dispose(reason, scheduler) -> Vec<AuthorityLogAction>
+```
+
+Every scheduler argument is the owning `GameKernel` scheduler. The log stores
+only IDs returned by it. Rebind preserves existing timer registrations and
+therefore does not receive or mutate the scheduler.
+
 ## Authority replica
 
 `AuthorityReplica` owns three separate monotonic frontiers: received, material, and control. It admits at most one incomplete revision. A duplicate resumes at the exact incomplete stage and never reapplies material. A future revision produces one coalesced tail request; it does not create a replica retry timer. N+1 remains blocked until N's stated control is installed.
@@ -186,6 +202,18 @@ Ordinary proposal fingerprints are the exact JavaScript `JSON.stringify` result 
 Proposal absolute/retry timers are allocated atomically by the kernel scheduler
 and owned by the sending endpoint (`proposal.from`). Destination/generation
 rebind updates retained egress but never moves the sender-local timer endpoint.
+
+The corrected lease signatures are frozen as:
+
+```rust
+arm(spec, scheduler) -> Result<ProposalLeaseOutcome, ProposalLeaseError>
+observe_committed(operation_id, scheduler) -> (bool, Vec<ProposalLeaseAction>)
+timer_fired(fired: ScheduledTimer, scheduler) -> Result<Vec<ProposalLeaseAction>, ProposalLeaseError>
+dispose(reason, scheduler) -> Vec<ProposalLeaseAction>
+```
+
+`arm` uses one atomic two-spec batch. Scheduler exhaustion is an explicit
+`ProposalLeaseError` and leaves both scheduler and lease state unchanged.
 
 ## Recovery transaction
 
@@ -220,6 +248,23 @@ all cancellations, terminal fence change, and exactly one shared terminal
 effect; only disposed state, unknown injected timers, and impossible caller
 phase misuse return `Err`. One transaction owns one fence and one kernel owns
 one transaction per endpoint.
+
+The corrected recovery signatures are frozen as:
+
+```rust
+start(request_id, captured, reason, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+accept_bundle(bundle, live: RecoveryLiveState, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+material_result(outcome, live: RecoveryLiveState, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+recovered_frontier_staged(outcome: RecoveryFrontierStagingOutcome, live: RecoveryLiveState, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+control_result(outcome, live: RecoveryLiveState, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+timer_fired(fired: ScheduledTimer, live: RecoveryLiveState, scheduler) -> Result<Vec<RecoveryAction>, RecoveryError>
+abort(reason, scheduler) -> Vec<RecoveryAction>
+dispose(reason, scheduler) -> Vec<RecoveryAction>
+```
+
+The live state is owned call-scoped data and is never retained. `Staged` carries
+the exact accepted revision; `Rejected` carries the adapter reason. A timer
+continuation validates the complete removed registration before any mutation.
 
 ## Deterministic adapters
 
