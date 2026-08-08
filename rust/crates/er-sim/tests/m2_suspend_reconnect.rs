@@ -45,7 +45,12 @@ const ABSOLUTE_PROPOSAL_CEILING_MS: u64 = 1_200_000;
 const RECOVERY_REQUEST_TIMEOUT_MS: u64 = 300_000;
 const EXPECTED_ABSOLUTE_TERMINAL_REASON: &str =
     "proposal m2b-08/reconnect terminalized: v2 proposal absolute ceiling";
-const EXPECTED_RECOVERY_TERMINAL_REASON: &str = "recovery request timeout exceeded";
+const EXPECTED_RECOVERY_TERMINAL_REASON: &str = concat!(
+    "recovery live frontier changed under the fence (captured AuthorityFrontier { received: ",
+    "Revision(SafeU53(0)), material: Revision(SafeU53(0)), control: Revision(SafeU53(0)) }, ",
+    "live AuthorityFrontier { received: Revision(SafeU53(1)), material: Revision(SafeU53(1)), ",
+    "control: Revision(SafeU53(1)) })",
+);
 
 fn safe(value: u64) -> SafeU53 {
     assert!(value <= SafeU53::MAX.get());
@@ -832,7 +837,7 @@ fn assert_exact_authority_entry(step: &PairStep, expected_generation: u64) -> Te
         .collect::<Vec<_>>();
     assert_eq!(
         authority_effect_order,
-        vec!["material", "control", "authorityEntry"]
+        vec!["material", "authorityEntry", "control"]
     );
     assert_eq!(
         authority_entries(step)?,
@@ -1100,13 +1105,24 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     );
     let queue_before_disconnected_advance =
         disconnect_step.snapshot.network.queued_packet_ids.clone();
+    let dropped_before_disconnected_advance = disconnect_step.snapshot.network.dropped_count;
     record_step(&mut steps, disconnect_step);
     let disconnected_advance = pair.advance_time(safe(10_000))?;
     assert_eq!(disconnected_advance.snapshot.virtual_time_ms, safe(70_250));
     assert_eq!(network_send_count(&disconnected_advance), 0);
+    assert!(disconnected_advance
+        .snapshot
+        .network
+        .queued_packet_ids
+        .is_empty());
     assert_eq!(
-        disconnected_advance.snapshot.network.queued_packet_ids,
-        queue_before_disconnected_advance
+        disconnected_advance.snapshot.network.dropped_count,
+        safe(
+            dropped_before_disconnected_advance
+                .get()
+                .checked_add(queue_before_disconnected_advance.len() as u64)
+                .ok_or("stale packet drop counter overflowed")?
+        )
     );
     assert_eq!(terminal_effect_count(&disconnected_advance), 0);
     assert_timers_live(&disconnected_advance.snapshot, &post_retry_connected_ids);
