@@ -119,26 +119,26 @@ fn two_seat_keyboard_drivers_keep_raw_timer_state_isolated() -> TestResult {
     let guest_down = guest.key_down(PhysicalKey::ArrowDown, false)?;
     assert_eq!(scheduled_for(&host_down, host_seat), 1);
     assert_eq!(scheduled_for(&guest_down, guest_seat), 1);
-    assert_eq!(host.kernel().live_resources().timers.len(), 1);
-    assert_eq!(guest.kernel().live_resources().timers.len(), 1);
+    assert_eq!(host.live_resources().timers.len(), 1);
+    assert_eq!(guest.live_resources().timers.len(), 1);
 
     let host_up = host.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancelled_for(&host_up, host_seat), 1);
-    assert!(host.kernel().live_resources().timers.is_empty());
-    assert_eq!(guest.kernel().live_resources().timers.len(), 1);
+    assert!(host.live_resources().timers.is_empty());
+    assert_eq!(guest.live_resources().timers.len(), 1);
 
     let guest_up = guest.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancelled_for(&guest_up, guest_seat), 1);
-    assert!(guest.kernel().live_resources().timers.is_empty());
+    assert!(guest.live_resources().timers.is_empty());
 
     let guest_hold = guest.hold_for(PhysicalKey::ArrowDown, safe(250))?;
     assert_eq!(scheduled_for(&guest_hold, guest_seat), 2);
     assert_eq!(cancelled_for(&guest_hold, guest_seat), 1);
-    assert!(guest.kernel().live_resources().timers.is_empty());
+    assert!(guest.live_resources().timers.is_empty());
 
     let guest_release = guest.key_up(PhysicalKey::ArrowDown)?;
     assert!(guest_release.is_empty());
-    assert!(guest.kernel().live_resources().timers.is_empty());
+    assert!(guest.live_resources().timers.is_empty());
     Ok(())
 }
 

@@ -17,31 +17,150 @@ fn keyboard_driver_public_surface_stays_on_raw_input_and_read_only_state() {
         .nth(1)
         .and_then(|body| body.split("\nfn is_printable").next())
         .expect("KeyboardDriver implementation must remain present");
-    let public_methods = implementation
-        .lines()
-        .filter_map(|line| line.trim().strip_prefix("pub fn "))
+
+    let public_signatures = public_signatures(implementation);
+    let public_methods = public_signatures
+        .iter()
+        .filter_map(|signature| signature.strip_prefix("pub fn "))
         .filter_map(|signature| signature.split('(').next())
+        .map(str::to_owned)
         .collect::<Vec<_>>();
 
     assert_eq!(
         public_methods,
         vec![
-            "new", "key_down", "key_up", "press", "hold_for", "blur", "focus", "kernel",
+            "new",
+            "key_down",
+            "key_up",
+            "press",
+            "hold_for",
+            "blur",
+            "focus",
+            "ui_view",
+            "live_resources",
         ]
     );
+
     for forbidden in [
+        "kernel",
+        "kernel_mut",
+        "kernel_ref",
+        "kernel_handle",
+        "kernel_state",
+        "with_kernel",
+        "reducer",
+        "reducer_mut",
+        "reducer_ref",
+        "reducer_handle",
+        "ui_reducer",
+        "with_reducer",
+        "menu",
+        "menu_mut",
+        "menu_ref",
+        "menu_handle",
+        "menu_state",
+        "menu_view",
+        "with_menu",
         "select_command",
+        "choose_command",
+        "select_replacement",
         "choose_replacement",
+        "select_option",
         "choose_option",
         "set_cursor",
+        "submit_choice",
+        "submit_command",
         "submit_interaction",
         "open_menu",
+        "close_menu",
+        "inject_intent",
+        "send_intent",
+        "dispatch_intent",
     ] {
         assert!(
-            !implementation.contains(&format!("pub fn {forbidden}")),
-            "semantic choice bypass method {forbidden} must not enter the driver surface"
+            !public_methods.iter().any(|method| method == forbidden),
+            "forbidden public KeyboardDriver method {forbidden} must not enter the driver surface"
         );
     }
+
+    for forbidden in [
+        "GameKernel",
+        "UiReducer",
+        "UiState",
+        "MenuState",
+        "ChoiceListMenu",
+    ] {
+        assert!(
+            public_signatures
+                .iter()
+                .filter_map(|signature| signature.split_once(") ->").map(|(_, return_type)| return_type))
+                .all(|return_type| !return_type.contains(forbidden)),
+            "public KeyboardDriver methods must not return {forbidden} handles or state"
+        );
+    }
+
+    for forbidden in [
+        "UiIntent",
+        "KernelInput",
+        "Box<dyn",
+        "dyn ",
+        "Fn",
+        "dyn Fn",
+        "impl Fn",
+        "FnMut",
+        "FnOnce",
+    ] {
+        assert!(
+            public_signatures
+                .iter()
+                .all(|signature| !signature.contains(forbidden)),
+            "public KeyboardDriver API must not expose {forbidden}"
+        );
+    }
+
+    for forbidden in [
+        "pub fn kernel(",
+        "pub fn kernel_mut(",
+        "pub fn reducer(",
+        "pub fn reducer_mut(",
+        "pub fn menu(",
+        "pub fn menu_mut(",
+        "-> &GameKernel",
+        "-> &mut GameKernel",
+        "-> &UiReducer",
+        "-> &mut UiReducer",
+        "UiIntent",
+        "KernelInput::UiIntent",
+    ] {
+        assert!(
+            !implementation.contains(forbidden),
+            "forbidden KeyboardDriver surface {forbidden} must remain absent"
+        );
+    }
+}
+
+fn public_signatures(implementation: &str) -> Vec<String> {
+    let mut signatures = Vec::new();
+    let mut current = None;
+
+    for line in implementation.lines().map(str::trim) {
+        if line.starts_with("pub fn ") {
+            current = Some(line.to_owned());
+        } else if let Some(signature) = current.as_mut() {
+            signature.push(' ');
+            signature.push_str(line);
+        } else {
+            continue;
+        }
+
+        if line.contains('{') {
+            if let Some(signature) = current.take() {
+                signatures.push(signature);
+            }
+        }
+    }
+
+    signatures
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -207,19 +326,15 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
         .ok_or_else(|| std::io::Error::other("raw keydown did not schedule a timer"))?;
     assert_human_input_schedule(&first_down, seat, first_timer, GameButton::Down);
     assert_ui_cursor(&first_down, seat, safe(1));
-    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(1)));
+    assert_eq!(driver.ui_view().cursor, Some(safe(1)));
     assert!(
-        driver
-            .kernel()
-            .live_resources()
-            .timers
-            .contains(&first_timer)
+        driver.live_resources().timers.contains(&first_timer)
     );
 
     let first_up = driver.key_up(PhysicalKey::ArrowDown)?;
     assert_eq!(cancels(&first_up), 1);
     assert_cancel(&first_up, seat, first_timer);
-    assert!(driver.kernel().live_resources().timers.is_empty());
+    assert!(driver.live_resources().timers.is_empty());
 
     let press = driver.press(PhysicalKey::ArrowUp)?;
     assert_eq!(schedules(&press), 1);
@@ -233,8 +348,8 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
     assert_human_input_schedule(&press, seat, pressed_timer, GameButton::Up);
     assert_cancel(&press, seat, pressed_timer);
     assert_ui_cursor(&press, seat, safe(0));
-    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
-    assert!(driver.kernel().live_resources().timers.is_empty());
+    assert_eq!(driver.ui_view().cursor, Some(safe(0)));
+    assert!(driver.live_resources().timers.is_empty());
 
     let held = driver.hold_for(PhysicalKey::ArrowDown, safe(250))?;
     assert_eq!(schedules(&held), 2);
@@ -253,16 +368,16 @@ fn keyboard_driver_drives_menu_through_raw_keys_and_owns_repeat_timers() -> Test
     assert_human_input_schedule(&held, seat, repeat_timer, GameButton::Down);
     assert_cancel(&held, seat, repeat_timer);
     assert_ui_cursor(&held, seat, safe(0));
-    assert_eq!(driver.kernel().ui_view().cursor, Some(safe(0)));
-    assert!(driver.kernel().live_resources().timers.is_empty());
+    assert_eq!(driver.ui_view().cursor, Some(safe(0)));
+    assert!(driver.live_resources().timers.is_empty());
 
-    let before_text_entry = driver.kernel().ui_view();
+    let before_text_entry = driver.ui_view();
     assert!(driver.focus(InputFocus::TextEntry)?.is_empty());
     assert!(driver.key_down(PhysicalKey::KeyA, true)?.is_empty());
     assert!(driver.focus(InputFocus::Game)?.is_empty());
     assert!(driver.key_up(PhysicalKey::KeyA)?.is_empty());
-    assert_eq!(driver.kernel().ui_view(), before_text_entry);
+    assert_eq!(driver.ui_view(), before_text_entry);
     assert!(driver.blur()?.is_empty());
-    assert!(driver.kernel().live_resources().timers.is_empty());
+    assert!(driver.live_resources().timers.is_empty());
     Ok(())
 }

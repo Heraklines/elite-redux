@@ -2,10 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_kernel::{GameKernel, KernelError};
+use er_kernel::{GameKernel, KernelError, LiveResourceSnapshot};
 use er_types::{
     InputFocus, KernelEffect, KernelInput, PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass,
-    TimerId,
+    TimerId, UiViewModel,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -164,8 +164,12 @@ impl<'kernel> KeyboardDriver<'kernel> {
         Ok(effects)
     }
 
-    pub fn kernel(&self) -> &GameKernel {
-        self.kernel
+    pub fn ui_view(&self) -> UiViewModel {
+        self.kernel.ui_view()
+    }
+
+    pub fn live_resources(&self) -> LiveResourceSnapshot {
+        self.kernel.live_resources()
     }
 
     fn step_kernel(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
