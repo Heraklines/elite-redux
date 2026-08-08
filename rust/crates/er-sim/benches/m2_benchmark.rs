@@ -582,8 +582,16 @@ fn m2_proposal_receipt_cycles() -> TestResult {
     assert!(final_snapshot.host.live_resources.delivery_leases.is_empty());
     assert!(final_snapshot.host.live_resources.retained_revisions.is_empty());
     assert!(final_snapshot.guest.live_resources.proposal_leases.is_empty());
+    assert!(final_snapshot.clock_timers.is_empty());
+    for endpoint in [&final_snapshot.host, &final_snapshot.guest] {
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
+    }
     assert!(final_snapshot.network.queued_packet_ids.is_empty());
     assert!(final_snapshot.network.disposed);
+    assert!(final_snapshot.presenter.pending_event_ids.is_empty());
+    assert!(final_snapshot.presenter.settled_event_ids.is_empty());
     assert!(final_snapshot.presenter.disposed);
     assert!(final_snapshot.storage.disposed);
     absorb(&mut checksum, &final_snapshot)?;
@@ -873,8 +881,16 @@ fn m2_synthetic_pair_campaign() -> TestResult {
     assert!(final_snapshot.guest.live_resources.timers.is_empty());
     assert!(final_snapshot.host.live_resources.presentations.is_empty());
     assert!(final_snapshot.guest.live_resources.presentations.is_empty());
+    assert!(final_snapshot.clock_timers.is_empty());
+    for endpoint in [&final_snapshot.host, &final_snapshot.guest] {
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
+    }
     assert!(final_snapshot.network.queued_packet_ids.is_empty());
     assert!(final_snapshot.network.disposed);
+    assert!(final_snapshot.presenter.pending_event_ids.is_empty());
+    assert!(final_snapshot.presenter.settled_event_ids.is_empty());
     assert!(final_snapshot.presenter.disposed);
     assert!(final_snapshot.storage.disposed);
     absorb(&mut checksum, &final_snapshot)?;
