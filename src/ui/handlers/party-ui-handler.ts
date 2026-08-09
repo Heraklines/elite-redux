@@ -2586,12 +2586,14 @@ class PartySlot extends Phaser.GameObjects.Container {
     }
 
     if (isPseudoMega) {
-      const megaIcon = addTextObject(0, 0, "M", TextStyle.SUMMARY_GOLD)
-        .setOrigin(0, 0.15)
+      const megaIcon = globalScene.add
+        .image(0, 0, "icon_fun_mega")
+        .setScale(0.42)
+        .setOrigin(0)
         .setPositionRelative(
           slotLevelLabel,
           splicedIconToLevelLabelOffset.x + (isFusion ? 8 : 0),
-          splicedIconToLevelLabelOffset.y - 1,
+          splicedIconToLevelLabelOffset.y,
         );
       slotInfoContainer.add(megaIcon);
     }

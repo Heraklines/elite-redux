@@ -5,15 +5,21 @@ import { allMoves } from "#data/data-lists";
 import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
+import type { FormChangeItem } from "#enums/form-change-item";
 import type { PokeballType } from "#enums/pokeball";
 import { ShopCursorTarget } from "#enums/shop-cursor-target";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { HealShopCostModifier, LockModifierTiersModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
-import { getPlayerShopModifierTypeOptionsForWave, TmModifierType } from "#modifiers/modifier-type";
+import {
+  FormChangeItemModifierType,
+  getPlayerShopModifierTypeOptionsForWave,
+  TmModifierType,
+} from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
+import { FunMegaStatPreview } from "#ui/fun-mega-stat-preview";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getModifierTierTextTint, getTextColor, getTextStyleOptions } from "#ui/text";
 import { fixedInt, formatMoney, NumberHolder } from "#utils/common";
@@ -52,6 +58,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
    */
   private itemDescText: Phaser.GameObjects.Text;
   private itemDescScroll: Phaser.Tweens.Tween | null = null;
+  private funMegaStatPreview: FunMegaStatPreview | null = null;
   protected declare onActionInput: ModifierSelectCallback | null;
 
   private rowCursor = 0;
@@ -176,6 +183,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     // ER: dedicated, masked, auto-scrolling description box for ITEM descriptions.
     this.ensureItemDescText();
+    this.ensureFunMegaStatPreview();
   }
 
   /**
@@ -211,17 +219,29 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.itemDescText.setMask(itemDescMask.createGeometryMask());
   }
 
+  private ensureFunMegaStatPreview(): void {
+    if (this.funMegaStatPreview) {
+      return;
+    }
+    this.funMegaStatPreview = new FunMegaStatPreview(ITEM_DESC_X, ITEM_DESC_Y);
+    this.modifierContainer.add(this.funMegaStatPreview.container);
+  }
+
   /**
    * ER: show an item's description in the dedicated scrolling box (blanking the
    * shared message text underneath so they don't double up), and start a looping
    * scroll if it overflows the visible height. Mirrors MoveInfoOverlay's scroll.
    */
-  private showItemDescription(text: string): void {
+  private showItemDescription(text: string, funMegaStone?: FormChangeItem): void {
     // #852: build the pane on demand if the launch path (e.g. the co-op watcher mirror)
     // reached here before `setup` built it - the reader below must never touch an unbuilt object.
     this.ensureItemDescText();
+    this.ensureFunMegaStatPreview();
     this.hideItemDescription();
     this.getUi().showText("", 0);
+    if (funMegaStone != null && this.funMegaStatPreview?.show(funMegaStone)) {
+      return;
+    }
     this.itemDescText.setText(text);
     this.itemDescText.setVisible(true);
     this.itemDescText.y = ITEM_DESC_Y;
@@ -240,6 +260,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
   /** ER: hide the dedicated item-description box and stop any scroll. */
   private hideItemDescription(): void {
+    this.funMegaStatPreview?.hide();
     if (this.itemDescScroll) {
       this.itemDescScroll.remove();
       this.itemDescScroll = null;
@@ -691,7 +712,10 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
       const type = options[this.cursor].modifierTypeOption.type;
       if (type) {
-        this.showItemDescription(type.getDescription());
+        this.showItemDescription(
+          type.getDescription(),
+          type instanceof FormChangeItemModifierType ? type.formChangeItem : undefined,
+        );
       }
       if (type instanceof TmModifierType) {
         // prepare the move overlay to be shown with the toggle

@@ -20,6 +20,7 @@ import {
   formatFunMegaStatDelta,
   getFunMegaStoneItems,
   getFunMegaStoneMetadata,
+  getFunRealMegaChange,
 } from "#data/elite-redux/er-fun-mega-mode";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
@@ -2049,16 +2050,22 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
           if (isRareFormChangeItem) {
             return null;
           }
-          const availableStones = getFunMegaStoneItems().filter(item =>
-            party.some(
-              pokemon =>
-                canUseFunMegaStone(pokemon, item)
-                && !globalScene.findModifier(
-                  modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
-                ),
-            ),
+          const availablePokemon = party.filter(
+            pokemon =>
+              !pokemon.isMega()
+              && !globalScene.findModifier(
+                modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+              ),
           );
-          return availableStones.length > 0 ? new FormChangeItemModifierType(randSeedItem(availableStones)) : null;
+          if (availablePokemon.length === 0) {
+            return null;
+          }
+          const allStones = getFunMegaStoneItems();
+          const matchingStones = allStones.filter(item =>
+            availablePokemon.some(pokemon => getFunRealMegaChange(pokemon, item) != null),
+          );
+          const weightedStones = [...allStones, ...matchingStones, ...matchingStones, ...matchingStones];
+          return weightedStones.length > 0 ? new FormChangeItemModifierType(randSeedItem(weightedStones)) : null;
         }
 
         const formChangeItemPool = [

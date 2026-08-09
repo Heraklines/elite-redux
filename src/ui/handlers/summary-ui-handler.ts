@@ -37,6 +37,7 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { modifierSortFunc, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { FormChangeItemModifierType } from "#modifiers/modifier-type";
 import type { Move } from "#moves/move";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import {
@@ -52,6 +53,7 @@ import {
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
+import { FunMegaStatPreview } from "#ui/fun-mega-stat-preview";
 import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
 import {
   currentEvolutionIndex,
@@ -141,7 +143,8 @@ export class SummaryUiHandler extends UiHandler {
   private shinyLabSummarySpriteLoadKey: string | null = null;
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
-  private megaIcon: Phaser.GameObjects.Text;
+  private megaIcon: Phaser.GameObjects.Sprite;
+  private funMegaStatPreview: FunMegaStatPreview | null = null;
   private pokeball: Phaser.GameObjects.Sprite;
   private levelText: Phaser.GameObjects.Text;
   private genderText: Phaser.GameObjects.Text;
@@ -307,10 +310,11 @@ export class SummaryUiHandler extends UiHandler {
     this.splicedIcon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 12, 15), Phaser.Geom.Rectangle.Contains);
     this.summaryContainer.add(this.splicedIcon);
 
-    this.megaIcon = addTextObject(0, -54, "M", TextStyle.SUMMARY_GOLD);
+    this.megaIcon = globalScene.add.sprite(0, -54, "icon_fun_mega");
     this.megaIcon.setVisible(false);
     this.megaIcon.setOrigin(0, 0);
-    this.megaIcon.setInteractive();
+    this.megaIcon.setScale(0.62);
+    this.megaIcon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 24, 24), Phaser.Geom.Rectangle.Contains);
     this.summaryContainer.add(this.megaIcon);
 
     this.shinyIcon = globalScene.add.image(0, -54, "shiny_star");
@@ -1439,6 +1443,8 @@ export class SummaryUiHandler extends UiHandler {
       case Page.STATS: {
         this.statsContainer = globalScene.add.container(0, -pageBg.height);
         pageContainer.add(this.statsContainer);
+        this.funMegaStatPreview = new FunMegaStatPreview(5, 70, 204);
+        this.statsContainer.add(this.funMegaStatPreview.container);
         this.permStatsContainer = globalScene.add.container(27, 56);
         this.statsContainer.add(this.permStatsContainer);
         this.ivContainer = globalScene.add.container(27, 56);
@@ -1528,8 +1534,19 @@ export class SummaryUiHandler extends UiHandler {
           this.statsContainer.add(icon);
 
           icon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 32, 32), Phaser.Geom.Rectangle.Contains);
-          icon.on("pointerover", () => globalScene.ui.showTooltip(item.type.name, item.type.getDescription(), true));
-          icon.on("pointerout", () => globalScene.ui.hideTooltip());
+          icon.on("pointerover", () => {
+            globalScene.ui.showTooltip(item.type.name, item.type.getDescription(), true);
+            if (
+              item.type instanceof FormChangeItemModifierType
+              && this.funMegaStatPreview?.show(item.type.formChangeItem)
+            ) {
+              this.statsContainer.bringToTop(this.funMegaStatPreview.container);
+            }
+          });
+          icon.on("pointerout", () => {
+            globalScene.ui.hideTooltip();
+            this.funMegaStatPreview?.hide();
+          });
         });
 
         const pkmLvl = this.pokemon?.level!; // TODO: is this bang correct?
