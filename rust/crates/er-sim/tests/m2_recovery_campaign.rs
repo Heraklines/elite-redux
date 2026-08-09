@@ -246,6 +246,7 @@ fn protocol_configs() -> Result<(ProtocolKernelConfig, ProtocolKernelConfig), Bo
         command_plan(2, GUEST_SEAT)?,
         command_plan(3, HOST_SEAT)?,
         command_plan(4, GUEST_SEAT)?,
+        command_plan(5, HOST_SEAT)?,
     ];
     let resolutions = (1..=4)
         .map(|turn| resolution_plan(&authority_context, turn))
