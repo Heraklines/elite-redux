@@ -812,13 +812,7 @@ fn assert_exact_entry_receipts(
 ) {
     assert_eq!(
         authority_receipts_for(step, revision, operation_id),
-        expected_progress_receipts(
-            step,
-            revision,
-            operation_id,
-            control_id,
-            replay_control_id,
-        )
+        expected_progress_receipts(step, revision, operation_id, control_id, replay_control_id,)
     );
 }
 
