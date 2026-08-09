@@ -549,7 +549,6 @@ function scenarioFor(id: string): ScenarioSpec {
       break;
     case "existing-status-rejected":
       use(MoveId.POISON_POWDER);
-      enemy.status = StatusEffect.BURN;
       break;
     case "speed-tie":
       base.run = { ...base.run, double: true };
@@ -2052,6 +2051,18 @@ function applyTestOnlyContentProjection(game: GameManager, spec: ScenarioSpec, t
 }
 
 function applyScenarioInitialState(game: GameManager, id: string): void {
+  if (id === "existing-status-rejected") {
+    const enemy = game.scene.getEnemyParty()[0];
+    if (enemy == null) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", "existing-status rejection scenario has no enemy");
+    }
+    // The scenario builder's uniform ENEMY_STATUS_OVERRIDE constructs every
+    // status with a four-turn sleep companion.  That is valid for its sleep
+    // testing shortcut but is not the production Burn state this oracle case
+    // needs.  Seed the pre-turn state through Pokemon's production mutator so
+    // the non-sleep companion remains at its neutral zero sentinel.
+    enemy.doSetStatus(StatusEffect.BURN);
+  }
   if (id !== "pp-unusable-rejected") {
     return;
   }
