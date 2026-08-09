@@ -1833,7 +1833,10 @@ fn canonical_replacement_proposal(proposal: &BattleReplacementProposalV1) -> Str
         ("resolved_turn", json_u64(number(proposal.resolved_turn))),
         ("owner_seat", json_u64(number(proposal.owner_seat.get()))),
         ("occurrence", json_u64(number(proposal.occurrence))),
-        ("turn_occurrence", json_u64(u64::from(proposal.turn_occurrence))),
+        (
+            "turn_occurrence",
+            json_u64(u64::from(proposal.turn_occurrence)),
+        ),
         ("field_slot", canonical_field_slot(proposal.field_slot)),
         (
             "selection",
@@ -2227,7 +2230,7 @@ mod tests {
     fn replacement_occurrence_identities_have_distinct_operation_and_fingerprint_roles() {
         let human = human_proposal();
         let epoch = AuthorityEpoch::new(safe(1));
-        let operation = replacement_operation_id(
+        let replacement_operation = replacement_operation_id(
             epoch,
             human.battle_id,
             human.wave,
@@ -2238,7 +2241,7 @@ mod tests {
         )
         .unwrap();
         let first = BattleReplacementProposalV1::new(
-            operation.clone(),
+            replacement_operation.clone(),
             human.battle_id,
             human.wave,
             human.turn,
@@ -2258,12 +2261,10 @@ mod tests {
         second.validate().unwrap();
 
         assert_eq!(first.operation_id, second.operation_id);
-        assert_eq!(first.expected_operation_id(epoch).unwrap(), operation);
+        assert_eq!(first.expected_operation_id(epoch).unwrap(), replacement_operation);
         assert_ne!(first.fingerprint(), second.fingerprint());
         assert!(first.canonical_json().contains(r#""occurrence":9"#));
-        assert!(first
-            .canonical_json()
-            .contains(r#""turn_occurrence":2"#));
+        assert!(first.canonical_json().contains(r#""turn_occurrence":2"#));
 
         let later_operation = replacement_operation_id(
             epoch,
@@ -2275,7 +2276,7 @@ mod tests {
             human.owner_seat,
         )
         .unwrap();
-        assert_ne!(operation, later_operation);
+        assert_ne!(replacement_operation, later_operation);
         assert!(later_operation.as_str().contains("/o3/f"));
 
         let substituted_global = BattleReplacementProposalV1 {
