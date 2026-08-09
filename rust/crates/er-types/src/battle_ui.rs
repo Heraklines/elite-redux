@@ -534,17 +534,50 @@ impl<'de> Deserialize<'de> for PresentationSettlementOutcome {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+        #[serde(deny_unknown_fields)]
+        struct PresentationSettlementBasicWire {
+            kind: String,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct PresentationSettlementFailedWire {
+            kind: String,
+            reason: String,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
         enum PresentationSettlementOutcomeWire {
-            Settled,
-            IntentionallySkipped,
-            Failed { reason: String },
+            Basic(PresentationSettlementBasicWire),
+            Failed(PresentationSettlementFailedWire),
         }
 
         let value = match PresentationSettlementOutcomeWire::deserialize(deserializer)? {
-            PresentationSettlementOutcomeWire::Settled => Self::Settled,
-            PresentationSettlementOutcomeWire::IntentionallySkipped => Self::IntentionallySkipped,
-            PresentationSettlementOutcomeWire::Failed { reason } => Self::Failed { reason },
+            PresentationSettlementOutcomeWire::Basic(value) => match value.kind.as_str() {
+                "SETTLED" => Self::Settled,
+                "INTENTIONALLY_SKIPPED" => Self::IntentionallySkipped,
+                "FAILED" => {
+                    return Err(serde::de::Error::custom(
+                        "failed presentation settlement requires a reason",
+                    ));
+                }
+                _ => {
+                    return Err(serde::de::Error::custom(
+                        "unknown presentation settlement outcome kind",
+                    ));
+                }
+            },
+            PresentationSettlementOutcomeWire::Failed(value) if value.kind == "FAILED" => {
+                Self::Failed {
+                    reason: value.reason,
+                }
+            }
+            PresentationSettlementOutcomeWire::Failed(_) => {
+                return Err(serde::de::Error::custom(
+                    "presentation settlement reason is only valid for FAILED",
+                ));
+            }
         };
         value.validate().map_err(serde::de::Error::custom)?;
         Ok(value)
@@ -599,114 +632,146 @@ impl<'de> Deserialize<'de> for BattlePresentationKind {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
-        enum BattlePresentationKindWire {
-            MoveUsed {
-                actor: PokemonId,
-                move_id: MoveId,
-                targets: Vec<FieldSlot>,
-            },
-            AbilityActivated {
-                pokemon: PokemonId,
-                ability_id: AbilityId,
-            },
-            HpChanged {
-                pokemon: PokemonId,
-                before: u32,
-                after: u32,
-            },
-            StatusApplied {
-                pokemon: PokemonId,
-                before: StatusState,
-                after: StatusState,
-            },
-            StatStageChanged {
-                pokemon: PokemonId,
-                stat: BattleStat,
-                before: i8,
-                after: i8,
-            },
-            Switched {
-                slot: FieldSlot,
-                #[serde(deserialize_with = "deserialize_required_nullable")]
-                outgoing: Option<PokemonId>,
-                incoming: PokemonId,
-            },
-            Fainted {
-                pokemon: PokemonId,
-                occurrence: crate::battle_ids::FaintOccurrenceId,
-            },
-            BattleWon,
-            BattleLost,
+        #[serde(deny_unknown_fields)]
+        struct MoveUsedWire {
+            kind: String,
+            actor: PokemonId,
+            move_id: MoveId,
+            targets: Vec<FieldSlot>,
         }
 
-        Ok(
-            match BattlePresentationKindWire::deserialize(deserializer)? {
-                BattlePresentationKindWire::MoveUsed {
-                    actor,
-                    move_id,
-                    targets,
-                } => Self::MoveUsed {
-                    actor,
-                    move_id,
-                    targets,
-                },
-                BattlePresentationKindWire::AbilityActivated {
-                    pokemon,
-                    ability_id,
-                } => Self::AbilityActivated {
-                    pokemon,
-                    ability_id,
-                },
-                BattlePresentationKindWire::HpChanged {
-                    pokemon,
-                    before,
-                    after,
-                } => Self::HpChanged {
-                    pokemon,
-                    before,
-                    after,
-                },
-                BattlePresentationKindWire::StatusApplied {
-                    pokemon,
-                    before,
-                    after,
-                } => Self::StatusApplied {
-                    pokemon,
-                    before,
-                    after,
-                },
-                BattlePresentationKindWire::StatStageChanged {
-                    pokemon,
-                    stat,
-                    before,
-                    after,
-                } => Self::StatStageChanged {
-                    pokemon,
-                    stat,
-                    before,
-                    after,
-                },
-                BattlePresentationKindWire::Switched {
-                    slot,
-                    outgoing,
-                    incoming,
-                } => Self::Switched {
-                    slot,
-                    outgoing,
-                    incoming,
-                },
-                BattlePresentationKindWire::Fainted {
-                    pokemon,
-                    occurrence,
-                } => Self::Fainted {
-                    pokemon,
-                    occurrence,
-                },
-                BattlePresentationKindWire::BattleWon => Self::BattleWon,
-                BattlePresentationKindWire::BattleLost => Self::BattleLost,
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct AbilityActivatedWire {
+            kind: String,
+            pokemon: PokemonId,
+            ability_id: AbilityId,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct HpChangedWire {
+            kind: String,
+            pokemon: PokemonId,
+            before: u32,
+            after: u32,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StatusAppliedWire {
+            kind: String,
+            pokemon: PokemonId,
+            before: StatusState,
+            after: StatusState,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StatStageChangedWire {
+            kind: String,
+            pokemon: PokemonId,
+            stat: BattleStat,
+            before: i8,
+            after: i8,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct SwitchedWire {
+            kind: String,
+            slot: FieldSlot,
+            #[serde(deserialize_with = "deserialize_required_nullable")]
+            outgoing: Option<PokemonId>,
+            incoming: PokemonId,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct FaintedWire {
+            kind: String,
+            pokemon: PokemonId,
+            occurrence: crate::battle_ids::FaintOccurrenceId,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct NoPayloadWire {
+            kind: String,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum BattlePresentationKindWire {
+            MoveUsed(MoveUsedWire),
+            AbilityActivated(AbilityActivatedWire),
+            HpChanged(HpChangedWire),
+            StatusApplied(StatusAppliedWire),
+            StatStageChanged(StatStageChangedWire),
+            Switched(SwitchedWire),
+            Fainted(FaintedWire),
+            NoPayload(NoPayloadWire),
+        }
+
+        let value = match BattlePresentationKindWire::deserialize(deserializer)? {
+            BattlePresentationKindWire::MoveUsed(value) if value.kind == "MOVE_USED" => {
+                Self::MoveUsed {
+                    actor: value.actor,
+                    move_id: value.move_id,
+                    targets: value.targets,
+                }
+            }
+            BattlePresentationKindWire::AbilityActivated(value)
+                if value.kind == "ABILITY_ACTIVATED" => Self::AbilityActivated {
+                pokemon: value.pokemon,
+                ability_id: value.ability_id,
             },
-        )
+            BattlePresentationKindWire::HpChanged(value) if value.kind == "HP_CHANGED" => {
+                Self::HpChanged {
+                    pokemon: value.pokemon,
+                    before: value.before,
+                    after: value.after,
+                }
+            }
+            BattlePresentationKindWire::StatusApplied(value)
+                if value.kind == "STATUS_APPLIED" => Self::StatusApplied {
+                pokemon: value.pokemon,
+                before: value.before,
+                after: value.after,
+            },
+            BattlePresentationKindWire::StatStageChanged(value)
+                if value.kind == "STAT_STAGE_CHANGED" => Self::StatStageChanged {
+                pokemon: value.pokemon,
+                stat: value.stat,
+                before: value.before,
+                after: value.after,
+            },
+            BattlePresentationKindWire::Switched(value) if value.kind == "SWITCHED" => {
+                Self::Switched {
+                    slot: value.slot,
+                    outgoing: value.outgoing,
+                    incoming: value.incoming,
+                }
+            }
+            BattlePresentationKindWire::Fainted(value) if value.kind == "FAINTED" => {
+                Self::Fainted {
+                    pokemon: value.pokemon,
+                    occurrence: value.occurrence,
+                }
+            }
+            BattlePresentationKindWire::NoPayload(value) if value.kind == "BATTLE_WON" => {
+                Self::BattleWon
+            }
+            BattlePresentationKindWire::NoPayload(value) if value.kind == "BATTLE_LOST" => {
+                Self::BattleLost
+            }
+            _ => {
+                return Err(serde::de::Error::custom(
+                    "unknown or mismatched battle presentation kind",
+                ));
+            }
+        };
+        Ok(value)
     }
 }
 
