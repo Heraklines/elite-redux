@@ -23,7 +23,7 @@ pub const CONTENT_DIGEST_KIND: &str = "blake3-v1";
 pub enum CanonicalError {
     #[error("JSON serialization failed: {0}")]
     Serialization(#[from] serde_json::Error),
-    #[error("canonical JSON does not permit floats, negative integers, NaN, or infinity")]
+    #[error("canonical JSON does not permit floats, NaN, or infinity")]
     UnsupportedNumber,
     #[error("integer {value} exceeds JavaScript's maximum safe integer")]
     UnsafeInteger { value: u64 },
@@ -530,13 +530,20 @@ fn write_value(
             if number.is_f64() {
                 return Err(CanonicalError::UnsupportedNumber);
             }
-            let Some(integer) = number.as_u64() else {
+            if let Some(integer) = number.as_i64() {
+                let magnitude = integer.unsigned_abs();
+                if magnitude > MAX_SAFE_INTEGER {
+                    return Err(CanonicalError::UnsafeInteger { value: magnitude });
+                }
+                output.push_str(&integer.to_string());
+            } else if let Some(integer) = number.as_u64() {
+                if integer > MAX_SAFE_INTEGER {
+                    return Err(CanonicalError::UnsafeInteger { value: integer });
+                }
+                output.push_str(&integer.to_string());
+            } else {
                 return Err(CanonicalError::UnsupportedNumber);
-            };
-            if integer > MAX_SAFE_INTEGER {
-                return Err(CanonicalError::UnsafeInteger { value: integer });
             }
-            output.push_str(&integer.to_string());
         }
         Value::Array(values) => {
             output.push('[');
@@ -605,8 +612,20 @@ mod tests {
         CanonicalError, canonical_bytes, canonicalize, canonicalize_value, content_digest,
         fixture_digest, verify_fixture_digest,
     };
+    use serde::Serialize;
     use serde_json::{Map, Value};
     use std::error::Error;
+
+    #[derive(Serialize)]
+    struct NestedSignedContent {
+        delta: i8,
+    }
+
+    #[derive(Serialize)]
+    struct SignedContent {
+        top_level: i64,
+        nested: NestedSignedContent,
+    }
 
     #[test]
     fn canonicalizes_nested_utf16_order_and_arrays() -> Result<(), Box<dyn Error>> {
@@ -670,38 +689,66 @@ mod tests {
     }
 
     #[test]
-    fn accepts_only_nonnegative_safe_integers() -> Result<(), Box<dyn Error>> {
-        for source in ["0", "1", "9007199254740991"] {
+    fn accepts_signed_safe_integers_and_rejects_signed_overflow() -> Result<(), Box<dyn Error>> {
+        for source in ["-9007199254740991", "-1", "0", "1", "9007199254740991"] {
             let value: Value = serde_json::from_str(source)?;
             assert_eq!(canonicalize_value(&value)?, source);
         }
 
-        let over_safe: Value = serde_json::from_str("9007199254740992")?;
-        assert!(matches!(
-            canonicalize_value(&over_safe),
-            Err(CanonicalError::UnsafeInteger {
-                value: 9_007_199_254_740_992
-            })
-        ));
+        for value in [-9_007_199_254_740_991_i64, 9_007_199_254_740_991_i64] {
+            assert_eq!(canonicalize(&value)?, value.to_string());
+        }
+
+        for source in ["-9007199254740992", "9007199254740992"] {
+            let value: Value = serde_json::from_str(source)?;
+            assert!(matches!(
+                canonicalize_value(&value),
+                Err(CanonicalError::UnsafeInteger {
+                    value: 9_007_199_254_740_992
+                })
+            ));
+        }
 
         let max_unsigned = Value::Number(serde_json::Number::from(u64::MAX));
         assert!(matches!(
             canonicalize_value(&max_unsigned),
             Err(CanonicalError::UnsafeInteger { value: u64::MAX })
         ));
+
+        for value in [
+            -9_007_199_254_740_992_i64,
+            9_007_199_254_740_992_i64,
+        ] {
+            assert!(matches!(
+                canonicalize(&value),
+                Err(CanonicalError::UnsafeInteger {
+                    value: 9_007_199_254_740_992
+                })
+            ));
+        }
         Ok(())
     }
 
     #[test]
-    fn rejects_negative_and_float_forms_at_any_depth() -> Result<(), Box<dyn Error>> {
-        for source in ["-1", "-9007199254740991"] {
-            let value: Value = serde_json::from_str(source)?;
-            assert!(matches!(
-                canonicalize_value(&value),
-                Err(CanonicalError::UnsupportedNumber)
-            ));
-        }
+    fn canonicalizes_nested_typed_signed_content_and_content_bytes() -> Result<(), Box<dyn Error>> {
+        let content = SignedContent {
+            top_level: -1,
+            nested: NestedSignedContent { delta: -1 },
+        };
+        let expected = r#"{"nested":{"delta":-1},"top_level":-1}"#;
 
+        assert_eq!(canonicalize(&-1_i64)?, "-1");
+        assert_eq!(canonicalize(&content)?, expected);
+        assert_eq!(canonical_bytes(&content)?.as_slice(), expected.as_bytes());
+        assert_eq!(
+            content_digest(&content)?,
+            blake3::hash(expected.as_bytes()).to_hex().to_string()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_float_forms_at_any_depth() -> Result<(), Box<dyn Error>> {
         for source in ["1.0", "1e0", "1E+0", "1e-1", "-0.0"] {
             let value: Value = serde_json::from_str(source)?;
             assert!(matches!(
@@ -711,6 +758,13 @@ mod tests {
         }
 
         for value in [1.0_f64, 1.5_f64, -0.0_f64, f64::INFINITY, f64::NAN] {
+            assert!(matches!(
+                canonicalize(&value),
+                Err(CanonicalError::UnsupportedNumber)
+            ));
+        }
+
+        for value in [1.0_f32, 1.5_f32, -0.0_f32, f32::INFINITY, f32::NAN] {
             assert!(matches!(
                 canonicalize(&value),
                 Err(CanonicalError::UnsupportedNumber)
