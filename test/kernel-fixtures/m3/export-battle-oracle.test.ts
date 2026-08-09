@@ -2438,7 +2438,18 @@ function outcome(game: GameManager): string {
   return "ONGOING";
 }
 
-function assertFaintObservationComplete(trace: ObservationTrace): void {
+async function awaitFaintObservationComplete(trace: ObservationTrace): Promise<void> {
+  if (trace.faints.some(occurrence => !occurrence.resolved || occurrence.replacement?.kind === "PENDING")) {
+    try {
+      await vi.waitUntil(
+        () => trace.faints.every(occurrence => occurrence.resolved && occurrence.replacement?.kind !== "PENDING"),
+        { interval: 5, timeout: 5_000 },
+      );
+    } catch {
+      // Report the exact unresolved occurrence below.  This wait observes the
+      // real FaintPhase/tween/replacement lifecycle; it never resolves one.
+    }
+  }
   for (const occurrence of trace.faints) {
     if (!occurrence.resolved || occurrence.replacement?.kind === "PENDING") {
       fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} never reached a causal resolution boundary`);
@@ -3068,7 +3079,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (!game.isVictory() && !game.scene.getPlayerParty().every(mon => mon.isFainted())) {
     await game.toNextTurn();
   }
-  assertFaintObservationComplete(trace);
+  await awaitFaintObservationComplete(trace);
   const finalState = captureState(game, trace, contentHash);
   const finalRng = battleRngState(game);
   const replacement = replacementProposals(trace);
