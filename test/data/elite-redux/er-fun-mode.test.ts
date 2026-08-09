@@ -11,7 +11,7 @@ import {
   formatFunMegaStatDelta,
   getFunEnemyMegaChance,
   getFunMegaStoneMetadata,
-  shuffleFunMegaStats,
+  shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
   getFunModeConfig,
@@ -50,7 +50,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
       megaMode: true,
-      shuffleMegaStats: true,
+      shuffleStats: true,
       abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
@@ -59,7 +59,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
       megaMode: true,
-      shuffleMegaStats: true,
+      shuffleStats: true,
       abilityRerollSeed: 4,
     });
   });
@@ -109,6 +109,14 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
 });
 
 describe("Fun Mega Mode statlines", () => {
+  it("shuffles a non-Mega statline whenever Stat Shuffle is selected", () => {
+    const base = [45, 49, 49, 65, 65, 45];
+    const shuffled = shuffleFunStats(base, 123456);
+    expect(shuffled).not.toEqual(base);
+    expect(shuffled.reduce((total, value) => total + value, 0)).toBe(base.reduce((total, value) => total + value, 0));
+    expect([...shuffled].sort((a, b) => a - b)).toEqual([...base].sort((a, b) => a - b));
+  });
+
   it("derives a stone delta from the real source and Mega forms", () => {
     const metadata = getFunMegaStoneMetadata(FormChangeItem.SWAMPERTITE);
     expect(metadata).not.toBeNull();
@@ -119,12 +127,12 @@ describe("Fun Mega Mode statlines", () => {
   it("applies a pseudo-Mega delta before deterministically shuffling the effective line", () => {
     const base = [80, 80, 80, 80, 80, 80];
     const effective = applyFunMegaStatDelta(base, FormChangeItem.SWAMPERTITE);
-    const shuffled = shuffleFunMegaStats(effective, 123456, FormChangeItem.SWAMPERTITE);
+    const shuffled = shuffleFunStats(effective, 123456, FormChangeItem.SWAMPERTITE);
     expect(shuffled.reduce((total, value) => total + value, 0)).toBe(
       effective.reduce((total, value) => total + value, 0),
     );
     expect([...shuffled].sort((a, b) => a - b)).toEqual([...effective].sort((a, b) => a - b));
-    expect(shuffleFunMegaStats(effective, 123456, FormChangeItem.SWAMPERTITE)).toEqual(shuffled);
+    expect(shuffleFunStats(effective, 123456, FormChangeItem.SWAMPERTITE)).toEqual(shuffled);
   });
 
   it("persists the temporary pseudo-Mega record through CustomPokemonData", () => {

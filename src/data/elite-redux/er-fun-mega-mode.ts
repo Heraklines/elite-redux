@@ -141,10 +141,14 @@ function mix32(value: number): number {
   return mixed >>> 0;
 }
 
-/** Deterministically redistributes the already-effective Mega statline while preserving its BST. */
-export function shuffleFunMegaStats(baseStats: readonly number[], pokemonId: number, item: FormChangeItem): number[] {
+/** Deterministically shuffles the effective statline while preserving its BST. */
+export function shuffleFunStats(
+  baseStats: readonly number[],
+  pokemonId: number,
+  item?: FormChangeItem,
+): number[] {
   const shuffled = [...baseStats];
-  let state = mix32(pokemonId ^ Math.imul(item + 1, 0x9e3779b1));
+  let state = mix32(pokemonId ^ Math.imul((item ?? -1) + 1, 0x9e3779b1));
   for (let index = shuffled.length - 1; index > 0; index--) {
     state = mix32(state + index);
     const swapIndex = state % (index + 1);

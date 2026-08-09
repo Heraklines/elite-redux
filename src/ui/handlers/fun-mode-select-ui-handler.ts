@@ -46,10 +46,10 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
       "Start with a Mega Bracelet. Pokemon without a real Mega can use any Mega Stone as a temporary stat-only Mega.",
   },
   {
-    key: "shuffleMegaStats",
-    label: "Shuffle Mega Stats",
+    key: "shuffleStats",
+    label: "Stat Shuffle",
     description:
-      "While a Pokemon is Mega'd, redistribute its effective Mega stats while preserving the Mega form's total BST.",
+      "Shuffle every Pokemon's stats while preserving its total BST. Mega'd Pokemon shuffle their full effective Mega statline.",
   },
 ];
 
@@ -63,6 +63,9 @@ export class FunModeSelectUiHandler extends UiHandler {
   private descriptionText: Phaser.GameObjects.Text;
   private startText: Phaser.GameObjects.Text;
   private readonly valueTexts: Phaser.GameObjects.Text[] = [];
+  private readonly leftArrows: Phaser.GameObjects.Image[] = [];
+  private readonly rightArrows: Phaser.GameObjects.Image[] = [];
+  private startCursor: Phaser.GameObjects.NineSlice;
   private config: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
 
   constructor(mode: UiMode | null = null) {
@@ -83,27 +86,46 @@ export class FunModeSelectUiHandler extends UiHandler {
       .setAlpha(0.8);
     rulesText.setScale(rulesText.scaleX * 0.7, rulesText.scaleY * 0.7);
 
-    const optionsWidth = Math.floor(width * 0.56);
+    const optionsWidth = Math.floor(width * 0.6);
     const optionsWindow = addWindow(0, 24, optionsWidth, height - 26).setOrigin(0);
     const descriptionWindow = addWindow(optionsWidth, 24, width - optionsWidth, height - 50).setOrigin(0);
     const startWindow = addWindow(optionsWidth, height - 26, width - optionsWidth, 24).setOrigin(0);
 
     const rowObjects: Phaser.GameObjects.GameObject[] = [];
     OPTIONS.forEach((option, index) => {
-      const y = 32 + index * 21;
-      const label = addTextObject(10, y, option.label, TextStyle.SETTINGS_LABEL).setOrigin(0, 0.5);
-      const value = addTextObject(optionsWidth - 12, y, "ON", TextStyle.SETTINGS_LABEL).setOrigin(1, 0.5);
+      const y = 28 + index * 16;
+      const label = addTextObject(8, y, option.label, TextStyle.SETTINGS_LABEL).setOrigin(0);
+      const leftArrow = globalScene.add.image(0, 0, "cursor_reverse").setOrigin(0).setScale(0.75);
+      const rightArrow = globalScene.add.image(0, 0, "cursor").setOrigin(0).setScale(0.75);
+      const value = addTextObject(0, y, "ON", TextStyle.SETTINGS_LABEL).setOrigin(0.5, 0);
       this.valueTexts.push(value);
-      rowObjects.push(label, value);
+      this.leftArrows.push(leftArrow);
+      this.rightArrows.push(rightArrow);
+      rowObjects.push(label, leftArrow, rightArrow, value);
     });
 
     this.cursorObject = globalScene.add
-      .nineslice(5, 27, "summary_moves_cursor", undefined, optionsWidth - 10, 20, 1, 1, 1, 1)
+      .nineslice(4, 28, "summary_moves_cursor", undefined, optionsWidth - 8, 16, 1, 1, 1, 1)
       .setOrigin(0);
     this.descriptionText = addTextObject(optionsWidth + 7, 31, "", TextStyle.SETTINGS_LABEL).setOrigin(0);
     this.descriptionText.setWordWrapWidth((width - optionsWidth - 14) * 6);
     this.startText = addTextObject(0, 0, "START", TextStyle.SETTINGS_LABEL).setOrigin(0.5, 0.5);
     this.startText.setPosition(startWindow.x + startWindow.width / 2, startWindow.y + startWindow.height / 2);
+    this.startCursor = globalScene.add
+      .nineslice(
+        startWindow.x + 4,
+        startWindow.y + 3,
+        "summary_moves_cursor",
+        undefined,
+        startWindow.width - 8,
+        16,
+        1,
+        1,
+        1,
+        1,
+      )
+      .setOrigin(0)
+      .setVisible(false);
 
     this.container.add([
       overlay,
@@ -117,6 +139,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.cursorObject,
       this.descriptionText,
       this.startText,
+      this.startCursor,
     ]);
     this.container.setVisible(false);
     ui.add(this.container);
@@ -186,19 +209,34 @@ export class FunModeSelectUiHandler extends UiHandler {
       return;
     }
     const startIndex = OPTIONS.length;
+    const optionsWidth = Math.floor(globalScene.scaledCanvas.width * 0.6);
     this.valueTexts.forEach((text, index) => {
-      text.setText(this.config[OPTIONS[index].key] ? "ON" : "OFF");
-      text.setAlpha(this.config[OPTIONS[index].key] ? 1 : 0.55);
+      const enabled = this.config[OPTIONS[index].key] === true;
+      const leftArrow = this.leftArrows[index];
+      const rightArrow = this.rightArrows[index];
+      text.setText(enabled ? "ON" : "OFF").setAlpha(enabled ? 1 : 0.55);
+      rightArrow.setPosition(optionsWidth - 12, 32 + index * 16).setVisible(!enabled);
+      leftArrow.setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y).setVisible(enabled);
+      text.setX(Math.round((leftArrow.x + rightArrow.x + leftArrow.displayWidth) / 2));
+      if (this.cursor === startIndex) {
+        leftArrow.setTint(0x808080);
+        rightArrow.setTint(0x808080);
+      } else {
+        leftArrow.clearTint();
+        rightArrow.clearTint();
+      }
     });
     if (this.cursor < startIndex) {
-      const optionsWidth = Math.floor(globalScene.scaledCanvas.width * 0.56);
-      this.cursorObject.setPosition(5, 26 + this.cursor * 21).setSize(optionsWidth - 10, 18);
+      this.cursorObject
+        .setVisible(true)
+        .setPosition(4, 28 + this.cursor * 16)
+        .setSize(optionsWidth - 8, 16);
+      this.startCursor.setVisible(false);
       this.descriptionText.setText(OPTIONS[this.cursor].description);
     } else {
       const anyEnabled = hasEnabledMode(this.config);
-      const { width, height } = globalScene.scaledCanvas;
-      const optionsWidth = Math.floor(width * 0.56);
-      this.cursorObject.setPosition(optionsWidth + 4, height - 23).setSize(width - optionsWidth - 8, 18);
+      this.cursorObject.setVisible(false);
+      this.startCursor.setVisible(true);
       this.descriptionText.setText(
         anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one randomizer before starting.",
       );
