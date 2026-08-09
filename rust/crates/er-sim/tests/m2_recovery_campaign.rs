@@ -1228,6 +1228,11 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let disconnect_step = pair.apply(PairOperation::Disconnect {
         endpoint: PairEndpoint::Guest,
     })?;
+    assert_eq!(
+        guest_timer_cancellations(&disconnect_step),
+        vec![directional_repeat_timer],
+        "disconnect must own the directional repeat timer cancellation exactly once"
+    );
     trace.push(disconnect_step);
     let recovery_start = trace.len();
     trace.push(pair.apply(PairOperation::Reconnect {
@@ -1247,8 +1252,8 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let reconnect_fence = guest_recovery_fence(reconnect_step)?;
     assert_held_recovery_fence(&reconnect_fence);
     assert!(
-        guest_timer_cancellations(reconnect_step).contains(&directional_repeat_timer),
-        "reconnect fencing must cancel the live directional repeat timer"
+        !guest_timer_cancellations(reconnect_step).contains(&directional_repeat_timer),
+        "reconnect must not cancel the already-cleared directional repeat timer"
     );
     assert!(has_frame(
         &reconnect_step.generated_effects,

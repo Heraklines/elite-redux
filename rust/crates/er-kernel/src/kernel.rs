@@ -2052,12 +2052,17 @@ impl GameKernel {
         {
             return Ok(Vec::new());
         }
+        let mut effects = if state == TransportState::Disconnected {
+            self.clear_input_effects()
+        } else {
+            Vec::new()
+        };
         let connected = state == TransportState::Connected;
-        let mut effects = Self::map_scheduler_commands(
+        effects.extend(Self::map_scheduler_commands(
             self.scheduler
                 .set_connected(endpoint, connected)
                 .map_err(kernel_protocol_error)?,
-        );
+        ));
         let mut authority_actions = Vec::new();
         let mut proposal_actions = Vec::new();
         let mut recovery_cleanup_actions = Vec::new();
