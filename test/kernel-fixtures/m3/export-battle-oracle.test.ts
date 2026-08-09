@@ -838,6 +838,19 @@ async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
   // which cannot be reset by the next scenario's Object.assign.
   (Overrides as unknown as { BATTLE_STYLE_OVERRIDE: typeof battleStyle }).BATTLE_STYLE_OVERRIDE = battleStyle;
   const coopOwners = coopLaunchOwners(spec, starters);
+  if (coopOwners != null) {
+    // GameManager's ReloadHelper already replaces saveAll for tests, but its
+    // replacement still serializes a checkpoint.  A single-engine semantic
+    // oracle intentionally has no transport/session identity, so that co-op
+    // checkpoint guard would abort the otherwise valid production battle
+    // launch.  Disable only the mocked persistence callback; game mode,
+    // initBattle, owner tagging, topology, and battle execution remain real.
+    const saveAll = game.scene.gameData.saveAll as AnyRecord;
+    if (typeof saveAll.mockResolvedValue !== "function") {
+      fail("OBSERVATION_SEAM_MISSING", "GameManager saveAll persistence seam is not mocked");
+    }
+    saveAll.mockResolvedValue(true);
+  }
   game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     game.scene.gameMode = getGameMode(coopOwners == null ? GameModes.CLASSIC : GameModes.COOP);
     const starterPhase = new SelectStarterPhase();
