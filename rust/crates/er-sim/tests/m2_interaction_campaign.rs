@@ -685,6 +685,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
         material: fixture.interaction_revision,
         control: fixture.interaction_revision,
     };
+    let await_prompt = format!("await/{}", fixture.interaction_operation);
 
     let initial = fixture.pair.snapshot()?;
     assert_eq!(initial.seed, seed.to_string());
@@ -990,21 +991,13 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert_eq!(first_material.snapshot.guest.ui.kind, UiViewKind::Waiting);
     assert!(!first_material.snapshot.guest.ui.actionable);
-    assert!(
-        first_material
-            .snapshot
-            .guest
-            .live_resources
-            .controls
-            .is_empty()
+    assert_eq!(
+        first_material.snapshot.guest.live_resources.controls,
+        BTreeSet::new()
     );
-    assert!(
-        first_material
-            .snapshot
-            .guest
-            .live_resources
-            .waits
-            .contains(&fixture.wait_control_id)
+    assert_eq!(
+        first_material.snapshot.guest.live_resources.waits,
+        BTreeSet::from([await_prompt.clone()])
     );
     assert!(
         first_material
@@ -1078,12 +1071,10 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     assert!(settled.guest.live_resources.proposal_leases.is_empty());
     assert!(settled.host.live_resources.retained_revisions.is_empty());
-    assert!(
-        settled
-            .guest
-            .live_resources
-            .waits
-            .contains(&fixture.wait_control_id)
+    assert_eq!(settled.guest.live_resources.controls, BTreeSet::new());
+    assert_eq!(
+        settled.guest.live_resources.waits,
+        BTreeSet::from([await_prompt])
     );
 
     assert_eq!(
