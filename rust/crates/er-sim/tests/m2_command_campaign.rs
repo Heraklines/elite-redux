@@ -1106,7 +1106,7 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         stale_repeat.snapshot.guest.kernel.ui.stack.as_slice(),
         [MenuState::Waiting(menu)]
             if menu.prompt_key.as_deref() == Some("await/turn/host")
-    );
+    ));
     assert_eq!(replica_frontier(&stale_repeat), Some((1, 1, 1)));
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
     assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
