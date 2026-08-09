@@ -1587,6 +1587,49 @@ function installObservationHooks(): void {
   wrapMutation(PokemonMove.prototype, "usePp", "PP_CONSUMPTION");
   wrapMutation(Battle.prototype, "incrementTurn", "TURN_ADVANCE");
 
+  const originalFaintCry = Pokemon.prototype.faintCry;
+  Pokemon.prototype.faintCry = function (this: Pokemon, callback: () => any): void {
+    const trace = activeTrace;
+    const scene = (trace?.game as GameManager | undefined)?.scene;
+    if (trace == null || !trace.collectMutations || scene?.moveAnimations !== false) {
+      originalFaintCry.call(this, callback);
+      return;
+    }
+
+    // The production callback owns every mechanical faint mutation, but the
+    // headless runner does not advance the audio/tween clocks after TurnEnd.
+    // With animations already disabled, fast-forward only this Pokemon's one
+    // faint tween and execute that unchanged completion callback exactly once.
+    const tweenManager = scene.tweens as AnyRecord;
+    const originalTweenAdd = tweenManager.add;
+    const pokemon = this;
+    let completionScheduled = false;
+    tweenManager.add = function (this: AnyRecord, config: AnyRecord): any {
+      if (
+        !completionScheduled
+        && config?.targets === pokemon
+        && config?.ease === "Sine.easeIn"
+        && typeof config?.onComplete === "function"
+      ) {
+        completionScheduled = true;
+        queueMicrotask(config.onComplete);
+        return {};
+      }
+      return originalTweenAdd.call(this, config);
+    };
+    try {
+      callback();
+      if (!completionScheduled) {
+        fail("OBSERVATION_SEAM_MISSING", "disabled-animation faint did not publish its production completion tween");
+      }
+    } finally {
+      tweenManager.add = originalTweenAdd;
+    }
+  };
+  restoreHooks.push(() => {
+    Pokemon.prototype.faintCry = originalFaintCry;
+  });
+
   const originalFaintStart = FaintPhase.prototype.start;
   FaintPhase.prototype.start = function (this: FaintPhase): void {
     if (activeTrace != null) {
@@ -2438,18 +2481,7 @@ function outcome(game: GameManager): string {
   return "ONGOING";
 }
 
-async function awaitFaintObservationComplete(trace: ObservationTrace): Promise<void> {
-  if (trace.faints.some(occurrence => !occurrence.resolved || occurrence.replacement?.kind === "PENDING")) {
-    try {
-      await vi.waitUntil(
-        () => trace.faints.every(occurrence => occurrence.resolved && occurrence.replacement?.kind !== "PENDING"),
-        { interval: 5, timeout: 5_000 },
-      );
-    } catch {
-      // Report the exact unresolved occurrence below.  This wait observes the
-      // real FaintPhase/tween/replacement lifecycle; it never resolves one.
-    }
-  }
+function assertFaintObservationComplete(trace: ObservationTrace): void {
   for (const occurrence of trace.faints) {
     if (!occurrence.resolved || occurrence.replacement?.kind === "PENDING") {
       fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} never reached a causal resolution boundary`);
@@ -3079,7 +3111,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (!game.isVictory() && !game.scene.getPlayerParty().every(mon => mon.isFainted())) {
     await game.toNextTurn();
   }
-  await awaitFaintObservationComplete(trace);
+  assertFaintObservationComplete(trace);
   const finalState = captureState(game, trace, contentHash);
   const finalRng = battleRngState(game);
   const replacement = replacementProposals(trace);
