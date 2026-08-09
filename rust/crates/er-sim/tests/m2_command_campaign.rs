@@ -636,7 +636,11 @@ fn assert_proposal_retry_timer(snapshot: &PairSnapshot) -> TimerId {
                 && timer.timer.time_class == TimeClass::Connected
         })
         .collect::<Vec<_>>();
-    assert_eq!(timers.len(), 1, "expected one retained proposal retry timer");
+    assert_eq!(
+        timers.len(),
+        1,
+        "expected one retained proposal retry timer"
+    );
     let timer = timers[0];
     assert_eq!(timer.timer.delay_ms, safe(500));
     assert_eq!(timer.remaining_active_ms, safe(500));
@@ -646,9 +650,12 @@ fn assert_proposal_retry_timer(snapshot: &PairSnapshot) -> TimerId {
 
 fn assert_no_input_repeat_timer(snapshot: &PairSnapshot, endpoint: SeatId, button: GameButton) {
     let owner = TimerOwner::input_repeat(button);
-    assert!(snapshot.clock_timers.iter().all(|timer| {
-        !(timer.timer.endpoint == endpoint && timer.timer.owner == owner)
-    }));
+    assert!(
+        snapshot
+            .clock_timers
+            .iter()
+            .all(|timer| { !(timer.timer.endpoint == endpoint && timer.timer.owner == owner) })
+    );
 }
 
 fn assert_no_input_repeat_schedule(step: &PairStep, endpoint: SeatId, button: GameButton) {
@@ -1319,23 +1326,27 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         })
         .collect::<Vec<_>>();
     assert!(cancelled_timers.is_empty());
-    assert!(!stale_release
-        .snapshot
-        .guest
-        .live_resources
-        .timers
-        .contains(&repeat_timer_id));
+    assert!(
+        !stale_release
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&repeat_timer_id)
+    );
     assert_no_input_repeat_timer(&stale_release.snapshot, seat(1), GameButton::Up);
     assert_eq!(
         assert_proposal_retry_timer(&stale_release.snapshot),
         proposal_retry_timer_id
     );
-    assert!(stale_release
-        .snapshot
-        .guest
-        .live_resources
-        .timers
-        .contains(&proposal_retry_timer_id));
+    assert!(
+        stale_release
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&proposal_retry_timer_id)
+    );
     assert_eq!(
         stale_release
             .snapshot
@@ -1345,12 +1356,14 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .len(),
         1
     );
-    assert!(stale_release
-        .snapshot
-        .guest
-        .live_resources
-        .proposal_leases
-        .contains(&operation(GUEST_OPERATION)));
+    assert!(
+        stale_release
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&operation(GUEST_OPERATION))
+    );
     assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
     steps.push(stale_release);
 
@@ -1376,17 +1389,24 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         proposal_retry_timer_id
     );
     assert_no_input_repeat_timer(&before_teardown, seat(1), GameButton::Up);
-    assert!(before_teardown
-        .guest
-        .live_resources
-        .timers
-        .contains(&proposal_retry_timer_id));
-    assert_eq!(before_teardown.guest.live_resources.proposal_leases.len(), 1);
-    assert!(before_teardown
-        .guest
-        .live_resources
-        .proposal_leases
-        .contains(&operation(GUEST_OPERATION)));
+    assert!(
+        before_teardown
+            .guest
+            .live_resources
+            .timers
+            .contains(&proposal_retry_timer_id)
+    );
+    assert_eq!(
+        before_teardown.guest.live_resources.proposal_leases.len(),
+        1
+    );
+    assert!(
+        before_teardown
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&operation(GUEST_OPERATION))
+    );
     assert!(before_teardown.host.live_resources.timers.is_empty());
 
     let final_snapshot = pair.teardown("m2b-04 command campaign complete")?;
