@@ -840,7 +840,15 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
     assert!(quiescent.network.queued_packet_ids.is_empty());
     assert!(quiescent.host.live_resources.delivery_leases.is_empty());
     assert!(quiescent.host.live_resources.retained_revisions.is_empty());
-    assert!(quiescent.guest.live_resources.proposal_leases.is_empty());
+    assert_eq!(quiescent.guest.live_resources.proposal_leases.len(), 1);
+    assert!(
+        quiescent
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&operation(GUEST_OPERATION)),
+        "TurnCommit proposal lease must remain retained through receipt"
+    );
     assert!(quiescent.host.live_resources.timers.is_empty());
     assert!(quiescent.guest.live_resources.timers.is_empty());
     assert!(quiescent.host.live_resources.presentations.is_empty());
@@ -969,10 +977,10 @@ fn live_input_protocol_and_adapter_resources_are_all_released_by_pair_teardown()
     assert!(!live.host.live_resources.delivery_leases.is_empty());
     assert!(!live.host.live_resources.retained_revisions.is_empty());
     assert!(!live.guest.live_resources.presentations.is_empty());
-    assert!(
-        !live.host.live_resources.controls.is_empty()
-            || !live.guest.live_resources.controls.is_empty()
-    );
+    assert_eq!(live.guest.kernel.ui.stack, vec![MenuState::None]);
+    assert_eq!(live.guest.ui.kind, UiViewKind::None);
+    assert!(live.host.live_resources.controls.is_empty());
+    assert!(live.guest.live_resources.controls.is_empty());
     assert!(
         !live.host.live_resources.waits.is_empty() || !live.guest.live_resources.waits.is_empty(),
         "await state must be represented before teardown"
