@@ -135,7 +135,11 @@ Input/menu-only M1 snapshots use a typed `UiState` plus a lossless JSON `state` 
 
 - sort object keys with the oracle's JavaScript-compatible lexical order;
 - preserve arrays;
-- reject every floating value and integer outside U53 on the strict kernel canonical/content path;
+- reject every floating value and every integer outside the signed
+  JavaScript-safe range
+  `-9_007_199_254_740_991..=9_007_199_254_740_991` on the strict kernel
+  canonical/content path; signed safe integers emit canonical decimal tokens,
+  while `SafeU53` and coordinate/counter newtypes remain nonnegative;
 - preserve UTF-8 strings and absent-versus-null semantics;
 - emit compact JSON with no insignificant whitespace;
 - use SHA-256 for existing TypeScript fixture/wire compatibility;

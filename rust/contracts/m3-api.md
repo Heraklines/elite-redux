@@ -446,8 +446,11 @@ exactly `schema_version`, `oracle_game_sha`, `species`, `moves`, `abilities`,
 with `hash` absent. There is no newline or additional domain byte in this
 preimage; the `blake3-v1:` prefix is representation metadata, not hashed input.
 Object keys use the frozen JavaScript-compatible canonical order, arrays retain
-their declared order, and numbers use the strict safe-integer path. It is an
-internal content identity, not an Authority material digest.
+their declared order, and numbers use the strict signed-safe-integer path over
+`-9_007_199_254_740_991..=9_007_199_254_740_991`. This includes PLAY NICE's
+typed stat-stage `delta: -1`; no unsigned projection or compatibility
+canonicalizer is permitted. It is an internal content identity, not an
+Authority material digest.
 
 ## Canonical game and battle state
 
