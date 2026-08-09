@@ -1606,8 +1606,9 @@ fn run_reconnect_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)
     assert_exact_material_and_control(&authority_entry_step, seat(GUEST_SEAT))?;
     assert_exact_receipts(&authority_entry_step)?;
     assert_replica_frontier(&authority_entry_step.snapshot, 1, 1, 1)?;
+    // Ordered proposal settlement is interaction-only; this TurnCommit lease remains retained.
     assert!(
-        !authority_entry_step
+        authority_entry_step
             .snapshot
             .guest
             .live_resources
