@@ -1739,13 +1739,13 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
 
     let fresh_menu_generation = final_step.snapshot.guest.ui.generation;
-    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+    for (packet_id, _) in delayed_recovery_evidence.iter() {
         assert!(
             final_step
                 .snapshot
                 .network
                 .queued_packet_ids
-                .contains(&packet_id),
+                .contains(packet_id),
             "prior control evidence must remain delayed after the fresh menu opens"
         );
     }
@@ -1859,12 +1859,12 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .ok_or_else(|| std::io::Error::other("pending proposal release was not retained"))?
         .snapshot
         .clone();
-    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+    for (packet_id, _) in delayed_recovery_evidence.iter() {
         assert!(
             before_pending_delivery
                 .network
                 .queued_packet_ids
-                .contains(&packet_id),
+                .contains(packet_id),
             "delayed control evidence must remain queued ahead of N+1 delivery"
         );
     }
@@ -1930,12 +1930,12 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .ok_or_else(|| std::io::Error::other("recovery evidence was not retained"))?
         .snapshot
         .clone();
-    for (packet_id, _) in delayed_recovery_evidence.iter().copied() {
+    for (packet_id, _) in delayed_recovery_evidence.iter() {
         assert!(
             !after_recovery_evidence
                 .network
                 .queued_packet_ids
-                .contains(&packet_id),
+                .contains(packet_id),
             "all delayed recovery evidence must be delivered before retry"
         );
     }
