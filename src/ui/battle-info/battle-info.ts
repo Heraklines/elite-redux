@@ -116,7 +116,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected shinyIcon: Phaser.GameObjects.Sprite;
   protected fusionShinyIcon: Phaser.GameObjects.Sprite;
   protected splicedIcon: Phaser.GameObjects.Sprite;
-  protected megaIcon: Phaser.GameObjects.Text;
+  protected megaIcon: Phaser.GameObjects.Sprite;
   protected statusIndicator: Phaser.GameObjects.Sprite;
   /**
    * Elite Redux custom statuses (bleed/frostbite/fear) have no frame in the
@@ -189,11 +189,13 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .setInteractive(hitArea, hitCallback)
       .setPositionRelative(this.nameText, 0, 2);
 
-    this.megaIcon = addTextObject(0, 0, "M", TextStyle.SUMMARY_GOLD)
+    this.megaIcon = globalScene.add
+      .sprite(0, 0, "icon_fun_mega")
       .setName("icon_fun_mega")
       .setVisible(false)
-      .setOrigin(0, 0.15)
-      .setInteractive()
+      .setOrigin(0)
+      .setScale(0.42)
+      .setInteractive(hitArea, hitCallback)
       .setPositionRelative(this.nameText, 0, 2);
 
     this.add([this.teraIcon, this.shinyIcon, this.fusionShinyIcon, this.splicedIcon, this.megaIcon]);

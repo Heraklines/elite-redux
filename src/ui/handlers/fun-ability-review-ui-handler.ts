@@ -19,12 +19,24 @@ interface AbilityRow {
   description: string;
 }
 
-const MAX_DESCRIPTION_PAGE_LENGTH = 145;
+interface ReviewDensity {
+  rowHeight: number;
+  pokemonWidth: number;
+  iconScale: number;
+  nameFontSize: number;
+  abilityFontSize: number;
+  descriptionFontSize: number;
+  descriptionY: number;
+  descriptionMaxLines: number;
+  descriptionPageLength: number;
+}
 
 export class FunAbilityReviewUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private cursorObject: Phaser.GameObjects.NineSlice;
   private readonly rows: Phaser.GameObjects.Container[] = [];
+  private readonly rowWindows: Phaser.GameObjects.NineSlice[] = [];
+  private readonly rowDividers: Phaser.GameObjects.Rectangle[][] = [];
   private readonly pokemonNameTexts: Phaser.GameObjects.Text[] = [];
   private readonly abilityNameTexts: Phaser.GameObjects.Text[][] = [];
   private readonly abilityDescriptionTexts: Phaser.GameObjects.Text[][] = [];
@@ -33,6 +45,7 @@ export class FunAbilityReviewUiHandler extends UiHandler {
   private onContinue: (() => void) | null = null;
   private descriptionPage = 0;
   private descriptionTimer: Phaser.Time.TimerEvent | null = null;
+  private density: ReviewDensity = this.getDensity(6);
 
   constructor(mode: UiMode | null = null) {
     super(mode);
@@ -44,7 +57,7 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     this.container.add(globalScene.add.rectangle(0, 0, width, height, 0x242030, 0.96).setOrigin(0));
 
     const rowWidth = width - 2;
-    const pokemonWidth = 44;
+    const pokemonWidth = this.density.pokemonWidth;
     const abilityWidth = Math.floor((rowWidth - pokemonWidth) / 4);
     for (let index = 0; index < 6; index++) {
       const row = globalScene.add.container(1, 1 + index * 27);
@@ -56,11 +69,14 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       }).setOrigin(0);
       const names: Phaser.GameObjects.Text[] = [];
       const descriptions: Phaser.GameObjects.Text[] = [];
+      const dividers: Phaser.GameObjects.Rectangle[] = [];
       const pageSlots: string[][] = [];
       const objects: Phaser.GameObjects.GameObject[] = [window, name];
       for (let slot = 0; slot < 4; slot++) {
         const x = pokemonWidth + slot * abilityWidth;
-        objects.push(globalScene.add.rectangle(x, 2, 1, 22, 0x665c72).setOrigin(0));
+        const divider = globalScene.add.rectangle(x, 2, 1, 22, 0x665c72).setOrigin(0);
+        dividers.push(divider);
+        objects.push(divider);
         const abilityName = addTextObject(x + 2, 2, "", TextStyle.SETTINGS_LABEL, {
           fontSize: "14px",
           fixedWidth: (abilityWidth - 4) * 6,
@@ -81,6 +97,8 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       }
       row.add(objects);
       this.rows.push(row);
+      this.rowWindows.push(window);
+      this.rowDividers.push(dividers);
       this.pokemonNameTexts.push(name);
       this.abilityNameTexts.push(names);
       this.abilityDescriptionTexts.push(descriptions);
@@ -111,6 +129,7 @@ export class FunAbilityReviewUiHandler extends UiHandler {
   public override show(args: any[]): boolean {
     super.show(args);
     this.party = (args[0] as Pokemon[]).slice(0, 6);
+    this.density = this.getDensity(this.party.length);
     this.onContinue = args[1] as () => void;
     this.cursor = 6;
     this.descriptionPage = 0;
@@ -198,13 +217,13 @@ export class FunAbilityReviewUiHandler extends UiHandler {
   }
 
   private paginateDescription(description: string): string[] {
-    if (description.length <= MAX_DESCRIPTION_PAGE_LENGTH) {
+    if (description.length <= this.density.descriptionPageLength) {
       return [description];
     }
     const pages: string[] = [];
     let current = "";
     for (const word of description.split(/\s+/)) {
-      if (current && current.length + word.length + 1 > MAX_DESCRIPTION_PAGE_LENGTH) {
+      if (current && current.length + word.length + 1 > this.density.descriptionPageLength) {
         pages.push(current);
         current = word;
       } else {
@@ -238,13 +257,99 @@ export class FunAbilityReviewUiHandler extends UiHandler {
         const pages = this.descriptionPages[pokemonIndex][slot];
         const page = pages.length > 0 ? pages[this.descriptionPage % pages.length] : "";
         text.setText(page);
-        text.setFontSize(page.length > 115 ? 10 : page.length > 75 ? 12 : 14);
+      });
+    });
+  }
+
+  private getDensity(partySize: number): ReviewDensity {
+    const visibleRows = Phaser.Math.Clamp(partySize, 3, 6);
+    const rowHeight = Math.floor(162 / visibleRows);
+    if (visibleRows === 3) {
+      return {
+        rowHeight,
+        pokemonWidth: 58,
+        iconScale: 0.42,
+        nameFontSize: 28,
+        abilityFontSize: 23,
+        descriptionFontSize: 19,
+        descriptionY: 11,
+        descriptionMaxLines: 9,
+        descriptionPageLength: 145,
+      };
+    }
+    if (visibleRows === 4) {
+      return {
+        rowHeight,
+        pokemonWidth: 55,
+        iconScale: 0.34,
+        nameFontSize: 24,
+        abilityFontSize: 20,
+        descriptionFontSize: 17,
+        descriptionY: 9,
+        descriptionMaxLines: 7,
+        descriptionPageLength: 110,
+      };
+    }
+    if (visibleRows === 5) {
+      return {
+        rowHeight,
+        pokemonWidth: 50,
+        iconScale: 0.28,
+        nameFontSize: 20,
+        abilityFontSize: 18,
+        descriptionFontSize: 16,
+        descriptionY: 8,
+        descriptionMaxLines: 6,
+        descriptionPageLength: 86,
+      };
+    }
+    return {
+      rowHeight,
+      pokemonWidth: 44,
+      iconScale: 0.24,
+      nameFontSize: 18,
+      abilityFontSize: 16,
+      descriptionFontSize: 15,
+      descriptionY: 7,
+      descriptionMaxLines: 5,
+      descriptionPageLength: 68,
+    };
+  }
+
+  private applyDensity(): void {
+    const { width } = globalScene.scaledCanvas;
+    const rowWidth = width - 2;
+    const abilityWidth = Math.floor((rowWidth - this.density.pokemonWidth) / 4);
+    this.rows.forEach((row, rowIndex) => {
+      row.setY(1 + rowIndex * this.density.rowHeight);
+      this.rowWindows[rowIndex].setSize(rowWidth, this.density.rowHeight - 1);
+      const name = this.pokemonNameTexts[rowIndex];
+      name
+        .setPosition(16, this.density.rowHeight / 2)
+        .setOrigin(0, 0.5)
+        .setFontSize(this.density.nameFontSize)
+        .setFixedSize((this.density.pokemonWidth - 18) * 6, 0);
+      this.abilityNameTexts[rowIndex].forEach((abilityName, slot) => {
+        const x = this.density.pokemonWidth + slot * abilityWidth;
+        this.rowDividers[rowIndex][slot].setPosition(x, 2).setSize(1, Math.max(1, this.density.rowHeight - 5));
+        abilityName
+          .setPosition(x + 2, 2)
+          .setFontSize(this.density.abilityFontSize)
+          .setFixedSize((abilityWidth - 4) * 6, 0);
+        const description = this.abilityDescriptionTexts[rowIndex][slot];
+        description
+          .setPosition(x + 2, this.density.descriptionY)
+          .setFontSize(this.density.descriptionFontSize)
+          .setFixedSize((abilityWidth - 4) * 6, 0)
+          .setMaxLines(this.density.descriptionMaxLines);
+        description.setWordWrapWidth((abilityWidth - 4) * 6, true);
       });
     });
   }
 
   private refresh(): void {
     const { width } = globalScene.scaledCanvas;
+    this.applyDensity();
     this.rows.forEach((row, index) => {
       const pokemon = this.party[index];
       row.setVisible(!!pokemon);
@@ -253,12 +358,21 @@ export class FunAbilityReviewUiHandler extends UiHandler {
         this.descriptionPages[index].forEach(pages => pages.splice(0));
         return;
       }
-      const icon = globalScene.addPokemonIcon(pokemon, 1, 1, 0.24, 0.24, true).setName("pokemon-icon");
+      const iconOffsetY = Math.max(1, Math.floor((this.density.rowHeight - 12) / 2));
+      const icon = globalScene
+        .addPokemonIcon(pokemon, 1, iconOffsetY, this.density.iconScale, this.density.iconScale, true)
+        .setName("pokemon-icon");
       row.add(icon);
       const renderedName = pokemon.getNameToRender({ useIllusion: false });
       this.pokemonNameTexts[index]
         .setText(renderedName)
-        .setFontSize(renderedName.length > 12 ? 14 : renderedName.length > 9 ? 16 : 18);
+        .setFontSize(
+          renderedName.length > 12
+            ? this.density.nameFontSize - 4
+            : renderedName.length > 9
+              ? this.density.nameFontSize - 2
+              : this.density.nameFontSize,
+        );
       this.abilityRows(pokemon).forEach((ability, slot) => {
         const prefix = slot === 0 ? `R A${pokemon.abilityIndex + 1}/3` : `I${slot}`;
         this.abilityNameTexts[index][slot].setText(`${prefix} ${ability.name}`);
@@ -268,7 +382,9 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     this.updateDescriptionPages();
 
     if (this.cursor < this.party.length) {
-      this.cursorObject.setPosition(3, 3 + this.cursor * 27).setSize(width - 6, 22);
+      this.cursorObject
+        .setPosition(3, 3 + this.cursor * this.density.rowHeight)
+        .setSize(width - 6, this.density.rowHeight - 5);
     } else {
       this.cursorObject
         .setPosition(this.cursor === 7 ? Math.floor(width / 2) + 2 : 3, 165)

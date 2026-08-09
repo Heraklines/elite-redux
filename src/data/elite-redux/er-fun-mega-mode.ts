@@ -118,12 +118,12 @@ export function pokemonHasRealMega(pokemon: Pokemon): boolean {
   );
 }
 
-/** A species with a real Mega may only use its own stone; pseudo-Megas are for species without one. */
+/** A matching stone uses the real Mega form; every other stone grants a temporary stat-only Mega. */
 export function canUseFunMegaStone(pokemon: Pokemon, item: FormChangeItem): boolean {
   if (getFunRealMegaChange(pokemon, item)) {
     return true;
   }
-  return !pokemon.isMega() && !pokemonHasRealMega(pokemon) && getFunMegaStoneMetadata(item) != null;
+  return !pokemon.isMega() && getFunMegaStoneMetadata(item) != null;
 }
 
 export function applyFunMegaStatDelta(baseStats: readonly number[], item: FormChangeItem): number[] {
