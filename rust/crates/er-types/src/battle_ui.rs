@@ -722,10 +722,13 @@ impl<'de> Deserialize<'de> for BattlePresentationKind {
                 }
             }
             BattlePresentationKindWire::AbilityActivated(value)
-                if value.kind == "ABILITY_ACTIVATED" => Self::AbilityActivated {
-                pokemon: value.pokemon,
-                ability_id: value.ability_id,
-            },
+                if value.kind == "ABILITY_ACTIVATED" =>
+            {
+                Self::AbilityActivated {
+                    pokemon: value.pokemon,
+                    ability_id: value.ability_id,
+                }
+            }
             BattlePresentationKindWire::HpChanged(value) if value.kind == "HP_CHANGED" => {
                 Self::HpChanged {
                     pokemon: value.pokemon,
@@ -733,19 +736,23 @@ impl<'de> Deserialize<'de> for BattlePresentationKind {
                     after: value.after,
                 }
             }
-            BattlePresentationKindWire::StatusApplied(value)
-                if value.kind == "STATUS_APPLIED" => Self::StatusApplied {
-                pokemon: value.pokemon,
-                before: value.before,
-                after: value.after,
-            },
+            BattlePresentationKindWire::StatusApplied(value) if value.kind == "STATUS_APPLIED" => {
+                Self::StatusApplied {
+                    pokemon: value.pokemon,
+                    before: value.before,
+                    after: value.after,
+                }
+            }
             BattlePresentationKindWire::StatStageChanged(value)
-                if value.kind == "STAT_STAGE_CHANGED" => Self::StatStageChanged {
-                pokemon: value.pokemon,
-                stat: value.stat,
-                before: value.before,
-                after: value.after,
-            },
+                if value.kind == "STAT_STAGE_CHANGED" =>
+            {
+                Self::StatStageChanged {
+                    pokemon: value.pokemon,
+                    stat: value.stat,
+                    before: value.before,
+                    after: value.after,
+                }
+            }
             BattlePresentationKindWire::Switched(value) if value.kind == "SWITCHED" => {
                 Self::Switched {
                     slot: value.slot,
