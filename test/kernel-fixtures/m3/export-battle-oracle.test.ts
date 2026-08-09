@@ -2993,12 +2993,12 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
   }
   if (id === "voluntary-switch") {
     // In a double battle party slots 0 and 1 are active; slot 2 is the
-    // observed bench choice. Commit the partner's real command as well so the
-    // switch is admitted through the same complete command frontier.
+    // observed bench choice. Queue the lead's switch before the partner's real
+    // command so each prompt group binds to production field order.
+    game.doSwitchPokemon(2);
     if (field[1] != null && !field[1].isFainted()) {
       select(field[1], BattlerIndex.PLAYER_2);
     }
-    game.doSwitchPokemon(2);
   } else {
     if (field[0] != null && !field[0].isFainted()) {
       select(field[0], BattlerIndex.PLAYER);
