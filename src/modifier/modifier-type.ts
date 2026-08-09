@@ -3021,6 +3021,10 @@ export function regenerateModifierPoolThresholds(
   rerollCount = 0,
 ) {
   const pool = getModifierPoolForType(poolType);
+  const equalizeItemPool =
+    globalScene.gameMode.isFun
+    && getFunModeConfig().itemChaos
+    && [ModifierPoolType.PLAYER, ModifierPoolType.WILD, ModifierPoolType.TRAINER].includes(poolType);
   itemPoolChecks.forEach((_v, k) => {
     itemPoolChecks.set(k, false);
   });
@@ -3045,7 +3049,7 @@ export function regenerateModifierPoolThresholds(
             weightedModifierType.modifierType instanceof ModifierTypeGenerator
               ? weightedModifierType.modifierType.generateType(party)
               : weightedModifierType.modifierType;
-          const weight =
+          const naturalWeight =
             existingModifiers.length === 0
             || itemModifierType instanceof PokemonHeldItemModifierType
             || itemModifierType instanceof FormChangeItemModifierType
@@ -3055,6 +3059,7 @@ export function regenerateModifierPoolThresholds(
                   (weightedModifierType.weight as Function)(party, rerollCount)
                 : (weightedModifierType.weight as number)
               : 0;
+          const weight = equalizeItemPool && naturalWeight > 0 ? 1 : naturalWeight;
           if (weightedModifierType.maxWeight) {
             const modifierId = weightedModifierType.modifierType.id;
             tierModifierIds.push(modifierId);
@@ -3540,6 +3545,24 @@ function getNewModifierTypeOption(
     case ModifierPoolType.DAILY_STARTER:
       thresholds = dailyStarterModifierPoolThresholds;
       break;
+  }
+  const itemChaos =
+    globalScene.gameMode.isFun
+    && getFunModeConfig().itemChaos
+    && [ModifierPoolType.PLAYER, ModifierPoolType.WILD, ModifierPoolType.TRAINER].includes(poolType);
+  if (tier === undefined && itemChaos) {
+    const availableTiers = [
+      ModifierTier.COMMON,
+      ModifierTier.GREAT,
+      ModifierTier.ULTRA,
+      ModifierTier.ROGUE,
+      ModifierTier.MASTER,
+    ].filter(candidate => Object.keys(thresholds[candidate] ?? {}).length > 0);
+    if (availableTiers.length === 0) {
+      return null;
+    }
+    tier = randSeedItem(availableTiers);
+    upgradeCount = 0;
   }
   if (tier === undefined) {
     const tierValue = randSeedInt(1024);

@@ -55,6 +55,7 @@ import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { rollFunWeather } from "#data/elite-redux/er-fun-mode";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import {
   erApplyCovenantHeal,
@@ -2363,6 +2364,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetWeatherIfNewBiome(): void {
+    const funWeather = globalScene.gameMode.isFun ? rollFunWeather() : null;
+    if (funWeather != null) {
+      globalScene.arena.trySetWeather(funWeather);
+      return;
+    }
     // ER biome identity (#439 §3): some biomes FORCE a baseline weather instead
     // of rolling the vanilla pool (e.g. Desert/Badlands sandstorm, Ice Cave snow,
     // Graveyard fog). No `user` -> permanent (turnsLeft 0), so it persists across

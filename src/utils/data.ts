@@ -248,6 +248,19 @@ const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
   "randomizeLevelUpMoves",
   "megaMode",
   "shuffleStats",
+  "shuffleEvolutions",
+  "itemChaos",
+  "weatherRoulette",
+  "scrambleMoves",
+];
+
+const LEGACY_FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
+  "randomizePokemon",
+  "randomizeTypes",
+  "randomizeAbilities",
+  "randomizeLevelUpMoves",
+  "megaMode",
+  "shuffleStats",
 ];
 
 function lastFunModeKey(): string {
@@ -262,10 +275,14 @@ export function loadLastFunModeConfig(): SavedFunModeConfig | null {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<SavedFunModeConfig> | null;
-    if (!parsed || !FUN_MODE_CONFIG_KEYS.every(key => typeof parsed[key] === "boolean")) {
+    if (
+      !parsed
+      || !LEGACY_FUN_MODE_CONFIG_KEYS.every(key => typeof parsed[key] === "boolean")
+      || !FUN_MODE_CONFIG_KEYS.every(key => parsed[key] == null || typeof parsed[key] === "boolean")
+    ) {
       return null;
     }
-    return Object.fromEntries(FUN_MODE_CONFIG_KEYS.map(key => [key, parsed[key]])) as SavedFunModeConfig;
+    return Object.fromEntries(FUN_MODE_CONFIG_KEYS.map(key => [key, parsed[key] === true])) as SavedFunModeConfig;
   } catch {
     return null;
   }

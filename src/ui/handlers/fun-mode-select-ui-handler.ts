@@ -54,7 +54,32 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
     description:
       "Shuffle every Pokemon's stats while preserving its total BST. Mega'd Pokemon shuffle their full effective Mega statline.",
   },
+  {
+    key: "shuffleEvolutions",
+    label: "Evolution Shuffle",
+    description:
+      "Evolution requirements and timing stay intact, but every successful evolution becomes a random obtainable species or form.",
+  },
+  {
+    key: "itemChaos",
+    label: "Item Chaos",
+    description:
+      "Every eligible reward tier and every eligible item inside it have equal odds. Normal rarity weights and luck upgrades are ignored.",
+  },
+  {
+    key: "weatherRoulette",
+    label: "Weather Roulette",
+    description: "Every encounter begins with a random standard or Elite Redux weather, including clear weather.",
+  },
+  {
+    key: "scrambleMoves",
+    label: "Move Scrambler",
+    description:
+      "After a Pokemon finishes using a move, that moveset slot becomes a different random implemented move for both sides.",
+  },
 ];
+
+const VISIBLE_OPTION_ROWS = 7;
 
 function hasEnabledMode(config: FunModeConfig): boolean {
   return OPTIONS.some(option => config[option.key]);
@@ -68,10 +93,13 @@ export class FunModeSelectUiHandler extends UiHandler {
   private lastSetupButton: Phaser.GameObjects.NineSlice;
   private lastSetupText: Phaser.GameObjects.Text;
   private readonly valueTexts: Phaser.GameObjects.Text[] = [];
+  private readonly optionLabels: Phaser.GameObjects.Text[] = [];
   private readonly leftArrows: Phaser.GameObjects.Image[] = [];
   private readonly rightArrows: Phaser.GameObjects.Image[] = [];
   private startCursor: Phaser.GameObjects.NineSlice;
+  private scrollText: Phaser.GameObjects.Text;
   private onHeaderButton = false;
+  private visibleStart = 0;
   private config: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
 
   constructor(mode: UiMode | null = null) {
@@ -114,6 +142,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       const rightArrow = globalScene.add.image(0, 0, "cursor").setOrigin(0).setScale(0.75);
       const value = addTextObject(0, y, "ON", TextStyle.SETTINGS_LABEL).setOrigin(0.5, 0);
       this.valueTexts.push(value);
+      this.optionLabels.push(label);
       this.leftArrows.push(leftArrow);
       this.rightArrows.push(rightArrow);
       rowObjects.push(label, leftArrow, rightArrow, value);
@@ -150,6 +179,11 @@ export class FunModeSelectUiHandler extends UiHandler {
       )
       .setOrigin(0)
       .setVisible(false);
+    this.scrollText = addTextObject(optionsWidth - 8, height - 31, "", TextStyle.SETTINGS_LABEL, {
+      fontSize: "30px",
+    })
+      .setOrigin(1, 1)
+      .setAlpha(0.6);
 
     this.container.add([
       overlay,
@@ -166,6 +200,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.descriptionText,
       this.startText,
       this.startCursor,
+      this.scrollText,
     ]);
     this.container.setVisible(false);
     ui.add(this.container);
@@ -175,6 +210,7 @@ export class FunModeSelectUiHandler extends UiHandler {
     super.show(args);
     this.config = { ...getFunModeConfig() };
     this.onHeaderButton = false;
+    this.visibleStart = 0;
     this.container.setVisible(true);
     this.setCursor(0);
     this.refresh();
@@ -281,13 +317,29 @@ export class FunModeSelectUiHandler extends UiHandler {
     }
     const startIndex = OPTIONS.length;
     const optionsWidth = Math.floor(globalScene.scaledCanvas.width * 0.6);
+    if (this.cursor < startIndex) {
+      if (this.cursor < this.visibleStart) {
+        this.visibleStart = this.cursor;
+      } else if (this.cursor >= this.visibleStart + VISIBLE_OPTION_ROWS) {
+        this.visibleStart = this.cursor - VISIBLE_OPTION_ROWS + 1;
+      }
+    }
     this.valueTexts.forEach((text, index) => {
+      const visible = index >= this.visibleStart && index < this.visibleStart + VISIBLE_OPTION_ROWS;
+      const rowY = 28 + (index - this.visibleStart) * 16;
       const enabled = this.config[OPTIONS[index].key] === true;
       const leftArrow = this.leftArrows[index];
       const rightArrow = this.rightArrows[index];
-      text.setText(enabled ? "ON" : "OFF").setAlpha(enabled ? 1 : 0.55);
-      rightArrow.setPosition(optionsWidth - 12, 32 + index * 16).setVisible(!enabled);
-      leftArrow.setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y).setVisible(enabled);
+      this.optionLabels[index].setY(rowY).setVisible(visible);
+      text
+        .setText(enabled ? "ON" : "OFF")
+        .setY(rowY)
+        .setVisible(visible)
+        .setAlpha(enabled ? 1 : 0.55);
+      rightArrow.setPosition(optionsWidth - 12, rowY + 4).setVisible(visible && !enabled);
+      leftArrow
+        .setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y)
+        .setVisible(visible && enabled);
       text.setX(Math.round((leftArrow.x + rightArrow.x + leftArrow.displayWidth) / 2));
       if (this.cursor === startIndex) {
         leftArrow.setTint(0x808080);
@@ -300,7 +352,7 @@ export class FunModeSelectUiHandler extends UiHandler {
     if (this.cursor < startIndex) {
       this.cursorObject
         .setVisible(true)
-        .setPosition(4, 28 + this.cursor * 16)
+        .setPosition(4, 28 + (this.cursor - this.visibleStart) * 16)
         .setSize(optionsWidth - 8, 16);
       this.startCursor.setVisible(false);
       this.setDescription(OPTIONS[this.cursor].description);
@@ -313,6 +365,9 @@ export class FunModeSelectUiHandler extends UiHandler {
       );
       this.startText.setAlpha(anyEnabled ? 1 : 0.45);
     }
+    this.scrollText.setText(
+      `${this.visibleStart + 1}-${Math.min(startIndex, this.visibleStart + VISIBLE_OPTION_ROWS)} / ${startIndex}`,
+    );
     if (this.cursor < startIndex) {
       this.startText.setAlpha(hasEnabledMode(this.config) ? 1 : 0.45);
     }
