@@ -1185,7 +1185,24 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         ]
     );
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
-    assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
+    let rearmed_repeat_timer_id = assert_repeat_timer(&stale_repeat, seat(1), GameButton::Up);
+    assert_ne!(rearmed_repeat_timer_id, repeat_timer_id);
+    assert!(
+        !stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&repeat_timer_id)
+    );
+    assert!(
+        stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .contains(&rearmed_repeat_timer_id)
+    );
     assert!(
         !stale_repeat
             .snapshot
@@ -1204,6 +1221,19 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert!(!has_control_effect(&stale_release, HOST_OPERATION));
     assert!(authority_receipts(&stale_release).is_empty());
     assert!(authority_entry_revisions(&stale_release).is_empty());
+    let cancelled_timers = stale_release
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::CancelTimer {
+                endpoint,
+                timer_id,
+            } => Some((*endpoint, *timer_id)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(cancelled_timers, vec![(seat(1), rearmed_repeat_timer_id)]);
+    assert!(stale_release.snapshot.guest.live_resources.timers.is_empty());
     assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
     steps.push(stale_release);
 
