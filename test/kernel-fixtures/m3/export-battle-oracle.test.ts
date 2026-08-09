@@ -836,6 +836,30 @@ function battleRngState(game: GameManager): AnyRecord {
   };
 }
 
+function authoritativeWaveSeed(game: GameManager): string {
+  const waveSeed = game.scene.waveSeed;
+  if (typeof waveSeed !== "string" || waveSeed.length === 0) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "game.scene.waveSeed is absent or not a non-empty string");
+  }
+  return waveSeed;
+}
+
+function assertCanonicalWaveSeed(game: GameManager, value: unknown): void {
+  const authoritative = authoritativeWaveSeed(game);
+  if (value !== authoritative) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "canonical BattleState.wave_seed is not the authoritative waveSeed");
+  }
+  const transientOverride = (game.scene as AnyRecord).rngSeedOverride;
+  if (
+    typeof transientOverride === "string"
+    && transientOverride.length > 0
+    && transientOverride !== authoritative
+    && value === transientOverride
+  ) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "canonical BattleState.wave_seed followed a transient rngSeedOverride");
+  }
+}
+
 function rdgStateFromString(state: string): AnyRecord {
   const parts = state.split(",");
   if (parts.length !== 5 || parts[0] !== "!rnd") {
@@ -880,6 +904,7 @@ function liveFingerprint(game: GameManager): string {
       ? null
       : {
           turn: battle.turn,
+          wave_seed: authoritativeWaveSeed(game),
           commands: battle.turnCommands,
           pre_commands: battle.preTurnCommands,
           player: game.scene.getPlayerParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "PLAYER", index)),
@@ -1951,6 +1976,7 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
   const before = liveFingerprint(game);
   const battle = game.scene.currentBattle;
   const arena = game.scene.arena;
+  const waveSeed = authoritativeWaveSeed(game);
   if (arena.weatherType !== 0 || arena.terrainType !== 0 || !Array.isArray(arena.tags) || arena.tags.length > 0) {
     fail("CANONICAL_STATE_UNOBSERVABLE", "selected M3 state contains non-neutral field conditions");
   }
@@ -1978,6 +2004,7 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
       battle_id: 1,
       wave: battle.waveIndex,
       turn: battle.turn,
+      wave_seed: waveSeed,
       format: formatState(game),
       authority_seat: 1,
       player_party: game.scene.getPlayerParty().map((mon, index) => canonicalPokemon(trace, mon, "PLAYER", index)),
@@ -2006,6 +2033,7 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
       outcome: outcome(game),
     },
   };
+  assertCanonicalWaveSeed(game, state.battle.wave_seed);
   const after = liveFingerprint(game);
   if (before !== after) {
     fail("CAPTURE_MUTATED_STATE", `${trace.scenarioId} canonical capture changed live state`);
