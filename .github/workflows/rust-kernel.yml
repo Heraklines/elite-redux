@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - "arch/rust-kernel-v0"
+      - "arch/rust-kernel-m3"
       - "arch/rust-kernel/**"
       - "codex/rust-kernel-m2-*"
+      - "wrk/rk-m3-*"
     paths:
       - ".nvmrc"
       - "rust/**"
@@ -15,6 +17,7 @@ on:
       - "test/kernel-fixtures/**"
       - "scripts/export-kernel-*.mjs"
       - "scripts/benchmark-kernel-*.mjs"
+      - "docs/plans/rust-kernel/m3-*.md"
       - ".github/workflows/rust-kernel.yml"
   pull_request:
     paths:
@@ -26,6 +29,7 @@ on:
       - "test/kernel-fixtures/**"
       - "scripts/export-kernel-*.mjs"
       - "scripts/benchmark-kernel-*.mjs"
+      - "docs/plans/rust-kernel/m3-*.md"
       - ".github/workflows/rust-kernel.yml"
 
 permissions:
