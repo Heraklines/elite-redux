@@ -1244,6 +1244,27 @@ effect publication.
 ## Battle resolver and common material applier
 
 ```rust
+pub enum BattleAfterStateFailure {
+    State(StateValidationError),
+    MutationEvidenceMismatch { index: usize },
+    PresentationSequenceOverflow { index: usize },
+}
+
+pub enum BattleInvariantError {
+    InvalidBeforeState { source: StateValidationError },
+    UnsupportedEffectReached { subject: CapabilitySubject },
+    InvalidAfterState { source: BattleAfterStateFailure },
+}
+
+pub enum BattleResolveError {
+    Invariant(BattleInvariantError),
+    Legality(CommandLegalityError),
+    Content(ContentPackError),
+    Rng(RngError),
+    Digest(MechanicalDigestError),
+    Canonical(CanonicalError),
+}
+
 pub fn resolve_turn(
     before: &GameState,
     commands: &CommandSet,
@@ -1305,6 +1326,15 @@ consumes no RNG. The operation argument exists solely to assign allocator-free
 presentation IDs; neither function reads protocol runtime state. Neither
 function owns a menu, UI, timer, or environment state. `er-game` maps the typed
 `BattleNextDecision` to the exact `BattleControlPlan` carried by material.
+
+Before-state validation, including the state error returned by command
+legality, maps to `InvalidBeforeState`. A reachable capability classified as
+unsupported maps to `UnsupportedEffectReached`. Candidate-state validation,
+mutation-evidence disagreement, and presentation sequence overflow map to the
+corresponding nested `InvalidAfterState` reason. All other command-legality
+errors remain `Legality`; content, RNG, digest, and canonical failures retain
+their typed source. `NoLegalReplacement` is a valid next decision, not an
+error.
 
 ```rust
 pub struct BattleTurnMaterialV1 {

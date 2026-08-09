@@ -825,6 +825,9 @@ jobs:
               "JavaScript-safe range": contract_dir / "m1-api.md",
               "decision_operation_id": contract_dir / "m3-api.md",
               "pub wave_seed: String": contract_dir / "m3-api.md",
+              "pub enum BattleResolveError": contract_dir / "m3-api.md",
+              "pub enum BattleInvariantError": contract_dir / "m3-api.md",
+              "pub enum BattleAfterStateFailure": contract_dir / "m3-api.md",
               "Replacement control copies the stored faint source and actor": contract_dir / "m3-api.md",
               "M3_PRESENTATION_FAILED": contract_dir / "m3-presentation-control.md",
               "QuiescentPreparedTransaction": contract_dir / "m3-snapshot-trace.md",
@@ -878,6 +881,19 @@ jobs:
               raise SystemExit(
                   "BattleState must carry the exact wave seed adjacent to its wave and turn coordinates"
               )
+
+          battle_resolve_error_shape = (
+              "pub enum BattleResolveError {\n"
+              "    Invariant(BattleInvariantError),\n"
+              "    Legality(CommandLegalityError),\n"
+              "    Content(ContentPackError),\n"
+              "    Rng(RngError),\n"
+              "    Digest(MechanicalDigestError),\n"
+              "    Canonical(CanonicalError),\n"
+              "}"
+          )
+          if battle_resolve_error_shape not in api_text:
+              raise SystemExit("BattleResolveError must preserve the frozen typed nesting")
 
           proposal_start = api_text.index("pub struct BattleReplacementProposalV1 {")
           proposal_end = api_text.index("\n}\n", proposal_start)

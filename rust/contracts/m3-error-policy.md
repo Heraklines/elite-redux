@@ -86,6 +86,26 @@ Diagnostic rejection/trace records may be returned as observations, but they
 must not become inputs to later mechanics or alter a determinism digest that is
 defined to exclude diagnostics.
 
+## Battle resolver error nesting
+
+`BattleResolveError` is the closed public resolver boundary. Invalid canonical
+input state, including `CommandLegalityError::State`, maps to
+`BattleInvariantError::InvalidBeforeState`. A reachable
+`CommandLegalityError::UnsupportedCapability` maps to
+`BattleInvariantError::UnsupportedEffectReached`; it is an invariant breach,
+not an ordinary rejected command. Candidate-state validation,
+mutation-evidence disagreement, and presentation sequence overflow map through
+`BattleInvariantError::InvalidAfterState` with their exact
+`BattleAfterStateFailure` source.
+
+Every other command-legality failure remains nested as
+`BattleResolveError::Legality`. A command-side content error is unwrapped to
+`BattleResolveError::Content`; direct content, RNG, mechanical-digest, and
+canonical failures retain their corresponding typed variants. No blanket
+legality conversion may erase these classifications. `NoLegalReplacement`
+remains a successful typed next decision and must never be converted into an
+error.
+
 ## No local fallback
 
 Workers may add private context to these errors. They may not add a new
