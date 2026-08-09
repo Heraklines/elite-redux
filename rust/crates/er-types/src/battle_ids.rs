@@ -87,17 +87,7 @@ macro_rules! safe_u53_id {
 
 macro_rules! positive_safe_u53_id {
     ($name:ident) => {
-        #[derive(
-            Clone,
-            Copy,
-            Debug,
-            Eq,
-            Hash,
-            Ord,
-            PartialEq,
-            PartialOrd,
-            Serialize,
-        )]
+        #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
         #[serde(transparent)]
         pub struct $name(SafeU53);
 
@@ -423,7 +413,10 @@ impl ContentPackHash {
         let Some(hex) = value.strip_prefix(Self::PREFIX) else {
             return Err(ContentPackHashError::InvalidPrefix);
         };
-        if hex.len() != 64 || !hex.bytes().all(|digit| matches!(digit, b'0'..=b'9' | b'a'..=b'f'))
+        if hex.len() != 64
+            || !hex
+                .bytes()
+                .all(|digit| matches!(digit, b'0'..=b'9' | b'a'..=b'f'))
         {
             return Err(ContentPackHashError::InvalidHex);
         }
@@ -513,8 +506,8 @@ impl TryFrom<u64> for PartyIndex {
     type Error = SlotIndexError;
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
-        let value = u8::try_from(value)
-            .map_err(|_| SlotIndexError::PartyValueTooLarge { value })?;
+        let value =
+            u8::try_from(value).map_err(|_| SlotIndexError::PartyValueTooLarge { value })?;
         Self::new(value)
     }
 }
@@ -573,8 +566,8 @@ impl TryFrom<u64> for MoveSlotIndex {
     type Error = SlotIndexError;
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
-        let value = u8::try_from(value)
-            .map_err(|_| SlotIndexError::MoveSlotValueTooLarge { value })?;
+        let value =
+            u8::try_from(value).map_err(|_| SlotIndexError::MoveSlotValueTooLarge { value })?;
         Self::new(value)
     }
 }
@@ -851,12 +844,10 @@ impl BattleFormat {
             (1, 1) if self == &Self::single() => Ok(()),
             (2, 2) if self == &Self::coop_double() => Ok(()),
             (1, 1) | (2, 2) => Err(BattleFormatError::UnsupportedTopology),
-            (player_capacity, enemy_capacity) => {
-                Err(BattleFormatError::UnsupportedCapacity {
-                    player_capacity,
-                    enemy_capacity,
-                })
-            }
+            (player_capacity, enemy_capacity) => Err(BattleFormatError::UnsupportedCapacity {
+                player_capacity,
+                enemy_capacity,
+            }),
         }
     }
 
@@ -924,12 +915,8 @@ impl<'de> Deserialize<'de> for BattleFormat {
         }
 
         let value = BattleFormatWire::deserialize(deserializer)?;
-        Self::new(
-            value.player_capacity,
-            value.enemy_capacity,
-            value.adjacency,
-        )
-        .map_err(serde::de::Error::custom)
+        Self::new(value.player_capacity, value.enemy_capacity, value.adjacency)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -972,7 +959,7 @@ mod tests {
         assert!(serde_json::from_str::<SpeciesId>("-1").is_err());
         assert!(serde_json::from_str::<SpeciesId>("1.5").is_err());
         let decoded = serde_json::from_str::<SpeciesId>("0");
-        assert_eq!(decoded, Ok(SpeciesId::ZERO));
+        assert_eq!(decoded.ok(), Some(SpeciesId::ZERO));
     }
 
     #[test]
@@ -1039,9 +1026,15 @@ mod tests {
             Some(String::new())
         );
         assert!(CanonicalHexBytes::new("00a1ff".to_owned()).is_ok());
-        assert_eq!(CanonicalHexBytes::from_bytes(&[0x00, 0xa1, 0xff]).as_str(), "00a1ff");
+        assert_eq!(
+            CanonicalHexBytes::from_bytes(&[0x00, 0xa1, 0xff]).as_str(),
+            "00a1ff"
+        );
         for value in ["0", "0x00", "00A1", "00a", "00 a1", "gg"] {
-            assert!(CanonicalHexBytes::new(value.to_owned()).is_err(), "accepted {value}");
+            assert!(
+                CanonicalHexBytes::new(value.to_owned()).is_err(),
+                "accepted {value}"
+            );
             let json = format!("\"{value}\"");
             assert!(serde_json::from_str::<CanonicalHexBytes>(&json).is_err());
         }
@@ -1108,18 +1101,20 @@ mod tests {
         assert_eq!(edge.map(|edge| edge.second), Ok(enemy));
         assert!(AdjacencyEdge::new(player, player).is_err());
         assert!(FieldSlot::new(BattleSide::Player, 3).is_err());
-        assert!(AdjacencyEdge::new(
-            FieldSlot {
-                side: BattleSide::Player,
-                position: 3,
-            },
-            enemy,
-        )
-        .is_err());
+        assert!(
+            AdjacencyEdge::new(
+                FieldSlot {
+                    side: BattleSide::Player,
+                    position: 3,
+                },
+                enemy,
+            )
+            .is_err()
+        );
         let reversed_json =
             r#"{"first":{"side":"ENEMY","position":0},"second":{"side":"PLAYER","position":0}}"#;
         let decoded = serde_json::from_str::<AdjacencyEdge>(reversed_json);
-        assert_eq!(decoded.map(|edge| edge.first), Ok(player));
+        assert_eq!(decoded.map(|edge| edge.first).ok(), Some(player));
     }
 
     #[test]
@@ -1137,30 +1132,40 @@ mod tests {
             second: player_zero,
         };
         let format = BattleFormat::new(1, 1, vec![edge]);
-        assert_eq!(format.as_ref().map(|value| value.adjacency[0].first), Ok(player_zero));
-        assert_eq!(format.as_ref().map(|value| value.adjacency[0].second), Ok(enemy_zero));
+        assert_eq!(
+            format.as_ref().map(|value| value.adjacency[0].first),
+            Ok(player_zero)
+        );
+        assert_eq!(
+            format.as_ref().map(|value| value.adjacency[0].second),
+            Ok(enemy_zero)
+        );
         assert!(BattleFormat::new(1, 1, vec![edge, edge]).is_err());
-        assert!(BattleFormat::new(
-            1,
-            1,
-            vec![AdjacencyEdge {
-                first: player_zero,
-                second: player_zero,
-            }],
-        )
-        .is_err());
-        assert!(BattleFormat::new(
-            1,
-            1,
-            vec![AdjacencyEdge {
-                first: FieldSlot {
-                    side: BattleSide::Player,
-                    position: 1,
-                },
-                second: enemy_zero,
-            }],
-        )
-        .is_err());
+        assert!(
+            BattleFormat::new(
+                1,
+                1,
+                vec![AdjacencyEdge {
+                    first: player_zero,
+                    second: player_zero,
+                }],
+            )
+            .is_err()
+        );
+        assert!(
+            BattleFormat::new(
+                1,
+                1,
+                vec![AdjacencyEdge {
+                    first: FieldSlot {
+                        side: BattleSide::Player,
+                        position: 1,
+                    },
+                    second: enemy_zero,
+                }],
+            )
+            .is_err()
+        );
         assert!(BattleFormat::new(0, 1, Vec::new()).is_err());
         assert!(BattleFormat::new(4, 1, Vec::new()).is_err());
     }
@@ -1182,9 +1187,11 @@ mod tests {
         if let Ok(format) = representable_triple {
             assert!(format.validate_m3_supported().is_err());
         }
-        assert!(BattleFormat::new(1, 2, Vec::new())
-            .and_then(|format| format.validate_m3_supported().map(|()| format))
-            .is_err());
+        assert!(
+            BattleFormat::new(1, 2, Vec::new())
+                .and_then(|format| format.validate_m3_supported().map(|()| format))
+                .is_err()
+        );
     }
 
     #[test]
@@ -1198,16 +1205,18 @@ mod tests {
         assert_eq!(round_trip(&event).ok(), Some(event.clone()));
         let unknown = r#"{"operation_id":"turn/e1/w1/t1/result","sequence":0,"extra":true}"#;
         assert!(serde_json::from_str::<BattlePresentationEventId>(unknown).is_err());
-        assert!(serde_json::from_str::<FieldSlot>(
-            r#"{"side":"PLAYER","position":0,"extra":true}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<FieldSlot>(r#"{"side":"PLAYER","position":0,"extra":true}"#,)
+                .is_err()
+        );
 
         let single = BattleFormat::single();
         assert_eq!(round_trip(&single).ok(), Some(single));
-        assert!(serde_json::from_str::<BattleFormat>(
-            r#"{"player_capacity":1,"enemy_capacity":1,"adjacency":[],"extra":true}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<BattleFormat>(
+                r#"{"player_capacity":1,"enemy_capacity":1,"adjacency":[],"extra":true}"#,
+            )
+            .is_err()
+        );
     }
 }

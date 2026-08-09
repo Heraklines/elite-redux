@@ -2,12 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::OperationId;
 pub use crate::battle_ids::ContentPackHash;
 use crate::battle_ids::{
-    AbilityId, ArenaConditionId, AuthorityEpoch, BattleSide, FieldSlot, FaintOccurrenceId,
-    MoveId, PartyIndex, PokemonId, TurnIndex, WaveIndex,
+    AbilityId, ArenaConditionId, AuthorityEpoch, BattleSide, FaintOccurrenceId, FieldSlot, MoveId,
+    PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
-use crate::OperationId;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
@@ -235,14 +235,14 @@ pub struct StatStages {
     pub evasion: i8,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WeatherState {
     pub kind: WeatherKind,
     pub remaining_turns: u16,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TerrainState {
     pub kind: TerrainKind,
@@ -357,30 +357,30 @@ mod tests {
     #[test]
     fn leaf_enums_use_closed_screaming_snake_case_wire_values() {
         let encoded = serde_json::to_string(&PokemonType::Electric);
-        assert_eq!(encoded, Ok("\"ELECTRIC\"".to_owned()));
+        assert_eq!(encoded.ok(), Some("\"ELECTRIC\"".to_owned()));
         assert!(serde_json::from_str::<PokemonType>("\"ELECTRICITY\"").is_err());
 
         let encoded = serde_json::to_string(&MoveEffectDefinition::ApplyStatus(StatusKind::Burn));
         assert_eq!(
-            encoded,
-            Ok(r#"{"kind":"APPLY_STATUS","value":"BURN"}"#.to_owned())
+            encoded.ok(),
+            Some(r#"{"kind":"APPLY_STATUS","value":"BURN"}"#.to_owned())
         );
-        assert!(serde_json::from_str::<MoveEffectDefinition>(
-            r#"{"kind":"NOT_A_REAL_EFFECT"}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<MoveEffectDefinition>(r#"{"kind":"NOT_A_REAL_EFFECT"}"#,)
+                .is_err()
+        );
 
         let encoded = serde_json::to_string(&CapabilityStatus::Unsupported {
             reason_code: UnsupportedReasonCode::TargetingUnsupported,
         });
         assert_eq!(
-            encoded,
-            Ok(r#"{"kind":"UNSUPPORTED","reason_code":"TARGETING_UNSUPPORTED"}"#.to_owned())
+            encoded.ok(),
+            Some(r#"{"kind":"UNSUPPORTED","reason_code":"TARGETING_UNSUPPORTED"}"#.to_owned())
         );
-        assert!(serde_json::from_str::<CapabilityStatus>(
-            r#"{"kind":"SUPPORTED","extra":true}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<CapabilityStatus>(r#"{"kind":"SUPPORTED","extra":true}"#,)
+                .is_err()
+        );
     }
 
     #[test]
@@ -393,12 +393,14 @@ mod tests {
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {
             let decoded = serde_json::from_str::<PokemonTyping>(&encoded);
-            assert_eq!(decoded, Ok(typing));
+            assert_eq!(decoded.ok(), Some(typing));
         }
-        assert!(serde_json::from_str::<PokemonTyping>(
-            r#"{"primary":"GRASS","secondary":null,"extra":true}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<PokemonTyping>(
+                r#"{"primary":"GRASS","secondary":null,"extra":true}"#,
+            )
+            .is_err()
+        );
 
         let stats = BattleStats {
             hp: 100,
@@ -411,7 +413,7 @@ mod tests {
         let encoded = serde_json::to_string(&stats);
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {
-            assert_eq!(serde_json::from_str::<BattleStats>(&encoded), Ok(stats));
+            assert_eq!(serde_json::from_str::<BattleStats>(&encoded).ok(), Some(stats));
         }
     }
 
@@ -419,12 +421,16 @@ mod tests {
     fn frozen_state_enums_preserve_unsupported_representable_values() {
         let weather = WeatherKind::UnsupportedOracleCode(7);
         let encoded = serde_json::to_string(&weather);
-        assert_eq!(encoded, Ok(r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#.to_owned()));
+        assert_eq!(
+            encoded.ok(),
+            Some(r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#.to_owned())
+        );
         assert_eq!(
             serde_json::from_str::<WeatherKind>(
                 r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#,
-            ),
-            Ok(weather)
+            )
+            .ok(),
+            Some(weather)
         );
 
         let status = StatusState {
@@ -435,7 +441,7 @@ mod tests {
         let encoded = serde_json::to_string(&status);
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {
-            assert_eq!(serde_json::from_str::<StatusState>(&encoded), Ok(status));
+            assert_eq!(serde_json::from_str::<StatusState>(&encoded).ok(), Some(status));
         }
     }
 }
