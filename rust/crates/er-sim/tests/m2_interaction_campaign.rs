@@ -996,6 +996,14 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             .guest
             .live_resources
             .controls
+            .is_empty()
+    );
+    assert!(
+        first_material
+            .snapshot
+            .guest
+            .live_resources
+            .waits
             .contains(&fixture.wait_control_id)
     );
     assert!(
