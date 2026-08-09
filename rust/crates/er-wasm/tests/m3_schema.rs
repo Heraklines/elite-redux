@@ -81,7 +81,7 @@ const FIXED_VECTORS: &[(&str, &str, &str)] = &[
 ];
 
 fn fixture_text(input: &str) -> &str {
-    input.trim_end_matches(|character| character == '\r' || character == '\n')
+    input.trim_end_matches(['\r', '\n'])
 }
 
 fn assert_schema_value(
