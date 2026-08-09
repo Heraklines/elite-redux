@@ -102,9 +102,13 @@ fn replacement_control(operation_id: &OperationId) -> NextControl {
 }
 
 fn interaction_control(operation_id: &OperationId) -> NextControl {
+    interaction_control_for_owner(0, operation_id)
+}
+
+fn interaction_control_for_owner(owner: u64, operation_id: &OperationId) -> NextControl {
     NextControl::SharedInteraction(SharedInteractionControl {
         operation_id: operation_id.clone(),
-        owner_seat_id: seat(0),
+        owner_seat_id: seat(owner),
         epoch: safe(1),
         wave: safe(1),
         turn: safe(1),
@@ -144,6 +148,29 @@ fn command_plan(
         } else {
             Vec::new()
         },
+        cancel: CancelPolicy::Disabled,
+    })
+}
+
+fn interaction_plan_with_proposal(
+    control: &NextControl,
+    operation_id: &OperationId,
+) -> TestResult<ControlMenuPlan> {
+    let NextControl::SharedInteraction(control) = control else {
+        return Err("interaction plan requires interaction control".into());
+    };
+    Ok(ControlMenuPlan::Interaction {
+        control_id: control_id_of(&NextControl::SharedInteraction(control.clone())),
+        owner_seat_id: control.owner_seat_id,
+        operation_id: operation_id.clone(),
+        surface_class: control.surface_class.clone(),
+        operation_kind: control.operation_kind.clone(),
+        options: vec![option("accept")?],
+        proposals: vec![MenuProposalPlan {
+            option_id: MenuOptionId::new("accept")?,
+            fingerprint: "fp".to_owned(),
+            payload: json!({"choice": "accept"}),
+        }],
         cancel: CancelPolicy::Disabled,
     })
 }
@@ -446,6 +473,42 @@ fn sent_frame(effects: &[KernelEffect]) -> Option<er_types::NetworkFrame> {
         KernelEffect::SendFrame { frame, .. } => Some(frame.clone()),
         _ => None,
     })
+}
+
+fn proposal_timer_ids(effects: &[KernelEffect]) -> Vec<er_types::TimerId> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer { timer_id, owner, .. }
+                if owner.owner_id.starts_with("m2-kernel-proposal") =>
+            {
+                Some(*timer_id)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn initial_interaction_menu(
+    control: &NextControl,
+    operation_id: &OperationId,
+) -> TestResult<MenuState> {
+    let NextControl::SharedInteraction(control) = control else {
+        return Err("interaction menu requires interaction control".into());
+    };
+    Ok(MenuState::Interaction(er_types::InteractionMenu {
+        operation_id: operation_id.clone(),
+        control_id: control_id_of(&NextControl::SharedInteraction(control.clone())),
+        surface_class: control.surface_class.clone(),
+        operation_kind: control.operation_kind.clone(),
+        choice: er_types::ChoiceListMenu {
+            cursor: SafeU53::ZERO,
+            page: SafeU53::ZERO,
+            wrap: false,
+            options: vec![option("accept")?],
+            cancel: CancelPolicy::Disabled,
+        },
+    }))
 }
 
 #[test]
@@ -1100,6 +1163,189 @@ fn replacement_and_interaction_successors_install_their_embedded_operation_ids()
         return Err("interaction successor menu was not installed".into());
     };
     assert_eq!(menu.operation_id, host);
+    Ok(())
+}
+
+#[test]
+fn replica_interaction_commit_settles_proposal_lease_before_material_and_duplicate_is_idempotent()
+-> TestResult {
+    let operation_id = operation("replica.interaction-lease")?;
+    let control = interaction_control_for_owner(1, &operation_id);
+    let mut kernel = replica_kernel(
+        replica_config(vec![interaction_plan_with_proposal(&control, &operation_id)?])?,
+        ui(
+            initial_interaction_menu(&control, &operation_id)?,
+            Some(seat(1)),
+            true,
+        ),
+    );
+
+    let armed = key_down(&mut kernel, seat(1))?;
+    let proposal_timers = proposal_timer_ids(&armed);
+    assert_eq!(proposal_timers.len(), 2);
+    assert_eq!(
+        armed
+            .iter()
+            .filter(|effect| {
+                matches!(
+                    effect,
+                    KernelEffect::ScheduleTimer { owner, time_class, .. }
+                        if owner.owner_id.starts_with("m2-kernel-proposal")
+                            && *time_class == er_types::TimeClass::Absolute
+                )
+            })
+            .count(),
+        1
+    );
+    assert_eq!(
+        armed
+            .iter()
+            .filter(|effect| {
+                matches!(
+                    effect,
+                    KernelEffect::ScheduleTimer { owner, time_class, .. }
+                        if owner.owner_id.starts_with("m2-kernel-proposal")
+                            && *time_class == er_types::TimeClass::Connected
+                )
+            })
+            .count(),
+        1
+    );
+    assert!(armed.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::SendProposal { proposal } if proposal.operation_id == operation_id
+        )
+    }));
+    key_up(&mut kernel, seat(1))?;
+    assert!(kernel.live_resources().proposal_leases.contains(&operation_id));
+    assert!(proposal_timers
+        .iter()
+        .all(|timer_id| kernel.live_resources().timers.contains(timer_id)));
+
+    let entry = AuthorityEntry {
+        context: context(0, 0, 1)?,
+        revision: Revision::new(safe(1)),
+        operation_id: operation_id.clone(),
+        kind: AuthorityEntryKind::InteractionCommit,
+        material: Material {
+            digest: "replica-interaction-lease-material".to_owned(),
+            payload: json!({
+                "envelope": {
+                    "sessionEpoch": 1,
+                    "wave": 1,
+                    "turn": 1,
+                    "pendingOperation": {"kind": "ABILITY_PICK"}
+                },
+                "surfaceClass": "op:ability",
+                "choice": "accept"
+            }),
+        },
+        next_control: interaction_control(&operation_id),
+        subsumes: Vec::new(),
+    };
+    let frame = network_frame(
+        context(0, 0, 1)?,
+        FrameType::AuthorityEntry,
+        serde_json::to_value(AuthorityEntryBody::from(&entry))?,
+    );
+    let accepted = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: frame.clone(),
+    })?;
+    let apply_index = accepted
+        .iter()
+        .position(|effect| {
+            matches!(
+                effect,
+                KernelEffect::ApplyAuthorityMaterial { operation_id: actual, .. }
+                    if actual == &operation_id
+            )
+        })
+        .ok_or("interaction material effect was not emitted")?;
+    for timer_id in &proposal_timers {
+        let cancellations = accepted
+            .iter()
+            .enumerate()
+            .filter_map(|(index, effect)| match effect {
+                KernelEffect::CancelTimer {
+                    timer_id: actual, ..
+                } if actual == timer_id => Some(index),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(cancellations.len(), 1);
+        assert!(cancellations[0] < apply_index);
+    }
+    assert!(!kernel.live_resources().proposal_leases.contains(&operation_id));
+    assert!(proposal_timers
+        .iter()
+        .all(|timer_id| !kernel.live_resources().timers.contains(timer_id)));
+
+    let duplicate = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame,
+    })?;
+    assert!(has_apply(&duplicate, 1, &operation_id));
+    assert!(!duplicate.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::CancelTimer { timer_id, .. } if proposal_timers.contains(timer_id)
+        )
+    }));
+    assert!(!kernel.live_resources().proposal_leases.contains(&operation_id));
+    Ok(())
+}
+
+#[test]
+fn replica_turn_commit_does_not_settle_interaction_proposal_lease() -> TestResult {
+    let operation_id = operation("replica.turn-lease")?;
+    let interaction = interaction_control_for_owner(1, &operation_id);
+    let mut kernel = replica_kernel(
+        replica_config(vec![interaction_plan_with_proposal(&interaction, &operation_id)?])?,
+        ui(
+            initial_interaction_menu(&interaction, &operation_id)?,
+            Some(seat(1)),
+            true,
+        ),
+    );
+
+    let armed = key_down(&mut kernel, seat(1))?;
+    let proposal_timers = proposal_timer_ids(&armed);
+    assert_eq!(proposal_timers.len(), 2);
+    key_up(&mut kernel, seat(1))?;
+
+    let entry = AuthorityEntry {
+        context: context(0, 0, 1)?,
+        revision: Revision::new(safe(1)),
+        operation_id: operation_id.clone(),
+        kind: AuthorityEntryKind::TurnCommit,
+        material: Material {
+            digest: "replica-turn-lease-material".to_owned(),
+            payload: turn_payload(),
+        },
+        next_control: command_control(0, 99, 1),
+        subsumes: Vec::new(),
+    };
+    let accepted = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: network_frame(
+            context(0, 0, 1)?,
+            FrameType::AuthorityEntry,
+            serde_json::to_value(AuthorityEntryBody::from(&entry))?,
+        ),
+    })?;
+    assert!(has_apply(&accepted, 1, &operation_id));
+    assert!(!accepted.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::CancelTimer { timer_id, .. } if proposal_timers.contains(timer_id)
+        )
+    }));
+    assert!(kernel.live_resources().proposal_leases.contains(&operation_id));
+    assert!(proposal_timers
+        .iter()
+        .all(|timer_id| kernel.live_resources().timers.contains(timer_id)));
     Ok(())
 }
 

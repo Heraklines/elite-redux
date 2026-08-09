@@ -14,15 +14,15 @@ use er_protocol::{
     control_id_of, frame_contexts_compatible,
 };
 use er_types::{
-    AuthorityEntry, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice, ButtonEvent,
-    CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration, ControlProjectionOutcome,
-    FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton, InputMap, InputRouterOutput,
-    InputTimerCommand, InteractionMenu, MaterialApplicationOutcome, MenuGeneration, MenuOption,
-    MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId, PresentationEvent,
-    PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame, RecoveryAppliedProof,
-    RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody, ReplacementMenu,
-    Revision, SafeU53, SeatId, TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState,
-    TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
+    AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice,
+    ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration,
+    ControlProjectionOutcome, FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton, InputMap,
+    InputRouterOutput, InputTimerCommand, InteractionMenu, MaterialApplicationOutcome,
+    MenuGeneration, MenuOption, MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId,
+    PresentationEvent, PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame,
+    RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody,
+    ReplacementMenu, Revision, SafeU53, SeatId, TailRequestBody, TerminalFrameBody, TerminalMenu,
+    TerminalState, TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use serde_json::{Value, json};
@@ -1321,7 +1321,21 @@ impl GameKernel {
             return Ok(Vec::new());
         }
         let entry = body.with_context(context);
+        let operation_id = entry.operation_id.clone();
+        let kind = entry.kind;
         let step = replica.replica.admit(entry);
+        let proposal_actions = if matches!(
+            &step.admission,
+            ReplicaAdmission::Admitted { .. } | ReplicaAdmission::Duplicate { .. }
+        ) && kind == AuthorityEntryKind::InteractionCommit
+        {
+            let (_, actions) = replica
+                .leases
+                .observe_committed(&operation_id, &mut self.scheduler);
+            actions
+        } else {
+            Vec::new()
+        };
         let mut effects = match step.admission {
             ReplicaAdmission::Rejected { reason } => {
                 self.enter_terminal(format!("authority entry rejected: {reason:?}"))
@@ -1330,6 +1344,7 @@ impl GameKernel {
             | ReplicaAdmission::Duplicate { .. }
             | ReplicaAdmission::Gap { .. } => Vec::new(),
         };
+        effects.extend(self.map_proposal_actions(proposal_actions));
         effects.extend(self.map_replica_actions(step.actions));
         Ok(effects)
     }
