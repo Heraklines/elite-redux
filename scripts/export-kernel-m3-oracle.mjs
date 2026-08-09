@@ -2,8 +2,6 @@
 
 import { spawnSync } from "node:child_process";
 import {
-  basename,
-  dirname,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -11,7 +9,7 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
