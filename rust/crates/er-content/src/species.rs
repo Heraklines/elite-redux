@@ -128,13 +128,8 @@ impl<'de> Deserialize<'de> for SpeciesDefinition {
         }
 
         let wire = SpeciesDefinitionWire::deserialize(deserializer)?;
-        Self::new(
-            wire.id,
-            wire.base_types,
-            wire.base_stats,
-            wire.capability,
-        )
-        .map_err(serde::de::Error::custom)
+        Self::new(wire.id, wire.base_types, wire.base_stats, wire.capability)
+            .map_err(serde::de::Error::custom)
     }
 }
 

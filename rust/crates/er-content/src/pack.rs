@@ -3,7 +3,9 @@
 use crate::abilities::{
     AbilityCollectionError, AbilityDefinition, ability_definitions, validate_selected_abilities,
 };
-use crate::moves::{MoveCollectionError, MoveDefinition, move_definitions, validate_selected_moves};
+use crate::moves::{
+    MoveCollectionError, MoveDefinition, move_definitions, validate_selected_moves,
+};
 use crate::species::{
     SpeciesCollectionError, SpeciesDefinition, species_definitions, validate_selected_species,
 };
@@ -687,7 +689,10 @@ fn canonical_capability_entries() -> Vec<CapabilityEntry> {
             CapabilitySubject::Ability(ability_id(25)),
             supported(),
             &["wonder-guard-block"],
-            &["wonder-guard-super-effective-pass", "wonder-guard-status-pass"],
+            &[
+                "wonder-guard-super-effective-pass",
+                "wonder-guard-status-pass",
+            ],
         ),
         capability_entry(
             CapabilitySubject::Status(StatusKind::Poison),

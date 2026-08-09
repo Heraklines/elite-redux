@@ -9,8 +9,8 @@ use er_content::pack::{
     selected_type_chart,
 };
 use er_content::species::{
-    SpeciesBaseStats, SpeciesDefinitionError, SpeciesLookupError, find_species,
-    lookup_species, selected_species_definitions, validate_selected_species,
+    SpeciesBaseStats, SpeciesDefinitionError, SpeciesLookupError, find_species, lookup_species,
+    selected_species_definitions, validate_selected_species,
 };
 use er_types::battle_ids::{AbilityId, ContentPackHash, MoveId, SpeciesId};
 use er_types::battle_model::{
@@ -155,9 +155,11 @@ fn selected_species_match_manifest_values_and_order() -> Result<(), Box<dyn Erro
             speed: 90,
         }
     );
-    assert!(definitions
-        .iter()
-        .all(|definition| definition.capability == CapabilityStatus::Supported));
+    assert!(
+        definitions
+            .iter()
+            .all(|definition| definition.capability == CapabilityStatus::Supported)
+    );
     Ok(())
 }
 
@@ -217,18 +219,66 @@ fn type_chart_is_exact_sorted_and_neutral_by_absence() -> Result<(), Box<dyn Err
     assert_eq!(
         entries,
         vec![
-            (PokemonType::Fire, PokemonType::Water, SingleTypeMultiplier::Half),
-            (PokemonType::Fire, PokemonType::Grass, SingleTypeMultiplier::Two),
-            (PokemonType::Electric, PokemonType::Water, SingleTypeMultiplier::Two),
-            (PokemonType::Electric, PokemonType::Grass, SingleTypeMultiplier::Half),
-            (PokemonType::Electric, PokemonType::Ground, SingleTypeMultiplier::Zero),
-            (PokemonType::Grass, PokemonType::Water, SingleTypeMultiplier::Two),
-            (PokemonType::Grass, PokemonType::Grass, SingleTypeMultiplier::Half),
-            (PokemonType::Grass, PokemonType::Poison, SingleTypeMultiplier::Half),
-            (PokemonType::Grass, PokemonType::Ground, SingleTypeMultiplier::Two),
-            (PokemonType::Poison, PokemonType::Grass, SingleTypeMultiplier::Two),
-            (PokemonType::Poison, PokemonType::Poison, SingleTypeMultiplier::Half),
-            (PokemonType::Poison, PokemonType::Ground, SingleTypeMultiplier::Half),
+            (
+                PokemonType::Fire,
+                PokemonType::Water,
+                SingleTypeMultiplier::Half
+            ),
+            (
+                PokemonType::Fire,
+                PokemonType::Grass,
+                SingleTypeMultiplier::Two
+            ),
+            (
+                PokemonType::Electric,
+                PokemonType::Water,
+                SingleTypeMultiplier::Two
+            ),
+            (
+                PokemonType::Electric,
+                PokemonType::Grass,
+                SingleTypeMultiplier::Half
+            ),
+            (
+                PokemonType::Electric,
+                PokemonType::Ground,
+                SingleTypeMultiplier::Zero
+            ),
+            (
+                PokemonType::Grass,
+                PokemonType::Water,
+                SingleTypeMultiplier::Two
+            ),
+            (
+                PokemonType::Grass,
+                PokemonType::Grass,
+                SingleTypeMultiplier::Half
+            ),
+            (
+                PokemonType::Grass,
+                PokemonType::Poison,
+                SingleTypeMultiplier::Half
+            ),
+            (
+                PokemonType::Grass,
+                PokemonType::Ground,
+                SingleTypeMultiplier::Two
+            ),
+            (
+                PokemonType::Poison,
+                PokemonType::Grass,
+                SingleTypeMultiplier::Two
+            ),
+            (
+                PokemonType::Poison,
+                PokemonType::Poison,
+                SingleTypeMultiplier::Half
+            ),
+            (
+                PokemonType::Poison,
+                PokemonType::Ground,
+                SingleTypeMultiplier::Half
+            ),
         ]
     );
     assert_eq!(
@@ -270,7 +320,7 @@ fn type_chart_rejects_neutral_duplicate_unsorted_and_altered_entries() {
     ));
 
     let mut altered = selected_type_chart();
-    altered.entries[0].multiplier = SingleTypeMultiplier::Half;
+    altered.entries[0].multiplier = SingleTypeMultiplier::Two;
     assert!(matches!(
         altered.validate(),
         Err(TypeChartError::DefinitionMismatch)
@@ -340,7 +390,10 @@ fn capability_manifest_matches_exact_subject_order_and_cases() -> Result<(), Box
         vec!["stage-floor-cap"],
         vec!["physical-hit"],
         vec!["intimidate-stage-floor"],
-        vec!["wonder-guard-super-effective-pass", "wonder-guard-status-pass"],
+        vec![
+            "wonder-guard-super-effective-pass",
+            "wonder-guard-status-pass",
+        ],
         vec!["poison-residual"],
         vec!["paralysis-full-stop", "paralysis-speed-order"],
         vec!["burn-residual", "burn-physical-penalty"],
@@ -362,9 +415,11 @@ fn capability_manifest_matches_exact_subject_order_and_cases() -> Result<(), Box
         assert_eq!(actual_positive, positives[index]);
         assert_eq!(actual_edges, edges[index]);
     }
-    assert!(manifest
-        .find(&CapabilitySubject::Move(move_id(351)))
-        .is_some());
+    assert!(
+        manifest
+            .find(&CapabilitySubject::Move(move_id(351)))
+            .is_some()
+    );
     Ok(())
 }
 
@@ -435,12 +490,19 @@ fn selected_pack_hash_is_deterministic_and_validates_preimage() -> Result<(), Bo
     assert_eq!(first, second);
     assert_eq!(first.hash, first.recompute_hash()?);
     assert!(first.hash.as_str().starts_with(ContentPackHash::PREFIX));
-    assert_eq!(first.hash.as_str().len(), ContentPackHash::PREFIX.len() + 64);
-    assert!(first.hash.as_str().strip_prefix(ContentPackHash::PREFIX).is_some_and(
-        |hex| hex
-            .bytes()
-            .all(|digit| digit.is_ascii_hexdigit() && !digit.is_ascii_uppercase())
-    ));
+    assert_eq!(
+        first.hash.as_str().len(),
+        ContentPackHash::PREFIX.len() + 64
+    );
+    assert!(
+        first
+            .hash
+            .as_str()
+            .strip_prefix(ContentPackHash::PREFIX)
+            .is_some_and(|hex| hex
+                .bytes()
+                .all(|digit| digit.is_ascii_hexdigit() && !digit.is_ascii_uppercase()))
+    );
 
     let mut value = serde_json::to_value(&first)?;
     let object = value
@@ -469,11 +531,8 @@ fn selected_pack_hash_is_deterministic_and_validates_preimage() -> Result<(), Bo
 #[test]
 fn content_pack_rejects_mutations_and_strict_unknown_fields() -> Result<(), Box<dyn Error>> {
     let mut altered_hash = selected_content_pack()?;
-    altered_hash.hash = ContentPackHash::new(format!(
-        "{}{}",
-        ContentPackHash::PREFIX,
-        "0".repeat(64)
-    ))?;
+    altered_hash.hash =
+        ContentPackHash::new(format!("{}{}", ContentPackHash::PREFIX, "0".repeat(64)))?;
     assert!(matches!(
         altered_hash.validate(),
         Err(ContentPackError::HashMismatch { .. })
@@ -522,8 +581,8 @@ fn content_pack_rejects_mutations_and_strict_unknown_fields() -> Result<(), Box<
     ));
 
     let mut altered_capability = selected_content_pack()?;
-    altered_capability.capability_manifest.entries[0]
-        .required_positive_cases[0] = "not-the-oracle-case".to_owned();
+    altered_capability.capability_manifest.entries[0].required_positive_cases[0] =
+        "not-the-oracle-case".to_owned();
     assert!(matches!(
         altered_capability.validate(),
         Err(ContentPackError::CapabilityManifest(_))
