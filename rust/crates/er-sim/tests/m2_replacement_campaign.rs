@@ -1213,7 +1213,12 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             focus: InputFocus::Game,
         },
     })?;
-    assert_cursor_intent(std::slice::from_ref(&held_move), ids.guest, initial_generation, safe(1));
+    assert_cursor_intent(
+        std::slice::from_ref(&held_move),
+        ids.guest,
+        initial_generation,
+        safe(1),
+    );
     trace.push(held_move.clone());
     assert_replacement_menu(
         &held_move.snapshot,

@@ -892,7 +892,9 @@ fn mask_non_code(source: &str) -> String {
             mask_range(&mut output, bytes, start, index);
             continue;
         }
-        if bytes[index] == b'\'' && let Some(end) = char_literal_end(bytes, index) {
+        if bytes[index] == b'\''
+            && let Some(end) = char_literal_end(bytes, index)
+        {
             mask_range(&mut output, bytes, index, end);
             index = end;
             continue;
