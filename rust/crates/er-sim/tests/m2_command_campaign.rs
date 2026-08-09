@@ -1225,15 +1225,19 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .generated_effects
         .iter()
         .filter_map(|effect| match effect {
-            KernelEffect::CancelTimer {
-                endpoint,
-                timer_id,
-            } => Some((*endpoint, *timer_id)),
+            KernelEffect::CancelTimer { endpoint, timer_id } => Some((*endpoint, *timer_id)),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert_eq!(cancelled_timers, vec![(seat(1), rearmed_repeat_timer_id)]);
-    assert!(stale_release.snapshot.guest.live_resources.timers.is_empty());
+    assert!(
+        stale_release
+            .snapshot
+            .guest
+            .live_resources
+            .timers
+            .is_empty()
+    );
     assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
     steps.push(stale_release);
 
