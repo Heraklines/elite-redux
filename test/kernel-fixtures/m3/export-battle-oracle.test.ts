@@ -42,7 +42,7 @@ import Phaser from "phaser";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(HERE, "../../../..");
+const REPO_ROOT = resolve(HERE, "../../..");
 const OUTPUT_ROOT = process.env.M3_ORACLE_OUTPUT_ROOT;
 const ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const CASE_IDS = [
