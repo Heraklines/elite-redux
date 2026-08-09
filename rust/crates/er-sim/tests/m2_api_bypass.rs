@@ -892,12 +892,10 @@ fn mask_non_code(source: &str) -> String {
             mask_range(&mut output, bytes, start, index);
             continue;
         }
-        if bytes[index] == b'\'' {
-            if let Some(end) = char_literal_end(bytes, index) {
-                mask_range(&mut output, bytes, index, end);
-                index = end;
-                continue;
-            }
+        if bytes[index] == b'\'' && let Some(end) = char_literal_end(bytes, index) {
+            mask_range(&mut output, bytes, index, end);
+            index = end;
+            continue;
         }
         index += 1;
     }
@@ -1210,7 +1208,7 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
             continue;
         };
         let statement = &code[position..position + statement_end];
-        let flattened = compact(statement).replace('{', "").replace('}', "");
+        let flattened = compact(statement).replace(['{', '}'], "");
         if !(flattened.contains("std::time") || flattened.contains("core::time")) {
             continue;
         }
