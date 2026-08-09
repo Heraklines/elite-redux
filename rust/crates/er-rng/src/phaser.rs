@@ -700,15 +700,9 @@ mod tests {
         intermediate_coercions.n = 100_000_000_000.0;
         let intermediate_result = intermediate_coercions.hash("A");
         assert_eq!(intermediate_result.to_bits(), 0x0000_0000_0000_0000);
-        assert_eq!(
-            intermediate_coercions.n.to_bits(),
-            0xc5da_7479_eb00_0000
-        );
+        assert_eq!(intermediate_coercions.n.to_bits(), 0xc5da_7479_eb00_0000);
         assert_ne!(intermediate_result.to_bits(), 0x3fe2_8187_47a0_0000);
-        assert_ne!(
-            intermediate_coercions.n.to_bits(),
-            0x41e2_8187_47a0_0000
-        );
+        assert_ne!(intermediate_coercions.n.to_bits(), 0x41e2_8187_47a0_0000);
     }
 
     #[test]
