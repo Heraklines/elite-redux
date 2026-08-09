@@ -78,7 +78,7 @@ fn supported_formats_have_canonical_slot_order_and_exact_closure() -> Result<(),
     let doubles = BattleFormat::coop_double();
     assert_eq!(canonical_slots(&doubles)?.len(), 4);
     assert_eq!(
-        canonical_slots(&doubles)?.get(0).copied(),
+        canonical_slots(&doubles)?.first().copied(),
         Some(field_slot(BattleSide::Player, 0))
     );
     assert_eq!(
@@ -301,8 +301,18 @@ fn neutral_conditions_round_trip_and_active_conditions_fail_closed() -> Result<(
 fn malformed_identities_and_unknown_condition_fields_are_rejected() -> Result<(), Box<dyn Error>> {
     assert!(serde_json::from_str::<FieldSlot>(r#"{"side":"PLAYER","position":3}"#).is_err());
     assert!(serde_json::from_str::<PokemonId>("9007199254740992").is_err());
-    assert!(serde_json::from_str::<FieldState>(r#"{"slots":[{"slot":{"side":"PLAYER","position":0},"occupant":null,"extra":true}]}"#).is_err());
-    assert!(serde_json::from_str::<WeatherState>(r#"{"kind":{"kind":"NONE"},"remaining_turns":0,"extra":true}"#).is_err());
+    assert!(
+        serde_json::from_str::<FieldState>(
+            r#"{"slots":[{"slot":{"side":"PLAYER","position":0},"occupant":null,"extra":true}]}"#
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<WeatherState>(
+            r#"{"kind":{"kind":"NONE"},"remaining_turns":0,"extra":true}"#
+        )
+        .is_err()
+    );
     assert!(serde_json::from_str::<ArenaConditionState>(
         r#"{"condition":"m3/arena","scope":{"kind":"BOTH"},"turn_count":1,"layers":1,"extra":true}"#
     )
@@ -340,7 +350,10 @@ fn command_collection_and_faint_occurrence_shapes_are_explicit_and_closed()
     };
     let encoded = serde_json::to_string(&occurrence)?;
     assert!(encoded.contains(r#""replacement":{"kind":"PENDING"}"#));
-    assert_eq!(serde_json::from_str::<FaintOccurrence>(&encoded)?, occurrence);
+    assert_eq!(
+        serde_json::from_str::<FaintOccurrence>(&encoded)?,
+        occurrence
+    );
     let malformed = format!("{},\"extra\":true}}", encoded.trim_end_matches('}'));
     assert!(serde_json::from_str::<FaintOccurrence>(&malformed).is_err());
     Ok(())
