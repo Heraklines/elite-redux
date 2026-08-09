@@ -1406,13 +1406,16 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
 
     let mut delayed_recovery_evidence = Vec::<(SafeU53, FrameType)>::new();
     let mut delayed_control_receipt_packets = Vec::<SafeU53>::new();
-    for _ in 0..48 {
+    // Settle recovery one network tick at a time. Since enqueued packets have
+    // at least one millisecond of latency, sends produced at this boundary
+    // remain queued and retain exact packet ownership for evidence selection.
+    for _ in 0..480 {
         let before_step = trace
             .last()
             .ok_or_else(|| std::io::Error::other("recovery step has no preceding snapshot"))?
             .snapshot
             .clone();
-        let step = pair.advance_time(safe(10))?;
+        let step = pair.advance_time(safe(1))?;
         let recovery_released = step
             .snapshot
             .guest
