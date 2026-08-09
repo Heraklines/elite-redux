@@ -159,22 +159,22 @@ impl MoveDefinition {
             return Err(MoveDefinitionError::InvalidPower { id: self.id });
         }
 
-        if let MoveAccuracy::Percent(accuracy) = self.accuracy {
-            if accuracy == 0 {
-                return Err(MoveDefinitionError::InvalidAccuracy {
-                    id: self.id,
-                    accuracy,
-                });
-            }
+        if let MoveAccuracy::Percent(accuracy) = self.accuracy
+            && accuracy == 0
+        {
+            return Err(MoveDefinitionError::InvalidAccuracy {
+                id: self.id,
+                accuracy,
+            });
         }
 
-        if let EffectChance::Percent(chance) = self.effect_chance {
-            if chance > 100 {
-                return Err(MoveDefinitionError::InvalidEffectChance {
-                    id: self.id,
-                    chance,
-                });
-            }
+        if let EffectChance::Percent(chance) = self.effect_chance
+            && chance > 100
+        {
+            return Err(MoveDefinitionError::InvalidEffectChance {
+                id: self.id,
+                chance,
+            });
         }
 
         match (&self.category, &self.power) {
