@@ -803,6 +803,7 @@ pub struct BattleReplacementProposalV1 {
     pub resolved_turn: TurnIndex,
     pub owner_seat: SeatId,
     pub occurrence: FaintOccurrenceId,
+    pub turn_occurrence: u32,
     pub field_slot: FieldSlot,
     pub selection: ReplacementSelection,
     pub menu_instance_id: MenuInstanceId,
@@ -870,7 +871,7 @@ turn result:
 battle/{battleId}/wave/{wave}/turn/{turn}/result
 
 replacement (extends the pinned Authority V2 adapter component grammar):
-RC/e{epoch}/b{battleId}/w{wave}/t{turn}/o{occurrence}/f{fieldPosition}/s{ownerSeat}
+RC/e{epoch}/b{battleId}/w{wave}/t{turn}/o{turnOccurrence}/f{fieldPosition}/s{ownerSeat}
 ```
 
 All numeric components are canonical unsigned decimal without padding or sign.
@@ -895,7 +896,13 @@ The authority's own proposal enters the same ledger and reducer as a remote
 proposal; only delivery is internal instead of a proposal lease.
 
 `BattleReplacementProposalV1` uses the exact REPLACEMENT operation grammar.
-An external proposal may contain only `ReplacementSelection::Selected`;
+Its `occurrence` is the globally unique queue identity used to resolve the
+stored `FaintOccurrence`; its `turn_occurrence` is the source-local sequence
+used exclusively for the operation ID's `o` component. Admission requires the
+stored occurrence's source epoch, wave, resolved turn, and `turn_occurrence`,
+plus its owner and field slot, to equal the proposal and parsed operation
+address exactly. The two occurrence identities are never interchangeable. An
+external proposal may contain only `ReplacementSelection::Selected`;
 `NoLegalReplacement` is an internal deterministic decision and never a human
 or network-supplied default. Its fingerprint is
 `brp1-<canonical UTF-16 length>-<FNV-1a64 lowercase 16-hex>` over every field

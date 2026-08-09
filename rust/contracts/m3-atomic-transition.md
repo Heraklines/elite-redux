@@ -70,14 +70,16 @@ is allowed to survive a failed external step.
 REPLACEMENT uses the same fourteen-step path and the same clone-and-swap
 boundary, with these exact substitutions:
 
-1. Validate the stored head `FaintOccurrence`, owner, field slot, current
-   `ReplacementProgress`, and admitted `BattleReplacementProposalV1` when the
-   selection is human-supplied.
+1. Resolve the proposal's global `FaintOccurrenceId` to the stored head and
+   validate its source epoch, wave, resolved turn, per-turn occurrence, owner,
+   field slot, current `ReplacementProgress`, and admitted
+   `BattleReplacementProposalV1` when the selection is human-supplied.
 2. For an owner with no legal replacement, construct
    `ReplacementSelection::NoLegalReplacement` internally; no proposal or menu
    fallback is accepted.
-3. Derive the pinned REPLACEMENT operation ID from the stored occurrence and
-   call `resolve_replacement` with that ID. The resolver consumes no RNG.
+3. Derive the pinned REPLACEMENT operation ID from the stored occurrence's
+   `FaintSource.turn_occurrence`, never its global diagnostic ID, and call
+   `resolve_replacement` with that ID. The resolver consumes no RNG.
 4. Build, serialize, deserialize, and apply
    `BattleReplacementMaterialV1` through the common production replacement
    applier.

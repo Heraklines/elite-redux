@@ -819,6 +819,7 @@ jobs:
               "NoLegalReplacement": contract_dir / "m3-api.md",
               "PartyOptionSelect": contract_dir / "m3-api.md",
               "BattleReplacementProposalV1": contract_dir / "m3-api.md",
+              "used exclusively for the operation ID's `o` component": contract_dir / "m3-api.md",
               "decision_operation_id": contract_dir / "m3-api.md",
               "M3_PRESENTATION_FAILED": contract_dir / "m3-presentation-control.md",
               "QuiescentPreparedTransaction": contract_dir / "m3-snapshot-trace.md",
@@ -847,6 +848,23 @@ jobs:
           for phrase, path in required_api_phrases.items():
               if phrase not in path.read_text(encoding="utf-8"):
                   raise SystemExit(f"required contract phrase {phrase!r} absent from {path}")
+
+          api_text = (contract_dir / "m3-api.md").read_text(encoding="utf-8")
+          proposal_start = api_text.index("pub struct BattleReplacementProposalV1 {")
+          proposal_end = api_text.index("\n}\n", proposal_start)
+          proposal_shape = api_text[proposal_start:proposal_end]
+          dual_occurrence_shape = (
+              "    pub occurrence: FaintOccurrenceId,\n"
+              "    pub turn_occurrence: u32,\n"
+          )
+          if dual_occurrence_shape not in proposal_shape:
+              raise SystemExit(
+                  "BattleReplacementProposalV1 must carry adjacent global and per-turn occurrence identities"
+              )
+          if "o{turnOccurrence}" not in api_text or "o{occurrence}" in api_text:
+              raise SystemExit(
+                  "REPLACEMENT operation grammar must bind /o exclusively to turn_occurrence"
+              )
 
           rng_contract_text = (contract_dir / "m3-js-number-rng.md").read_text(encoding="utf-8")
           for stale_transcription in (
