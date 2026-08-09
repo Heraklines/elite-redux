@@ -8,7 +8,7 @@ use er_state::pokemon::{
     StatusValidationError, TypingPosition, TypingValidationError, calculate_max_pp,
     move_slot_is_usable, normalize_max_pp_override, validate_ability_loadout,
     validate_m3_status_state, validate_m3_typing, validate_move_slot, validate_move_slot_metadata,
-    validate_move_slots, validate_status_state, validate_stat_stages, validate_typing,
+    validate_move_slots, validate_stat_stages, validate_status_state, validate_typing,
 };
 use er_types::SafeU53;
 
