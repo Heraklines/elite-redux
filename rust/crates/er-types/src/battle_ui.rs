@@ -828,6 +828,14 @@ pub enum BattleUiProjectionError {
     SchemaVersion { expected: u32, actual: u32 },
     #[error("invalid seat control projection: {0}")]
     SeatControl(#[from] BattleControlError),
+    #[error("an actionable control projection must carry a decision operation identity")]
+    MissingDecisionOperation,
+    #[error("a waiting or complete control projection must not carry a decision operation identity")]
+    UnexpectedDecisionOperation,
+    #[error("the projected menu owner does not match the projected seat")]
+    MenuOwnerMismatch,
+    #[error("a waiting or complete control projection cannot be marked actionable")]
+    NonActionableControlMarkedActionable,
 }
 
 impl BattleUiProjection {
@@ -859,6 +867,33 @@ impl BattleUiProjection {
             });
         }
         self.seat_control.validate()?;
+        if self.seat_control.control.requires_decision_operation()
+            != self.seat_control.decision_operation_id.is_some()
+        {
+            return if self.seat_control.control.requires_decision_operation() {
+                Err(BattleUiProjectionError::MissingDecisionOperation)
+            } else {
+                Err(BattleUiProjectionError::UnexpectedDecisionOperation)
+            };
+        }
+        if self
+            .seat_control
+            .control
+            .owner_seat()
+            .is_some_and(|owner_seat| owner_seat != self.seat_control.seat)
+        {
+            return Err(BattleUiProjectionError::MenuOwnerMismatch);
+        }
+        self.seat_control.control.validate_control_ids(
+            self.battle_id,
+            self.wave,
+            self.turn,
+            self.seat_control.seat,
+            self.seat_control.decision_operation_id.as_ref(),
+        )?;
+        if self.actionable && !self.seat_control.control.is_actionable() {
+            return Err(BattleUiProjectionError::NonActionableControlMarkedActionable);
+        }
         Ok(())
     }
 }
@@ -897,8 +932,12 @@ mod tests {
     use std::error::Error;
 
     use super::*;
+    use crate::battle_control::{
+        BattleControl, CommandRootControl, WaitingControl, WaitingReason,
+    };
     use crate::battle_ids::{BattleSide, MenuInstanceId};
-    use crate::ids::{MenuOptionId, SafeU53, SeatId};
+    use crate::battle_model::BattleOutcome;
+    use crate::ids::{MenuOptionId, OperationId, SafeU53, SeatId};
 
     fn safe(value: u64) -> Result<SafeU53, Box<dyn Error>> {
         Ok(SafeU53::new(value)?)
@@ -921,12 +960,12 @@ mod tests {
         .map_err(Into::into)
     }
 
-    fn menu() -> Result<BattleMenu, Box<dyn Error>> {
+    fn menu_for_owner(owner_seat: u64) -> Result<BattleMenu, Box<dyn Error>> {
         let fight = MenuOptionId::new("command/fight")?;
         let switch = MenuOptionId::new("command/switch")?;
         BattleMenu::new(
             MenuInstanceId::new(safe(1)?),
-            SeatId::new(safe(1)?),
+            SeatId::new(safe(owner_seat)?),
             "battle/1/wave/1/turn/1/control/player/0/seat/1/command",
             fight,
             vec![
@@ -940,6 +979,74 @@ mod tests {
             )],
         )
         .map_err(Into::into)
+    }
+
+    fn menu() -> Result<BattleMenu, Box<dyn Error>> {
+        menu_for_owner(1)
+    }
+
+    fn command_control(owner_seat: u64) -> Result<BattleControl, Box<dyn Error>> {
+        Ok(BattleControl::CommandRoot(CommandRootControl::new(
+            PokemonId::new(safe(7)?),
+            FieldSlot {
+                side: BattleSide::Player,
+                position: 0,
+            },
+            menu_for_owner(owner_seat)?,
+        )?))
+    }
+
+    fn waiting_control() -> Result<BattleControl, Box<dyn Error>> {
+        Ok(BattleControl::Waiting(WaitingControl::new(
+            WaitingReason::PartnerCommand,
+            vec![OperationId::new(
+                "battle/1/wave/1/turn/1/command/player/0/seat/1",
+            )?],
+        )?))
+    }
+
+    fn projection(
+        seat: u64,
+        decision_operation_id: Option<OperationId>,
+        control: BattleControl,
+        actionable: bool,
+    ) -> Result<BattleUiProjection, BattleUiProjectionError> {
+        BattleUiProjection::new(
+            BATTLE_UI_PROJECTION_SCHEMA_VERSION,
+            BattleId::new(SafeU53::new(1).expect("test battle ID is safe")),
+            WaveIndex::new(SafeU53::new(1).expect("test wave is safe"))
+                .expect("test wave is positive"),
+            TurnIndex::new(SafeU53::new(1).expect("test turn is safe"))
+                .expect("test turn is positive"),
+            SeatBattleControl::new(
+                SeatId::new(SafeU53::new(seat).expect("test seat is safe")),
+                decision_operation_id,
+                control,
+            ),
+            actionable,
+        )
+    }
+
+    fn unchecked_projection(
+        seat: u64,
+        decision_operation_id: Option<OperationId>,
+        control: BattleControl,
+        actionable: bool,
+    ) -> BattleUiProjection {
+        BattleUiProjection {
+            schema_version: BATTLE_UI_PROJECTION_SCHEMA_VERSION,
+            battle_id: BattleId::new(SafeU53::new(1).expect("test battle ID is safe")),
+            wave: WaveIndex::new(SafeU53::new(1).expect("test wave is safe"))
+                .expect("test wave is positive"),
+            turn: TurnIndex::new(SafeU53::new(1).expect("test turn is safe"))
+                .expect("test turn is positive"),
+            seat_control: SeatBattleControl::new(
+                SeatId::new(SafeU53::new(seat).expect("test seat is safe")),
+                decision_operation_id,
+                control,
+            ),
+            actionable,
+        }
     }
 
     #[test]
@@ -988,6 +1095,121 @@ mod tests {
             hidden_edge,
             Err(BattleMenuError::HiddenNavigationEndpoint)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn projection_requires_the_exact_decision_operation_presence()
+    -> Result<(), Box<dyn Error>> {
+        let operation_id = OperationId::new(
+            "battle/1/wave/1/turn/1/command/player/0/seat/1",
+        )?;
+        assert_eq!(
+            projection(1, None, command_control(1)?, false),
+            Err(BattleUiProjectionError::MissingDecisionOperation)
+        );
+        assert_eq!(
+            projection(1, Some(operation_id.clone()), waiting_control()?, false),
+            Err(BattleUiProjectionError::UnexpectedDecisionOperation)
+        );
+        assert!(projection(1, Some(operation_id), command_control(1)?, false).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn projection_rejects_foreign_menu_ownership() -> Result<(), Box<dyn Error>> {
+        assert_eq!(
+            projection(
+                1,
+                Some(OperationId::new(
+                    "battle/1/wave/1/turn/1/command/player/0/seat/1",
+                )?),
+                command_control(2)?,
+                true,
+            ),
+            Err(BattleUiProjectionError::MenuOwnerMismatch)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn projection_never_makes_waiting_or_complete_actionable()
+    -> Result<(), Box<dyn Error>> {
+        assert_eq!(
+            projection(1, None, waiting_control()?, true),
+            Err(BattleUiProjectionError::NonActionableControlMarkedActionable)
+        );
+        assert_eq!(
+            projection(
+                1,
+                None,
+                BattleControl::Complete(BattleOutcome::Victory),
+                true,
+            ),
+            Err(BattleUiProjectionError::NonActionableControlMarkedActionable)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn projection_rejects_contextually_wrong_control_ids() -> Result<(), Box<dyn Error>> {
+        let mut control = command_control(1)?;
+        let BattleControl::CommandRoot(command) = &mut control else {
+            unreachable!("test helper always builds CommandRoot");
+        };
+        command.menu.control_id =
+            "battle/01/wave/1/turn/1/control/player/0/seat/1/command".to_owned();
+        let operation_id = OperationId::new(
+            "battle/1/wave/1/turn/1/command/player/0/seat/1",
+        )?;
+        assert_eq!(
+            projection(1, Some(operation_id.clone()), control.clone(), true),
+            Err(BattleUiProjectionError::SeatControl(
+                BattleControlError::ControlIdMismatch
+            ))
+        );
+
+        let encoded = serde_json::to_string(&unchecked_projection(
+            1,
+            Some(operation_id),
+            control,
+            true,
+        ))?;
+        assert!(serde_json::from_str::<BattleUiProjection>(&encoded).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_projection_wires_are_rejected() -> Result<(), Box<dyn Error>> {
+        let operation_id = OperationId::new(
+            "battle/1/wave/1/turn/1/command/player/0/seat/1",
+        )?;
+        let invalid = vec![
+            unchecked_projection(1, None, command_control(1)?, false),
+            unchecked_projection(
+                1,
+                Some(operation_id.clone()),
+                waiting_control()?,
+                false,
+            ),
+            unchecked_projection(
+                1,
+                Some(operation_id),
+                command_control(2)?,
+                true,
+            ),
+            unchecked_projection(1, None, waiting_control()?, true),
+            unchecked_projection(
+                1,
+                None,
+                BattleControl::Complete(BattleOutcome::Victory),
+                true,
+            ),
+        ];
+        for projection in invalid {
+            let encoded = serde_json::to_string(&projection)?;
+            assert!(serde_json::from_str::<BattleUiProjection>(&encoded).is_err());
+        }
         Ok(())
     }
 

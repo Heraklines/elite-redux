@@ -51,6 +51,8 @@ pub enum BattleControlError {
     CancelHistoryTooDeep,
     #[error("cancel history changes the battle/turn/seat/actor frontier")]
     CancelHistoryFrontierMismatch,
+    #[error("invalid cancel restoration: {0}")]
+    CancelRestoration(#[from] CancelRestorationError),
     #[error("waiting control must retain at least one operation identity")]
     EmptyWaitingOperations,
     #[error("waiting operation identities contain a duplicate")]
@@ -59,6 +61,37 @@ pub enum BattleControlError {
     UnsortedWaitingOperations,
     #[error("complete control cannot carry the ongoing outcome")]
     OngoingCompleteOutcome,
+    #[error("battle control_id does not match its contextual identity")]
+    ControlIdMismatch,
+}
+
+/// Closed failures for the frozen per-control Cancel restoration graph.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum CancelRestorationError {
+    #[error("TargetSelect cancel restoration must reference MoveSelect")]
+    TargetSelectRequiresMoveSelect,
+    #[error("MoveSelect cancel restoration must reference CommandRoot")]
+    MoveSelectRequiresCommandRoot,
+    #[error("PartySelect cancel restoration must reference CommandRoot")]
+    PartySelectRequiresCommandRoot,
+    #[error("PartyOptionSelect cancel restoration must reference PartySelect or ReplacementSelect")]
+    PartyOptionSelectRequiresPartyOrReplacement,
+    #[error("cancel restoration changes the owning seat")]
+    OwnerSeatMismatch,
+    #[error("cancel restoration changes the actor")]
+    ActorMismatch,
+    #[error("cancel restoration changes the field slot")]
+    FieldSlotMismatch,
+    #[error("cancel restoration changes the stable battle/wave/turn control coordinates")]
+    StableCoordinatesMismatch,
+    #[error("TargetSelect cancel restoration does not retain its selected move")]
+    TargetSelectedMoveMismatch,
+    #[error("MoveSelect cancel restoration does not restore selected Fight")]
+    CommandFightNotSelected,
+    #[error("PartySelect cancel restoration does not restore selected Switch")]
+    CommandSwitchNotSelected,
+    #[error("PartyOptionSelect cancel restoration does not retain its selected party slot")]
+    PartyOptionSelectedSlotMismatch,
 }
 
 /// A complete logical battle-control graph for one endpoint seat.
@@ -293,6 +326,13 @@ impl BattleControlPlan {
             {
                 return Err(BattleControlPlanError::MenuOwnerMismatch);
             }
+            seat.control.validate_control_ids(
+                self.battle_id,
+                self.wave,
+                self.turn,
+                seat.seat,
+                seat.decision_operation_id.as_ref(),
+            )?;
 
             let mut menu_ids = Vec::new();
             seat.control.menu_instance_ids(&mut menu_ids);
@@ -411,8 +451,8 @@ impl MoveSelectControl {
     }
 
     pub fn validate(&self) -> Result<(), BattleControlError> {
-        self.menu.validate()?;
-        self.cancel_to.validate()
+        self.validate_basic()?;
+        self.validate_cancel_at_depth(0)
     }
 }
 
@@ -454,9 +494,8 @@ impl TargetSelectControl {
     }
 
     pub fn validate(&self) -> Result<(), BattleControlError> {
-        validate_field_slot_vector(&self.candidate_targets)?;
-        self.menu.validate()?;
-        self.cancel_to.validate()
+        self.validate_basic()?;
+        self.validate_cancel_at_depth(0)
     }
 }
 
@@ -494,12 +533,8 @@ impl PartySelectControl {
     }
 
     pub fn validate(&self) -> Result<(), BattleControlError> {
-        validate_party_memory(
-            &self.menu,
-            &self.last_left_option_id,
-            &self.last_right_option_id,
-        )?;
-        self.cancel_to.validate()
+        self.validate_basic()?;
+        self.validate_cancel_at_depth(0)
     }
 }
 
@@ -534,8 +569,8 @@ impl PartyOptionSelectControl {
     }
 
     pub fn validate(&self) -> Result<(), BattleControlError> {
-        self.menu.validate()?;
-        self.cancel_to.validate()
+        self.validate_basic()?;
+        self.validate_cancel_at_depth(0)
     }
 }
 
@@ -787,7 +822,7 @@ pub enum WaitingReason {
 
 impl BattleControl {
     pub fn validate(&self) -> Result<(), BattleControlError> {
-        self.validate_at_depth(0, None)
+        self.validate_at_depth(0)
     }
 
     pub fn owner_seat(&self) -> Option<SeatId> {
@@ -817,76 +852,91 @@ impl BattleControl {
         Ok(Self::Complete(outcome))
     }
 
-    fn validate_at_depth(
+    pub(crate) fn validate_control_ids(
         &self,
-        depth: usize,
-        parent_frontier: Option<&ControlFrontier>,
+        battle_id: BattleId,
+        wave: WaveIndex,
+        turn: TurnIndex,
+        seat: SeatId,
+        decision_operation_id: Option<&OperationId>,
     ) -> Result<(), BattleControlError> {
-        match self {
-            Self::CommandRoot(value) => value.validate_basic()?,
-            Self::MoveSelect(value) => value.validate_basic()?,
-            Self::TargetSelect(value) => value.validate_basic()?,
-            Self::PartySelect(value) => value.validate_basic()?,
-            Self::PartyOptionSelect(value) => value.validate_basic()?,
-            Self::ReplacementSelect(value) => value.validate_basic()?,
-            Self::Waiting(value) => {
-                value.validate()?;
-                if parent_frontier.is_some() {
-                    return Err(BattleControlError::CancelHistoryFrontierMismatch);
-                }
-                return Ok(());
-            }
-            Self::Complete(outcome) => {
-                if *outcome == BattleOutcome::Ongoing {
-                    return Err(BattleControlError::OngoingCompleteOutcome);
-                }
-                if parent_frontier.is_some() {
-                    return Err(BattleControlError::CancelHistoryFrontierMismatch);
-                }
-                return Ok(());
-            }
-        }
-
-        let frontier = self.control_frontier();
-        if parent_frontier.is_some_and(|parent| frontier.as_ref() != Some(parent)) {
-            return Err(BattleControlError::CancelHistoryFrontierMismatch);
-        }
-        let Some(cancel_to) = self.cancel_to() else {
-            return Ok(());
-        };
-        if depth >= MAX_CANCEL_HISTORY_DEPTH {
-            return Err(BattleControlError::CancelHistoryTooDeep);
-        }
-        cancel_to.validate_at_depth(depth + 1, frontier.as_ref())
-    }
-
-    fn control_frontier(&self) -> Option<ControlFrontier> {
-        let (menu, actor) = match self {
-            Self::CommandRoot(value) => (&value.menu, Some(value.actor)),
-            Self::MoveSelect(value) => (&value.menu, Some(value.actor)),
-            Self::TargetSelect(value) => (&value.menu, Some(value.actor)),
-            Self::PartySelect(value) => (&value.menu, Some(value.actor)),
-            Self::PartyOptionSelect(value) => (&value.menu, Some(value.actor)),
-            Self::ReplacementSelect(value) => (&value.menu, None),
-            Self::Waiting(_) | Self::Complete(_) => return None,
-        };
-        Some(ControlFrontier {
-            owner_seat: menu.owner_seat,
-            actor,
-            stable_control_prefix: stable_control_prefix(&menu.control_id),
+        self.validate_control_ids_with_context(&ControlIdentityContext {
+            battle_id,
+            wave,
+            turn,
+            seat,
+            decision_operation_id,
         })
     }
 
-    fn cancel_to(&self) -> Option<&BattleControl> {
+    fn validate_at_depth(&self, depth: usize) -> Result<(), BattleControlError> {
         match self {
-            Self::MoveSelect(value) => Some(&value.cancel_to),
-            Self::TargetSelect(value) => Some(&value.cancel_to),
-            Self::PartySelect(value) => Some(&value.cancel_to),
-            Self::PartyOptionSelect(value) => Some(&value.cancel_to),
-            Self::CommandRoot(_)
-            | Self::ReplacementSelect(_)
-            | Self::Waiting(_)
-            | Self::Complete(_) => None,
+            Self::CommandRoot(value) => value.validate_basic(),
+            Self::MoveSelect(value) => {
+                value.validate_basic()?;
+                value.validate_cancel_at_depth(depth)
+            }
+            Self::TargetSelect(value) => {
+                value.validate_basic()?;
+                value.validate_cancel_at_depth(depth)
+            }
+            Self::PartySelect(value) => {
+                value.validate_basic()?;
+                value.validate_cancel_at_depth(depth)
+            }
+            Self::PartyOptionSelect(value) => {
+                value.validate_basic()?;
+                value.validate_cancel_at_depth(depth)
+            }
+            Self::ReplacementSelect(value) => value.validate_basic(),
+            Self::Waiting(value) => value.validate(),
+            Self::Complete(outcome) => {
+                if *outcome == BattleOutcome::Ongoing {
+                    Err(BattleControlError::OngoingCompleteOutcome)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn validate_control_ids_with_context(
+        &self,
+        context: &ControlIdentityContext<'_>,
+    ) -> Result<(), BattleControlError> {
+        match self {
+            Self::CommandRoot(value) => {
+                validate_command_control_id(&value.menu, value.field_slot, "command", context)
+            }
+            Self::MoveSelect(value) => {
+                validate_command_control_id(&value.menu, value.field_slot, "move", context)?;
+                value.cancel_to.validate_control_ids_with_context(context)
+            }
+            Self::TargetSelect(value) => {
+                validate_command_control_id(&value.menu, value.field_slot, "target", context)?;
+                value.cancel_to.validate_control_ids_with_context(context)
+            }
+            Self::PartySelect(value) => {
+                validate_command_control_id(&value.menu, value.field_slot, "party", context)?;
+                value.cancel_to.validate_control_ids_with_context(context)
+            }
+            Self::PartyOptionSelect(value) => {
+                let kind = format!("party-option/{}", value.selected_party_slot.get());
+                match value.cancel_to.as_ref() {
+                    Self::PartySelect(_) => {
+                        validate_command_control_id(&value.menu, value.field_slot, &kind, context)?;
+                    }
+                    Self::ReplacementSelect(_) => {
+                        validate_replacement_control_id(&value.menu, &kind, context)?;
+                    }
+                    _ => return Err(BattleControlError::ControlIdMismatch),
+                }
+                value.cancel_to.validate_control_ids_with_context(context)
+            }
+            Self::ReplacementSelect(value) => {
+                validate_replacement_control_id(&value.menu, "replacement", context)
+            }
+            Self::Waiting(_) | Self::Complete(_) => Ok(()),
         }
     }
 
@@ -915,17 +965,113 @@ impl BattleControl {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ControlFrontier {
-    owner_seat: SeatId,
-    actor: Option<PokemonId>,
-    stable_control_prefix: String,
+struct ControlIdentityContext<'a> {
+    battle_id: BattleId,
+    wave: WaveIndex,
+    turn: TurnIndex,
+    seat: SeatId,
+    decision_operation_id: Option<&'a OperationId>,
 }
 
-fn stable_control_prefix(control_id: &str) -> String {
+fn validate_command_control_id(
+    menu: &BattleMenu,
+    field_slot: FieldSlot,
+    kind: &str,
+    context: &ControlIdentityContext<'_>,
+) -> Result<(), BattleControlError> {
+    if field_slot.side != crate::battle_ids::BattleSide::Player {
+        return Err(BattleControlError::ControlIdMismatch);
+    }
+    let expected = format!(
+        "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/{}",
+        context.battle_id,
+        context.wave,
+        context.turn,
+        field_slot.position,
+        context.seat,
+        kind,
+    );
+    if menu.control_id.as_str() != expected.as_str() {
+        return Err(BattleControlError::ControlIdMismatch);
+    }
+    Ok(())
+}
+
+fn validate_replacement_control_id(
+    menu: &BattleMenu,
+    kind: &str,
+    context: &ControlIdentityContext<'_>,
+) -> Result<(), BattleControlError> {
+    let Some(decision_operation_id) = context.decision_operation_id else {
+        return Err(BattleControlError::ControlIdMismatch);
+    };
+    let expected = format!("{}/control/{kind}", decision_operation_id.as_str());
+    if menu.control_id.as_str() != expected.as_str() {
+        return Err(BattleControlError::ControlIdMismatch);
+    }
+    Ok(())
+}
+
+fn stable_control_prefix(control_id: &str) -> &str {
     control_id
         .split_once("/control/")
-        .map_or_else(|| control_id.to_owned(), |(prefix, _)| prefix.to_owned())
+        .map_or(control_id, |(prefix, _)| prefix)
+}
+
+fn validate_cancel_history(
+    cancel_to: &BattleControl,
+    depth: usize,
+) -> Result<(), BattleControlError> {
+    if depth >= MAX_CANCEL_HISTORY_DEPTH {
+        return Err(BattleControlError::CancelHistoryTooDeep);
+    }
+    cancel_to.validate_at_depth(depth + 1)
+}
+
+fn validate_restoration_coordinates(
+    current_menu: &BattleMenu,
+    current_field_slot: FieldSlot,
+    restored_menu: &BattleMenu,
+    restored_field_slot: FieldSlot,
+) -> Result<(), CancelRestorationError> {
+    if current_menu.owner_seat != restored_menu.owner_seat {
+        return Err(CancelRestorationError::OwnerSeatMismatch);
+    }
+    if current_field_slot != restored_field_slot {
+        return Err(CancelRestorationError::FieldSlotMismatch);
+    }
+    if stable_control_prefix(&current_menu.control_id)
+        != stable_control_prefix(&restored_menu.control_id)
+    {
+        return Err(CancelRestorationError::StableCoordinatesMismatch);
+    }
+    Ok(())
+}
+
+fn validate_restoration_actor(
+    current_actor: PokemonId,
+    restored_actor: PokemonId,
+) -> Result<(), CancelRestorationError> {
+    if current_actor != restored_actor {
+        return Err(CancelRestorationError::ActorMismatch);
+    }
+    Ok(())
+}
+
+fn retains_party_slot(menu: &BattleMenu, selected_party_slot: PartyIndex) -> bool {
+    let expected_slot = selected_party_slot.get().to_string();
+    let mut segments = menu.selected_option_id.as_str().split('/');
+    matches!(
+        (
+            segments.next(),
+            segments.next(),
+            segments.next(),
+            segments.next(),
+            segments.next(),
+        ),
+        (Some("party"), Some(pokemon_id), Some("slot"), Some(slot), None)
+            if !pokemon_id.is_empty() && slot == expected_slot.as_str()
+    )
 }
 
 fn validate_field_slot_vector(candidates: &[FieldSlot]) -> Result<(), BattleControlError> {
@@ -1003,12 +1149,49 @@ impl MoveSelectControl {
     fn validate_basic(&self) -> Result<(), BattleControlError> {
         self.menu.validate().map_err(BattleControlError::from)
     }
+
+    fn validate_cancel_at_depth(&self, depth: usize) -> Result<(), BattleControlError> {
+        validate_cancel_history(&self.cancel_to, depth)?;
+        let BattleControl::CommandRoot(restored) = self.cancel_to.as_ref() else {
+            return Err(CancelRestorationError::MoveSelectRequiresCommandRoot.into());
+        };
+        validate_restoration_coordinates(
+            &self.menu,
+            self.field_slot,
+            &restored.menu,
+            restored.field_slot,
+        )?;
+        validate_restoration_actor(self.actor, restored.actor)?;
+        if restored.menu.selected_option_id.as_str() != "command/fight" {
+            return Err(CancelRestorationError::CommandFightNotSelected.into());
+        }
+        Ok(())
+    }
 }
 
 impl TargetSelectControl {
     fn validate_basic(&self) -> Result<(), BattleControlError> {
         validate_field_slot_vector(&self.candidate_targets)?;
         self.menu.validate().map_err(BattleControlError::from)
+    }
+
+    fn validate_cancel_at_depth(&self, depth: usize) -> Result<(), BattleControlError> {
+        validate_cancel_history(&self.cancel_to, depth)?;
+        let BattleControl::MoveSelect(restored) = self.cancel_to.as_ref() else {
+            return Err(CancelRestorationError::TargetSelectRequiresMoveSelect.into());
+        };
+        validate_restoration_coordinates(
+            &self.menu,
+            self.field_slot,
+            &restored.menu,
+            restored.field_slot,
+        )?;
+        validate_restoration_actor(self.actor, restored.actor)?;
+        let selected_move = format!("move/{}/slot/{}", self.actor, self.move_slot.get());
+        if restored.menu.selected_option_id.as_str() != selected_move.as_str() {
+            return Err(CancelRestorationError::TargetSelectedMoveMismatch.into());
+        }
+        Ok(())
     }
 }
 
@@ -1020,11 +1203,63 @@ impl PartySelectControl {
             &self.last_right_option_id,
         )
     }
+
+    fn validate_cancel_at_depth(&self, depth: usize) -> Result<(), BattleControlError> {
+        validate_cancel_history(&self.cancel_to, depth)?;
+        let BattleControl::CommandRoot(restored) = self.cancel_to.as_ref() else {
+            return Err(CancelRestorationError::PartySelectRequiresCommandRoot.into());
+        };
+        validate_restoration_coordinates(
+            &self.menu,
+            self.field_slot,
+            &restored.menu,
+            restored.field_slot,
+        )?;
+        validate_restoration_actor(self.actor, restored.actor)?;
+        if restored.menu.selected_option_id.as_str() != "command/switch" {
+            return Err(CancelRestorationError::CommandSwitchNotSelected.into());
+        }
+        Ok(())
+    }
 }
 
 impl PartyOptionSelectControl {
     fn validate_basic(&self) -> Result<(), BattleControlError> {
         self.menu.validate().map_err(BattleControlError::from)
+    }
+
+    fn validate_cancel_at_depth(&self, depth: usize) -> Result<(), BattleControlError> {
+        validate_cancel_history(&self.cancel_to, depth)?;
+        let restored_menu = match self.cancel_to.as_ref() {
+            BattleControl::PartySelect(restored) => {
+                validate_restoration_coordinates(
+                    &self.menu,
+                    self.field_slot,
+                    &restored.menu,
+                    restored.field_slot,
+                )?;
+                validate_restoration_actor(self.actor, restored.actor)?;
+                &restored.menu
+            }
+            BattleControl::ReplacementSelect(restored) => {
+                validate_restoration_coordinates(
+                    &self.menu,
+                    self.field_slot,
+                    &restored.menu,
+                    restored.field_slot,
+                )?;
+                &restored.menu
+            }
+            _ => {
+                return Err(
+                    CancelRestorationError::PartyOptionSelectRequiresPartyOrReplacement.into(),
+                );
+            }
+        };
+        if !retains_party_slot(restored_menu, self.selected_party_slot) {
+            return Err(CancelRestorationError::PartyOptionSelectedSlotMismatch.into());
+        }
+        Ok(())
     }
 }
 
@@ -1046,18 +1281,30 @@ mod tests {
         Ok(SafeU53::new(value)?)
     }
 
-    fn menu(instance_id: u64, control_id: &str) -> Result<BattleMenu, Box<dyn Error>> {
-        let option_id = MenuOptionId::new("command/fight")?;
+    fn field_slot(position: u8) -> FieldSlot {
+        FieldSlot {
+            side: BattleSide::Player,
+            position,
+        }
+    }
+
+    fn menu(
+        instance_id: u64,
+        owner_seat: u64,
+        control_id: &str,
+        selected_option_id: &str,
+    ) -> Result<BattleMenu, Box<dyn Error>> {
+        let option_id = MenuOptionId::new(selected_option_id)?;
         let option = BattleMenuOption::new(
             option_id.clone(),
-            "menu.fight",
+            "menu.option",
             MenuOptionVisibility::Visible,
             true,
             MenuOptionLayout::new(option_id.clone(), 0, 0, 0),
         )?;
         Ok(BattleMenu::new(
             MenuInstanceId::new(safe(instance_id)?),
-            SeatId::new(safe(1)?),
+            SeatId::new(safe(owner_seat)?),
             control_id,
             option_id,
             vec![option],
@@ -1065,31 +1312,94 @@ mod tests {
         )?)
     }
 
-    fn root(instance_id: u64, control_id: &str) -> Result<BattleControl, Box<dyn Error>> {
+    fn root_with(
+        instance_id: u64,
+        owner_seat: u64,
+        actor: u64,
+        position: u8,
+        control_id: &str,
+        selected_option_id: &str,
+    ) -> Result<BattleControl, Box<dyn Error>> {
         Ok(BattleControl::CommandRoot(CommandRootControl::new(
-            PokemonId::new(safe(7)?),
-            FieldSlot {
-                side: BattleSide::Player,
-                position: 0,
-            },
-            menu(instance_id, control_id)?,
+            PokemonId::new(safe(actor)?),
+            field_slot(position),
+            menu(
+                instance_id,
+                owner_seat,
+                control_id,
+                selected_option_id,
+            )?,
         )?))
+    }
+
+    fn root(instance_id: u64, control_id: &str) -> Result<BattleControl, Box<dyn Error>> {
+        root_with(
+            instance_id,
+            1,
+            7,
+            0,
+            control_id,
+            "command/fight",
+        )
     }
 
     fn move_control(
         instance_id: u64,
         control_id: &str,
+        selected_option_id: &str,
         cancel_to: BattleControl,
     ) -> Result<BattleControl, Box<dyn Error>> {
         Ok(BattleControl::MoveSelect(MoveSelectControl::new(
             PokemonId::new(safe(7)?),
-            FieldSlot {
-                side: BattleSide::Player,
-                position: 0,
-            },
-            menu(instance_id, control_id)?,
+            field_slot(0),
+            menu(instance_id, 1, control_id, selected_option_id)?,
             Box::new(cancel_to),
         )?))
+    }
+
+    fn party_control(
+        instance_id: u64,
+        control_id: &str,
+        selected_option_id: &str,
+        cancel_to: BattleControl,
+    ) -> Result<BattleControl, Box<dyn Error>> {
+        let selected_option_id = MenuOptionId::new(selected_option_id)?;
+        Ok(BattleControl::PartySelect(PartySelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(
+                instance_id,
+                1,
+                control_id,
+                selected_option_id.as_str(),
+            )?,
+            selected_option_id.clone(),
+            selected_option_id,
+            Box::new(cancel_to),
+        )?))
+    }
+
+    fn replacement_control(
+        instance_id: u64,
+        control_id: &str,
+        selected_option_id: &str,
+    ) -> Result<BattleControl, Box<dyn Error>> {
+        let selected_option_id = MenuOptionId::new(selected_option_id)?;
+        Ok(BattleControl::ReplacementSelect(
+            ReplacementSelectControl::new(
+                FaintOccurrenceId::new(safe(9)?),
+                field_slot(0),
+                SeatId::new(safe(1)?),
+                menu(
+                    instance_id,
+                    1,
+                    control_id,
+                    selected_option_id.as_str(),
+                )?,
+                selected_option_id.clone(),
+                selected_option_id,
+            )?,
+        ))
     }
 
     fn plan(
@@ -1148,36 +1458,402 @@ mod tests {
     }
 
     #[test]
-    fn cancel_history_is_bounded_and_same_frontier() -> Result<(), Box<dyn Error>> {
-        let control_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
-        let first = move_control(
-            2,
-            control_id,
-            root(1, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
-        )?;
-        let second = move_control(3, control_id, first)?;
-        let third = move_control(4, control_id, second)?;
-        assert!(plan(third.clone(), 5).is_ok());
-
-        let too_deep = move_control(5, control_id, third)?;
+    fn contextual_control_ids_are_exact() -> Result<(), Box<dyn Error>> {
         assert!(matches!(
-            plan(too_deep, 6),
+            plan(
+                root(
+                    1,
+                    "battle/01/wave/1/turn/1/control/player/0/seat/1/command",
+                )?,
+                2,
+            ),
             Err(BattleControlPlanError::Control(
-                BattleControlError::CancelHistoryTooDeep
+                BattleControlError::ControlIdMismatch
             ))
         ));
 
-        let mismatched = move_control(
-            2,
-            "battle/2/wave/1/turn/1/control/player/0/seat/1/move",
-            root(1, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
+        let battle_id = BattleId::new(safe(1)?);
+        let wave = WaveIndex::new(safe(1)?)?;
+        let turn = TurnIndex::new(safe(1)?)?;
+        let seat = SeatId::new(safe(1)?);
+        let operation_id = OperationId::new("RC/e1/b1/w1/t1/o9/f0/s1")?;
+        let replacement = replacement_control(
+            1,
+            "RC/e1/b1/w1/t1/o9/f0/s1/control/replacement",
+            "party/42/slot/3",
         )?;
-        assert!(matches!(
-            plan(mismatched, 3),
-            Err(BattleControlPlanError::Control(
-                BattleControlError::CancelHistoryFrontierMismatch
-            ))
-        ));
+        assert!(replacement
+            .validate_control_ids(battle_id, wave, turn, seat, Some(&operation_id))
+            .is_ok());
+
+        let wrong_suffix = replacement_control(
+            1,
+            "RC/e1/b1/w1/t1/o9/f0/s1/control/party-option/3",
+            "party/42/slot/3",
+        )?;
+        assert_eq!(
+            wrong_suffix.validate_control_ids(battle_id, wave, turn, seat, Some(&operation_id)),
+            Err(BattleControlError::ControlIdMismatch)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_restoration_accepts_only_the_frozen_edges() -> Result<(), Box<dyn Error>> {
+        let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
+        let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
+        let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
+        let party_option_id =
+            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+
+        let move_select = move_control(
+            2,
+            move_id,
+            "move/7/slot/2",
+            root(1, command_id)?,
+        )?;
+        let target_select = BattleControl::TargetSelect(TargetSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            MoveSlotIndex::new(2)?,
+            false,
+            vec![FieldSlot {
+                side: BattleSide::Enemy,
+                position: 0,
+            }],
+            menu(3, 1, target_id, "target/enemy/0")?,
+            Box::new(move_select),
+        )?);
+        assert!(target_select.validate().is_ok());
+
+        let party_select = party_control(
+            5,
+            party_id,
+            "party/42/slot/3",
+            root_with(4, 1, 7, 0, command_id, "command/switch")?,
+        )?;
+        let party_option = BattleControl::PartyOptionSelect(PartyOptionSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            PartyIndex::new(3)?,
+            menu(6, 1, party_option_id, "party-option/send-out")?,
+            Box::new(party_select),
+        )?);
+        assert!(party_option.validate().is_ok());
+
+        let replacement_operation = "RC/e1/b1/w1/t1/o9/f0/s1";
+        let replacement = replacement_control(
+            7,
+            &format!("{replacement_operation}/control/replacement"),
+            "party/42/slot/3",
+        )?;
+        let replacement_party_option = BattleControl::PartyOptionSelect(
+            PartyOptionSelectControl::new(
+                PokemonId::new(safe(7)?),
+                field_slot(0),
+                PartyIndex::new(3)?,
+                menu(
+                    8,
+                    1,
+                    &format!("{replacement_operation}/control/party-option/3"),
+                    "party-option/send-out",
+                )?,
+                Box::new(replacement),
+            )?,
+        );
+        assert!(replacement_party_option.validate().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_restoration_rejects_wrong_variants_on_the_same_frontier()
+    -> Result<(), Box<dyn Error>> {
+        let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
+        let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
+        let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
+        let party_option_id =
+            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+
+        let wrong_target = TargetSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            MoveSlotIndex::new(2)?,
+            false,
+            vec![FieldSlot {
+                side: BattleSide::Enemy,
+                position: 0,
+            }],
+            menu(2, 1, target_id, "target/enemy/0")?,
+            Box::new(root(1, command_id)?),
+        );
+        assert_eq!(
+            wrong_target.expect_err("TargetSelect must reject CommandRoot restoration"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::TargetSelectRequiresMoveSelect
+            )
+        );
+
+        let prior_move = move_control(
+            4,
+            move_id,
+            "move/7/slot/2",
+            root(3, command_id)?,
+        )?;
+        let wrong_move = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(5, 1, move_id, "move/7/slot/2")?,
+            Box::new(prior_move.clone()),
+        );
+        assert_eq!(
+            wrong_move.expect_err("MoveSelect must reject MoveSelect restoration"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::MoveSelectRequiresCommandRoot
+            )
+        );
+
+        let selected_party = MenuOptionId::new("party/42/slot/3")?;
+        let wrong_party = PartySelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(6, 1, party_id, selected_party.as_str())?,
+            selected_party.clone(),
+            selected_party,
+            Box::new(prior_move.clone()),
+        );
+        assert_eq!(
+            wrong_party.expect_err("PartySelect must reject MoveSelect restoration"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::PartySelectRequiresCommandRoot
+            )
+        );
+
+        let wrong_party_option = PartyOptionSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            PartyIndex::new(3)?,
+            menu(7, 1, party_option_id, "party-option/send-out")?,
+            Box::new(prior_move),
+        );
+        assert_eq!(
+            wrong_party_option
+                .expect_err("PartyOptionSelect must reject MoveSelect restoration"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::PartyOptionSelectRequiresPartyOrReplacement
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_restoration_retains_coordinates_and_parent_selection()
+    -> Result<(), Box<dyn Error>> {
+        let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
+
+        let owner_error = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(2, 1, move_id, "move/7/slot/2")?,
+            Box::new(root_with(
+                1,
+                2,
+                7,
+                0,
+                command_id,
+                "command/fight",
+            )?),
+        );
+        assert_eq!(
+            owner_error.expect_err("restoration must retain the owner seat"),
+            BattleControlError::CancelRestoration(CancelRestorationError::OwnerSeatMismatch)
+        );
+
+        let actor_error = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(4, 1, move_id, "move/7/slot/2")?,
+            Box::new(root_with(
+                3,
+                1,
+                8,
+                0,
+                command_id,
+                "command/fight",
+            )?),
+        );
+        assert_eq!(
+            actor_error.expect_err("restoration must retain the actor"),
+            BattleControlError::CancelRestoration(CancelRestorationError::ActorMismatch)
+        );
+
+        let field_error = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(6, 1, move_id, "move/7/slot/2")?,
+            Box::new(root_with(
+                5,
+                1,
+                7,
+                1,
+                command_id,
+                "command/fight",
+            )?),
+        );
+        assert_eq!(
+            field_error.expect_err("restoration must retain the field slot"),
+            BattleControlError::CancelRestoration(CancelRestorationError::FieldSlotMismatch)
+        );
+
+        let stable_error = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(
+                8,
+                1,
+                "battle/2/wave/1/turn/1/control/player/0/seat/1/move",
+                "move/7/slot/2",
+            )?,
+            Box::new(root(7, command_id)?),
+        );
+        assert_eq!(
+            stable_error.expect_err("restoration must retain stable coordinates"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::StableCoordinatesMismatch
+            )
+        );
+
+        let fight_error = MoveSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(10, 1, move_id, "move/7/slot/2")?,
+            Box::new(root_with(
+                9,
+                1,
+                7,
+                0,
+                command_id,
+                "command/switch",
+            )?),
+        );
+        assert_eq!(
+            fight_error.expect_err("MoveSelect must restore selected Fight"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::CommandFightNotSelected
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_restoration_retains_move_and_party_slots() -> Result<(), Box<dyn Error>> {
+        let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
+        let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
+        let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
+        let party_option_id =
+            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+
+        let wrong_move = move_control(
+            2,
+            move_id,
+            "move/7/slot/1",
+            root(1, command_id)?,
+        )?;
+        let target_error = TargetSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            MoveSlotIndex::new(2)?,
+            false,
+            vec![FieldSlot {
+                side: BattleSide::Enemy,
+                position: 0,
+            }],
+            menu(3, 1, target_id, "target/enemy/0")?,
+            Box::new(wrong_move),
+        );
+        assert_eq!(
+            target_error.expect_err("TargetSelect must retain its selected move"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::TargetSelectedMoveMismatch
+            )
+        );
+
+        let selected_party = MenuOptionId::new("party/42/slot/3")?;
+        let switch_error = PartySelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            menu(5, 1, party_id, selected_party.as_str())?,
+            selected_party.clone(),
+            selected_party,
+            Box::new(root(4, command_id)?),
+        );
+        assert_eq!(
+            switch_error.expect_err("PartySelect must restore selected Switch"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::CommandSwitchNotSelected
+            )
+        );
+
+        let wrong_party_slot = party_control(
+            7,
+            party_id,
+            "party/42/slot/2",
+            root_with(6, 1, 7, 0, command_id, "command/switch")?,
+        )?;
+        let party_slot_error = PartyOptionSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            PartyIndex::new(3)?,
+            menu(8, 1, party_option_id, "party-option/send-out")?,
+            Box::new(wrong_party_slot),
+        );
+        assert_eq!(
+            party_slot_error
+                .expect_err("PartyOptionSelect must retain the selected party slot"),
+            BattleControlError::CancelRestoration(
+                CancelRestorationError::PartyOptionSelectedSlotMismatch
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_cancel_wires_are_rejected_and_history_stays_bounded()
+    -> Result<(), Box<dyn Error>> {
+        let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
+        let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
+        let invalid_wire = BattleControl::TargetSelect(TargetSelectControl {
+            actor: PokemonId::new(safe(7)?),
+            field_slot: field_slot(0),
+            move_slot: MoveSlotIndex::new(2)?,
+            multiple: false,
+            candidate_targets: vec![FieldSlot {
+                side: BattleSide::Enemy,
+                position: 0,
+            }],
+            menu: menu(2, 1, target_id, "target/enemy/0")?,
+            cancel_to: Box::new(root(1, command_id)?),
+        });
+        let encoded = serde_json::to_string(&invalid_wire)?;
+        assert!(serde_json::from_str::<BattleControl>(&encoded).is_err());
+
+        let mut too_deep = root(1, command_id)?;
+        for instance_id in 2..=5 {
+            too_deep = BattleControl::MoveSelect(MoveSelectControl {
+                actor: PokemonId::new(safe(7)?),
+                field_slot: field_slot(0),
+                menu: menu(instance_id, 1, move_id, "move/7/slot/2")?,
+                cancel_to: Box::new(too_deep),
+            });
+        }
+        assert_eq!(
+            too_deep.validate(),
+            Err(BattleControlError::CancelHistoryTooDeep)
+        );
         Ok(())
     }
 
