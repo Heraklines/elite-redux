@@ -9,6 +9,7 @@ import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
+import { WeatherType } from "#enums/weather-type";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 import { randSeedInt, randSeedItem } from "#utils/common";
 
@@ -19,6 +20,10 @@ export interface FunModeConfig {
   randomizeLevelUpMoves: boolean;
   megaMode: boolean;
   shuffleStats: boolean;
+  shuffleEvolutions: boolean;
+  itemChaos: boolean;
+  weatherRoulette: boolean;
+  scrambleMoves: boolean;
   abilityRerollSeed: number;
 }
 
@@ -29,6 +34,10 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   randomizeLevelUpMoves: true,
   megaMode: false,
   shuffleStats: false,
+  shuffleEvolutions: false,
+  itemChaos: false,
+  weatherRoulette: false,
+  scrambleMoves: false,
   abilityRerollSeed: 0,
 });
 
@@ -48,6 +57,10 @@ export function setFunModeConfig(config: FunModeConfig): void {
     randomizeLevelUpMoves: config.randomizeLevelUpMoves === true,
     megaMode: config.megaMode === true,
     shuffleStats: config.shuffleStats === true,
+    shuffleEvolutions: config.shuffleEvolutions === true,
+    itemChaos: config.itemChaos === true,
+    weatherRoulette: config.weatherRoulette === true,
+    scrambleMoves: config.scrambleMoves === true,
     abilityRerollSeed: Number.isFinite(config.abilityRerollSeed) ? Math.max(0, Math.floor(config.abilityRerollSeed)) : 0,
   };
 }
@@ -178,9 +191,70 @@ export function getFunRandomLevelMoves(pokemonId: number, levelMoves: LevelMoves
   });
 }
 
+export function getFunScrambledMoveId(
+  pokemonId: number,
+  usedMoveId: MoveId,
+  waveIndex: number,
+  turn: number,
+  currentMoveIds: readonly MoveId[],
+): MoveId | null {
+  if (!currentConfig.scrambleMoves) {
+    return null;
+  }
+  const excluded = new Set<MoveId>([...currentMoveIds, MoveId.NONE, MoveId.STRUGGLE]);
+  const pool = movePool().filter(moveId => !excluded.has(moveId));
+  if (pool.length === 0) {
+    return null;
+  }
+  const salt = Math.imul(usedMoveId + 1, 131) ^ Math.imul(waveIndex + 1, 17) ^ Math.imul(turn + 1, 0x41);
+  return pool[deterministicIndex(pokemonId, salt, pool.length)];
+}
+
+const FUN_WEATHERS: readonly WeatherType[] = [
+  WeatherType.NONE,
+  WeatherType.SUNNY,
+  WeatherType.RAIN,
+  WeatherType.SANDSTORM,
+  WeatherType.HAIL,
+  WeatherType.SNOW,
+  WeatherType.FOG,
+  WeatherType.TEMPEST_STORM,
+  WeatherType.SNOWY_WRATH,
+  WeatherType.EERIE_FOG,
+];
+
+export function rollFunWeather(): WeatherType | null {
+  return currentConfig.weatherRoulette ? randSeedItem(FUN_WEATHERS) : null;
+}
+
 export interface FunRandomSpeciesChoice {
   species: PokemonSpecies;
   formIndex: number;
+}
+
+export function getFunEvolutionTarget(
+  pokemonId: number,
+  currentSpeciesId: number,
+  occurrence: number,
+): FunRandomSpeciesChoice | null {
+  if (!currentConfig.shuffleEvolutions) {
+    return null;
+  }
+  const pool = allSpecies.filter(
+    species => species != null && species.speciesId > 0 && species.speciesId !== currentSpeciesId && species.forms.length > 0,
+  );
+  if (pool.length === 0) {
+    return null;
+  }
+  const species = pool[deterministicIndex(pokemonId, currentSpeciesId ^ Math.imul(occurrence + 1, 0x71), pool.length)];
+  const formIndices = species.forms
+    .map((form, index) => ({ form, index }))
+    .filter(({ form, index }) => index === 0 || form.isStarterSelectable)
+    .map(({ index }) => index);
+  const formIndex = formIndices.length > 0
+    ? formIndices[deterministicIndex(pokemonId, currentSpeciesId ^ Math.imul(occurrence + 1, 0x97), formIndices.length)]
+    : 0;
+  return { species, formIndex };
 }
 
 export function rollFunRandomSpecies(): FunRandomSpeciesChoice | null {

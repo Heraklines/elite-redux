@@ -1,21 +1,26 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { getFunScrambledMoveId } from "#data/elite-redux/er-fun-mode";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonPhase } from "#phases/pokemon-phase";
 
 export class MoveEndPhase extends PokemonPhase {
   public readonly phaseName = "MoveEndPhase";
-  private wasFollowUp: boolean;
+  private readonly wasFollowUp: boolean;
+  private readonly usedMoveId: MoveId | undefined;
 
   /** Targets from the preceding MovePhase */
-  private targets: Pokemon[];
-  constructor(battlerIndex: BattlerIndex, targets: Pokemon[], wasFollowUp = false) {
+  private readonly targets: Pokemon[];
+  constructor(battlerIndex: BattlerIndex, targets: Pokemon[], wasFollowUp = false, usedMoveId?: MoveId) {
     super(battlerIndex);
 
     this.targets = targets;
     this.wasFollowUp = wasFollowUp;
+    this.usedMoveId = usedMoveId;
   }
 
   start() {
@@ -39,6 +44,31 @@ export class MoveEndPhase extends PokemonPhase {
     for (const target of this.targets) {
       if (target) {
         applyAbAttrs("PostSummonRemoveEffectAbAttr", { pokemon: target });
+      }
+    }
+
+    if (
+      !this.wasFollowUp
+      && this.usedMoveId != null
+      && pokemon
+      && globalScene.gameMode.isFun
+      && !pokemon.getTag(BattlerTagType.CHARGING)
+    ) {
+      const move = pokemon.moveset.find(candidate => candidate?.moveId === this.usedMoveId);
+      if (move) {
+        const replacement = getFunScrambledMoveId(
+          pokemon.id,
+          this.usedMoveId,
+          globalScene.currentBattle.waveIndex,
+          globalScene.currentBattle.turn,
+          pokemon.moveset.map(candidate => candidate?.moveId ?? MoveId.NONE),
+        );
+        if (replacement != null) {
+          move.moveId = replacement;
+          move.ppUsed = 0;
+          move.ppUp = 0;
+          move.maxPpOverride = undefined;
+        }
       }
     }
 

@@ -1077,6 +1077,7 @@ export class MovePhase extends PokemonPhase {
       this.pokemon.getBattlerIndex(),
       this.getActiveTargetPokemon(),
       isVirtual(this.useMode),
+      this.cancelled ? undefined : this.move.moveId,
     );
 
     super.end();

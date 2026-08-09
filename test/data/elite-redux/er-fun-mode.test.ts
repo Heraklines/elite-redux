@@ -14,12 +14,16 @@ import {
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
+  DEFAULT_FUN_MODE_CONFIG,
+  getFunEvolutionTarget,
   getFunModeConfig,
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
   getFunRandomTypes,
+  getFunScrambledMoveId,
   rerollFunAbilities,
   resetFunModeConfig,
+  rollFunWeather,
   setFunModeConfig,
 } from "#data/elite-redux/er-fun-mode";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -30,7 +34,11 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
+beforeAll(() => {
+  Phaser.Math.RND = new Phaser.Math.RandomDataGenerator(["er-fun-mode-test"]);
+});
 
 afterEach(() => {
   resetFunModeConfig();
@@ -60,6 +68,10 @@ describe("Fun Mode configuration", () => {
       randomizeLevelUpMoves: true,
       megaMode: true,
       shuffleStats: true,
+      shuffleEvolutions: true,
+      itemChaos: true,
+      weatherRoulette: true,
+      scrambleMoves: true,
       abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
@@ -69,6 +81,10 @@ describe("Fun Mode configuration", () => {
       randomizeLevelUpMoves: true,
       megaMode: true,
       shuffleStats: true,
+      shuffleEvolutions: true,
+      itemChaos: true,
+      weatherRoulette: true,
+      scrambleMoves: true,
       abilityRerollSeed: 4,
     });
   });
@@ -81,6 +97,10 @@ describe("Fun Mode configuration", () => {
       randomizeLevelUpMoves: false,
       megaMode: true,
       shuffleStats: true,
+      shuffleEvolutions: true,
+      itemChaos: true,
+      weatherRoulette: true,
+      scrambleMoves: true,
       abilityRerollSeed: 27,
     };
     saveLastFunModeConfig(config);
@@ -91,6 +111,39 @@ describe("Fun Mode configuration", () => {
       randomizeLevelUpMoves: false,
       megaMode: true,
       shuffleStats: true,
+      shuffleEvolutions: true,
+      itemChaos: true,
+      weatherRoulette: true,
+      scrambleMoves: true,
+    });
+  });
+
+  it("loads legacy six-toggle setups with every newer modifier disabled", () => {
+    saveLastFunModeConfig(DEFAULT_FUN_MODE_CONFIG);
+    const storageKey = localStorage.key(0);
+    expect(storageKey).not.toBeNull();
+    localStorage.setItem(
+      storageKey!,
+      JSON.stringify({
+        randomizePokemon: true,
+        randomizeTypes: false,
+        randomizeAbilities: true,
+        randomizeLevelUpMoves: false,
+        megaMode: true,
+        shuffleStats: false,
+      }),
+    );
+    expect(loadLastFunModeConfig()).toMatchObject({
+      randomizePokemon: true,
+      randomizeTypes: false,
+      randomizeAbilities: true,
+      randomizeLevelUpMoves: false,
+      megaMode: true,
+      shuffleStats: false,
+      shuffleEvolutions: false,
+      itemChaos: false,
+      weatherRoulette: false,
+      scrambleMoves: false,
     });
   });
 });
@@ -139,6 +192,31 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
       expect(moveId).not.toBe(MoveId.STRUGGLE);
       expect(allMoves[moveId].isUnimplemented).toBe(false);
     }
+  });
+
+  it("replaces a used moveset slot with a stable implemented move not already known", () => {
+    setFunModeConfig({ ...getFunModeConfig(), scrambleMoves: true });
+    const current = [MoveId.TACKLE, MoveId.GROWL, MoveId.QUICK_ATTACK, MoveId.BITE];
+    const replacement = getFunScrambledMoveId(12345, MoveId.TACKLE, 20, 3, current);
+    expect(replacement).not.toBeNull();
+    expect(current).not.toContain(replacement);
+    expect(allMoves[replacement!].isUnimplemented).toBe(false);
+    expect(getFunScrambledMoveId(12345, MoveId.TACKLE, 20, 3, current)).toBe(replacement);
+  });
+
+  it("selects a stable obtainable evolution target distinct from the current species", () => {
+    setFunModeConfig({ ...getFunModeConfig(), shuffleEvolutions: true });
+    const target = getFunEvolutionTarget(12345, 1, 0);
+    expect(target).not.toBeNull();
+    expect(target!.species.speciesId).not.toBe(1);
+    expect(target!.formIndex === 0 || target!.species.forms[target!.formIndex].isStarterSelectable).toBe(true);
+    expect(getFunEvolutionTarget(12345, 1, 0)).toEqual(target);
+  });
+
+  it("rolls weather only when Weather Roulette is enabled", () => {
+    expect(rollFunWeather()).toBeNull();
+    setFunModeConfig({ ...getFunModeConfig(), weatherRoulette: true });
+    expect(rollFunWeather()).not.toBeNull();
   });
 });
 

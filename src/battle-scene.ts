@@ -71,6 +71,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -4221,6 +4222,9 @@ export class BattleScene extends SceneBase {
             if (!randSeedInt(this.gameMode.getEnemyModifierChance(isBoss))) {
               count++;
             }
+          }
+          if (this.gameMode.isFun && getFunModeConfig().itemChaos) {
+            count = Math.max(1, count);
           }
           if (isBoss) {
             count = Math.max(count, Math.floor(chances / 2));

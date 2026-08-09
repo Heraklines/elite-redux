@@ -17,11 +17,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/moves/signature-moves";
-import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import {
   FusionSpeciesFormEvolution,
   pokemonEvolutions,
   pokemonPrevolutions,
+  SpeciesFormEvolution,
   validateShedinjaEvo,
 } from "#balance/pokemon-evolutions";
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
@@ -144,6 +144,7 @@ import {
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
+  getFunEvolutionTarget,
   getFunModeConfig,
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
@@ -4295,6 +4296,28 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           valid.push(fe);
         }
       }
+    }
+
+    if (globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions) {
+      return valid.map((evolution, index) => {
+        const target = getFunEvolutionTarget(this.id, this.species.speciesId, index);
+        if (!target) {
+          return evolution;
+        }
+        const form = target.species.forms[target.formIndex] as { formKey?: string } | undefined;
+        const shuffled = new SpeciesFormEvolution(
+          target.species.speciesId,
+          evolution.preFormKey,
+          form?.formKey || null,
+          evolution.level,
+          evolution.item,
+          evolution.condition?.data ?? null,
+          evolution.evoLevelThreshold,
+        );
+        return evolution instanceof FusionSpeciesFormEvolution
+          ? new FusionSpeciesFormEvolution(evolution.primarySpeciesId, shuffled)
+          : shuffled;
+      });
     }
 
     return valid;

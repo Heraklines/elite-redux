@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { rollFunWeather } from "#data/elite-redux/er-fun-mode";
 import { EncounterPhase } from "#phases/encounter-phase";
 
 /**
@@ -84,8 +85,13 @@ export class NextEncounterPhase extends EncounterPhase {
     });
   }
 
-  /** Do nothing (since this is simply the next wave in the same biome). */
-  protected override trySetWeatherIfNewBiome(): void {}
+  /** Fun Mode Weather Roulette rolls every encounter; ordinary runs retain biome weather. */
+  protected override trySetWeatherIfNewBiome(): void {
+    const funWeather = globalScene.gameMode.isFun ? rollFunWeather() : null;
+    if (funWeather != null) {
+      globalScene.arena.trySetWeather(funWeather);
+    }
+  }
 
   /** Do nothing (since this is simply the next wave in the same biome). */
   protected override trySetTerrainIfNewBiome(): void {}
