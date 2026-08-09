@@ -725,6 +725,21 @@ fn authority_receipts(step: &PairStep) -> Vec<(SeatId, FrameContext, AuthorityRe
         .collect()
 }
 
+fn authority_receipts_for(
+    step: &PairStep,
+    revision: u64,
+    operation_id: &str,
+) -> Vec<(SeatId, FrameContext, AuthorityReceiptBody)> {
+    let revision = Revision::new(safe(revision));
+    let operation_id = operation(operation_id);
+    authority_receipts(step)
+        .into_iter()
+        .filter(|(_, _, body)| {
+            body.revision == revision && body.operation_id == operation_id
+        })
+        .collect()
+}
+
 fn expected_receipt(
     revision: u64,
     operation_id: &str,
@@ -743,7 +758,12 @@ fn expected_receipt(
     )
 }
 
-fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, control_id: &str) {
+fn expected_progress_receipts(
+    step: &PairStep,
+    revision: u64,
+    operation_id: &str,
+    control_id: &str,
+) -> Vec<(SeatId, FrameContext, AuthorityReceiptBody)> {
     let mut expected = vec![
         expected_receipt(revision, operation_id, AckStage::Admitted, None),
         expected_receipt(revision, operation_id, AckStage::MaterialApplied, None),
@@ -766,7 +786,26 @@ fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, con
             None,
         ));
     }
-    assert_eq!(authority_receipts(step), expected);
+    expected
+}
+
+fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, control_id: &str) {
+    assert_eq!(
+        authority_receipts(step),
+        expected_progress_receipts(step, revision, operation_id, control_id)
+    );
+}
+
+fn assert_exact_entry_receipts(
+    step: &PairStep,
+    revision: u64,
+    operation_id: &str,
+    control_id: &str,
+) {
+    assert_eq!(
+        authority_receipts_for(step, revision, operation_id),
+        expected_progress_receipts(step, revision, operation_id, control_id)
+    );
 }
 
 fn authority_entry_revisions(step: &PairStep) -> Vec<Revision> {
@@ -836,18 +875,6 @@ fn has_guest_tail_request_effect(step: &PairStep) -> bool {
                     && frame.body == json!({"fromRevision": 1})
         )
     })
-}
-
-fn drain_network(pair: &mut SimulatedPair, steps: &mut Vec<PairStep>) -> TestResult<()> {
-    for _ in 0..128 {
-        if pair.snapshot()?.network.queued_packet_ids.is_empty() {
-            return Ok(());
-        }
-        steps.push(pair.apply(PairOperation::Fault {
-            operation: FaultOperation::DeliverNext,
-        })?);
-    }
-    Err("command campaign network did not quiesce".into())
 }
 
 fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
@@ -1107,57 +1134,71 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         [MenuState::Waiting(menu)]
             if menu.prompt_key.as_deref() == Some("await/turn/host")
     ));
-    assert_eq!(replica_frontier(&stale_repeat), Some((1, 1, 1)));
-    assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
-    assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
-    steps.push(stale_repeat);
-    steps.push(pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?);
-
-    let replay_requested = pair.apply(PairOperation::Fault {
-        operation: FaultOperation::Deliver {
-            packet_id: tail_request_packet,
-        },
-    })?;
-    assert_eq!(replica_frontier(&replay_requested), Some((1, 1, 1)));
-    assert!(authority_entry_revisions(&replay_requested).contains(&Revision::new(safe(2))));
-    assert!(replay_requested.snapshot.network.queued_packet_ids.len() >= 2);
-    assert!(
-        !replay_requested
-            .snapshot
-            .network
-            .queued_packet_ids
-            .is_empty()
-    );
-    let replay_start = steps.len();
-    steps.push(replay_requested);
-
-    drain_network(&mut pair, &mut steps)?;
-    let replay_steps = &steps[replay_start..];
-    let second_entry_step = replay_steps
-        .iter()
-        .find(|step| has_material_effect(step, HOST_OPERATION))
-        .expect("replayed N+1 must apply authority material through Pair");
-    assert_eq!(replica_frontier(second_entry_step), Some((2, 2, 2)));
+    assert_eq!(replica_frontier(&stale_repeat), Some((2, 2, 2)));
     assert_material_effect(
-        second_entry_step,
+        &stale_repeat,
         seat(1),
         2,
         HOST_OPERATION,
         &authority_material(1, "host"),
     );
     assert_control_effect(
-        second_entry_step,
+        &stale_repeat,
         seat(1),
         2,
         HOST_OPERATION,
         &await_control(),
     );
-    assert_exact_receipts(
-        second_entry_step,
+    assert_exact_entry_receipts(
+        &stale_repeat,
         2,
         HOST_OPERATION,
         &control_id_of(&await_control()),
     );
+    let duplicate_receipts = authority_receipts_for(&stale_repeat, 1, GUEST_OPERATION);
+    assert_eq!(
+        duplicate_receipts,
+        vec![expected_receipt(
+            1,
+            GUEST_OPERATION,
+            AckStage::ControlInstalled,
+            Some(&control_id_of(&remaining_control())),
+        )]
+    );
+    let revision_two_receipts = authority_receipts_for(&stale_repeat, 2, HOST_OPERATION);
+    assert_eq!(
+        authority_receipts(&stale_repeat).len(),
+        duplicate_receipts.len() + revision_two_receipts.len()
+    );
+    assert!(!has_material_effect(&stale_repeat, GUEST_OPERATION));
+    assert!(!has_control_effect(&stale_repeat, GUEST_OPERATION));
+    let replay_revisions = authority_entry_revisions(&stale_repeat);
+    assert_eq!(replay_revisions.len(), 2);
+    assert!(replay_revisions.contains(&Revision::new(safe(1))));
+    assert!(replay_revisions.contains(&Revision::new(safe(2))));
+    assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
+    assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
+    assert!(
+        !stale_repeat
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&tail_request_packet)
+    );
+    assert!(stale_repeat.snapshot.network.queued_packet_ids.is_empty());
+    steps.push(stale_repeat);
+    let stale_release = pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?;
+    assert_eq!(replica_frontier(&stale_release), Some((2, 2, 2)));
+    assert_no_command_or_cursor_intent(&stale_release, seat(1));
+    assert!(!has_material_effect(&stale_release, GUEST_OPERATION));
+    assert!(!has_material_effect(&stale_release, HOST_OPERATION));
+    assert!(!has_control_effect(&stale_release, GUEST_OPERATION));
+    assert!(!has_control_effect(&stale_release, HOST_OPERATION));
+    assert!(authority_receipts(&stale_release).is_empty());
+    assert!(authority_entry_revisions(&stale_release).is_empty());
+    assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
+    steps.push(stale_release);
+
     let before_teardown = pair.snapshot()?;
     assert_eq!(
         replica_frontier_from_snapshot(&before_teardown),
