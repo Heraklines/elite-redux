@@ -12,6 +12,8 @@ import { BattleScene } from "#app/battle-scene";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { getGameMode } from "#app/game-mode";
+import Overrides from "#app/overrides";
+import { PhaseManager } from "#app/phase-manager";
 import { MovePhasePriorityQueue } from "#app/queues/move-phase-priority-queue";
 import { PokemonPhasePriorityQueue } from "#app/queues/pokemon-phase-priority-queue";
 import { allAbilities } from "#data/data-lists";
@@ -90,21 +92,6 @@ const CASE_IDS = [
   "victory",
   "defeat",
 ];
-const DOUBLE_SCENARIO_PLAYER_OWNERS: Readonly<Partial<Record<string, readonly ("host" | "guest")[]>>> = Object.freeze({
-  "speed-tie": ["host", "guest"],
-  "paralysis-speed-order": ["host", "guest"],
-  "spread-stage-down": ["host", "guest"],
-  "stage-floor-cap": ["host", "guest"],
-  "intimidate-switch-in": ["host", "guest"],
-  "intimidate-stage-floor": ["host", "guest"],
-  "voluntary-switch": ["host", "guest", "host"],
-  "doubles-single-target": ["host", "guest"],
-  "same-side-simultaneous-faint": ["host", "guest"],
-  "mixed-side-simultaneous-faint": ["host", "guest"],
-  "forced-replacement": ["host", "guest", "host"],
-  "no-legal-replacement": ["host", "guest"],
-});
-
 const SAFE_U53_MAX = 9_007_199_254_740_991;
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -126,6 +113,9 @@ interface ObservationTrace {
   tieOrderByPhase?: WeakMap<object, number>;
   identity?: WeakMap<object, number>;
   abilityOverrides?: WeakMap<object, number>;
+  faintByPhase?: WeakMap<object, AnyRecord>;
+  faintBySwitchPhase?: WeakMap<object, AnyRecord>;
+  faintBranchByPhase?: WeakMap<object, AnyRecord>;
 }
 
 let activeTrace: ObservationTrace | null = null;
@@ -513,16 +503,6 @@ function generateRngVectors(): AnyRecord[] {
   return vectors;
 }
 
-function effectiveBattleStyle(spec: ScenarioSpec): "single" | "double" | "triple" {
-  if (spec.run?.triple) {
-    return "triple";
-  }
-  if (spec.run?.double || (spec.enemy?.kind === "party" && (spec.enemy.party?.length ?? 0) >= 2)) {
-    return "double";
-  }
-  return "single";
-}
-
 function scenarioFor(id: string): ScenarioSpec {
   const base: ScenarioSpec = {
     v: 1,
@@ -817,6 +797,30 @@ function restoreRealBattleRng(): void {
   (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionSceneRandBattleSeedInt;
 }
 
+function coopLaunchOwners(spec: ScenarioSpec, starters: readonly unknown[]): ("host" | "guest")[] | undefined {
+  if (spec.run?.triple) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "the selected M3 oracle does not admit a co-op triple launch");
+  }
+  if (!spec.run?.double) {
+    return;
+  }
+  if (starters.length < 2 || starters.length > 6) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "a selected co-op launch must contain two to six interleaved starters");
+  }
+  // The scenario party is already in the production launch order
+  // host0, guest0, host1, guest1, ... . Pass that semantic launch input
+  // through SelectStarterPhase.initBattle so production creates and persists
+  // each PlayerPokemon.coopOwner tag; the exporter never writes ownership.
+  return starters.map((_, index) => (index % 2 === 0 ? "host" : "guest"));
+}
+
+function scenarioBattleStyle(spec: ScenarioSpec): "single" | "double" | "triple" {
+  if (spec.run?.triple) {
+    return "triple";
+  }
+  return spec.run?.double ? "double" : "single";
+}
+
 async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
   const game = new GameManager(phaserGame);
   currentScenarioGame = game;
@@ -828,16 +832,29 @@ async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
   const { scenario, postLaunch } = buildDevScenario(spec);
   await game.runToTitle();
   const starters = scenario.setup();
-  game.override.battleStyle(effectiveBattleStyle(spec));
+  const battleStyle = scenarioBattleStyle(spec);
+  // buildDevScenario resets this mutable dev input before every launch, but only
+  // writes the double/triple cases. Pin singles through that same production
+  // input directly: OverridesHelper.battleStyle installs a Vitest getter spy,
+  // which cannot be reset by the next scenario's Object.assign.
+  (Overrides as unknown as { BATTLE_STYLE_OVERRIDE: typeof battleStyle }).BATTLE_STYLE_OVERRIDE = battleStyle;
+  const coopOwners = coopLaunchOwners(spec, starters);
   game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
-    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
+    game.scene.gameMode = getGameMode(coopOwners == null ? GameModes.CLASSIC : GameModes.COOP);
     const starterPhase = new SelectStarterPhase();
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    starterPhase.initBattle(starters, true);
+    starterPhase.initBattle(starters, true, coopOwners);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");
   await game.phaseInterceptor.to("CommandPhase");
+  const expectedCapacity = battleStyle === "single" ? 1 : battleStyle === "double" ? 2 : 3;
+  if (
+    game.scene.currentBattle.arrangement.playerCapacity !== expectedCapacity
+    || game.scene.currentBattle.arrangement.enemyCapacity !== expectedCapacity
+  ) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `scenario launched with the wrong ${battleStyle} topology`);
+  }
   scenario.onBattleStart?.();
   return game;
 }
@@ -979,6 +996,58 @@ function installObservationHooks(): void {
       (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionSceneRandBattleSeedInt;
     }
     productionSceneRandBattleSeedInt = undefined;
+  });
+
+  const recordFaintBranch = (manager: PhaseManager, phaseName: string, args: any[]): void => {
+    const trace = activeTrace;
+    const current = manager.getCurrentPhase();
+    if (trace == null || !(current instanceof FaintPhase) || (current as AnyRecord).player !== true) {
+      return;
+    }
+    let branch: AnyRecord | null = null;
+    if (phaseName === "SwitchPhase") {
+      branch = {
+        kind: "SWITCH_QUEUED",
+        field_index: args[1],
+        player: args[2],
+        source: args[4],
+      };
+    } else if (phaseName === "GameOverPhase" || phaseName === "ToggleDoublePositionPhase") {
+      branch = { kind: "NO_REPLACEMENT_QUEUED", phase_name: phaseName };
+    }
+    if (branch == null) {
+      return;
+    }
+    if (trace.faintBranchByPhase?.has(current)) {
+      fail("UNRECORDED_STATE_CHANGE", "FaintPhase queued more than one replacement terminal branch");
+    }
+    trace.faintBranchByPhase?.set(current, branch);
+  };
+
+  const originalPhasePushNew = PhaseManager.prototype.pushNew;
+  (PhaseManager.prototype as AnyRecord).pushNew = function (
+    this: PhaseManager,
+    phaseName: string,
+    ...args: any[]
+  ): void {
+    (originalPhasePushNew as AnyRecord).call(this, phaseName, ...args);
+    recordFaintBranch(this, phaseName, args);
+  };
+  restoreHooks.push(() => {
+    PhaseManager.prototype.pushNew = originalPhasePushNew;
+  });
+
+  const originalPhaseUnshiftNew = PhaseManager.prototype.unshiftNew;
+  (PhaseManager.prototype as AnyRecord).unshiftNew = function (
+    this: PhaseManager,
+    phaseName: string,
+    ...args: any[]
+  ): void {
+    (originalPhaseUnshiftNew as AnyRecord).call(this, phaseName, ...args);
+    recordFaintBranch(this, phaseName, args);
+  };
+  restoreHooks.push(() => {
+    PhaseManager.prototype.unshiftNew = originalPhaseUnshiftNew;
   });
 
   const originalBattleRand = Battle.prototype.randSeedInt;
@@ -1318,17 +1387,54 @@ function installObservationHooks(): void {
 
   const originalSwitchStart = SwitchSummonPhase.prototype.start;
   SwitchSummonPhase.prototype.start = function (this: SwitchSummonPhase): void {
-    if (activeTrace != null) {
+    const trace = activeTrace;
+    if (trace != null) {
       const pokemon = this.getPokemon();
       const forcedReplacement = pokemon.isFainted();
+      let selectedOccurrence: AnyRecord | null = null;
+      let selectedProgress: AnyRecord | null = null;
+      if (forcedReplacement) {
+        const raw = this as AnyRecord;
+        if (
+          raw.player !== true
+          || !Number.isSafeInteger(raw.fieldIndex)
+          || raw.fieldIndex < 0
+          || !Number.isSafeInteger(raw.slotIndex)
+          || raw.slotIndex < 0
+        ) {
+          fail("UNRECORDED_STATE_CHANGE", "selected player replacement lacks a stable switch address");
+        }
+        const game = trace.game as GameManager;
+        const party = game.scene.getPlayerParty();
+        const incoming = party[raw.slotIndex];
+        if (incoming == null || !incoming.isAllowedInBattle()) {
+          fail("UNRECORDED_STATE_CHANGE", "selected player replacement is not an observed legal party member");
+        }
+        selectedOccurrence = pendingFaintForPlayerSlot(trace, raw.fieldIndex);
+        if (resolvePlayerOwnerSeat(game, incoming, raw.slotIndex) !== selectedOccurrence.owner_seat) {
+          fail(
+            "CANONICAL_STATE_UNOBSERVABLE",
+            `selected replacement for faint ${String(selectedOccurrence.id)} changed owner`,
+          );
+        }
+        selectedProgress = {
+          kind: "SELECTED",
+          party_slot: raw.slotIndex,
+          pokemon: pokemonId(trace, incoming),
+        };
+      }
       recordResolvedAction(
-        activeTrace.game as GameManager,
+        trace.game as GameManager,
         this,
         pokemon,
         forcedReplacement ? "REPLACEMENT" : "SWITCH",
         "EXECUTED",
         forcedReplacement ? null : undefined,
       );
+      if (selectedOccurrence != null && selectedProgress != null) {
+        appendFaintProgress(trace, selectedOccurrence, selectedProgress, "SwitchSummonPhase");
+        trace.faintBySwitchPhase?.set(this, selectedOccurrence);
+      }
     }
     originalSwitchStart.call(this);
   };
@@ -1398,6 +1504,17 @@ function installObservationHooks(): void {
           before: pokemonId(trace, outgoing),
           after: pokemonId(trace, incoming),
         });
+        const occurrence = trace.faintBySwitchPhase?.get(this);
+        if (occurrence != null) {
+          if (
+            !player
+            || occurrence.replacement?.kind !== "SELECTED"
+            || occurrence.replacement.pokemon !== pokemonId(trace, incoming)
+          ) {
+            fail("UNRECORDED_STATE_CHANGE", "field replacement write diverged from its selected faint progress");
+          }
+          appendFaintResolved(trace, occurrence, phase.phaseName);
+        }
       },
     });
     try {
@@ -1458,13 +1575,31 @@ function installObservationHooks(): void {
     if (!address || !pokemon) {
       fail("CANONICAL_STATE_UNOBSERVABLE", "FaintPhase did not expose its source address");
     }
+    assertFaintSourceAddress(address);
     const id = activeTrace.nextGlobalFaintId++;
     const slot = fieldSlot(activeTrace.game as GameManager, this.battlerIndex);
+    let ownerSeat: number | null = null;
     if (slot.side === "PLAYER") {
       const game = activeTrace.game as GameManager;
       const partyIndex = game.scene.getPlayerParty().indexOf(pokemon);
-      if (resolvePlayerOwnerSeat(game, pokemon, partyIndex) !== slot.position + 1) {
+      ownerSeat = resolvePlayerOwnerSeat(game, pokemon, partyIndex);
+      if (ownerSeat !== slot.position + 1) {
         fail("CANONICAL_STATE_UNOBSERVABLE", `faint ${String(id)} conflicts with its owner seat`);
+      }
+      const branch = activeTrace.faintBranchByPhase?.get(this);
+      if (branch?.kind === "SWITCH_QUEUED") {
+        const source = branch.source as AnyRecord | undefined;
+        if (
+          branch.field_index !== slot.position
+          || branch.player !== true
+          || source?.wave !== address.wave
+          || source?.turn !== address.turn
+          || source?.occurrence !== address.occurrence
+        ) {
+          fail("UNRECORDED_STATE_CHANGE", `faint ${String(id)} queued a mismatched replacement branch`);
+        }
+      } else if (branch?.kind !== "NO_REPLACEMENT_QUEUED") {
+        fail("UNRECORDED_STATE_CHANGE", `faint ${String(id)} exposed no production replacement branch`);
       }
     }
     const occurrence = {
@@ -1477,11 +1612,12 @@ function installObservationHooks(): void {
       },
       slot,
       pokemon: pokemonId(activeTrace, pokemon),
-      owner_seat: slot.side === "PLAYER" ? slot.position + 1 : null,
-      replacement: { kind: "PENDING" },
+      owner_seat: ownerSeat,
+      replacement: { kind: slot.side === "PLAYER" ? "PENDING" : "NOT_REQUIRED" },
       resolved: false,
     };
     activeTrace.faints.push(occurrence);
+    activeTrace.faintByPhase?.set(this, occurrence);
     activeTrace.mutations.push({
       sequence: activeTrace.mutations.length,
       kind: "FAINT_QUEUED",
@@ -1494,6 +1630,37 @@ function installObservationHooks(): void {
   };
   restoreHooks.push(() => {
     FaintPhase.prototype.start = originalFaintStart;
+  });
+
+  const originalFaintEnd = FaintPhase.prototype.end;
+  FaintPhase.prototype.end = function (this: FaintPhase): void {
+    const trace = activeTrace;
+    const occurrence = trace?.faintByPhase?.get(this);
+    if (trace != null && occurrence != null && !occurrence.resolved) {
+      if (occurrence.slot?.side === "ENEMY") {
+        if (occurrence.replacement?.kind !== "NOT_REQUIRED") {
+          fail("UNRECORDED_STATE_CHANGE", `enemy faint ${String(occurrence.id)} has replacement progress`);
+        }
+        appendFaintResolved(trace, occurrence, "FaintPhase");
+      } else if (occurrence.slot?.side === "PLAYER") {
+        if (occurrence.replacement?.kind !== "PENDING") {
+          fail("UNRECORDED_STATE_CHANGE", `player faint ${String(occurrence.id)} completed with invalid progress`);
+        }
+        const branch = trace.faintBranchByPhase?.get(this);
+        if (branch?.kind === "NO_REPLACEMENT_QUEUED") {
+          appendFaintProgress(trace, occurrence, { kind: "NO_LEGAL_REPLACEMENT" }, "FaintPhase");
+          appendFaintResolved(trace, occurrence, "FaintPhase");
+        } else if (branch?.kind !== "SWITCH_QUEUED") {
+          fail("UNRECORDED_STATE_CHANGE", `player faint ${String(occurrence.id)} lost its production branch`);
+        }
+      } else {
+        fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} has an invalid side`);
+      }
+    }
+    originalFaintEnd.call(this);
+  };
+  restoreHooks.push(() => {
+    FaintPhase.prototype.end = originalFaintEnd;
   });
 }
 
@@ -1621,6 +1788,82 @@ function pokemonId(trace: ObservationTrace, mon: Pokemon): number {
 function faintProjection(occurrence: AnyRecord): AnyRecord {
   const { resolved: _resolved, ...canonical } = occurrence;
   return canonical;
+}
+
+function assertFaintSourceAddress(address: AnyRecord): void {
+  if (
+    !Number.isSafeInteger(address.wave)
+    || address.wave < 1
+    || address.wave > SAFE_U53_MAX
+    || !Number.isSafeInteger(address.turn)
+    || address.turn < 1
+    || address.turn > SAFE_U53_MAX
+    || !Number.isSafeInteger(address.occurrence)
+    || address.occurrence < 0
+    || address.occurrence > 0xffffffff
+  ) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "FaintPhase exposed an invalid wave/turn occurrence address");
+  }
+}
+
+function faintQueueIndex(trace: ObservationTrace, occurrence: AnyRecord): number {
+  const index = trace.faints.indexOf(occurrence);
+  if (index < 0) {
+    fail("UNRECORDED_STATE_CHANGE", "faint occurrence is absent from the observed causal queue");
+  }
+  return index;
+}
+
+function appendFaintProgress(trace: ObservationTrace, occurrence: AnyRecord, after: AnyRecord, phase: string): void {
+  if (occurrence.resolved || occurrence.replacement?.kind !== "PENDING") {
+    fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} cannot change replacement progress`);
+  }
+  const before = occurrence.replacement;
+  occurrence.replacement = after;
+  const index = faintQueueIndex(trace, occurrence);
+  trace.mutations.push({
+    sequence: trace.mutations.length,
+    kind: "FAINT_PROGRESS_CHANGED",
+    phase,
+    cause: trace.activeAction == null ? "TURN_RESOLUTION" : trace.activeAction.sequence,
+    path: `battle.faint_queue[${index}].replacement`,
+    occurrence: occurrence.id,
+    before,
+    after,
+  });
+}
+
+function appendFaintResolved(trace: ObservationTrace, occurrence: AnyRecord, phase: string): void {
+  if (occurrence.resolved) {
+    fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} resolved more than once`);
+  }
+  const index = faintQueueIndex(trace, occurrence);
+  occurrence.resolved = true;
+  trace.mutations.push({
+    sequence: trace.mutations.length,
+    kind: "FAINT_RESOLVED",
+    phase,
+    cause: trace.activeAction == null ? "TURN_RESOLUTION" : trace.activeAction.sequence,
+    path: `battle.faint_queue[${index}]`,
+    occurrence: occurrence.id,
+  });
+}
+
+function pendingFaintForPlayerSlot(trace: ObservationTrace, position: number): AnyRecord {
+  const matches = trace.faints.filter(
+    occurrence =>
+      occurrence.slot?.side === "PLAYER"
+      && occurrence.slot.position === position
+      && occurrence.replacement?.kind === "PENDING"
+      && occurrence.resolved !== true,
+  );
+  if (matches.length !== 1) {
+    fail(
+      "UNRECORDED_STATE_CHANGE",
+      `player field ${String(position)} has ${String(matches.length)} pending faint occurrences`,
+    );
+  }
+  return matches[0];
 }
 
 function fieldSlot(game: GameManager, battlerIndex: number): AnyRecord {
@@ -1809,19 +2052,6 @@ function applyTestOnlyContentProjection(game: GameManager, spec: ScenarioSpec, t
 }
 
 function applyScenarioInitialState(game: GameManager, id: string): void {
-  const ownerRoles = DOUBLE_SCENARIO_PLAYER_OWNERS[id];
-  const playerCapacity = game.scene.currentBattle.arrangement.playerCapacity;
-  if (playerCapacity === 2) {
-    const party = game.scene.getPlayerParty();
-    if (ownerRoles == null || ownerRoles.length !== party.length) {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `${id} lacks an exact explicit double-party owner projection`);
-    }
-    party.forEach((mon, index) => {
-      mon.coopOwner = ownerRoles[index];
-    });
-  } else if (playerCapacity !== 1 || ownerRoles != null) {
-    fail("CANONICAL_STATE_UNOBSERVABLE", `${id} has an unsupported player capacity/owner projection`);
-  }
   if (id !== "pp-unusable-rejected") {
     return;
   }
@@ -1838,25 +2068,13 @@ function applyScenarioInitialState(game: GameManager, id: string): void {
 
 function explicitPlayerOwnerSeat(mon: Pokemon, path: string): number | null {
   const role = (mon as AnyRecord).coopOwner;
-  let roleSeat: number | null = null;
-  if (role != null) {
-    if (role !== "host" && role !== "guest") {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid coopOwner at ${path}`);
-    }
-    roleSeat = role === "host" ? 1 : 2;
+  if (role == null) {
+    return null;
   }
-  const rawSeat = (mon as AnyRecord).coopOwnerSeatId;
-  let numericSeat: number | null = null;
-  if (rawSeat != null) {
-    if (!Number.isSafeInteger(rawSeat) || (rawSeat !== 0 && rawSeat !== 1)) {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid coopOwnerSeatId at ${path}`);
-    }
-    numericSeat = rawSeat + 1;
+  if (role !== "host" && role !== "guest") {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `invalid persistent coopOwner at ${path}`);
   }
-  if (roleSeat != null && numericSeat != null && roleSeat !== numericSeat) {
-    fail("CANONICAL_STATE_UNOBSERVABLE", `conflicting owner evidence at ${path}`);
-  }
-  return roleSeat ?? numericSeat;
+  return role === "host" ? 1 : 2;
 }
 
 function resolvePlayerOwnerSeat(game: GameManager, mon: Pokemon, partyIndex: number): number {
@@ -1878,10 +2096,10 @@ function resolvePlayerOwnerSeat(game: GameManager, mon: Pokemon, partyIndex: num
   const fieldPosition = game.scene.getPlayerField(false).indexOf(mon);
   if (fieldPosition === 0 || fieldPosition === 1) {
     const expected = fieldPosition + 1;
-    if (explicit != null && explicit !== expected) {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `active player_party[${partyIndex}] owner conflicts with field seat`);
+    if (explicit !== expected) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `active player_party[${partyIndex}] lacks its persistent field-seat owner`);
     }
-    return expected;
+    return explicit;
   }
   if (explicit == null) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `bench player_party[${partyIndex}] has no explicit owner`);
@@ -2154,7 +2372,11 @@ function commandFrontier(game: GameManager): AnyRecord[] {
       }
       const flat = battle.arrangement.indexOf({ side: 0, position });
       const turn = battle.turn;
-      const ownerSeat = position + 1;
+      const partyIndex = game.scene.getPlayerParty().indexOf(mon);
+      const ownerSeat = resolvePlayerOwnerSeat(game, mon, partyIndex);
+      if (ownerSeat !== position + 1) {
+        fail("COMMAND_UNOBSERVABLE", `active command owner conflicts with player field ${String(position)}`);
+      }
       return {
         operation_id: `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${position}/seat/${ownerSeat}`,
         owner_seat: ownerSeat,
@@ -2177,50 +2399,10 @@ function outcome(game: GameManager): string {
   return "ONGOING";
 }
 
-function updateFaintProgress(game: GameManager, trace: ObservationTrace): void {
+function assertFaintObservationComplete(trace: ObservationTrace): void {
   for (const occurrence of trace.faints) {
-    const slot = occurrence.slot;
-    if (slot.side !== "PLAYER") {
-      occurrence.replacement = { kind: "NOT_REQUIRED" };
-      continue;
-    }
-    const field = game.scene.getPlayerField(false);
-    const current = field[slot.position];
-    const currentId = current == null ? null : pokemonId(trace, current);
-    const original =
-      trace.identity == null
-        ? null
-        : [...game.scene.getPlayerParty()].find(mon => pokemonId(trace, mon) === occurrence.pokemon);
-    if (currentId != null && currentId !== occurrence.pokemon && !current?.isFainted()) {
-      const partySlot = game.scene.getPlayerParty().indexOf(current);
-      if (resolvePlayerOwnerSeat(game, current, partySlot) !== occurrence.owner_seat) {
-        fail("CANONICAL_STATE_UNOBSERVABLE", `replacement for faint ${String(occurrence.id)} changed owner seat`);
-      }
-      occurrence.replacement = { kind: "SELECTED", party_slot: partySlot, pokemon: currentId };
-    } else if (original?.isFainted()) {
-      occurrence.replacement = { kind: "NO_LEGAL_REPLACEMENT" };
-    } else {
-      occurrence.replacement = { kind: "PENDING" };
-    }
-  }
-}
-
-function settleFaintOccurrences(game: GameManager, trace: ObservationTrace): void {
-  updateFaintProgress(game, trace);
-  const playerField = game.scene.getPlayerField(false);
-  for (const occurrence of trace.faints) {
-    if (occurrence.slot.side === "ENEMY") {
-      occurrence.resolved = true;
-      continue;
-    }
-    const current = playerField[occurrence.slot.position];
-    const currentId = current == null ? null : pokemonId(trace, current);
-    if (occurrence.replacement.kind === "NO_LEGAL_REPLACEMENT") {
-      occurrence.resolved = true;
-    } else if (currentId != null && currentId !== occurrence.pokemon && !current.isFainted()) {
-      occurrence.resolved = true;
-    } else if (game.scene.getPlayerParty().every(mon => mon.isFainted())) {
-      occurrence.resolved = true;
+    if (!occurrence.resolved || occurrence.replacement?.kind === "PENDING") {
+      fail("UNRECORDED_STATE_CHANGE", `faint ${String(occurrence.id)} never reached a causal resolution boundary`);
     }
   }
 }
@@ -2249,7 +2431,7 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
   const state = {
     schema_version: 1,
     content_hash: `blake3-v1:${contentHash}`,
-    mode: GameModes.CLASSIC,
+    mode: game.scene.gameMode.modeId,
     wave: battle.waveIndex,
     next_battle_id: 2,
     run_rng: battleRngState(game).run,
@@ -2452,8 +2634,7 @@ function semanticIntent(id: string, spec: ScenarioSpec, game: GameManager): AnyR
   ];
 }
 
-function replacementProposals(game: GameManager, trace: ObservationTrace): AnyRecord[] {
-  updateFaintProgress(game, trace);
+function replacementProposals(trace: ObservationTrace): AnyRecord[] {
   return trace.faints
     .filter(occurrence => occurrence.slot.side === "PLAYER" && occurrence.replacement.kind !== "PENDING")
     .map(occurrence => {
@@ -2559,13 +2740,36 @@ function nextControl(game: GameManager): AnyRecord {
 
 function registerReplacementPrompt(game: GameManager): void {
   game.onNextPrompt("SwitchPhase", UiMode.PARTY, () => {
+    const trace = activeTrace;
+    const phase = game.scene.phaseManager.getCurrentPhase() as AnyRecord | undefined;
+    const fieldIndex = phase?.fieldIndex;
+    if (
+      trace == null
+      || phase?.phaseName !== "SwitchPhase"
+      || !Number.isSafeInteger(fieldIndex)
+      || fieldIndex < 0
+      || fieldIndex >= game.scene.currentBattle.arrangement.playerCapacity
+    ) {
+      fail("NEXT_CONTROL_UNOBSERVABLE", "replacement prompt lacks its observed player field address");
+    }
+    const occurrence = pendingFaintForPlayerSlot(trace, fieldIndex);
+    const ownerSeat = occurrence.owner_seat;
     const handler = game.scene.ui.getHandler() as AnyRecord;
     const battlerCount = game.scene.currentBattle.getBattlerCount();
     const slot = game.scene
       .getPlayerParty()
-      .findIndex((mon, index) => index >= battlerCount && mon.isAllowedInBattle());
+      .findIndex(
+        (mon, index) =>
+          index >= battlerCount
+          && index < 6
+          && mon.isAllowedInBattle()
+          && resolvePlayerOwnerSeat(game, mon, index) === ownerSeat,
+      );
     if (slot < 0) {
-      return;
+      fail(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        `replacement prompt for faint ${String(occurrence.id)} has no observed same-owner candidate`,
+      );
     }
     if (typeof handler.setCursor !== "function" || typeof handler.processInput !== "function") {
       fail("NEXT_CONTROL_UNOBSERVABLE", "replacement prompt did not expose its observed party handler");
@@ -2584,7 +2788,7 @@ async function waitForUiMode(game: GameManager, mode: UiMode, context: string): 
   }
 }
 
-async function admitPlayerCommands(game: GameManager, id: string): Promise<AnyRecord[]> {
+async function admitPlayerCommands(game: GameManager, id: string): Promise<void> {
   const field = game.scene.getPlayerField(false);
   const select = (mon: Pokemon, battlerIndex: number): void => {
     const move = mon.getMoveset()[0];
@@ -2682,57 +2886,7 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<AnyRe
     if (committed?.cursor !== 1 || committed?.move?.move !== fallback.moveId) {
       fail("COMMAND_UNOBSERVABLE", "usable fallback command lost its observed move-slot identity");
     }
-    return [
-      {
-        sequence: 0,
-        phase: "CommandPhase",
-        ui_mode: "COMMAND",
-        button: "ACTION",
-        cursor: Command.FIGHT,
-        result: "ACCEPTED_OPEN_FIGHT",
-      },
-      {
-        sequence: 1,
-        phase: "CommandPhase",
-        ui_mode: "FIGHT",
-        button: "ACTION",
-        cursor: 0,
-        move_id: exhausted.moveId,
-        result: "REJECTED_EXHAUSTED_PP",
-        pp_used_before: ppBefore,
-        pp_used_after: exhausted.ppUsed,
-        rng_before: rngBefore,
-        rng_after: rngAfterRejection,
-        rng_draw_count_before: rngDrawCountBefore,
-        rng_draw_count_after: rngDrawCountAfter,
-        command_state_before: commandsBefore,
-        command_state_after: commandsAfterRejection,
-      },
-      {
-        sequence: 2,
-        phase: "CommandPhase",
-        ui_mode: "MESSAGE",
-        button: "ACTION",
-        result: "ACKNOWLEDGED_REJECTION",
-      },
-      {
-        sequence: 3,
-        phase: "CommandPhase",
-        ui_mode: "FIGHT",
-        button: "RIGHT",
-        cursor: 1,
-        result: "SELECTED_USABLE_FALLBACK",
-      },
-      {
-        sequence: 4,
-        phase: "CommandPhase",
-        ui_mode: "FIGHT",
-        button: "ACTION",
-        cursor: 1,
-        move_id: fallback.moveId,
-        result: "COMMITTED_USABLE_FALLBACK",
-      },
-    ];
+    return;
   }
   if (id === "voluntary-switch") {
     // In a double battle party slots 0 and 1 are active; slot 2 is the
@@ -2750,7 +2904,6 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<AnyRe
       select(field[1], BattlerIndex.PLAYER_2);
     }
   }
-  return [];
 }
 
 async function admitEnemyCommands(game: GameManager, id: string): Promise<void> {
@@ -2814,6 +2967,9 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
     activeAction: null,
     actionByPhase: new WeakMap<object, AnyRecord>(),
     tieOrderByPhase: new WeakMap<object, number>(),
+    faintByPhase: new WeakMap<object, AnyRecord>(),
+    faintBySwitchPhase: new WeakMap<object, AnyRecord>(),
+    faintBranchByPhase: new WeakMap<object, AnyRecord>(),
     collectRng: false,
     collectMutations: false,
   };
@@ -2830,7 +2986,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
     registerReplacementPrompt(game);
   }
-  const inputEvents = await admitPlayerCommands(game, id);
+  await admitPlayerCommands(game, id);
   await admitEnemyCommands(game, id);
   const rawCommitted = JSON.parse(JSON.stringify(game.scene.currentBattle.turnCommands)) as AnyRecord;
   const admitted = committedCommands(game, rawCommitted, trace);
@@ -2845,10 +3001,10 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (!game.isVictory() && !game.scene.getPlayerParty().every(mon => mon.isFainted())) {
     await game.toNextTurn();
   }
-  settleFaintOccurrences(game, trace);
+  assertFaintObservationComplete(trace);
   const finalState = captureState(game, trace, contentHash);
   const finalRng = battleRngState(game);
-  const replacement = replacementProposals(game, trace);
+  const replacement = replacementProposals(trace);
   const committed = [...admitted];
   const semantic = semanticIntent(id, spec, game);
   const actionOrder = normalizeActionOrder(game, trace);
@@ -2862,16 +3018,10 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
     },
     initial_rng: initialRng,
     commands: {
-      input_events: inputEvents,
+      input_events: [],
       semantic_intent: semantic,
       committed,
       replacement_proposals: replacement,
-      replacement_identity_observations: trace.faints.map(occurrence => ({
-        global_faint_occurrence_id: occurrence.id,
-        turn_occurrence: occurrence.source.turn_occurrence,
-        operation_id_turn_occurrence_component: occurrence.source.turn_occurrence,
-        source: "TEST_ONLY_FAINT_PHASE_ORDER_PROJECTION; PRODUCTION_FaintSource_HAS_TURN_OCCURRENCE_ONLY",
-      })),
     },
     expected_rng_draws: trace.rngDraws,
     expected_action_order: actionOrder,
