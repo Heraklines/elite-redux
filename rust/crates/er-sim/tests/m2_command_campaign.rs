@@ -734,9 +734,7 @@ fn authority_receipts_for(
     let operation_id = operation(operation_id);
     authority_receipts(step)
         .into_iter()
-        .filter(|(_, _, body)| {
-            body.revision == revision && body.operation_id == operation_id
-        })
+        .filter(|(_, _, body)| body.revision == revision && body.operation_id == operation_id)
         .collect()
 }
 
@@ -763,6 +761,7 @@ fn expected_progress_receipts(
     revision: u64,
     operation_id: &str,
     control_id: &str,
+    replay_control_id: Option<&str>,
 ) -> Vec<(SeatId, FrameContext, AuthorityReceiptBody)> {
     let mut expected = vec![
         expected_receipt(revision, operation_id, AckStage::Admitted, None),
@@ -786,13 +785,21 @@ fn expected_progress_receipts(
             None,
         ));
     }
+    if let Some(replay_control_id) = replay_control_id {
+        expected.push(expected_receipt(
+            revision,
+            operation_id,
+            AckStage::ControlInstalled,
+            Some(replay_control_id),
+        ));
+    }
     expected
 }
 
 fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, control_id: &str) {
     assert_eq!(
         authority_receipts(step),
-        expected_progress_receipts(step, revision, operation_id, control_id)
+        expected_progress_receipts(step, revision, operation_id, control_id, None)
     );
 }
 
@@ -801,10 +808,17 @@ fn assert_exact_entry_receipts(
     revision: u64,
     operation_id: &str,
     control_id: &str,
+    replay_control_id: Option<&str>,
 ) {
     assert_eq!(
         authority_receipts_for(step, revision, operation_id),
-        expected_progress_receipts(step, revision, operation_id, control_id)
+        expected_progress_receipts(
+            step,
+            revision,
+            operation_id,
+            control_id,
+            replay_control_id,
+        )
     );
 }
 
@@ -1142,18 +1156,13 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         HOST_OPERATION,
         &authority_material(1, "host"),
     );
-    assert_control_effect(
-        &stale_repeat,
-        seat(1),
-        2,
-        HOST_OPERATION,
-        &await_control(),
-    );
+    assert_control_effect(&stale_repeat, seat(1), 2, HOST_OPERATION, &await_control());
     assert_exact_entry_receipts(
         &stale_repeat,
         2,
         HOST_OPERATION,
         &control_id_of(&await_control()),
+        Some(&control_id_of(&await_control())),
     );
     let duplicate_receipts = authority_receipts_for(&stale_repeat, 1, GUEST_OPERATION);
     assert_eq!(
