@@ -300,10 +300,22 @@ pub mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn strict_canonical_boundary_rejects_non_kernel_numbers() {
+    fn strict_canonical_boundary_accepts_signed_safe_integers_and_rejects_non_kernel_numbers() {
+        for input in [r#"{"value":-1}"#, r#"{"value":-9007199254740991}"#] {
+            let result = canonicalize_json(input);
+            assert!(
+                result.is_ok(),
+                "canonicalization rejected signed-safe input: {input}"
+            );
+            let Some(canonical) = result.ok() else {
+                return;
+            };
+            assert_eq!(canonical, input);
+        }
+
         for input in [
             r#"{"value":9007199254740992}"#,
-            r#"{"value":-1}"#,
+            r#"{"value":-9007199254740992}"#,
             r#"{"value":1.5}"#,
         ] {
             assert!(

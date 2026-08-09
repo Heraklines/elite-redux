@@ -715,10 +715,7 @@ mod tests {
             Err(CanonicalError::UnsafeInteger { value: u64::MAX })
         ));
 
-        for value in [
-            -9_007_199_254_740_992_i64,
-            9_007_199_254_740_992_i64,
-        ] {
+        for value in [-9_007_199_254_740_992_i64, 9_007_199_254_740_992_i64] {
             assert!(matches!(
                 canonicalize(&value),
                 Err(CanonicalError::UnsafeInteger {
