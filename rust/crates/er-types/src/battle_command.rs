@@ -10,8 +10,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
 use crate::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId,
-    MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex, MAX_FIELD_POSITION,
+    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, MAX_FIELD_POSITION,
+    MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use crate::ids::{
     OperationId, SafeU53, SeatId, validate_authority_material_digest,
@@ -258,7 +258,10 @@ pub struct OfferedSwitchCommand {
 
 impl OfferedSwitchCommand {
     pub const fn new(party_slot: PartyIndex, pokemon: PokemonId) -> Self {
-        Self { party_slot, pokemon }
+        Self {
+            party_slot,
+            pokemon,
+        }
     }
 
     pub const fn validate(&self) -> Result<(), BattleCommandError> {
@@ -739,6 +742,7 @@ pub struct BattleReplacementProposalV1 {
     pub resolved_turn: TurnIndex,
     pub owner_seat: SeatId,
     pub occurrence: FaintOccurrenceId,
+    pub turn_occurrence: u32,
     pub field_slot: FieldSlot,
     pub selection: ReplacementSelection,
     pub menu_instance_id: MenuInstanceId,
@@ -754,6 +758,7 @@ impl BattleReplacementProposalV1 {
         resolved_turn: TurnIndex,
         owner_seat: SeatId,
         occurrence: FaintOccurrenceId,
+        turn_occurrence: u32,
         field_slot: FieldSlot,
         selection: ReplacementSelection,
         menu_instance_id: MenuInstanceId,
@@ -767,6 +772,7 @@ impl BattleReplacementProposalV1 {
             resolved_turn,
             owner_seat,
             occurrence,
+            turn_occurrence,
             field_slot,
             selection,
             menu_instance_id,
@@ -785,6 +791,7 @@ impl BattleReplacementProposalV1 {
         resolved_turn: TurnIndex,
         owner_seat: SeatId,
         occurrence: FaintOccurrenceId,
+        turn_occurrence: u32,
         field_slot: FieldSlot,
         selection: ReplacementSelection,
         menu_instance_id: MenuInstanceId,
@@ -798,6 +805,7 @@ impl BattleReplacementProposalV1 {
             resolved_turn,
             owner_seat,
             occurrence,
+            turn_occurrence,
             field_slot,
             selection,
             menu_instance_id,
@@ -826,7 +834,7 @@ impl BattleReplacementProposalV1 {
             self.battle_id,
             self.wave,
             self.resolved_turn,
-            self.occurrence,
+            self.turn_occurrence,
             self.field_slot,
             self.owner_seat,
         )
@@ -842,7 +850,7 @@ impl BattleReplacementProposalV1 {
             self.battle_id,
             self.wave,
             self.resolved_turn,
-            self.occurrence,
+            self.turn_occurrence,
             self.field_slot,
             self.owner_seat,
         )
@@ -868,7 +876,7 @@ impl BattleReplacementProposalV1 {
             self.battle_id,
             self.wave,
             self.resolved_turn,
-            self.occurrence,
+            self.turn_occurrence,
             self.field_slot,
             self.owner_seat,
         )
@@ -1122,10 +1130,7 @@ impl ScriptedEnemyPolicyV1 {
     }
 
     pub fn validate(&self) -> Result<(), BattleCommandError> {
-        validate_schema(
-            self.schema_version,
-            SCRIPTED_ENEMY_POLICY_SCHEMA_VERSION,
-        )?;
+        validate_schema(self.schema_version, SCRIPTED_ENEMY_POLICY_SCHEMA_VERSION)?;
         for command in &self.commands {
             command.validate()?;
         }
@@ -1361,7 +1366,7 @@ pub fn player_command_operation_id(
     if field_slot.side != BattleSide::Player {
         return Err(BattleCommandError::WrongFieldSide { context: "human" });
     }
-    operation_id(format!(
+    operation(format!(
         "battle/{}/wave/{}/turn/{}/command/player/{}/seat/{}",
         number(battle_id),
         number(wave),
@@ -1385,7 +1390,7 @@ pub fn scripted_enemy_command_operation_id(
             context: "scripted enemy",
         });
     }
-    operation_id(format!(
+    operation(format!(
         "battle/{}/wave/{}/turn/{}/command/enemy/{}/script/{}",
         number(battle_id),
         number(wave),
@@ -1401,7 +1406,7 @@ pub fn turn_result_operation_id(
     wave: WaveIndex,
     turn: TurnIndex,
 ) -> Result<OperationId, BattleCommandError> {
-    operation_id(format!(
+    operation(format!(
         "battle/{}/wave/{}/turn/{}/result",
         number(battle_id),
         number(wave),
@@ -1416,7 +1421,7 @@ pub fn replacement_operation_id(
     battle_id: BattleId,
     wave: WaveIndex,
     resolved_turn: TurnIndex,
-    occurrence: FaintOccurrenceId,
+    turn_occurrence: u32,
     field_slot: FieldSlot,
     owner_seat: SeatId,
 ) -> Result<OperationId, BattleCommandError> {
@@ -1426,13 +1431,13 @@ pub fn replacement_operation_id(
             context: "replacement",
         });
     }
-    operation_id(format!(
+    operation(format!(
         "RC/e{}/b{}/w{}/t{}/o{}/f{}/s{}",
         number(epoch),
         number(battle_id),
         number(wave),
         number(resolved_turn),
-        number(occurrence),
+        number(turn_occurrence),
         field_slot.position,
         number(owner_seat.get()),
     ))
@@ -1484,7 +1489,7 @@ pub fn validate_replacement_operation_id(
     battle_id: BattleId,
     wave: WaveIndex,
     resolved_turn: TurnIndex,
-    occurrence: FaintOccurrenceId,
+    turn_occurrence: u32,
     field_slot: FieldSlot,
     owner_seat: SeatId,
 ) -> Result<(), BattleCommandError> {
@@ -1493,7 +1498,7 @@ pub fn validate_replacement_operation_id(
         battle_id,
         wave,
         resolved_turn,
-        occurrence,
+        turn_occurrence,
         field_slot,
         owner_seat,
     )?;
@@ -1547,7 +1552,7 @@ pub fn build_replacement_operation_id(
     battle_id: BattleId,
     wave: WaveIndex,
     resolved_turn: TurnIndex,
-    occurrence: FaintOccurrenceId,
+    turn_occurrence: u32,
     field_slot: FieldSlot,
     owner_seat: SeatId,
 ) -> Result<OperationId, BattleCommandError> {
@@ -1556,7 +1561,7 @@ pub fn build_replacement_operation_id(
         battle_id,
         wave,
         resolved_turn,
-        occurrence,
+        turn_occurrence,
         field_slot,
         owner_seat,
     )
@@ -1570,14 +1575,7 @@ pub fn validate_command_operation_id(
     field_slot: FieldSlot,
     owner_seat: SeatId,
 ) -> Result<(), BattleCommandError> {
-    validate_player_command_operation_id(
-        operation,
-        battle_id,
-        wave,
-        turn,
-        field_slot,
-        owner_seat,
-    )
+    validate_player_command_operation_id(operation, battle_id, wave, turn, field_slot, owner_seat)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1586,7 +1584,7 @@ fn validate_replacement_operation_skeleton(
     battle_id: BattleId,
     wave: WaveIndex,
     resolved_turn: TurnIndex,
-    occurrence: FaintOccurrenceId,
+    turn_occurrence: u32,
     field_slot: FieldSlot,
     owner_seat: SeatId,
 ) -> Result<(), BattleCommandError> {
@@ -1607,7 +1605,7 @@ fn validate_replacement_operation_skeleton(
     expect_prefixed_decimal(parts[2], 'b', number(battle_id))?;
     expect_prefixed_decimal(parts[3], 'w', number(wave))?;
     expect_prefixed_decimal(parts[4], 't', number(resolved_turn))?;
-    expect_prefixed_decimal(parts[5], 'o', number(occurrence))?;
+    expect_prefixed_decimal(parts[5], 'o', number(turn_occurrence))?;
     expect_prefixed_decimal(parts[6], 'f', u64::from(field_slot.position))?;
     expect_prefixed_decimal(parts[7], 's', number(owner_seat.get()))?;
     Ok(())
@@ -1682,11 +1680,12 @@ fn parse_canonical_decimal(value: &str) -> Result<u64, BattleCommandError> {
             context: "replacement",
         });
     }
-    let parsed = value
-        .parse::<u64>()
-        .map_err(|_| BattleCommandError::OperationGrammarMismatch {
-            context: "replacement",
-        })?;
+    let parsed =
+        value
+            .parse::<u64>()
+            .map_err(|_| BattleCommandError::OperationGrammarMismatch {
+                context: "replacement",
+            })?;
     SafeU53::new(parsed).map_err(|_| BattleCommandError::OperationGrammarMismatch {
         context: "replacement",
     })?;
@@ -1720,7 +1719,10 @@ fn validate_field_slot(slot: FieldSlot) -> Result<(), BattleCommandError> {
     }
 }
 
-fn compare_target_selections(left: &BattleTargetSelection, right: &BattleTargetSelection) -> Ordering {
+fn compare_target_selections(
+    left: &BattleTargetSelection,
+    right: &BattleTargetSelection,
+) -> Ordering {
     match (left, right) {
         (BattleTargetSelection::Implicit, BattleTargetSelection::Implicit) => Ordering::Equal,
         (BattleTargetSelection::Implicit, BattleTargetSelection::Selected(_)) => Ordering::Less,
@@ -1740,7 +1742,8 @@ fn cmp_utf16(left: &str, right: &str) -> Ordering {
 }
 
 fn validate_fingerprint(value: &str, prefix: &str) -> Result<(), BattleCommandError> {
-    validate_authority_material_digest(value).map_err(|_| BattleCommandError::InvalidFingerprintFormat)?;
+    validate_authority_material_digest(value)
+        .map_err(|_| BattleCommandError::InvalidFingerprintFormat)?;
     let Some(rest) = value.strip_prefix(prefix) else {
         return Err(BattleCommandError::InvalidFingerprintFormat);
     };
@@ -1781,7 +1784,10 @@ fn canonical_enemy_envelope(command: &ScriptedEnemyBattleCommandV1) -> String {
 
 fn canonical_human_proposal(proposal: &BattleCommandProposalV1) -> String {
     canonical_object(vec![
-        ("schema_version", json_u64(u64::from(proposal.schema_version))),
+        (
+            "schema_version",
+            json_u64(u64::from(proposal.schema_version)),
+        ),
         ("operation_id", json_string(proposal.operation_id.as_str())),
         ("battle_id", json_u64(number(proposal.battle_id))),
         ("wave", json_u64(number(proposal.wave))),
@@ -1800,7 +1806,10 @@ fn canonical_human_proposal(proposal: &BattleCommandProposalV1) -> String {
 
 fn canonical_scripted_command(command: &ScriptedEnemyBattleCommandV1) -> String {
     canonical_object(vec![
-        ("schema_version", json_u64(u64::from(command.schema_version))),
+        (
+            "schema_version",
+            json_u64(u64::from(command.schema_version)),
+        ),
         ("operation_id", json_string(command.operation_id.as_str())),
         ("battle_id", json_u64(number(command.battle_id))),
         ("wave", json_u64(number(command.wave))),
@@ -1814,18 +1823,22 @@ fn canonical_scripted_command(command: &ScriptedEnemyBattleCommandV1) -> String 
 
 fn canonical_replacement_proposal(proposal: &BattleReplacementProposalV1) -> String {
     canonical_object(vec![
-        ("schema_version", json_u64(u64::from(proposal.schema_version))),
+        (
+            "schema_version",
+            json_u64(u64::from(proposal.schema_version)),
+        ),
         ("operation_id", json_string(proposal.operation_id.as_str())),
         ("battle_id", json_u64(number(proposal.battle_id))),
         ("wave", json_u64(number(proposal.wave))),
-        (
-            "resolved_turn",
-            json_u64(number(proposal.resolved_turn)),
-        ),
+        ("resolved_turn", json_u64(number(proposal.resolved_turn))),
         ("owner_seat", json_u64(number(proposal.owner_seat.get()))),
         ("occurrence", json_u64(number(proposal.occurrence))),
+        ("turn_occurrence", json_u64(u64::from(proposal.turn_occurrence))),
         ("field_slot", canonical_field_slot(proposal.field_slot)),
-        ("selection", canonical_replacement_selection(proposal.selection)),
+        (
+            "selection",
+            canonical_replacement_selection(proposal.selection),
+        ),
         (
             "menu_instance_id",
             json_u64(number(proposal.menu_instance_id)),
@@ -1856,7 +1869,9 @@ fn canonical_command(command: &BattleCommand) -> String {
 
 fn canonical_target_selection(selection: &BattleTargetSelection) -> String {
     match selection {
-        BattleTargetSelection::Implicit => canonical_object(vec![("kind", json_string("IMPLICIT"))]),
+        BattleTargetSelection::Implicit => {
+            canonical_object(vec![("kind", json_string("IMPLICIT"))])
+        }
         BattleTargetSelection::Selected(targets) => canonical_object(vec![
             ("kind", json_string("SELECTED")),
             (
@@ -1885,10 +1900,13 @@ fn canonical_replacement_selection(selection: ReplacementSelection) -> String {
 
 fn canonical_field_slot(slot: FieldSlot) -> String {
     canonical_object(vec![
-        ("side", json_string(match slot.side {
-            BattleSide::Player => "PLAYER",
-            BattleSide::Enemy => "ENEMY",
-        })),
+        (
+            "side",
+            json_string(match slot.side {
+                BattleSide::Player => "PLAYER",
+                BattleSide::Enemy => "ENEMY",
+            }),
+        ),
         ("position", json_u64(u64::from(slot.position))),
     ])
 }
@@ -1996,7 +2014,8 @@ mod tests {
         BattleCommand::fight(
             actor,
             MoveSlotIndex::new(0).unwrap_or(MoveSlotIndex::ZERO),
-            BattleTargetSelection::selected(vec![target]).unwrap_or(BattleTargetSelection::Implicit),
+            BattleTargetSelection::selected(vec![target])
+                .unwrap_or(BattleTargetSelection::Implicit),
         )
         .unwrap_or_else(|_| BattleCommand::switch(actor, PartyIndex::ZERO))
     }
@@ -2006,14 +2025,8 @@ mod tests {
         let wave = WaveIndex::new(safe(2)).unwrap_or_else(|_| WaveIndex::new(safe(1)).unwrap());
         let turn = TurnIndex::new(safe(3)).unwrap_or_else(|_| TurnIndex::new(safe(1)).unwrap());
         let slot = player(0);
-        let operation = player_command_operation_id(
-            battle,
-            wave,
-            turn,
-            slot,
-            SeatId::new(safe(1)),
-        )
-        .unwrap();
+        let operation =
+            player_command_operation_id(battle, wave, turn, slot, SeatId::new(safe(1))).unwrap();
         BattleCommandProposalV1::new(
             operation,
             battle,
@@ -2034,14 +2047,8 @@ mod tests {
         let wave = WaveIndex::new(safe(2)).unwrap_or_else(|_| WaveIndex::new(safe(1)).unwrap());
         let turn = TurnIndex::new(safe(3)).unwrap_or_else(|_| TurnIndex::new(safe(1)).unwrap());
         let slot = enemy(0);
-        let operation = scripted_enemy_command_operation_id(
-            battle,
-            wave,
-            turn,
-            slot,
-            safe(4),
-        )
-        .unwrap();
+        let operation =
+            scripted_enemy_command_operation_id(battle, wave, turn, slot, safe(4)).unwrap();
         ScriptedEnemyBattleCommandV1::new(
             operation,
             battle,
@@ -2085,19 +2092,23 @@ mod tests {
         .unwrap();
         let offer = BattleCommandOffer::new(vec![move_zero.clone(), move_one], vec![]).unwrap();
         assert!(offer.is_canonical());
-        assert!(BattleCommandOffer::new(vec![move_zero.clone(), move_zero], vec![]).is_err());
-        assert!(BattleCommandOffer::new(
-            vec![
-                OfferedMoveCommand::new(
-                    MoveSlotIndex::new(1).unwrap(),
-                    vec![BattleTargetSelection::Implicit],
-                )
-                .unwrap(),
-                move_zero.clone(),
-            ],
-            vec![]
-        )
-        .is_err());
+        assert!(
+            BattleCommandOffer::new(vec![move_zero.clone(), move_zero.clone()], vec![]).is_err()
+        );
+        assert!(
+            BattleCommandOffer::new(
+                vec![
+                    OfferedMoveCommand::new(
+                        MoveSlotIndex::new(1).unwrap(),
+                        vec![BattleTargetSelection::Implicit],
+                    )
+                    .unwrap(),
+                    move_zero.clone(),
+                ],
+                vec![]
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2107,68 +2118,78 @@ mod tests {
             proposal.expected_operation_id().unwrap(),
             proposal.operation_id
         );
-        assert!(validate_player_command_operation_id(
-            &proposal.operation_id,
-            proposal.battle_id,
-            proposal.wave,
-            proposal.turn,
-            proposal.field_slot,
-            proposal.owner_seat,
-        )
-        .is_ok());
+        assert!(
+            validate_player_command_operation_id(
+                &proposal.operation_id,
+                proposal.battle_id,
+                proposal.wave,
+                proposal.turn,
+                proposal.field_slot,
+                proposal.owner_seat,
+            )
+            .is_ok()
+        );
         let stale = operation("battle/7/wave/2/turn/4/command/player/0/seat/1".to_owned());
-        assert!(validate_player_command_operation_id(
-            &stale,
-            proposal.battle_id,
-            proposal.wave,
-            proposal.turn,
-            proposal.field_slot,
-            proposal.owner_seat,
-        )
-        .is_err());
+        assert!(
+            validate_player_command_operation_id(
+                &stale,
+                proposal.battle_id,
+                proposal.wave,
+                proposal.turn,
+                proposal.field_slot,
+                proposal.owner_seat,
+            )
+            .is_err()
+        );
         let malformed = operation("battle/07/wave/2/turn/3/command/player/0/seat/1".to_owned());
-        assert!(validate_player_command_operation_id(
-            &malformed,
-            proposal.battle_id,
-            proposal.wave,
-            proposal.turn,
-            proposal.field_slot,
-            proposal.owner_seat,
-        )
-        .is_err());
+        assert!(
+            validate_player_command_operation_id(
+                &malformed,
+                proposal.battle_id,
+                proposal.wave,
+                proposal.turn,
+                proposal.field_slot,
+                proposal.owner_seat,
+            )
+            .is_err()
+        );
 
         let replacement = replacement_operation_id(
             AuthorityEpoch::new(safe(8)),
             proposal.battle_id,
             proposal.wave,
             proposal.turn,
-            FaintOccurrenceId::new(safe(5)),
+            5,
             player(1),
             proposal.owner_seat,
         )
         .unwrap();
-        assert!(validate_replacement_operation_id(
-            &replacement,
-            AuthorityEpoch::new(safe(8)),
-            proposal.battle_id,
-            proposal.wave,
-            proposal.turn,
-            FaintOccurrenceId::new(safe(5)),
-            player(1),
-            proposal.owner_seat,
-        )
-        .is_ok());
-        assert!(validate_replacement_operation_id(
-            &replacement,
-            AuthorityEpoch::new(safe(9)),
-            proposal.battle_id,
-            proposal.wave,
-            proposal.turn,
-            FaintOccurrenceId::new(safe(5)),
-            player(1),
-            proposal.owner_seat,
-        )
-        .is_err());
+        assert!(
+            validate_replacement_operation_id(
+                &replacement,
+                AuthorityEpoch::new(safe(8)),
+                proposal.battle_id,
+                proposal.wave,
+                proposal.turn,
+                5,
+                player(1),
+                proposal.owner_seat,
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_replacement_operation_id(
+                &replacement,
+                AuthorityEpoch::new(safe(9)),
+                proposal.battle_id,
+                proposal.wave,
+                proposal.turn,
+                5,
+                player(1),
+                proposal.owner_seat,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2179,15 +2200,94 @@ mod tests {
         assert!(canonical.contains("\"control_id\":\"control/é🙂\""));
         let fingerprint = proposal.fingerprint();
         let suffix = fingerprint.as_str().strip_prefix("bc1-").unwrap_or("");
-        let length = suffix.split('-').next().unwrap_or("").parse::<usize>().unwrap_or(0);
+        let length = suffix
+            .split('-')
+            .next()
+            .unwrap_or("")
+            .parse::<usize>()
+            .unwrap_or(0);
         assert_eq!(length, canonical.encode_utf16().count());
-        assert_eq!(fingerprint.as_str(), BattleCommandFingerprint::from_human_proposal(&proposal).as_str());
+        assert_eq!(
+            fingerprint.as_str(),
+            BattleCommandFingerprint::from_human_proposal(&proposal).as_str()
+        );
 
         let scripted = scripted_command();
-        assert!(scripted.canonical_json().contains(r#""kind":"SCRIPTED_ENEMY""#));
+        assert!(
+            scripted
+                .canonical_json()
+                .contains(r#""kind":"SCRIPTED_ENEMY""#)
+        );
         let enemy_fingerprint = scripted.fingerprint();
         assert!(enemy_fingerprint.as_str().starts_with("bc1-"));
         assert_ne!(fingerprint, enemy_fingerprint);
+    }
+
+    #[test]
+    fn replacement_occurrence_identities_have_distinct_operation_and_fingerprint_roles() {
+        let human = human_proposal();
+        let epoch = AuthorityEpoch::new(safe(1));
+        let operation = replacement_operation_id(
+            epoch,
+            human.battle_id,
+            human.wave,
+            human.turn,
+            2,
+            human.field_slot,
+            human.owner_seat,
+        )
+        .unwrap();
+        let first = BattleReplacementProposalV1::new(
+            operation.clone(),
+            human.battle_id,
+            human.wave,
+            human.turn,
+            human.owner_seat,
+            FaintOccurrenceId::new(safe(9)),
+            2,
+            human.field_slot,
+            ReplacementSelection::selected(PartyIndex::ZERO, human.actor),
+            human.menu_instance_id,
+            "replacement/first",
+        )
+        .unwrap();
+        let second = BattleReplacementProposalV1 {
+            occurrence: FaintOccurrenceId::new(safe(10)),
+            ..first.clone()
+        };
+        second.validate().unwrap();
+
+        assert_eq!(first.operation_id, second.operation_id);
+        assert_eq!(first.expected_operation_id(epoch).unwrap(), operation);
+        assert_ne!(first.fingerprint(), second.fingerprint());
+        assert!(first.canonical_json().contains(r#""occurrence":9"#));
+        assert!(first
+            .canonical_json()
+            .contains(r#""turn_occurrence":2"#));
+
+        let later_operation = replacement_operation_id(
+            epoch,
+            human.battle_id,
+            human.wave,
+            human.turn,
+            3,
+            human.field_slot,
+            human.owner_seat,
+        )
+        .unwrap();
+        assert_ne!(operation, later_operation);
+        assert!(later_operation.as_str().contains("/o3/f"));
+
+        let substituted_global = BattleReplacementProposalV1 {
+            operation_id: operation("RC/e1/b7/w2/t3/o9/f0/s1".to_owned()),
+            ..first
+        };
+        assert_eq!(
+            substituted_global.validate(),
+            Err(BattleCommandError::OperationIdMismatch {
+                context: "replacement"
+            })
+        );
     }
 
     #[test]
@@ -2198,7 +2298,7 @@ mod tests {
             human.battle_id,
             human.wave,
             human.turn,
-            FaintOccurrenceId::new(safe(2)),
+            0,
             human.field_slot,
             human.owner_seat,
         )
@@ -2210,6 +2310,7 @@ mod tests {
             human.turn,
             human.owner_seat,
             FaintOccurrenceId::new(safe(2)),
+            0,
             human.field_slot,
             ReplacementSelection::selected(PartyIndex::ZERO, human.actor),
             human.menu_instance_id,
@@ -2232,7 +2333,7 @@ mod tests {
             human.battle_id,
             human.wave,
             human.turn,
-            FaintOccurrenceId::new(safe(2)),
+            0,
             human.field_slot,
             human.owner_seat,
         )
@@ -2245,6 +2346,7 @@ mod tests {
                 human.turn,
                 human.owner_seat,
                 FaintOccurrenceId::new(safe(2)),
+                0,
                 human.field_slot,
                 ReplacementSelection::NoLegalReplacement,
                 human.menu_instance_id,
@@ -2264,7 +2366,10 @@ mod tests {
             proposal,
             fingerprint: BattleCommandFingerprint::new("bc1-1-0000000000000000").unwrap(),
         };
-        assert_eq!(forged.validate(), Err(BattleCommandError::FingerprintMismatch));
+        assert_eq!(
+            forged.validate(),
+            Err(BattleCommandError::FingerprintMismatch)
+        );
 
         let command = scripted_command();
         let later_cursor = safe(5);
@@ -2285,7 +2390,10 @@ mod tests {
         assert!(policy.is_ok());
         assert_eq!(policy.unwrap().next_command(), Some(&command));
         let duplicate = ScriptedEnemyPolicyV1::new(safe(4), vec![command.clone(), command]);
-        assert_eq!(duplicate.err(), Some(BattleCommandError::DuplicateScriptCursor));
+        assert_eq!(
+            duplicate.err(),
+            Some(BattleCommandError::DuplicateScriptCursor)
+        );
     }
 
     #[test]
@@ -2312,7 +2420,10 @@ mod tests {
         );
         assert!(BattleCommandFingerprint::new("bc1-01-0123456789abcdef").is_err());
         assert!(BattleCommandFingerprint::new("bc1-1-0123456789ABCDEf").is_err());
-        assert!(serde_json::from_str::<BattleCommandFingerprint>(r#""bc1-1-0123456789abcdeg""#).is_err());
+        assert!(
+            serde_json::from_str::<BattleCommandFingerprint>(r#""bc1-1-0123456789abcdeg""#)
+                .is_err()
+        );
     }
 
     #[test]
@@ -2320,14 +2431,9 @@ mod tests {
         let battle = battle_id(JS_MAX_SAFE_INTEGER);
         let wave = WaveIndex::new(SafeU53::MAX).unwrap();
         let turn = TurnIndex::new(SafeU53::MAX).unwrap();
-        let operation = player_command_operation_id(
-            battle,
-            wave,
-            turn,
-            player(2),
-            SeatId::new(SafeU53::MAX),
-        )
-        .unwrap();
+        let operation =
+            player_command_operation_id(battle, wave, turn, player(2), SeatId::new(SafeU53::MAX))
+                .unwrap();
         assert!(operation.as_str().contains("9007199254740991"));
         let proposal = BattleCommandProposalV1::new(
             operation,
