@@ -1137,7 +1137,7 @@ mod tests {
         assert_eq!(control_plan.menu_allocators.len(), 1);
         assert!(control_plan.seat(SeatId::new(safe(1)?)).is_some());
         assert!(control_plan.allocator(SeatId::new(safe(1)?)).is_some());
-        assert!(matches!(
+        assert!(
             plan(
                 root(2, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
                 2
