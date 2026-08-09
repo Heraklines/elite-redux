@@ -5,8 +5,8 @@ use er_types::battle_ids::{TurnIndex, WaveIndex};
 use serde::{Deserialize, Serialize};
 
 use crate::audit::{
-    RngAuditLog, RngAuditState, RngCallsiteId, RngDraw, RngDrawInput, RngPublicApi,
-    RngReason, RngStream, SeedOffsetContext,
+    RngAuditLog, RngAuditState, RngCallsiteId, RngDraw, RngDrawInput, RngPublicApi, RngReason,
+    RngStream, SeedOffsetContext,
 };
 use crate::phaser::{
     PhaserRdg, PhaserRdgState, RngError, RunRngState, checked_range_max, safe_from_usize,
@@ -68,10 +68,7 @@ pub struct RngRuntime {
 
 impl RngRuntime {
     /// Creates a runtime at audit sequence zero from canonical persisted states.
-    pub fn from_states(
-        run: RunRngState,
-        battle: Option<BattleRngState>,
-    ) -> Result<Self, RngError> {
+    pub fn from_states(run: RunRngState, battle: Option<BattleRngState>) -> Result<Self, RngError> {
         Self::from_states_at_sequence(run, battle, SafeU53::ZERO)
     }
 
@@ -433,8 +430,7 @@ impl RngRuntime {
                 RngCallsiteId::speed_tie(),
                 true,
             )?;
-            let selected =
-                usize::try_from(selected.get()).map_err(|_| RngError::SliceTooLong)?;
+            let selected = usize::try_from(selected.get()).map_err(|_| RngError::SliceTooLong)?;
             staged_values.swap(index, selected);
         }
 

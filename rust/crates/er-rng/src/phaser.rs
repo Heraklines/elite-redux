@@ -650,7 +650,7 @@ fn js_number_to_string(value: f64) -> String {
 }
 
 fn split_decimal_exponent(source: &str) -> (&str, i32) {
-    let Some(index) = source.find(|character| character == 'e' || character == 'E') else {
+    let Some(index) = source.find(['e', 'E']) else {
         return (source, 0);
     };
     let mantissa = &source[..index];
