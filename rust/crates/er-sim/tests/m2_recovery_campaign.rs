@@ -1857,44 +1857,44 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     })?;
     trace.push(control_pending_release);
 
-    let before_pending_delivery = trace
+    let before_pending_drop = trace
         .last()
         .ok_or_else(|| std::io::Error::other("pending proposal release was not retained"))?
         .snapshot
         .clone();
     for (packet_id, _) in delayed_recovery_evidence.iter() {
         assert!(
-            before_pending_delivery
+            before_pending_drop
                 .network
                 .queued_packet_ids
                 .contains(packet_id),
-            "delayed control evidence must remain queued ahead of N+1 delivery"
+            "delayed control evidence must remain queued while retained N+1 is withheld"
         );
     }
-    let pending_delivery = pair.apply(PairOperation::Fault {
-        operation: FaultOperation::Deliver {
+    let pending_drop = pair.apply(PairOperation::Fault {
+        operation: FaultOperation::Drop {
             packet_id: pending_proposal_packet_id,
         },
     })?;
-    let mut expected_pending_queue = before_pending_delivery.network.queued_packet_ids.clone();
-    assert!(expected_pending_queue.remove(&pending_proposal_packet_id));
+    let mut expected_pending_drop_queue = before_pending_drop.network.queued_packet_ids.clone();
+    assert!(expected_pending_drop_queue.remove(&pending_proposal_packet_id));
     assert_eq!(
-        pending_delivery.snapshot.network.queued_packet_ids, expected_pending_queue,
-        "N+1 delivery must precede, and not consume, delayed control evidence"
+        pending_drop.snapshot.network.queued_packet_ids, expected_pending_drop_queue,
+        "dropping retained N+1 must remove only its packet and preserve delayed control evidence"
     );
-    assert_no_protocol_progression(&before_pending_delivery, &pending_delivery.snapshot)?;
-    assert!(pending_delivery.generated_effects.iter().all(|effect| {
-        !matches!(effect, KernelEffect::SendProposal { .. })
-            && !matches!(effect, KernelEffect::ApplyAuthorityMaterial { .. })
-            && !matches!(effect, KernelEffect::ProjectAuthorityControl { .. })
-            && !matches!(
-                effect,
-                KernelEffect::SendFrame { frame, .. }
-                    if frame.frame_type == FrameType::AuthorityEntry
-            )
-            && !matches!(effect, KernelEffect::UiChanged { .. })
-    }));
-    trace.push(pending_delivery);
+    for (packet_id, _) in delayed_recovery_evidence.iter() {
+        assert!(
+            pending_drop
+                .snapshot
+                .network
+                .queued_packet_ids
+                .contains(packet_id),
+            "retained N+1 must be withheld/lost while delayed control evidence remains queued"
+        );
+    }
+    assert_no_protocol_progression(&before_pending_drop, &pending_drop.snapshot)?;
+    assert!(pending_drop.generated_effects.is_empty());
+    trace.push(pending_drop);
 
     for (packet_id, frame_type) in delayed_recovery_evidence.iter().copied() {
         let before_evidence_delivery = trace
