@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "required_oracle_axes": [
+    "INITIAL_STATE_AND_RNG",
+    "ADMITTED_COMMANDS",
+    "CONSUMING_RNG_DRAWS",
+    "DYNAMIC_ACTION_ORDER",
+    "CAUSAL_MUTATIONS",
+    "PRESENTATION_PLAN",
+    "FINAL_STATE_AND_RNG",
+    "NEXT_LOGICAL_CONTROL"
+  ],
+  "oracle_cases": [
+    {
+      "case_id": "physical-hit",
+      "format": "SINGLE",
+      "claims": ["MOVE_1_POUND", "PHYSICAL_DAMAGE", "NONE_ABILITY", "NORMAL_NEUTRAL_TYPE"]
+    },
+    {
+      "case_id": "critical-hit",
+      "format": "SINGLE",
+      "claims": ["CRITICAL_DRAW_ORDER", "CRITICAL_MULTIPLIER", "MOVE_1_POUND"]
+    },
+    {
+      "case_id": "special-hit-priority",
+      "format": "SINGLE",
+      "claims": ["MOVE_351_SHOCK_WAVE", "SPECIAL_DAMAGE", "MOVE_PRIORITY_TWO"]
+    },
+    {
+      "case_id": "always-hit",
+      "format": "SINGLE",
+      "claims": ["ALWAYS_HIT_SKIPS_ACCURACY_DRAW", "MOVE_351_SHOCK_WAVE"]
+    },
+    {
+      "case_id": "miss",
+      "format": "SINGLE",
+      "claims": ["MOVE_77_POISON_POWDER", "ACCURACY_MISS", "NO_STATUS_ON_MISS"]
+    },
+    {
+      "case_id": "poison-type-immunity",
+      "format": "SINGLE",
+      "claims": ["POISON_STATUS_REJECTED_BY_POISON_TYPE", "MOVE_77_POISON_POWDER", "NO_STATUS_MUTATION"]
+    },
+    {
+      "case_id": "grass-powder-immunity",
+      "format": "SINGLE",
+      "claims": ["GRASS_TYPE_REJECTS_POWDER_MOVE", "POWDER_FLAG", "NO_STATUS_MUTATION"]
+    },
+    {
+      "case_id": "existing-status-rejected",
+      "format": "SINGLE",
+      "claims": ["ONE_MAJOR_STATUS_ONLY", "NO_STATUS_OVERWRITE", "NO_SECOND_STATUS_MUTATION"]
+    },
+    {
+      "case_id": "speed-tie",
+      "format": "COOP_DOUBLE",
+      "claims": ["PHASER_FISHER_YATES_TIE_ORDER", "STABLE_EQUAL_KEY_ORDER"]
+    },
+    {
+      "case_id": "pp-consumption",
+      "format": "SINGLE",
+      "claims": ["FINITE_PP_FORMULA", "PP_CONSUMED_AT_ORACLE_POINT"]
+    },
+    {
+      "case_id": "pp-unusable-rejected",
+      "format": "SINGLE",
+      "claims": ["ZERO_PP_DISABLED_MENU_OPTION", "NO_PP_UNDERFLOW", "NO_RNG_ON_REJECTION"]
+    },
+    {
+      "case_id": "poison-application",
+      "format": "SINGLE",
+      "claims": ["MOVE_77_POISON_POWDER", "STATUS_1_POISON", "STATUS_PRESENTATION"]
+    },
+    {
+      "case_id": "poison-residual",
+      "format": "SINGLE",
+      "claims": ["POISON_MAX_HP_EIGHTH", "STATUS_TURN_COUNT_INCREMENT", "TURN_END_INSERTION", "FAINT_DISCOVERY"]
+    },
+    {
+      "case_id": "paralysis-application",
+      "format": "SINGLE",
+      "claims": ["MOVE_78_STUN_SPORE", "STATUS_3_PARALYSIS"]
+    },
+    {
+      "case_id": "paralysis-full-stop",
+      "format": "SINGLE",
+      "claims": ["PARALYSIS_ACTIVATION_DRAW", "MOVE_SKIPPED_BEFORE_ACCURACY", "PP_ORDER"]
+    },
+    {
+      "case_id": "paralysis-speed-order",
+      "format": "COOP_DOUBLE",
+      "claims": ["PARALYSIS_JS_SIGNED_SHIFT_HALVING", "LIVE_SPEED_REORDER_BEFORE_POP"]
+    },
+    {
+      "case_id": "burn-application",
+      "format": "SINGLE",
+      "claims": ["MOVE_52_EMBER", "STATUS_6_BURN", "SECONDARY_EFFECT_CHANCE"]
+    },
+    {
+      "case_id": "burn-residual",
+      "format": "SINGLE",
+      "claims": ["BURN_MAX_HP_SIXTEENTH", "STATUS_TURN_COUNT_INCREMENT", "TURN_END_INSERTION"]
+    },
+    {
+      "case_id": "burn-physical-penalty",
+      "format": "SINGLE",
+      "claims": ["BURN_DAMAGE_MULTIPLIER_ORDER", "MOVE_1_POUND"]
+    },
+    {
+      "case_id": "spread-stage-down",
+      "format": "COOP_DOUBLE",
+      "claims": ["MOVE_589_PLAY_NICE", "ALL_NEAR_ENEMIES_TARGET_SET", "ORDERED_MULTI_TARGET_STAGE_MUTATIONS"]
+    },
+    {
+      "case_id": "stage-floor-cap",
+      "format": "COOP_DOUBLE",
+      "claims": ["STAT_STAGE_MINUS_SIX_CAP", "NO_BELOW_CAP_MUTATION"]
+    },
+    {
+      "case_id": "none-ability-no-trigger",
+      "format": "SINGLE",
+      "claims": ["ABILITY_0_NONE", "NO_ABILITY_EVENT", "NO_ABILITY_MUTATION"]
+    },
+    {
+      "case_id": "intimidate-switch-in",
+      "format": "COOP_DOUBLE",
+      "claims": ["ABILITY_22_INTIMIDATE", "ADJACENT_OPPONENT_ATTACK_MINUS_ONE", "ABILITY_TRIGGER_ORDER"]
+    },
+    {
+      "case_id": "intimidate-stage-floor",
+      "format": "COOP_DOUBLE",
+      "claims": ["ABILITY_22_INTIMIDATE", "STAT_STAGE_MINUS_SIX_CAP"]
+    },
+    {
+      "case_id": "wonder-guard-block",
+      "format": "SINGLE",
+      "claims": ["ABILITY_25_WONDER_GUARD", "NON_SUPER_EFFECTIVE_IMMUNITY", "IMMUNITY_BEFORE_ACCURACY"]
+    },
+    {
+      "case_id": "wonder-guard-super-effective-pass",
+      "format": "SINGLE",
+      "claims": ["ABILITY_25_WONDER_GUARD", "SUPER_EFFECTIVE_DAMAGE_PASSES"]
+    },
+    {
+      "case_id": "wonder-guard-status-pass",
+      "format": "SINGLE",
+      "claims": ["ABILITY_25_WONDER_GUARD", "STATUS_MOVE_NOT_ATTACK_MOVE", "STATUS_ATTEMPT_PASSES_ABILITY"]
+    },
+    {
+      "case_id": "type-weakness",
+      "format": "SINGLE",
+      "claims": ["TYPE_EFFECTIVENESS_TWO", "STAB_AND_TYPE_MULTIPLIER_ORDER"]
+    },
+    {
+      "case_id": "type-resistance",
+      "format": "SINGLE",
+      "claims": ["TYPE_EFFECTIVENESS_HALF", "MINIMUM_DAMAGE_AFTER_FLOOR"]
+    },
+    {
+      "case_id": "type-native-immunity",
+      "format": "SINGLE",
+      "claims": ["ELECTRIC_TO_GROUND_ZERO", "IMMUNITY_BEFORE_ACCURACY", "NO_DAMAGE_DRAW"]
+    },
+    {
+      "case_id": "voluntary-switch",
+      "format": "COOP_DOUBLE",
+      "claims": ["SWITCH_BEFORE_FIGHT", "SAME_OWNER_SWITCH_LEGALITY", "SWITCH_PRESENTATION"]
+    },
+    {
+      "case_id": "doubles-single-target",
+      "format": "COOP_DOUBLE",
+      "claims": ["FIELDSLOT_TARGET_IDENTITY", "ADJACENCY_FILTER", "ONE_TARGET_ONLY"]
+    },
+    {
+      "case_id": "same-side-simultaneous-faint",
+      "format": "COOP_DOUBLE",
+      "claims": ["ORDERED_FAINT_INSERTION", "SAME_SIDE_REPLACEMENT_TAIL", "NO_SLOT_TIEBREAK"]
+    },
+    {
+      "case_id": "mixed-side-simultaneous-faint",
+      "format": "COOP_DOUBLE",
+      "claims": ["MIXED_SIDE_RESIDUAL_DOUBLE_KO", "EXPORTED_PHASE_ORDER", "EXPLICIT_OUTCOME_CONTROL"]
+    },
+    {
+      "case_id": "forced-replacement",
+      "format": "COOP_DOUBLE",
+      "claims": ["OWNER_ONLY_REPLACEMENT", "REPLACEMENT_OPERATION_GRAMMAR", "REPLACEMENT_MATERIAL"]
+    },
+    {
+      "case_id": "no-legal-replacement",
+      "format": "COOP_DOUBLE",
+      "claims": ["NO_LEGAL_REPLACEMENT_SENTINEL", "EMPTY_SLOT_PRESERVED", "CHAIN_ADVANCES"]
+    },
+    {
+      "case_id": "victory",
+      "format": "SINGLE",
+      "claims": ["EXPLICIT_VICTORY_OUTCOME", "BATTLE_WON_PRESENTATION", "COMPLETE_CONTROL"]
+    },
+    {
+      "case_id": "defeat",
+      "format": "SINGLE",
+      "claims": ["EXPLICIT_DEFEAT_OUTCOME", "BATTLE_LOST_PRESENTATION", "COMPLETE_CONTROL"]
+    }
+  ],
+  "non_oracle_hosted_requirements": [
+    {
+      "requirement_id": "ARCHITECTURAL_BATTLE_SEAM_CLOSURE",
+      "owned_tests": [
+        "rust/crates/er-sim/tests/m3_api_bypass.rs",
+        "rust/crates/er-kernel/tests/m3_authority_commands.rs",
+        "rust/crates/er-kernel/tests/m3_material_apply.rs"
+      ],
+      "claims": [
+        "NO_CONTROL_MENU_PLAN_IN_BATTLE_MODE",
+        "NO_AUTHORITY_RESOLUTION_PLAN_IN_BATTLE_MODE",
+        "NO_EXTERNAL_MATERIAL_APPLIED_OR_CONTROL_PROJECTED",
+        "NO_CANONICAL_WORK_EFFECTS"
+      ]
+    },
+    {
+      "requirement_id": "MENU_EXACTNESS",
+      "owned_tests": [
+        "rust/crates/er-kernel/tests/m3_battle_ui.rs",
+        "rust/crates/er-game/tests/m3_command_menus.rs",
+        "rust/crates/er-game/tests/m3_party_menus.rs"
+      ],
+      "claims": [
+        "EXACT_EDGE_TABLES",
+        "STABLE_OPTION_IDS",
+        "MENU_INSTANCE_KEY_BLEED_FENCE",
+        "CANCEL_RESTORATION",
+        "WRONG_SEAT_REJECTION"
+      ]
+    },
+    {
+      "requirement_id": "ATOMIC_COMMON_APPLIER",
+      "owned_tests": [
+        "rust/crates/er-game/tests/m3_runtime.rs",
+        "rust/crates/er-kernel/tests/m3_material_apply.rs"
+      ],
+      "claims": [
+        "CLONE_AND_SWAP",
+        "FAILURE_INJECTION_NO_LEAK",
+        "RESOLVER_EQUALS_AUTHORITY_EQUALS_REPLICA"
+      ]
+    },
+    {
+      "requirement_id": "RESTORABLE_CONTINUATION",
+      "owned_tests": [
+        "rust/crates/er-sim/tests/m3_snapshot_continuation.rs",
+        "rust/crates/er-sim/tests/m3_fault_recovery.rs"
+      ],
+      "claims": [
+        "QUIESCENT_COMPLETE_SNAPSHOTS",
+        "ACTUAL_QUEUED_PACKET_BODIES",
+        "HELD_INPUT_AND_MENU_INSTANCE",
+        "EVENTWISE_CONTINUATION_PARITY"
+      ]
+    },
+    {
+      "requirement_id": "RAW_KEY_CAMPAIGNS",
+      "owned_tests": [
+        "rust/crates/er-sim/tests/m3_raw_key_local.rs",
+        "rust/crates/er-sim/tests/m3_raw_key_coop.rs"
+      ],
+      "claims": [
+        "NO_SEMANTIC_DRIVER_BYPASS",
+        "LOCAL_SINGLE_BATTLE",
+        "TWO_SEAT_FORCED_DOUBLE_BATTLE",
+        "FAULT_AND_RECONNECT_FLOW"
+      ]
+    },
+    {
+      "requirement_id": "NATIVE_WASM_TEARDOWN_PERFORMANCE",
+      "owned_tests": [
+        "rust/crates/er-wasm/tests/m3_parity.rs",
+        "rust/crates/er-sim/tests/m3_resource_teardown.rs",
+        "rust/crates/er-sim/benches/m3_benchmark.rs"
+      ],
+      "claims": [
+        "EVENTWISE_NATIVE_WASM_PARITY",
+        "ZERO_LIVE_RESOURCES",
+        "MEASURED_BASELINE_AND_REGRESSION_GATE"
+      ]
+    }
+  ],
+  "ordering_branch_classification": {
+    "ordinary_fight_and_switch": "SUPPORTED",
+    "live_speed_stage_and_paralysis_reorder": "SUPPORTED",
+    "seeded_speed_tie": "SUPPORTED",
+    "same_side_simultaneous_faint": "SUPPORTED_BY_NAMED_FIXTURE",
+    "mixed_side_simultaneous_faint": "SUPPORTED_BY_NAMED_FIXTURE",
+    "pursuit_or_interception": "UNSUPPORTED",
+    "self_switching_move": "UNSUPPORTED",
+    "trick_room": "UNSUPPORTED",
+    "explicit_set_order": "UNSUPPORTED",
+    "triple_only_shift": "UNSUPPORTED"
+  }
+}

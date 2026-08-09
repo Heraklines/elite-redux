@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "slice_manifest": "rust/fixtures/m3/m3-slice-manifest.json",
+  "initialization_policy": {
+    "all_reachable_active_and_bench_content_must_be_classified": true,
+    "unsupported_reachable_content_result": "BATTLE_INITIALIZATION_ERROR_UNSUPPORTED_CONTENT",
+    "unsupported_content_is_never_coerced_to_none_or_noop": true,
+    "selected_scenario_loadouts_override_unselected_natural_ability_references": true,
+    "unused_passive_slots_are_null": true,
+    "all_structural_suppression_flags_are_false": true,
+    "global_ability_suppression_is_disabled": true,
+    "weather_is_none": true,
+    "terrain_is_none": true,
+    "arena_conditions_are_empty": true
+  },
+  "reason_codes": [
+    "OUTSIDE_SELECTED_CONTENT",
+    "EFFECT_VOCABULARY_UNSUPPORTED",
+    "CALLBACK_OR_SCRIPT_REQUIRED",
+    "DYNAMIC_SUPPRESSION_UNSUPPORTED",
+    "FIELD_CONDITION_MECHANICS_UNSUPPORTED",
+    "STATUS_MECHANICS_UNSUPPORTED",
+    "TARGETING_UNSUPPORTED"
+  ],
+  "entries": [
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 1,
+      "name": "POUND",
+      "status": "SUPPORTED",
+      "positive_cases": ["physical-hit"],
+      "edge_cases": ["critical-hit", "pp-unusable-rejected"]
+    },
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 52,
+      "name": "EMBER",
+      "status": "SUPPORTED",
+      "positive_cases": ["burn-application"],
+      "edge_cases": ["burn-residual", "burn-physical-penalty"]
+    },
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 77,
+      "name": "POISON_POWDER",
+      "status": "SUPPORTED",
+      "positive_cases": ["poison-application"],
+      "edge_cases": ["miss", "poison-type-immunity", "grass-powder-immunity", "existing-status-rejected"]
+    },
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 78,
+      "name": "STUN_SPORE",
+      "status": "SUPPORTED",
+      "positive_cases": ["paralysis-application"],
+      "edge_cases": ["paralysis-full-stop", "paralysis-speed-order", "grass-powder-immunity"]
+    },
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 351,
+      "name": "SHOCK_WAVE",
+      "status": "SUPPORTED",
+      "positive_cases": ["special-hit-priority"],
+      "edge_cases": ["always-hit", "wonder-guard-block"]
+    },
+    {
+      "subject_kind": "MOVE",
+      "subject_id": 589,
+      "name": "PLAY_NICE",
+      "status": "SUPPORTED",
+      "positive_cases": ["spread-stage-down"],
+      "edge_cases": ["stage-floor-cap"]
+    },
+    {
+      "subject_kind": "ABILITY",
+      "subject_id": 0,
+      "name": "NONE",
+      "status": "SUPPORTED",
+      "positive_cases": ["none-ability-no-trigger"],
+      "edge_cases": ["physical-hit"]
+    },
+    {
+      "subject_kind": "ABILITY",
+      "subject_id": 22,
+      "name": "INTIMIDATE",
+      "status": "SUPPORTED",
+      "positive_cases": ["intimidate-switch-in"],
+      "edge_cases": ["intimidate-stage-floor"]
+    },
+    {
+      "subject_kind": "ABILITY",
+      "subject_id": 25,
+      "name": "WONDER_GUARD",
+      "status": "SUPPORTED",
+      "positive_cases": ["wonder-guard-block"],
+      "edge_cases": ["wonder-guard-super-effective-pass", "wonder-guard-status-pass"]
+    },
+    {
+      "subject_kind": "STATUS",
+      "subject_id": 1,
+      "name": "POISON",
+      "status": "SUPPORTED",
+      "positive_cases": ["poison-application"],
+      "edge_cases": ["poison-residual"]
+    },
+    {
+      "subject_kind": "STATUS",
+      "subject_id": 3,
+      "name": "PARALYSIS",
+      "status": "SUPPORTED",
+      "positive_cases": ["paralysis-application"],
+      "edge_cases": ["paralysis-full-stop", "paralysis-speed-order"]
+    },
+    {
+      "subject_kind": "STATUS",
+      "subject_id": 6,
+      "name": "BURN",
+      "status": "SUPPORTED",
+      "positive_cases": ["burn-application"],
+      "edge_cases": ["burn-residual", "burn-physical-penalty"]
+    },
+    {
+      "subject_kind": "WEATHER",
+      "subject_id": 0,
+      "name": "NONE",
+      "status": "SUPPORTED",
+      "positive_cases": ["physical-hit"],
+      "edge_cases": ["special-hit-priority"]
+    },
+    {
+      "subject_kind": "TERRAIN",
+      "subject_id": 0,
+      "name": "NONE",
+      "status": "SUPPORTED",
+      "positive_cases": ["physical-hit"],
+      "edge_cases": ["spread-stage-down"]
+    }
+  ],
+  "species_coverage": [
+    {
+      "species_id": 1,
+      "name": "Bulbasaur",
+      "roles": ["player_status", "enemy_resistant"],
+      "positive_cases": ["poison-application", "paralysis-application"],
+      "edge_cases": ["stage-floor-cap"]
+    },
+    {
+      "species_id": 7,
+      "name": "Squirtle",
+      "roles": ["player_special", "enemy_weak"],
+      "positive_cases": ["special-hit-priority"],
+      "edge_cases": ["wonder-guard-super-effective-pass"]
+    },
+    {
+      "species_id": 19,
+      "name": "Rattata",
+      "roles": ["player_physical"],
+      "positive_cases": ["physical-hit"],
+      "edge_cases": ["burn-physical-penalty"]
+    },
+    {
+      "species_id": 23,
+      "name": "Ekans",
+      "roles": ["switch_in_carrier"],
+      "positive_cases": ["intimidate-switch-in"],
+      "edge_cases": ["intimidate-stage-floor"]
+    },
+    {
+      "species_id": 50,
+      "name": "Diglett",
+      "roles": ["enemy_immune"],
+      "positive_cases": ["always-hit"],
+      "edge_cases": ["doubles-single-target"]
+    },
+    {
+      "species_id": 52,
+      "name": "Meowth",
+      "roles": ["enemy_neutral", "ability_immunity_carrier"],
+      "positive_cases": ["physical-hit", "wonder-guard-block"],
+      "edge_cases": ["wonder-guard-super-effective-pass"]
+    }
+  ],
+  "unsupported_reachable_families": [
+    {
+      "family": "UNSELECTED_MOVE_OR_ABILITY_ID",
+      "reason_code": "OUTSIDE_SELECTED_CONTENT"
+    },
+    {
+      "family": "MOVE_OR_ABILITY_CALLBACK",
+      "reason_code": "CALLBACK_OR_SCRIPT_REQUIRED"
+    },
+    {
+      "family": "UNLISTED_MOVE_EFFECT",
+      "reason_code": "EFFECT_VOCABULARY_UNSUPPORTED"
+    },
+    {
+      "family": "RANDOM_OR_TRIPLE_ONLY_TARGET",
+      "reason_code": "TARGETING_UNSUPPORTED"
+    },
+    {
+      "family": "UNBOUNDED_PP_MOVE_OR_OVERRIDE",
+      "reason_code": "OUTSIDE_SELECTED_CONTENT"
+    },
+    {
+      "family": "PURSUIT_SELF_SWITCH_TRICK_ROOM_OR_EXPLICIT_SET_ORDER",
+      "reason_code": "EFFECT_VOCABULARY_UNSUPPORTED"
+    },
+    {
+      "family": "TOXIC_SLEEP_FREEZE_OR_FAINT_STATUS_MECHANICS",
+      "reason_code": "STATUS_MECHANICS_UNSUPPORTED"
+    },
+    {
+      "family": "NON_NEUTRAL_WEATHER_TERRAIN_OR_ARENA_TAG",
+      "reason_code": "FIELD_CONDITION_MECHANICS_UNSUPPORTED"
+    },
+    {
+      "family": "ARENA_TIMED_OR_SOURCE_AWARE_ABILITY_SUPPRESSION",
+      "reason_code": "DYNAMIC_SUPPRESSION_UNSUPPORTED"
+    }
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "publication_state": "CONTRACT_CATALOG_FROZEN",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_protocol_version": "er-coop-47",
+  "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
+  "slice_manifest": "rust/fixtures/m3/m3-slice-manifest.json",
+  "capability_manifest": "rust/fixtures/m3/m3-capability-manifest.json",
+  "coverage_map": "rust/fixtures/m3/m3-coverage-map.json",
+  "exporter_paths": [
+    "scripts/export-kernel-m3-oracle.mjs",
+    "test/kernel-fixtures/m3/export-battle-oracle.test.ts"
+  ],
+  "canonical_output": {
+    "encoding": "UTF-8",
+    "object_keys": "SORTED",
+    "array_order": "PRESERVED",
+    "finite_number_format": "CANONICAL_JSON_NUMBER",
+    "trailing_newline_count": 1,
+    "fresh_process_runs": 2,
+    "fixture_hash": "SHA-256_LOWERCASE_64_HEX"
+  },
+  "required_axes": [
+    "INITIAL_STATE_AND_RNG",
+    "ADMITTED_COMMANDS",
+    "CONSUMING_RNG_DRAWS",
+    "DYNAMIC_ACTION_ORDER",
+    "CAUSAL_MUTATIONS",
+    "PRESENTATION_PLAN",
+    "FINAL_STATE_AND_RNG",
+    "NEXT_LOGICAL_CONTROL"
+  ],
+  "supporting_artifact_contracts": [
+    {
+      "artifact_id": "content-pack-v1",
+      "fixture_path": "rust/fixtures/m3/oracle/content-pack-v1.json",
+      "required_identity": "BLAKE3_V1_CONTENT_PACK_HASH"
+    },
+    {
+      "artifact_id": "rng-vectors-v1",
+      "fixture_path": "rust/fixtures/m3/oracle/rng-vectors-v1.json",
+      "required_identity": "SHA256_MANIFEST_ENTRY"
+    }
+  ],
+  "case_contracts": [
+    {
+      "scenario_id": "physical-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/physical-hit.json"
+    },
+    {
+      "scenario_id": "critical-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/critical-hit.json"
+    },
+    {
+      "scenario_id": "special-hit-priority",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/special-hit-priority.json"
+    },
+    {
+      "scenario_id": "always-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/always-hit.json"
+    },
+    {
+      "scenario_id": "miss",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/miss.json"
+    },
+    {
+      "scenario_id": "poison-type-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-type-immunity.json"
+    },
+    {
+      "scenario_id": "grass-powder-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/grass-powder-immunity.json"
+    },
+    {
+      "scenario_id": "existing-status-rejected",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/existing-status-rejected.json"
+    },
+    {
+      "scenario_id": "speed-tie",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/speed-tie.json"
+    },
+    {
+      "scenario_id": "pp-consumption",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/pp-consumption.json"
+    },
+    {
+      "scenario_id": "pp-unusable-rejected",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json"
+    },
+    {
+      "scenario_id": "poison-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-application.json"
+    },
+    {
+      "scenario_id": "poison-residual",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-residual.json"
+    },
+    {
+      "scenario_id": "paralysis-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-application.json"
+    },
+    {
+      "scenario_id": "paralysis-full-stop",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-full-stop.json"
+    },
+    {
+      "scenario_id": "paralysis-speed-order",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-speed-order.json"
+    },
+    {
+      "scenario_id": "burn-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-application.json"
+    },
+    {
+      "scenario_id": "burn-residual",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-residual.json"
+    },
+    {
+      "scenario_id": "burn-physical-penalty",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-physical-penalty.json"
+    },
+    {
+      "scenario_id": "spread-stage-down",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/spread-stage-down.json"
+    },
+    {
+      "scenario_id": "stage-floor-cap",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/stage-floor-cap.json"
+    },
+    {
+      "scenario_id": "none-ability-no-trigger",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json"
+    },
+    {
+      "scenario_id": "intimidate-switch-in",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/intimidate-switch-in.json"
+    },
+    {
+      "scenario_id": "intimidate-stage-floor",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json"
+    },
+    {
+      "scenario_id": "wonder-guard-block",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-block.json"
+    },
+    {
+      "scenario_id": "wonder-guard-super-effective-pass",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-super-effective-pass.json"
+    },
+    {
+      "scenario_id": "wonder-guard-status-pass",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json"
+    },
+    {
+      "scenario_id": "type-weakness",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-weakness.json"
+    },
+    {
+      "scenario_id": "type-resistance",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-resistance.json"
+    },
+    {
+      "scenario_id": "type-native-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-native-immunity.json"
+    },
+    {
+      "scenario_id": "voluntary-switch",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/voluntary-switch.json"
+    },
+    {
+      "scenario_id": "doubles-single-target",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/doubles-single-target.json"
+    },
+    {
+      "scenario_id": "same-side-simultaneous-faint",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/same-side-simultaneous-faint.json"
+    },
+    {
+      "scenario_id": "mixed-side-simultaneous-faint",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/mixed-side-simultaneous-faint.json"
+    },
+    {
+      "scenario_id": "forced-replacement",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/forced-replacement.json"
+    },
+    {
+      "scenario_id": "no-legal-replacement",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/no-legal-replacement.json"
+    },
+    {
+      "scenario_id": "victory",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/victory.json"
+    },
+    {
+      "scenario_id": "defeat",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/defeat.json"
+    }
+  ],
+  "published_fixtures": [],
+  "published_supporting_artifacts": [],
+  "publication_rules": {
+    "contract_catalog_must_match_coverage_map_exactly": true,
+    "each_published_fixture_must_match_one_contract": true,
+    "each_contract_must_have_exactly_one_fixture_before_m3b": true,
+    "each_supporting_artifact_contract_must_be_published_before_m3b": true,
+    "all_required_axes_must_be_gap_free": true,
+    "raw_input_axis_is_not_claimed_by_semantic_oracle_cases": true,
+    "published_fixture_requires_complete_content_hash": true,
+    "exporter_output_root_must_be_empty": true,
+    "independent_exact_sha_checkouts_required": true,
+    "two_fresh_process_outputs_must_be_byte_identical": true,
+    "git_provenance_must_resolve": true,
+    "content_pack_hash_must_be_independently_recomputed": true,
+    "published_tree_must_have_exactly_40_files": true,
+    "m3b_and_m3c_require_published_state": true,
+    "unlisted_generated_files_are_not_evidence": true
+  }
+}

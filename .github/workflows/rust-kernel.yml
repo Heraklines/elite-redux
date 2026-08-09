@@ -8,8 +8,16 @@ on:
       - "arch/rust-kernel/**"
       - "codex/rust-kernel-m2-*"
       - "wrk/rk-m3-*"
+      - "wrk/rk-m3a-*"
+      - "wrk/rk-m3b-*"
+      - "wrk/rk-m3c-*"
     paths:
       - ".nvmrc"
+      - ".gitmodules"
+      - "assets"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "rust/**"
       - "rust/rust-toolchain.toml"
       - "rust/fixtures/**"
@@ -18,10 +26,16 @@ on:
       - "scripts/export-kernel-*.mjs"
       - "scripts/benchmark-kernel-*.mjs"
       - "docs/plans/rust-kernel/m3-*.md"
+      - "src/**"
       - ".github/workflows/rust-kernel.yml"
   pull_request:
     paths:
       - ".nvmrc"
+      - ".gitmodules"
+      - "assets"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "rust/**"
       - "rust/rust-toolchain.toml"
       - "rust/fixtures/**"
@@ -30,6 +44,7 @@ on:
       - "scripts/export-kernel-*.mjs"
       - "scripts/benchmark-kernel-*.mjs"
       - "docs/plans/rust-kernel/m3-*.md"
+      - "src/**"
       - ".github/workflows/rust-kernel.yml"
 
 permissions:
@@ -44,8 +59,1440 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  m3-production-source-lock:
+    name: M3 production source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out immutable production surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.nvmrc
+            /.gitmodules
+            /package.json
+            /pnpm-lock.yaml
+            /pnpm-workspace.yaml
+            /rust/contracts/m3-contract.toml
+            /rust/source-lock.toml
+            /src/
+          submodules: false
+
+      - name: Require M2-identical production TypeScript and source lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f rust/contracts/m3-contract.toml ]]; then
+            echo "M3 contract surface is not present on this branch"
+            exit 0
+          fi
+          base=7357166c19bdb5cf0e32c84b0f74f22e79d80798
+          oracle=3b534099919efae827019d4a3f3c4ab0ecd6d67b
+          git cat-file -e "${base}^{commit}"
+          git cat-file -e "${oracle}^{commit}"
+          git merge-base --is-ancestor "$oracle" "$base"
+          git merge-base --is-ancestor "$base" "$GITHUB_SHA"
+          locked_runtime=(.nvmrc .gitmodules package.json pnpm-lock.yaml pnpm-workspace.yaml src)
+          git diff --exit-code "$oracle" "$base" -- "${locked_runtime[@]}"
+          git diff --exit-code "$base" "$GITHUB_SHA" -- \
+            "${locked_runtime[@]}" rust/source-lock.toml
+          oracle_gitlinks="$(git ls-tree -r "$oracle" | awk '$1 == "160000"')"
+          base_gitlinks="$(git ls-tree -r "$base" | awk '$1 == "160000"')"
+          head_gitlinks="$(git ls-tree -r "$GITHUB_SHA" | awk '$1 == "160000"')"
+          test "$oracle_gitlinks" = "$base_gitlinks"
+          test "$base_gitlinks" = "$head_gitlinks"
+          echo "M3 production TypeScript and asset gitlinks match oracle ${oracle} through base ${base}"
+
+  m3-contract-freeze:
+    name: M3 contract freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out M3 contract surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/rust-kernel.yml
+            /rust/contracts/
+            /rust/fixtures/m3/
+            /rust/source-lock.toml
+          submodules: false
+
+      - name: Validate frozen contract and evidence catalogs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          contract_dir = Path("rust/contracts")
+          fixture_dir = Path("rust/fixtures/m3")
+          required_contracts = {
+              "m3-api.md",
+              "m3-atomic-transition.md",
+              "m3-contract.toml",
+              "m3-error-policy.md",
+              "m3-internal-event-loop.md",
+              "m3-js-number-rng.md",
+              "m3-oracle-export.md",
+              "m3-ownership.toml",
+              "m3-presentation-control.md",
+              "m3-snapshot-trace.md",
+              "m3-ui-navigation.md",
+          }
+          required_manifests = {
+              "m3-slice-manifest.json",
+              "m3-capability-manifest.json",
+              "m3-oracle-manifest.json",
+              "m3-coverage-map.json",
+          }
+          generated_manifests = {
+              "m3-benchmark-manifest.json",
+          }
+
+          present_contracts = {path.name for path in contract_dir.glob("m3-*")}
+          present_manifests = {path.name for path in fixture_dir.glob("m3-*.json")}
+          ref_name = os.environ.get("GITHUB_HEAD_REF") or os.environ.get("GITHUB_REF_NAME", "")
+          m3_surface_required = (
+              ref_name == "arch/rust-kernel-m3"
+              or re.fullmatch(r"wrk/rk-m3[abc]-.*", ref_name) is not None
+          )
+          release_generation = re.fullmatch(r"wrk/rk-m3[bc]-.*", ref_name) is not None
+          feature_present = bool(present_contracts or present_manifests)
+          if not feature_present:
+              if m3_surface_required:
+                  raise SystemExit(f"{ref_name} may not delete or omit the frozen M3 surface")
+              print("M3 contract surface is not present on this branch")
+              raise SystemExit(0)
+          if present_contracts != required_contracts:
+              raise SystemExit(
+                  "M3 contract surface is not exact; "
+                  f"missing={sorted(required_contracts - present_contracts)} "
+                  f"unexpected={sorted(present_contracts - required_contracts)}"
+              )
+          missing_manifests = required_manifests - present_manifests
+          unexpected_manifests = present_manifests - required_manifests - generated_manifests
+          if missing_manifests or unexpected_manifests:
+              raise SystemExit(
+                  "M3 fixture surface is not exact; "
+                  f"missing={sorted(missing_manifests)} "
+                  f"unexpected={sorted(unexpected_manifests)}"
+              )
+          if (
+              generated_manifests & present_manifests
+              and ref_name != "arch/rust-kernel-m3"
+              and re.fullmatch(r"wrk/rk-m3c-.*", ref_name) is None
+          ):
+              raise SystemExit("the generated M3 benchmark manifest is restricted to M3C/integration")
+
+          with (contract_dir / "m3-contract.toml").open("rb") as stream:
+              lock = tomllib.load(stream)
+          with (contract_dir / "m3-ownership.toml").open("rb") as stream:
+              ownership = tomllib.load(stream)
+          with Path("rust/source-lock.toml").open("rb") as stream:
+              source_lock = tomllib.load(stream)
+
+          expected_lock = {
+              "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
+              "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+              "oracle_protocol_version": "er-coop-47",
+              "battle_state_schema_version": 1,
+              "content_pack_schema_version": 1,
+              "battle_turn_material_version": 1,
+              "battle_replacement_material_version": 1,
+              "command_proposal_version": 1,
+              "replacement_proposal_version": 1,
+              "battle_control_plan_version": 1,
+              "battle_start_version": 1,
+              "restorable_snapshot_version": 2,
+              "kernel_trace_version": 2,
+              "rng_algorithm_version": 1,
+              "menu_navigation_version": 1,
+              "capability_manifest_version": 1,
+              "oracle_manifest_version": 1,
+              "coverage_map_version": 1,
+              "turn_coordinate_version": 1,
+              "mechanical_digest_version": 1,
+              "kernel_determinism_digest_version": 1,
+              "presentation_plan_digest_version": 1,
+              "pair_determinism_digest_version": 1,
+          }
+          if lock != expected_lock:
+              raise SystemExit(f"m3-contract.toml is not exact: {lock!r}")
+          if source_lock.get("oracle_game_sha") != expected_lock["oracle_game_sha"]:
+              raise SystemExit("M3 oracle pin differs from rust/source-lock.toml")
+          if source_lock.get("protocol_version") != expected_lock["oracle_protocol_version"]:
+              raise SystemExit("M3 protocol pin differs from rust/source-lock.toml")
+          expected_source_lock = {
+              "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+              "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+              "protocol_version": "er-coop-47",
+              "schema_version": 1,
+              "input_repeat_delay_ms": 250,
+              "input_repeat_interval_ms": 250,
+          }
+          if source_lock != expected_source_lock:
+              raise SystemExit("rust/source-lock.toml differs from the frozen M2 source lock")
+          if ownership.get("m2_base_sha") != expected_lock["m2_base_sha"]:
+              raise SystemExit("ownership M2 base differs from contract lock")
+          if ownership.get("oracle_game_sha") != expected_lock["oracle_game_sha"]:
+              raise SystemExit("ownership oracle differs from contract lock")
+          if ownership.get("integration_branch") != "arch/rust-kernel-m3":
+              raise SystemExit("ownership integration branch is not exact")
+          if ownership.get("branch_base_resolution") != (
+              "head_sha in the m3-g6-attestation artifact from a successful overall "
+              "Rust Kernel Gate run on arch/rust-kernel-m3"
+          ):
+              raise SystemExit("ownership branch-base resolution is not exact")
+          rules = ownership.get("rules", {})
+          required_true_rules = {
+              "isolated_worktree",
+              "exclusive_paths",
+              "same_freeze_sha_for_each_generation",
+              "public_signatures_frozen_after_g6",
+              "integration_owner_only_merges",
+              "integration_owner_only_pushes",
+              "integration_owner_only_contract_changes",
+              "integration_owner_only_shared_crate_roots",
+              "integration_owner_only_kernel_step",
+              "production_typescript_read_only",
+              "m2_source_lock_read_only",
+              "hosted_rust_gate_required",
+              "branch_base_must_equal_hosted_green_head",
+              "integration_owner_verifies_green_attestation",
+              "one_behavioral_concern_per_commit",
+          }
+          false_rules = sorted(key for key in required_true_rules if rules.get(key) is not True)
+          if false_rules:
+              raise SystemExit(f"ownership rules must be true: {false_rules}")
+          if rules.get("local_rust_execution") is not False or rules.get("local_coop_vitest") is not False:
+              raise SystemExit("local heavy-test prohibitions must remain false")
+          if rules.get("workers_may_spawn_agents") is not False:
+              raise SystemExit("M3 workers must not spawn nested agents")
+          if rules.get("workers_may_rebase_onto_each_other") is not False:
+              raise SystemExit("M3 workers may not rebase onto one another")
+          generation_gates = ownership.get("generation_gates", {})
+          required_generation_gates = {
+              "m3b_requires_all_38_published_fixtures",
+              "m3b_requires_both_published_supporting_artifacts",
+              "m3b_requires_fresh_process_double_export_job",
+              "m3b_requires_gap_free_manifest",
+              "m3b_requires_branch_aware_hosted_publication_job",
+              "m3b_requires_independent_exact_sha_export_checkouts",
+              "m3b_requires_verified_git_and_content_provenance",
+          }
+          false_generation_gates = sorted(
+              key for key in required_generation_gates if generation_gates.get(key) is not True
+          )
+          if false_generation_gates:
+              raise SystemExit(f"M3 generation gates must be true: {false_generation_gates}")
+
+          lanes = ownership.get("lanes", [])
+          required_lane_ids = {
+              *(f"M3A-{index:02d}" for index in range(1, 13)),
+              *(f"M3B-{index:02d}" for index in range(1, 13)),
+              *(f"M3C-{index:02d}" for index in range(1, 13)),
+          }
+          lane_ids = [lane["id"] for lane in lanes]
+          lane_branches = [lane["branch"] for lane in lanes]
+          if set(lane_ids) != required_lane_ids or len(lane_ids) != 36:
+              raise SystemExit("the exact 36-lane M3 ownership matrix is not frozen")
+          if len(lane_branches) != len(set(lane_branches)) or any(
+              not branch.startswith(("wrk/rk-m3a-", "wrk/rk-m3b-", "wrk/rk-m3c-"))
+              for branch in lane_branches
+          ):
+              raise SystemExit("every M3 lane must have one unique isolated branch")
+          owned_paths = {}
+          for lane in lanes:
+              for path in lane["paths"]:
+                  if path in owned_paths:
+                      raise SystemExit(
+                          f"owned path collision: {path} in {owned_paths[path]} and {lane['id']}"
+                      )
+                  if (
+                      re.match(r"^[A-Za-z]:[\\/]", path)
+                      or path.startswith(("/", "\\", "src/"))
+                      or "onedrive" in path.lower()
+                  ):
+                      raise SystemExit(f"lane path escapes the repository-owned M3 surface: {path}")
+                  owned_paths[path] = lane["id"]
+          integration_owned = ownership.get("integration_owned", {}).get("paths", [])
+          exact_overlap = sorted(set(integration_owned) & set(owned_paths))
+          if exact_overlap:
+              raise SystemExit(f"lane paths overlap exact integration-owned paths: {exact_overlap}")
+
+          def load_json(name):
+              with (fixture_dir / name).open("r", encoding="utf-8") as stream:
+                  return json.load(stream)
+
+          slice_manifest = load_json("m3-slice-manifest.json")
+          capability = load_json("m3-capability-manifest.json")
+          coverage = load_json("m3-coverage-map.json")
+          oracle = load_json("m3-oracle-manifest.json")
+          documents = [slice_manifest, capability, coverage, oracle]
+          for document in documents:
+              if document.get("schema_version") != 1:
+                  raise SystemExit("every M3 JSON manifest must use schema version 1")
+              if document.get("oracle_game_sha") != expected_lock["oracle_game_sha"]:
+                  raise SystemExit("every M3 JSON manifest must use the pinned oracle SHA")
+              if document.get("project") != "PokéRogue Redux":
+                  raise SystemExit("every M3 JSON manifest must name PokéRogue Redux")
+
+          expected_species = {1, 7, 19, 23, 50, 52}
+          expected_moves = {1, 52, 77, 78, 351, 589}
+          expected_abilities = {0, 22, 25}
+          expected_statuses = {1, 3, 6}
+          species = {entry["id"] for entry in slice_manifest["species_definitions"]}
+          moves = {entry["id"] for entry in slice_manifest["move_definitions"]}
+          abilities = {entry["id"] for entry in slice_manifest["ability_definitions"]}
+          statuses = {entry["id"] for entry in slice_manifest["statuses"]}
+          if (species, moves, abilities, statuses) != (
+              expected_species,
+              expected_moves,
+              expected_abilities,
+              expected_statuses,
+          ):
+              raise SystemExit("selected species/move/ability/status IDs are not exact")
+          if set(slice_manifest["abilities"].values()) != expected_abilities:
+              raise SystemExit("ability role mapping is not exact")
+          if set(slice_manifest["moves"].values()) != expected_moves:
+              raise SystemExit("move role mapping is not exact")
+
+          expected_formats = {
+              "single": {
+                  "player_capacity": 1,
+                  "enemy_capacity": 1,
+                  "authority_seat": 1,
+                  "player_seat_ownership": [1],
+                  "adjacency": [
+                      {"first": ["PLAYER", 0], "second": ["ENEMY", 0]},
+                  ],
+              },
+              "coop_double": {
+                  "player_capacity": 2,
+                  "enemy_capacity": 2,
+                  "authority_seat": 1,
+                  "player_seat_ownership": [1, 2],
+                  "adjacency": [
+                      {"first": ["PLAYER", 0], "second": ["PLAYER", 1]},
+                      {"first": ["PLAYER", 0], "second": ["ENEMY", 0]},
+                      {"first": ["PLAYER", 0], "second": ["ENEMY", 1]},
+                      {"first": ["PLAYER", 1], "second": ["ENEMY", 0]},
+                      {"first": ["PLAYER", 1], "second": ["ENEMY", 1]},
+                      {"first": ["ENEMY", 0], "second": ["ENEMY", 1]},
+                  ],
+              },
+          }
+          if slice_manifest.get("battle_formats") != expected_formats:
+              raise SystemExit("selected battle capacities, seat ownership, or adjacency are not exact")
+
+          loadout_ids = set()
+          required_loadouts = {
+              "player-physical-none": (19, [1, 52, 351, 589], 0),
+              "player-special-none": (7, [351, 52, 1, 589], 0),
+              "player-status-none": (1, [77, 78, 589, 1], 0),
+              "switch-in-intimidate": (23, [1, 77, 78, 589], 22),
+              "enemy-neutral-none": (52, [1, 52, 351, 589], 0),
+              "enemy-weak-none": (7, [1, 52, 351, 589], 0),
+              "enemy-resistant-none": (1, [1, 52, 351, 589], 0),
+              "enemy-native-immune-none": (50, [1, 52, 351, 589], 0),
+              "enemy-wonder-guard": (52, [1, 52, 351, 589], 25),
+          }
+          for loadout in slice_manifest["loadouts"]:
+              identity = loadout["loadout_id"]
+              if identity in loadout_ids:
+                  raise SystemExit(f"duplicate loadout {identity}")
+              loadout_ids.add(identity)
+              if loadout["species_id"] not in species:
+                  raise SystemExit(f"loadout {identity} uses unknown species")
+              if len(loadout["move_slots"]) != 4 or any(value not in moves for value in loadout["move_slots"]):
+                  raise SystemExit(f"loadout {identity} must have four selected moves")
+              if loadout["active_ability_id"] not in abilities:
+                  raise SystemExit(f"loadout {identity} uses unknown active ability")
+              if loadout["passive_ability_ids"] != [None, None, None]:
+                  raise SystemExit(f"loadout {identity} must retain three explicit null passives")
+              if identity in required_loadouts and (
+                  loadout["species_id"],
+                  loadout["move_slots"],
+                  loadout["active_ability_id"],
+              ) != required_loadouts[identity]:
+                  raise SystemExit(f"loadout {identity} differs from its exact frozen shape")
+          if loadout_ids != set(required_loadouts):
+              raise SystemExit(
+                  f"loadout catalog mismatch: {sorted(loadout_ids ^ set(required_loadouts))}"
+              )
+
+          coverage_ids = [entry["case_id"] for entry in coverage["oracle_cases"]]
+          oracle_ids = [entry["scenario_id"] for entry in oracle["case_contracts"]]
+          if len(coverage_ids) != len(set(coverage_ids)):
+              raise SystemExit("coverage case IDs must be unique")
+          if len(oracle_ids) != len(set(oracle_ids)):
+              raise SystemExit("oracle contract IDs must be unique")
+          if set(coverage_ids) != set(oracle_ids):
+              raise SystemExit("oracle case catalog must exactly equal coverage catalog")
+          required_case_ids = {
+              "physical-hit",
+              "critical-hit",
+              "special-hit-priority",
+              "always-hit",
+              "miss",
+              "poison-type-immunity",
+              "grass-powder-immunity",
+              "existing-status-rejected",
+              "speed-tie",
+              "pp-consumption",
+              "pp-unusable-rejected",
+              "poison-application",
+              "poison-residual",
+              "paralysis-application",
+              "paralysis-full-stop",
+              "paralysis-speed-order",
+              "burn-application",
+              "burn-residual",
+              "burn-physical-penalty",
+              "spread-stage-down",
+              "stage-floor-cap",
+              "none-ability-no-trigger",
+              "intimidate-switch-in",
+              "intimidate-stage-floor",
+              "wonder-guard-block",
+              "wonder-guard-super-effective-pass",
+              "wonder-guard-status-pass",
+              "type-weakness",
+              "type-resistance",
+              "type-native-immunity",
+              "voluntary-switch",
+              "doubles-single-target",
+              "same-side-simultaneous-faint",
+              "mixed-side-simultaneous-faint",
+              "forced-replacement",
+              "no-legal-replacement",
+              "victory",
+              "defeat",
+          }
+          if set(coverage_ids) != required_case_ids or len(coverage_ids) != 38:
+              raise SystemExit("the exact 38-case oracle catalog is not frozen")
+          supporting = oracle.get("supporting_artifact_contracts", [])
+          if supporting != [
+              {
+                  "artifact_id": "content-pack-v1",
+                  "fixture_path": "rust/fixtures/m3/oracle/content-pack-v1.json",
+                  "required_identity": "BLAKE3_V1_CONTENT_PACK_HASH",
+              },
+              {
+                  "artifact_id": "rng-vectors-v1",
+                  "fixture_path": "rust/fixtures/m3/oracle/rng-vectors-v1.json",
+                  "required_identity": "SHA256_MANIFEST_ENTRY",
+              },
+          ]:
+              raise SystemExit("supporting oracle artifact catalog is not exact")
+          if oracle.get("m2_base_sha") != expected_lock["m2_base_sha"]:
+              raise SystemExit("oracle manifest M2 base is not exact")
+          if oracle.get("oracle_protocol_version") != expected_lock["oracle_protocol_version"]:
+              raise SystemExit("oracle manifest protocol pin is not exact")
+          if oracle.get("exporter_paths") != [
+              "scripts/export-kernel-m3-oracle.mjs",
+              "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+          ]:
+              raise SystemExit("oracle exporter path catalog is not exact")
+          if oracle.get("canonical_output") != {
+              "encoding": "UTF-8",
+              "object_keys": "SORTED",
+              "array_order": "PRESERVED",
+              "finite_number_format": "CANONICAL_JSON_NUMBER",
+              "trailing_newline_count": 1,
+              "fresh_process_runs": 2,
+              "fixture_hash": "SHA-256_LOWERCASE_64_HEX",
+          }:
+              raise SystemExit("oracle canonical-output contract is not exact")
+          if oracle.get("publication_rules") != {
+              "contract_catalog_must_match_coverage_map_exactly": True,
+              "each_published_fixture_must_match_one_contract": True,
+              "each_contract_must_have_exactly_one_fixture_before_m3b": True,
+              "each_supporting_artifact_contract_must_be_published_before_m3b": True,
+              "all_required_axes_must_be_gap_free": True,
+              "raw_input_axis_is_not_claimed_by_semantic_oracle_cases": True,
+              "published_fixture_requires_complete_content_hash": True,
+              "exporter_output_root_must_be_empty": True,
+              "independent_exact_sha_checkouts_required": True,
+              "two_fresh_process_outputs_must_be_byte_identical": True,
+              "git_provenance_must_resolve": True,
+              "content_pack_hash_must_be_independently_recomputed": True,
+              "published_tree_must_have_exactly_40_files": True,
+              "m3b_and_m3c_require_published_state": True,
+              "unlisted_generated_files_are_not_evidence": True,
+          }:
+              raise SystemExit("oracle publication rules are not exact")
+
+          publication_state = oracle.get("publication_state")
+          published_fixtures = oracle.get("published_fixtures")
+          published_supporting = oracle.get("published_supporting_artifacts")
+          if publication_state not in {
+              "CONTRACT_CATALOG_FROZEN",
+              "ORACLE_EVIDENCE_PUBLISHED",
+          }:
+              raise SystemExit(f"unknown M3 oracle publication state: {publication_state!r}")
+          if publication_state == "CONTRACT_CATALOG_FROZEN":
+              if published_fixtures != [] or published_supporting != []:
+                  raise SystemExit("catalog-only oracle state requires empty publication arrays")
+              if release_generation:
+                  raise SystemExit(
+                      f"{ref_name} is blocked until all M3 oracle evidence is published"
+                  )
+          else:
+              hash64 = re.compile(r"[0-9a-f]{64}")
+              hash40 = re.compile(r"[0-9a-f]{40}")
+              fixture_keys = {
+                  "scenario_id",
+                  "fixture_path",
+                  "sha256",
+                  "required_axes",
+                  "gap_free",
+                  "oracle_game_sha",
+                  "oracle_tree_sha",
+                  "exporter_commit_sha",
+                  "content_pack_hash",
+              }
+              supporting_keys = {
+                  "artifact_id",
+                  "fixture_path",
+                  "sha256",
+                  "gap_free",
+                  "oracle_game_sha",
+                  "oracle_tree_sha",
+                  "exporter_commit_sha",
+                  "content_pack_hash",
+              }
+              if not isinstance(published_fixtures, list) or len(published_fixtures) != 38:
+                  raise SystemExit("published oracle state requires exactly 38 fixture entries")
+              if not isinstance(published_supporting, list) or len(published_supporting) != 2:
+                  raise SystemExit("published oracle state requires exactly two supporting entries")
+              if [entry.get("scenario_id") for entry in published_fixtures] != oracle_ids:
+                  raise SystemExit("published fixture entries must follow exact catalog order")
+              if [entry.get("artifact_id") for entry in published_supporting] != [
+                  entry["artifact_id"] for entry in supporting
+              ]:
+                  raise SystemExit("published supporting entries must follow exact catalog order")
+
+              catalog_by_id = {entry["scenario_id"]: entry for entry in oracle["case_contracts"]}
+              support_by_id = {entry["artifact_id"]: entry for entry in supporting}
+              expected_files = set()
+              provenance = set()
+              case_fields = {
+                  "schema_version",
+                  "scenario_id",
+                  "provenance",
+                  "initial_state",
+                  "initial_rng",
+                  "commands",
+                  "expected_rng_draws",
+                  "expected_action_order",
+                  "expected_mutations",
+                  "expected_presentation",
+                  "expected_final_state",
+                  "final_rng",
+                  "expected_next_control",
+                  "gaps",
+              }
+
+              def require_bound_provenance(value, entry, path):
+                  provenance_value = value.get("provenance") if isinstance(value, dict) else None
+                  if not isinstance(provenance_value, dict):
+                      raise SystemExit(f"published evidence provenance is absent: {path}")
+                  expected = {
+                      "oracle_game_sha": entry["oracle_game_sha"],
+                      "oracle_tree_sha": entry["oracle_tree_sha"],
+                      "exporter_commit_sha": entry["exporter_commit_sha"],
+                      "content_pack_hash": entry["content_pack_hash"],
+                  }
+                  actual = {key: provenance_value.get(key) for key in expected}
+                  if actual != expected:
+                      raise SystemExit(
+                          f"published evidence provenance is not bound to its manifest: {path}"
+                      )
+
+              for entry in published_fixtures:
+                  if set(entry) != fixture_keys:
+                      raise SystemExit(f"published fixture fields are not exact: {entry!r}")
+                  contract = catalog_by_id[entry["scenario_id"]]
+                  if entry["fixture_path"] != contract["fixture_path"]:
+                      raise SystemExit(f"published fixture path differs from catalog: {entry!r}")
+                  if entry["required_axes"] != oracle["required_axes"]:
+                      raise SystemExit(f"published fixture axes are not exact: {entry!r}")
+                  if entry["gap_free"] is not True:
+                      raise SystemExit(f"published fixture is not gap-free: {entry!r}")
+                  if entry["oracle_game_sha"] != expected_lock["oracle_game_sha"]:
+                      raise SystemExit(f"published fixture oracle pin is wrong: {entry!r}")
+                  if hash64.fullmatch(entry["sha256"]) is None:
+                      raise SystemExit(f"published fixture SHA-256 is malformed: {entry!r}")
+                  if hash40.fullmatch(entry["oracle_tree_sha"]) is None:
+                      raise SystemExit(f"published fixture oracle tree is malformed: {entry!r}")
+                  if hash40.fullmatch(entry["exporter_commit_sha"]) is None:
+                      raise SystemExit(f"published fixture exporter commit is malformed: {entry!r}")
+                  if hash64.fullmatch(entry["content_pack_hash"]) is None:
+                      raise SystemExit(f"published fixture content hash is malformed: {entry!r}")
+                  path = Path(entry["fixture_path"])
+                  if not path.is_file():
+                      raise SystemExit(f"published fixture is missing: {path}")
+                  actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+                  if actual_hash != entry["sha256"]:
+                      raise SystemExit(f"published fixture SHA-256 mismatch: {path}")
+                  with path.open("r", encoding="utf-8") as stream:
+                      case = json.load(stream)
+                  if not isinstance(case, dict) or set(case) != case_fields:
+                      raise SystemExit(f"published fixture envelope is not exact: {path}")
+                  if case["scenario_id"] != entry["scenario_id"] or case["gaps"] != []:
+                      raise SystemExit(f"published fixture identity/gaps are invalid: {path}")
+                  require_bound_provenance(case, entry, path)
+                  expected_files.add(path.as_posix())
+                  provenance.add(
+                      (
+                          entry["oracle_tree_sha"],
+                          entry["exporter_commit_sha"],
+                          entry["content_pack_hash"],
+                      )
+                  )
+              for entry in published_supporting:
+                  if set(entry) != supporting_keys:
+                      raise SystemExit(f"published supporting fields are not exact: {entry!r}")
+                  contract = support_by_id[entry["artifact_id"]]
+                  if entry["fixture_path"] != contract["fixture_path"]:
+                      raise SystemExit(f"published supporting path differs from catalog: {entry!r}")
+                  if entry["gap_free"] is not True:
+                      raise SystemExit(f"published supporting artifact is not gap-free: {entry!r}")
+                  if entry["oracle_game_sha"] != expected_lock["oracle_game_sha"]:
+                      raise SystemExit(f"published supporting oracle pin is wrong: {entry!r}")
+                  if hash64.fullmatch(entry["sha256"]) is None:
+                      raise SystemExit(f"published supporting SHA-256 is malformed: {entry!r}")
+                  if hash40.fullmatch(entry["oracle_tree_sha"]) is None:
+                      raise SystemExit(f"published supporting oracle tree is malformed: {entry!r}")
+                  if hash40.fullmatch(entry["exporter_commit_sha"]) is None:
+                      raise SystemExit(f"published supporting exporter commit is malformed: {entry!r}")
+                  if hash64.fullmatch(entry["content_pack_hash"]) is None:
+                      raise SystemExit(f"published supporting content hash is malformed: {entry!r}")
+                  path = Path(entry["fixture_path"])
+                  if not path.is_file():
+                      raise SystemExit(f"published supporting artifact is missing: {path}")
+                  actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+                  if actual_hash != entry["sha256"]:
+                      raise SystemExit(f"published supporting SHA-256 mismatch: {path}")
+                  with path.open("r", encoding="utf-8") as stream:
+                      value = json.load(stream)
+                  if not isinstance(value, dict):
+                      raise SystemExit(f"published supporting artifact must be an object: {path}")
+                  require_bound_provenance(value, entry, path)
+                  if entry["artifact_id"] == "content-pack-v1":
+                      if set(value) != {
+                          "artifact_id",
+                          "schema_version",
+                          "provenance",
+                          "content_pack",
+                      }:
+                          raise SystemExit(f"content-pack artifact envelope is not exact: {path}")
+                      pack = value.get("content_pack")
+                      if not isinstance(pack, dict) or set(pack) != {
+                          "schema_version",
+                          "oracle_game_sha",
+                          "hash",
+                          "species",
+                          "moves",
+                          "abilities",
+                          "type_chart",
+                          "capability_manifest",
+                      }:
+                          raise SystemExit(f"content-pack object is not exact: {path}")
+                      if pack["schema_version"] != 1:
+                          raise SystemExit(f"content-pack schema version is wrong: {path}")
+                      if pack["oracle_game_sha"] != expected_lock["oracle_game_sha"]:
+                          raise SystemExit(f"content-pack oracle identity is wrong: {path}")
+                      if pack["hash"] != "blake3-v1:" + entry["content_pack_hash"]:
+                          raise SystemExit(f"content-pack stated hash differs from manifest: {path}")
+                  else:
+                      if set(value) != {
+                          "artifact_id",
+                          "schema_version",
+                          "provenance",
+                          "vectors",
+                      }:
+                          raise SystemExit(f"RNG-vector artifact envelope is not exact: {path}")
+                      if value["schema_version"] != 1 or not isinstance(value["vectors"], list):
+                          raise SystemExit(f"RNG-vector artifact is malformed: {path}")
+                      if not value["vectors"]:
+                          raise SystemExit(f"RNG-vector artifact must be non-empty: {path}")
+                  if value["artifact_id"] != entry["artifact_id"]:
+                      raise SystemExit(f"supporting artifact identity is wrong: {path}")
+                  expected_files.add(path.as_posix())
+                  provenance.add(
+                      (
+                          entry["oracle_tree_sha"],
+                          entry["exporter_commit_sha"],
+                          entry["content_pack_hash"],
+                      )
+                  )
+              if len(provenance) != 1:
+                  raise SystemExit("all published M3 oracle evidence must share one provenance identity")
+              oracle_tree_sha, exporter_commit_sha, _content_pack_hash = next(iter(provenance))
+              resolved_oracle_tree = subprocess.check_output(
+                  ["git", "rev-parse", f"{expected_lock['oracle_game_sha']}^{{tree}}"],
+                  text=True,
+              ).strip()
+              if oracle_tree_sha != resolved_oracle_tree:
+                  raise SystemExit("published oracle tree does not resolve from the pinned commit")
+              subprocess.run(
+                  ["git", "cat-file", "-e", f"{exporter_commit_sha}^{{commit}}"],
+                  check=True,
+              )
+              subprocess.run(
+                  ["git", "merge-base", "--is-ancestor", exporter_commit_sha, os.environ["GITHUB_SHA"]],
+                  check=True,
+              )
+              subprocess.run(
+                  [
+                      "git",
+                      "diff",
+                      "--quiet",
+                      exporter_commit_sha,
+                      os.environ["GITHUB_SHA"],
+                      "--",
+                      "scripts/export-kernel-m3-oracle.mjs",
+                      "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+                  ],
+                  check=True,
+              )
+              oracle_root = Path("rust/fixtures/m3/oracle")
+              actual_files = {
+                  path.as_posix()
+                  for path in oracle_root.rglob("*")
+                  if path.is_file()
+              }
+              if actual_files != expected_files:
+                  raise SystemExit(
+                      "published oracle tree inventory is not exact; "
+                      f"missing={sorted(expected_files - actual_files)} "
+                      f"unexpected={sorted(actual_files - expected_files)}"
+                  )
+          for entry in capability["entries"]:
+              if entry.get("status") != "SUPPORTED":
+                  raise SystemExit("selected capability entries must be supported")
+              positive = entry.get("positive_cases")
+              edge = entry.get("edge_cases")
+              if not positive or not edge:
+                  raise SystemExit(f"capability entry lacks positive/edge cases: {entry!r}")
+              dangling = (set(positive) | set(edge)) - set(coverage_ids)
+              if dangling:
+                  raise SystemExit(f"capability entry has dangling cases: {sorted(dangling)}")
+
+          expected_axes = coverage["required_oracle_axes"]
+          if oracle["required_axes"] != expected_axes or len(expected_axes) != 8:
+              raise SystemExit("oracle and coverage axes must be the same exact eight-axis list")
+          for entry in oracle["case_contracts"]:
+              expected_path = f"rust/fixtures/m3/oracle/battle-cases/{entry['scenario_id']}.json"
+              if entry["fixture_path"] != expected_path:
+                  raise SystemExit(f"noncanonical fixture path for {entry['scenario_id']}")
+
+          forbidden = re.compile(r"\b(?:TODO|TBD|FIXME|zero-filled|fill later)\b", re.IGNORECASE)
+          for path in sorted(required_contracts | required_manifests):
+              root = contract_dir if path.endswith((".md", ".toml")) else fixture_dir
+              text = (root / path).read_text(encoding="utf-8")
+              match = forbidden.search(text)
+              if match:
+                  raise SystemExit(f"forbidden freeze marker {match.group(0)!r} in {path}")
+
+          required_api_phrases = {
+              "4,096 internal events": contract_dir / "m3-internal-event-loop.md",
+              "NoLegalReplacement": contract_dir / "m3-api.md",
+              "PartyOptionSelect": contract_dir / "m3-api.md",
+              "BattleReplacementProposalV1": contract_dir / "m3-api.md",
+              "decision_operation_id": contract_dir / "m3-api.md",
+              "M3_PRESENTATION_FAILED": contract_dir / "m3-presentation-control.md",
+              "QuiescentPreparedTransaction": contract_dir / "m3-snapshot-trace.md",
+              "prepared_transaction = None": contract_dir / "m3-snapshot-trace.md",
+              "PreparedBattleResolution": contract_dir / "m3-internal-event-loop.md",
+              "M3_INVALID_AUTHORITY_MATERIAL": contract_dir / "m3-error-policy.md",
+              "Pick,": contract_dir / "m3-js-number-rng.md",
+              "ApplyAuthorityMaterial": contract_dir / "m3-api.md",
+              "ProjectAuthorityControl": contract_dir / "m3-api.md",
+              "RC/e{epoch}/b{battleId}": contract_dir / "m3-api.md",
+              "BattleMaterialApplyError": contract_dir / "m3-api.md",
+              "CanonicalU64Decimal": contract_dir / "m3-api.md",
+              "OpaqueAuthorityEntrySnapshotV2": contract_dir / "m3-snapshot-trace.md",
+              "AuthorityDeliveryStageV2": contract_dir / "m3-snapshot-trace.md",
+              "PairPresenterEventSnapshotV2": contract_dir / "m3-snapshot-trace.md",
+              "PairKernelTraceV2": contract_dir / "m3-snapshot-trace.md",
+              "blake3-v1:<64 lowercase hex>": contract_dir / "m3-snapshot-trace.md",
+              "runtime_identity": contract_dir / "m3-snapshot-trace.md",
+              "--output-root <absolute-directory>": contract_dir / "m3-oracle-export.md",
+              "separate clean detached Git checkouts": contract_dir / "m3-oracle-export.md",
+              "b3sum` version 1.8.6": contract_dir / "m3-oracle-export.md",
+          }
+          for phrase, path in required_api_phrases.items():
+              if phrase not in path.read_text(encoding="utf-8"):
+                  raise SystemExit(f"required contract phrase {phrase!r} absent from {path}")
+
+          workflow_text = Path(".github/workflows/rust-kernel.yml").read_text(encoding="utf-8")
+          for phrase in (
+              '"arch/rust-kernel-m3"',
+              '"wrk/rk-m3a-*"',
+              '"wrk/rk-m3b-*"',
+              '"wrk/rk-m3c-*"',
+              "m3-production-source-lock:",
+              "m3-oracle-publication:",
+              "git clone --shared --no-checkout",
+              "cargo install b3sum --version 1.8.6 --locked",
+              "may not delete or omit the frozen M3 surface",
+              "m3-g6-attestation-" + "$" + "{{ github.run_id }}-" + "$" + "{{ github.run_attempt }}",
+          ):
+              if phrase not in workflow_text:
+                  raise SystemExit(f"required M3 workflow registration is absent: {phrase}")
+          if workflow_text.count("\n    needs: m3-oracle-publication") != 6:
+              raise SystemExit("all six implementation/static jobs must wait for the M3 publication gate")
+
+          digest = hashlib.sha256()
+          for path in sorted((contract_dir / name for name in required_contracts), key=str):
+              digest.update(path.read_bytes())
+          for path in sorted((fixture_dir / name for name in required_manifests), key=str):
+              digest.update(path.read_bytes())
+          print(f"M3 contract freeze valid; catalog_cases={len(coverage_ids)} sha256={digest.hexdigest()}")
+          PY
+
+      - name: Write G6 run attestation
+        if: ${{ hashFiles('rust/contracts/m3-contract.toml') != '' }}
+        shell: bash
+        env:
+          G6_BRANCH: ${{ github.ref_name }}
+          G6_HEAD_SHA: ${{ github.sha }}
+          G6_RUN_ID: ${{ github.run_id }}
+          G6_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          paths = sorted(Path("rust/contracts").glob("m3-*"), key=str)
+          paths += sorted(Path("rust/fixtures/m3").glob("m3-*.json"), key=str)
+          digest = hashlib.sha256()
+          for path in paths:
+              digest.update(path.read_bytes())
+          attestation = {
+              "schema_version": 1,
+              "branch": os.environ["G6_BRANCH"],
+              "head_sha": os.environ["G6_HEAD_SHA"],
+              "run_id": os.environ["G6_RUN_ID"],
+              "run_attempt": os.environ["G6_RUN_ATTEMPT"],
+              "workflow": "Rust Kernel Gate",
+              "contract_aggregate_sha256": digest.hexdigest(),
+              "valid_only_when_overall_run_conclusion": "success",
+          }
+          Path("m3-g6-attestation.json").write_text(
+              json.dumps(attestation, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload G6 run attestation
+        if: ${{ hashFiles('rust/contracts/m3-contract.toml') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-g6-attestation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: m3-g6-attestation.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m3-oracle-publication:
+    name: M3 oracle publication and fresh-process determinism
+    needs: m3-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out M3 oracle publication surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.nvmrc
+            /package.json
+            /pnpm-lock.yaml
+            /pnpm-workspace.yaml
+            /rust/fixtures/m3/
+            /scripts/export-kernel-m3-oracle.mjs
+            /test/kernel-fixtures/m3/export-battle-oracle.test.ts
+          submodules: false
+
+      - name: Enforce publication generation barrier
+        id: publication
+        shell: bash
+        env:
+          M3_REF_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          manifest_path = Path("rust/fixtures/m3/m3-oracle-manifest.json")
+          exporter = Path("scripts/export-kernel-m3-oracle.mjs")
+          exporter_test = Path("test/kernel-fixtures/m3/export-battle-oracle.test.ts")
+          ref_name = os.environ.get("M3_REF_NAME", "")
+          m3_surface_required = (
+              ref_name == "arch/rust-kernel-m3"
+              or re.fullmatch(r"wrk/rk-m3[abc]-.*", ref_name) is not None
+          )
+          release_generation = re.fullmatch(r"wrk/rk-m3[bc]-.*", ref_name) is not None
+          if not manifest_path.is_file():
+              if m3_surface_required:
+                  raise SystemExit(f"{ref_name} may not delete or omit the frozen M3 oracle manifest")
+              if exporter.exists() or exporter_test.exists():
+                  raise SystemExit("M3 exporter exists without its frozen oracle manifest")
+              output.write_text("ready=false\npublication_state=ABSENT\n", encoding="utf-8")
+              print("M3 oracle publication surface is not present on this branch")
+              raise SystemExit(0)
+
+          with manifest_path.open("r", encoding="utf-8") as stream:
+              manifest = json.load(stream)
+          state = manifest.get("publication_state")
+          if state not in {"CONTRACT_CATALOG_FROZEN", "ORACLE_EVIDENCE_PUBLISHED"}:
+              raise SystemExit(f"unknown M3 oracle publication state: {state!r}")
+          if release_generation and state != "ORACLE_EVIDENCE_PUBLISHED":
+              raise SystemExit(
+                  f"{ref_name} cannot start until all 38 cases and two support artifacts are published"
+              )
+          exporter_exists = exporter.is_file()
+          test_exists = exporter_test.is_file()
+          if exporter_exists != test_exists:
+              raise SystemExit("M3 exporter implementation is partial")
+          if state == "ORACLE_EVIDENCE_PUBLISHED" and not exporter_exists:
+              raise SystemExit("published M3 oracle evidence requires the pinned exporter and test")
+          ready = exporter_exists and test_exists
+          expected_oracle_files = {
+              entry["fixture_path"]
+              for entry in manifest["case_contracts"]
+          } | {
+              entry["fixture_path"]
+              for entry in manifest["supporting_artifact_contracts"]
+          }
+          oracle_root = Path("rust/fixtures/m3/oracle")
+          actual_oracle_files = {
+              path.as_posix()
+              for path in oracle_root.rglob("*")
+              if path.is_file()
+          }
+          if actual_oracle_files and actual_oracle_files != expected_oracle_files:
+              raise SystemExit(
+                  "checked-in M3 oracle tree is partial or contains unlisted files; "
+                  f"missing={sorted(expected_oracle_files - actual_oracle_files)} "
+                  f"unexpected={sorted(actual_oracle_files - expected_oracle_files)}"
+              )
+          checked_in_tree = actual_oracle_files == expected_oracle_files
+          if state == "ORACLE_EVIDENCE_PUBLISHED" and not checked_in_tree:
+              raise SystemExit("published M3 oracle state requires the exact checked-in 40-file tree")
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write(f"ready={'true' if ready else 'false'}\n")
+              stream.write(f"publication_state={state}\n")
+              stream.write(f"checked_in_tree={'true' if checked_in_tree else 'false'}\n")
+          if not ready:
+              print("M3 oracle catalog is frozen; exporter publication has not started")
+          PY
+
+      - name: Expand exact publication checkout
+        if: steps.publication.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable
+
+      - name: Install repository-pinned pnpm
+        if: steps.publication.outputs.ready == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        if: steps.publication.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install pinned independent BLAKE3 verifier
+        if: steps.publication.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked --force
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+
+      - name: Prepare two immutable exact-SHA exporter checkouts
+        id: exporter-checkouts
+        if: steps.publication.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          checkout_root="$RUNNER_TEMP/m3-oracle-immutable-checkouts"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e "$checkout_root"
+          mkdir -p "$checkout_root"
+          for label in one two; do
+            checkout="$checkout_root/$label"
+            git clone --shared --no-checkout "$GITHUB_WORKSPACE" "$checkout"
+            git -C "$checkout" checkout --detach "$GITHUB_SHA"
+            test "$(git -C "$checkout" rev-parse HEAD)" = "$GITHUB_SHA"
+            git -C "$checkout" submodule update --init --recursive
+            pnpm --dir "$checkout" install --frozen-lockfile
+            git -C "$checkout" diff --exit-code
+            changed="$(git -C "$checkout" status --porcelain --untracked-files=all)"
+            if [[ -n "$changed" ]]; then
+              echo "::error::Dependency setup mutated immutable exporter checkout $label"
+              printf '%s\n' "$changed"
+              exit 1
+            fi
+            git -C "$checkout" submodule foreach --recursive \
+              'git diff --exit-code -- . && test -z "$(git status --porcelain --untracked-files=all)"'
+          done
+          echo "one=$checkout_root/one" >> "$GITHUB_OUTPUT"
+          echo "two=$checkout_root/two" >> "$GITHUB_OUTPUT"
+
+      - name: Verify two independent M3 oracle exports
+        id: m3-export
+        if: steps.publication.outputs.ready == 'true'
+        shell: bash
+        env:
+          LC_ALL: C
+          TZ: UTC
+          PUBLICATION_STATE: ${{ steps.publication.outputs.publication_state }}
+          CHECKED_IN_TREE: ${{ steps.publication.outputs.checked_in_tree }}
+          M3_CHECKOUT_ONE: ${{ steps.exporter-checkouts.outputs.one }}
+          M3_CHECKOUT_TWO: ${{ steps.exporter-checkouts.outputs.two }}
+          ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
+        run: |
+          set -euo pipefail
+          test "$(git -C "$M3_CHECKOUT_ONE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$M3_CHECKOUT_TWO" rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+          pass_one="$(mktemp -d "$RUNNER_TEMP/m3-oracle-pass-one.XXXXXX")"
+          pass_two="$(mktemp -d "$RUNNER_TEMP/m3-oracle-pass-two.XXXXXX")"
+          (
+            cd "$M3_CHECKOUT_ONE"
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$pass_one"
+          )
+          git -C "$M3_CHECKOUT_ONE" diff --exit-code
+          test -z "$(git -C "$M3_CHECKOUT_ONE" status --porcelain --untracked-files=all)"
+          git -C "$M3_CHECKOUT_ONE" submodule foreach --recursive \
+            'git diff --exit-code -- . && test -z "$(git status --porcelain --untracked-files=all)"'
+          (
+            cd "$M3_CHECKOUT_TWO"
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$pass_two"
+          )
+          git -C "$M3_CHECKOUT_TWO" diff --exit-code
+          test -z "$(git -C "$M3_CHECKOUT_TWO" status --porcelain --untracked-files=all)"
+          git -C "$M3_CHECKOUT_TWO" submodule foreach --recursive \
+            'git diff --exit-code -- . && test -z "$(git status --porcelain --untracked-files=all)"'
+          M3_PASS_ONE="$pass_one" M3_PASS_TWO="$pass_two" python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          with Path("rust/fixtures/m3/m3-oracle-manifest.json").open(
+              "r", encoding="utf-8"
+          ) as stream:
+              manifest = json.load(stream)
+          resolved_oracle_tree = subprocess.check_output(
+              ["git", "rev-parse", f"{os.environ['ORACLE_SHA']}^{{tree}}"],
+              text=True,
+          ).strip()
+          prefix = "rust/fixtures/m3/oracle/"
+          expected = [
+              entry["fixture_path"].removeprefix(prefix)
+              for entry in manifest["case_contracts"]
+          ]
+          expected += [
+              entry["fixture_path"].removeprefix(prefix)
+              for entry in manifest["supporting_artifact_contracts"]
+          ]
+          if len(expected) != 40 or len(expected) != len(set(expected)):
+              raise SystemExit("M3 oracle export catalog must contain exactly 40 unique paths")
+
+          roots = [
+              Path(os.environ["M3_PASS_ONE"]),
+              Path(os.environ["M3_PASS_TWO"]),
+          ]
+          if os.environ["CHECKED_IN_TREE"] == "true":
+              roots.append(Path("rust/fixtures/m3/oracle"))
+          inventories = []
+          for root in roots:
+              inventory = sorted(
+                  path.relative_to(root).as_posix()
+                  for path in root.rglob("*")
+                  if path.is_file()
+              )
+              if inventory != sorted(expected):
+                  raise SystemExit(
+                      f"fresh M3 oracle inventory differs from catalog at {root}: {inventory!r}"
+                  )
+              inventories.append(inventory)
+
+          def first_byte_offset(left, right):
+              for index, (first, second) in enumerate(zip(left, right, strict=False)):
+                  if first != second:
+                      return index
+              return min(len(left), len(right))
+
+          def first_json_path(left, right, path="$"):
+              if type(left) is not type(right):
+                  return path
+              if isinstance(left, dict):
+                  for key in sorted(set(left) | set(right)):
+                      child = f"{path}.{key}"
+                      if key not in left or key not in right:
+                          return child
+                      found = first_json_path(left[key], right[key], child)
+                      if found is not None:
+                          return found
+                  return None
+              if isinstance(left, list):
+                  limit = min(len(left), len(right))
+                  for index in range(limit):
+                      found = first_json_path(left[index], right[index], f"{path}[{index}]")
+                      if found is not None:
+                          return found
+                  return None if len(left) == len(right) else f"{path}[{limit}]"
+              return None if left == right else path
+
+          def require_equal(relative, label, left, right):
+              if left == right:
+                  return
+              offset = first_byte_offset(left, right)
+              decoded_path = None
+              try:
+                  decoded_path = first_json_path(json.loads(left), json.loads(right))
+              except (UnicodeDecodeError, json.JSONDecodeError):
+                  pass
+              suffix = f" json_path={decoded_path}" if decoded_path is not None else ""
+              raise SystemExit(
+                  f"M3 oracle bytes differ ({label}): {relative} offset={offset}{suffix}"
+              )
+
+          def reject_nonfinite(token):
+              raise ValueError(f"non-finite JSON number: {token}")
+
+          def require_sorted_keys(value, path="$"):
+              if isinstance(value, dict):
+                  keys = list(value)
+                  if keys != sorted(keys):
+                      raise SystemExit(f"M3 oracle object keys are not sorted at {path}")
+                  for key, child in value.items():
+                      require_sorted_keys(child, f"{path}.{key}")
+              elif isinstance(value, list):
+                  for index, child in enumerate(value):
+                      require_sorted_keys(child, f"{path}[{index}]")
+
+          node_version = subprocess.check_output(["node", "--version"], text=True).strip()
+          with (
+              Path(os.environ["M3_CHECKOUT_ONE"]) / "node_modules/phaser/package.json"
+          ).open("r", encoding="utf-8") as stream:
+              phaser_version = json.load(stream)["version"]
+          expected_runtime_provenance = {
+              "node_version": node_version,
+              "phaser_version": phaser_version,
+              "runner_class": "GITHUB_HOSTED_UBUNTU",
+              "platform": "linux",
+              "architecture": "x64",
+              "locale": "C",
+              "timezone": "UTC",
+          }
+
+          def require_provenance(value, relative):
+              provenance = value.get("provenance") if isinstance(value, dict) else None
+              if not isinstance(provenance, dict):
+                  raise SystemExit(f"M3 oracle provenance is absent: {relative}")
+              for key, expected_value in expected_runtime_provenance.items():
+                  if provenance.get(key) != expected_value:
+                      raise SystemExit(
+                          f"M3 oracle runtime provenance {key} is wrong: {relative}"
+                      )
+              identity = (
+                  provenance.get("oracle_game_sha"),
+                  provenance.get("oracle_tree_sha"),
+                  provenance.get("exporter_commit_sha"),
+                  provenance.get("content_pack_hash"),
+              )
+              if any(not isinstance(component, str) for component in identity):
+                  raise SystemExit(f"M3 oracle identity provenance is malformed: {relative}")
+              return identity
+
+          def require_strict_content_value(value, path="$"):
+              if value is None or type(value) is bool:
+                  return
+              if type(value) is int:
+                  if not -(2**53 - 1) <= value <= 2**53 - 1:
+                      raise SystemExit(f"content canonical integer is outside SafeU53 at {path}")
+                  return
+              if type(value) is float:
+                  raise SystemExit(f"content canonical value contains a float at {path}")
+              if isinstance(value, str):
+                  try:
+                      value.encode("utf-8")
+                  except UnicodeEncodeError as error:
+                      raise SystemExit(f"content string contains a lone surrogate at {path}: {error}")
+                  return
+              if isinstance(value, list):
+                  for index, child in enumerate(value):
+                      require_strict_content_value(child, f"{path}[{index}]")
+                  return
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      if not isinstance(key, str) or not key.isascii():
+                          raise SystemExit(f"content canonical object key is not ASCII at {path}")
+                      require_strict_content_value(child, f"{path}.{key}")
+                  return
+              raise SystemExit(f"unsupported content canonical value at {path}: {type(value)}")
+
+          case_fields = {
+              "schema_version",
+              "scenario_id",
+              "provenance",
+              "initial_state",
+              "initial_rng",
+              "commands",
+              "expected_rng_draws",
+              "expected_action_order",
+              "expected_mutations",
+              "expected_presentation",
+              "expected_final_state",
+              "final_rng",
+              "expected_next_control",
+              "gaps",
+          }
+
+          entries = []
+          aggregate = hashlib.sha256()
+          provenance_identities = set()
+          content_pack_artifact = None
+          for relative in inventories[0]:
+              first = roots[0] / relative
+              second = roots[1] / relative
+              first_bytes = first.read_bytes()
+              second_bytes = second.read_bytes()
+              require_equal(relative, "fresh process 1 vs 2", first_bytes, second_bytes)
+              if len(roots) == 3:
+                  checked_bytes = (roots[2] / relative).read_bytes()
+                  require_equal(relative, "fresh process vs checked-in", first_bytes, checked_bytes)
+              if (
+                  not first_bytes.endswith(b"\n")
+                  or first_bytes.endswith(b"\n\n")
+                  or b"\r" in first_bytes
+              ):
+                  raise SystemExit(f"M3 oracle output must have one trailing newline: {relative}")
+              try:
+                  value = json.loads(first_bytes, parse_constant=reject_nonfinite)
+              except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                  raise SystemExit(f"M3 oracle output is not finite UTF-8 JSON: {relative}: {error}")
+              require_sorted_keys(value)
+              provenance_identities.add(require_provenance(value, relative))
+              digest = hashlib.sha256(first_bytes).hexdigest()
+              aggregate.update(relative.encode("utf-8"))
+              aggregate.update(b"\0")
+              aggregate.update(first_bytes)
+              if relative.startswith("battle-cases/"):
+                  if set(value) != case_fields:
+                      raise SystemExit(f"generated case envelope is not exact: {relative}")
+                  if value.get("scenario_id") != Path(relative).stem or value.get("gaps") != []:
+                      raise SystemExit(f"generated case is not gap-free/canonical: {relative}")
+              elif relative == "content-pack-v1.json":
+                  if set(value) != {
+                      "artifact_id",
+                      "schema_version",
+                      "provenance",
+                      "content_pack",
+                  } or value.get("artifact_id") != "content-pack-v1":
+                      raise SystemExit("generated content-pack envelope is not exact")
+                  if value.get("schema_version") != 1:
+                      raise SystemExit("generated content-pack envelope version is wrong")
+                  content_pack_artifact = value
+              elif relative == "rng-vectors-v1.json":
+                  if set(value) != {
+                      "artifact_id",
+                      "schema_version",
+                      "provenance",
+                      "vectors",
+                  } or value.get("artifact_id") != "rng-vectors-v1":
+                      raise SystemExit("generated RNG-vector envelope is not exact")
+                  if value.get("schema_version") != 1 or not value.get("vectors"):
+                      raise SystemExit("generated RNG-vector evidence is empty or wrong-version")
+              entries.append({"path": relative, "sha256": digest})
+
+          if len(provenance_identities) != 1:
+              raise SystemExit("all 40 generated oracle files must share one provenance identity")
+          oracle_game_sha, oracle_tree_sha, exporter_commit_sha, content_pack_hash = next(
+              iter(provenance_identities)
+          )
+          if oracle_game_sha != os.environ["ORACLE_SHA"]:
+              raise SystemExit("generated oracle commit provenance is not pinned")
+          if oracle_tree_sha != resolved_oracle_tree:
+              raise SystemExit("generated oracle tree provenance does not resolve from its commit")
+          if len(content_pack_hash) != 64 or any(
+              character not in "0123456789abcdef" for character in content_pack_hash
+          ):
+              raise SystemExit("generated content-pack provenance is not lowercase 64-hex")
+          subprocess.run(
+              ["git", "cat-file", "-e", f"{exporter_commit_sha}^{{commit}}"],
+              check=True,
+          )
+          subprocess.run(
+              ["git", "merge-base", "--is-ancestor", exporter_commit_sha, os.environ["GITHUB_SHA"]],
+              check=True,
+          )
+          subprocess.run(
+              [
+                  "git",
+                  "diff",
+                  "--quiet",
+                  exporter_commit_sha,
+                  os.environ["GITHUB_SHA"],
+                  "--",
+                  "scripts/export-kernel-m3-oracle.mjs",
+                  "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+              ],
+              check=True,
+          )
+
+          if content_pack_artifact is None:
+              raise SystemExit("generated content-pack artifact is absent")
+          pack = content_pack_artifact["content_pack"]
+          expected_pack_fields = {
+              "schema_version",
+              "oracle_game_sha",
+              "hash",
+              "species",
+              "moves",
+              "abilities",
+              "type_chart",
+              "capability_manifest",
+          }
+          if not isinstance(pack, dict) or set(pack) != expected_pack_fields:
+              raise SystemExit("generated ContentPack fields are not exact")
+          if pack["schema_version"] != 1 or pack["oracle_game_sha"] != os.environ["ORACLE_SHA"]:
+              raise SystemExit("generated ContentPack schema/oracle identity is wrong")
+          pack_view = {key: value for key, value in pack.items() if key != "hash"}
+          require_strict_content_value(pack_view)
+          canonical_pack_bytes = json.dumps(
+              pack_view,
+              ensure_ascii=False,
+              sort_keys=True,
+              separators=(",", ":"),
+              allow_nan=False,
+          ).encode("utf-8")
+          preimage_path = Path(os.environ["RUNNER_TEMP"]) / "m3-content-pack-preimage.json"
+          preimage_path.write_bytes(canonical_pack_bytes)
+          recomputed_content_hash = subprocess.check_output(
+              ["b3sum", str(preimage_path)],
+              text=True,
+          ).split()[0]
+          if recomputed_content_hash != content_pack_hash:
+              raise SystemExit("recomputed BLAKE3 content-pack hash differs from provenance")
+          if pack["hash"] != "blake3-v1:" + recomputed_content_hash:
+              raise SystemExit("ContentPack.hash differs from independently recomputed BLAKE3")
+
+          published_entries = manifest["published_fixtures"] + manifest[
+              "published_supporting_artifacts"
+          ]
+          if os.environ["PUBLICATION_STATE"] == "ORACLE_EVIDENCE_PUBLISHED":
+              if len(published_entries) != 40:
+                  raise SystemExit("published state must bind all 40 generated files")
+              for entry in published_entries:
+                  if (
+                      entry["oracle_game_sha"],
+                      entry["oracle_tree_sha"],
+                      entry["exporter_commit_sha"],
+                      entry["content_pack_hash"],
+                  ) != next(iter(provenance_identities)):
+                      raise SystemExit("published manifest provenance differs from generated evidence")
+          elif published_entries:
+              raise SystemExit("catalog-only state may not contain publication entries")
+
+          evidence = {
+              "schema_version": 1,
+              "head_sha": os.environ["GITHUB_SHA"],
+              "publication_state": os.environ["PUBLICATION_STATE"],
+              "checked_in_tree": os.environ["CHECKED_IN_TREE"] == "true",
+              "oracle_tree_sha": oracle_tree_sha,
+              "exporter_commit_sha": exporter_commit_sha,
+              "content_pack_hash": recomputed_content_hash,
+              "b3sum_version": subprocess.check_output(
+                  ["b3sum", "--version"], text=True
+              ).strip(),
+              "fresh_process_count": 2,
+              "file_count": len(entries),
+              "aggregate_sha256": aggregate.hexdigest(),
+              "files": entries,
+          }
+          Path("m3-oracle-double-export.json").write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(
+              "M3 oracle fresh-process export valid; "
+              f"files={len(entries)} sha256={aggregate.hexdigest()}"
+          )
+          PY
+          echo "generated_tree=$pass_one" >> "$GITHUB_OUTPUT"
+          echo "checked_in_tree=$CHECKED_IN_TREE" >> "$GITHUB_OUTPUT"
+          git diff --exit-code
+          changed="$(git status --porcelain --untracked-files=all)"
+          if [[ "$changed" != "?? m3-oracle-double-export.json" ]]; then
+            echo "::error::M3 publication job mutated the exact checkout"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+
+      - name: Upload first hosted M3 oracle generation tree
+        if: >-
+          steps.publication.outputs.ready == 'true' &&
+          steps.m3-export.outputs.checked_in_tree != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-oracle-generated-tree-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.m3-export.outputs.generated_tree }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload M3 oracle determinism evidence
+        if: steps.publication.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-oracle-double-export-${{ github.run_id }}-${{ github.run_attempt }}
+          path: m3-oracle-double-export.json
+          if-no-files-found: error
+          retention-days: 30
+
   source-lock-and-fixtures:
     name: Source lock and deterministic fixtures
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -91,7 +1538,10 @@ jobs:
           set -euo pipefail
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
           shopt -s nullglob
-          exporters=(scripts/export-kernel-*.mjs)
+          exporters=(
+            scripts/export-kernel-fixtures.mjs
+            scripts/export-kernel-schema.mjs
+          )
           fixture_dir_present=0
           fixture_files=()
           if [[ -d test/kernel-fixtures ]]; then
@@ -123,7 +1573,9 @@ jobs:
           for path in "${core[@]}" rust/source-lock.toml; do
             [[ -e "$path" ]] || missing+=("$path")
           done
-          ((${#exporters[@]} > 0)) || missing+=("scripts/export-kernel-*.mjs")
+          for exporter in "${exporters[@]}"; do
+            [[ -e "$exporter" ]] || missing+=("$exporter")
+          done
           ((${#fixture_files[@]} > 0)) || missing+=("test/kernel-fixtures/*")
           if ((${#missing[@]} > 0)); then
             printf '::error::Rust kernel source-lock contract is partially present; missing: %s\n' "${missing[*]}"
@@ -319,7 +1771,10 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          exporters=(scripts/export-kernel-*.mjs)
+          exporters=(
+            scripts/export-kernel-fixtures.mjs
+            scripts/export-kernel-schema.mjs
+          )
           for pass in 1 2; do
             echo "Running kernel exporters, determinism pass $pass/2"
             for exporter in "${exporters[@]}"; do
@@ -403,6 +1858,7 @@ jobs:
 
   rust-format:
     name: Rust format
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -593,6 +2049,7 @@ jobs:
 
   rust-clippy:
     name: Rust clippy
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -774,6 +2231,7 @@ jobs:
 
   rust-native-tests:
     name: Rust native nextest and doctests
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -986,6 +2444,7 @@ jobs:
 
   rust-wasm-node-parity:
     name: Rust wasm32 er-wasm Node parity
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -1222,6 +2681,7 @@ jobs:
 
   rust-benchmarks:
     name: Rust kernel M2 measured benchmarks
+    needs: m3-oracle-publication
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
