@@ -8,6 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 const TWO_POW_NEGATIVE_32: f64 = 2.328_306_436_538_696_3e-10;
+const TWO_POW_31: f64 = 2_147_483_648.0;
 const TWO_POW_32: f64 = 4_294_967_296.0;
 const TWO_POW_NEGATIVE_53: f64 = 1.110_223_024_625_156_5e-16;
 const PHASER_MULTIPLIER: f64 = 2_091_639.0;
@@ -398,11 +399,13 @@ impl PhaserRdg {
         if !span.is_finite() {
             return Err(RngError::RangeOverflow);
         }
-        let scaled = self.frac() * span;
+        let mut staged = self.clone();
+        let scaled = staged.frac() * span;
         let result = scaled + minimum;
         if !result.is_finite() {
             return Err(RngError::RangeOverflow);
         }
+        *self = staged;
         Ok(result)
     }
 
@@ -418,6 +421,12 @@ impl PhaserRdg {
                 maximum: maximum.get(),
             });
         }
+        let inclusive_width = maximum
+            .get()
+            .checked_sub(minimum.get())
+            .and_then(|difference| difference.checked_add(1))
+            .ok_or(RngError::RangeOverflow)?;
+        SafeU53::new(inclusive_width).map_err(|_| RngError::RangeOverflow)?;
 
         let mut staged = self.clone();
         let minimum_number = minimum.get() as f64;
@@ -493,15 +502,15 @@ impl PhaserRdg {
         for code_unit in data.encode_utf16() {
             n += f64::from(code_unit);
             let mut h = HASH_MULTIPLIER * n;
-            n = f64::from(js_to_uint32(h));
+            n = f64::from(js_to_int32(h));
             h -= n;
             h *= n;
-            n = f64::from(js_to_uint32(h));
+            n = f64::from(js_to_int32(h));
             h -= n;
             n += h * TWO_POW_32;
         }
         self.n = n;
-        f64::from(js_to_uint32(n)) * TWO_POW_NEGATIVE_32
+        f64::from(js_to_int32(n)) * TWO_POW_NEGATIVE_32
     }
 }
 
@@ -564,7 +573,7 @@ fn parse_f64_component(value: Option<&str>) -> Result<f64, RngError> {
         .map_err(|_| RngError::InvalidStateString)
 }
 
-fn js_to_uint32(value: f64) -> u32 {
+fn js_to_int32(value: f64) -> i32 {
     if !value.is_finite() || value == 0.0 {
         return 0;
     }
@@ -572,11 +581,11 @@ fn js_to_uint32(value: f64) -> u32 {
     if modulo < 0.0 {
         modulo += TWO_POW_32;
     }
-    modulo as u32
-}
-
-fn js_to_int32(value: f64) -> i32 {
-    js_to_uint32(value) as i32
+    if modulo >= TWO_POW_31 {
+        (modulo - TWO_POW_32) as i32
+    } else {
+        modulo as i32
+    }
 }
 
 fn js_number_to_string(value: f64) -> String {
@@ -675,6 +684,32 @@ fn split_decimal_exponent(source: &str) -> (&str, i32) {
 #[cfg(test)]
 mod tests {
     use super::{PhaserRdg, PhaserRdgState};
+
+    #[test]
+    fn hash_uses_signed_to_int32_for_final_and_intermediate_accumulators() {
+        // Independent literal-ECMAScript vectors. The paired unsigned mutation
+        // produces the hard-coded alternatives asserted below.
+        let mut final_coercion = PhaserRdg::from_seed("unused");
+        final_coercion.n = 4_022_871_197.0;
+        let final_result = final_coercion.hash(" ");
+        assert_eq!(final_result.to_bits(), 0xbfc1_7e70_1700_0000);
+        assert_ne!(final_result.to_bits(), 0x3feb_a063_fa40_0000);
+        assert_eq!(final_coercion.n.to_bits(), 0x41eb_a063_fa40_0000);
+
+        let mut intermediate_coercions = PhaserRdg::from_seed("unused");
+        intermediate_coercions.n = 100_000_000_000.0;
+        let intermediate_result = intermediate_coercions.hash("A");
+        assert_eq!(intermediate_result.to_bits(), 0x0000_0000_0000_0000);
+        assert_eq!(
+            intermediate_coercions.n.to_bits(),
+            0xc5da_7479_eb00_0000
+        );
+        assert_ne!(intermediate_result.to_bits(), 0x3fe2_8187_47a0_0000);
+        assert_ne!(
+            intermediate_coercions.n.to_bits(),
+            0x41e2_8187_47a0_0000
+        );
+    }
 
     #[test]
     fn rnd_never_mutates_the_private_seed_hash_accumulator() {
