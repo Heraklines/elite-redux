@@ -10,7 +10,6 @@ use serde::ser::SerializeTuple;
 use serde::ser::SerializeTupleStruct;
 use serde::ser::SerializeTupleVariant;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::fmt;
 use thiserror::Error;
@@ -49,7 +48,7 @@ pub fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalErro
 
 pub fn fixture_digest<T: Serialize>(value: &T) -> Result<String, CanonicalError> {
     let bytes = fixture_bytes(value)?;
-    Ok(hex::encode(Sha256::digest(bytes)))
+    Ok(encode_lowercase_hex(&sha256_digest(&bytes)))
 }
 
 pub fn content_digest<T: Serialize>(value: &T) -> Result<String, CanonicalError> {
@@ -81,6 +80,183 @@ fn fixture_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalError> {
     let mut output = String::new();
     write_value(&value, &mut output, true)?;
     Ok(output.into_bytes())
+}
+
+const SHA256_INITIAL_STATE: [u32; 8] = [
+    0x6a09e667,
+    0xbb67ae85,
+    0x3c6ef372,
+    0xa54ff53a,
+    0x510e527f,
+    0x9b05688c,
+    0x1f83d9ab,
+    0x5be0cd19,
+];
+
+const SHA256_ROUND_CONSTANTS: [u32; 64] = [
+    0x428a2f98,
+    0x71374491,
+    0xb5c0fbcf,
+    0xe9b5dba5,
+    0x3956c25b,
+    0x59f111f1,
+    0x923f82a4,
+    0xab1c5ed5,
+    0xd807aa98,
+    0x12835b01,
+    0x243185be,
+    0x550c7dc3,
+    0x72be5d74,
+    0x80deb1fe,
+    0x9bdc06a7,
+    0xc19bf174,
+    0xe49b69c1,
+    0xefbe4786,
+    0x0fc19dc6,
+    0x240ca1cc,
+    0x2de92c6f,
+    0x4a7484aa,
+    0x5cb0a9dc,
+    0x76f988da,
+    0x983e5152,
+    0xa831c66d,
+    0xb00327c8,
+    0xbf597fc7,
+    0xc6e00bf3,
+    0xd5a79147,
+    0x06ca6351,
+    0x14292967,
+    0x27b70a85,
+    0x2e1b2138,
+    0x4d2c6dfc,
+    0x53380d13,
+    0x650a7354,
+    0x766a0abb,
+    0x81c2c92e,
+    0x92722c85,
+    0xa2bfe8a1,
+    0xa81a664b,
+    0xc24b8b70,
+    0xc76c51a3,
+    0xd192e819,
+    0xd6990624,
+    0xf40e3585,
+    0x106aa070,
+    0x19a4c116,
+    0x1e376c08,
+    0x2748774c,
+    0x34b0bcb5,
+    0x391c0cb3,
+    0x4ed8aa4a,
+    0x5b9cca4f,
+    0x682e6ff3,
+    0x748f82ee,
+    0x78a5636f,
+    0x84c87814,
+    0x8cc70208,
+    0x90befffa,
+    0xa4506ceb,
+    0xbef9a3f7,
+    0xc67178f2,
+];
+
+fn sha256_digest(bytes: &[u8]) -> [u8; 32] {
+    let mut state = SHA256_INITIAL_STATE;
+    let mut block = [0_u8; 64];
+    let mut chunks = bytes.chunks_exact(64);
+
+    for chunk in &mut chunks {
+        block.copy_from_slice(chunk);
+        sha256_compress(&mut state, &block);
+    }
+
+    let remainder = chunks.remainder();
+    block = [0_u8; 64];
+    block[..remainder.len()].copy_from_slice(remainder);
+    block[remainder.len()] = 0x80;
+
+    let bit_length = (bytes.len() as u64).wrapping_mul(8);
+    if remainder.len() > 55 {
+        sha256_compress(&mut state, &block);
+        block = [0_u8; 64];
+    }
+    block[56..64].copy_from_slice(&bit_length.to_be_bytes());
+    sha256_compress(&mut state, &block);
+
+    let mut digest = [0_u8; 32];
+    for (index, word) in state.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
+}
+
+fn sha256_compress(state: &mut [u32; 8], block: &[u8; 64]) {
+    let mut schedule = [0_u32; 64];
+    for (index, word) in schedule[..16].iter_mut().enumerate() {
+        let offset = index * 4;
+        *word = u32::from_be_bytes([
+            block[offset],
+            block[offset + 1],
+            block[offset + 2],
+            block[offset + 3],
+        ]);
+    }
+
+    for index in 16..64 {
+        let s0 = schedule[index - 15].rotate_right(7)
+            ^ schedule[index - 15].rotate_right(18)
+            ^ (schedule[index - 15] >> 3);
+        let s1 = schedule[index - 2].rotate_right(17)
+            ^ schedule[index - 2].rotate_right(19)
+            ^ (schedule[index - 2] >> 10);
+        schedule[index] = schedule[index - 16]
+            .wrapping_add(s0)
+            .wrapping_add(schedule[index - 7])
+            .wrapping_add(s1);
+    }
+
+    let mut working = *state;
+    for (constant, word) in SHA256_ROUND_CONSTANTS.iter().zip(schedule) {
+        let s1 = working[4].rotate_right(6)
+            ^ working[4].rotate_right(11)
+            ^ working[4].rotate_right(25);
+        let choice = (working[4] & working[5]) ^ ((!working[4]) & working[6]);
+        let temporary1 = working[7]
+            .wrapping_add(s1)
+            .wrapping_add(choice)
+            .wrapping_add(*constant)
+            .wrapping_add(word);
+        let s0 = working[0].rotate_right(2)
+            ^ working[0].rotate_right(13)
+            ^ working[0].rotate_right(22);
+        let majority = (working[0] & working[1])
+            ^ (working[0] & working[2])
+            ^ (working[1] & working[2]);
+        let temporary2 = s0.wrapping_add(majority);
+
+        working[7] = working[6];
+        working[6] = working[5];
+        working[5] = working[4];
+        working[4] = working[3].wrapping_add(temporary1);
+        working[3] = working[2];
+        working[2] = working[1];
+        working[1] = working[0];
+        working[0] = temporary1.wrapping_add(temporary2);
+    }
+
+    for (state_word, working_word) in state.iter_mut().zip(working) {
+        *state_word = state_word.wrapping_add(working_word);
+    }
+}
+
+fn encode_lowercase_hex(bytes: &[u8; 32]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(64);
+    for &byte in bytes {
+        output.push(DIGITS[(byte >> 4) as usize] as char);
+        output.push(DIGITS[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 fn validated_value<T: Serialize>(value: &T) -> Result<Value, CanonicalError> {

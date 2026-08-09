@@ -30,7 +30,7 @@ The M2 graph is acyclic:
 
 ```text
 er-types       -> serde, serde_json, thiserror
-er-canonical   -> serde, serde_json, sha2, blake3, hex, thiserror
+er-canonical   -> serde, serde_json, blake3, thiserror
 er-protocol    -> er-types, er-canonical
 er-kernel      -> er-types, er-canonical, er-protocol
 er-testkit     -> er-types, er-canonical, er-kernel, er-protocol

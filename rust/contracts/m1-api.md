@@ -24,7 +24,7 @@ The production dependency graph is acyclic:
 
 ```text
 er-types       -> serde, serde_json, thiserror
-er-canonical   -> serde, serde_json, sha2, blake3, hex, thiserror
+er-canonical   -> serde, serde_json, blake3, thiserror
 er-kernel      -> er-types, er-canonical
 er-protocol    -> er-types, er-canonical       (M2 implementation surface)
 er-testkit     -> er-types, er-canonical, er-kernel
