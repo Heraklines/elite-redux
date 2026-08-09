@@ -206,6 +206,17 @@ struct MenuSubmission {
 }
 
 #[derive(Clone, Debug)]
+enum CommandPlan {
+    EmptyLocalPartition,
+    Exact {
+        owner: SeatId,
+        operation_id: OperationId,
+        options: Vec<MenuOption>,
+        cancel: CancelPolicy,
+    },
+}
+
+#[derive(Clone, Debug)]
 enum ProtocolActionBatch {
     Authority(Vec<AuthorityLogAction>),
     Proposal(Vec<ProposalLeaseAction>),
@@ -2186,9 +2197,16 @@ impl GameKernel {
                 return self.enter_terminal_control(control.terminal_id.clone());
             }
             NextControl::CommandFrontier(control) => {
-                let plan = self.find_command_plan(&pending, control);
-                plan.map(|(owner, operation_id, options, cancel)| {
-                    (
+                match self.find_command_plan(&pending, control) {
+                    Some(CommandPlan::EmptyLocalPartition) => {
+                        Some((None, false, MenuState::None))
+                    }
+                    Some(CommandPlan::Exact {
+                        owner,
+                        operation_id,
+                        options,
+                        cancel,
+                    }) => Some((
                         Some(owner),
                         true,
                         MenuState::Command(CommandMenu {
@@ -2198,8 +2216,9 @@ impl GameKernel {
                             options,
                             cancel,
                         }),
-                    )
-                })
+                    )),
+                    None => None,
+                }
             }
             NextControl::Replacement(control) => self.find_replacement_plan(&pending, control).map(
                 |(owner, operation_id, field_index, options, cancel)| {
@@ -2257,13 +2276,13 @@ impl GameKernel {
         &self,
         pending: &PendingControl,
         control: &er_types::CommandFrontierControl,
-    ) -> Option<(SeatId, OperationId, Vec<MenuOption>, CancelPolicy)> {
+    ) -> Option<CommandPlan> {
         let local_endpoint = self.local_endpoint();
         let plans = match self.protocol.as_ref()? {
             ProtocolState::Authority(authority) => &authority.menu_plans,
             ProtocolState::Replica(replica) => &replica.menu_plans,
         };
-        let target = control
+        let Some(target) = control
             .commands
             .iter()
             .filter(|target| target.owner_seat_id == local_endpoint)
@@ -2272,7 +2291,10 @@ impl GameKernel {
                     .cmp(&right.field_index)
                     .then_with(|| left.owner_seat_id.cmp(&right.owner_seat_id))
                     .then_with(|| left.pokemon_id.cmp(&right.pokemon_id))
-            })?;
+            })
+        else {
+            return Some(CommandPlan::EmptyLocalPartition);
+        };
         let matches = plans.iter().filter_map(|plan| {
             let ControlMenuPlan::Command {
                 control_id,
@@ -2299,7 +2321,14 @@ impl GameKernel {
         });
         let mut matches = matches.collect::<Vec<_>>();
         if matches.len() == 1 {
-            matches.pop()
+            matches.pop().map(|(owner, operation_id, options, cancel)| {
+                CommandPlan::Exact {
+                    owner,
+                    operation_id,
+                    options,
+                    cancel,
+                }
+            })
         } else {
             None
         }

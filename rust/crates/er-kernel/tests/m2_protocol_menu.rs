@@ -632,6 +632,159 @@ fn multi_target_command_frontier_selects_the_local_canonical_target() -> TestRes
 }
 
 #[test]
+fn peer_only_command_frontier_installs_without_a_local_command_surface() -> TestResult {
+    let peer_control = command_control(0, 44, 1);
+    let peer_operation = operation("peer.only-command")?;
+    let stale_control = command_control(1, 45, 1);
+    let stale_operation = operation("stale.local-command")?;
+    let mut kernel = replica_kernel(
+        replica_config(Vec::new())?,
+        ui(
+            initial_command_menu(&stale_control, &stale_operation)?,
+            Some(seat(1)),
+            true,
+        ),
+    );
+    assert!(
+        kernel
+            .live_resources()
+            .controls
+            .contains(&control_id_of(&stale_control))
+    );
+
+    let entry = AuthorityEntry {
+        context: context(0, 0, 1)?,
+        revision: Revision::new(safe(1)),
+        operation_id: peer_operation.clone(),
+        kind: AuthorityEntryKind::TurnCommit,
+        material: Material {
+            digest: "peer-only-material".to_owned(),
+            payload: turn_payload(),
+        },
+        next_control: peer_control.clone(),
+        subsumes: Vec::new(),
+    };
+    let accepted = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: network_frame(
+            context(0, 0, 1)?,
+            FrameType::AuthorityEntry,
+            serde_json::to_value(AuthorityEntryBody::from(&entry))?,
+        ),
+    })?;
+    assert!(has_apply(&accepted, 1, &peer_operation));
+
+    let projected = kernel.step(KernelInput::MaterialApplied {
+        endpoint: seat(1),
+        revision: Revision::new(safe(1)),
+        outcome: MaterialApplicationOutcome::Applied,
+    })?;
+    assert!(has_project(&projected, 1, &peer_operation, &peer_control));
+
+    let control_id = control_id_of(&peer_control);
+    let installed = kernel.step(KernelInput::ControlProjected {
+        endpoint: seat(1),
+        revision: Revision::new(safe(1)),
+        outcome: ControlProjectionOutcome::Installed {
+            control_id: control_id.clone(),
+        },
+    })?;
+    assert!(installed
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::UiChanged { .. })));
+    assert!(!installed
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    let receipt = sent_frame(&installed).ok_or("controlInstalled receipt was not emitted")?;
+    let receipt: AuthorityReceiptBody = serde_json::from_value(receipt.body)?;
+    assert_eq!(receipt.stage, AckStage::ControlInstalled);
+    assert_eq!(receipt.control_id, Some(control_id.clone()));
+    assert_eq!(kernel.ui_state().owner_seat, None);
+    assert!(!kernel.ui_state().actionable);
+    assert_eq!(kernel.ui_state().stack, vec![MenuState::None]);
+    assert_eq!(kernel.ui_state().generation, MenuGeneration::new(safe(2)));
+    assert!(kernel.live_resources().controls.is_empty());
+    assert_eq!(kernel.live_resources().presentations.len(), 1);
+
+    let duplicate = kernel.step(KernelInput::NetworkFrame {
+        endpoint: seat(1),
+        frame: network_frame(
+            context(0, 0, 1)?,
+            FrameType::AuthorityEntry,
+            serde_json::to_value(AuthorityEntryBody::from(&entry))?,
+        ),
+    })?;
+    let duplicate_receipt = sent_frame(&duplicate).ok_or("duplicate receipt was not emitted")?;
+    let duplicate_receipt: AuthorityReceiptBody =
+        serde_json::from_value(duplicate_receipt.body)?;
+    assert_eq!(duplicate_receipt.stage, AckStage::ControlInstalled);
+    assert_eq!(duplicate_receipt.control_id, Some(control_id));
+    assert!(!duplicate
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert_eq!(kernel.ui_state().stack, vec![MenuState::None]);
+    assert!(kernel.live_resources().controls.is_empty());
+    assert_eq!(kernel.live_resources().presentations.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn local_command_frontier_without_an_exact_plan_still_terminalizes() -> TestResult {
+    let local_control = command_control(0, 46, 1);
+    let local_operation = operation("local.missing-command-plan")?;
+    let control_id = control_id_of(&local_control);
+    let mut kernel = authority_kernel(
+        authority_config(
+            Vec::new(),
+            vec![AuthorityResolutionPlan {
+                operation_id: local_operation.clone(),
+                fingerprint: "fp".to_owned(),
+                draft: draft(
+                    &local_operation,
+                    AuthorityEntryKind::TurnCommit,
+                    turn_payload(),
+                    local_control,
+                )?,
+            }],
+            &[1],
+        )?,
+        UiState::default(),
+    );
+    assert!(has_apply(
+        &kernel.step(KernelInput::ProposalReceived {
+            endpoint: seat(0),
+            proposal: proposal(0, &local_operation, "fp", 1),
+        })?,
+        1,
+        &local_operation,
+    ));
+    kernel.step(KernelInput::MaterialApplied {
+        endpoint: seat(0),
+        revision: Revision::new(safe(1)),
+        outcome: MaterialApplicationOutcome::Applied,
+    })?;
+
+    let terminalized = kernel.step(KernelInput::ControlProjected {
+        endpoint: seat(0),
+        revision: Revision::new(safe(1)),
+        outcome: ControlProjectionOutcome::Installed { control_id },
+    })?;
+    assert!(terminalized
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    let Some(MenuState::Terminal(TerminalMenu { prompt_key, .. })) =
+        kernel.ui_state().stack.last()
+    else {
+        return Err("missing local command plan did not install a terminal menu".into());
+    };
+    assert!(prompt_key
+        .as_deref()
+        .is_some_and(|reason| reason.contains("missing exact control menu plan")));
+    assert_eq!(kernel.live_resources(), Default::default());
+    Ok(())
+}
+
+#[test]
 fn peer_proposal_projects_locally_and_duplicate_is_idempotent() -> TestResult {
     let control = command_control(0, 43, 1);
     let guest = operation("guest.peer")?;
