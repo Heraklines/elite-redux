@@ -74,9 +74,7 @@ pub fn canonical_player_slots(
 }
 
 /// Return the enemy slots in canonical order.
-pub fn canonical_enemy_slots(
-    format: &BattleFormat,
-) -> Result<Vec<FieldSlot>, FormatTopologyError> {
+pub fn canonical_enemy_slots(format: &BattleFormat) -> Result<Vec<FieldSlot>, FormatTopologyError> {
     Ok(canonical_slots(format)?
         .into_iter()
         .filter(|slot| slot.side == BattleSide::Enemy)
@@ -84,10 +82,7 @@ pub fn canonical_enemy_slots(
 }
 
 /// Validate a slot against the capacities encoded by a format.
-pub fn validate_slot(
-    format: &BattleFormat,
-    slot: FieldSlot,
-) -> Result<(), FormatTopologyError> {
+pub fn validate_slot(format: &BattleFormat, slot: FieldSlot) -> Result<(), FormatTopologyError> {
     validate_format(format)?;
     let capacity = match slot.side {
         BattleSide::Player => format.player_capacity,
@@ -120,12 +115,10 @@ pub fn human_seats(format: &BattleFormat) -> Result<Vec<SeatId>, FormatTopologyE
     match (format.player_capacity, format.enemy_capacity) {
         (1, 1) => Ok(vec![seat_id(1)]),
         (2, 2) => Ok(vec![seat_id(1), seat_id(2)]),
-        (player_capacity, enemy_capacity) => {
-            Err(FormatTopologyError::UnsupportedM3Format {
-                player_capacity,
-                enemy_capacity,
-            })
-        }
+        (player_capacity, enemy_capacity) => Err(FormatTopologyError::UnsupportedM3Format {
+            player_capacity,
+            enemy_capacity,
+        }),
     }
 }
 
@@ -143,10 +136,7 @@ pub fn owner_seat_for(
 }
 
 /// Return whether a slot is a player-owned slot in the selected M3 format.
-pub fn is_human_slot(
-    format: &BattleFormat,
-    slot: FieldSlot,
-) -> Result<bool, FormatTopologyError> {
+pub fn is_human_slot(format: &BattleFormat, slot: FieldSlot) -> Result<bool, FormatTopologyError> {
     Ok(owner_seat_for(format, slot)?.is_some())
 }
 

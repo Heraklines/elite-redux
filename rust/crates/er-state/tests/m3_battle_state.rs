@@ -58,10 +58,7 @@ fn field_state_has_exact_closed_json_shape_and_round_trips() -> Result<(), Box<d
         r#"{"slots":[{"slot":{"side":"PLAYER","position":0},"occupant":null},{"slot":{"side":"ENEMY","position":0},"occupant":null}]}"#,
     );
     assert_eq!(serde_json::from_str::<FieldState>(&encoded)?, state);
-    assert!(serde_json::from_str::<FieldState>(
-        r#"{"slots":[],"extra":true}"#
-    )
-    .is_err());
+    assert!(serde_json::from_str::<FieldState>(r#"{"slots":[],"extra":true}"#).is_err());
     Ok(())
 }
 
@@ -80,10 +77,22 @@ fn supported_formats_have_canonical_slot_order_and_exact_closure() -> Result<(),
 
     let doubles = BattleFormat::coop_double();
     assert_eq!(canonical_slots(&doubles)?.len(), 4);
-    assert_eq!(canonical_slots(&doubles)?.get(0).copied(), Some(field_slot(BattleSide::Player, 0)));
-    assert_eq!(canonical_slots(&doubles)?.get(1).copied(), Some(field_slot(BattleSide::Player, 1)));
-    assert_eq!(canonical_slots(&doubles)?.get(2).copied(), Some(field_slot(BattleSide::Enemy, 0)));
-    assert_eq!(canonical_slots(&doubles)?.get(3).copied(), Some(field_slot(BattleSide::Enemy, 1)));
+    assert_eq!(
+        canonical_slots(&doubles)?.get(0).copied(),
+        Some(field_slot(BattleSide::Player, 0))
+    );
+    assert_eq!(
+        canonical_slots(&doubles)?.get(1).copied(),
+        Some(field_slot(BattleSide::Player, 1))
+    );
+    assert_eq!(
+        canonical_slots(&doubles)?.get(2).copied(),
+        Some(field_slot(BattleSide::Enemy, 0))
+    );
+    assert_eq!(
+        canonical_slots(&doubles)?.get(3).copied(),
+        Some(field_slot(BattleSide::Enemy, 1))
+    );
     assert!(validate_m3_supported(&doubles).is_ok());
     assert!(empty_field(&doubles).is_ok());
 
@@ -94,8 +103,8 @@ fn supported_formats_have_canonical_slot_order_and_exact_closure() -> Result<(),
 }
 
 #[test]
-fn field_state_rejects_duplicate_missing_unsorted_and_duplicate_occupancy(
-) -> Result<(), Box<dyn Error>> {
+fn field_state_rejects_duplicate_missing_unsorted_and_duplicate_occupancy()
+-> Result<(), Box<dyn Error>> {
     let player_zero = field_slot(BattleSide::Player, 0);
     let enemy_zero = field_slot(BattleSide::Enemy, 0);
     let duplicate_slot = FieldState::new(vec![
@@ -119,7 +128,9 @@ fn field_state_rejects_duplicate_missing_unsorted_and_duplicate_occupancy(
     ]);
     assert_eq!(
         duplicate_occupant,
-        Err(FieldStateError::DuplicateOccupant { pokemon: pokemon(7) })
+        Err(FieldStateError::DuplicateOccupant {
+            pokemon: pokemon(7)
+        })
     );
 
     let missing = FieldState::new_for_format(
@@ -149,18 +160,33 @@ fn field_state_rejects_duplicate_missing_unsorted_and_duplicate_occupancy(
 }
 
 #[test]
-fn format_helpers_freeze_authority_seats_and_reject_unsupported_topology(
-) -> Result<(), Box<dyn Error>> {
+fn format_helpers_freeze_authority_seats_and_reject_unsupported_topology()
+-> Result<(), Box<dyn Error>> {
     let singles = BattleFormat::single();
     assert_eq!(human_seats(&singles)?, vec![seat(1)]);
-    assert_eq!(owner_seat_for(&singles, field_slot(BattleSide::Player, 0))?, Some(seat(1)));
-    assert_eq!(owner_seat_for(&singles, field_slot(BattleSide::Enemy, 0))?, None);
+    assert_eq!(
+        owner_seat_for(&singles, field_slot(BattleSide::Player, 0))?,
+        Some(seat(1))
+    );
+    assert_eq!(
+        owner_seat_for(&singles, field_slot(BattleSide::Enemy, 0))?,
+        None
+    );
 
     let doubles = BattleFormat::coop_double();
     assert_eq!(human_seats(&doubles)?, vec![seat(1), seat(2)]);
-    assert_eq!(owner_seat_for(&doubles, field_slot(BattleSide::Player, 0))?, Some(seat(1)));
-    assert_eq!(owner_seat_for(&doubles, field_slot(BattleSide::Player, 1))?, Some(seat(2)));
-    assert_eq!(owner_seat_for(&doubles, field_slot(BattleSide::Enemy, 1))?, None);
+    assert_eq!(
+        owner_seat_for(&doubles, field_slot(BattleSide::Player, 0))?,
+        Some(seat(1))
+    );
+    assert_eq!(
+        owner_seat_for(&doubles, field_slot(BattleSide::Player, 1))?,
+        Some(seat(2))
+    );
+    assert_eq!(
+        owner_seat_for(&doubles, field_slot(BattleSide::Enemy, 1))?,
+        None
+    );
 
     let triples = BattleFormat::new(3, 3, Vec::new())?;
     assert_eq!(
@@ -174,17 +200,26 @@ fn format_helpers_freeze_authority_seats_and_reject_unsupported_topology(
 }
 
 #[test]
-fn positive_coordinates_and_explicit_outcomes_preserve_frozen_wire_values(
-) -> Result<(), Box<dyn Error>> {
+fn positive_coordinates_and_explicit_outcomes_preserve_frozen_wire_values()
+-> Result<(), Box<dyn Error>> {
     assert!(serde_json::from_str::<TurnIndex>("0").is_err());
     assert!(serde_json::from_str::<WaveIndex>("0").is_err());
     let turn = TurnIndex::new(safe(1)).map_err(|error| format!("turn: {error}"))?;
     let wave = WaveIndex::new(safe(2)).map_err(|error| format!("wave: {error}"))?;
     assert_eq!(serde_json::to_string(&turn)?, "1");
     assert_eq!(serde_json::to_string(&wave)?, "2");
-    assert_eq!(serde_json::to_string(&BattleOutcome::Ongoing)?, r#""ONGOING""#);
-    assert_eq!(serde_json::to_string(&BattleOutcome::Victory)?, r#""VICTORY""#);
-    assert_eq!(serde_json::to_string(&BattleOutcome::Defeat)?, r#""DEFEAT""#);
+    assert_eq!(
+        serde_json::to_string(&BattleOutcome::Ongoing)?,
+        r#""ONGOING""#
+    );
+    assert_eq!(
+        serde_json::to_string(&BattleOutcome::Victory)?,
+        r#""VICTORY""#
+    );
+    assert_eq!(
+        serde_json::to_string(&BattleOutcome::Defeat)?,
+        r#""DEFEAT""#
+    );
     assert_eq!(
         serde_json::from_str::<BattleOutcome>(r#""ONGOING""#)?,
         BattleOutcome::Ongoing
@@ -206,8 +241,14 @@ fn neutral_conditions_round_trip_and_active_conditions_fail_closed() -> Result<(
         ignore_abilities: false,
         source: None,
     };
-    assert_eq!(serde_json::to_string(&weather)?, r#"{"kind":{"kind":"NONE"},"remaining_turns":0}"#);
-    assert_eq!(serde_json::from_str::<WeatherState>(&serde_json::to_string(&weather)?)?, weather);
+    assert_eq!(
+        serde_json::to_string(&weather)?,
+        r#"{"kind":{"kind":"NONE"},"remaining_turns":0}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<WeatherState>(&serde_json::to_string(&weather)?)?,
+        weather
+    );
     assert!(validate_m3_conditions(&weather, &terrain, &[], &suppression).is_ok());
     assert!(validate_m3_weather(&weather).is_ok());
     assert!(validate_m3_terrain(&terrain).is_ok());
@@ -241,7 +282,10 @@ fn neutral_conditions_round_trip_and_active_conditions_fail_closed() -> Result<(
         encoded_condition,
         r#"{"condition":"m3/arena","scope":{"kind":"BOTH"},"turn_count":1,"layers":1}"#
     );
-    assert_eq!(serde_json::from_str::<ArenaConditionState>(&encoded_condition)?, condition);
+    assert_eq!(
+        serde_json::from_str::<ArenaConditionState>(&encoded_condition)?,
+        condition
+    );
     assert!(validate_m3_arena_conditions(std::slice::from_ref(&condition)).is_err());
 
     let active_suppression = GlobalAbilitySuppressionState {
@@ -255,19 +299,10 @@ fn neutral_conditions_round_trip_and_active_conditions_fail_closed() -> Result<(
 
 #[test]
 fn malformed_identities_and_unknown_condition_fields_are_rejected() -> Result<(), Box<dyn Error>> {
-    assert!(serde_json::from_str::<FieldSlot>(
-        r#"{"side":"PLAYER","position":3}"#
-    )
-    .is_err());
+    assert!(serde_json::from_str::<FieldSlot>(r#"{"side":"PLAYER","position":3}"#).is_err());
     assert!(serde_json::from_str::<PokemonId>("9007199254740992").is_err());
-    assert!(serde_json::from_str::<FieldState>(
-        r#"{"slots":[{"slot":{"side":"PLAYER","position":0},"occupant":null,"extra":true}]}"#
-    )
-    .is_err());
-    assert!(serde_json::from_str::<WeatherState>(
-        r#"{"kind":{"kind":"NONE"},"remaining_turns":0,"extra":true}"#
-    )
-    .is_err());
+    assert!(serde_json::from_str::<FieldState>(r#"{"slots":[{"slot":{"side":"PLAYER","position":0},"occupant":null,"extra":true}]}"#).is_err());
+    assert!(serde_json::from_str::<WeatherState>(r#"{"kind":{"kind":"NONE"},"remaining_turns":0,"extra":true}"#).is_err());
     assert!(serde_json::from_str::<ArenaConditionState>(
         r#"{"condition":"m3/arena","scope":{"kind":"BOTH"},"turn_count":1,"layers":1,"extra":true}"#
     )
@@ -276,17 +311,17 @@ fn malformed_identities_and_unknown_condition_fields_are_rejected() -> Result<()
 }
 
 #[test]
-fn command_collection_and_faint_occurrence_shapes_are_explicit_and_closed(
-) -> Result<(), Box<dyn Error>> {
+fn command_collection_and_faint_occurrence_shapes_are_explicit_and_closed()
+-> Result<(), Box<dyn Error>> {
     let commands = er_state::battle::CommandCollectionState::new(Vec::new(), Vec::new())?;
     assert_eq!(
         serde_json::to_string(&commands)?,
         r#"{"frontier":[],"tombstones":[]}"#
     );
     assert_eq!(
-        serde_json::from_str::<er_state::battle::CommandCollectionState>(
-            &serde_json::to_string(&commands)?,
-        )?,
+        serde_json::from_str::<er_state::battle::CommandCollectionState>(&serde_json::to_string(
+            &commands
+        )?,)?,
         commands
     );
 
@@ -306,10 +341,7 @@ fn command_collection_and_faint_occurrence_shapes_are_explicit_and_closed(
     let encoded = serde_json::to_string(&occurrence)?;
     assert!(encoded.contains(r#""replacement":{"kind":"PENDING"}"#));
     assert_eq!(serde_json::from_str::<FaintOccurrence>(&encoded)?, occurrence);
-    let malformed = format!(
-        "{},\"extra\":true}}",
-        encoded.trim_end_matches('}')
-    );
+    let malformed = format!("{},\"extra\":true}}", encoded.trim_end_matches('}'));
     assert!(serde_json::from_str::<FaintOccurrence>(&malformed).is_err());
     Ok(())
 }
