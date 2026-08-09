@@ -7,19 +7,15 @@
  * observation state used to correlate the existing phase seams.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import {
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { Battle } from "#app/battle";
 import { BattleScene } from "#app/battle-scene";
-import { getGameMode } from "#app/game-mode";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
+import { DynamicQueueManager } from "#app/dynamic-queue-manager";
+import { getGameMode } from "#app/game-mode";
+import { MovePhasePriorityQueue } from "#app/queues/move-phase-priority-queue";
+import { PokemonPhasePriorityQueue } from "#app/queues/pokemon-phase-priority-queue";
 import { allAbilities } from "#data/data-lists";
+import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -31,10 +27,8 @@ import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
-import { Battle } from "#app/battle";
-import { DynamicQueueManager } from "#app/dynamic-queue-manager";
-import { MovePhasePriorityQueue } from "#app/queues/move-phase-priority-queue";
-import { PokemonPhasePriorityQueue } from "#app/queues/pokemon-phase-priority-queue";
+import { Pokemon } from "#field/pokemon";
+import { PokemonMove } from "#moves/pokemon-move";
 import { FaintPhase } from "#phases/faint-phase";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
 import { MovePhase } from "#phases/move-phase";
@@ -42,13 +36,15 @@ import { PostTurnStatusEffectPhase } from "#phases/post-turn-status-effect-phase
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { TurnStartPhase } from "#phases/turn-start-phase";
-import { Pokemon } from "#field/pokemon";
-import { PokemonMove } from "#moves/pokemon-move";
-import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import Phaser from "phaser";
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
@@ -94,6 +90,20 @@ const CASE_IDS = [
   "victory",
   "defeat",
 ];
+const DOUBLE_SCENARIO_PLAYER_OWNERS: Readonly<Partial<Record<string, readonly ("host" | "guest")[]>>> = Object.freeze({
+  "speed-tie": ["host", "guest"],
+  "paralysis-speed-order": ["host", "guest"],
+  "spread-stage-down": ["host", "guest"],
+  "stage-floor-cap": ["host", "guest"],
+  "intimidate-switch-in": ["host", "guest"],
+  "intimidate-stage-floor": ["host", "guest"],
+  "voluntary-switch": ["host", "guest", "host"],
+  "doubles-single-target": ["host", "guest"],
+  "same-side-simultaneous-faint": ["host", "guest"],
+  "mixed-side-simultaneous-faint": ["host", "guest"],
+  "forced-replacement": ["host", "guest", "host"],
+  "no-legal-replacement": ["host", "guest"],
+});
 
 const SAFE_U53_MAX = 9_007_199_254_740_991;
 
@@ -120,6 +130,7 @@ interface ObservationTrace {
 
 let activeTrace: ObservationTrace | null = null;
 let phaserGame: Phaser.Game;
+let currentScenarioGame: GameManager | null = null;
 const restoreHooks: (() => void)[] = [];
 let productionSceneRandBattleSeedInt: BattleScene["randBattleSeedInt"] | undefined;
 
@@ -157,13 +168,16 @@ function sortedValue(value: unknown, path = "$", content = false): JsonValue {
     // preserving a hole that JSON.stringify would later erase implicitly.
     return Array.from(value, (child, index) =>
       child === undefined
-        ? (content ? fail("CONTENT_CANONICAL_VALUE", `${path}[${index}] is undefined`) : null)
-        : sortedValue(child, `${path}[${index}]`, content));
+        ? content
+          ? fail("CONTENT_CANONICAL_VALUE", `${path}[${index}] is undefined`)
+          : null
+        : sortedValue(child, `${path}[${index}]`, content),
+    );
   }
   if (typeof value === "object") {
     const out: { [key: string]: JsonValue } = {};
     for (const key of Object.keys(value).sort()) {
-      if (content && !/^[\x00-\x7F]*$/u.test(key)) {
+      if (content && [...key].some(character => (character.codePointAt(0) ?? 0x80) > 0x7f)) {
         fail("CONTENT_CANONICAL_KEY", `${path}.${key}`);
       }
       const child = (value as AnyRecord)[key];
@@ -325,9 +339,7 @@ function contentPack(): { pack: AnyRecord; hash: string } {
     power: entry.power < 0 ? { kind: "NONE" } : { kind: "VALUE", value: entry.power },
     accuracy: entry.accuracy < 0 ? { kind: "ALWAYS_HITS" } : { kind: "PERCENT", value: entry.accuracy },
     base_pp: entry.pp,
-    effect_chance: entry.effect_chance < 0
-      ? { kind: "NONE" }
-      : { kind: "PERCENT", value: entry.effect_chance },
+    effect_chance: entry.effect_chance < 0 ? { kind: "NONE" } : { kind: "PERCENT", value: entry.effect_chance },
     priority: entry.priority,
     target: entry.target,
     flags: entry.flags,
@@ -357,9 +369,15 @@ function contentPack(): { pack: AnyRecord; hash: string } {
     capability: capabilityStatus(),
   }));
   const multiplier = (value: string): string => {
-    if (value === "0") return "ZERO";
-    if (value === "1/2") return "HALF";
-    if (value === "2") return "TWO";
+    if (value === "0") {
+      return "ZERO";
+    }
+    if (value === "1/2") {
+      return "HALF";
+    }
+    if (value === "2") {
+      return "TWO";
+    }
     fail("CONTENT_CANONICAL_VALUE", `unmapped type multiplier ${value}`);
   };
   const typeChart = {
@@ -412,7 +430,12 @@ function rdgState(rng: Phaser.Math.RandomDataGenerator): AnyRecord {
   }
   const carry = Number(parts[1]);
   const values = parts.slice(2).map(Number);
-  if (!Number.isInteger(carry) || carry < 0 || carry > 0xffffffff || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)) {
+  if (
+    !Number.isInteger(carry)
+    || carry < 0
+    || carry > 0xffffffff
+    || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)
+  ) {
     fail("RNG_STATE_UNOBSERVABLE", `invalid Phaser state fields ${state}`);
   }
   return {
@@ -521,7 +544,10 @@ function scenarioFor(id: string): ScenarioSpec {
     if (lead == null) {
       fail("SCENARIO_SETUP", `${id} has no lead party member`);
     }
-    lead.moves = [move, 1, 52, 589];
+    const fallbackMoves = [MoveId.POUND, MoveId.EMBER, MoveId.SHOCK_WAVE, MoveId.PLAY_NICE].filter(
+      candidate => candidate !== move,
+    );
+    lead.moves = [move, ...fallbackMoves].slice(0, 4);
   };
   switch (id) {
     case "special-hit-priority":
@@ -793,6 +819,7 @@ function restoreRealBattleRng(): void {
 
 async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
   const game = new GameManager(phaserGame);
+  currentScenarioGame = game;
   restoreRealBattleRng();
   game.override.criticalHits(null);
   if (!(game.scene.ui.shouldSkipDialogue as AnyRecord).mock) {
@@ -820,19 +847,21 @@ function battleRngState(game: GameManager): AnyRecord {
   const saved = battle?.battleSeedState as string | null | undefined;
   return {
     run: { rdg: rdgState(Phaser.Math.RND) },
-    battle: battle == null
-      ? null
-      : {
-          battle_seed: String(battle.battleSeed),
-          turn: battle.turn,
-          saved_substream: saved == null ? null : rdgStateFromString(saved),
-        },
-    seed_offset: game.scene.rngOffset === 0 && game.scene.rngSeedOverride === ""
-      ? null
-      : {
-          wave_seed: String(game.scene.rngSeedOverride || game.scene.waveSeed || game.scene.seed),
-          offset: game.scene.rngOffset,
-        },
+    battle:
+      battle == null
+        ? null
+        : {
+            battle_seed: String(battle.battleSeed),
+            turn: battle.turn,
+            saved_substream: saved == null ? null : rdgStateFromString(saved),
+          },
+    seed_offset:
+      game.scene.rngOffset === 0 && game.scene.rngSeedOverride === ""
+        ? null
+        : {
+            wave_seed: String(game.scene.rngSeedOverride || game.scene.waveSeed || game.scene.seed),
+            offset: game.scene.rngOffset,
+          },
     next_sequence: activeTrace?.nextRngSequence ?? 0,
   };
 }
@@ -868,7 +897,12 @@ function rdgStateFromString(state: string): AnyRecord {
   }
   const carry = Number(parts[1]);
   const values = parts.slice(2).map(Number);
-  if (!Number.isInteger(carry) || carry < 0 || carry > 0xffffffff || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)) {
+  if (
+    !Number.isInteger(carry)
+    || carry < 0
+    || carry > 0xffffffff
+    || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)
+  ) {
     fail("RNG_STATE_UNOBSERVABLE", `invalid saved Phaser state ${state}`);
   }
   return {
@@ -885,13 +919,14 @@ function simplePokemon(mon: Pokemon): AnyRecord {
     id: mon.id,
     hp: mon.hp,
     fainted: mon.isFainted(),
-    status: mon.status == null
-      ? { effect: StatusEffect.NONE, toxic_turn_count: 0, sleep_turns_remaining: null }
-      : {
-          effect: mon.status.effect,
-          toxic_turn_count: mon.status.toxicTurnCount,
-          sleep_turns_remaining: mon.status.sleepTurnsRemaining ?? null,
-        },
+    status:
+      mon.status == null
+        ? { effect: StatusEffect.NONE, toxic_turn_count: 0, sleep_turns_remaining: null }
+        : {
+            effect: mon.status.effect,
+            toxic_turn_count: mon.status.toxicTurnCount,
+            sleep_turns_remaining: mon.status.sleepTurnsRemaining ?? null,
+          },
     stages: mon.getStatStages().slice(),
     moves: mon.getMoveset().map(move => ({ move_id: move.moveId, pp_used: move.ppUsed })),
   };
@@ -901,35 +936,40 @@ function liveFingerprint(game: GameManager): string {
   const battle = game.scene.currentBattle as AnyRecord | undefined;
   const value = {
     rng: battleRngState(game),
-    battle: battle == null
-      ? null
-      : {
-          turn: battle.turn,
-          wave_seed: authoritativeWaveSeed(game),
-          commands: battle.turnCommands,
-          pre_commands: battle.preTurnCommands,
-          player: game.scene.getPlayerParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "PLAYER", index)),
-          enemy: game.scene.getEnemyParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "ENEMY", index)),
-          field: formatState(game),
-          weather: {
-            type: game.scene.arena.weatherType,
-            remaining_turns: game.scene.arena.weather?.turnsLeft ?? 0,
+    battle:
+      battle == null
+        ? null
+        : {
+            turn: battle.turn,
+            wave_seed: authoritativeWaveSeed(game),
+            commands: battle.turnCommands,
+            pre_commands: battle.preTurnCommands,
+            player: game.scene
+              .getPlayerParty()
+              .map((mon, index) => canonicalPokemon(activeTrace!, mon, "PLAYER", index)),
+            enemy: game.scene.getEnemyParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "ENEMY", index)),
+            field: formatState(game),
+            weather: {
+              type: game.scene.arena.weatherType,
+              remaining_turns: game.scene.arena.weather?.turnsLeft ?? 0,
+            },
+            terrain: {
+              type: game.scene.arena.terrainType,
+              remaining_turns: game.scene.arena.terrain?.turnsLeft ?? 0,
+            },
+            tags: game.scene.arena.tags.map((tag: AnyRecord) => ({
+              type: tag.tagType,
+              side: tag.side,
+              turn_count: tag.turnCount,
+              layers: tag.layers,
+            })),
+            ignore_abilities: game.scene.arena.ignoreAbilities === true,
+            ignoring_effect_source: game.scene.arena.ignoringEffectSource,
           },
-          terrain: {
-            type: game.scene.arena.terrainType,
-            remaining_turns: game.scene.arena.terrain?.turnsLeft ?? 0,
-          },
-          tags: game.scene.arena.tags.map((tag: AnyRecord) => ({
-            type: tag.tagType,
-            side: tag.side,
-            turn_count: tag.turnCount,
-            layers: tag.layers,
-          })),
-          ignore_abilities: game.scene.arena.ignoreAbilities === true,
-          ignoring_effect_source: game.scene.arena.ignoringEffectSource,
-        },
   };
-  return createHash("sha256").update(canonicalBytes(value, false, false)).digest("hex");
+  return createHash("sha256")
+    .update(canonicalBytes(value, false, false))
+    .digest("hex");
 }
 
 function installObservationHooks(): void {
@@ -949,7 +989,7 @@ function installObservationHooks(): void {
     }
     const game = activeTrace.game as GameManager;
     const before = battleRngState(game);
-    const stack = new Error().stack ?? "";
+    const stack = new Error("M3 battle RNG callsite").stack ?? "";
     battleDrawInProgress = true;
     let result: number;
     try {
@@ -1043,7 +1083,7 @@ function installObservationHooks(): void {
       directRangeInProgress = false;
     }
     const after = battleRngState(game);
-    const stack = new Error().stack ?? "";
+    const stack = new Error("M3 Phaser range RNG callsite").stack ?? "";
     const offset = game.scene.rngOffset;
     const seedOffset = offset !== 0 || game.scene.rngSeedOverride !== "";
     const cardinality = max - min + 1;
@@ -1093,7 +1133,12 @@ function installObservationHooks(): void {
       const auditCount = activeTrace.rngDraws.length;
       if (methodName === "pick") {
         const values = args[0];
-        if (values == null || typeof values.length !== "number" || values.length < 1 || !Number.isSafeInteger(values.length)) {
+        if (
+          values == null
+          || typeof values.length !== "number"
+          || values.length === 0
+          || !Number.isSafeInteger(values.length)
+        ) {
           fail("RNG_DRAW_UNOBSERVABLE", "Phaser pick received a non-empty array-like value");
         }
         directPickInProgress = true;
@@ -1108,7 +1153,7 @@ function installObservationHooks(): void {
         if (resultIndex < 0) {
           fail("RNG_DRAW_UNOBSERVABLE", "Phaser pick returned a value absent from its input");
         }
-        const stack = new Error().stack ?? "";
+        const stack = new Error("M3 direct Phaser RNG callsite").stack ?? "";
         const offset = game.scene.rngOffset;
         const seedOffset = offset !== 0 || game.scene.rngSeedOverride !== "";
         const callsite = callsiteId(stack);
@@ -1135,10 +1180,11 @@ function installObservationHooks(): void {
       }
       const result = original.apply(this, args);
       const after = battleRngState(game);
-      if (JSON.stringify(before) !== JSON.stringify(after)) {
-        if (methodName !== "shuffle" || activeTrace.rngDraws.length === auditCount) {
-          fail("UNRECORDED_RNG_STATE_CHANGE", `direct Phaser ${methodName} changed the run stream`);
-        }
+      if (
+        JSON.stringify(before) !== JSON.stringify(after)
+        && (methodName !== "shuffle" || activeTrace.rngDraws.length === auditCount)
+      ) {
+        fail("UNRECORDED_RNG_STATE_CHANGE", `direct Phaser ${methodName} changed the run stream`);
       }
       return result;
     };
@@ -1188,7 +1234,10 @@ function installObservationHooks(): void {
   });
 
   const originalHandle = (TurnStartPhase.prototype as AnyRecord).handleTurnCommand;
-  (TurnStartPhase.prototype as AnyRecord).handleTurnCommand = function (turnCommand: AnyRecord, pokemon: Pokemon): void {
+  (TurnStartPhase.prototype as AnyRecord).handleTurnCommand = function (
+    turnCommand: AnyRecord,
+    pokemon: Pokemon,
+  ): void {
     if (activeTrace != null && turnCommand?.skip) {
       const command = commandKind(turnCommand.command);
       if (command !== "FIGHT" && command !== "SWITCH") {
@@ -1202,14 +1251,17 @@ function installObservationHooks(): void {
         "SKIPPED_ACTOR_INACTIVE",
       );
     }
-    return originalHandle.call(this, turnCommand, pokemon);
+    originalHandle.call(this, turnCommand, pokemon);
   };
   restoreHooks.push(() => {
     (TurnStartPhase.prototype as AnyRecord).handleTurnCommand = originalHandle;
   });
 
   const originalPopNextPhase = DynamicQueueManager.prototype.popNextPhase;
-  (DynamicQueueManager.prototype as AnyRecord).popNextPhase = function (this: DynamicQueueManager, name: string): AnyRecord | undefined {
+  (DynamicQueueManager.prototype as AnyRecord).popNextPhase = function (
+    this: DynamicQueueManager,
+    name: string,
+  ): AnyRecord | undefined {
     const phase = originalPopNextPhase.call(this, name as never) as AnyRecord | undefined;
     if (activeTrace != null && name === "MovePhase" && phase != null) {
       if (!(phase instanceof MovePhase)) {
@@ -1235,9 +1287,10 @@ function installObservationHooks(): void {
     }
     const raw = this as AnyRecord;
     if (raw.cancelled === true || raw.failed === true) {
-      action.disposition = raw.cancelled === true && this.pokemon.status?.effect === StatusEffect.PARALYSIS
-        ? "CANCELLED_BY_PARALYSIS"
-        : "NO_EFFECT";
+      action.disposition =
+        raw.cancelled === true && this.pokemon.status?.effect === StatusEffect.PARALYSIS
+          ? "CANCELLED_BY_PARALYSIS"
+          : "NO_EFFECT";
     }
   };
   restoreHooks.push(() => {
@@ -1277,10 +1330,92 @@ function installObservationHooks(): void {
         forcedReplacement ? null : undefined,
       );
     }
-    return originalSwitchStart.call(this);
+    originalSwitchStart.call(this);
   };
   restoreHooks.push(() => {
     SwitchSummonPhase.prototype.start = originalSwitchStart;
+  });
+
+  const originalSwitchAndSummon = SwitchSummonPhase.prototype.switchAndSummon;
+  SwitchSummonPhase.prototype.switchAndSummon = function (this: SwitchSummonPhase): void {
+    const trace = activeTrace;
+    if (trace == null || !trace.collectMutations) {
+      originalSwitchAndSummon.call(this);
+      return;
+    }
+    const raw = this as AnyRecord;
+    const player = raw.player;
+    const fieldIndex = raw.fieldIndex;
+    const slotIndex = raw.slotIndex;
+    if (
+      typeof player !== "boolean"
+      || !Number.isSafeInteger(fieldIndex)
+      || fieldIndex < 0
+      || !Number.isSafeInteger(slotIndex)
+    ) {
+      fail("UNRECORDED_STATE_CHANGE", "SwitchSummonPhase did not expose a valid side/slot address");
+    }
+    const game = trace.game as GameManager;
+    const party = player ? game.scene.getPlayerParty() : game.scene.getEnemyParty();
+    const outgoing = party[fieldIndex];
+    const incoming = slotIndex < 0 ? undefined : party[slotIndex];
+    if (incoming == null) {
+      originalSwitchAndSummon.call(this);
+      return;
+    }
+    if (outgoing == null || outgoing === incoming) {
+      fail("UNRECORDED_STATE_CHANGE", "SwitchSummonPhase field swap lacks distinct observed occupants");
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(party, String(fieldIndex));
+    if (descriptor == null || !descriptor.configurable || !("value" in descriptor)) {
+      fail("OBSERVATION_SEAM_MISSING", "party field slot is not an interceptable data property");
+    }
+    let current = outgoing;
+    let writeCount = 0;
+    Object.defineProperty(party, String(fieldIndex), {
+      configurable: true,
+      enumerable: descriptor.enumerable,
+      get: () => current,
+      set: (value: Pokemon) => {
+        writeCount++;
+        if (writeCount !== 1 || value !== incoming) {
+          fail("UNRECORDED_STATE_CHANGE", "SwitchSummonPhase wrote an unexpected field occupant");
+        }
+        current = value;
+        const flatIndex = player ? fieldIndex : game.scene.currentBattle.arrangement.enemyOffset + fieldIndex;
+        const slot = fieldSlot(game, flatIndex);
+        const phase = game.scene.phaseManager.getCurrentPhase();
+        if (phase == null || typeof phase.phaseName !== "string" || phase.phaseName.length === 0) {
+          fail("UNRECORDED_STATE_CHANGE", "field mutation has no observed phase");
+        }
+        trace.mutations.push({
+          sequence: trace.mutations.length,
+          kind: "FIELD_CHANGED",
+          phase: phase.phaseName,
+          cause: trace.activeAction == null ? "TURN_RESOLUTION" : trace.activeAction.sequence,
+          path: `battle/field/slots/${slot.side.toLowerCase()}/${slot.position}/occupant`,
+          slot,
+          before: pokemonId(trace, outgoing),
+          after: pokemonId(trace, incoming),
+        });
+      },
+    });
+    try {
+      originalSwitchAndSummon.call(this);
+    } finally {
+      Object.defineProperty(party, String(fieldIndex), {
+        configurable: descriptor.configurable,
+        enumerable: descriptor.enumerable,
+        writable: descriptor.writable,
+        value: current,
+      });
+    }
+    if (writeCount !== 1) {
+      fail("UNRECORDED_STATE_CHANGE", "SwitchSummonPhase did not expose its field occupant write");
+    }
+  };
+  restoreHooks.push(() => {
+    SwitchSummonPhase.prototype.switchAndSummon = originalSwitchAndSummon;
   });
 
   const originalResidualStart = PostTurnStatusEffectPhase.prototype.start;
@@ -1295,7 +1430,7 @@ function installObservationHooks(): void {
         null,
       );
     }
-    return originalResidualStart.call(this);
+    originalResidualStart.call(this);
   };
   restoreHooks.push(() => {
     PostTurnStatusEffectPhase.prototype.start = originalResidualStart;
@@ -1312,14 +1447,7 @@ function installObservationHooks(): void {
   FaintPhase.prototype.start = function (this: FaintPhase): void {
     if (activeTrace != null) {
       const pokemon = this.getPokemon();
-      recordResolvedAction(
-        activeTrace.game as GameManager,
-        this,
-        pokemon,
-        "FAINT",
-        "EXECUTED",
-        null,
-      );
+      recordResolvedAction(activeTrace.game as GameManager, this, pokemon, "FAINT", "EXECUTED", null);
     }
     originalFaintStart.call(this);
     if (activeTrace == null) {
@@ -1332,6 +1460,13 @@ function installObservationHooks(): void {
     }
     const id = activeTrace.nextGlobalFaintId++;
     const slot = fieldSlot(activeTrace.game as GameManager, this.battlerIndex);
+    if (slot.side === "PLAYER") {
+      const game = activeTrace.game as GameManager;
+      const partyIndex = game.scene.getPlayerParty().indexOf(pokemon);
+      if (resolvePlayerOwnerSeat(game, pokemon, partyIndex) !== slot.position + 1) {
+        fail("CANONICAL_STATE_UNOBSERVABLE", `faint ${String(id)} conflicts with its owner seat`);
+      }
+    }
     const occurrence = {
       id,
       source: {
@@ -1470,7 +1605,9 @@ function rngReason(stack: string): string {
 }
 
 function fingerprint(value: unknown): string {
-  return createHash("sha256").update(canonicalBytes(value, false, false)).digest("hex");
+  return createHash("sha256")
+    .update(canonicalBytes(value, false, false))
+    .digest("hex");
 }
 
 function pokemonId(trace: ObservationTrace, mon: Pokemon): number {
@@ -1584,9 +1721,7 @@ function recordResolvedAction(
   ) {
     fail("ACTION_ORDER_UNOBSERVABLE", `invalid move ordering tuple for Pokemon ${String(pokemon.id)}`);
   }
-  const tieOrder = kind === "MOVE"
-    ? (phase == null ? undefined : trace.tieOrderByPhase?.get(phase))
-    : 0;
+  const tieOrder = kind === "MOVE" ? (phase == null ? undefined : trace.tieOrderByPhase?.get(phase)) : 0;
   if (!Number.isSafeInteger(tieOrder) || (tieOrder as number) < 0) {
     fail("ACTION_ORDER_UNOBSERVABLE", `missing seeded tie position for Pokemon ${String(pokemon.id)}`);
   }
@@ -1643,27 +1778,30 @@ function applyTestOnlyContentProjection(game: GameManager, spec: ScenarioSpec, t
       fail("CANONICAL_STATE_UNOBSERVABLE", `scenario omitted an explicit active ability for Pokemon ${String(mon.id)}`);
     }
     if (!Number.isSafeInteger(requested) || requested < 0 || allAbilities[requested]?.id !== requested) {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported explicit ability ${String(requested)} for Pokemon ${String(mon.id)}`);
+      fail(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        `unsupported explicit ability ${String(requested)} for Pokemon ${String(mon.id)}`,
+      );
     }
     trace.abilityOverrides?.set(mon, requested);
-    if (passive !== undefined) {
+    if (passive === undefined) {
+      mon.setTempPassives([null, null, null]);
+    } else {
       if (!Number.isSafeInteger(passive) || passive < 0 || allAbilities[passive]?.id !== passive) {
-        fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported explicit passive ability ${String(passive)} for Pokemon ${String(mon.id)}`);
+        fail(
+          "CANONICAL_STATE_UNOBSERVABLE",
+          `unsupported explicit passive ability ${String(passive)} for Pokemon ${String(mon.id)}`,
+        );
       }
       mon.setTempPassives([allAbilities[passive], null, null]);
-    } else {
-      mon.setTempPassives([null, null, null]);
     }
   };
 
   game.scene.getPlayerParty().forEach((mon, index) => {
     project(mon, spec.party[index]?.ability, spec.party[index]?.passiveAbility);
   });
-  const enemySpecs = spec.enemy?.kind === "wild"
-    ? [spec.enemy.wild]
-    : spec.enemy?.kind === "party"
-      ? spec.enemy.party ?? []
-      : [];
+  const enemySpecs =
+    spec.enemy?.kind === "wild" ? [spec.enemy.wild] : spec.enemy?.kind === "party" ? (spec.enemy.party ?? []) : [];
   game.scene.getEnemyParty().forEach((mon, index) => {
     const enemySpec = enemySpecs[index];
     project(mon, enemySpec?.ability, enemySpec?.passiveAbility);
@@ -1671,6 +1809,19 @@ function applyTestOnlyContentProjection(game: GameManager, spec: ScenarioSpec, t
 }
 
 function applyScenarioInitialState(game: GameManager, id: string): void {
+  const ownerRoles = DOUBLE_SCENARIO_PLAYER_OWNERS[id];
+  const playerCapacity = game.scene.currentBattle.arrangement.playerCapacity;
+  if (playerCapacity === 2) {
+    const party = game.scene.getPlayerParty();
+    if (ownerRoles == null || ownerRoles.length !== party.length) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `${id} lacks an exact explicit double-party owner projection`);
+    }
+    party.forEach((mon, index) => {
+      mon.coopOwner = ownerRoles[index];
+    });
+  } else if (playerCapacity !== 1 || ownerRoles != null) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `${id} has an unsupported player capacity/owner projection`);
+  }
   if (id !== "pp-unusable-rejected") {
     return;
   }
@@ -1685,21 +1836,77 @@ function applyScenarioInitialState(game: GameManager, id: string): void {
   move.ppUsed = move.getMovePp();
 }
 
-function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" | "ENEMY", partyIndex: number): AnyRecord {
+function explicitPlayerOwnerSeat(mon: Pokemon, path: string): number | null {
+  const role = (mon as AnyRecord).coopOwner;
+  let roleSeat: number | null = null;
+  if (role != null) {
+    if (role !== "host" && role !== "guest") {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid coopOwner at ${path}`);
+    }
+    roleSeat = role === "host" ? 1 : 2;
+  }
+  const rawSeat = (mon as AnyRecord).coopOwnerSeatId;
+  let numericSeat: number | null = null;
+  if (rawSeat != null) {
+    if (!Number.isSafeInteger(rawSeat) || (rawSeat !== 0 && rawSeat !== 1)) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid coopOwnerSeatId at ${path}`);
+    }
+    numericSeat = rawSeat + 1;
+  }
+  if (roleSeat != null && numericSeat != null && roleSeat !== numericSeat) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `conflicting owner evidence at ${path}`);
+  }
+  return roleSeat ?? numericSeat;
+}
+
+function resolvePlayerOwnerSeat(game: GameManager, mon: Pokemon, partyIndex: number): number {
+  const party = game.scene.getPlayerParty();
+  if (!Number.isSafeInteger(partyIndex) || partyIndex < 0 || party[partyIndex] !== mon) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `player party identity mismatch at index ${String(partyIndex)}`);
+  }
+  const capacity = game.scene.currentBattle.arrangement.playerCapacity;
+  const explicit = explicitPlayerOwnerSeat(mon, `player_party[${partyIndex}]`);
+  if (capacity === 1) {
+    if (explicit != null && explicit !== 1) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `single-battle player_party[${partyIndex}] is not owned by seat 1`);
+    }
+    return 1;
+  }
+  if (capacity !== 2) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported player capacity ${String(capacity)}`);
+  }
+  const fieldPosition = game.scene.getPlayerField(false).indexOf(mon);
+  if (fieldPosition === 0 || fieldPosition === 1) {
+    const expected = fieldPosition + 1;
+    if (explicit != null && explicit !== expected) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `active player_party[${partyIndex}] owner conflicts with field seat`);
+    }
+    return expected;
+  }
+  if (explicit == null) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `bench player_party[${partyIndex}] has no explicit owner`);
+  }
+  return explicit;
+}
+
+function canonicalPokemon(
+  trace: ObservationTrace,
+  mon: Pokemon,
+  side: "PLAYER" | "ENEMY",
+  partyIndex: number,
+): AnyRecord {
   if (mon.isFusion() || mon.isTerastallized) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `fusion/Tera state on ${side}[${partyIndex}]`);
   }
   const rawTypes = mon.getTypes(false, false, false, false);
-  if (rawTypes.length < 1 || rawTypes.length > 2) {
+  if (rawTypes.length === 0 || rawTypes.length > 2) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `effective typing on ${side}[${partyIndex}] has ${rawTypes.length} entries`);
   }
   // getTypes() represents the absence of a secondary type with a trailing
   // UNKNOWN sentinel.  Remove only that documented slot sentinel; an
   // UNKNOWN primary, UNKNOWN in any other position, STELLAR, or a third type
   // remains an unsupported effective typing rather than being truncated.
-  const types = rawTypes.length === 2 && rawTypes[1] === PokemonType.UNKNOWN
-    ? rawTypes.slice(0, 1)
-    : rawTypes;
+  const types = rawTypes.length === 2 && rawTypes[1] === PokemonType.UNKNOWN ? rawTypes.slice(0, 1) : rawTypes;
   if (types.some(type => type === PokemonType.UNKNOWN || type === PokemonType.STELLAR)) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported effective typing on ${side}[${partyIndex}]`);
   }
@@ -1745,10 +1952,7 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
     if (!Number.isSafeInteger(move.ppUp) || move.ppUp < 0 || move.ppUp > 3) {
       fail("CANONICAL_STATE_UNOBSERVABLE", `invalid PP Ups on ${side}[${partyIndex}][${moveSlot}]`);
     }
-    if (
-      move.maxPpOverride != null
-      && (!Number.isSafeInteger(move.maxPpOverride) || move.maxPpOverride < 0)
-    ) {
+    if (move.maxPpOverride != null && (!Number.isSafeInteger(move.maxPpOverride) || move.maxPpOverride < 0)) {
       fail("CANONICAL_STATE_UNOBSERVABLE", `invalid PP override on ${side}[${partyIndex}][${moveSlot}]`);
     }
     return {
@@ -1769,7 +1973,11 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
   if (!activeAbility || activeAbility.id == null) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `active ability on ${side}[${partyIndex}]`);
   }
-  if (!Number.isSafeInteger(activeAbility.id) || activeAbility.id < 0 || allAbilities[activeAbility.id]?.id !== activeAbility.id) {
+  if (
+    !Number.isSafeInteger(activeAbility.id)
+    || activeAbility.id < 0
+    || allAbilities[activeAbility.id]?.id !== activeAbility.id
+  ) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported active ability on ${side}[${partyIndex}]`);
   }
   const abilitySuppressed = (mon.summonData as AnyRecord).abilitySuppressed;
@@ -1798,7 +2006,7 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
   }
   return {
     id: pokemonId(trace, mon),
-    owner_seat: side === "PLAYER" ? 1 : null,
+    owner_seat: side === "PLAYER" ? resolvePlayerOwnerSeat(trace.game as GameManager, mon, partyIndex) : null,
     species_id: mon.species.speciesId,
     form_index: mon.formIndex,
     level: mon.level,
@@ -1882,18 +2090,53 @@ function formatState(game: GameManager): AnyRecord {
 
 function commandOffer(game: GameManager, mon: Pokemon, fieldIndex: number): AnyRecord {
   const battle = game.scene.currentBattle;
-  const moves = mon.getMoveset().map((move, moveSlot) => ({
-      move_slot: moveSlot,
-    legal_targets: game.scene.getEnemyField(false)
-      .map((target, position) => ({ target, position }))
-      .filter(({ target }) => target != null && !target.isFainted() && battle.arrangement.isAdjacent(
-        battle.arrangement.locate(fieldIndex),
-        battle.arrangement.locate(target.getBattlerIndex()),
-      ))
-      .map(({ position }) => ({ kind: "SELECTED", value: [fieldSlot(game, battle.arrangement.enemyOffset + position)] })),
-  }));
-  const switches = game.scene.getPlayerParty().map((candidate, partySlot) => ({ candidate, partySlot }))
-    .filter(({ candidate, partySlot }) => partySlot >= battle.getBattlerCount() && candidate.isAllowedInBattle())
+  const actorPartyIndex = game.scene.getPlayerParty().indexOf(mon);
+  const actorOwnerSeat = resolvePlayerOwnerSeat(game, mon, actorPartyIndex);
+  const moves = mon.getMoveset().flatMap((move, moveSlot) => {
+    const maxPp = move.getMovePp();
+    if (
+      !Number.isSafeInteger(move.ppUsed)
+      || move.ppUsed < 0
+      || !Number.isSafeInteger(maxPp)
+      || maxPp < 0
+      || move.ppUsed > maxPp
+    ) {
+      fail("COMMAND_UNOBSERVABLE", `invalid PP frontier for move slot ${String(moveSlot)}`);
+    }
+    if (move.ppUsed === maxPp) {
+      return [];
+    }
+    return [
+      {
+        move_slot: moveSlot,
+        legal_targets: game.scene
+          .getEnemyField(false)
+          .map((target, position) => ({ target, position }))
+          .filter(
+            ({ target }) =>
+              target != null
+              && !target.isFainted()
+              && battle.arrangement.isAdjacent(
+                battle.arrangement.locate(fieldIndex),
+                battle.arrangement.locate(target.getBattlerIndex()),
+              ),
+          )
+          .map(({ position }) => ({
+            kind: "SELECTED",
+            value: [fieldSlot(game, battle.arrangement.enemyOffset + position)],
+          })),
+      },
+    ];
+  });
+  const switches = game.scene
+    .getPlayerParty()
+    .map((candidate, partySlot) => ({ candidate, partySlot }))
+    .filter(
+      ({ candidate, partySlot }) =>
+        partySlot >= battle.getBattlerCount()
+        && candidate.isAllowedInBattle()
+        && resolvePlayerOwnerSeat(game, candidate, partySlot) === actorOwnerSeat,
+    )
     .map(({ candidate, partySlot }) => ({ party_slot: partySlot, pokemon: pokemonId(activeTrace!, candidate) }));
   return { fight: moves, switches };
 }
@@ -1903,22 +2146,25 @@ function commandFrontier(game: GameManager): AnyRecord[] {
   if (game.isVictory() || game.scene.getPlayerParty().every(mon => mon.isFainted())) {
     return [];
   }
-  return game.scene.getPlayerField(false).map((mon, position) => {
-    if (mon == null || mon.isFainted()) {
-      return null;
-    }
-    const flat = battle.arrangement.indexOf({ side: 0, position });
-    const turn = battle.turn;
-    const ownerSeat = position + 1;
-    return {
-      operation_id: `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${position}/seat/${ownerSeat}`,
-      owner_seat: ownerSeat,
-      actor: pokemonId(activeTrace!, mon),
-      field_slot: fieldSlot(game, flat),
-      offer: commandOffer(game, mon, flat),
-      status: { kind: "PENDING" },
-    };
-  }).filter(Boolean);
+  return game.scene
+    .getPlayerField(false)
+    .map((mon, position) => {
+      if (mon == null || mon.isFainted()) {
+        return null;
+      }
+      const flat = battle.arrangement.indexOf({ side: 0, position });
+      const turn = battle.turn;
+      const ownerSeat = position + 1;
+      return {
+        operation_id: `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${position}/seat/${ownerSeat}`,
+        owner_seat: ownerSeat,
+        actor: pokemonId(activeTrace!, mon),
+        field_slot: fieldSlot(game, flat),
+        offer: commandOffer(game, mon, flat),
+        status: { kind: "PENDING" },
+      };
+    })
+    .filter(Boolean);
 }
 
 function outcome(game: GameManager): string {
@@ -1941,9 +2187,15 @@ function updateFaintProgress(game: GameManager, trace: ObservationTrace): void {
     const field = game.scene.getPlayerField(false);
     const current = field[slot.position];
     const currentId = current == null ? null : pokemonId(trace, current);
-    const original = trace.identity == null ? null : [...game.scene.getPlayerParty()].find(mon => pokemonId(trace, mon) === occurrence.pokemon);
+    const original =
+      trace.identity == null
+        ? null
+        : [...game.scene.getPlayerParty()].find(mon => pokemonId(trace, mon) === occurrence.pokemon);
     if (currentId != null && currentId !== occurrence.pokemon && !current?.isFainted()) {
       const partySlot = game.scene.getPlayerParty().indexOf(current);
+      if (resolvePlayerOwnerSeat(game, current, partySlot) !== occurrence.owner_seat) {
+        fail("CANONICAL_STATE_UNOBSERVABLE", `replacement for faint ${String(occurrence.id)} changed owner seat`);
+      }
       occurrence.replacement = { kind: "SELECTED", party_slot: partySlot, pokemon: currentId };
     } else if (original?.isFainted()) {
       occurrence.replacement = { kind: "NO_LEGAL_REPLACEMENT" };
@@ -2059,11 +2311,38 @@ function committedCommands(game: GameManager, rawCommands: AnyRecord, trace: Obs
     }
     const kind = commandKind(turnCommand.command);
     const moveId = turnCommand.move?.move;
-    const moveSlot = moveId == null ? null : actor.getMoveset().findIndex(move => move.moveId === moveId);
-    const targets = (turnCommand.targets ?? turnCommand.move?.targets ?? []).map((target: number) => fieldSlot(game, target));
+    let moveSlot: number | null = null;
+    if (moveId != null) {
+      const cursor = turnCommand.cursor;
+      if (Number.isSafeInteger(cursor) && cursor >= 0 && actor.getMoveset()[cursor]?.moveId === moveId) {
+        moveSlot = cursor;
+      } else {
+        const matchingSlots = actor
+          .getMoveset()
+          .map((move, index) => ({ move, index }))
+          .filter(({ move }) => move.moveId === moveId)
+          .map(({ index }) => index);
+        if (matchingSlots.length !== 1) {
+          fail(
+            "COMMAND_UNOBSERVABLE",
+            `move ${String(moveId)} has no unique observed slot for actor ${String(actor.id)}`,
+          );
+        }
+        moveSlot = matchingSlots[0]!;
+      }
+    }
+    const targets = (turnCommand.targets ?? turnCommand.move?.targets ?? []).map((target: number) =>
+      fieldSlot(game, target),
+    );
     const player = location.side === 0;
     const position = location.position;
     const ownerSeat = player ? position + 1 : null;
+    if (player) {
+      const partyIndex = game.scene.getPlayerParty().indexOf(actor);
+      if (resolvePlayerOwnerSeat(game, actor, partyIndex) !== ownerSeat) {
+        fail("COMMAND_UNOBSERVABLE", `command actor at ${String(key)} conflicts with its owner seat`);
+      }
+    }
     const operationId = player
       ? `battle/1/wave/${battle.waveIndex}/turn/${battle.turn}/command/player/${position}/seat/${ownerSeat}`
       : `battle/1/wave/${battle.waveIndex}/turn/${battle.turn}/command/enemy/${position}/script/${turnCommand.cursor ?? 0}`;
@@ -2081,6 +2360,14 @@ function committedCommands(game: GameManager, rawCommands: AnyRecord, trace: Obs
     } else if (kind === "SWITCH") {
       const partySlot = turnCommand.cursor;
       const selected = partySlot == null ? null : game.scene.getPlayerParty()[partySlot];
+      if (
+        !player
+        || selected == null
+        || ownerSeat == null
+        || resolvePlayerOwnerSeat(game, selected, partySlot) !== ownerSeat
+      ) {
+        fail("COMMAND_UNOBSERVABLE", "switch command lacks a same-owner observed replacement");
+      }
       command = {
         kind: "SWITCH",
         actor: pokemonId(trace, actor),
@@ -2096,7 +2383,7 @@ function committedCommands(game: GameManager, rawCommands: AnyRecord, trace: Obs
       actor: pokemonId(trace, actor),
       field_slot: fieldSlot(game, flatIndex),
       command,
-      source: player ? "AUTHORITY_LOCAL_INTERNAL" : "SCRIPTED_ENEMY",
+      source: player ? (ownerSeat === 1 ? "AUTHORITY_LOCAL_INTERNAL" : "AUTHORITY_REMOTE_PROPOSAL") : "SCRIPTED_ENEMY",
     });
   }
   return commands;
@@ -2104,32 +2391,65 @@ function committedCommands(game: GameManager, rawCommands: AnyRecord, trace: Obs
 
 function semanticIntent(id: string, spec: ScenarioSpec, game: GameManager): AnyRecord[] {
   const move = spec.party[0]?.moves?.[0];
+  if (id === "pp-unusable-rejected") {
+    const fallback = spec.party[0]?.moves?.[1];
+    return [
+      {
+        sequence: 0,
+        scenario_id: id,
+        action: {
+          kind: "FIGHT",
+          move_id: move ?? null,
+          move_slot: 0,
+          target: fieldSlot(game, BattlerIndex.ENEMY),
+          expected_admission: "REJECTED_EXHAUSTED_PP",
+          source: "SCENARIO_SEMANTIC_INTENT",
+        },
+      },
+      {
+        sequence: 1,
+        scenario_id: id,
+        action: {
+          kind: "FIGHT",
+          move_id: fallback ?? null,
+          move_slot: 1,
+          target: fieldSlot(game, BattlerIndex.ENEMY),
+          expected_admission: "COMMITTED_AFTER_REJECTION",
+          source: "SCENARIO_FALLBACK_INTENT",
+        },
+      },
+    ];
+  }
   if (id === "voluntary-switch") {
     const replacement = game.scene.getPlayerParty()[2];
     if (replacement == null) {
       fail("COMMAND_UNOBSERVABLE", "voluntary-switch semantic intent has no observed bench replacement");
     }
-    return [{
+    return [
+      {
+        sequence: 0,
+        scenario_id: id,
+        action: {
+          kind: "SWITCH",
+          party_slot: 2,
+          pokemon: pokemonId(activeTrace!, replacement),
+          source: "SCENARIO_SEMANTIC_INTENT",
+        },
+      },
+    ];
+  }
+  return [
+    {
       sequence: 0,
       scenario_id: id,
       action: {
-        kind: "SWITCH",
-        party_slot: 2,
-        pokemon: pokemonId(activeTrace!, replacement),
+        kind: "FIGHT",
+        move_id: move ?? null,
+        target: move === MoveId.PLAY_NICE ? null : fieldSlot(game, BattlerIndex.ENEMY),
         source: "SCENARIO_SEMANTIC_INTENT",
       },
-    }];
-  }
-  return [{
-    sequence: 0,
-    scenario_id: id,
-    action: {
-      kind: "FIGHT",
-      move_id: move ?? null,
-      target: move === MoveId.PLAY_NICE ? null : fieldSlot(game, BattlerIndex.ENEMY),
-      source: "SCENARIO_SEMANTIC_INTENT",
     },
-  }];
+  ];
 }
 
 function replacementProposals(game: GameManager, trace: ObservationTrace): AnyRecord[] {
@@ -2140,9 +2460,10 @@ function replacementProposals(game: GameManager, trace: ObservationTrace): AnyRe
       const source = occurrence.source;
       const operationId = `RC/e${source.epoch}/w${source.wave}/t${source.resolved_turn}/o${source.turn_occurrence}/f${occurrence.slot.position}/s${occurrence.owner_seat}`;
       const progress = occurrence.replacement;
-      const selection = progress.kind === "SELECTED"
-        ? { kind: "SELECTED", party_slot: progress.party_slot, pokemon: progress.pokemon }
-        : { kind: "NO_LEGAL_REPLACEMENT" };
+      const selection =
+        progress.kind === "SELECTED"
+          ? { kind: "SELECTED", party_slot: progress.party_slot, pokemon: progress.pokemon }
+          : { kind: "NO_LEGAL_REPLACEMENT" };
       return {
         schema_version: 1,
         operation_id: operationId,
@@ -2202,7 +2523,9 @@ function nextControl(game: GameManager): AnyRecord {
   if (controlKind === "Command") {
     const commands = game.scene.currentBattle.turnCommands;
     for (const mon of game.scene.getPlayerField(false)) {
-      if (mon == null || mon.isFainted()) continue;
+      if (mon == null || mon.isFainted()) {
+        continue;
+      }
       const fieldIndex = mon.getBattlerIndex();
       if (commands[fieldIndex] == null) {
         pending.push(mon.getFieldIndex() + 1);
@@ -2238,7 +2561,9 @@ function registerReplacementPrompt(game: GameManager): void {
   game.onNextPrompt("SwitchPhase", UiMode.PARTY, () => {
     const handler = game.scene.ui.getHandler() as AnyRecord;
     const battlerCount = game.scene.currentBattle.getBattlerCount();
-    const slot = game.scene.getPlayerParty().findIndex((mon, index) => index >= battlerCount && mon.isAllowedInBattle());
+    const slot = game.scene
+      .getPlayerParty()
+      .findIndex((mon, index) => index >= battlerCount && mon.isAllowedInBattle());
     if (slot < 0) {
       return;
     }
@@ -2251,7 +2576,15 @@ function registerReplacementPrompt(game: GameManager): void {
   });
 }
 
-function admitPlayerCommands(game: GameManager, id: string): void {
+async function waitForUiMode(game: GameManager, mode: UiMode, context: string): Promise<void> {
+  try {
+    await vi.waitUntil(() => game.scene.ui.getMode() === mode, { interval: 5, timeout: 5_000 });
+  } catch {
+    fail("COMMAND_UNOBSERVABLE", `${context} did not reach ${UiMode[mode]}`);
+  }
+}
+
+async function admitPlayerCommands(game: GameManager, id: string): Promise<AnyRecord[]> {
   const field = game.scene.getPlayerField(false);
   const select = (mon: Pokemon, battlerIndex: number): void => {
     const move = mon.getMoveset()[0];
@@ -2261,6 +2594,146 @@ function admitPlayerCommands(game: GameManager, id: string): void {
     const target = move.moveId === MoveId.PLAY_NICE ? undefined : BattlerIndex.ENEMY;
     game.move.select(move.moveId, battlerIndex as BattlerIndex, target);
   };
+  if (id === "pp-unusable-rejected") {
+    const lead = field[0];
+    const exhausted = lead?.getMoveset()[0];
+    const fallback = lead?.getMoveset()[1];
+    if (
+      lead == null
+      || exhausted == null
+      || fallback == null
+      || exhausted.ppUsed !== exhausted.getMovePp()
+      || fallback.ppUsed >= fallback.getMovePp()
+    ) {
+      fail("COMMAND_UNOBSERVABLE", "PP rejection scenario lacks one exhausted and one usable observed move");
+    }
+    if (game.scene.ui.getMode() !== UiMode.COMMAND) {
+      fail("COMMAND_UNOBSERVABLE", "PP rejection did not begin at the production command menu");
+    }
+    const battle = game.scene.currentBattle;
+    const rngBefore = battleRngState(game);
+    const commandsBefore = JSON.parse(
+      JSON.stringify({
+        turn: battle.turn,
+        turn_commands: battle.turnCommands,
+        pre_turn_commands: battle.preTurnCommands,
+      }),
+    ) as AnyRecord;
+    const ppBefore = exhausted.ppUsed;
+    const rngDrawCountBefore = activeTrace?.rngDraws.length ?? 0;
+
+    game.scene.ui.setCursor(Command.FIGHT);
+    const openedFight = game.scene.ui.processInput(Button.ACTION);
+    if (!openedFight) {
+      fail("COMMAND_UNOBSERVABLE", "production command menu rejected the Fight selection");
+    }
+    await waitForUiMode(game, UiMode.FIGHT, "opening the Fight menu");
+    game.scene.ui.setCursor(0);
+    const fightHandler = game.scene.ui.getHandler() as AnyRecord;
+    if (typeof fightHandler.getCursor !== "function" || fightHandler.getCursor() !== 0) {
+      fail("COMMAND_UNOBSERVABLE", "production Fight menu did not expose exhausted slot 0");
+    }
+
+    const acceptedExhaustedMove = game.scene.ui.processInput(Button.ACTION);
+    if (acceptedExhaustedMove) {
+      fail("COMMAND_UNOBSERVABLE", "production Fight menu accepted an exhausted move");
+    }
+    await waitForUiMode(game, UiMode.MESSAGE, "rejecting the exhausted move");
+    const rngAfterRejection = battleRngState(game);
+    const commandsAfterRejection = JSON.parse(
+      JSON.stringify({
+        turn: battle.turn,
+        turn_commands: battle.turnCommands,
+        pre_turn_commands: battle.preTurnCommands,
+      }),
+    ) as AnyRecord;
+    const rngDrawCountAfter = activeTrace?.rngDraws.length ?? 0;
+    if (!canonicalBytes(rngBefore, false, false).equals(canonicalBytes(rngAfterRejection, false, false))) {
+      fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection consumed battle RNG");
+    }
+    if (!canonicalBytes(commandsBefore, false, false).equals(canonicalBytes(commandsAfterRejection, false, false))) {
+      fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection mutated the command frontier");
+    }
+    if (exhausted.ppUsed !== ppBefore || rngDrawCountAfter !== rngDrawCountBefore) {
+      fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection changed PP or emitted an RNG draw");
+    }
+
+    const messageHandler = game.scene.ui.getMessageHandler() as AnyRecord;
+    try {
+      await vi.waitUntil(() => messageHandler.awaitingActionInput === true, { interval: 5, timeout: 5_000 });
+    } catch {
+      fail("COMMAND_UNOBSERVABLE", "PP rejection message never became actionable");
+    }
+    if (!game.scene.ui.processInput(Button.ACTION)) {
+      fail("COMMAND_UNOBSERVABLE", "PP rejection message could not be dismissed");
+    }
+    await waitForUiMode(game, UiMode.FIGHT, "returning from the PP rejection message");
+    if (!game.scene.ui.processInput(Button.RIGHT)) {
+      fail("COMMAND_UNOBSERVABLE", "production Fight menu could not move to the usable fallback slot");
+    }
+    const fallbackHandler = game.scene.ui.getHandler() as AnyRecord;
+    if (typeof fallbackHandler.getCursor !== "function" || fallbackHandler.getCursor() !== 1) {
+      fail("COMMAND_UNOBSERVABLE", "production Fight menu did not select fallback slot 1");
+    }
+    if (!game.scene.ui.processInput(Button.ACTION)) {
+      fail("COMMAND_UNOBSERVABLE", "production Fight menu rejected the usable fallback move");
+    }
+    const committed = battle.turnCommands[BattlerIndex.PLAYER];
+    if (committed?.cursor !== 1 || committed?.move?.move !== fallback.moveId) {
+      fail("COMMAND_UNOBSERVABLE", "usable fallback command lost its observed move-slot identity");
+    }
+    return [
+      {
+        sequence: 0,
+        phase: "CommandPhase",
+        ui_mode: "COMMAND",
+        button: "ACTION",
+        cursor: Command.FIGHT,
+        result: "ACCEPTED_OPEN_FIGHT",
+      },
+      {
+        sequence: 1,
+        phase: "CommandPhase",
+        ui_mode: "FIGHT",
+        button: "ACTION",
+        cursor: 0,
+        move_id: exhausted.moveId,
+        result: "REJECTED_EXHAUSTED_PP",
+        pp_used_before: ppBefore,
+        pp_used_after: exhausted.ppUsed,
+        rng_before: rngBefore,
+        rng_after: rngAfterRejection,
+        rng_draw_count_before: rngDrawCountBefore,
+        rng_draw_count_after: rngDrawCountAfter,
+        command_state_before: commandsBefore,
+        command_state_after: commandsAfterRejection,
+      },
+      {
+        sequence: 2,
+        phase: "CommandPhase",
+        ui_mode: "MESSAGE",
+        button: "ACTION",
+        result: "ACKNOWLEDGED_REJECTION",
+      },
+      {
+        sequence: 3,
+        phase: "CommandPhase",
+        ui_mode: "FIGHT",
+        button: "RIGHT",
+        cursor: 1,
+        result: "SELECTED_USABLE_FALLBACK",
+      },
+      {
+        sequence: 4,
+        phase: "CommandPhase",
+        ui_mode: "FIGHT",
+        button: "ACTION",
+        cursor: 1,
+        move_id: fallback.moveId,
+        result: "COMMITTED_USABLE_FALLBACK",
+      },
+    ];
+  }
   if (id === "voluntary-switch") {
     // In a double battle party slots 0 and 1 are active; slot 2 is the
     // observed bench choice. Commit the partner's real command as well so the
@@ -2270,9 +2743,14 @@ function admitPlayerCommands(game: GameManager, id: string): void {
     }
     game.doSwitchPokemon(2);
   } else {
-    if (field[0] != null && !field[0].isFainted()) select(field[0], BattlerIndex.PLAYER);
-    if (field[1] != null && !field[1].isFainted()) select(field[1], BattlerIndex.PLAYER_2);
+    if (field[0] != null && !field[0].isFainted()) {
+      select(field[0], BattlerIndex.PLAYER);
+    }
+    if (field[1] != null && !field[1].isFainted()) {
+      select(field[1], BattlerIndex.PLAYER_2);
+    }
   }
+  return [];
 }
 
 async function admitEnemyCommands(game: GameManager, id: string): Promise<void> {
@@ -2283,10 +2761,11 @@ async function admitEnemyCommands(game: GameManager, id: string): Promise<void> 
   const targets = game.scene.getPlayerField(false);
   for (let index = 0; index < enemy.length; index++) {
     const mon = enemy[index];
-    if (mon == null || mon.isFainted()) continue;
-    const target = targets[index] && !targets[index].isFainted()
-      ? targets[index].getBattlerIndex()
-      : BattlerIndex.PLAYER;
+    if (mon == null || mon.isFainted()) {
+      continue;
+    }
+    const target =
+      targets[index] && !targets[index].isFainted() ? targets[index].getBattlerIndex() : BattlerIndex.PLAYER;
     await game.move.forceEnemyMove(MoveId.POUND, target);
   }
 }
@@ -2351,13 +2830,17 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
     registerReplacementPrompt(game);
   }
-  admitPlayerCommands(game, id);
+  const inputEvents = await admitPlayerCommands(game, id);
   await admitEnemyCommands(game, id);
   const rawCommitted = JSON.parse(JSON.stringify(game.scene.currentBattle.turnCommands)) as AnyRecord;
   const admitted = committedCommands(game, rawCommitted, trace);
   await game.toEndOfTurn();
   const recording = endCoopRecording();
-  const presentation = presentationPlan(recording.events as AnyRecord[], game.scene.currentBattle.waveIndex, resolvedTurn);
+  const presentation = presentationPlan(
+    recording.events as AnyRecord[],
+    game.scene.currentBattle.waveIndex,
+    resolvedTurn,
+  );
 
   if (!game.isVictory() && !game.scene.getPlayerParty().every(mon => mon.isFainted())) {
     await game.toNextTurn();
@@ -2379,7 +2862,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
     },
     initial_rng: initialRng,
     commands: {
-      input_events: [],
+      input_events: inputEvents,
       semantic_intent: semantic,
       committed,
       replacement_proposals: replacement,
@@ -2413,11 +2896,19 @@ function outputRootPath(): string {
   return OUTPUT_ROOT;
 }
 
-function releaseScenarioPromptInterval(): void {
+function releaseScenarioHarness(): void {
   if (PromptHandler.runInterval != null) {
     clearInterval(PromptHandler.runInterval);
     PromptHandler.runInterval = undefined;
   }
+  currentScenarioGame?.promptHandler.clearPrompts();
+  const setModeInternal =
+    currentScenarioGame == null ? null : (currentScenarioGame.scene.ui as AnyRecord).setModeInternal;
+  if (typeof setModeInternal?.mockRestore === "function") {
+    setModeInternal.mockRestore();
+  }
+  currentScenarioGame = null;
+  activeTrace = null;
 }
 
 describe("M3A-05 fresh semantic oracle export", () => {
@@ -2433,8 +2924,7 @@ describe("M3A-05 fresh semantic oracle export", () => {
   });
 
   afterAll(() => {
-    activeTrace = null;
-    releaseScenarioPromptInterval();
+    releaseScenarioHarness();
     for (const restore of restoreHooks.splice(0).reverse()) {
       restore();
     }
@@ -2451,7 +2941,7 @@ describe("M3A-05 fresh semantic oracle export", () => {
         const envelope = await exportCase(id, hash, sharedProvenance);
         writeCanonical(resolve(root, "battle-cases", `${id}.json`), envelope);
       } finally {
-        releaseScenarioPromptInterval();
+        releaseScenarioHarness();
       }
     }
     writeCanonical(resolve(root, "content-pack-v1.json"), {
