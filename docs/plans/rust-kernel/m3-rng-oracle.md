@@ -42,7 +42,6 @@ c  = t | 0
 s0 = s1
 s1 = s2
 s2 = t - c
-n  = n + 1
 return s2
 ```
 
@@ -59,12 +58,16 @@ are in `P:154-207`.
 
 ### Number and integer semantics
 
+Phaser's separate `n` field is the seed-hash accumulator. `sow()` resets it,
+`hash()` updates it for each seed code unit, and `rnd()` neither reads nor
+mutates it (`P:116-218`).
+
 **Observed:** Phaser's primitive consumption is:
 
 | API | Observable operation | Core `rnd()` calls |
 | --- | --- | ---: |
-| `integer()` | `rnd() * 0x100000000` converted to an unsigned 32-bit integer | 1 |
-| `frac()` | `rnd() + (rnd() * 0x200 | 0) * 1.1102230246251565e-16` | 2 |
+| `integer()` | `rnd() * 0x100000000` with no source-level integer coercion | 1 |
+| `frac()` | `rnd() + (rnd() * 0x200000 | 0) * 1.1102230246251565e-16` | 2 |
 | `realInRange(min,max)` | `frac() * (max - min) + min` | 2 |
 | `integerInRange(min,max)` | `Math.floor(realInRange(0, max - min + 1) + min)` | 2 |
 | `pick(array)` | `array[integerInRange(0, array.length - 1)]` | 2 when length > 1 |

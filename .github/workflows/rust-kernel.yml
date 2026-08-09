@@ -826,6 +826,9 @@ jobs:
               "PreparedBattleResolution": contract_dir / "m3-internal-event-loop.md",
               "M3_INVALID_AUTHORITY_MATERIAL": contract_dir / "m3-error-policy.md",
               "Pick,": contract_dir / "m3-js-number-rng.md",
+              "rnd() * 4294967296": contract_dir / "m3-js-number-rng.md",
+              "ToInt32(rnd() * 2097152)": contract_dir / "m3-js-number-rng.md",
+              "seed-hash accumulator": contract_dir / "m3-js-number-rng.md",
               "ApplyAuthorityMaterial": contract_dir / "m3-api.md",
               "ProjectAuthorityControl": contract_dir / "m3-api.md",
               "RC/e{epoch}/b{battleId}": contract_dir / "m3-api.md",
@@ -844,6 +847,17 @@ jobs:
           for phrase, path in required_api_phrases.items():
               if phrase not in path.read_text(encoding="utf-8"):
                   raise SystemExit(f"required contract phrase {phrase!r} absent from {path}")
+
+          rng_contract_text = (contract_dir / "m3-js-number-rng.md").read_text(encoding="utf-8")
+          for stale_transcription in (
+              "ToUint32(rnd() * 4294967296)",
+              "ToInt32(rnd() * 512)",
+              "private `n` call counter",
+          ):
+              if stale_transcription in rng_contract_text:
+                  raise SystemExit(
+                      f"stale Phaser RNG transcription remains in contract: {stale_transcription!r}"
+                  )
 
           workflow_text = Path(".github/workflows/rust-kernel.yml").read_text(encoding="utf-8")
           for phrase in (

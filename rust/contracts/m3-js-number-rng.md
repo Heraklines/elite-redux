@@ -38,11 +38,13 @@ binary64 bits, with no `0x` prefix. Canonical state never serializes `s0`,
 `!rnd,c,s0,s1,s2`, generated with JavaScript number-to-string semantics and
 validated to represent the same four canonical fields.
 
-Phaser's private `n` call counter is excluded from M3 canonical state. It is
-not serialized/restored by Phaser and does not affect the selected integer,
-fraction, range, pick, or shuffle results. M3 tracks its own `SafeU53` audit
-sequence separately; unsupported Phaser APIs that would make `n` observable
-fail capability validation.
+Phaser's private `n` seed-hash accumulator is excluded from M3 canonical
+state. `sow()` resets it to `0xefc8249d`, `hash()` updates it while processing
+seed UTF-16 code units, and `rnd()` does not read or mutate it. It is not
+serialized/restored by Phaser and does not affect draws from an already sown
+or restored generator; a later `sow()` resets it before use. M3 tracks its own
+`SafeU53` audit sequence separately; unsupported direct hash APIs fail
+capability validation.
 
 A valid canonical state has finite `s0/s1/s2` in `[0,1)`, a carry representable
 as `u32`, and a state string that reparses to the same bits and carry. Although
@@ -71,11 +73,18 @@ The selected public operations are exact:
 
 | Operation | Evaluation | Primitive calls |
 | --- | --- | ---: |
-| `integer()` | `ToUint32(rnd() * 4294967296)` | 1 |
-| `frac()` | `rnd() + (ToInt32(rnd() * 512) * 2^-53)` | 2 |
+| `integer()` | `rnd() * 4294967296` | 1 |
+| `frac()` | `rnd() + (ToInt32(rnd() * 2097152) * 2^-53)` | 2 |
 | `realInRange(min,max)` | `frac() * (max - min) + min` | 2 |
 | `integerInRange(min,max)` | `Math.floor(realInRange(0, max - min + 1) + min)` | 2 |
 | `pick(values)` | `values[integerInRange(0, len - 1)]` | 0 when `len = 1`; 2 when `len > 1` |
+
+The `frac()` multiplier is Phaser's literal `0x200000`; the following `| 0`
+is the `ToInt32` coercion. Phaser's `integer()` source performs no `>>> 0`,
+`| 0`, `Math.floor`, or other conversion at that call site. Its binary64
+result is preserved exactly; a Rust integer representation is permitted only
+after checking that the result is finite, integral, in `0..=u32::MAX`, and
+round-trips to the same binary64 value.
 
 `randSeedInt(cardinality, minimum)` returns `minimum` without a state swap or
 primitive draw when `cardinality <= 1`. Otherwise it invokes
