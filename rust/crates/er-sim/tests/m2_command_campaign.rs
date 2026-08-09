@@ -1035,7 +1035,20 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         first_entry.snapshot.guest.ui.generation,
         before_n_plus_one.guest.ui.generation
     );
+    assert_eq!(first_entry.snapshot.guest.ui.kind, UiViewKind::None);
+    assert_eq!(first_entry.snapshot.guest.ui.owner_seat, None);
     assert!(!first_entry.snapshot.guest.ui.actionable);
+    assert_eq!(
+        first_entry.snapshot.guest.ui.generation,
+        MenuGeneration::new(safe(2))
+    );
+    assert_eq!(first_entry.snapshot.guest.ui.cursor, None);
+    assert!(first_entry.snapshot.guest.ui.options.is_empty());
+    assert_eq!(first_entry.snapshot.guest.ui.prompt_key, None);
+    assert_eq!(
+        first_entry.snapshot.guest.kernel.ui.stack,
+        vec![MenuState::None]
+    );
     assert_eq!(replica_frontier(&first_entry), Some((1, 1, 1)));
     assert_material_effect(
         &first_entry,
@@ -1057,11 +1070,43 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         GUEST_OPERATION,
         &control_id_of(&remaining_control()),
     );
-    let first_entry_ui = first_entry.snapshot.guest.ui.clone();
     steps.push(first_entry);
 
     let stale_repeat = pair.advance_time(safe(250))?;
-    assert_eq!(stale_repeat.snapshot.guest.ui, first_entry_ui);
+    assert_eq!(stale_repeat.snapshot.host.ui.kind, UiViewKind::Waiting);
+    assert_eq!(
+        stale_repeat.snapshot.host.ui.generation,
+        MenuGeneration::new(safe(3))
+    );
+    assert_eq!(stale_repeat.snapshot.host.ui.owner_seat, None);
+    assert!(!stale_repeat.snapshot.host.ui.actionable);
+    assert_eq!(
+        stale_repeat.snapshot.host.ui.prompt_key.as_deref(),
+        Some("await/turn/host")
+    );
+    assert!(matches!(
+        stale_repeat.snapshot.host.kernel.ui.stack.as_slice(),
+        [MenuState::Waiting(menu)]
+            if menu.prompt_key.as_deref() == Some("await/turn/host")
+    ));
+    assert_eq!(stale_repeat.snapshot.guest.ui.kind, UiViewKind::Waiting);
+    assert_eq!(stale_repeat.snapshot.guest.ui.owner_seat, None);
+    assert!(!stale_repeat.snapshot.guest.ui.actionable);
+    assert_eq!(
+        stale_repeat.snapshot.guest.ui.generation,
+        MenuGeneration::new(safe(3))
+    );
+    assert_eq!(stale_repeat.snapshot.guest.ui.cursor, None);
+    assert!(stale_repeat.snapshot.guest.ui.options.is_empty());
+    assert_eq!(
+        stale_repeat.snapshot.guest.ui.prompt_key.as_deref(),
+        Some("await/turn/host")
+    );
+    assert!(matches!(
+        stale_repeat.snapshot.guest.kernel.ui.stack.as_slice(),
+        [MenuState::Waiting(menu)]
+            if menu.prompt_key.as_deref() == Some("await/turn/host")
+    );
     assert_eq!(replica_frontier(&stale_repeat), Some((1, 1, 1)));
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
     assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
