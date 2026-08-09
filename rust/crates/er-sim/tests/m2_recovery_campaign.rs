@@ -1511,7 +1511,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let request: RecoveryRequestBody = typed_frame_body(request_frame)?;
     assert!(!request.request_id.is_empty());
     assert_eq!(request.captured_frontier, revision(1));
-    assert_eq!(request.reason, "reconnect");
+    assert_eq!(request.reason, "transport-reconnect");
 
     let bundle_frames = frame_effects(&recovery_effects, FrameType::RecoveryBundle);
     assert_eq!(bundle_frames.len(), 1);
