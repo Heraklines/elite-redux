@@ -15,12 +15,14 @@ production capabilities.
 ## Result boundary
 
 M2 is architecture, menu, and protocol completion. It is not the full
-Pokémon combat or run engine. This audit proves a static/API boundary and
-records what the later hosted gates must prove. It does not claim campaign
-behavior, Wasm parity, browser transport parity, or benchmark performance.
+Pokémon combat or run engine. This document and lane are a static/API-bypass
+audit: they record what the later hosted gates must prove, but do not
+themselves establish runtime campaign, Wasm, browser transport, or benchmark
+evidence.
 
-Hosted-green status: pending. This lane has not run or claimed the hosted G5,
-Wasm, campaign, or measured-benchmark evidence.
+Milestone completion additionally requires a separate Rust Kernel Gate run
+against the exact integration SHA; the final handoff must identify the current
+hosted run.
 
 ## Requirement evidence
 
@@ -34,7 +36,7 @@ Wasm, campaign, or measured-benchmark evidence.
 | M2: frozen snapshot seed | pair_operation_is_the_raw_environment_union; PairSnapshot in pair.rs; rust/contracts/m2-api.md | PairSnapshot.seed must be Rust String; the contract requires a canonical unsigned decimal string and forbids JSON numeric, empty, signed, or padded representations. |
 | M2/G5: deterministic production core | production_core_has_no_escape_hatches_or_test_transition_branches; every .rs file under rust/crates/er-kernel/src, er-protocol/src, and er-sim/src | After comments, doc comments, strings, chars, and raw strings are masked, the audit rejects async/runtime, threads, sleep/park/wall-time reads, sockets/network, filesystem, browser/Phaser/Vite, unsafe, mutable globals, and callback retention. |
 | M2/G5: test-only branches | assert_cfg_policy and strip_test_modules in the same production scan | cfg(test) is allowed only on a brace-balanced test module. Feature cfgs, cfg!, cfg_attr, and test-conditioned transition code fail. The sole documented item exception is KernelScheduler::set_next_timer_id_for_test, which is removed as a cfg(test)-only allocator helper, as allowed by m2-ownership.toml. |
-| M2B-04..08 final integration boundary | later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions | The five exact campaign files collectively cover the ten contract-required raw-input/environment scenarios and are required at final integration; any missing file fails closed. Read-only matching/assertion of emitted KernelEffect::UiIntent and typed UiIntent variants is allowed as raw-key causality evidence. Semantic PairOperation construction, semantic SimulatedPair calls, KernelInput/GameKernel/reducer/owner handles, and direct transitions fail. The hosted G5 gate remains authoritative, and no hosted-green result is claimed here. |
+| M2B-04..08 final integration boundary | later_m2b_campaigns_cannot_call_semantic_or_lower_level_transitions | The five exact campaign files collectively cover the ten contract-required raw-input/environment scenarios and are required at final integration; any missing file fails closed. Read-only matching/assertion of emitted KernelEffect::UiIntent and typed UiIntent variants is allowed as raw-key causality evidence. Semantic PairOperation construction, semantic SimulatedPair calls, KernelInput/GameKernel/reducer/owner handles, and direct transitions fail. This is static/API-bypass evidence only; milestone completion still requires the separate exact-SHA hosted Rust Kernel Gate, with the current hosted run identified in the final handoff. |
 | M2: TypeScript immutability | no_production_typescript_path_changed_since_the_oracle; exact git diff invocation below | The audit fails unless the oracle-to-HEAD diff has no .ts path. This is a precise evidence check, not a claim that Rust implements the missing browser/scene/transport adapters. |
 | M2/G5: ownership and schema | source_lock_ownership_and_contract_map_are_frozen; rust/contracts/m2-ownership.toml | Requires ownership schema revision 6, M2B-12’s two owned paths, local Rust/co-op execution disabled, and production TypeScript read-only. No public schema or dependency changes are made here. |
 
