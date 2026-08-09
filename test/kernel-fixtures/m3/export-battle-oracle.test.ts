@@ -123,6 +123,7 @@ interface ObservationTrace {
 let activeTrace: ObservationTrace | null = null;
 let phaserGame: Phaser.Game;
 let currentScenarioGame: GameManager | null = null;
+let restoreScenarioFaintCry: (() => void) | null = null;
 const restoreHooks: (() => void)[] = [];
 let productionSceneRandBattleSeedInt: BattleScene["randBattleSeedInt"] | undefined;
 
@@ -823,8 +824,33 @@ function scenarioBattleStyle(spec: ScenarioSpec): "single" | "double" | "triple"
 }
 
 async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
+  restoreScenarioFaintCry?.();
+  restoreScenarioFaintCry = null;
   const game = new GameManager(phaserGame);
   currentScenarioGame = game;
+  const harnessFaintCry = Pokemon.prototype.faintCry;
+  const gatedFaintCry = function (this: Pokemon, callback: () => any): void {
+    const trace = activeTrace;
+    if (trace == null || !trace.collectMutations) {
+      harnessFaintCry.call(this, callback);
+      return;
+    }
+    const completions = trace.faintCompletionByPokemon;
+    if (completions == null || completions.has(this)) {
+      fail("OBSERVATION_SEAM_MISSING", "scenario faint completion gate is absent or already occupied");
+    }
+    // GameWrapper intentionally collapses cry/tween presentation to this
+    // callback.  Hold that existing harness callback until FaintPhase.start has
+    // registered the matching occurrence, then release it unchanged there.
+    completions.set(this, () => harnessFaintCry.call(this, callback));
+  };
+  Pokemon.prototype.faintCry = gatedFaintCry;
+  restoreScenarioFaintCry = () => {
+    if (Pokemon.prototype.faintCry === gatedFaintCry) {
+      Pokemon.prototype.faintCry = harnessFaintCry;
+    }
+    restoreScenarioFaintCry = null;
+  };
   restoreRealBattleRng();
   game.override.criticalHits(null);
   if (!(game.scene.ui.shouldSkipDialogue as AnyRecord).mock) {
@@ -1587,49 +1613,6 @@ function installObservationHooks(): void {
   wrapMutation(Pokemon.prototype, "setStatStage", "STAT_STAGE");
   wrapMutation(PokemonMove.prototype, "usePp", "PP_CONSUMPTION");
   wrapMutation(Battle.prototype, "incrementTurn", "TURN_ADVANCE");
-
-  const originalFaintCry = Pokemon.prototype.faintCry;
-  Pokemon.prototype.faintCry = function (this: Pokemon, callback: () => any): void {
-    const trace = activeTrace;
-    const scene = (trace?.game as GameManager | undefined)?.scene;
-    if (trace == null || !trace.collectMutations || scene?.moveAnimations !== false) {
-      originalFaintCry.call(this, callback);
-      return;
-    }
-
-    // The production callback owns every mechanical faint mutation, but the
-    // headless runner does not advance the audio/tween clocks after TurnEnd.
-    // With animations already disabled, fast-forward only this Pokemon's one
-    // faint tween and execute that unchanged completion callback exactly once.
-    const tweenManager = scene.tweens as AnyRecord;
-    const originalTweenAdd = tweenManager.add;
-    const pokemon = this;
-    let completion: (() => void) | null = null;
-    tweenManager.add = function (this: AnyRecord, config: AnyRecord): any {
-      if (
-        completion == null
-        && config?.targets === pokemon
-        && config?.ease === "Sine.easeIn"
-        && typeof config?.onComplete === "function"
-      ) {
-        completion = config.onComplete;
-        return {};
-      }
-      return originalTweenAdd.call(this, config);
-    };
-    try {
-      callback();
-      if (completion == null) {
-        fail("OBSERVATION_SEAM_MISSING", "disabled-animation faint did not publish its production completion tween");
-      }
-      trace.faintCompletionByPokemon?.set(pokemon, completion);
-    } finally {
-      tweenManager.add = originalTweenAdd;
-    }
-  };
-  restoreHooks.push(() => {
-    Pokemon.prototype.faintCry = originalFaintCry;
-  });
 
   const originalFaintStart = FaintPhase.prototype.start;
   FaintPhase.prototype.start = function (this: FaintPhase): void {
@@ -3175,6 +3158,8 @@ function releaseScenarioHarness(): void {
   if (typeof setModeInternal?.mockRestore === "function") {
     setModeInternal.mockRestore();
   }
+  restoreScenarioFaintCry?.();
+  restoreScenarioFaintCry = null;
   currentScenarioGame = null;
   activeTrace = null;
 }
