@@ -2261,7 +2261,10 @@ mod tests {
         second.validate().unwrap();
 
         assert_eq!(first.operation_id, second.operation_id);
-        assert_eq!(first.expected_operation_id(epoch).unwrap(), replacement_operation);
+        assert_eq!(
+            first.expected_operation_id(epoch).unwrap(),
+            replacement_operation
+        );
         assert_ne!(first.fingerprint(), second.fingerprint());
         assert!(first.canonical_json().contains(r#""occurrence":9"#));
         assert!(first.canonical_json().contains(r#""turn_occurrence":2"#));
