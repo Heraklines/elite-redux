@@ -858,8 +858,7 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
         .map(|timer| timer.timer.timer_id)
         .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
-        clock_timer_ids,
-        quiescent.guest.live_resources.timers,
+        clock_timer_ids, quiescent.guest.live_resources.timers,
         "the retained TurnCommit lease must own every quiescent clock timer"
     );
     let proposal_timer_owner = format!("m2b-10:proposal:{GUEST_OPERATION}");
