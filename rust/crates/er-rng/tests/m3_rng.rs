@@ -196,6 +196,40 @@ fn consuming_and_nonconsuming_raw_range_paths_are_distinct() -> Result<(), Box<d
 }
 
 #[test]
+fn real_range_overflow_discards_its_staged_draws() -> Result<(), Box<dyn Error>> {
+    let near_one_source = f64::from_bits(0x3ea0_0acb_c3f0_f500);
+    let state = PhaserRdgState::from_values(0, near_one_source, near_one_source, 0.0)?;
+    let mut generator = PhaserRdg::from_state(&state)?;
+    let before = generator.state();
+
+    assert!(matches!(
+        generator.real_in_range(0.0, f64::MAX),
+        Err(RngError::RangeOverflow)
+    ));
+    assert_eq!(generator.state(), before);
+    Ok(())
+}
+
+#[test]
+fn integer_range_rejects_width_above_safe_u53_before_drawing() -> Result<(), Box<dyn Error>> {
+    let mut rejected = PhaserRdg::from_seed("range-width-overflow");
+    let rejected_before = rejected.state();
+    assert!(matches!(
+        rejected.integer_in_range(SafeU53::ZERO, SafeU53::MAX),
+        Err(RngError::RangeOverflow)
+    ));
+    assert_eq!(rejected.state(), rejected_before);
+
+    let maximum_accepted = safe(SafeU53::MAX.get() - 1)?;
+    let mut accepted = PhaserRdg::from_seed("range-width-boundary");
+    let accepted_before = accepted.state();
+    let result = accepted.integer_in_range(SafeU53::ZERO, maximum_accepted)?;
+    assert!(result <= maximum_accepted);
+    assert_ne!(accepted.state(), accepted_before);
+    Ok(())
+}
+
+#[test]
 fn pick_and_shuffle_apply_the_selected_slice_draw_rules() -> Result<(), Box<dyn Error>> {
     let mut generator = PhaserRdg::from_seed("pick-shuffle");
     let initial = generator.state();
