@@ -10,14 +10,12 @@ const ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
 const BATTLE_SEED_CHARACTER_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/utils/common.ts:25";
-const SPEED_TIE_ID: &str =
-    "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/utils/common.ts:151";
+const SPEED_TIE_ID: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/utils/common.ts:151";
 const PARALYSIS_ACTIVATION_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/phases/move-phase.ts:546";
 const ACCURACY_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/phases/move-effect-phase.ts:563";
-const CRITICAL_HIT_ID: &str =
-    "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/field/pokemon.ts:5880";
+const CRITICAL_HIT_ID: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/field/pokemon.ts:5880";
 const DAMAGE_VARIANCE_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/field/pokemon.ts:5550";
 const SECONDARY_STATUS_ID: &str =
@@ -320,9 +318,7 @@ impl RngAuditLog {
     }
 
     pub(crate) fn record(&mut self, input: RngDrawInput) -> Result<(), RngError> {
-        let sequence = self
-            .next_sequence
-            .ok_or(RngError::AuditSequenceExhausted)?;
+        let sequence = self.next_sequence.ok_or(RngError::AuditSequenceExhausted)?;
         let before_fingerprint = rng_state_fingerprint(&input.before_state)?;
         let after_fingerprint = rng_state_fingerprint(&input.after_state)?;
         let draw = RngDraw {
@@ -346,10 +342,7 @@ impl RngAuditLog {
         self.next_sequence = if sequence == SafeU53::MAX {
             None
         } else {
-            Some(
-                SafeU53::new(sequence.get() + 1)
-                    .map_err(|_| RngError::AuditSequenceExhausted)?,
-            )
+            Some(SafeU53::new(sequence.get() + 1).map_err(|_| RngError::AuditSequenceExhausted)?)
         };
         self.entries.push(draw);
         Ok(())
@@ -428,9 +421,7 @@ fn validate_api_shape(draw: &RngDraw) -> Result<(), RngError> {
         .ok_or(RngError::InvalidAudit {
             detail: "range upper bound overflowed",
         })?;
-    if upper > SafeU53::MAX.get()
-        || !(draw.minimum.get()..=upper).contains(&draw.result.get())
-    {
+    if upper > SafeU53::MAX.get() || !(draw.minimum.get()..=upper).contains(&draw.result.get()) {
         return Err(RngError::InvalidAudit {
             detail: "result lies outside the audited range",
         });
@@ -468,14 +459,10 @@ fn callsite_spec(value: &str) -> Option<(RngReason, u8)> {
         )),
         ACCURACY_ID => Some((RngReason::Accuracy, stream_bit(RngStream::Battle))),
         CRITICAL_HIT_ID => Some((RngReason::CriticalHit, stream_bit(RngStream::Battle))),
-        DAMAGE_VARIANCE_ID => Some((
-            RngReason::DamageVariance,
-            stream_bit(RngStream::Battle),
-        )),
-        SECONDARY_STATUS_ID | SECONDARY_STATUS_BYPASS_ID | SECONDARY_STAGE_ID => Some((
-            RngReason::SecondaryEffect,
-            stream_bit(RngStream::Battle),
-        )),
+        DAMAGE_VARIANCE_ID => Some((RngReason::DamageVariance, stream_bit(RngStream::Battle))),
+        SECONDARY_STATUS_ID | SECONDARY_STATUS_BYPASS_ID | SECONDARY_STAGE_ID => {
+            Some((RngReason::SecondaryEffect, stream_bit(RngStream::Battle)))
+        }
         MULTI_HIT_COUNT_ID => Some((RngReason::MultiHitCount, stream_bit(RngStream::Battle))),
         _ => None,
     }

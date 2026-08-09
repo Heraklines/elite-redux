@@ -6,9 +6,7 @@ use er_rng::audit::{
     RngCallsiteId, RngDraw, RngPublicApi, RngReason, RngStream, rng_state_fingerprint,
 };
 use er_rng::battle::{BattleRngState, RngRuntime};
-use er_rng::phaser::{
-    F64Bits, PhaserRdg, PhaserRdgState, RngError, RunRngState, shift_char_codes,
-};
+use er_rng::phaser::{F64Bits, PhaserRdg, PhaserRdgState, RngError, RunRngState, shift_char_codes};
 use er_types::SafeU53;
 use er_types::battle_ids::{TurnIndex, WaveIndex};
 use serde_json::Value;
@@ -60,18 +58,16 @@ fn frac_uses_the_corrected_0x200000_coercion_term() -> Result<(), Box<dyn Error>
     let fraction = generator.frac();
 
     assert_eq!(fraction.to_bits(), 0x3de8_0000_0000_0000);
-    assert_eq!(
-        generator.state().state_string,
-        "!rnd,522909,0.5,0,0.75"
-    );
+    assert_eq!(generator.state().state_string, "!rnd,522909,0.5,0,0.75");
 
-    let stale_0x200_term = 384.0 * 1.110_223_024_625_156_5e-16;
+    let stale_0x200_term: f64 = 384.0 * 1.110_223_024_625_156_5e-16;
     assert_ne!(fraction.to_bits(), stale_0x200_term.to_bits());
     Ok(())
 }
 
 #[test]
-fn integer_preserves_fractional_binary64_instead_of_coercing_to_uint() -> Result<(), Box<dyn Error>> {
+fn integer_preserves_fractional_binary64_instead_of_coercing_to_uint() -> Result<(), Box<dyn Error>>
+{
     let adversarial_s0 = f64::from_bits(0x3c90_0000_0000_0000);
     let initial = PhaserRdgState::from_values(0, adversarial_s0, 0.0, 0.0)?;
     let mut generator = PhaserRdg::from_state(&initial)?;
@@ -93,16 +89,8 @@ fn integer_preserves_fractional_binary64_instead_of_coercing_to_uint() -> Result
 
 #[test]
 fn state_strings_and_json_preserve_full_width_bits() -> Result<(), Box<dyn Error>> {
-    let state = PhaserRdgState::from_values(
-        1,
-        f64::from_bits(0x3df0_0000_0000_0000),
-        0.0,
-        0.75,
-    )?;
-    assert_eq!(
-        state.state_string,
-        "!rnd,1,2.3283064365386963e-10,0,0.75"
-    );
+    let state = PhaserRdgState::from_values(1, f64::from_bits(0x3df0_0000_0000_0000), 0.0, 0.75)?;
+    assert_eq!(state.state_string, "!rnd,1,2.3283064365386963e-10,0,0.75");
     assert_eq!(state.s0_bits.as_str(), "3df0000000000000");
     assert_eq!(state.s1_bits.as_str(), "0000000000000000");
     assert_eq!(state.s2_bits.as_str(), "3fe8000000000000");
@@ -202,10 +190,7 @@ fn consuming_and_nonconsuming_raw_range_paths_are_distinct() -> Result<(), Box<d
     assert_eq!(generator.rand_seed_int(safe(1)?, safe(85)?)?, safe(85)?);
     assert_eq!(generator.state(), initial);
 
-    assert_eq!(
-        generator.integer_in_range(safe(85)?, safe(85)?)?,
-        safe(85)?
-    );
+    assert_eq!(generator.integer_in_range(safe(85)?, safe(85)?)?, safe(85)?);
     assert_ne!(generator.state(), initial);
     Ok(())
 }
@@ -243,10 +228,12 @@ fn battle_draw_advances_only_the_cached_substream() -> Result<(), Box<dyn Error>
 
     assert!((85..=100).contains(&result.get()));
     assert_eq!(runtime.run_state(), run_before);
-    assert!(runtime
-        .battle_state()
-        .and_then(|battle| battle.saved_substream.as_ref())
-        .is_some());
+    assert!(
+        runtime
+            .battle_state()
+            .and_then(|battle| battle.saved_substream.as_ref())
+            .is_some()
+    );
     assert_eq!(runtime.audit_entries().len(), 1);
 
     let draw = &runtime.audit_entries()[0];
@@ -368,21 +355,13 @@ fn pick_is_one_logical_audit_and_empty_pick_is_atomic() -> Result<(), Box<dyn Er
     let mut runtime = runtime_with_battle()?;
     let before = runtime.clone();
     assert!(matches!(
-        runtime.battle_pick_index(
-            0,
-            RngReason::Accuracy,
-            RngCallsiteId::accuracy(),
-        ),
+        runtime.battle_pick_index(0, RngReason::Accuracy, RngCallsiteId::accuracy(),),
         Err(RngError::EmptyPick)
     ));
     assert_eq!(runtime, before);
 
     assert_eq!(
-        runtime.battle_pick(
-            &["only"],
-            RngReason::Accuracy,
-            RngCallsiteId::accuracy(),
-        )?,
+        runtime.battle_pick(&["only"], RngReason::Accuracy, RngCallsiteId::accuracy(),)?,
         &"only"
     );
     assert_eq!(runtime.audit_entries().len(), 1);
@@ -392,11 +371,7 @@ fn pick_is_one_logical_audit_and_empty_pick_is_atomic() -> Result<(), Box<dyn Er
     assert!(!draw.consumed);
 
     let values = [10, 20, 30];
-    let selected = runtime.battle_pick(
-        &values,
-        RngReason::Accuracy,
-        RngCallsiteId::accuracy(),
-    )?;
+    let selected = runtime.battle_pick(&values, RngReason::Accuracy, RngCallsiteId::accuracy())?;
     assert!(values.contains(selected));
     assert_eq!(runtime.audit_entries().len(), 2);
     assert_eq!(runtime.audit_entries()[1].public_api, RngPublicApi::Pick);
@@ -442,7 +417,8 @@ fn one_sequence_is_monotonic_across_offset_and_battle_streams() -> Result<(), Bo
 }
 
 #[test]
-fn speed_offset_shuffle_restores_run_and_context_with_per_swap_audits() -> Result<(), Box<dyn Error>> {
+fn speed_offset_shuffle_restores_run_and_context_with_per_swap_audits() -> Result<(), Box<dyn Error>>
+{
     let mut first = runtime_with_battle()?;
     let mut second = runtime_with_battle()?;
     let run_before = first.run_state();
@@ -480,7 +456,8 @@ fn speed_offset_shuffle_restores_run_and_context_with_per_swap_audits() -> Resul
 }
 
 #[test]
-fn battle_construction_uses_wave_offset_and_sixteen_closed_character_draws() -> Result<(), Box<dyn Error>> {
+fn battle_construction_uses_wave_offset_and_sixteen_closed_character_draws()
+-> Result<(), Box<dyn Error>> {
     let mut first = RngRuntime::from_run_seed("ambient-run");
     let mut second = RngRuntime::from_run_seed("ambient-run");
     let run_before = first.run_state();
@@ -490,10 +467,12 @@ fn battle_construction_uses_wave_offset_and_sixteen_closed_character_draws() -> 
     assert_eq!(battle, duplicate);
     assert_eq!(battle.turn, turn(1)?);
     assert_eq!(battle.battle_seed.len(), 16);
-    assert!(battle
-        .battle_seed
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric()));
+    assert!(
+        battle
+            .battle_seed
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric())
+    );
     assert!(battle.saved_substream.is_none());
     assert_eq!(first.run_state(), run_before);
     assert_eq!(first.battle_state(), Some(&battle));
@@ -617,11 +596,7 @@ fn range_turn_and_offset_rejections_are_atomic() -> Result<(), Box<dyn Error>> {
     let offset_before = offset_runtime.clone();
     let mut values = [0, 1];
     assert!(matches!(
-        offset_runtime.speed_order_shuffle(
-            &mut values,
-            "wave",
-            turn(SafeU53::MAX.get())?,
-        ),
+        offset_runtime.speed_order_shuffle(&mut values, "wave", turn(SafeU53::MAX.get())?,),
         Err(RngError::UnsafeSeedOffset)
     ));
     assert_eq!(offset_runtime, offset_before);
@@ -701,7 +676,8 @@ fn callsite_identity_is_closed_and_pinned() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn eventual_rng_vectors_are_ingested_only_after_manifest_publication() -> Result<(), Box<dyn Error>> {
+fn eventual_rng_vectors_are_ingested_only_after_manifest_publication() -> Result<(), Box<dyn Error>>
+{
     let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let manifest_path = repository.join("rust/fixtures/m3/m3-oracle-manifest.json");
     let manifest: Value = serde_json::from_str(&fs::read_to_string(manifest_path)?)?;
@@ -711,9 +687,7 @@ fn eventual_rng_vectors_are_ingested_only_after_manifest_publication() -> Result
         .ok_or("missing supporting artifact contracts")?;
     let rng_contract = contracts
         .iter()
-        .find(|entry| {
-            entry.get("artifact_id").and_then(Value::as_str) == Some("rng-vectors-v1")
-        })
+        .find(|entry| entry.get("artifact_id").and_then(Value::as_str) == Some("rng-vectors-v1"))
         .ok_or("missing rng-vectors-v1 contract")?;
     assert_eq!(
         rng_contract.get("fixture_path").and_then(Value::as_str),
@@ -747,10 +721,12 @@ fn eventual_rng_vectors_are_ingested_only_after_manifest_publication() -> Result
         artifact.get("schema_version").and_then(Value::as_u64),
         Some(1)
     );
-    assert!(!artifact
-        .get("vectors")
-        .and_then(Value::as_array)
-        .ok_or("published RNG artifact has no vectors")?
-        .is_empty());
+    assert!(
+        !artifact
+            .get("vectors")
+            .and_then(Value::as_array)
+            .ok_or("published RNG artifact has no vectors")?
+            .is_empty()
+    );
     Ok(())
 }
