@@ -1,0 +1,1 @@
+{"commands":[{"actor":9,"battle_id":1,"command":{"actor":9,"kind":"FIGHT","move_slot":0,"targets":{"kind":"IMPLICIT"}},"field_slot":{"position":0,"side":"ENEMY"},"operation_id":"battle/1/wave/1/turn/1/command/enemy/0/script/0","schema_version":1,"script_cursor":0,"turn":1,"wave":1}],"cursor":0,"schema_version":1}
