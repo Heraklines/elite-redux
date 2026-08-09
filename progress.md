@@ -7751,3 +7751,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   field. Unsigned/stale guest trainer phases remain fail-closed. New CI-only positive evidence requires this cue
   plus enemy-trainer intro and victory presentation on both real browsers; final-hidden cleanup alone no longer
   qualifies the lifecycle.
+
+2026-08-09 - Fun Mode staging checkpoint
+
+- Added a standalone Fun Mode configuration screen with independent Pokemon, type, ability, and level-up move randomizers. Runs use Youngster cadence, skip difficulty selection, and grant no Favor, candy multipliers, or vouchers.
+- Randomized per-Pokemon state is deterministic from Pokemon identity so saves and battle reconstruction retain the same types, abilities, innates, and learnset. Random encounters use the full starter-safe species/form pool and bypass the BST clamp only when the Pokemon randomizer is enabled.
+- Implemented Klutz item suppression and adjacent-ally Symbiosis transfer. Removed stale `(N)` markers from Klutz, Symbiosis, Overzealous, Sunstrike, and Tempest Storm, and aligned their displayed descriptions with runtime behavior.
+- Verification: Fun Mode suite 11/11, Klutz/Symbiosis focused integration scenarios green, ability-overhaul suite 25/25, targeted TypeScript diagnostics clear, full Vite build green, and staging deploy `31290756176` green at `a578bf5f7`.
+- Visual harness: desktop and 390x844 mobile layouts are non-overlapping; toggles, START, direct starter-select flow, and return-to-config behavior work; no browser console errors were emitted. Production remains untouched.
