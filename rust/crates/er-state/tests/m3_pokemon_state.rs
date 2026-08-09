@@ -1,16 +1,15 @@
 use std::error::Error;
 
+use er_state::pokemon::SeatId;
 use er_state::pokemon::{
     AbilityId, AbilityLoadout, AbilityLoadoutValidationError, BattleStat, BattleStats, MoveId,
     MoveSlotState, MoveSlotsValidationError, PokemonId, PokemonState, PokemonType, PokemonTyping,
     PpValidationError, SpeciesId, StatStages, StatStagesValidationError, StatusKind, StatusState,
     StatusValidationError, TypingPosition, TypingValidationError, calculate_max_pp,
     move_slot_is_usable, normalize_max_pp_override, validate_ability_loadout,
-    validate_m3_status_state,
-    validate_m3_typing, validate_move_slot, validate_move_slot_metadata, validate_move_slots,
-    validate_status_state, validate_stat_stages, validate_typing,
+    validate_m3_status_state, validate_m3_typing, validate_move_slot, validate_move_slot_metadata,
+    validate_move_slots, validate_status_state, validate_stat_stages, validate_typing,
 };
-use er_state::pokemon::SeatId;
 use er_types::SafeU53;
 
 fn safe(value: u64) -> SafeU53 {
@@ -108,9 +107,11 @@ fn canonical_state_round_trips_and_rejects_unknown_fields() -> Result<(), Box<dy
     let state = valid_state()?;
     assert_eq!(state.id, PokemonId::new(safe(17)));
     assert_eq!(state.owner_seat, Some(SeatId::new(safe(1))));
-    assert!(state
-        .validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)])
-        .is_ok());
+    assert!(
+        state
+            .validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)])
+            .is_ok()
+    );
 
     let encoded = serde_json::to_string(&state)?;
     assert!(encoded.contains(r#""owner_seat":1"#));
@@ -353,9 +354,11 @@ fn fixed_move_slots_require_content_resolved_pp_for_occupied_slots() -> Result<(
     if let Some(move_slot) = overused.moves[0].as_mut() {
         move_slot.pp_used = 36;
     }
-    assert!(overused
-        .validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)])
-        .is_err());
+    assert!(
+        overused
+            .validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)])
+            .is_err()
+    );
     Ok(())
 }
 

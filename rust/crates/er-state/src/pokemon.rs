@@ -12,8 +12,8 @@ use thiserror::Error;
 pub use er_types::SeatId;
 pub use er_types::battle_ids::{AbilityId, MoveId, PokemonId, SpeciesId};
 pub use er_types::battle_model::{
-    AbilityLoadout, BattleStat, BattleStats, MoveSlotState, PokemonType, PokemonTyping,
-    StatStages, StatusKind, StatusState,
+    AbilityLoadout, BattleStat, BattleStats, MoveSlotState, PokemonType, PokemonTyping, StatStages,
+    StatusKind, StatusState,
 };
 
 /// The fixed number of move slots in a canonical Pokémon record.
@@ -477,10 +477,7 @@ pub fn validate_move_slot_metadata(slot: &MoveSlotState) -> Result<(), PpValidat
 }
 
 /// Validate a move slot's PP usage against the resolved finite base PP.
-pub fn validate_move_slot(
-    slot: &MoveSlotState,
-    base_pp: u16,
-) -> Result<u16, PpValidationError> {
+pub fn validate_move_slot(slot: &MoveSlotState, base_pp: u16) -> Result<u16, PpValidationError> {
     validate_move_slot_metadata(slot)?;
     let max_pp = calculate_max_pp(base_pp, slot.pp_ups, slot.max_pp_override)?;
     if slot.pp_used > max_pp {
