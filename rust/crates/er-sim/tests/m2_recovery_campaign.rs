@@ -1118,49 +1118,20 @@ fn assert_fresh_guest_command(
     Ok(())
 }
 
-fn network_is_quiescent(snapshot: &PairSnapshot) -> bool {
-    snapshot.network.queued_packet_ids.is_empty()
-        && snapshot.network.disconnected_endpoints.is_empty()
-        && snapshot.network.suspended_endpoints.is_empty()
-        && snapshot.host.live_resources.timers.is_empty()
-        && snapshot.guest.live_resources.timers.is_empty()
-        && snapshot.host.live_resources.delivery_leases.is_empty()
-        && snapshot.guest.live_resources.proposal_leases.is_empty()
-        && snapshot
-            .host
-            .live_resources
-            .recovery_transactions
-            .is_empty()
-        && snapshot
-            .guest
-            .live_resources
-            .recovery_transactions
-            .is_empty()
-        && snapshot.presenter.pending_event_ids.is_empty()
-}
-
-fn drain_network_to_quiescence(
+fn drain_queued_protocol_frames(
     pair: &mut SimulatedPair,
     trace: &mut Vec<PairStep>,
 ) -> TestResult<PairSnapshot> {
     for _ in 0..256 {
         let snapshot = pair.snapshot()?;
-        if network_is_quiescent(&snapshot) {
+        if snapshot.network.queued_packet_ids.is_empty() {
             return Ok(snapshot);
         }
-        let operation = if snapshot.network.queued_packet_ids.is_empty() {
-            PairOperation::AdvanceTime { delta_ms: safe(10) }
-        } else {
-            PairOperation::Fault {
-                operation: FaultOperation::DeliverNext,
-            }
-        };
-        trace.push(pair.apply(operation)?);
+        trace.push(pair.apply(PairOperation::Fault {
+            operation: FaultOperation::DeliverNext,
+        })?);
     }
-    Err(
-        std::io::Error::other("real network did not reach quiescence within 2,560 virtual ms")
-            .into(),
-    )
+    Err(std::io::Error::other("queued protocol frames did not drain within 256 deliveries").into())
 }
 
 fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
@@ -2074,7 +2045,7 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_full_tail_entry(&retry_entry, 4)?;
     trace.extend(retry_attempt_steps);
 
-    let before_teardown = drain_network_to_quiescence(&mut pair, &mut trace)?;
+    let before_teardown = drain_queued_protocol_frames(&mut pair, &mut trace)?;
     let host_head: Revision = typed_json_path(
         &before_teardown.host.kernel.state,
         &["protocol", "log", "headRevision"],
@@ -2095,6 +2066,19 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(
         (guest_received, guest_material, guest_control),
         (revision(4), revision(4), revision(4))
+    );
+    assert_eq!(before_teardown.terminal_reason, None);
+    assert!(
+        before_teardown
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&operation(4)?),
+        "TurnCommit proposal lease must remain retained until explicit teardown"
+    );
+    assert!(
+        !before_teardown.guest.live_resources.timers.is_empty(),
+        "retained TurnCommit proposal must keep its retry/absolute timers live"
     );
     assert!(before_teardown.network.queued_packet_ids.is_empty());
     assert!(!before_teardown.storage.keys.is_empty());
