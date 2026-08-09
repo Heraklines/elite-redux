@@ -1,7 +1,8 @@
 use std::error::Error;
 
 use er_state::battle::{
-    BattleOutcome, FaintOccurrence, FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
+    BattleId, BattleOutcome, BattleRngState, BattleState, CommandCollectionState,
+    FaintOccurrence, FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
 };
 use er_state::conditions::{
     AbilitySuppressionSource, ArenaConditionScope, ArenaConditionState,
@@ -47,6 +48,82 @@ fn empty_field(format: &BattleFormat) -> Result<FieldState, FieldStateError> {
             .map(|slot| FieldSlotState::new(slot, None))
             .collect(),
     )
+}
+
+fn empty_battle_state() -> Result<BattleState, Box<dyn Error>> {
+    let turn = TurnIndex::new(safe(1)).map_err(|error| format!("turn: {error}"))?;
+    let format = BattleFormat::single();
+    Ok(BattleState {
+        battle_id: BattleId::new(safe(7)),
+        wave: WaveIndex::new(safe(2)).map_err(|error| format!("wave: {error}"))?,
+        turn,
+        field: empty_field(&format)?,
+        format,
+        authority_seat: seat(1),
+        player_party: Vec::new(),
+        enemy_party: Vec::new(),
+        weather: WeatherState {
+            kind: WeatherKind::None,
+            remaining_turns: 0,
+        },
+        terrain: TerrainState {
+            kind: TerrainKind::None,
+            remaining_turns: 0,
+        },
+        arena_conditions: Vec::new(),
+        global_ability_suppression: GlobalAbilitySuppressionState {
+            ignore_abilities: false,
+            source: None,
+        },
+        battle_rng: BattleRngState::new("m3-battle-seed", turn),
+        command_state: CommandCollectionState::new(Vec::new(), Vec::new())?,
+        faint_queue: Vec::new(),
+        next_faint_occurrence: FaintOccurrenceId::new(safe(0)),
+        outcome: BattleOutcome::Ongoing,
+    })
+}
+
+#[test]
+fn battle_state_uses_the_frozen_closed_wire_shape_and_shared_rng_state()
+-> Result<(), Box<dyn Error>> {
+    let state = empty_battle_state()?;
+    let encoded = serde_json::to_value(&state)?;
+    let object = encoded
+        .as_object()
+        .ok_or("battle state must serialize as an object")?;
+    let expected_fields = [
+        "battle_id",
+        "wave",
+        "turn",
+        "format",
+        "authority_seat",
+        "player_party",
+        "enemy_party",
+        "field",
+        "weather",
+        "terrain",
+        "arena_conditions",
+        "global_ability_suppression",
+        "battle_rng",
+        "command_state",
+        "faint_queue",
+        "next_faint_occurrence",
+        "outcome",
+    ];
+    assert_eq!(object.len(), expected_fields.len());
+    assert!(expected_fields.iter().all(|field| object.contains_key(*field)));
+    assert_eq!(encoded["battle_rng"]["battle_seed"], "m3-battle-seed");
+    assert_eq!(encoded["battle_rng"]["turn"], 1);
+    assert_eq!(encoded["battle_rng"]["saved_substream"], serde_json::Value::Null);
+    assert_eq!(serde_json::from_value::<BattleState>(encoded.clone())?, state);
+
+    let mut malformed = encoded;
+    malformed
+        .as_object_mut()
+        .ok_or("battle state must serialize as an object")?
+        .insert("extra".to_owned(), serde_json::Value::Bool(true));
+    assert!(serde_json::from_value::<BattleState>(malformed).is_err());
+    Ok(())
 }
 
 #[test]
