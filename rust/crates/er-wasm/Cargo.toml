@@ -9,9 +9,13 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
 er-kernel = { path = "../er-kernel" }
 er-protocol = { path = "../er-protocol" }
+er-rng = { path = "../er-rng" }
+er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde_json.workspace = true
 wasm-bindgen.workspace = true

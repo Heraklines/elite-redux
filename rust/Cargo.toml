@@ -2,6 +2,10 @@
 members = [
     "crates/er-canonical",
     "crates/er-types",
+    "crates/er-rng",
+    "crates/er-content",
+    "crates/er-state",
+    "crates/er-battle",
     "crates/er-kernel",
     "crates/er-protocol",
     "crates/er-sim",

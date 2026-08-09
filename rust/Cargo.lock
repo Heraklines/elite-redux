@@ -89,10 +89,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-battle"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-content",
+ "er-rng",
+ "er-state",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "er-canonical"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-content"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-types",
  "serde",
  "serde_json",
  "thiserror",
@@ -121,6 +146,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-rng"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "er-sim"
 version = "0.1.0"
 dependencies = [
@@ -135,12 +171,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "er-testkit"
+name = "er-state"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-rng",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-testkit"
+version = "0.1.0"
+dependencies = [
+ "er-battle",
+ "er-canonical",
+ "er-content",
  "er-kernel",
  "er-protocol",
+ "er-rng",
+ "er-state",
  "er-types",
  "serde",
  "serde_json",
@@ -160,9 +212,13 @@ dependencies = [
 name = "er-wasm"
 version = "0.1.0"
 dependencies = [
+ "er-battle",
  "er-canonical",
+ "er-content",
  "er-kernel",
  "er-protocol",
+ "er-rng",
+ "er-state",
  "er-types",
  "serde_json",
  "wasm-bindgen",

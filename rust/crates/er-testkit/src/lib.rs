@@ -3,6 +3,7 @@
 pub mod assertions;
 pub mod fixture;
 pub mod keyboard_driver;
+pub mod m3_fixture;
 
 pub use assertions::{AssertionError, assert_fixture_digest, assert_fixture_round_trip};
 pub use fixture::{
