@@ -71,8 +71,9 @@ REPLACEMENT uses the same fourteen-step path and the same clone-and-swap
 boundary, with these exact substitutions:
 
 1. Resolve the proposal's global `FaintOccurrenceId` to the stored head and
-   validate its source epoch, wave, resolved turn, per-turn occurrence, owner,
-   field slot, current `ReplacementProgress`, and admitted
+   validate its source epoch, wave, resolved turn, per-turn occurrence, actor,
+   owner, field slot, current `ReplacementProgress`, projected replacement
+   control tuple, and admitted
    `BattleReplacementProposalV1` when the selection is human-supplied.
 2. For an owner with no legal replacement, construct
    `ReplacementSelection::NoLegalReplacement` internally; no proposal or menu

@@ -214,6 +214,12 @@ In voluntary `PartySelect`, Send Out produces the current command window's
 `BattleReplacementProposalV1` with `ReplacementSelection::Selected` and the
 exact pinned REPLACEMENT operation ID. Neither path invokes a resolver directly.
 
+The replacement control copies the stored faint occurrence's `source` and
+`pokemon` as its typed source and actor. Plan/projection validation reconstructs
+the complete REPLACEMENT operation ID from that source plus the plan battle,
+field, and seat coordinates; a syntactically plausible prefix with the correct
+control suffix is rejected when any coordinate differs.
+
 Voluntary PartySelect has enabled main Cancel. ReplacementSelect renders the
 same main Cancel node disabled. If an owner has no legal same-owner replacement,
 no unfinishable menu is installed: the stored occurrence is resolved as
@@ -232,6 +238,10 @@ PartyOptionSelect -> exact parent Party/Replacement selection
 ReplacementSelect -> disabled
 CommandRoot        -> disabled
 ```
+
+For a replacement parent, the exact restoration includes the copied stored
+faint actor and source-pinned decision operation in addition to owner, field
+slot, selected party option, and immutable menu graph.
 
 The pinned TypeScript target Cancel requeues CommandRoot, and its voluntary
 party return corrects POKEMON to FIGHT. M3 uses the explicit restoration rules

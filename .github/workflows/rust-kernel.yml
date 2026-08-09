@@ -824,6 +824,7 @@ jobs:
               "outside the signed": contract_dir / "m1-api.md",
               "JavaScript-safe range": contract_dir / "m1-api.md",
               "decision_operation_id": contract_dir / "m3-api.md",
+              "Replacement control copies the stored faint source and actor": contract_dir / "m3-api.md",
               "M3_PRESENTATION_FAILED": contract_dir / "m3-presentation-control.md",
               "QuiescentPreparedTransaction": contract_dir / "m3-snapshot-trace.md",
               "prepared_transaction = None": contract_dir / "m3-snapshot-trace.md",
@@ -877,6 +878,23 @@ jobs:
           if "o{turnOccurrence}" not in api_text or "o{occurrence}" in api_text:
               raise SystemExit(
                   "REPLACEMENT operation grammar must bind /o exclusively to turn_occurrence"
+              )
+
+          replacement_control_start = api_text.index("pub struct ReplacementSelectControl {")
+          replacement_control_end = api_text.index("\n}\n", replacement_control_start)
+          replacement_control_shape = api_text[
+              replacement_control_start:replacement_control_end
+          ]
+          stored_faint_control_shape = (
+              "    pub occurrence: FaintOccurrenceId,\n"
+              "    pub source: FaintSource,\n"
+              "    pub actor: PokemonId,\n"
+              "    pub field_slot: FieldSlot,\n"
+              "    pub owner_seat: SeatId,\n"
+          )
+          if stored_faint_control_shape not in replacement_control_shape:
+              raise SystemExit(
+                  "ReplacementSelectControl must carry the stored occurrence, source, actor, slot, and owner"
               )
 
           rng_contract_text = (contract_dir / "m3-js-number-rng.md").read_text(encoding="utf-8")
