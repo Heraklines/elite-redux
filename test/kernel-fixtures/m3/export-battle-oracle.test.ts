@@ -1789,6 +1789,7 @@ const RNG_REASON_BY_CALLSITE: Readonly<Record<string, string>> = Object.freeze({
   "src/phases/move-phase.ts:546": "ParalysisActivation",
   "src/data/moves/move.ts:3502": "SecondaryEffect",
   "src/data/moves/move.ts:3533": "SecondaryEffect",
+  "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496": "SecondaryEffect",
 });
 
 const RNG_HELPER_CALLSITES = new Set([
