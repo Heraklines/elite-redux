@@ -27,6 +27,14 @@ use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+struct DelayedRecoveryPair {
+    pair: SimulatedPair,
+    steps: Vec<PairStep>,
+    recovery_timer_ids: BTreeSet<TimerId>,
+    recovery_request_packet_id: SafeU53,
+    recovery_start_time: SafeU53,
+}
+
 const HOST_SEAT: u64 = 1;
 const GUEST_SEAT: u64 = 2;
 const INITIAL_GENERATION: u64 = 0;
@@ -804,15 +812,15 @@ fn authority_entries(
 ) -> TestResult<Vec<(SeatId, u32, FrameContext, AuthorityEntryBody)>> {
     let mut entries = Vec::new();
     for effect in &step.generated_effects {
-        if let KernelEffect::SendFrame { from, frame } = effect {
-            if frame.frame_type == FrameType::AuthorityEntry {
-                entries.push((
-                    *from,
-                    frame.version,
-                    frame.context.clone(),
-                    serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?,
-                ));
-            }
+        if let KernelEffect::SendFrame { from, frame } = effect
+            && frame.frame_type == FrameType::AuthorityEntry
+        {
+            entries.push((
+                *from,
+                frame.version,
+                frame.context.clone(),
+                serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?,
+            ));
         }
     }
     Ok(entries)
@@ -920,15 +928,15 @@ fn authority_receipts(
 ) -> TestResult<Vec<(SeatId, u32, FrameContext, AuthorityReceiptBody)>> {
     let mut receipts = Vec::new();
     for effect in &step.generated_effects {
-        if let KernelEffect::SendFrame { from, frame } = effect {
-            if frame.frame_type == FrameType::AuthorityReceipt {
-                receipts.push((
-                    *from,
-                    frame.version,
-                    frame.context.clone(),
-                    serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())?,
-                ));
-            }
+        if let KernelEffect::SendFrame { from, frame } = effect
+            && frame.frame_type == FrameType::AuthorityReceipt
+        {
+            receipts.push((
+                *from,
+                frame.version,
+                frame.context.clone(),
+                serde_json::from_value::<AuthorityReceiptBody>(frame.body.clone())?,
+            ));
         }
     }
     Ok(receipts)
@@ -1197,15 +1205,7 @@ fn raw_suspend_resume_preserves_all_mechanical_delays_while_absolute_advances() 
     Ok(())
 }
 
-fn delayed_recovery_pair(
-    seed: u64,
-) -> TestResult<(
-    SimulatedPair,
-    Vec<PairStep>,
-    BTreeSet<TimerId>,
-    SafeU53,
-    SafeU53,
-)> {
+fn delayed_recovery_pair(seed: u64) -> TestResult<DelayedRecoveryPair> {
     let (mut pair, mut steps, proposal) = initial_protocol_pair(seed)?;
     delay_all_queued(&mut pair, &mut steps, safe(2_000_000))?;
 
@@ -1269,13 +1269,13 @@ fn delayed_recovery_pair(
             .queued_packet_ids
             .contains(&recovery_request_packet_id)
     );
-    Ok((
+    Ok(DelayedRecoveryPair {
         pair,
         steps,
         recovery_timer_ids,
         recovery_request_packet_id,
         recovery_start_time,
-    ))
+    })
 }
 
 fn assert_terminal_ui_semantics(
@@ -1284,7 +1284,7 @@ fn assert_terminal_ui_semantics(
     host_view: &UiViewModel,
     guest_view: &UiViewModel,
     expected_reason: &str,
-) {
+) -> TestResult {
     // Menu generations are endpoint-local stale-input fences, so compare only
     // the semantic fields shared by the two terminal projections.
     assert_eq!(host_kernel_ui.owner_seat, guest_kernel_ui.owner_seat);
@@ -1315,15 +1315,26 @@ fn assert_terminal_ui_semantics(
             Some(MenuState::Terminal(menu)) => {
                 assert_eq!(menu.prompt_key.as_deref(), Some(expected_reason));
             }
-            other => panic!("{endpoint} terminal kernel UI was not a terminal menu: {other:?}"),
+            other => {
+                return Err(format!(
+                    "{endpoint} terminal kernel UI was not a terminal menu: {other:?}"
+                )
+                .into());
+            }
         }
     }
+    Ok(())
 }
 
 #[test]
 fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -> TestResult {
-    let (mut pair, mut steps, recovery_timer_ids, recovery_request_packet_id, recovery_start_time) =
-        delayed_recovery_pair(0x2468_ace0)?;
+    let DelayedRecoveryPair {
+        mut pair,
+        mut steps,
+        recovery_timer_ids,
+        recovery_request_packet_id,
+        recovery_start_time,
+    } = delayed_recovery_pair(0x2468_ace0)?;
     let suspended_virtual_ms = 60_000_u64;
     let before_suspend = pair.snapshot()?;
     let active_recovery_before_suspend = before_suspend
@@ -1443,7 +1454,7 @@ fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -
         &terminal_step.snapshot.host.ui,
         &terminal_step.snapshot.guest.ui,
         EXPECTED_RECOVERY_TERMINAL_REASON,
-    );
+    )?;
     let terminal_snapshot = terminal_step.snapshot.clone();
     let terminal_reason = terminal_step.snapshot.terminal_reason.clone();
     record_step(&mut steps, terminal_step);
