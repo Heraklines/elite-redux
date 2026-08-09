@@ -3088,10 +3088,10 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   trace.collectRng = true;
   trace.collectMutations = true;
   beginCoopRecording(resolvedTurn);
+  await admitPlayerCommands(game, id);
   if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
     registerReplacementPrompt(game);
   }
-  await admitPlayerCommands(game, id);
   await admitEnemyCommands(game, id);
   const rawCommitted = JSON.parse(JSON.stringify(game.scene.currentBattle.turnCommands)) as AnyRecord;
   const admitted = committedCommands(game, rawCommitted, trace);
