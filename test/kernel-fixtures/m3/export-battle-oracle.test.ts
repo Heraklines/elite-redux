@@ -2867,11 +2867,11 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
     if (move == null) {
       fail("COMMAND_UNOBSERVABLE", `no selected move in player field ${String(battlerIndex)}`);
     }
-    // Multi-target moves commit directly from the Fight menu. Registering a
-    // SelectTargetPhase callback for them leaves a stale prompt that can bind
-    // to the partner's single-target selection in doubles.
-    const target = move.getMove().isMultiTarget() ? null : BattlerIndex.ENEMY;
-    game.move.select(move.moveId, battlerIndex as BattlerIndex, target);
+    // Leave the helper target optional. Its SelectTargetPhase callback then
+    // confirms spread targets without a cursor and defaults a single target to
+    // ENEMY based on the phase that actually opened, so doubles callbacks
+    // cannot carry one battler's target shape into its partner's phase.
+    game.move.select(move.moveId, battlerIndex as BattlerIndex);
   };
   if (id === "pp-unusable-rejected") {
     const lead = field[0];
