@@ -117,6 +117,7 @@ interface ObservationTrace {
   faintByPhase?: WeakMap<object, AnyRecord>;
   faintBySwitchPhase?: WeakMap<object, AnyRecord>;
   faintBranchByPhase?: WeakMap<object, AnyRecord>;
+  faintCompletionByPokemon?: WeakMap<object, () => void>;
 }
 
 let activeTrace: ObservationTrace | null = null;
@@ -1603,25 +1604,25 @@ function installObservationHooks(): void {
     const tweenManager = scene.tweens as AnyRecord;
     const originalTweenAdd = tweenManager.add;
     const pokemon = this;
-    let completionScheduled = false;
+    let completion: (() => void) | null = null;
     tweenManager.add = function (this: AnyRecord, config: AnyRecord): any {
       if (
-        !completionScheduled
+        completion == null
         && config?.targets === pokemon
         && config?.ease === "Sine.easeIn"
         && typeof config?.onComplete === "function"
       ) {
-        completionScheduled = true;
-        queueMicrotask(config.onComplete);
+        completion = config.onComplete;
         return {};
       }
       return originalTweenAdd.call(this, config);
     };
     try {
       callback();
-      if (!completionScheduled) {
+      if (completion == null) {
         fail("OBSERVATION_SEAM_MISSING", "disabled-animation faint did not publish its production completion tween");
       }
+      trace.faintCompletionByPokemon?.set(pokemon, completion);
     } finally {
       tweenManager.add = originalTweenAdd;
     }
@@ -1697,6 +1698,12 @@ function installObservationHooks(): void {
       before: null,
       after: faintProjection(occurrence),
     });
+    const completion = activeTrace.faintCompletionByPokemon?.get(pokemon);
+    if (completion == null) {
+      fail("OBSERVATION_SEAM_MISSING", `faint ${String(id)} lost its disabled-animation completion callback`);
+    }
+    activeTrace.faintCompletionByPokemon?.delete(pokemon);
+    completion();
   };
   restoreHooks.push(() => {
     FaintPhase.prototype.start = originalFaintStart;
@@ -3080,6 +3087,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
     faintByPhase: new WeakMap<object, AnyRecord>(),
     faintBySwitchPhase: new WeakMap<object, AnyRecord>(),
     faintBranchByPhase: new WeakMap<object, AnyRecord>(),
+    faintCompletionByPokemon: new WeakMap<object, () => void>(),
     collectRng: false,
     collectMutations: false,
   };
