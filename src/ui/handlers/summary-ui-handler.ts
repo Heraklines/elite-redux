@@ -141,6 +141,7 @@ export class SummaryUiHandler extends UiHandler {
   private shinyLabSummarySpriteLoadKey: string | null = null;
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
+  private megaIcon: Phaser.GameObjects.Text;
   private pokeball: Phaser.GameObjects.Sprite;
   private levelText: Phaser.GameObjects.Text;
   private genderText: Phaser.GameObjects.Text;
@@ -305,6 +306,12 @@ export class SummaryUiHandler extends UiHandler {
     this.splicedIcon.setScale(0.75);
     this.splicedIcon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 12, 15), Phaser.Geom.Rectangle.Contains);
     this.summaryContainer.add(this.splicedIcon);
+
+    this.megaIcon = addTextObject(0, -54, "M", TextStyle.SUMMARY_GOLD);
+    this.megaIcon.setVisible(false);
+    this.megaIcon.setOrigin(0, 0);
+    this.megaIcon.setInteractive();
+    this.summaryContainer.add(this.megaIcon);
 
     this.shinyIcon = globalScene.add.image(0, -54, "shiny_star");
     this.shinyIcon.setVisible(false);
@@ -651,6 +658,18 @@ export class SummaryUiHandler extends UiHandler {
       this.splicedIcon.on("pointerout", () => globalScene.ui.hideTooltip());
     }
 
+    this.megaIcon
+      .setPositionRelative(
+        this.nameText,
+        this.nameText.displayWidth + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0) + 2,
+        1,
+      )
+      .setVisible(this.pokemon.isFunPseudoMega());
+    if (this.megaIcon.visible) {
+      this.megaIcon.on("pointerover", () => globalScene.ui.showTooltip("", "Pseudo Mega", true));
+      this.megaIcon.on("pointerout", () => globalScene.ui.hideTooltip());
+    }
+
     if (
       globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId()].classicWinCount > 0
       && globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId(true)].classicWinCount > 0
@@ -697,7 +716,10 @@ export class SummaryUiHandler extends UiHandler {
 
     this.shinyIcon.setPositionRelative(
       this.nameText,
-      this.nameText.displayWidth + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0) + 1,
+      this.nameText.displayWidth
+        + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0)
+        + (this.megaIcon.visible ? this.megaIcon.displayWidth + 1 : 0)
+        + 1,
       3,
     );
     this.shinyIcon

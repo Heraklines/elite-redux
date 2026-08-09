@@ -154,6 +154,7 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // the guest boots from the host's launch session, applyCoopLaunchSession).
   [UiMode.CHALLENGE_SELECT]: "local-only",
   [UiMode.FUN_MODE_SELECT]: "local-only",
+  [UiMode.FUN_ABILITY_REVIEW]: "local-only",
   [UiMode.COMMUNITY_CHALLENGES]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_CREATE]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_TEXT]: "local-only",

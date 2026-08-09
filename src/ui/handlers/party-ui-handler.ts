@@ -2461,6 +2461,7 @@ class PartySlot extends Phaser.GameObjects.Container {
 
     const genderSymbol = getGenderSymbol(this.pokemon.getGender(true));
     const isFusion = this.pokemon.isFusion();
+    const isPseudoMega = this.pokemon.isFunPseudoMega();
 
     // Here we define positions and offsets
     // Base values are for the active pokemon; they are changed for benched pokemon,
@@ -2471,7 +2472,7 @@ class PartySlot extends Phaser.GameObjects.Container {
     // name position relative to slot background
     let namePosition = { x: 24, y: 10 };
     // maximum allowed length of name; must accomodate fusion symbol
-    let maxNameTextWidth = 76 - (isFusion ? 8 : 0);
+    let maxNameTextWidth = 76 - (isFusion ? 8 : 0) - (isPseudoMega ? 8 : 0);
     // "Lv." label position relative to slot background
     let levelLabelPosition = { x: 24 + 8, y: 10 + 12 };
     // offset from "Lv." to the level number; should not be changed.
@@ -2582,6 +2583,17 @@ class PartySlot extends Phaser.GameObjects.Container {
         .setOrigin(0)
         .setPositionRelative(slotLevelLabel, splicedIconToLevelLabelOffset.x, splicedIconToLevelLabelOffset.y);
       slotInfoContainer.add(splicedIcon);
+    }
+
+    if (isPseudoMega) {
+      const megaIcon = addTextObject(0, 0, "M", TextStyle.SUMMARY_GOLD)
+        .setOrigin(0, 0.15)
+        .setPositionRelative(
+          slotLevelLabel,
+          splicedIconToLevelLabelOffset.x + (isFusion ? 8 : 0),
+          splicedIconToLevelLabelOffset.y - 1,
+        );
+      slotInfoContainer.add(megaIcon);
     }
 
     if (this.pokemon.status) {

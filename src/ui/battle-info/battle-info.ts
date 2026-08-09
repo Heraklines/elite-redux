@@ -116,6 +116,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected shinyIcon: Phaser.GameObjects.Sprite;
   protected fusionShinyIcon: Phaser.GameObjects.Sprite;
   protected splicedIcon: Phaser.GameObjects.Sprite;
+  protected megaIcon: Phaser.GameObjects.Text;
   protected statusIndicator: Phaser.GameObjects.Sprite;
   /**
    * Elite Redux custom statuses (bleed/frostbite/fear) have no frame in the
@@ -188,7 +189,14 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .setInteractive(hitArea, hitCallback)
       .setPositionRelative(this.nameText, 0, 2);
 
-    this.add([this.teraIcon, this.shinyIcon, this.fusionShinyIcon, this.splicedIcon]);
+    this.megaIcon = addTextObject(0, 0, "M", TextStyle.SUMMARY_GOLD)
+      .setName("icon_fun_mega")
+      .setVisible(false)
+      .setOrigin(0, 0.15)
+      .setInteractive()
+      .setPositionRelative(this.nameText, 0, 2);
+
+    this.add([this.teraIcon, this.shinyIcon, this.fusionShinyIcon, this.splicedIcon, this.megaIcon]);
   }
 
   /**
@@ -370,6 +378,22 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .on("pointerout", () => globalScene.ui.hideTooltip());
   }
 
+  private initFunMegaIcon(pokemon: Pokemon, baseWidth: number): void {
+    this.megaIcon
+      .setPositionRelative(
+        this.nameText,
+        baseWidth
+          + this.genderText.displayWidth
+          + 1
+          + (this.teraIcon.visible ? this.teraIcon.displayWidth + 1 : 0)
+          + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0),
+        1,
+      )
+      .setVisible(pokemon.isFunPseudoMega())
+      .on("pointerover", () => globalScene.ui.showTooltip("", "Pseudo Mega"))
+      .on("pointerout", () => globalScene.ui.hideTooltip());
+  }
+
   /**
    * Called by {@linkcode initInfo} to initialize the shiny icon
    * @param pokemon - The pokemon object attached to this battle info
@@ -385,7 +409,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
         + this.genderText.displayWidth
         + 1
         + (this.teraIcon.visible ? this.teraIcon.displayWidth + 1 : 0)
-        + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0),
+        + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0)
+        + (this.megaIcon.visible ? this.megaIcon.displayWidth + 1 : 0),
       2.5,
     );
     this.shinyIcon
@@ -445,6 +470,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
     const isFusion = pokemon.isFusion(true);
     this.initSplicedIcon(pokemon, nameTextWidth);
+    this.initFunMegaIcon(pokemon, nameTextWidth);
 
     const doubleShiny = isFusion && pokemon.shiny && pokemon.fusionShiny;
     this.initShinyIcon(pokemon, nameTextWidth, doubleShiny);

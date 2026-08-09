@@ -74,6 +74,7 @@ import { FunModeSelectUiHandler } from "#ui/fun-mode-select-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
 import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
 import { GhostTrainerEditorUiHandler } from "#ui/ghost-trainer-editor-ui-handler";
+import { FunAbilityReviewUiHandler } from "#ui/handlers/fun-ability-review-ui-handler";
 import { KeyboardBindingUiHandler } from "#ui/keyboard-binding-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import { LlmDirectorThemePickerUiHandler } from "#ui/llm-director-theme-picker-ui-handler";
@@ -136,6 +137,7 @@ const transitionModes = [
   UiMode.POKEDEX_PAGE,
   UiMode.CHALLENGE_SELECT,
   UiMode.FUN_MODE_SELECT,
+  UiMode.FUN_ABILITY_REVIEW,
   UiMode.RUN_HISTORY,
 ];
 
@@ -297,6 +299,7 @@ export class UI extends Phaser.GameObjects.Container {
       new TournamentBracketUiHandler(),
       new ShowdownSyncCommandUiHandler(),
       new FunModeSelectUiHandler(),
+      new FunAbilityReviewUiHandler(),
     ];
   }
 

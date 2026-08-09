@@ -12,6 +12,8 @@ import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/a
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { canUseFunMegaStone, getFunRealMegaChange } from "#data/elite-redux/er-fun-mega-mode";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
@@ -3499,6 +3501,38 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
    * @returns `true` if the form change item was applied
    */
   override apply(pokemon: Pokemon, active: boolean): boolean {
+    if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+      if (active) {
+        if (pokemon.customPokemonData.erFunMegaStone === this.formChangeItem) {
+          return true;
+        }
+        const realMega = getFunRealMegaChange(pokemon, this.formChangeItem);
+        if (!realMega && !canUseFunMegaStone(pokemon, this.formChangeItem)) {
+          return false;
+        }
+        pokemon.customPokemonData.erFunMegaStone = this.formChangeItem;
+        pokemon.customPokemonData.erFunPseudoMega = !realMega;
+        if (!realMega) {
+          const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+          pokemon.calculateStats();
+          pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+          void pokemon.updateInfo();
+          return true;
+        }
+      } else if (pokemon.customPokemonData.erFunMegaStone === this.formChangeItem) {
+        const wasPseudo = pokemon.customPokemonData.erFunPseudoMega;
+        pokemon.customPokemonData.erFunMegaStone = undefined;
+        pokemon.customPokemonData.erFunPseudoMega = false;
+        if (wasPseudo) {
+          const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+          pokemon.calculateStats();
+          pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+          void pokemon.updateInfo();
+          return true;
+        }
+      }
+    }
+
     const switchActive = this.active && !active;
 
     if (switchActive) {

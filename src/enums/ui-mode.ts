@@ -90,4 +90,6 @@ export enum UiMode {
   SHOWDOWN_SYNC_COMMAND,
   /** Fun Mode: configure the run's independent randomizers. */
   FUN_MODE_SELECT,
+  /** Fun Mode: one-time party ability review and reroll before wave 1. */
+  FUN_ABILITY_REVIEW,
 }

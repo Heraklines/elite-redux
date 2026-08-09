@@ -7759,3 +7759,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Implemented Klutz item suppression and adjacent-ally Symbiosis transfer. Removed stale `(N)` markers from Klutz, Symbiosis, Overzealous, Sunstrike, and Tempest Storm, and aligned their displayed descriptions with runtime behavior.
 - Verification: Fun Mode suite 11/11, Klutz/Symbiosis focused integration scenarios green, ability-overhaul suite 25/25, targeted TypeScript diagnostics clear, full Vite build green, and staging deploy `31290756176` green at `a578bf5f7`.
 - Visual harness: desktop and 390x844 mobile layouts are non-overlapping; toggles, START, direct starter-select flow, and return-to-config behavior work; no browser console errors were emitted. Production remains untouched.
+
+2026-08-09 - Fun Mega Mode implementation in progress
+
+- Added Mega Mode and Mega-stat-shuffle toggles plus a one-time pre-wave-1 party ability review/reroll screen.
+- Mega Stone metadata now derives each stone's stat delta from its real source and target Mega forms. Species with real Megas use only their compatible form; species without one receive a saved, temporary pseudo-Mega record that preserves their sprite and abilities while applying the stone delta.
+- Stat shuffle runs only while a Pokemon has the saved Mega Stone record and is currently Mega'd. It shuffles the effective real/pseudo Mega statline and preserves BST.
+- Pseudo-Megas expose `isMega()`, save/load through `CustomPokemonData`, and show a Mega Bracelet marker in battle info, party, and summary UI.
+- Mega Mode starts with a Mega Bracelet, puts all available Mega Stones in the Ultra reward generator, suppresses the Rogue stone generator, increases stone frequency, and ramps generated enemy Megas from 8% on wave 1 to 100% from wave 50.
+- Verification so far: targeted TypeScript has no diagnostics; the expanded Fun Mode test file is green. Remaining before staging: focused runtime tests for modifier add/remove and save restore, full build, desktop/mobile visual harness, then commit/push/deploy staging only.
