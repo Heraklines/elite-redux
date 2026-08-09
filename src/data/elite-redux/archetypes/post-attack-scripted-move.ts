@@ -136,7 +136,10 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (this.opts.typeFilter !== undefined && !this.opts.typeFilter.includes(move.type)) {
       return false;
     }
-    if (this.opts.flagFilter !== undefined && !move.hasFlag(this.opts.flagFilter)) {
+    if (
+      this.opts.flagFilter !== undefined
+      && !move.doesFlagEffectApply({ flag: this.opts.flagFilter, user: pokemon, target: opponent })
+    ) {
       return false;
     }
     return true;

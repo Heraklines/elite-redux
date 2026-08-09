@@ -458,7 +458,11 @@ export class Trainer extends Phaser.GameObjects.Container {
             ret = this.config.partyMemberFuncs[index](level, strength);
             return;
           }
-          if (Object.hasOwn(this.config.partyMemberFuncs, index - template.size)) {
+          // The wrapped lookup is only for an authored double trainer's second
+          // half. Triple-format padding must fall through to normal species
+          // generation; wrapping a two-member rival template made slot 3 call
+          // slot 1's starter generator again.
+          if (this.isDouble() && Object.hasOwn(this.config.partyMemberFuncs, index - template.size)) {
             ret = this.config.partyMemberFuncs[index - template.size](level, template.getStrength(index));
             return;
           }

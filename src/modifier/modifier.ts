@@ -3389,6 +3389,7 @@ export class PokemonMultiHitModifier extends PokemonHeldItemModifier {
     moveId: MoveId,
     count: NumberHolder | null = null,
     damageMultiplier: NumberHolder | null = null,
+    target: Pokemon | null = null,
   ): boolean {
     const move = allMoves[moveId];
     /**
@@ -3400,7 +3401,7 @@ export class PokemonMultiHitModifier extends PokemonHeldItemModifier {
      * - Multi-target moves are not boosted *unless* they can only hit a single Pokemon
      * - Fling, Uproar, Rollout, Ice Ball, and Endeavor are not boosted
      */
-    if (!move.canBeMultiStrikeEnhanced(pokemon)) {
+    if (!move.canBeMultiStrikeEnhanced(pokemon, false, target)) {
       return false;
     }
 

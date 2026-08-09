@@ -29,6 +29,7 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
   ER_PARTNER_EEVEE_ABILITY_ID,
+  ER_PARTNER_LEAFEON_ABILITY_ID,
   ER_PARTNER_NIMBEON_ABILITY_ID,
   ER_PARTNER_RYUVEON_ABILITY_ID,
   ER_PARTNER_TITANEON_ABILITY_ID,
@@ -44,6 +45,8 @@ import {
   ER_EGOELK_SPECIES_ID,
   ER_IDOLFIN_SPECIES_ID,
   ER_NIMBEON_SPECIES_ID,
+  ER_PARTNER_FLAREON_SPECIES_ID,
+  ER_PARTNER_LEAFEON_SPECIES_ID,
   ER_PARTNER_NIMBEON_SPECIES_ID,
   ER_PARTNER_RYUVEON_SPECIES_ID,
   ER_PARTNER_TITANEON_SPECIES_ID,
@@ -201,6 +204,19 @@ describe.skipIf(!RUN)("Batch-2 maintainer verdicts (2026-07-22)", () => {
       erOmniformOnMoveStart(holder, allMoves[MoveId.WATER_GUN]);
       expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_VAPOREON_SPECIES_ID);
       expect(holder.getMoveset().map(m => m?.moveId)).toContain(MoveId.WATER_GUN);
+    });
+
+    it("Partner Leafeon transforms into Partner Flareon when it uses Sizzly Slide", async () => {
+      game.override
+        .moveset([MoveId.SIZZLY_SLIDE, MoveId.LEAF_BLADE, MoveId.TACKLE, MoveId.SPLASH])
+        .ability(ER_PARTNER_LEAFEON_ABILITY_ID as AbilityId);
+      await game.classicMode.startBattle(ER_PARTNER_LEAFEON_SPECIES_ID as SpeciesId);
+      const holder = game.field.getPlayerPokemon();
+
+      erOmniformOnMoveStart(holder, allMoves[MoveId.SIZZLY_SLIDE]);
+
+      expect(holder.getSpeciesForm().speciesId).toBe(ER_PARTNER_FLAREON_SPECIES_ID);
+      expect(holder.getMoveset().map(m => m?.moveId)).toContain(MoveId.SIZZLY_SLIDE);
     });
   });
 

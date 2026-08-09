@@ -13,7 +13,7 @@
 // (1 + perFaint × count) — a true stat multiplier, not stat stages.
 //
 // Implemented as a faint-counting trigger plus per-stat multiplier attrs that
-// share a Symbol counter on the holder.
+// share a serialized counter on the holder.
 //
 // Engine note: PostKnockOut only fires for on-field holders, so only faints
 // that occur while the holder is out are counted (matches every ER faint-react
@@ -33,9 +33,7 @@ import {
 import type { BattleStat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 
-const COUNT = Symbol("StatMultiplierPerFaint.count");
-
-const faintCount = (pokemon: Pokemon): number => (pokemon as unknown as Record<symbol, number>)[COUNT] ?? 0;
+const faintCount = (pokemon: Pokemon): number => pokemon.customPokemonData.erSoulHarvestFaintCount ?? 0;
 
 export class FaintCountTriggerAbAttr extends PostKnockOutAbAttr {
   override canApply({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
@@ -47,8 +45,7 @@ export class FaintCountTriggerAbAttr extends PostKnockOutAbAttr {
     if (simulated) {
       return;
     }
-    const store = pokemon as unknown as Record<symbol, number>;
-    store[COUNT] = (store[COUNT] ?? 0) + 1;
+    pokemon.customPokemonData.erSoulHarvestFaintCount = faintCount(pokemon) + 1;
   }
 }
 

@@ -81,7 +81,7 @@ import { BattleType } from "#enums/battle-type";
 import { FormChangeItem } from "#enums/form-change-item";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
-import type { ModifierTier } from "#enums/modifier-tier";
+import { ModifierTier } from "#enums/modifier-tier";
 import { Nature } from "#enums/nature";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -131,6 +131,32 @@ import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
+
+export interface RewardRerollTierPolicy {
+  tiers: (ModifierTier | undefined)[] | undefined;
+  allowLuckUpgrades: boolean;
+}
+
+/**
+ * Locked rerolls preserve every slot exactly. Unlocked rerolls remain free to
+ * change ordinary tiers, but a Master/Luxury reward can never downgrade.
+ */
+export function resolveRewardRerollTierPolicy(
+  lockTiers: boolean,
+  rerollCount: number,
+  previousTiers?: ModifierTier[],
+): RewardRerollTierPolicy {
+  if (lockTiers) {
+    return { tiers: previousTiers, allowLuckUpgrades: false };
+  }
+  if (rerollCount > 0 && previousTiers?.some(tier => tier >= ModifierTier.MASTER)) {
+    return {
+      tiers: previousTiers.map(tier => (tier >= ModifierTier.MASTER ? tier : undefined)),
+      allowLuckUpgrades: true,
+    };
+  }
+  return { tiers: undefined, allowLuckUpgrades: true };
+}
 
 const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTypeFunc>> = {
   // `modifierTypes` is populated by initModifierTypes() after module evaluation. Keep every registry
@@ -1894,11 +1920,17 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   getModifierTypeOptions(modifierCount: number): ModifierTypeOption[] {
+    const rerollTierPolicy = resolveRewardRerollTierPolicy(
+      globalScene.lockModifierTiers,
+      this.rerollCount,
+      this.modifierTiers,
+    );
     return getPlayerModifierTypeOptions(
       modifierCount,
       globalScene.getPlayerParty(),
-      globalScene.lockModifierTiers ? this.modifierTiers : undefined,
+      rerollTierPolicy.tiers,
       this.customModifierSettings,
+      rerollTierPolicy.allowLuckUpgrades,
     );
   }
 

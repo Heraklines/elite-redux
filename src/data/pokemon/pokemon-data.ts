@@ -78,6 +78,8 @@ export class CustomPokemonData {
   public erBlackShiny = false;
   public erGiftAbilities: number[] = [];
   public erGiftIndex = 0;
+  /** Soul Harvest's run-long faint counter. Serialized so save/reload cannot erase its accumulated multiplier. */
+  public erSoulHarvestFaintCount = 0;
   /**
    * ER Shiny Lab: an optional carried cosmetic look for cross-player ghosts.
    * Permanent starter unlocks still live in starterData; this compact tuple is
@@ -176,6 +178,7 @@ export class CustomPokemonData {
     this.erBlackShiny = data?.erBlackShiny ?? false;
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
+    this.erSoulHarvestFaintCount = data?.erSoulHarvestFaintCount ?? 0;
     this.erShinyLab = normalizeErShinyLabSavedLook(data?.erShinyLab);
     this.erShinyLabName = sanitizeErShinyLabPresetName(data?.erShinyLabName) || undefined;
     this.erShinyLabSuppressLocal = data?.erShinyLabSuppressLocal ?? false;

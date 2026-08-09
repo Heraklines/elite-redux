@@ -10645,8 +10645,8 @@ export class AllySwitchAttr extends MoveEffectAttr {
   }
 
   override apply(user: Pokemon, _target: Pokemon, _move: Move, _args?: any[]): boolean {
-    const ally = user.getAlly();
-    if (!ally || ally === user) {
+    const ally = user.getAdjacentAllies().find(candidate => candidate.isActive(true) && !candidate.isFainted());
+    if (!ally) {
       return false;
     }
 

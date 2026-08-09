@@ -8839,15 +8839,21 @@ export class PlayerPokemon extends Pokemon {
 
         globalScene.getPlayerParty().push(newPokemon);
         newPokemon.evolve(isFusion ? new FusionSpeciesFormEvolution(this.id, newEvolution) : newEvolution, evoSpecies);
-        const modifiers = globalScene.findModifiers(
-          m => m instanceof PokemonHeldItemModifier && m.pokemonId === this.id,
-          true,
-        ) as PokemonHeldItemModifier[];
-        modifiers.forEach(m => {
-          const clonedModifier = m.clone() as PokemonHeldItemModifier;
-          clonedModifier.pokemonId = newPokemon.id;
-          globalScene.addModifier(clonedModifier, true);
-        });
+        // In solo play the original held items stay with the evolved Ninjask.
+        // Cloning them onto Shedinja duplicated every stack in the account's run.
+        // Keep the existing co-op snapshot behavior byte-for-byte outside this
+        // solo bug fix; co-op is intentionally not part of this triage pass.
+        if (globalScene.gameMode.isCoop) {
+          const modifiers = globalScene.findModifiers(
+            m => m instanceof PokemonHeldItemModifier && m.pokemonId === this.id,
+            true,
+          ) as PokemonHeldItemModifier[];
+          modifiers.forEach(m => {
+            const clonedModifier = m.clone() as PokemonHeldItemModifier;
+            clonedModifier.pokemonId = newPokemon.id;
+            globalScene.addModifier(clonedModifier, true);
+          });
+        }
         globalScene.updateModifiers(true);
       }
     }

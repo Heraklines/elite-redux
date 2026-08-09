@@ -9,7 +9,7 @@ import { GameManager } from "#test/framework/game-manager";
 import type { SessionSaveData, SystemSaveData } from "#types/save-data";
 import { decrypt, encrypt } from "#utils/data";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("System - Game Data", () => {
   let phaserGame: Phaser.Game;
@@ -193,6 +193,87 @@ describe("System - Game Data", () => {
       expect(success).toBe(true);
       expect(verifySpy).not.toHaveBeenCalled();
       expect(updateAllSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("solo session cache freshness", () => {
+    beforeEach(async () => {
+      vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+      vi.spyOn(pokerogueApi.account, "getInfo").mockResolvedValue([
+        {
+          accountId: "er-account:cloud",
+          username: "cloud",
+          lastSessionSlot: 0,
+          discordId: "",
+          googleId: "",
+          hasAdminRole: false,
+        },
+        200,
+      ]);
+      await account.updateUserInfo();
+      localStorage.clear();
+    });
+
+    afterEach(() => localStorage.clear());
+
+    it("adopts a newer cloud solo checkpoint instead of loading an older device cache", async () => {
+      const local = JSON.stringify({
+        gameVersion: "1.11.19",
+        gameMode: 0,
+        waveIndex: 10,
+        party: [],
+        enemyParty: [],
+        timestamp: 100,
+      });
+      const cloud = JSON.stringify({
+        gameVersion: "1.11.19",
+        gameMode: 0,
+        waveIndex: 20,
+        party: [],
+        enemyParty: [],
+        timestamp: 200,
+      });
+      localStorage.setItem("sessionData_cloud", encrypt(local, false));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+        ok: true,
+        status: 200,
+        rawSavedata: cloud,
+      });
+
+      const loaded = await game.scene.gameData.getSession(0);
+
+      expect(loaded?.waveIndex).toBe(20);
+      expect(decrypt(localStorage.getItem("sessionData_cloud")!, false)).toBe(cloud);
+    });
+
+    it("keeps a newer local solo checkpoint when the cloud copy is older", async () => {
+      const local = JSON.stringify({
+        gameVersion: "1.11.19",
+        gameMode: 0,
+        waveIndex: 30,
+        party: [],
+        enemyParty: [],
+        timestamp: 300,
+      });
+      const cloud = JSON.stringify({
+        gameVersion: "1.11.19",
+        gameMode: 0,
+        waveIndex: 20,
+        party: [],
+        enemyParty: [],
+        timestamp: 200,
+      });
+      localStorage.setItem("sessionData_cloud", encrypt(local, false));
+      vi.spyOn(pokerogueApi.savedata.session, "getCoopCas").mockResolvedValue({
+        ok: true,
+        status: 200,
+        rawSavedata: cloud,
+      });
+
+      const loaded = await game.scene.gameData.getSession(0);
+
+      expect(loaded?.waveIndex).toBe(30);
+      expect(decrypt(localStorage.getItem("sessionData_cloud")!, false)).toBe(local);
     });
   });
 

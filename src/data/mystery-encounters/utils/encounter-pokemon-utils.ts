@@ -726,7 +726,7 @@ export async function catchPokemon(
         // #807 B: an ME catch on THIS client is an allowlisted account write.
         coopAllowAccountWrite("me-catch", () => globalScene.gameData.setPokemonCaught(pokemon)),
       ]).then(() => {
-        if (!(isObtain || addStatus.value)) {
+        if (!shouldAddEncounterPokemonToParty(isObtain, addStatus.value, globalScene.gameMode.isCoop)) {
           removePokemon();
           end();
           return;
@@ -878,6 +878,18 @@ export async function catchPokemon(
       doPokemonCatchMenu();
     }
   });
+}
+
+/**
+ * Gifts/obtains in solo runs obey the same active-roster challenge gate as
+ * catches. The co-op obtain behavior is intentionally preserved unchanged.
+ */
+export function shouldAddEncounterPokemonToParty(
+  isObtain: boolean,
+  challengeAllows: boolean,
+  isCoop: boolean,
+): boolean {
+  return challengeAllows || (isObtain && isCoop);
 }
 
 /**

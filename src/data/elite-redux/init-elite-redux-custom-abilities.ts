@@ -900,6 +900,11 @@ function buildCustomAbility(
   if (archetypeRow !== undefined && pokerogueId !== ER_SUGAR_RUSH_ABILITY_ID) {
     wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
   }
+  // Fire Aspect copies Desolate Land's weather lifecycle. Its clear-weather attr
+  // must still run when the holder faints, just like the vanilla constituent.
+  if (draft.id === 871) {
+    builder.bypassFaint();
+  }
 
   if (pokerogueId === ER_SUGAR_RUSH_ABILITY_ID) {
     builder.attr(

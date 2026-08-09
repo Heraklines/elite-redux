@@ -171,6 +171,7 @@ describe.skipIf(!RUN)("ER 869-873 cluster — cross-wiring fix", () => {
 
     expect(game.scene.arena.weather?.weatherType).toBe(WeatherType.HARSH_SUN);
     expect(game.scene.arena.getTagOnSide(ArenaTagType.TAILWIND, ArenaTagSide.PLAYER)).toBeDefined();
+    expect(allAbilities[FIRE_ASPECT].bypassFaint).toBe(true);
   });
 
   // 872 Aurora's Gale halves incoming Special damage. Deterministic test-RNG

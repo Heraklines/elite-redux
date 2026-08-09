@@ -60,4 +60,24 @@ describe.skipIf(!RUN)("ER Two Step dance rider targets the FOE, not the dancer (
     // ...and the dancer never damaged itself.
     expect(player.hp).toBe(playerHpBefore);
   });
+
+  it("Festivities makes Hyper Voice count as a dance for Two Step", async () => {
+    game.override
+      .ability(ER_ID_MAP.abilities[842] as AbilityId)
+      .passiveAbility(ER_ID_MAP.abilities[TWO_STEP_ER_ID] as AbilityId)
+      .moveset(MoveId.HYPER_VOICE);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const enemy = game.scene.getEnemyPokemon()!;
+
+    game.move.use(MoveId.HYPER_VOICE);
+    await game.toEndOfTurn();
+
+    expect(
+      game.scene
+        .getPlayerPokemon()!
+        .getLastXMoves(2)
+        .map(entry => entry.move),
+    ).toContain(MoveId.REVELATION_DANCE);
+    expect(enemy.getInverseHp()).toBeGreaterThan(0);
+  });
 });

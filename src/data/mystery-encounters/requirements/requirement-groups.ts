@@ -1,4 +1,5 @@
 import { AbilityId } from "#enums/ability-id";
+import { ErMoveId } from "#enums/er-move-id";
 import { MoveId } from "#enums/move-id";
 
 /**
@@ -43,6 +44,7 @@ export const DANCING_MOVES = [
   MoveId.SWORDS_DANCE,
   MoveId.TEETER_DANCE,
   MoveId.VICTORY_DANCE,
+  ErMoveId.MYSTIC_DANCE as MoveId,
 ];
 
 /**

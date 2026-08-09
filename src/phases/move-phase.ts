@@ -212,6 +212,14 @@ export class MovePhase extends PokemonPhase {
     /** Indicates this is the release turn of the move */
     const releasing = isChargingMove && !charging;
 
+    // A faster battler may remove every queued target before this phase starts.
+    // Resolve that edge before committing PP; otherwise the move both failed and
+    // consumed PP, and empty-side effects could enter their no-target path.
+    if (this.getActiveTargetPokemon().length === 0 && this.resolveFinalPreMoveCancellationChecks(false)) {
+      this.end();
+      return;
+    }
+
     // Charging moves consume PP when they begin charging, *not* when they release
     if (!releasing) {
       this.usePP();
@@ -863,7 +871,7 @@ export class MovePhase extends PokemonPhase {
    * @returns Whether the move failed due to an edge case
    */
   // TODO: The first part of this check seems already covered in `checkValidity`...
-  protected resolveFinalPreMoveCancellationChecks(): boolean {
+  protected resolveFinalPreMoveCancellationChecks(lapseMoveTags = true): boolean {
     let targets = this.getActiveTargetPokemon();
     const moveQueue = this.pokemon.getMoveQueue();
 
@@ -906,7 +914,9 @@ export class MovePhase extends PokemonPhase {
       this.pokemon.pushMoveHistory(this.moveHistoryEntry);
       return true;
     }
-    this.pokemon.lapseTags(BattlerTagLapseType.MOVE);
+    if (lapseMoveTags) {
+      this.pokemon.lapseTags(BattlerTagLapseType.MOVE);
+    }
     return false;
   }
 

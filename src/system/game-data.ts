@@ -2024,14 +2024,42 @@ export class GameData {
 
     console.log("Getting Session Slot id: %d", slotId);
 
-    // Check local storage for the cached session data
-    if (bypassLogin || localStorage.getItem(getSessionDataLocalStorageKey(slotId))) {
-      const sessionData = localStorage.getItem(getSessionDataLocalStorageKey(slotId));
-      if (!sessionData) {
-        console.error("No session data found!");
-        return;
+    const localKey = getSessionDataLocalStorageKey(slotId);
+    const localEncrypted = localStorage.getItem(localKey);
+
+    // Offline/guest saves have no cloud replica to reconcile.
+    if (bypassLogin && localEncrypted != null) {
+      return this.parseSessionData(decrypt(localEncrypted, true));
+    }
+
+    // A logged-in solo cache is not automatically authoritative: another
+    // device may have pushed a newer checkpoint into the same cloud slot.
+    // Reconcile by the save timestamp before Continue can load stale bytes.
+    // Protected co-op replicas deliberately retain their separate CAS path.
+    if (localEncrypted != null) {
+      const localRaw = decrypt(localEncrypted, false);
+      const localSession = this.parseSessionData(localRaw);
+      if (classifySessionProtection(localRaw) !== "solo") {
+        return localSession;
       }
-      return this.parseSessionData(decrypt(sessionData, bypassLogin));
+
+      const cloudRead = await this.readCoopCas(slotId);
+      if (!cloudRead.ok || classifySessionProtection(cloudRead.rawSavedata) !== "solo") {
+        return localSession;
+      }
+      const cloudSession = this.parseSessionData(cloudRead.rawSavedata);
+      if ((cloudSession.timestamp ?? 0) <= (localSession.timestamp ?? 0)) {
+        return localSession;
+      }
+
+      const encryptedCloud = encrypt(cloudRead.rawSavedata, false);
+      const cached = await this.withSessionPersistenceLease(async () => {
+        if (localStorage.getItem(localKey) !== localEncrypted) {
+          return false;
+        }
+        return trySetLocalStorageItem(localKey, encryptedCloud) && localStorage.getItem(localKey) === encryptedCloud;
+      }, false);
+      return cached === true ? cloudSession : localSession;
     }
 
     // Ask the server API for the save data and store it in localstorage
@@ -2042,7 +2070,6 @@ export class GameData {
     }
     const response = cloudRead.rawSavedata;
 
-    const localKey = getSessionDataLocalStorageKey(slotId);
     const protectedCoop = classifySessionProtection(response) !== "solo";
     const cached = await this.withSessionPersistenceLease(async () => {
       if (localStorage.getItem(localKey) != null) {
@@ -6765,6 +6792,13 @@ export class GameData {
    */
   public getRootStarterSpeciesId(speciesId: number): SpeciesId {
     const baseId = erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId;
+    // ER imports Spiky-eared Pichu as a standalone compatibility species. The
+    // rebuilt prevolution table can therefore point ordinary Pikachu/Raichu at
+    // that removed-form id (10194) instead of the playable vanilla Pichu bucket.
+    // Starter progress for every ordinary Pikachu form still belongs to Pichu.
+    if (baseId === SpeciesId.PIKACHU || baseId === SpeciesId.RAICHU || baseId === SpeciesId.ALOLA_RAICHU) {
+      return SpeciesId.PICHU;
+    }
     return getPokemonSpecies(baseId)?.getRootSpeciesId() ?? (baseId as SpeciesId);
   }
 
@@ -6801,11 +6835,7 @@ export class GameData {
       // ER: fold a custom MEGA form's stray bucket into its base too (mega has no
       // prevolution, so getRootSpeciesId returns itself - resolve mega->base first
       // so an already-split save (base candy X, mega candy Y) heals to base X+Y).
-      const megaBase = erMegaTargetToBaseSpeciesId(speciesId);
-      const rootId =
-        megaBase === undefined
-          ? species.getRootSpeciesId()
-          : (getPokemonSpecies(megaBase)?.getRootSpeciesId() ?? megaBase);
+      const rootId = this.getRootStarterSpeciesId(speciesId);
       if (rootId === speciesId) {
         continue;
       }

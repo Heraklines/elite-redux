@@ -970,6 +970,22 @@ export class CommandPhase extends FieldPhase {
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
 
+    // A solo multi-battle may still keep a fainted occupant in its field slot
+    // until replacement resolution. Skip that exact slot before the legacy
+    // lone-survivor redirect can turn it into a duplicate command for an ally.
+    if (!globalScene.gameMode.isCoop) {
+      const commandPokemon = globalScene.getPlayerField()[this.fieldIndex];
+      if (commandPokemon == null || !commandPokemon.isActive(true)) {
+        globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+          command: Command.FIGHT,
+          move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+          skip: true,
+        };
+        this.end();
+        return;
+      }
+    }
+
     if (this.fieldIndex) {
       this.handleFieldIndexLogic();
     }

@@ -295,8 +295,10 @@ export function getErSharedGiftAbilityIdsFor(pokemon: Pokemon): number[] {
   }
   try {
     if (pokemon.isOnField?.()) {
-      const ally = pokemon.getAlly?.();
-      if (ally && ally !== pokemon && ally.isOnField() && isErBlackShiny(ally)) {
+      for (const ally of pokemon.getAllies?.() ?? []) {
+        if (!ally.isOnField() || !isErBlackShiny(ally)) {
+          continue;
+        }
         const gift = getErActiveGiftAbilityId(ally);
         if (gift !== null && !ids.includes(gift)) {
           ids.push(gift);

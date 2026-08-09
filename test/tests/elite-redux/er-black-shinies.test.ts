@@ -225,6 +225,25 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
     });
   });
 
+  describe("triples - gift sharing", () => {
+    beforeEach(async () => {
+      game = new GameManager(phaserGame);
+      game.override.battleStyle("triple");
+      await game.classicMode.startBattle(SpeciesId.JIGGLYPUFF, SpeciesId.SNORLAX, SpeciesId.EEVEE);
+    });
+
+    it("shares a black shiny's gift with both on-field allies", () => {
+      const [puff, lax, eevee] = game.scene.getPlayerField();
+      applyErBlackShinyKit(puff);
+      const gift = getErActiveGiftAbilityId(puff)!;
+
+      expect(getErSharedGiftAbilityIdsFor(lax)).toContain(gift);
+      expect(getErSharedGiftAbilityIdsFor(eevee)).toContain(gift);
+      expect(lax.getPassiveAbilities().map(a => a?.id)).toContain(gift);
+      expect(eevee.getPassiveAbilities().map(a => a?.id)).toContain(gift);
+    });
+  });
+
   describe("generation-time dev override (dev suite spawn-speed fix)", () => {
     type MutableErBlackOverrides = {
       ER_BLACK_SHINY_ENEMY_OVERRIDE: SpeciesId | null;

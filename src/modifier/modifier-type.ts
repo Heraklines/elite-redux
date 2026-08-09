@@ -3118,8 +3118,9 @@ export function getModifierTypeFuncById(id: string): ModifierTypeFunc {
 export function getPlayerModifierTypeOptions(
   count: number,
   party: PlayerPokemon[],
-  modifierTiers?: ModifierTier[],
+  modifierTiers?: (ModifierTier | undefined)[],
   customModifierSettings?: CustomModifierSettings,
+  allowTierLuckUpgrades = true,
 ): ModifierTypeOption[] {
   const options: ModifierTypeOption[] = [];
   const retryCount = Math.min(count * 5, 50);
@@ -3190,7 +3191,7 @@ export function getPlayerModifierTypeOptions(
   } else {
     for (let i = 0; i < count; i++) {
       const tier = modifierTiers && modifierTiers.length > i ? modifierTiers[i] : undefined;
-      options.push(getModifierTypeOptionWithRetry(options, retryCount, party, tier));
+      options.push(getModifierTypeOptionWithRetry(options, retryCount, party, tier, allowTierLuckUpgrades));
     }
   }
 

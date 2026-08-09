@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
+import { AllySwitchAttr } from "#data/moves/move";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -149,6 +150,21 @@ describe.skipIf(!RUN)("ER final-four primitives", () => {
 
       // Still in slot 0 — the move had no legal effect in singles.
       expect(player.getFieldIndex()).toBe(0);
+    });
+
+    it("refuses to swap with a fainted field ally", async () => {
+      game.override.battleStyle("double").moveset([MoveId.ALLY_SWITCH, MoveId.SPLASH]);
+      await game.classicMode.startBattle(SpeciesId.ALAKAZAM, SpeciesId.BLASTOISE);
+      const [user, ally] = game.scene.getPlayerField();
+      ally.hp = 0;
+      const userSlot = user.getFieldIndex();
+      const allySlot = ally.getFieldIndex();
+
+      const applied = new AllySwitchAttr().apply(user, user, allMoves[MoveId.ALLY_SWITCH]);
+
+      expect(applied).toBe(false);
+      expect(user.getFieldIndex()).toBe(userSlot);
+      expect(ally.getFieldIndex()).toBe(allySlot);
     });
   });
 

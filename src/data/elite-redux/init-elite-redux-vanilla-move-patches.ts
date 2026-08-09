@@ -172,6 +172,17 @@ function patchErPledge(move: MutableMove, rules: readonly ErPledgeRule[], descri
 }
 
 const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map([
+  // Confirmed ER metadata corrections from the seven-day player report.
+  [MoveId.SHELL_SIDE_ARM, move => orFlag(move, MoveFlags.PULSE_MOVE)],
+  [
+    MoveId.SKULL_BASH,
+    move => {
+      if (move.chargeAttrs) {
+        move.chargeAttrs = move.chargeAttrs.filter(attr => !(attr instanceof StatStageChangeAttr));
+        move.chargeAttrs.push(new StatStageChangeAttr([Stat.ATK], 1, true));
+      }
+    },
+  ],
   // =====================================================================
   // TOTAL rewrites — 4 OHKO nerfs
   // =====================================================================

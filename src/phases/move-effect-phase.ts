@@ -247,7 +247,7 @@ export class MoveEffectPhase extends PokemonPhase {
         applyAbAttrs("AllAttacksMultiHitAbAttr", { pokemon: user, move, hitCount, opponent });
       }
       // If Multi-Lens is applicable, add hits equal to the number of held Multi-Lenses
-      globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount);
+      globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount, null, opponent);
       // ER multi-hit COUNT override (Giant Shuriken 960: Water Shuriken hits
       // exactly once). Scanned by name — registration-free, same pattern as the
       // MoveCategoryOverrideAbAttr scan in Pokemon.getAttackDamage. Runs LAST
