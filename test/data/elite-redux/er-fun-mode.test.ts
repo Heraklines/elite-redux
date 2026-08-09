@@ -29,9 +29,18 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { LevelMoves } from "#types/pokemon-level-moves";
+import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
 import { afterEach, describe, expect, it } from "vitest";
 
-afterEach(() => resetFunModeConfig());
+afterEach(() => {
+  resetFunModeConfig();
+  for (let index = localStorage.length - 1; index >= 0; index--) {
+    const key = localStorage.key(index);
+    if (key?.startsWith("lastFunMode_")) {
+      localStorage.removeItem(key);
+    }
+  }
+});
 
 describe("Fun Mode configuration", () => {
   it("is a 200-wave classic-style run with no leaderboard determinism", () => {
@@ -61,6 +70,27 @@ describe("Fun Mode configuration", () => {
       megaMode: true,
       shuffleStats: true,
       abilityRerollSeed: 4,
+    });
+  });
+
+  it("persists the last modifier setup without carrying over its reroll seed", () => {
+    const config = {
+      randomizePokemon: false,
+      randomizeTypes: true,
+      randomizeAbilities: true,
+      randomizeLevelUpMoves: false,
+      megaMode: true,
+      shuffleStats: true,
+      abilityRerollSeed: 27,
+    };
+    saveLastFunModeConfig(config);
+    expect(loadLastFunModeConfig()).toEqual({
+      randomizePokemon: false,
+      randomizeTypes: true,
+      randomizeAbilities: true,
+      randomizeLevelUpMoves: false,
+      megaMode: true,
+      shuffleStats: true,
     });
   });
 });
