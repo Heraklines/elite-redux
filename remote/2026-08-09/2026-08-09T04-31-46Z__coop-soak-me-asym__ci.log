@@ -1,0 +1,56 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 31294411130 (main)
+timestamp: 2026-08-09T04-31-46Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=15 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=15 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=17 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=17 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=13 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=13 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 12 (seed 828633): wave driving threw (strand/stall): wave 12 guest-owned Mystery never exposed actionable MYSTERY_ENCOUNTER (mode=MESSAGE active=true actionable=false). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-08-09T04-31-46-683Z__seed-828633__wave-12. Replay: SOAK_SEED=828633[39m
+
+----- vitest result tail -----
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[coop:launch] clearCoopRuntime role=host netcode=authoritative gen->12
+[coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[coop:relay] dispose() (no in-flight waiters)
+[coop:pump] end session { seq: 8_000_013, termSeq: -1, wasOwner: false }
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=false)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:228:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1) > drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m44501[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-me.test.ts:228:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:228:3[22m[2m > [22mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 12 (seed 828633): wave driving threw (strand/stall): wave 12 guest-owned Mystery never exposed actionable MYSTERY_ENCOUNTER (mode=MESSAGE active=true actionable=false). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-08-09T04-31-46-683Z__seed-828633__wave-12. Replay: SOAK_SEED=828633[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1791:11[22m[39m
+    [90m1789|[39m       phaseState: phaseStateDump(rig),
+    [90m1790|[39m     });
+    [90m1791|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1792|[39m   };
+    [90m1793|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m5386:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak-me.test.ts:[2m246:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (5)[39m
+[2m   Start at [22m 04:28:29
+[2m   Duration [22m 197.46s[2m (transform 42.86s, setup 52.89s, import 702ms, tests 181.59s, environment 1.27s)[22m
+
