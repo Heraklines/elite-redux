@@ -624,7 +624,7 @@ function scenarioFor(id: string): ScenarioSpec {
           { species: 52, level: 100, moves: [1, 52, 351, 589], ability: AbilityId.NONE },
           { species: 52, level: 100, moves: [1, 52, 351, 589], ability: AbilityId.NONE },
         ],
-      ];
+      };
       use(MoveId.PLAY_NICE);
       break;
     case "doubles-single-target":
