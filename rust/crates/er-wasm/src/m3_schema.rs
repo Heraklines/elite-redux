@@ -202,10 +202,7 @@ macro_rules! round_trip_validated {
 /// Decode one named production DTO, validate it through its owning crate, and
 /// return its compact strict canonical JSON. Re-decoding and canonicalizing the
 /// result must be byte-idempotent.
-pub fn round_trip_m3_schema_json(
-    schema: &str,
-    input: &str,
-) -> Result<String, M3SchemaError> {
+pub fn round_trip_m3_schema_json(schema: &str, input: &str) -> Result<String, M3SchemaError> {
     match schema {
         "BattleCommand" => round_trip_validated!(
             "BattleCommand",
@@ -258,12 +255,9 @@ pub fn round_trip_m3_schema_json(
             BattleRngState,
             BattleRngState::validate
         ),
-        "BattleState" => round_trip_validated!(
-            "BattleState",
-            input,
-            BattleState,
-            validate_battle_state
-        ),
+        "BattleState" => {
+            round_trip_validated!("BattleState", input, BattleState, validate_battle_state)
+        }
         "BattleUiProjection" => round_trip_validated!(
             "BattleUiProjection",
             input,
@@ -289,12 +283,9 @@ pub fn round_trip_m3_schema_json(
             PhaserRdgState,
             PhaserRdgState::validate
         ),
-        "PokemonState" => round_trip_validated!(
-            "PokemonState",
-            input,
-            PokemonState,
-            PokemonState::validate
-        ),
+        "PokemonState" => {
+            round_trip_validated!("PokemonState", input, PokemonState, PokemonState::validate)
+        }
         "RngAuditState" => round_trip_validated!(
             "RngAuditState",
             input,
@@ -324,6 +315,5 @@ pub fn round_trip_m3_schema_json(
 /// wasm-bindgen wrapper over the same native implementation.
 #[wasm_bindgen(js_name = roundTripM3SchemaJson)]
 pub fn round_trip_m3_schema_json_wasm(schema: &str, input: &str) -> Result<String, JsValue> {
-    round_trip_m3_schema_json(schema, input)
-        .map_err(|error| JsValue::from_str(&error.to_string()))
+    round_trip_m3_schema_json(schema, input).map_err(|error| JsValue::from_str(&error.to_string()))
 }

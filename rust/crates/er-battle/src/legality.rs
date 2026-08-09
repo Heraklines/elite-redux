@@ -16,9 +16,9 @@ use er_types::OperationId;
 use er_types::SeatId;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleCommandError, BattleCommandOffer,
-    BattleCommandProposalV1, BattleReplacementProposalV1, BattleTargetSelection, CommandSet,
-    CommandFrontierEntry, CommandFrontierStatus, OfferedMoveCommand, OfferedSwitchCommand,
-    ReplacementSelection,
+    BattleCommandProposalV1, BattleReplacementProposalV1, BattleTargetSelection,
+    CommandFrontierEntry, CommandFrontierStatus, CommandSet, OfferedMoveCommand,
+    OfferedSwitchCommand, ReplacementSelection,
 };
 use er_types::battle_ids::{
     AbilityId, BattleSide, FaintOccurrenceId, FieldSlot, MoveId, MoveSlotIndex, PartyIndex,
@@ -54,17 +54,11 @@ pub enum CommandLegalityError {
         species: SpeciesId,
     },
     #[error("form {form_index} for Pokémon {pokemon:?} is outside the selected content pack")]
-    UnsupportedForm {
-        pokemon: PokemonId,
-        form_index: u16,
-    },
+    UnsupportedForm { pokemon: PokemonId, form_index: u16 },
     #[error("effective typing for Pokémon {pokemon:?} is outside the selected content pack")]
     UnsupportedEffectiveTyping { pokemon: PokemonId },
     #[error("move {move_id:?} for Pokémon {pokemon:?} is absent from the content pack")]
-    UnknownMove {
-        pokemon: PokemonId,
-        move_id: MoveId,
-    },
+    UnknownMove { pokemon: PokemonId, move_id: MoveId },
     #[error("ability {ability_id:?} for Pokémon {pokemon:?} is absent from the content pack")]
     UnknownAbility {
         pokemon: PokemonId,
@@ -296,12 +290,7 @@ pub fn normalize_command_set(
     }
 
     let mut normalized = Vec::with_capacity(commands.entries.len());
-    for (entry, supplied) in battle
-        .command_state
-        .frontier
-        .iter()
-        .zip(&commands.entries)
-    {
+    for (entry, supplied) in battle.command_state.frontier.iter().zip(&commands.entries) {
         let CommandFrontierStatus::Admitted { command, .. } = &entry.status else {
             return Err(CommandLegalityError::CommandNotAdmitted);
         };
@@ -310,10 +299,7 @@ pub fn normalize_command_set(
         }
         validate_preserved_offer_in_battle(battle, entry, content)?;
         normalized.push(normalize_accepted_in_battle(
-            battle,
-            entry,
-            supplied,
-            content,
+            battle, entry, supplied, content,
         )?);
     }
     validate_unique_switch_destinations(&normalized)?;
@@ -526,8 +512,7 @@ fn build_full_offer(
             continue;
         }
         let move_slot = MoveSlotIndex::new(
-            u8::try_from(index)
-                .map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?,
+            u8::try_from(index).map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?,
         )
         .map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?;
         fight.push(OfferedMoveCommand::new(move_slot, legal_targets)?);
@@ -584,8 +569,7 @@ fn target_candidates(
 
 fn are_adjacent(battle: &BattleState, left: FieldSlot, right: FieldSlot) -> bool {
     battle.format.adjacency.iter().any(|edge| {
-        (edge.first == left && edge.second == right)
-            || (edge.first == right && edge.second == left)
+        (edge.first == left && edge.second == right) || (edge.first == right && edge.second == left)
     })
 }
 
@@ -600,8 +584,7 @@ fn switch_candidates(
             continue;
         }
         let party_slot = PartyIndex::new(
-            u8::try_from(index)
-                .map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?,
+            u8::try_from(index).map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?,
         )
         .map_err(|_| CommandLegalityError::SlotIndexInvariant { index })?;
         candidates.push(OfferedSwitchCommand::new(party_slot, pokemon.id));
@@ -626,9 +609,7 @@ fn ensure_command_in_full_offer(
     let offer = build_full_offer(battle, field_slot, content)?;
     let offered = match command {
         BattleCommand::Fight {
-            move_slot,
-            targets,
-            ..
+            move_slot, targets, ..
         } => offer.fight.iter().any(|candidate| {
             candidate.move_slot == *move_slot && candidate.legal_targets.contains(targets)
         }),
@@ -651,9 +632,7 @@ fn singleton_offer_for_command(
 ) -> Result<BattleCommandOffer, CommandLegalityError> {
     match command {
         BattleCommand::Fight {
-            move_slot,
-            targets,
-            ..
+            move_slot, targets, ..
         } => Ok(BattleCommandOffer::new(
             vec![OfferedMoveCommand::new(*move_slot, vec![targets.clone()])?],
             Vec::new(),
@@ -792,9 +771,7 @@ fn normalize_accepted_in_battle(
             }
             let offered = command_from_scripted_offer(entry)?;
             if command.command != offered {
-                return Err(CommandLegalityError::CommandNotOffered {
-                    actor: entry.actor,
-                });
+                return Err(CommandLegalityError::CommandNotOffered { actor: entry.actor });
             }
             (&command.operation_id, &command.command)
         }
@@ -822,9 +799,7 @@ fn normalize_command_in_battle(
     ensure_command_in_full_offer(battle, field_slot, actor, command, content)?;
     match command {
         BattleCommand::Fight {
-            move_slot,
-            targets,
-            ..
+            move_slot, targets, ..
         } => {
             let slot = actor
                 .moves
@@ -896,9 +871,7 @@ fn validate_unique_switch_destinations(
             continue;
         };
         if !destinations.insert(*incoming) {
-            return Err(CommandLegalityError::DuplicateSwitchDestination {
-                pokemon: *incoming,
-            });
+            return Err(CommandLegalityError::DuplicateSwitchDestination { pokemon: *incoming });
         }
     }
     Ok(())
@@ -944,10 +917,11 @@ fn validate_replacement_selection_in_battle(
             pokemon,
         } if candidates.iter().any(|candidate| {
             candidate.party_slot == *party_slot && candidate.pokemon == *pokemon
-        }) => Ok(()),
-        ReplacementSelection::Selected { .. } => {
-            Err(CommandLegalityError::ReplacementNotOffered)
+        }) =>
+        {
+            Ok(())
         }
+        ReplacementSelection::Selected { .. } => Err(CommandLegalityError::ReplacementNotOffered),
         ReplacementSelection::NoLegalReplacement if candidates.is_empty() => Ok(()),
         ReplacementSelection::NoLegalReplacement => {
             Err(CommandLegalityError::LegalReplacementExists)
@@ -962,11 +936,7 @@ fn party_for_side(battle: &BattleState, side: BattleSide) -> &[PokemonState] {
     }
 }
 
-fn find_pokemon(
-    battle: &BattleState,
-    side: BattleSide,
-    id: PokemonId,
-) -> Option<&PokemonState> {
+fn find_pokemon(battle: &BattleState, side: BattleSide, id: PokemonId) -> Option<&PokemonState> {
     party_for_side(battle, side)
         .iter()
         .find(|pokemon| pokemon.id == id)

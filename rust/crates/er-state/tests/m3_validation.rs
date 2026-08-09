@@ -3,8 +3,8 @@ use std::error::Error;
 use er_canonical::content_digest;
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::battle::{
-    BattleId, BattleOutcome, BattleRngState, BattleState, CommandCollectionState,
-    FaintOccurrence, FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
+    BattleId, BattleOutcome, BattleRngState, BattleState, CommandCollectionState, FaintOccurrence,
+    FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
 };
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
@@ -63,11 +63,7 @@ fn wave(value: u64) -> Result<WaveIndex, Box<dyn Error>> {
     Ok(WaveIndex::new(safe(value)).map_err(|error| format!("wave: {error}"))?)
 }
 
-fn pokemon(
-    id: u64,
-    owner: Option<SeatId>,
-    fainted: bool,
-) -> Result<PokemonState, Box<dyn Error>> {
+fn pokemon(id: u64, owner: Option<SeatId>, fainted: bool) -> Result<PokemonState, Box<dyn Error>> {
     let hp = if fainted { 0 } else { 100 };
     Ok(PokemonState::new(
         PokemonId::new(safe(id)),
@@ -207,7 +203,11 @@ fn complete_game_state_is_valid_and_round_trips_only_as_canonical_bytes()
         "battle",
     ];
     assert_eq!(object.len(), expected_fields.len());
-    assert!(expected_fields.iter().all(|field| object.contains_key(*field)));
+    assert!(
+        expected_fields
+            .iter()
+            .all(|field| object.contains_key(*field))
+    );
 
     let pretty = serde_json::to_vec_pretty(&state)?;
     assert!(matches!(
@@ -249,7 +249,12 @@ fn game_coordinates_allocator_and_rng_turn_must_agree() -> Result<(), Box<dyn Er
     ));
 
     let mut state = valid_game()?;
-    state.battle.as_mut().ok_or("missing battle")?.battle_rng.turn = turn(2)?;
+    state
+        .battle
+        .as_mut()
+        .ok_or("missing battle")?
+        .battle_rng
+        .turn = turn(2)?;
     assert!(matches!(
         validate_game_state(&state),
         Err(StateValidationError::BattleRngTurnMismatch { .. })
@@ -263,22 +268,10 @@ fn game_coordinates_allocator_and_rng_turn_must_agree() -> Result<(), Box<dyn Er
     battle.field = FieldState::new_for_format(
         &battle.format,
         vec![
-            FieldSlotState::new(
-                slot(BattleSide::Player, 0),
-                Some(PokemonId::new(safe(17))),
-            ),
-            FieldSlotState::new(
-                slot(BattleSide::Player, 1),
-                Some(PokemonId::new(safe(19))),
-            ),
-            FieldSlotState::new(
-                slot(BattleSide::Enemy, 0),
-                Some(PokemonId::new(safe(18))),
-            ),
-            FieldSlotState::new(
-                slot(BattleSide::Enemy, 1),
-                Some(PokemonId::new(safe(20))),
-            ),
+            FieldSlotState::new(slot(BattleSide::Player, 0), Some(PokemonId::new(safe(17)))),
+            FieldSlotState::new(slot(BattleSide::Player, 1), Some(PokemonId::new(safe(19)))),
+            FieldSlotState::new(slot(BattleSide::Enemy, 0), Some(PokemonId::new(safe(18)))),
+            FieldSlotState::new(slot(BattleSide::Enemy, 1), Some(PokemonId::new(safe(20)))),
         ],
     )?;
     battle.authority_seat = seat(2);
@@ -290,8 +283,8 @@ fn game_coordinates_allocator_and_rng_turn_must_agree() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn party_identity_ownership_field_and_outcome_invariants_fail_closed()
--> Result<(), Box<dyn Error>> {
+fn party_identity_ownership_field_and_outcome_invariants_fail_closed() -> Result<(), Box<dyn Error>>
+{
     let mut state = valid_game()?;
     let player_id = state.battle.as_ref().ok_or("missing battle")?.player_party[0].id;
     state.battle.as_mut().ok_or("missing battle")?.enemy_party[0].id = player_id;
@@ -325,8 +318,8 @@ fn party_identity_ownership_field_and_outcome_invariants_fail_closed()
 }
 
 #[test]
-fn command_frontier_is_bound_to_current_actor_owner_and_coordinates()
--> Result<(), Box<dyn Error>> {
+fn command_frontier_is_bound_to_current_actor_owner_and_coordinates() -> Result<(), Box<dyn Error>>
+{
     let mut state = valid_game()?;
     let battle = state.battle.as_mut().ok_or("missing battle")?;
     let field_slot = slot(BattleSide::Player, 0);
@@ -480,8 +473,7 @@ fn faint_queue_preserves_allocator_causality_and_stored_replacement_truth()
 }
 
 #[test]
-fn mechanical_digest_is_strict_domain_separated_and_state_complete()
--> Result<(), Box<dyn Error>> {
+fn mechanical_digest_is_strict_domain_separated_and_state_complete() -> Result<(), Box<dyn Error>> {
     let state = valid_game()?;
     let digest = compute_mechanical_state_digest(&state)?;
     assert!(digest.as_str().starts_with(MECHANICAL_DIGEST_PREFIX));
@@ -515,11 +507,10 @@ fn mechanical_digest_is_strict_domain_separated_and_state_complete()
     ));
 
     assert!(MechanicalStateDigest::new("bad").is_err());
-    assert!(MechanicalStateDigest::new(format!(
-        "{MECHANICAL_DIGEST_PREFIX}{}",
-        "A".repeat(64)
-    ))
-    .is_err());
+    assert!(
+        MechanicalStateDigest::new(format!("{MECHANICAL_DIGEST_PREFIX}{}", "A".repeat(64)))
+            .is_err()
+    );
     Ok(())
 }
 

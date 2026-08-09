@@ -99,7 +99,10 @@ const UNCLAIMED_SUBDIMENSIONS: [&str; 3] = [
 const ORDERING_BRANCH_CLASSIFICATION: [(&str, &str); 10] = [
     ("explicit_set_order", "UNSUPPORTED"),
     ("live_speed_stage_and_paralysis_reorder", "SUPPORTED"),
-    ("mixed_side_simultaneous_faint", "SUPPORTED_BY_NAMED_FIXTURE"),
+    (
+        "mixed_side_simultaneous_faint",
+        "SUPPORTED_BY_NAMED_FIXTURE",
+    ),
     ("ordinary_fight_and_switch", "SUPPORTED"),
     ("pursuit_or_interception", "UNSUPPORTED"),
     ("same_side_simultaneous_faint", "SUPPORTED_BY_NAMED_FIXTURE"),
@@ -341,10 +344,7 @@ impl M3FixtureCatalog {
             },
             M3OraclePublicationState::OracleEvidencePublished => M3OracleReadiness::Published {
                 cases: self.oracle_manifest.published_fixtures.len(),
-                supporting_artifacts: self
-                    .oracle_manifest
-                    .published_supporting_artifacts
-                    .len(),
+                supporting_artifacts: self.oracle_manifest.published_supporting_artifacts.len(),
             },
         })
     }
@@ -373,8 +373,7 @@ impl M3FixtureCatalog {
                 kind: M3FixtureKind::BattleCase,
                 id: scenario_id.to_owned(),
             })?;
-        if self.oracle_manifest.publication_state
-            == M3OraclePublicationState::ContractCatalogFrozen
+        if self.oracle_manifest.publication_state == M3OraclePublicationState::ContractCatalogFrozen
         {
             return Err(M3FixtureError::Unpublished {
                 kind: M3FixtureKind::BattleCase,
@@ -406,8 +405,7 @@ impl M3FixtureCatalog {
                 kind: M3FixtureKind::SupportingArtifact,
                 id: artifact_id.to_owned(),
             })?;
-        if self.oracle_manifest.publication_state
-            == M3OraclePublicationState::ContractCatalogFrozen
+        if self.oracle_manifest.publication_state == M3OraclePublicationState::ContractCatalogFrozen
         {
             return Err(M3FixtureError::Unpublished {
                 kind: M3FixtureKind::SupportingArtifact,
@@ -495,9 +493,7 @@ fn validate_coverage_map(coverage: &M3CoverageMap) -> Result<(), M3FixtureError>
             "coverage map must contain exactly 38 cases",
         ));
     }
-    for (actual, (expected_id, expected_format)) in
-        coverage.oracle_cases.iter().zip(ORACLE_CASES)
-    {
+    for (actual, (expected_id, expected_format)) in coverage.oracle_cases.iter().zip(ORACLE_CASES) {
         if actual.case_id != expected_id || actual.format != expected_format {
             return Err(contract_error(
                 "oracle_cases",
@@ -608,9 +604,7 @@ fn validate_oracle_manifest(oracle: &M3OracleManifest) -> Result<(), M3FixtureEr
     validate_publication(oracle)
 }
 
-fn validate_canonical_output(
-    output: &M3CanonicalOutputContract,
-) -> Result<(), M3FixtureError> {
+fn validate_canonical_output(output: &M3CanonicalOutputContract) -> Result<(), M3FixtureError> {
     if output.encoding != "UTF-8"
         || output.object_keys != "SORTED"
         || output.array_order != "PRESERVED"
@@ -648,9 +642,7 @@ fn validate_supporting_contracts(
             "supporting artifact catalog must contain exactly two entries",
         ));
     }
-    for (actual, (artifact_id, fixture_path, required_identity)) in
-        contracts.iter().zip(expected)
-    {
+    for (actual, (artifact_id, fixture_path, required_identity)) in contracts.iter().zip(expected) {
         if actual.artifact_id != artifact_id
             || actual.fixture_path != fixture_path
             || actual.required_identity != required_identity
@@ -725,9 +717,7 @@ fn validate_publication(oracle: &M3OracleManifest) -> Result<(), M3FixtureError>
             }
             Ok(())
         }
-        M3OraclePublicationState::OracleEvidencePublished => {
-            validate_complete_publication(oracle)
-        }
+        M3OraclePublicationState::OracleEvidencePublished => validate_complete_publication(oracle),
     }
 }
 
@@ -839,7 +829,11 @@ fn validate_shared_provenance(
     let actual = (oracle_tree_sha, exporter_commit_sha, content_pack_hash);
     match expected.as_ref() {
         Some(expected) => {
-            let expected = (expected.0.as_str(), expected.1.as_str(), expected.2.as_str());
+            let expected = (
+                expected.0.as_str(),
+                expected.1.as_str(),
+                expected.2.as_str(),
+            );
             if expected == actual {
                 Ok(())
             } else {
@@ -899,7 +893,10 @@ fn validate_token_set(field: &'static str, values: &[String]) -> Result<(), M3Fi
 }
 
 fn exact_strings(actual: &[String], expected: &[&str]) -> bool {
-    actual.iter().map(String::as_str).eq(expected.iter().copied())
+    actual
+        .iter()
+        .map(String::as_str)
+        .eq(expected.iter().copied())
 }
 
 fn is_lower_hex(value: &str, width: usize) -> bool {
@@ -994,8 +991,7 @@ fn validate_case_evidence(
     let object = exact_object(value, &KEYS, "published case envelope")?;
     if object.get("schema_version").and_then(Value::as_u64)
         != Some(u64::from(M3_MANIFEST_SCHEMA_VERSION))
-        || object.get("scenario_id").and_then(Value::as_str)
-            != Some(contract.scenario_id.as_str())
+        || object.get("scenario_id").and_then(Value::as_str) != Some(contract.scenario_id.as_str())
         || !object
             .get("gaps")
             .and_then(Value::as_array)
@@ -1018,7 +1014,12 @@ fn validate_supporting_evidence(
         "content-pack-v1" => {
             let object = exact_object(
                 value,
-                &["artifact_id", "schema_version", "provenance", "content_pack"],
+                &[
+                    "artifact_id",
+                    "schema_version",
+                    "provenance",
+                    "content_pack",
+                ],
                 "content-pack artifact envelope",
             )?;
             let pack_value = object.get("content_pack").ok_or_else(|| {
@@ -1169,7 +1170,9 @@ fn validate_bound_provenance(
 }
 
 fn nonempty_string(value: Option<&Value>) -> bool {
-    value.and_then(Value::as_str).is_some_and(|value| !value.is_empty())
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty())
 }
 
 fn exact_object<'a>(
@@ -1219,19 +1222,14 @@ pub enum M3FixtureError {
     UnknownFixture { kind: M3FixtureKind, id: String },
     #[error("M3 {kind} {id:?} is cataloged but not published")]
     Unpublished { kind: M3FixtureKind, id: String },
-    #[error(
-        "M3 evidence {path:?} SHA-256 mismatch: expected {expected}, actual {actual}"
-    )]
+    #[error("M3 evidence {path:?} SHA-256 mismatch: expected {expected}, actual {actual}")]
     DigestMismatch {
         path: PathBuf,
         expected: String,
         actual: String,
     },
     #[error("M3 evidence {path:?} is not canonical: {detail}")]
-    NonCanonicalEvidence {
-        path: PathBuf,
-        detail: &'static str,
-    },
+    NonCanonicalEvidence { path: PathBuf, detail: &'static str },
 }
 
 /// Return the lowercase SHA-256 of arbitrary bytes without a runtime or test dependency.

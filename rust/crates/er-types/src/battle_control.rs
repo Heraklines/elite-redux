@@ -601,6 +601,9 @@ pub struct ReplacementSelectControl {
 }
 
 impl ReplacementSelectControl {
+    // The frozen replacement-control schema carries eight independent identity,
+    // topology, ownership, menu, and navigation-memory fields.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         occurrence: FaintOccurrenceId,
         source: FaintSource,
@@ -935,7 +938,12 @@ impl BattleControl {
                 value.cancel_to.validate_control_ids_with_context(context)
             }
             Self::TargetSelect(value) => {
-                validate_command_control_identity(&value.menu, value.field_slot, "target", context)?;
+                validate_command_control_identity(
+                    &value.menu,
+                    value.field_slot,
+                    "target",
+                    context,
+                )?;
                 value.cancel_to.validate_control_ids_with_context(context)
             }
             Self::PartySelect(value) => {
@@ -1025,9 +1033,7 @@ fn validate_command_control_identity(
         "battle/{}/wave/{}/turn/{}/command/player/{}/seat/{}",
         context.battle_id, context.wave, context.turn, field_slot.position, context.seat,
     );
-    if context
-        .decision_operation_id
-        .map(OperationId::as_str)
+    if context.decision_operation_id.map(OperationId::as_str)
         != Some(expected_operation_id.as_str())
     {
         return Err(BattleControlError::DecisionOperationIdMismatch);
@@ -1072,9 +1078,7 @@ fn validate_replacement_control_identity(
         field_slot.position,
         owner_seat,
     );
-    if context
-        .decision_operation_id
-        .map(OperationId::as_str)
+    if context.decision_operation_id.map(OperationId::as_str)
         != Some(expected_operation_id.as_str())
     {
         return Err(BattleControlError::DecisionOperationIdMismatch);
@@ -1632,11 +1636,7 @@ mod tests {
             "turn/e1/w1/t1/command/player/0",
         ] {
             assert_eq!(
-                plan_with_operation(
-                    root(1, control_id)?,
-                    2,
-                    Some(OperationId::new(mutated)?),
-                ),
+                plan_with_operation(root(1, control_id)?, 2, Some(OperationId::new(mutated)?),),
                 Err(BattleControlPlanError::Control(
                     BattleControlError::DecisionOperationIdMismatch
                 )),
@@ -1678,16 +1678,18 @@ mod tests {
     fn replacement_decision_operation_identity_rejects_each_mutated_coordinate()
     -> Result<(), Box<dyn Error>> {
         let exact = "RC/e3/b1/w1/t1/o4/f0/s1";
-        assert!(plan_with_operation(
-            replacement_control(
-                1,
-                &format!("{exact}/control/replacement"),
-                "party/42/slot/3",
-            )?,
-            2,
-            Some(OperationId::new(exact)?),
-        )
-        .is_ok());
+        assert!(
+            plan_with_operation(
+                replacement_control(
+                    1,
+                    &format!("{exact}/control/replacement"),
+                    "party/42/slot/3",
+                )?,
+                2,
+                Some(OperationId::new(exact)?),
+            )
+            .is_ok()
+        );
 
         for mutated in [
             "RC/e4/b1/w1/t1/o4/f0/s1",
@@ -1908,8 +1910,8 @@ mod tests {
     }
 
     #[test]
-    fn replacement_party_option_restoration_retains_the_fainted_actor()
-    -> Result<(), Box<dyn Error>> {
+    fn replacement_party_option_restoration_retains_the_fainted_actor() -> Result<(), Box<dyn Error>>
+    {
         let replacement_operation = "RC/e3/b1/w1/t1/o4/f0/s1";
         let mut replacement = replacement_control(
             1,

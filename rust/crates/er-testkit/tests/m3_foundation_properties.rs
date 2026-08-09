@@ -5,9 +5,7 @@ use er_battle::legality::validate_state_content;
 use er_canonical::{canonical_bytes, canonicalize};
 use er_content::pack::selected_content_pack;
 use er_kernel::InputRouter;
-use er_protocol::{
-    KernelScheduler, ProposalFingerprintInput, ProposalJson, proposal_fingerprint,
-};
+use er_protocol::{KernelScheduler, ProposalFingerprintInput, ProposalJson, proposal_fingerprint};
 use er_rng::phaser::{F64Bits, PhaserRdg, RunRngState};
 use er_state::digest::MechanicalStateDigest;
 use er_state::format::{
@@ -15,17 +13,17 @@ use er_state::format::{
 };
 use er_state::snapshot::{GameState, decode_canonical_game_state};
 use er_testkit::m3_fixture::{
-    M3CoverageMap, M3FixtureError, M3FixtureKind, M3OraclePublicationState,
-    M3OracleReadiness, M3_ORACLE_CASE_IDS, M3_REQUIRED_ORACLE_AXES,
-    M3_SUPPORTING_ARTIFACT_IDS, load_m3_fixture_catalog, sha256_hex,
+    M3_ORACLE_CASE_IDS, M3_REQUIRED_ORACLE_AXES, M3_SUPPORTING_ARTIFACT_IDS, M3CoverageMap,
+    M3FixtureError, M3FixtureKind, M3OraclePublicationState, M3OracleReadiness,
+    load_m3_fixture_catalog, sha256_hex,
 };
 use er_types::battle_command::{BattleCommandError, BattleTargetSelection};
 use er_types::battle_ids::{
     BattleFormat, BattleId, BattleSide, FieldSlot, GameModeId, PokemonId, WaveIndex,
 };
 use er_types::{
-    ButtonEvent, GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent,
-    SafeU53, SeatId, JS_MAX_SAFE_INTEGER,
+    ButtonEvent, GameButton, InputFocus, InputMap, JS_MAX_SAFE_INTEGER, KeyBinding, PhysicalKey,
+    RawInputEvent, SafeU53, SeatId,
 };
 use serde_json::{Value, json};
 
@@ -48,7 +46,10 @@ impl DeterministicCorpus {
 fn frozen_catalog_is_valid_but_never_claims_unpublished_evidence() -> TestResult {
     let catalog = load_m3_fixture_catalog()?;
 
-    assert_eq!(catalog.coverage_map.oracle_cases.len(), M3_ORACLE_CASE_IDS.len());
+    assert_eq!(
+        catalog.coverage_map.oracle_cases.len(),
+        M3_ORACLE_CASE_IDS.len()
+    );
     assert_eq!(
         catalog.oracle_manifest.required_axes.len(),
         M3_REQUIRED_ORACLE_AXES.len()
@@ -203,7 +204,10 @@ fn supported_topologies_close_slots_owners_and_command_target_order() -> TestRes
             slots.len(),
             usize::from(format.player_capacity + format.enemy_capacity)
         );
-        assert_eq!(slots.iter().copied().collect::<BTreeSet<_>>().len(), slots.len());
+        assert_eq!(
+            slots.iter().copied().collect::<BTreeSet<_>>().len(),
+            slots.len()
+        );
 
         for slot in &slots {
             validate_slot(&format, *slot)?;
@@ -216,7 +220,10 @@ fn supported_topologies_close_slots_owners_and_command_target_order() -> TestRes
                 BattleSide::Enemy => assert_eq!(owner, None),
             }
         }
-        assert_eq!(human_seats(&format)?.len(), usize::from(format.player_capacity));
+        assert_eq!(
+            human_seats(&format)?.len(),
+            usize::from(format.player_capacity)
+        );
 
         let mut reversed_edges = format.adjacency.clone();
         reversed_edges.reverse();

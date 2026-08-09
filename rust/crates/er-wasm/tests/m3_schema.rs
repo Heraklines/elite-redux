@@ -11,19 +11,15 @@ use er_types::battle_command::{
     BATTLE_COMMAND_SCHEMA_VERSION, BATTLE_REPLACEMENT_PROPOSAL_SCHEMA_VERSION,
 };
 use er_types::battle_control::BATTLE_CONTROL_PLAN_SCHEMA_VERSION;
-use er_wasm::m3_schema::{
-    M3_SCHEMA_PARITY_VERSION, M3_SCHEMA_TYPES, round_trip_m3_schema_json,
-};
+use er_wasm::m3_schema::{M3_SCHEMA_PARITY_VERSION, M3_SCHEMA_TYPES, round_trip_m3_schema_json};
 use serde_json::Value;
 
 const MANIFEST: &str = include_str!("../../../fixtures/m3/schema/manifest-v1.json");
 const F64_BITS: &str = include_str!("../../../fixtures/m3/schema/f64-bits-v1.json");
-const PHASER_RDG_STATE: &str =
-    include_str!("../../../fixtures/m3/schema/phaser-rdg-state-v1.json");
+const PHASER_RDG_STATE: &str = include_str!("../../../fixtures/m3/schema/phaser-rdg-state-v1.json");
 const INVALID_PHASER_RDG_STATE: &str =
     include_str!("../../../fixtures/m3/schema/phaser-rdg-state-mismatch-v1.json");
-const GAME_STATE: &str =
-    include_str!("../../../fixtures/m3/schema/game-state-active-v1.json");
+const GAME_STATE: &str = include_str!("../../../fixtures/m3/schema/game-state-active-v1.json");
 const BATTLE_COMMAND_OFFER: &str =
     include_str!("../../../fixtures/m3/schema/battle-command-offer-v1.json");
 const BATTLE_COMMAND_PROPOSAL: &str =
@@ -231,20 +227,13 @@ fn assert_valid_schema_vectors() -> Result<(), Box<dyn Error>> {
         .first()
         .ok_or("schema RNG draw was not recorded")?;
     let draw_json = canonicalize(draw)?;
-    assert_eq!(
-        round_trip_m3_schema_json("RngDraw", &draw_json)?,
-        draw_json
-    );
+    assert_eq!(round_trip_m3_schema_json("RngDraw", &draw_json)?, draw_json);
     assert!(draw_json.contains(r#""s0_bits":"#));
     assert!(!draw_json.contains(r#""s0":"#));
     covered.insert("RngDraw");
 
     let draw_value: Value = serde_json::from_str(&draw_json)?;
-    assert_schema_value(
-        "RngAuditState",
-        &draw_value["before_state"],
-        &mut covered,
-    )?;
+    assert_schema_value("RngAuditState", &draw_value["before_state"], &mut covered)?;
 
     let expected = M3_SCHEMA_TYPES.iter().copied().collect::<BTreeSet<_>>();
     assert_eq!(covered, expected, "schema registry has an untested DTO");
@@ -321,10 +310,8 @@ fn wasm32_node_m3_schema_boundary_fails_closed() -> Result<(), Box<dyn Error>> {
 fn wasm32_export_uses_the_shared_typed_registry() -> Result<(), wasm_bindgen::JsValue> {
     let direct = round_trip_m3_schema_json("PhaserRdgState", PHASER_RDG_STATE)
         .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
-    let exported = er_wasm::m3_schema::round_trip_m3_schema_json_wasm(
-        "PhaserRdgState",
-        PHASER_RDG_STATE,
-    )?;
+    let exported =
+        er_wasm::m3_schema::round_trip_m3_schema_json_wasm("PhaserRdgState", PHASER_RDG_STATE)?;
     assert_eq!(exported, direct);
     Ok(())
 }

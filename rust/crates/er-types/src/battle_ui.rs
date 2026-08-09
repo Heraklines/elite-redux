@@ -1226,13 +1226,15 @@ mod tests {
         );
 
         let exact = "RC/e3/b1/w1/t1/o4/f0/s1";
-        assert!(projection(
-            1,
-            Some(OperationId::new(exact)?),
-            replacement_control(exact)?,
-            true,
-        )
-        .is_ok());
+        assert!(
+            projection(
+                1,
+                Some(OperationId::new(exact)?),
+                replacement_control(exact)?,
+                true,
+            )
+            .is_ok()
+        );
 
         let mutated = "RC/e3/b1/w1/t1/o5/f0/s1";
         assert_eq!(

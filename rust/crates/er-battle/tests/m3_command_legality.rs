@@ -2,10 +2,9 @@ use std::error::Error;
 
 use er_battle::command::NormalizedBattleCommand;
 use er_battle::legality::{
-    CommandLegalityError, build_command_offer, build_replacement_offer,
-    build_scripted_enemy_offer, normalize_command_set, validate_command_proposal,
-    validate_preserved_offer, validate_replacement_proposal, validate_replacement_selection,
-    validate_state_content,
+    CommandLegalityError, build_command_offer, build_replacement_offer, build_scripted_enemy_offer,
+    normalize_command_set, validate_command_proposal, validate_preserved_offer,
+    validate_replacement_proposal, validate_replacement_selection, validate_state_content,
 };
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_content::species::find_species;
@@ -25,15 +24,14 @@ use er_state::pokemon::{
 };
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1,
-    BattleReplacementProposalV1, BattleTargetSelection, CommandAdmissionSource, CommandSet,
-    CommandFrontierEntry, CommandFrontierStatus, ReplacementSelection,
-    ScriptedEnemyBattleCommandV1, player_command_operation_id, replacement_operation_id,
-    scripted_enemy_command_operation_id,
+    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleReplacementProposalV1,
+    BattleTargetSelection, CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus,
+    CommandSet, ReplacementSelection, ScriptedEnemyBattleCommandV1, player_command_operation_id,
+    replacement_operation_id, scripted_enemy_command_operation_id,
 };
 use er_types::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
-    MenuInstanceId, MoveSlotIndex, PartyIndex, TurnIndex, WaveIndex,
+    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId, MenuInstanceId,
+    MoveSlotIndex, PartyIndex, TurnIndex, WaveIndex,
 };
 use er_types::{SafeU53, SeatId};
 
@@ -146,10 +144,7 @@ fn game_state(
     let battle_wave = wave(2)?;
     let battle_turn = turn(1)?;
     let slots = match (format.player_capacity, format.enemy_capacity) {
-        (1, 1) => vec![
-            slot(BattleSide::Player, 0),
-            slot(BattleSide::Enemy, 0),
-        ],
+        (1, 1) => vec![slot(BattleSide::Player, 0), slot(BattleSide::Enemy, 0)],
         (2, 2) => vec![
             slot(BattleSide::Player, 0),
             slot(BattleSide::Player, 1),
@@ -250,10 +245,7 @@ fn battle(state: &GameState) -> TestResult<&BattleState> {
 }
 
 fn battle_mut(state: &mut GameState) -> TestResult<&mut BattleState> {
-    state
-        .battle
-        .as_mut()
-        .ok_or_else(|| "missing battle".into())
+    state.battle.as_mut().ok_or_else(|| "missing battle".into())
 }
 
 #[test]
@@ -281,13 +273,8 @@ fn singles_offer_uses_implicit_fixed_target_and_same_owner_switches() -> TestRes
     let battle_wave = current.wave;
     let battle_turn = current.turn;
     let actor = current.player_party[0].id;
-    let operation = player_command_operation_id(
-        battle_id,
-        battle_wave,
-        battle_turn,
-        player_slot,
-        seat(1),
-    )?;
+    let operation =
+        player_command_operation_id(battle_id, battle_wave, battle_turn, player_slot, seat(1))?;
     let entry = CommandFrontierEntry::new(
         operation.clone(),
         Some(seat(1)),
@@ -296,8 +283,7 @@ fn singles_offer_uses_implicit_fixed_target_and_same_owner_switches() -> TestRes
         offer,
         CommandFrontierStatus::Pending,
     )?;
-    battle_mut(&mut state)?.command_state =
-        CommandCollectionState::new(vec![entry], Vec::new())?;
+    battle_mut(&mut state)?.command_state = CommandCollectionState::new(vec![entry], Vec::new())?;
 
     let implicit = BattleCommandProposalV1::new(
         operation.clone(),
@@ -367,13 +353,15 @@ fn doubles_targets_are_canonical_and_spread_targets_are_complete() -> TestResult
     );
     assert_eq!(
         offer.fight[1].legal_targets,
-        vec![BattleTargetSelection::Selected(vec![
-            enemy_zero,
-            enemy_one,
-        ])]
+        vec![BattleTargetSelection::Selected(
+            vec![enemy_zero, enemy_one,]
+        )]
     );
     assert_eq!(offer.switches.len(), 1);
-    assert_eq!(offer.switches[0].pokemon, battle(&state)?.player_party[2].id);
+    assert_eq!(
+        offer.switches[0].pokemon,
+        battle(&state)?.player_party[2].id
+    );
     Ok(())
 }
 
@@ -400,9 +388,9 @@ fn exhausted_pp_invalidates_a_preserved_offer_without_mutating_state() -> TestRe
         stale_offer,
         CommandFrontierStatus::Pending,
     )?;
-    let battle = battle_mut(&mut state)?;
-    battle.command_state = CommandCollectionState::new(vec![entry], Vec::new())?;
-    battle.player_party[0].moves[0]
+    let battle_state = battle_mut(&mut state)?;
+    battle_state.command_state = CommandCollectionState::new(vec![entry], Vec::new())?;
+    battle_state.player_party[0].moves[0]
         .as_mut()
         .ok_or("missing move")?
         .pp_used = 35;
@@ -533,23 +521,23 @@ fn replacement_uses_stored_queue_identity_owner_and_exact_operation_address() ->
     let occurrence = FaintOccurrenceId::new(safe(4));
     let epoch = AuthorityEpoch::new(safe(3));
     let player_slot = slot(BattleSide::Player, 0);
-    let battle = battle_mut(&mut state)?;
-    battle.player_party[0].hp = 0;
-    battle.player_party[0].fainted = true;
-    battle.faint_queue = vec![FaintOccurrence {
+    let battle_state = battle_mut(&mut state)?;
+    battle_state.player_party[0].hp = 0;
+    battle_state.player_party[0].fainted = true;
+    battle_state.faint_queue = vec![FaintOccurrence {
         id: occurrence,
         source: FaintSource {
             epoch,
-            wave: battle.wave,
-            resolved_turn: battle.turn,
+            wave: battle_state.wave,
+            resolved_turn: battle_state.turn,
             turn_occurrence: 2,
         },
         slot: player_slot,
-        pokemon: battle.player_party[0].id,
+        pokemon: battle_state.player_party[0].id,
         owner_seat: Some(seat(1)),
         replacement: ReplacementProgress::Pending,
     }];
-    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(5));
+    battle_state.next_faint_occurrence = FaintOccurrenceId::new(safe(5));
 
     let offer = build_replacement_offer(&state, occurrence, &content)?;
     assert_eq!(offer.len(), 1);
@@ -650,26 +638,26 @@ fn content_membership_and_internal_no_replacement_decision_fail_closed() -> Test
     let mut state = single_state(&content)?;
     let occurrence = FaintOccurrenceId::new(safe(0));
     let player_slot = slot(BattleSide::Player, 0);
-    let battle = battle_mut(&mut state)?;
-    for pokemon in &mut battle.player_party {
+    let battle_state = battle_mut(&mut state)?;
+    for pokemon in &mut battle_state.player_party {
         pokemon.hp = 0;
         pokemon.fainted = true;
     }
-    battle.faint_queue = vec![FaintOccurrence {
+    battle_state.faint_queue = vec![FaintOccurrence {
         id: occurrence,
         source: FaintSource {
             epoch: AuthorityEpoch::new(safe(1)),
-            wave: battle.wave,
-            resolved_turn: battle.turn,
+            wave: battle_state.wave,
+            resolved_turn: battle_state.turn,
             turn_occurrence: 0,
         },
         slot: player_slot,
-        pokemon: battle.player_party[0].id,
+        pokemon: battle_state.player_party[0].id,
         owner_seat: Some(seat(1)),
         replacement: ReplacementProgress::Pending,
     }];
-    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(1));
-    battle.outcome = BattleOutcome::Defeat;
+    battle_state.next_faint_occurrence = FaintOccurrenceId::new(safe(1));
+    battle_state.outcome = BattleOutcome::Defeat;
 
     assert!(build_replacement_offer(&state, occurrence, &content)?.is_empty());
     assert!(

@@ -90,10 +90,7 @@ pub enum StateValidationError {
     #[error("M3 authority seat must be {expected:?}, got {actual:?}")]
     AuthoritySeatMismatch { expected: SeatId, actual: SeatId },
     #[error("field occupant {pokemon:?} in {slot:?} is absent from the matching party")]
-    MissingFieldOccupant {
-        slot: FieldSlot,
-        pokemon: PokemonId,
-    },
+    MissingFieldOccupant { slot: FieldSlot, pokemon: PokemonId },
     #[error("field occupant {pokemon:?} in {slot:?} has owner {actual:?}, expected {expected:?}")]
     FieldOwnerMismatch {
         slot: FieldSlot,
@@ -172,10 +169,7 @@ pub enum StateValidationError {
         id: er_types::battle_ids::FaintOccurrenceId,
     },
     #[error("fainted field occupant {pokemon:?} in {slot:?} has no unresolved faint occurrence")]
-    FaintedFieldOccupantWithoutQueue {
-        slot: FieldSlot,
-        pokemon: PokemonId,
-    },
+    FaintedFieldOccupantWithoutQueue { slot: FieldSlot, pokemon: PokemonId },
     #[error("faint occurrence {id:?} has invalid replacement progress for its side/party")]
     InvalidReplacementProgress {
         id: er_types::battle_ids::FaintOccurrenceId,
@@ -288,12 +282,13 @@ pub fn validate_battle_state(battle: &BattleState) -> Result<(), StateValidation
             seat: battle.authority_seat,
         });
     }
-    let expected_authority = seats
-        .first()
-        .copied()
-        .ok_or(StateValidationError::InvalidAuthoritySeat {
-            seat: battle.authority_seat,
-        })?;
+    let expected_authority =
+        seats
+            .first()
+            .copied()
+            .ok_or(StateValidationError::InvalidAuthoritySeat {
+                seat: battle.authority_seat,
+            })?;
     if battle.authority_seat != expected_authority {
         return Err(StateValidationError::AuthoritySeatMismatch {
             expected: expected_authority,
@@ -326,10 +321,7 @@ fn validate_party_sizes(battle: &BattleState) -> Result<(), StateValidationError
     Ok(())
 }
 
-fn validate_parties(
-    battle: &BattleState,
-    seats: &[SeatId],
-) -> Result<(), StateValidationError> {
+fn validate_parties(battle: &BattleState, seats: &[SeatId]) -> Result<(), StateValidationError> {
     let mut ids = BTreeSet::new();
     for (side, party) in [
         (BattleSide::Player, battle.player_party.as_slice()),
@@ -439,9 +431,7 @@ fn validate_command_entry(
         )?,
         BattleSide::Enemy => {
             let cursor = match accepted_command(&entry.status).map(|(command, _)| command) {
-                Some(AcceptedBattleCommand::ScriptedEnemy { command, .. }) => {
-                    command.script_cursor
-                }
+                Some(AcceptedBattleCommand::ScriptedEnemy { command, .. }) => command.script_cursor,
                 Some(AcceptedBattleCommand::Human { .. }) => {
                     return Err(StateValidationError::CommandAuthoritySourceMismatch);
                 }
@@ -467,7 +457,13 @@ fn validate_command_entry(
     if actor.fainted {
         return Err(StateValidationError::CommandActorFainted { actor: actor.id });
     }
-    validate_offer(battle, entry.field_slot.side, expected_owner, actor, &entry.offer)?;
+    validate_offer(
+        battle,
+        entry.field_slot.side,
+        expected_owner,
+        actor,
+        &entry.offer,
+    )?;
     if entry.field_slot.side == BattleSide::Enemy {
         let offered_commands = entry.offer.switches.len()
             + entry
@@ -595,10 +591,8 @@ fn validate_battle_command(
         } => {
             if *command_actor != actor.id {
                 return Err(StateValidationError::CommandActorMismatch {
-                    slot: field_slot_for_actor(battle, actor.id).unwrap_or(FieldSlot {
-                        side,
-                        position: 0,
-                    }),
+                    slot: field_slot_for_actor(battle, actor.id)
+                        .unwrap_or(FieldSlot { side, position: 0 }),
                     actor: *command_actor,
                 });
             }
@@ -614,13 +608,9 @@ fn validate_battle_command(
                 });
             }
             validate_targets(&battle.format, targets)?;
-            if !offer
-                .fight
-                .iter()
-                .any(|offered| {
-                    offered.move_slot == *move_slot && offered.legal_targets.contains(targets)
-                })
-            {
+            if !offer.fight.iter().any(|offered| {
+                offered.move_slot == *move_slot && offered.legal_targets.contains(targets)
+            }) {
                 return Err(StateValidationError::CommandNotOffered { actor: actor.id });
             }
             Ok(())
@@ -631,10 +621,8 @@ fn validate_battle_command(
         } => {
             if *command_actor != actor.id {
                 return Err(StateValidationError::CommandActorMismatch {
-                    slot: field_slot_for_actor(battle, actor.id).unwrap_or(FieldSlot {
-                        side,
-                        position: 0,
-                    }),
+                    slot: field_slot_for_actor(battle, actor.id)
+                        .unwrap_or(FieldSlot { side, position: 0 }),
                     actor: *command_actor,
                 });
             }
@@ -650,9 +638,7 @@ fn validate_battle_command(
             if !offer
                 .switches
                 .iter()
-                .any(|offered| {
-                    offered.party_slot == *party_slot && offered.pokemon == selected.id
-                })
+                .any(|offered| offered.party_slot == *party_slot && offered.pokemon == selected.id)
             {
                 return Err(StateValidationError::CommandNotOffered { actor: actor.id });
             }
@@ -843,11 +829,7 @@ fn party_for_side(battle: &BattleState, side: BattleSide) -> &[PokemonState] {
     }
 }
 
-fn find_pokemon(
-    battle: &BattleState,
-    side: BattleSide,
-    id: PokemonId,
-) -> Option<&PokemonState> {
+fn find_pokemon(battle: &BattleState, side: BattleSide, id: PokemonId) -> Option<&PokemonState> {
     party_for_side(battle, side)
         .iter()
         .find(|pokemon| pokemon.id == id)

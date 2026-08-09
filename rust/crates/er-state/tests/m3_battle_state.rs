@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use er_state::battle::{
-    BattleId, BattleOutcome, BattleRngState, BattleState, CommandCollectionState,
-    FaintOccurrence, FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
+    BattleId, BattleOutcome, BattleRngState, BattleState, CommandCollectionState, FaintOccurrence,
+    FaintSource, ReplacementProgress, TurnIndex, WaveIndex,
 };
 use er_state::conditions::{
     AbilitySuppressionSource, ArenaConditionScope, ArenaConditionState,
@@ -111,11 +111,21 @@ fn battle_state_uses_the_frozen_closed_wire_shape_and_shared_rng_state()
         "outcome",
     ];
     assert_eq!(object.len(), expected_fields.len());
-    assert!(expected_fields.iter().all(|field| object.contains_key(*field)));
+    assert!(
+        expected_fields
+            .iter()
+            .all(|field| object.contains_key(*field))
+    );
     assert_eq!(encoded["battle_rng"]["battle_seed"], "m3-battle-seed");
     assert_eq!(encoded["battle_rng"]["turn"], 1);
-    assert_eq!(encoded["battle_rng"]["saved_substream"], serde_json::Value::Null);
-    assert_eq!(serde_json::from_value::<BattleState>(encoded.clone())?, state);
+    assert_eq!(
+        encoded["battle_rng"]["saved_substream"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        serde_json::from_value::<BattleState>(encoded.clone())?,
+        state
+    );
 
     let mut malformed = encoded;
     malformed
