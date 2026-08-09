@@ -38,7 +38,6 @@ struct ReplacementIds {
     tail_control_id: String,
     await_control_id: String,
     head_fingerprint: String,
-    tail_fingerprint: String,
     head_proposal_payload: Value,
     head_material: Material,
     tail_material: Material,
@@ -554,7 +553,6 @@ fn campaign_config(seed: u64) -> TestResult<(SimulatedPairConfig, ReplacementIds
             tail_control_id,
             await_control_id,
             head_fingerprint,
-            tail_fingerprint,
             head_proposal_payload,
             head_material,
             tail_material,
@@ -861,7 +859,7 @@ fn assert_authority_chain(
             continue;
         };
         let body = serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?;
-        if &frame.context == authority_context && &body == &expected_entry {
+        if &frame.context == authority_context && body == expected_entry {
             entry_locations.push(location);
         }
     }
@@ -1215,7 +1213,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             focus: InputFocus::Game,
         },
     })?;
-    assert_cursor_intent(&[held_move.clone()], ids.guest, initial_generation, safe(1));
+    assert_cursor_intent(std::slice::from_ref(&held_move), ids.guest, initial_generation, safe(1));
     trace.push(held_move.clone());
     assert_replacement_menu(
         &held_move.snapshot,
