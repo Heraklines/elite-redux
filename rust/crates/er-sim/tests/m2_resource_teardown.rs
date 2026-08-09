@@ -564,7 +564,7 @@ fn assert_terminal_absorbing_path(
     assert_eq!(terminal_snapshot, triggering_snapshot);
     assert_terminal_snapshot(&terminal_snapshot, &terminal)?;
 
-    let inert_steps = vec![
+    let inert_steps = [
         pair.key_down(PairEndpoint::Guest, PhysicalKey::Enter, false)?,
         pair.key_up(PairEndpoint::Guest, PhysicalKey::Enter)?,
         pair.advance_time(safe(10_000))?,
@@ -850,7 +850,43 @@ fn run_successful_lifecycle(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapsho
         "TurnCommit proposal lease must remain retained through receipt"
     );
     assert!(quiescent.host.live_resources.timers.is_empty());
-    assert!(quiescent.guest.live_resources.timers.is_empty());
+    assert_eq!(quiescent.guest.live_resources.timers.len(), 2);
+    assert_eq!(quiescent.clock_timers.len(), 2);
+    let clock_timer_ids = quiescent
+        .clock_timers
+        .iter()
+        .map(|timer| timer.timer.timer_id)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        clock_timer_ids,
+        quiescent.guest.live_resources.timers,
+        "the retained TurnCommit lease must own every quiescent clock timer"
+    );
+    let proposal_timer_owner = format!("m2b-10:proposal:{GUEST_OPERATION}");
+    for (time_class, delay_ms, reason) in [
+        (TimeClass::Connected, safe(250), "v2 proposal retry"),
+        (
+            TimeClass::Absolute,
+            safe(ABSOLUTE_PROPOSAL_CEILING_MS),
+            "v2 proposal absolute ceiling",
+        ),
+    ] {
+        let timer = quiescent
+            .clock_timers
+            .iter()
+            .find(|timer| timer.timer.time_class == time_class)
+            .expect("retained TurnCommit proposal timer must remain live through receipt");
+        assert_eq!(timer.timer.endpoint, seat(1));
+        assert_eq!(
+            timer.timer.owner.owner_id.as_str(),
+            proposal_timer_owner.as_str()
+        );
+        assert_eq!(timer.timer.owner.address.as_str(), GUEST_OPERATION);
+        assert_eq!(timer.timer.owner.reason.as_str(), reason);
+        assert_eq!(timer.timer.delay_ms, delay_ms);
+        assert_eq!(timer.remaining_active_ms, delay_ms);
+        assert!(!timer.paused);
+    }
     assert!(quiescent.host.live_resources.presentations.is_empty());
     assert!(quiescent.guest.live_resources.presentations.is_empty());
     assert!(quiescent.host.live_resources.storage_requests.is_empty());
