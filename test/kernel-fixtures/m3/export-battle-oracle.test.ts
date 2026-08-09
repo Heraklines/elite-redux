@@ -31,6 +31,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
+import { CommandPhase } from "#phases/command-phase";
 import { FaintPhase } from "#phases/faint-phase";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
 import { MovePhase } from "#phases/move-phase";
@@ -850,6 +851,20 @@ async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
       fail("OBSERVATION_SEAM_MISSING", "GameManager saveAll persistence seam is not mocked");
     }
     saveAll.mockResolvedValue(true);
+
+    // The semantic exporter observes the authority engine only; transport,
+    // recovery, and checkpoint delivery are independently covered by the co-op
+    // gates.  Let CommandPhase cross the same successful host checkpoint seam
+    // without constructing a second engine/runtime.  All command UI, owner
+    // attribution, queueing, and resolution code after this seam stays real.
+    const commandPrototype = CommandPhase.prototype as AnyRecord;
+    const checkpointSync = commandPrototype.tryCoopCheckpointSync;
+    if (typeof checkpointSync !== "function") {
+      fail("OBSERVATION_SEAM_MISSING", "CommandPhase checkpoint seam is not callable");
+    }
+    if (checkpointSync.mock == null) {
+      vi.spyOn(commandPrototype, "tryCoopCheckpointSync").mockReturnValue(true);
+    }
   }
   game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     game.scene.gameMode = getGameMode(coopOwners == null ? GameModes.CLASSIC : GameModes.COOP);
