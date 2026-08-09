@@ -618,6 +618,53 @@ fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) ->
     timer_id
 }
 
+fn proposal_retry_owner() -> TimerOwner {
+    TimerOwner {
+        owner_id: format!("m2b-04:proposal:{GUEST_OPERATION}"),
+        address: GUEST_OPERATION.to_owned(),
+        reason: "v2 proposal retry".to_owned(),
+    }
+}
+
+fn assert_proposal_retry_timer(snapshot: &PairSnapshot) -> TimerId {
+    let timers = snapshot
+        .clock_timers
+        .iter()
+        .filter(|timer| {
+            timer.timer.endpoint == seat(1)
+                && timer.timer.owner == proposal_retry_owner()
+                && timer.timer.time_class == TimeClass::Connected
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(timers.len(), 1, "expected one retained proposal retry timer");
+    let timer = timers[0];
+    assert_eq!(timer.timer.delay_ms, safe(500));
+    assert_eq!(timer.remaining_active_ms, safe(500));
+    assert!(!timer.paused);
+    timer.timer.timer_id
+}
+
+fn assert_no_input_repeat_timer(snapshot: &PairSnapshot, endpoint: SeatId, button: GameButton) {
+    let owner = TimerOwner::input_repeat(button);
+    assert!(snapshot.clock_timers.iter().all(|timer| {
+        !(timer.timer.endpoint == endpoint && timer.timer.owner == owner)
+    }));
+}
+
+fn assert_no_input_repeat_schedule(step: &PairStep, endpoint: SeatId, button: GameButton) {
+    let owner = TimerOwner::input_repeat(button);
+    assert!(!step.generated_effects.iter().any(|effect| {
+        matches!(
+            effect,
+            KernelEffect::ScheduleTimer {
+                endpoint: effect_endpoint,
+                owner: effect_owner,
+                ..
+            } if *effect_endpoint == endpoint && effect_owner == &owner
+        )
+    }));
+}
+
 fn has_material_effect(step: &PairStep, operation_id: &str) -> bool {
     step.generated_effects.iter().any(|effect| {
         matches!(
@@ -1185,8 +1232,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         ]
     );
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
-    let rearmed_repeat_timer_id = assert_repeat_timer(&stale_repeat, seat(1), GameButton::Up);
-    assert_ne!(rearmed_repeat_timer_id, repeat_timer_id);
+    // The control projection has made this logical repeat stale. Its input
+    // timer is consumed without a rearm; the retained TurnCommit proposal
+    // lease is a separate protocol resource and remains live.
+    assert_no_input_repeat_schedule(&stale_repeat, seat(1), GameButton::Up);
     assert!(
         !stale_repeat
             .snapshot
@@ -1195,13 +1244,53 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .timers
             .contains(&repeat_timer_id)
     );
+    assert_no_input_repeat_timer(&stale_repeat.snapshot, seat(1), GameButton::Up);
+    let scheduled_guest_timers = stale_repeat
+        .generated_effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::ScheduleTimer {
+                endpoint,
+                timer_id,
+                owner,
+                delay_ms,
+                time_class,
+            } if *endpoint == seat(1) => Some((*timer_id, owner, *delay_ms, *time_class)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(scheduled_guest_timers.len(), 1);
+    let (scheduled_timer_id, scheduled_owner, scheduled_delay_ms, scheduled_time_class) =
+        scheduled_guest_timers[0];
+    assert_eq!(scheduled_owner, &proposal_retry_owner());
+    assert_eq!(scheduled_delay_ms, safe(500));
+    assert_eq!(scheduled_time_class, TimeClass::Connected);
+    let proposal_retry_timer_id = assert_proposal_retry_timer(&stale_repeat.snapshot);
+    assert_eq!(scheduled_timer_id, proposal_retry_timer_id);
     assert!(
         stale_repeat
             .snapshot
             .guest
             .live_resources
             .timers
-            .contains(&rearmed_repeat_timer_id)
+            .contains(&proposal_retry_timer_id)
+    );
+    assert_eq!(
+        stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .len(),
+        1
+    );
+    assert!(
+        stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&operation(GUEST_OPERATION))
     );
     assert!(
         !stale_repeat
@@ -1229,15 +1318,39 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(cancelled_timers, vec![(seat(1), rearmed_repeat_timer_id)]);
-    assert!(
+    assert!(cancelled_timers.is_empty());
+    assert!(!stale_release
+        .snapshot
+        .guest
+        .live_resources
+        .timers
+        .contains(&repeat_timer_id));
+    assert_no_input_repeat_timer(&stale_release.snapshot, seat(1), GameButton::Up);
+    assert_eq!(
+        assert_proposal_retry_timer(&stale_release.snapshot),
+        proposal_retry_timer_id
+    );
+    assert!(stale_release
+        .snapshot
+        .guest
+        .live_resources
+        .timers
+        .contains(&proposal_retry_timer_id));
+    assert_eq!(
         stale_release
             .snapshot
             .guest
             .live_resources
-            .timers
-            .is_empty()
+            .proposal_leases
+            .len(),
+        1
     );
+    assert!(stale_release
+        .snapshot
+        .guest
+        .live_resources
+        .proposal_leases
+        .contains(&operation(GUEST_OPERATION)));
     assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
     steps.push(stale_release);
 
@@ -1256,15 +1369,25 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .delivery_leases
             .is_empty()
     );
-    assert!(
-        before_teardown
-            .guest
-            .live_resources
-            .proposal_leases
-            .is_empty()
+    // TurnCommit is settled only by explicit teardown in this campaign;
+    // KeyUp must not cancel its unrelated proposal retry lease.
+    assert_eq!(
+        assert_proposal_retry_timer(&before_teardown),
+        proposal_retry_timer_id
     );
+    assert_no_input_repeat_timer(&before_teardown, seat(1), GameButton::Up);
+    assert!(before_teardown
+        .guest
+        .live_resources
+        .timers
+        .contains(&proposal_retry_timer_id));
+    assert_eq!(before_teardown.guest.live_resources.proposal_leases.len(), 1);
+    assert!(before_teardown
+        .guest
+        .live_resources
+        .proposal_leases
+        .contains(&operation(GUEST_OPERATION)));
     assert!(before_teardown.host.live_resources.timers.is_empty());
-    assert!(before_teardown.guest.live_resources.timers.is_empty());
 
     let final_snapshot = pair.teardown("m2b-04 command campaign complete")?;
     assert_eq!(final_snapshot.host.live_resources, Default::default());
