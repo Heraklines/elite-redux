@@ -52,15 +52,15 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       const row = Math.floor(index / 2);
       const card = globalScene.add.container(column * (cardWidth + 2) + 1, 23 + row * 39);
       const window = addWindow(0, 0, cardWidth, 38).setOrigin(0);
-      const nameText = addTextObject(23, 3, "", TextStyle.SETTINGS_LABEL, {
-        fontSize: "48px",
+      const nameText = addTextObject(23, 2, "", TextStyle.SETTINGS_LABEL, {
+        fontSize: "42px",
         fixedWidth: (cardWidth - 27) * 6,
         maxLines: 1,
       }).setOrigin(0);
       nameText.setName("pokemon-name");
       const rows: Phaser.GameObjects.Text[] = [];
       for (let slot = 0; slot < 4; slot++) {
-        const text = addTextObject(24, 12 + slot * 6, "", TextStyle.SETTINGS_LABEL, {
+        const text = addTextObject(24, 10 + slot * 6, "", TextStyle.SETTINGS_LABEL, {
           fontSize: "36px",
           fixedWidth: (cardWidth - 28) * 6,
           maxLines: 1,
