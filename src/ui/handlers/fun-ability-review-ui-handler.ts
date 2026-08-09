@@ -39,10 +39,11 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     const overlay = globalScene.add.rectangle(0, 0, width, height, 0x242030, 0.96).setOrigin(0);
     const header = addWindow(0, 0, width, 22).setOrigin(0);
     const headerText = addTextObject(7, 4, "RANDOMIZED ABILITIES", TextStyle.HEADER_LABEL).setOrigin(0);
-    const hintText = addTextObject(width - 6, 7, "Review before starting", TextStyle.SETTINGS_LABEL)
+    const hintText = addTextObject(width - 6, 7, "Review before starting", TextStyle.SETTINGS_LABEL, {
+      fontSize: "48px",
+    })
       .setOrigin(1, 0)
       .setAlpha(0.75);
-    hintText.setScale(0.7);
     this.container.add([overlay, header, headerText, hintText]);
 
     const cardWidth = Math.floor(width / 2) - 3;
@@ -55,8 +56,11 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       nameText.setName("pokemon-name");
       const rows: Phaser.GameObjects.Text[] = [];
       for (let slot = 0; slot < 4; slot++) {
-        const text = addTextObject(24, 12 + slot * 6, "", TextStyle.SETTINGS_LABEL).setOrigin(0);
-        text.setScale(0.58);
+        const text = addTextObject(24, 12 + slot * 6, "", TextStyle.SETTINGS_LABEL, {
+          fontSize: "36px",
+          fixedWidth: (cardWidth - 28) * 6,
+          maxLines: 1,
+        }).setOrigin(0);
         rows.push(text);
       }
       card.add([window, nameText, ...rows]);
@@ -66,9 +70,10 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     }
 
     const descriptionWindow = addWindow(1, 140, width - 2, 20).setOrigin(0);
-    this.descriptionText = addTextObject(6, 144, "", TextStyle.SETTINGS_LABEL).setOrigin(0);
-    this.descriptionText.setScale(0.72);
-    this.descriptionText.setWordWrapWidth((width - 12) * 7);
+    this.descriptionText = addTextObject(6, 144, "", TextStyle.SETTINGS_LABEL, {
+      fontSize: "42px",
+    }).setOrigin(0);
+    this.descriptionText.setWordWrapWidth((width - 12) * 6);
     const rerollWindow = addWindow(1, 161, Math.floor(width / 2) - 2, 18).setOrigin(0);
     const startWindow = addWindow(Math.floor(width / 2), 161, Math.ceil(width / 2) - 1, 18).setOrigin(0);
     const rerollText = addTextObject(
