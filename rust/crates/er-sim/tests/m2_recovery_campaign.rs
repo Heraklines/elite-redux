@@ -1235,9 +1235,51 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     trace.push(disconnect_step);
     let recovery_start = trace.len();
-    trace.push(pair.apply(PairOperation::Reconnect {
+    let before_reconnect = trace
+        .last()
+        .ok_or_else(|| std::io::Error::other("reconnect has no preceding campaign step"))?
+        .snapshot
+        .clone();
+    let reconnect_step = pair.apply(PairOperation::Reconnect {
         endpoint: PairEndpoint::Guest,
-    })?);
+    })?;
+    // Rebind republishes the retained tail before the RecoveryBundle.  One
+    // tail control is host-owned, so it is intentionally a remote-only
+    // projection on the guest; discard every rebind entry, rather than
+    // treating that empty local surface as a recovered guest command.
+    let mut rebound_tail_packets = Vec::<(SafeU53, AuthorityEntryBody)>::new();
+    for (packet_id, effect) in send_effect_packets(&before_reconnect, &reconnect_step)? {
+        let KernelEffect::SendFrame { from, frame } = effect else {
+            continue;
+        };
+        if from != seat(HOST_SEAT) || frame.frame_type != FrameType::AuthorityEntry {
+            continue;
+        }
+        assert_eq!(frame.context, context_at(HOST_SEAT, 1)?);
+        rebound_tail_packets.push((packet_id, typed_frame_body(&frame)?));
+    }
+    assert_eq!(
+        rebound_tail_packets.len(),
+        2,
+        "reconnect must retain exactly the dense authority tail for recovery"
+    );
+    assert_full_tail_entry(&rebound_tail_packets[0].1, 2)?;
+    assert_full_tail_entry(&rebound_tail_packets[1].1, 3)?;
+    trace.push(reconnect_step);
+    for (packet_id, _) in rebound_tail_packets {
+        let dropped = pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Drop { packet_id },
+        })?;
+        assert!(
+            !dropped
+                .snapshot
+                .network
+                .queued_packet_ids
+                .contains(&packet_id),
+            "rebound authority tail must be discarded before recovery installs the frontier"
+        );
+        trace.push(dropped);
+    }
 
     let reconnect_step = trace
         .get(recovery_start)
@@ -1278,15 +1320,24 @@ fn run_campaign() -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(rebound_proposal.connection_generation, generation(1));
     assert_proposal_identities(std::slice::from_ref(reconnect_step), &[(2, generation(1))])?;
 
-    assert!(
+    let before_stale_delivery = pair.snapshot()?;
+    assert_eq!(
+        before_stale_delivery.network.dropped_count.get(),
         reconnect_step
             .snapshot
             .network
+            .dropped_count
+            .get()
+            .saturating_add(2),
+        "the two retained-tail drops must increment dropped_count exactly twice"
+    );
+    assert!(
+        before_stale_delivery
+            .network
             .queued_packet_ids
             .contains(&stale_packet_id),
-        "the duplicated old-generation proposal must remain available for stale delivery"
+        "the duplicated old-generation proposal must remain queued after tail drops"
     );
-    let before_stale_delivery = reconnect_step.snapshot.clone();
     let stale_delivery = pair.apply(PairOperation::Fault {
         operation: FaultOperation::Deliver {
             packet_id: stale_packet_id,
