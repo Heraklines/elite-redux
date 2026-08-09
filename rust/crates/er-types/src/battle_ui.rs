@@ -12,7 +12,7 @@ use crate::battle_ids::{
     WaveIndex,
 };
 use crate::battle_model::{BattleStat, StatusState};
-use crate::ids::{MenuOptionId, SeatId};
+use crate::ids::{MenuOptionId, SafeU53, SeatId};
 
 fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -107,11 +107,7 @@ pub struct MenuNavigationEdge {
 }
 
 impl MenuNavigationEdge {
-    pub fn new(
-        from: MenuOptionId,
-        direction: NavigationDirection,
-        to: MenuOptionId,
-    ) -> Self {
+    pub fn new(from: MenuOptionId, direction: NavigationDirection, to: MenuOptionId) -> Self {
         Self {
             from,
             direction,
@@ -120,10 +116,7 @@ impl MenuNavigationEdge {
     }
 }
 
-fn compare_navigation_edges(
-    first: &MenuNavigationEdge,
-    second: &MenuNavigationEdge,
-) -> Ordering {
+fn compare_navigation_edges(first: &MenuNavigationEdge, second: &MenuNavigationEdge) -> Ordering {
     first
         .from
         .cmp(&second.from)
@@ -195,7 +188,7 @@ impl<'de> Deserialize<'de> for MenuNavigation {
 }
 
 /// Immutable renderer geometry for one stable option identity.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MenuOptionLayout {
     pub option_id: MenuOptionId,
@@ -378,7 +371,7 @@ impl BattleMenu {
     }
 
     pub fn validate(&self) -> Result<(), BattleMenuError> {
-        if self.instance_id.get() == 0 {
+        if self.instance_id.get() == SafeU53::ZERO {
             return Err(BattleMenuError::ZeroInstanceId);
         }
         if self.control_id.is_empty() {
@@ -503,11 +496,7 @@ pub enum PresentationSkipPolicy {
 
 /// The exact settlement result for one event identity.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(
-    tag = "kind",
-    rename_all = "SCREAMING_SNAKE_CASE",
-    deny_unknown_fields
-)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum PresentationSettlementOutcome {
     Settled,
     IntentionallySkipped,
@@ -564,11 +553,7 @@ impl<'de> Deserialize<'de> for PresentationSettlementOutcome {
 
 /// Closed typed presentation event kinds in the supported M3 battle slice.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(
-    tag = "kind",
-    rename_all = "SCREAMING_SNAKE_CASE",
-    deny_unknown_fields
-)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum BattlePresentationKind {
     MoveUsed {
         actor: PokemonId,
@@ -655,71 +640,73 @@ impl<'de> Deserialize<'de> for BattlePresentationKind {
             BattleLost,
         }
 
-        Ok(match BattlePresentationKindWire::deserialize(deserializer)? {
-            BattlePresentationKindWire::MoveUsed {
-                actor,
-                move_id,
-                targets,
-            } => Self::MoveUsed {
-                actor,
-                move_id,
-                targets,
+        Ok(
+            match BattlePresentationKindWire::deserialize(deserializer)? {
+                BattlePresentationKindWire::MoveUsed {
+                    actor,
+                    move_id,
+                    targets,
+                } => Self::MoveUsed {
+                    actor,
+                    move_id,
+                    targets,
+                },
+                BattlePresentationKindWire::AbilityActivated {
+                    pokemon,
+                    ability_id,
+                } => Self::AbilityActivated {
+                    pokemon,
+                    ability_id,
+                },
+                BattlePresentationKindWire::HpChanged {
+                    pokemon,
+                    before,
+                    after,
+                } => Self::HpChanged {
+                    pokemon,
+                    before,
+                    after,
+                },
+                BattlePresentationKindWire::StatusApplied {
+                    pokemon,
+                    before,
+                    after,
+                } => Self::StatusApplied {
+                    pokemon,
+                    before,
+                    after,
+                },
+                BattlePresentationKindWire::StatStageChanged {
+                    pokemon,
+                    stat,
+                    before,
+                    after,
+                } => Self::StatStageChanged {
+                    pokemon,
+                    stat,
+                    before,
+                    after,
+                },
+                BattlePresentationKindWire::Switched {
+                    slot,
+                    outgoing,
+                    incoming,
+                } => Self::Switched {
+                    slot,
+                    outgoing,
+                    incoming,
+                },
+                BattlePresentationKindWire::Fainted {
+                    pokemon,
+                    occurrence,
+                } => Self::Fainted {
+                    pokemon,
+                    occurrence,
+                },
+                BattlePresentationKindWire::BattleWon => Self::BattleWon,
+                BattlePresentationKindWire::BattleLost => Self::BattleLost,
             },
-            BattlePresentationKindWire::AbilityActivated {
-                pokemon,
-                ability_id,
-            } => Self::AbilityActivated {
-                pokemon,
-                ability_id,
-            },
-            BattlePresentationKindWire::HpChanged {
-                pokemon,
-                before,
-                after,
-            } => Self::HpChanged {
-                pokemon,
-                before,
-                after,
-            },
-            BattlePresentationKindWire::StatusApplied {
-                pokemon,
-                before,
-                after,
-            } => Self::StatusApplied {
-                pokemon,
-                before,
-                after,
-            },
-            BattlePresentationKindWire::StatStageChanged {
-                pokemon,
-                stat,
-                before,
-                after,
-            } => Self::StatStageChanged {
-                pokemon,
-                stat,
-                before,
-                after,
-            },
-            BattlePresentationKindWire::Switched {
-                slot,
-                outgoing,
-                incoming,
-            } => Self::Switched {
-                slot,
-                outgoing,
-                incoming,
-            },
-            BattlePresentationKindWire::Fainted {
-                pokemon,
-                occurrence,
-            } => Self::Fainted {
-                pokemon,
-                occurrence,
-            },
-            BattlePresentationKindWire::BattleWon => Self::BattleWon,
-            BattlePresentationKindWire::BattleLost => Self::BattleLost,
-        })
+        )
     }
 }
 
@@ -760,7 +747,6 @@ pub struct BattleUiProjection {
     pub seat_control: SeatBattleControl,
     pub actionable: bool,
 }
-
 
 pub const BATTLE_UI_PROJECTION_SCHEMA_VERSION: u32 = 1;
 
@@ -885,7 +871,8 @@ mod tests {
     }
 
     #[test]
-    fn menu_constructors_normalize_vectors_and_preserve_stable_identity() -> Result<(), Box<dyn Error>> {
+    fn menu_constructors_normalize_vectors_and_preserve_stable_identity()
+    -> Result<(), Box<dyn Error>> {
         let menu = menu()?;
         assert_eq!(menu.options[0].option_id.as_str(), "command/fight");
         assert_eq!(menu.options[1].option_id.as_str(), "command/switch");
@@ -940,14 +927,16 @@ mod tests {
             serde_json::to_string(&failed)?,
             r#"{"kind":"FAILED","reason":"renderer-timeout"}"#
         );
-        assert!(serde_json::from_str::<PresentationSettlementOutcome>(
-            r#"{"kind":"SETTLED","extra":true}"#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<BattlePresentationKind>(
-            r#"{"kind":"BATTLE_WON","extra":true}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<PresentationSettlementOutcome>(
+                r#"{"kind":"SETTLED","extra":true}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<BattlePresentationKind>(r#"{"kind":"BATTLE_WON","extra":true}"#)
+                .is_err()
+        );
         Ok(())
     }
 
@@ -970,10 +959,13 @@ mod tests {
         let encoded = serde_json::to_string(&event)?;
         let decoded: BattlePresentationEvent = serde_json::from_str(&encoded)?;
         assert_eq!(decoded, event);
-        assert!(serde_json::from_str::<BattlePresentationEvent>(
-            &encoded.replace("\"kind\":\"SWITCHED\"", "\"kind\":\"SWITCHED\",\"extra\":true")
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<BattlePresentationEvent>(&encoded.replace(
+                "\"kind\":\"SWITCHED\"",
+                "\"kind\":\"SWITCHED\",\"extra\":true"
+            ))
+            .is_err()
+        );
         Ok(())
     }
 }

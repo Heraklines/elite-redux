@@ -10,7 +10,7 @@ use crate::battle_ids::{
     TurnIndex, WaveIndex,
 };
 use crate::battle_model::BattleOutcome;
-use crate::ids::{OperationId, SeatId};
+use crate::ids::{OperationId, SafeU53, SeatId};
 
 pub use crate::battle_ui::{
     BattleMenu, BattleMenuError, BattleMenuOption, BattleMenuOptionError, MenuNavigation,
@@ -141,7 +141,7 @@ impl SeatMenuInstanceAllocator {
     }
 
     pub fn validate(&self) -> Result<(), SeatMenuInstanceAllocatorError> {
-        if self.next_menu_instance_id.get() == 0 {
+        if self.next_menu_instance_id.get() == SafeU53::ZERO {
             return Err(SeatMenuInstanceAllocatorError::ZeroNextMenuInstanceId);
         }
         Ok(())
@@ -883,9 +883,10 @@ impl BattleControl {
             Self::TargetSelect(value) => Some(&value.cancel_to),
             Self::PartySelect(value) => Some(&value.cancel_to),
             Self::PartyOptionSelect(value) => Some(&value.cancel_to),
-            Self::CommandRoot(_) | Self::ReplacementSelect(_) | Self::Waiting(_) | Self::Complete(_) => {
-                None
-            }
+            Self::CommandRoot(_)
+            | Self::ReplacementSelect(_)
+            | Self::Waiting(_)
+            | Self::Complete(_) => None,
         }
     }
 
@@ -1091,37 +1092,54 @@ mod tests {
         )?))
     }
 
-    fn plan(control: BattleControl, next_menu_instance_id: u64) -> Result<BattleControlPlan, Box<dyn Error>> {
-        Ok(BattleControlPlan::new(
+    fn plan(
+        control: BattleControl,
+        next_menu_instance_id: u64,
+    ) -> Result<BattleControlPlan, BattleControlPlanError> {
+        BattleControlPlan::new(
             BATTLE_CONTROL_PLAN_SCHEMA_VERSION,
-            BattleId::new(safe(1)?),
-            WaveIndex::new(safe(1)?)?,
-            TurnIndex::new(safe(1)?)?,
+            BattleId::new(SafeU53::new(1).expect("test ID is safe")),
+            WaveIndex::new(SafeU53::new(1).expect("test index is safe"))
+                .expect("test wave is positive"),
+            TurnIndex::new(SafeU53::new(1).expect("test index is safe"))
+                .expect("test turn is positive"),
             vec![SeatBattleControl::new(
-                SeatId::new(safe(1)?),
+                SeatId::new(SafeU53::new(1).expect("test seat is safe")),
                 if control.requires_decision_operation() {
-                    Some(OperationId::new("turn/e1/w1/t1/command/player/0")?)
+                    Some(
+                        OperationId::new("turn/e1/w1/t1/command/player/0")
+                            .expect("test operation ID is non-empty"),
+                    )
                 } else {
                     None
                 },
                 control,
             )],
             vec![SeatMenuInstanceAllocator::new(
-                SeatId::new(safe(1)?),
-                MenuInstanceId::new(safe(next_menu_instance_id)?),
-            )?],
-        )?)
+                SeatId::new(SafeU53::new(1).expect("test seat is safe")),
+                MenuInstanceId::new(
+                    SafeU53::new(next_menu_instance_id).expect("test allocator is safe"),
+                ),
+            )
+            .expect("test allocator is positive")],
+        )
     }
 
     #[test]
     fn plan_is_complete_per_seat_and_checks_allocator_high_water() -> Result<(), Box<dyn Error>> {
-        let plan = plan(root(1, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?, 2)?;
-        assert_eq!(plan.seats.len(), 1);
-        assert_eq!(plan.menu_allocators.len(), 1);
-        assert!(plan.seat(SeatId::new(safe(1)?)).is_some());
-        assert!(plan.allocator(SeatId::new(safe(1)?)).is_some());
+        let control_plan = plan(
+            root(1, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
+            2,
+        )?;
+        assert_eq!(control_plan.seats.len(), 1);
+        assert_eq!(control_plan.menu_allocators.len(), 1);
+        assert!(control_plan.seat(SeatId::new(safe(1)?)).is_some());
+        assert!(control_plan.allocator(SeatId::new(safe(1)?)).is_some());
         assert!(matches!(
-            plan(root(2, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?, 2),
+            plan(
+                root(2, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
+                2
+            ),
             Err(_)
         ));
         Ok(())
@@ -1173,10 +1191,12 @@ mod tests {
             BattleControl::complete(BattleOutcome::Ongoing),
             Err(BattleControlError::OngoingCompleteOutcome)
         ));
-        assert!(serde_json::from_str::<BattleControl>(
-            r#"{"kind":"COMPLETE","value":"VICTORY","extra":true}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<BattleControl>(
+                r#"{"kind":"COMPLETE","value":"VICTORY","extra":true}"#
+            )
+            .is_err()
+        );
         Ok(())
     }
 }
