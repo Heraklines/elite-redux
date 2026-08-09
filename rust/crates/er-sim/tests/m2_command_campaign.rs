@@ -1176,9 +1176,14 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert!(!has_material_effect(&stale_repeat, GUEST_OPERATION));
     assert!(!has_control_effect(&stale_repeat, GUEST_OPERATION));
     let replay_revisions = authority_entry_revisions(&stale_repeat);
-    assert_eq!(replay_revisions.len(), 2);
-    assert!(replay_revisions.contains(&Revision::new(safe(1))));
-    assert!(replay_revisions.contains(&Revision::new(safe(2))));
+    assert_eq!(
+        replay_revisions,
+        vec![
+            Revision::new(safe(1)),
+            Revision::new(safe(2)),
+            Revision::new(safe(2)),
+        ]
+    );
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
     assert!(stale_repeat.snapshot.guest.live_resources.timers.is_empty());
     assert!(
