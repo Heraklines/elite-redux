@@ -479,11 +479,9 @@ fn proposal_timer_ids(effects: &[KernelEffect]) -> Vec<er_types::TimerId> {
     effects
         .iter()
         .filter_map(|effect| match effect {
-            KernelEffect::ScheduleTimer { timer_id, owner, .. }
-                if owner.owner_id.starts_with("m2-kernel-proposal") =>
-            {
-                Some(*timer_id)
-            }
+            KernelEffect::ScheduleTimer {
+                timer_id, owner, ..
+            } if owner.owner_id.starts_with("m2-kernel-proposal") => Some(*timer_id),
             _ => None,
         })
         .collect()
@@ -752,12 +750,16 @@ fn peer_only_command_frontier_installs_without_a_local_command_surface() -> Test
             control_id: control_id.clone(),
         },
     })?;
-    assert!(installed
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::UiChanged { .. })));
-    assert!(!installed
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        installed
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::UiChanged { .. }))
+    );
+    assert!(
+        !installed
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
     let receipt = sent_frame(&installed).ok_or("controlInstalled receipt was not emitted")?;
     let receipt: AuthorityReceiptBody = serde_json::from_value(receipt.body)?;
     assert_eq!(receipt.stage, AckStage::ControlInstalled);
@@ -778,13 +780,14 @@ fn peer_only_command_frontier_installs_without_a_local_command_surface() -> Test
         ),
     })?;
     let duplicate_receipt = sent_frame(&duplicate).ok_or("duplicate receipt was not emitted")?;
-    let duplicate_receipt: AuthorityReceiptBody =
-        serde_json::from_value(duplicate_receipt.body)?;
+    let duplicate_receipt: AuthorityReceiptBody = serde_json::from_value(duplicate_receipt.body)?;
     assert_eq!(duplicate_receipt.stage, AckStage::ControlInstalled);
     assert_eq!(duplicate_receipt.control_id, Some(control_id));
-    assert!(!duplicate
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        !duplicate
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
     assert_eq!(kernel.ui_state().stack, vec![MenuState::None]);
     assert!(kernel.live_resources().controls.is_empty());
     assert_eq!(kernel.live_resources().presentations.len(), 1);
@@ -832,17 +835,20 @@ fn local_command_frontier_without_an_exact_plan_still_terminalizes() -> TestResu
         revision: Revision::new(safe(1)),
         outcome: ControlProjectionOutcome::Installed { control_id },
     })?;
-    assert!(terminalized
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
-    let Some(MenuState::Terminal(TerminalMenu { prompt_key, .. })) =
-        kernel.ui_state().stack.last()
+    assert!(
+        terminalized
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
+    let Some(MenuState::Terminal(TerminalMenu { prompt_key, .. })) = kernel.ui_state().stack.last()
     else {
         return Err("missing local command plan did not install a terminal menu".into());
     };
-    assert!(prompt_key
-        .as_deref()
-        .is_some_and(|reason| reason.contains("missing exact control menu plan")));
+    assert!(
+        prompt_key
+            .as_deref()
+            .is_some_and(|reason| reason.contains("missing exact control menu plan"))
+    );
     assert_eq!(kernel.live_resources(), Default::default());
     Ok(())
 }
@@ -1172,7 +1178,10 @@ fn replica_interaction_commit_settles_proposal_lease_before_material_and_duplica
     let operation_id = operation("replica.interaction-lease")?;
     let control = interaction_control_for_owner(1, &operation_id);
     let mut kernel = replica_kernel(
-        replica_config(vec![interaction_plan_with_proposal(&control, &operation_id)?])?,
+        replica_config(vec![interaction_plan_with_proposal(
+            &control,
+            &operation_id,
+        )?])?,
         ui(
             initial_interaction_menu(&control, &operation_id)?,
             Some(seat(1)),
@@ -1218,10 +1227,17 @@ fn replica_interaction_commit_settles_proposal_lease_before_material_and_duplica
         )
     }));
     key_up(&mut kernel, seat(1))?;
-    assert!(kernel.live_resources().proposal_leases.contains(&operation_id));
-    assert!(proposal_timers
-        .iter()
-        .all(|timer_id| kernel.live_resources().timers.contains(timer_id)));
+    assert!(
+        kernel
+            .live_resources()
+            .proposal_leases
+            .contains(&operation_id)
+    );
+    assert!(
+        proposal_timers
+            .iter()
+            .all(|timer_id| kernel.live_resources().timers.contains(timer_id))
+    );
 
     let entry = AuthorityEntry {
         context: context(0, 0, 1)?,
@@ -1277,10 +1293,17 @@ fn replica_interaction_commit_settles_proposal_lease_before_material_and_duplica
         assert_eq!(cancellations.len(), 1);
         assert!(cancellations[0] < apply_index);
     }
-    assert!(!kernel.live_resources().proposal_leases.contains(&operation_id));
-    assert!(proposal_timers
-        .iter()
-        .all(|timer_id| !kernel.live_resources().timers.contains(timer_id)));
+    assert!(
+        !kernel
+            .live_resources()
+            .proposal_leases
+            .contains(&operation_id)
+    );
+    assert!(
+        proposal_timers
+            .iter()
+            .all(|timer_id| !kernel.live_resources().timers.contains(timer_id))
+    );
 
     let duplicate = kernel.step(KernelInput::NetworkFrame {
         endpoint: seat(1),
@@ -1293,7 +1316,12 @@ fn replica_interaction_commit_settles_proposal_lease_before_material_and_duplica
             KernelEffect::CancelTimer { timer_id, .. } if proposal_timers.contains(timer_id)
         )
     }));
-    assert!(!kernel.live_resources().proposal_leases.contains(&operation_id));
+    assert!(
+        !kernel
+            .live_resources()
+            .proposal_leases
+            .contains(&operation_id)
+    );
     Ok(())
 }
 
@@ -1302,7 +1330,10 @@ fn replica_turn_commit_does_not_settle_interaction_proposal_lease() -> TestResul
     let operation_id = operation("replica.turn-lease")?;
     let interaction = interaction_control_for_owner(1, &operation_id);
     let mut kernel = replica_kernel(
-        replica_config(vec![interaction_plan_with_proposal(&interaction, &operation_id)?])?,
+        replica_config(vec![interaction_plan_with_proposal(
+            &interaction,
+            &operation_id,
+        )?])?,
         ui(
             initial_interaction_menu(&interaction, &operation_id)?,
             Some(seat(1)),
@@ -1342,10 +1373,17 @@ fn replica_turn_commit_does_not_settle_interaction_proposal_lease() -> TestResul
             KernelEffect::CancelTimer { timer_id, .. } if proposal_timers.contains(timer_id)
         )
     }));
-    assert!(kernel.live_resources().proposal_leases.contains(&operation_id));
-    assert!(proposal_timers
-        .iter()
-        .all(|timer_id| kernel.live_resources().timers.contains(timer_id)));
+    assert!(
+        kernel
+            .live_resources()
+            .proposal_leases
+            .contains(&operation_id)
+    );
+    assert!(
+        proposal_timers
+            .iter()
+            .all(|timer_id| kernel.live_resources().timers.contains(timer_id))
+    );
     Ok(())
 }
 

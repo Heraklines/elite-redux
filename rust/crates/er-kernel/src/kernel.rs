@@ -14,15 +14,16 @@ use er_protocol::{
     control_id_of, frame_contexts_compatible,
 };
 use er_types::{
-    AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityReceiptBody, AuthorityRecoverySlice,
-    ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu, ConnectionGeneration,
-    ControlProjectionOutcome, FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton, InputMap,
-    InputRouterOutput, InputTimerCommand, InteractionMenu, MaterialApplicationOutcome,
-    MenuGeneration, MenuOption, MenuOptionId, MenuState, NetworkFrame, NextControl, OperationId,
-    PresentationEvent, PresentationEventId, PresentationOutcome, ProposalMessage, RawFrame,
-    RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody, RecoveryPhase, RecoveryRequestBody,
-    ReplacementMenu, Revision, SafeU53, SeatId, TailRequestBody, TerminalFrameBody, TerminalMenu,
-    TerminalState, TimeClass, TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
+    AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityReceiptBody,
+    AuthorityRecoverySlice, ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu,
+    ConnectionGeneration, ControlProjectionOutcome, FRAME_PROTOCOL_VERSION, FrameContext,
+    FrameType, GameButton, InputMap, InputRouterOutput, InputTimerCommand, InteractionMenu,
+    MaterialApplicationOutcome, MenuGeneration, MenuOption, MenuOptionId, MenuState, NetworkFrame,
+    NextControl, OperationId, PresentationEvent, PresentationEventId, PresentationOutcome,
+    ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody,
+    RecoveryPhase, RecoveryRequestBody, ReplacementMenu, Revision, SafeU53, SeatId,
+    TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState, TimeClass, TimerId,
+    TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use serde_json::{Value, json};
@@ -2218,9 +2219,7 @@ impl GameKernel {
             }
             NextControl::CommandFrontier(control) => {
                 match self.find_command_plan(&pending, control) {
-                    Some(CommandPlan::EmptyLocalPartition) => {
-                        Some((None, false, MenuState::None))
-                    }
+                    Some(CommandPlan::EmptyLocalPartition) => Some((None, false, MenuState::None)),
                     Some(CommandPlan::Exact {
                         owner,
                         operation_id,
@@ -2341,14 +2340,14 @@ impl GameKernel {
         });
         let mut matches = matches.collect::<Vec<_>>();
         if matches.len() == 1 {
-            matches.pop().map(|(owner, operation_id, options, cancel)| {
-                CommandPlan::Exact {
+            matches.pop().map(
+                |(owner, operation_id, options, cancel)| CommandPlan::Exact {
                     owner,
                     operation_id,
                     options,
                     cancel,
-                }
-            })
+                },
+            )
         } else {
             None
         }
