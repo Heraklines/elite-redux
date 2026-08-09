@@ -519,10 +519,10 @@ impl PresentationSettlementOutcome {
     }
 
     pub fn validate(&self) -> Result<(), PresentationSettlementOutcomeError> {
-        if let Self::Failed { reason } = self {
-            if reason.is_empty() {
-                return Err(PresentationSettlementOutcomeError::EmptyFailureReason);
-            }
+        if let Self::Failed { reason } = self
+            && reason.is_empty()
+        {
+            return Err(PresentationSettlementOutcomeError::EmptyFailureReason);
         }
         Ok(())
     }

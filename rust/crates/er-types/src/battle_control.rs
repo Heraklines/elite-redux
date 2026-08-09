@@ -216,8 +216,8 @@ impl BattleControlPlan {
         mut seats: Vec<SeatBattleControl>,
         mut menu_allocators: Vec<SeatMenuInstanceAllocator>,
     ) -> Result<Self, BattleControlPlanError> {
-        seats.sort_unstable_by(|first, second| first.seat.cmp(&second.seat));
-        menu_allocators.sort_unstable_by(|first, second| first.seat.cmp(&second.seat));
+        seats.sort_unstable_by_key(|first| first.seat);
+        menu_allocators.sort_unstable_by_key(|first| first.seat);
         let value = Self {
             schema_version,
             battle_id,
@@ -1115,13 +1115,15 @@ mod tests {
                 },
                 control,
             )],
-            vec![SeatMenuInstanceAllocator::new(
-                SeatId::new(SafeU53::new(1).expect("test seat is safe")),
-                MenuInstanceId::new(
-                    SafeU53::new(next_menu_instance_id).expect("test allocator is safe"),
-                ),
-            )
-            .expect("test allocator is positive")],
+            vec![
+                SeatMenuInstanceAllocator::new(
+                    SeatId::new(SafeU53::new(1).expect("test seat is safe")),
+                    MenuInstanceId::new(
+                        SafeU53::new(next_menu_instance_id).expect("test allocator is safe"),
+                    ),
+                )
+                .expect("test allocator is positive"),
+            ],
         )
     }
 
@@ -1139,9 +1141,9 @@ mod tests {
             plan(
                 root(2, "battle/1/wave/1/turn/1/control/player/0/seat/1/command")?,
                 2
-            ),
-            Err(_)
-        ));
+            )
+            .is_err()
+        );
         Ok(())
     }
 
