@@ -934,9 +934,11 @@ mod tests {
     use std::error::Error;
 
     use super::*;
-    use crate::battle_control::{BattleControl, CommandRootControl, WaitingControl, WaitingReason};
-    use crate::battle_ids::{BattleSide, MenuInstanceId};
-    use crate::battle_model::BattleOutcome;
+    use crate::battle_control::{
+        BattleControl, CommandRootControl, ReplacementSelectControl, WaitingControl, WaitingReason,
+    };
+    use crate::battle_ids::{AuthorityEpoch, BattleSide, FaintOccurrenceId, MenuInstanceId};
+    use crate::battle_model::{BattleOutcome, FaintSource};
     use crate::ids::{MenuOptionId, OperationId, SafeU53, SeatId};
 
     fn safe(value: u64) -> Result<SafeU53, Box<dyn Error>> {
@@ -994,6 +996,43 @@ mod tests {
             },
             menu_for_owner(owner_seat)?,
         )?))
+    }
+
+    fn replacement_control(operation_id: &str) -> Result<BattleControl, Box<dyn Error>> {
+        let selected_option_id = MenuOptionId::new("party/42/slot/3")?;
+        let menu = BattleMenu::new(
+            MenuInstanceId::new(safe(1)?),
+            SeatId::new(safe(1)?),
+            format!("{operation_id}/control/replacement"),
+            selected_option_id.clone(),
+            vec![option(
+                selected_option_id.as_str(),
+                0,
+                MenuOptionVisibility::Visible,
+                true,
+            )?],
+            Vec::new(),
+        )?;
+        Ok(BattleControl::ReplacementSelect(
+            ReplacementSelectControl::new(
+                FaintOccurrenceId::new(safe(9)?),
+                FaintSource {
+                    epoch: AuthorityEpoch::new(safe(3)?),
+                    wave: WaveIndex::new(safe(1)?)?,
+                    resolved_turn: TurnIndex::new(safe(1)?)?,
+                    turn_occurrence: 4,
+                },
+                PokemonId::new(safe(7)?),
+                FieldSlot {
+                    side: BattleSide::Player,
+                    position: 0,
+                },
+                SeatId::new(safe(1)?),
+                menu,
+                selected_option_id.clone(),
+                selected_option_id,
+            )?,
+        ))
     }
 
     fn waiting_control() -> Result<BattleControl, Box<dyn Error>> {
@@ -1170,12 +1209,67 @@ mod tests {
     }
 
     #[test]
+    fn projection_reconstructs_exact_command_and_replacement_operations()
+    -> Result<(), Box<dyn Error>> {
+        assert_eq!(
+            projection(
+                1,
+                Some(OperationId::new(
+                    "battle/2/wave/1/turn/1/command/player/0/seat/1",
+                )?),
+                command_control(1)?,
+                true,
+            ),
+            Err(BattleUiProjectionError::SeatControl(
+                BattleControlError::DecisionOperationIdMismatch
+            ))
+        );
+
+        let exact = "RC/e3/b1/w1/t1/o4/f0/s1";
+        assert!(projection(
+            1,
+            Some(OperationId::new(exact)?),
+            replacement_control(exact)?,
+            true,
+        )
+        .is_ok());
+
+        let mutated = "RC/e3/b1/w1/t1/o5/f0/s1";
+        assert_eq!(
+            projection(
+                1,
+                Some(OperationId::new(mutated)?),
+                replacement_control(mutated)?,
+                true,
+            ),
+            Err(BattleUiProjectionError::SeatControl(
+                BattleControlError::DecisionOperationIdMismatch
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn invalid_projection_wires_are_rejected() -> Result<(), Box<dyn Error>> {
         let operation_id = OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/1")?;
         let invalid = vec![
             unchecked_projection(1, None, command_control(1)?, false),
             unchecked_projection(1, Some(operation_id.clone()), waiting_control()?, false),
             unchecked_projection(1, Some(operation_id), command_control(2)?, true),
+            unchecked_projection(
+                1,
+                Some(OperationId::new(
+                    "battle/2/wave/1/turn/1/command/player/0/seat/1",
+                )?),
+                command_control(1)?,
+                false,
+            ),
+            unchecked_projection(
+                1,
+                Some(OperationId::new("RC/e3/b1/w1/t1/o5/f0/s1")?),
+                replacement_control("RC/e3/b1/w1/t1/o5/f0/s1")?,
+                false,
+            ),
             unchecked_projection(1, None, waiting_control()?, true),
             unchecked_projection(
                 1,

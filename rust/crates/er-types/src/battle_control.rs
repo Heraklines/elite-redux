@@ -9,7 +9,7 @@ use crate::battle_ids::{
     BattleId, FaintOccurrenceId, FieldSlot, MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId,
     TurnIndex, WaveIndex,
 };
-use crate::battle_model::BattleOutcome;
+use crate::battle_model::{BattleOutcome, FaintSource};
 use crate::ids::{OperationId, SafeU53, SeatId};
 
 pub use crate::battle_ui::{
@@ -63,6 +63,18 @@ pub enum BattleControlError {
     OngoingCompleteOutcome,
     #[error("battle control_id does not match its contextual identity")]
     ControlIdMismatch,
+    #[error("decision operation_id does not match its contextual identity")]
+    DecisionOperationIdMismatch,
+    #[error("command control field_slot must be player-side")]
+    CommandFieldMustBePlayer,
+    #[error("replacement control field_slot must be player-side")]
+    ReplacementFieldMustBePlayer,
+    #[error("replacement source wave does not match the plan/projection wave")]
+    ReplacementSourceWaveMismatch,
+    #[error("replacement source resolved_turn does not match the plan/projection turn")]
+    ReplacementSourceTurnMismatch,
+    #[error("replacement owner and menu owner must match the plan/projection seat")]
+    ReplacementSeatMismatch,
 }
 
 /// Closed failures for the frozen per-control Cancel restoration graph.
@@ -579,6 +591,8 @@ impl PartyOptionSelectControl {
 #[serde(deny_unknown_fields)]
 pub struct ReplacementSelectControl {
     pub occurrence: FaintOccurrenceId,
+    pub source: FaintSource,
+    pub actor: PokemonId,
     pub field_slot: FieldSlot,
     pub owner_seat: SeatId,
     pub menu: BattleMenu,
@@ -589,6 +603,8 @@ pub struct ReplacementSelectControl {
 impl ReplacementSelectControl {
     pub fn new(
         occurrence: FaintOccurrenceId,
+        source: FaintSource,
+        actor: PokemonId,
         field_slot: FieldSlot,
         owner_seat: SeatId,
         menu: BattleMenu,
@@ -597,6 +613,8 @@ impl ReplacementSelectControl {
     ) -> Result<Self, BattleControlError> {
         let value = Self {
             occurrence,
+            source,
+            actor,
             field_slot,
             owner_seat,
             menu,
@@ -735,6 +753,8 @@ impl<'de> Deserialize<'de> for ReplacementSelectControl {
         #[serde(deny_unknown_fields)]
         struct ReplacementSelectControlWire {
             occurrence: FaintOccurrenceId,
+            source: FaintSource,
+            actor: PokemonId,
             field_slot: FieldSlot,
             owner_seat: SeatId,
             menu: BattleMenu,
@@ -745,6 +765,8 @@ impl<'de> Deserialize<'de> for ReplacementSelectControl {
         let value = ReplacementSelectControlWire::deserialize(deserializer)?;
         Self::new(
             value.occurrence,
+            value.source,
+            value.actor,
             value.field_slot,
             value.owner_seat,
             value.menu,
@@ -906,36 +928,53 @@ impl BattleControl {
     ) -> Result<(), BattleControlError> {
         match self {
             Self::CommandRoot(value) => {
-                validate_command_control_id(&value.menu, value.field_slot, "command", context)
+                validate_command_control_identity(&value.menu, value.field_slot, "command", context)
             }
             Self::MoveSelect(value) => {
-                validate_command_control_id(&value.menu, value.field_slot, "move", context)?;
+                validate_command_control_identity(&value.menu, value.field_slot, "move", context)?;
                 value.cancel_to.validate_control_ids_with_context(context)
             }
             Self::TargetSelect(value) => {
-                validate_command_control_id(&value.menu, value.field_slot, "target", context)?;
+                validate_command_control_identity(&value.menu, value.field_slot, "target", context)?;
                 value.cancel_to.validate_control_ids_with_context(context)
             }
             Self::PartySelect(value) => {
-                validate_command_control_id(&value.menu, value.field_slot, "party", context)?;
+                validate_command_control_identity(&value.menu, value.field_slot, "party", context)?;
                 value.cancel_to.validate_control_ids_with_context(context)
             }
             Self::PartyOptionSelect(value) => {
                 let kind = format!("party-option/{}", value.selected_party_slot.get());
                 match value.cancel_to.as_ref() {
                     Self::PartySelect(_) => {
-                        validate_command_control_id(&value.menu, value.field_slot, &kind, context)?;
+                        validate_command_control_identity(
+                            &value.menu,
+                            value.field_slot,
+                            &kind,
+                            context,
+                        )?;
                     }
-                    Self::ReplacementSelect(_) => {
-                        validate_replacement_control_id(&value.menu, &kind, context)?;
+                    Self::ReplacementSelect(restored) => {
+                        validate_replacement_control_identity(
+                            &value.menu,
+                            restored.source,
+                            value.field_slot,
+                            restored.owner_seat,
+                            &kind,
+                            context,
+                        )?;
                     }
                     _ => return Err(BattleControlError::ControlIdMismatch),
                 }
                 value.cancel_to.validate_control_ids_with_context(context)
             }
-            Self::ReplacementSelect(value) => {
-                validate_replacement_control_id(&value.menu, "replacement", context)
-            }
+            Self::ReplacementSelect(value) => validate_replacement_control_identity(
+                &value.menu,
+                value.source,
+                value.field_slot,
+                value.owner_seat,
+                "replacement",
+                context,
+            ),
             Self::Waiting(_) | Self::Complete(_) => Ok(()),
         }
     }
@@ -973,35 +1012,75 @@ struct ControlIdentityContext<'a> {
     decision_operation_id: Option<&'a OperationId>,
 }
 
-fn validate_command_control_id(
+fn validate_command_control_identity(
     menu: &BattleMenu,
     field_slot: FieldSlot,
     kind: &str,
     context: &ControlIdentityContext<'_>,
 ) -> Result<(), BattleControlError> {
     if field_slot.side != crate::battle_ids::BattleSide::Player {
-        return Err(BattleControlError::ControlIdMismatch);
+        return Err(BattleControlError::CommandFieldMustBePlayer);
     }
-    let expected = format!(
+    let expected_operation_id = format!(
+        "battle/{}/wave/{}/turn/{}/command/player/{}/seat/{}",
+        context.battle_id, context.wave, context.turn, field_slot.position, context.seat,
+    );
+    if context
+        .decision_operation_id
+        .map(OperationId::as_str)
+        != Some(expected_operation_id.as_str())
+    {
+        return Err(BattleControlError::DecisionOperationIdMismatch);
+    }
+    let expected_control_id = format!(
         "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/{}",
         context.battle_id, context.wave, context.turn, field_slot.position, context.seat, kind,
     );
-    if menu.control_id.as_str() != expected.as_str() {
+    if menu.control_id.as_str() != expected_control_id.as_str() {
         return Err(BattleControlError::ControlIdMismatch);
     }
     Ok(())
 }
 
-fn validate_replacement_control_id(
+fn validate_replacement_control_identity(
     menu: &BattleMenu,
+    source: FaintSource,
+    field_slot: FieldSlot,
+    owner_seat: SeatId,
     kind: &str,
     context: &ControlIdentityContext<'_>,
 ) -> Result<(), BattleControlError> {
-    let Some(decision_operation_id) = context.decision_operation_id else {
-        return Err(BattleControlError::ControlIdMismatch);
-    };
-    let expected = format!("{}/control/{kind}", decision_operation_id.as_str());
-    if menu.control_id.as_str() != expected.as_str() {
+    if field_slot.side != crate::battle_ids::BattleSide::Player {
+        return Err(BattleControlError::ReplacementFieldMustBePlayer);
+    }
+    if source.wave != context.wave {
+        return Err(BattleControlError::ReplacementSourceWaveMismatch);
+    }
+    if source.resolved_turn != context.turn {
+        return Err(BattleControlError::ReplacementSourceTurnMismatch);
+    }
+    if owner_seat != context.seat || menu.owner_seat != context.seat {
+        return Err(BattleControlError::ReplacementSeatMismatch);
+    }
+    let expected_operation_id = format!(
+        "RC/e{}/b{}/w{}/t{}/o{}/f{}/s{}",
+        source.epoch,
+        context.battle_id,
+        source.wave,
+        source.resolved_turn,
+        source.turn_occurrence,
+        field_slot.position,
+        owner_seat,
+    );
+    if context
+        .decision_operation_id
+        .map(OperationId::as_str)
+        != Some(expected_operation_id.as_str())
+    {
+        return Err(BattleControlError::DecisionOperationIdMismatch);
+    }
+    let expected_control_id = format!("{expected_operation_id}/control/{kind}");
+    if menu.control_id.as_str() != expected_control_id.as_str() {
         return Err(BattleControlError::ControlIdMismatch);
     }
     Ok(())
@@ -1243,6 +1322,7 @@ impl PartyOptionSelectControl {
                     &restored.menu,
                     restored.field_slot,
                 )?;
+                validate_restoration_actor(self.actor, restored.actor)?;
                 &restored.menu
             }
             _ => {
@@ -1269,7 +1349,7 @@ mod tests {
     use std::error::Error;
 
     use super::*;
-    use crate::battle_ids::{BattleSide, MenuInstanceId};
+    use crate::battle_ids::{AuthorityEpoch, BattleSide, MenuInstanceId};
     use crate::ids::{MenuOptionId, OperationId, SafeU53, SeatId};
 
     fn safe(value: u64) -> Result<SafeU53, Box<dyn Error>> {
@@ -1362,22 +1442,95 @@ mod tests {
         control_id: &str,
         selected_option_id: &str,
     ) -> Result<BattleControl, Box<dyn Error>> {
+        replacement_control_with(
+            instance_id,
+            control_id,
+            selected_option_id,
+            9,
+            FaintSource {
+                epoch: AuthorityEpoch::new(safe(3)?),
+                wave: WaveIndex::new(safe(1)?)?,
+                resolved_turn: TurnIndex::new(safe(1)?)?,
+                turn_occurrence: 4,
+            },
+            7,
+            field_slot(0),
+            1,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn replacement_control_with(
+        instance_id: u64,
+        control_id: &str,
+        selected_option_id: &str,
+        occurrence: u64,
+        source: FaintSource,
+        actor: u64,
+        field_slot: FieldSlot,
+        owner_seat: u64,
+    ) -> Result<BattleControl, Box<dyn Error>> {
         let selected_option_id = MenuOptionId::new(selected_option_id)?;
         Ok(BattleControl::ReplacementSelect(
             ReplacementSelectControl::new(
-                FaintOccurrenceId::new(safe(9)?),
-                field_slot(0),
-                SeatId::new(safe(1)?),
-                menu(instance_id, 1, control_id, selected_option_id.as_str())?,
+                FaintOccurrenceId::new(safe(occurrence)?),
+                source,
+                PokemonId::new(safe(actor)?),
+                field_slot,
+                SeatId::new(safe(owner_seat)?),
+                menu(
+                    instance_id,
+                    owner_seat,
+                    control_id,
+                    selected_option_id.as_str(),
+                )?,
                 selected_option_id.clone(),
                 selected_option_id,
             )?,
         ))
     }
 
+    fn replacement_operation_id(control: &BattleControl) -> Option<String> {
+        let replacement = match control {
+            BattleControl::ReplacementSelect(value) => value,
+            BattleControl::PartyOptionSelect(value) => match value.cancel_to.as_ref() {
+                BattleControl::ReplacementSelect(restored) => restored,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        Some(format!(
+            "RC/e{}/b1/w{}/t{}/o{}/f{}/s{}",
+            replacement.source.epoch,
+            replacement.source.wave,
+            replacement.source.resolved_turn,
+            replacement.source.turn_occurrence,
+            replacement.field_slot.position,
+            replacement.owner_seat,
+        ))
+    }
+
     fn plan(
         control: BattleControl,
         next_menu_instance_id: u64,
+    ) -> Result<BattleControlPlan, BattleControlPlanError> {
+        let decision_operation_id = if control.requires_decision_operation() {
+            Some(
+                OperationId::new(replacement_operation_id(&control).unwrap_or_else(|| {
+                    "battle/1/wave/1/turn/1/command/player/0/seat/1".to_owned()
+                }))
+                .expect("test operation ID is non-empty"),
+            )
+        } else {
+            None
+        };
+        plan_with_operation(control, next_menu_instance_id, decision_operation_id)
+    }
+
+    fn plan_with_operation(
+        control: BattleControl,
+        next_menu_instance_id: u64,
+        decision_operation_id: Option<OperationId>,
     ) -> Result<BattleControlPlan, BattleControlPlanError> {
         BattleControlPlan::new(
             BATTLE_CONTROL_PLAN_SCHEMA_VERSION,
@@ -1388,14 +1541,7 @@ mod tests {
                 .expect("test turn is positive"),
             vec![SeatBattleControl::new(
                 SeatId::new(SafeU53::new(1).expect("test seat is safe")),
-                if control.requires_decision_operation() {
-                    Some(
-                        OperationId::new("turn/e1/w1/t1/command/player/0")
-                            .expect("test operation ID is non-empty"),
-                    )
-                } else {
-                    None
-                },
+                decision_operation_id,
                 control,
             )],
             vec![
@@ -1446,10 +1592,10 @@ mod tests {
         let wave = WaveIndex::new(safe(1)?)?;
         let turn = TurnIndex::new(safe(1)?)?;
         let seat = SeatId::new(safe(1)?);
-        let operation_id = OperationId::new("RC/e1/b1/w1/t1/o9/f0/s1")?;
+        let operation_id = OperationId::new("RC/e3/b1/w1/t1/o4/f0/s1")?;
         let replacement = replacement_control(
             1,
-            "RC/e1/b1/w1/t1/o9/f0/s1/control/replacement",
+            "RC/e3/b1/w1/t1/o4/f0/s1/control/replacement",
             "party/42/slot/3",
         )?;
         assert!(
@@ -1460,13 +1606,243 @@ mod tests {
 
         let wrong_suffix = replacement_control(
             1,
-            "RC/e1/b1/w1/t1/o9/f0/s1/control/party-option/3",
+            "RC/e3/b1/w1/t1/o4/f0/s1/control/party-option/3",
             "party/42/slot/3",
         )?;
         assert_eq!(
             wrong_suffix.validate_control_ids(battle_id, wave, turn, seat, Some(&operation_id)),
             Err(BattleControlError::ControlIdMismatch)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn command_decision_operation_identity_rejects_each_mutated_coordinate()
+    -> Result<(), Box<dyn Error>> {
+        let control_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
+        let exact = OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/1")?;
+        assert!(plan_with_operation(root(1, control_id)?, 2, Some(exact)).is_ok());
+
+        for mutated in [
+            "battle/2/wave/1/turn/1/command/player/0/seat/1",
+            "battle/1/wave/2/turn/1/command/player/0/seat/1",
+            "battle/1/wave/1/turn/2/command/player/0/seat/1",
+            "battle/1/wave/1/turn/1/command/player/1/seat/1",
+            "battle/1/wave/1/turn/1/command/player/0/seat/2",
+            "turn/e1/w1/t1/command/player/0",
+        ] {
+            assert_eq!(
+                plan_with_operation(
+                    root(1, control_id)?,
+                    2,
+                    Some(OperationId::new(mutated)?),
+                ),
+                Err(BattleControlPlanError::Control(
+                    BattleControlError::DecisionOperationIdMismatch
+                )),
+                "mutated command operation {mutated} must be rejected"
+            );
+        }
+
+        let enemy_side = BattleControl::CommandRoot(CommandRootControl::new(
+            PokemonId::new(safe(7)?),
+            FieldSlot {
+                side: BattleSide::Enemy,
+                position: 0,
+            },
+            menu(1, 1, control_id, "command/fight")?,
+        )?);
+        assert_eq!(
+            plan_with_operation(
+                enemy_side,
+                2,
+                Some(OperationId::new(
+                    "battle/1/wave/1/turn/1/command/player/0/seat/1",
+                )?),
+            ),
+            Err(BattleControlPlanError::Control(
+                BattleControlError::CommandFieldMustBePlayer
+            ))
+        );
+
+        let mut invalid_wire = plan(root(1, control_id)?, 2)?;
+        invalid_wire.seats[0].decision_operation_id = Some(OperationId::new(
+            "battle/2/wave/1/turn/1/command/player/0/seat/1",
+        )?);
+        let encoded = serde_json::to_string(&invalid_wire)?;
+        assert!(serde_json::from_str::<BattleControlPlan>(&encoded).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_decision_operation_identity_rejects_each_mutated_coordinate()
+    -> Result<(), Box<dyn Error>> {
+        let exact = "RC/e3/b1/w1/t1/o4/f0/s1";
+        assert!(plan_with_operation(
+            replacement_control(
+                1,
+                &format!("{exact}/control/replacement"),
+                "party/42/slot/3",
+            )?,
+            2,
+            Some(OperationId::new(exact)?),
+        )
+        .is_ok());
+
+        for mutated in [
+            "RC/e4/b1/w1/t1/o4/f0/s1",
+            "RC/e3/b2/w1/t1/o4/f0/s1",
+            "RC/e3/b1/w2/t1/o4/f0/s1",
+            "RC/e3/b1/w1/t2/o4/f0/s1",
+            "RC/e3/b1/w1/t1/o5/f0/s1",
+            "RC/e3/b1/w1/t1/o4/f1/s1",
+            "RC/e3/b1/w1/t1/o4/f0/s2",
+        ] {
+            assert_eq!(
+                plan_with_operation(
+                    replacement_control(
+                        1,
+                        &format!("{mutated}/control/replacement"),
+                        "party/42/slot/3",
+                    )?,
+                    2,
+                    Some(OperationId::new(mutated)?),
+                ),
+                Err(BattleControlPlanError::Control(
+                    BattleControlError::DecisionOperationIdMismatch
+                )),
+                "mutated replacement operation {mutated} must be rejected"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_context_rejects_source_and_side_mismatches() -> Result<(), Box<dyn Error>> {
+        let wave_two_source = FaintSource {
+            epoch: AuthorityEpoch::new(safe(3)?),
+            wave: WaveIndex::new(safe(2)?)?,
+            resolved_turn: TurnIndex::new(safe(1)?)?,
+            turn_occurrence: 4,
+        };
+        assert_eq!(
+            plan_with_operation(
+                replacement_control_with(
+                    1,
+                    "RC/e3/b1/w2/t1/o4/f0/s1/control/replacement",
+                    "party/42/slot/3",
+                    9,
+                    wave_two_source,
+                    7,
+                    field_slot(0),
+                    1,
+                )?,
+                2,
+                Some(OperationId::new("RC/e3/b1/w2/t1/o4/f0/s1")?),
+            ),
+            Err(BattleControlPlanError::Control(
+                BattleControlError::ReplacementSourceWaveMismatch
+            ))
+        );
+
+        let turn_two_source = FaintSource {
+            epoch: AuthorityEpoch::new(safe(3)?),
+            wave: WaveIndex::new(safe(1)?)?,
+            resolved_turn: TurnIndex::new(safe(2)?)?,
+            turn_occurrence: 4,
+        };
+        assert_eq!(
+            plan_with_operation(
+                replacement_control_with(
+                    1,
+                    "RC/e3/b1/w1/t2/o4/f0/s1/control/replacement",
+                    "party/42/slot/3",
+                    9,
+                    turn_two_source,
+                    7,
+                    field_slot(0),
+                    1,
+                )?,
+                2,
+                Some(OperationId::new("RC/e3/b1/w1/t2/o4/f0/s1")?),
+            ),
+            Err(BattleControlPlanError::Control(
+                BattleControlError::ReplacementSourceTurnMismatch
+            ))
+        );
+
+        let source = FaintSource {
+            epoch: AuthorityEpoch::new(safe(3)?),
+            wave: WaveIndex::new(safe(1)?)?,
+            resolved_turn: TurnIndex::new(safe(1)?)?,
+            turn_occurrence: 4,
+        };
+        assert_eq!(
+            plan_with_operation(
+                replacement_control_with(
+                    1,
+                    "RC/e3/b1/w1/t1/o4/f0/s1/control/replacement",
+                    "party/42/slot/3",
+                    9,
+                    source,
+                    7,
+                    FieldSlot {
+                        side: BattleSide::Enemy,
+                        position: 0,
+                    },
+                    1,
+                )?,
+                2,
+                Some(OperationId::new("RC/e3/b1/w1/t1/o4/f0/s1")?),
+            ),
+            Err(BattleControlPlanError::Control(
+                BattleControlError::ReplacementFieldMustBePlayer
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_global_occurrence_is_serialized_but_never_drives_operation_identity()
+    -> Result<(), Box<dyn Error>> {
+        let control_id = "RC/e3/b1/w1/t1/o4/f0/s1/control/replacement";
+        let original = replacement_control(1, control_id, "party/42/slot/3")?;
+        let original_json = serde_json::to_string(&original)?;
+        assert!(plan(original, 2).is_ok());
+
+        let mut changed = replacement_control(1, control_id, "party/42/slot/3")?;
+        let BattleControl::ReplacementSelect(replacement) = &mut changed else {
+            unreachable!("test helper always builds ReplacementSelect");
+        };
+        replacement.occurrence = FaintOccurrenceId::new(safe(10)?);
+        let changed_json = serde_json::to_string(&changed)?;
+        assert_ne!(original_json, changed_json);
+        assert!(changed_json.contains(r#""occurrence":10"#));
+        assert!(changed_json.contains(r#""turn_occurrence":4"#));
+        assert!(plan(changed, 2).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_source_and_actor_are_required_on_the_wire() -> Result<(), Box<dyn Error>> {
+        let replacement = replacement_control(
+            1,
+            "RC/e3/b1/w1/t1/o4/f0/s1/control/replacement",
+            "party/42/slot/3",
+        )?;
+        for missing in ["source", "actor"] {
+            let mut wire = serde_json::to_value(&replacement)?;
+            let removed = wire
+                .get_mut("value")
+                .and_then(serde_json::Value::as_object_mut)
+                .expect("replacement wire value is an object")
+                .remove(missing);
+            assert!(removed.is_some(), "test fixture contains {missing}");
+            assert!(
+                serde_json::from_value::<BattleControl>(wire).is_err(),
+                "missing {missing} must be rejected"
+            );
+        }
         Ok(())
     }
 
@@ -1508,7 +1884,7 @@ mod tests {
         )?);
         assert!(party_option.validate().is_ok());
 
-        let replacement_operation = "RC/e1/b1/w1/t1/o9/f0/s1";
+        let replacement_operation = "RC/e3/b1/w1/t1/o4/f0/s1";
         let replacement = replacement_control(
             7,
             &format!("{replacement_operation}/control/replacement"),
@@ -1528,6 +1904,78 @@ mod tests {
                 Box::new(replacement),
             )?);
         assert!(replacement_party_option.validate().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_party_option_restoration_retains_the_fainted_actor()
+    -> Result<(), Box<dyn Error>> {
+        let replacement_operation = "RC/e3/b1/w1/t1/o4/f0/s1";
+        let mut replacement = replacement_control(
+            1,
+            &format!("{replacement_operation}/control/replacement"),
+            "party/42/slot/3",
+        )?;
+        let BattleControl::ReplacementSelect(restored) = &mut replacement else {
+            unreachable!("test helper always builds ReplacementSelect");
+        };
+        restored.actor = PokemonId::new(safe(8)?);
+
+        let error = PartyOptionSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            PartyIndex::new(3)?,
+            menu(
+                2,
+                1,
+                &format!("{replacement_operation}/control/party-option/3"),
+                "party-option/send-out",
+            )?,
+            Box::new(replacement),
+        );
+        assert_eq!(
+            error.expect_err("replacement restoration must retain the fainted actor"),
+            BattleControlError::CancelRestoration(CancelRestorationError::ActorMismatch)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replacement_party_option_uses_the_nested_source_for_exact_operation_context()
+    -> Result<(), Box<dyn Error>> {
+        let replacement_operation = "RC/e3/b1/w1/t1/o4/f0/s1";
+        let mut replacement = replacement_control(
+            1,
+            &format!("{replacement_operation}/control/replacement"),
+            "party/42/slot/3",
+        )?;
+        let BattleControl::ReplacementSelect(restored) = &mut replacement else {
+            unreachable!("test helper always builds ReplacementSelect");
+        };
+        restored.source.epoch = AuthorityEpoch::new(safe(4)?);
+
+        let party_option = BattleControl::PartyOptionSelect(PartyOptionSelectControl::new(
+            PokemonId::new(safe(7)?),
+            field_slot(0),
+            PartyIndex::new(3)?,
+            menu(
+                2,
+                1,
+                &format!("{replacement_operation}/control/party-option/3"),
+                "party-option/send-out",
+            )?,
+            Box::new(replacement),
+        )?);
+        assert_eq!(
+            plan_with_operation(
+                party_option,
+                3,
+                Some(OperationId::new(replacement_operation)?),
+            ),
+            Err(BattleControlPlanError::Control(
+                BattleControlError::DecisionOperationIdMismatch
+            ))
+        );
         Ok(())
     }
 
