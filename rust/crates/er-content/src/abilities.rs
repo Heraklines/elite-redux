@@ -126,8 +126,7 @@ impl<'de> Deserialize<'de> for AbilityDefinition {
         }
 
         let wire = AbilityDefinitionWire::deserialize(deserializer)?;
-        Self::new(wire.id, wire.effect, wire.capability)
-            .map_err(serde::de::Error::custom)
+        Self::new(wire.id, wire.effect, wire.capability).map_err(serde::de::Error::custom)
     }
 }
 

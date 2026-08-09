@@ -204,8 +204,10 @@ impl MoveDefinition {
                     has_damage = true;
                 }
                 MoveEffectDefinition::ApplyStatus(status) => {
-                    if !matches!(status, StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis)
-                    {
+                    if !matches!(
+                        status,
+                        StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis
+                    ) {
                         return Err(MoveDefinitionError::UnsupportedStatus {
                             id: self.id,
                             status: *status,
@@ -226,7 +228,11 @@ impl MoveDefinition {
         if matches!(self.category, MoveCategory::Status) && has_damage {
             return Err(MoveDefinitionError::StatusMoveHasDamageEffect { id: self.id });
         }
-        if matches!(self.category, MoveCategory::Physical | MoveCategory::Special) && !has_damage {
+        if matches!(
+            self.category,
+            MoveCategory::Physical | MoveCategory::Special
+        ) && !has_damage
+        {
             return Err(MoveDefinitionError::DamagingMoveHasNoDamageEffect { id: self.id });
         }
 
@@ -342,9 +348,7 @@ pub fn find_move(
 }
 
 /// Validates the complete selected move collection and its deterministic order.
-pub fn validate_selected_moves(
-    definitions: &[MoveDefinition],
-) -> Result<(), MoveCollectionError> {
+pub fn validate_selected_moves(definitions: &[MoveDefinition]) -> Result<(), MoveCollectionError> {
     if definitions.len() != SELECTED_MOVE_IDS.len() {
         return Err(MoveCollectionError::WrongLength {
             expected: SELECTED_MOVE_IDS.len(),

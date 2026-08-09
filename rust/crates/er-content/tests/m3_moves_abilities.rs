@@ -31,7 +31,10 @@ fn selected_moves_match_the_manifest_and_are_canonically_ordered() {
         .collect();
     assert_eq!(ids, vec![1, 52, 77, 78, 351, 589]);
 
-    assert_eq!(definitions[0].category, er_types::battle_model::MoveCategory::Physical);
+    assert_eq!(
+        definitions[0].category,
+        er_types::battle_model::MoveCategory::Physical
+    );
     assert_eq!(definitions[0].move_type, PokemonType::Normal);
     assert_eq!(definitions[0].power, MovePower::Value(40));
     assert_eq!(definitions[0].accuracy, MoveAccuracy::Percent(100));
@@ -70,7 +73,10 @@ fn selected_moves_match_the_manifest_and_are_canonically_ordered() {
     assert_eq!(definitions[4].priority, 2);
     assert!(definitions[4].flags.is_empty());
 
-    assert_eq!(definitions[5].target, er_types::battle_model::MoveTarget::AllNearEnemies);
+    assert_eq!(
+        definitions[5].target,
+        er_types::battle_model::MoveTarget::AllNearEnemies
+    );
     assert_eq!(definitions[5].accuracy, MoveAccuracy::AlwaysHits);
     assert_eq!(
         definitions[5].flags,
@@ -109,7 +115,10 @@ fn selected_abilities_match_the_manifest_and_are_canonically_ordered() {
 fn lookups_are_deterministic_and_reject_outside_content() {
     let definitions = selected_move_definitions();
     let found = find_move(&definitions, move_id(351));
-    assert_eq!(found.ok().map(|definition| u64::from(definition.id)), Some(351));
+    assert_eq!(
+        found.ok().map(|definition| u64::from(definition.id)),
+        Some(351)
+    );
     assert!(matches!(
         lookup_move(move_id(408)),
         Err(MoveLookupError::UnsupportedId { id }) if id == move_id(408)
