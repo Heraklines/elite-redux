@@ -105,10 +105,10 @@ impl FieldState {
                     std::cmp::Ordering::Less => {}
                 }
             }
-            if let Some(pokemon) = entry.occupant {
-                if !occupants.insert(pokemon) {
-                    return Err(FieldStateError::DuplicateOccupant { pokemon });
-                }
+            if let Some(pokemon) = entry.occupant
+                && !occupants.insert(pokemon)
+            {
+                return Err(FieldStateError::DuplicateOccupant { pokemon });
             }
         }
         Ok(())
