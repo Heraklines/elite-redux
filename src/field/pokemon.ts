@@ -141,7 +141,7 @@ import {
   getFunEnemyMegaChance,
   getFunMegaStoneItems,
   getFunRealMegaChoices,
-  shuffleFunMegaStats,
+  shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
   getFunModeConfig,
@@ -2206,8 +2206,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.isFunPseudoMega() && funMegaStone != null) {
       baseStats = applyFunMegaStatDelta(baseStats, funMegaStone);
     }
-    if (getFunModeConfig().shuffleMegaStats && funMegaStone != null && this.isMega()) {
-      baseStats = shuffleFunMegaStats(baseStats, this.id, funMegaStone);
+    if (getFunModeConfig().shuffleStats) {
+      baseStats = shuffleFunStats(baseStats, this.id, this.isMega() ? funMegaStone : undefined);
     }
     applyChallenges(ChallengeType.FLIP_STAT, this, baseStats);
     // Shuckle Juice

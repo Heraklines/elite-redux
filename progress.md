@@ -7760,13 +7760,15 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Verification: Fun Mode suite 11/11, Klutz/Symbiosis focused integration scenarios green, ability-overhaul suite 25/25, targeted TypeScript diagnostics clear, full Vite build green, and staging deploy `31290756176` green at `a578bf5f7`.
 - Visual harness: desktop and 390x844 mobile layouts are non-overlapping; toggles, START, direct starter-select flow, and return-to-config behavior work; no browser console errors were emitted. Production remains untouched.
 
-2026-08-09 - Fun Mega Mode staging checkpoint
+2026-08-09 - Fun Mega Mode staging checkpoint (UI revision pending approval)
 
-- Added Mega Mode and Mega-stat-shuffle toggles plus a one-time pre-wave-1 party ability review/reroll screen.
+- Added Mega Mode and Stat Shuffle toggles plus a one-time pre-wave-1 party ability review/reroll screen.
 - Mega Stone metadata now derives each stone's stat delta from its real source and target Mega forms. Species with real Megas use only their compatible form; species without one receive a saved, temporary pseudo-Mega record that preserves their sprite and abilities while applying the stone delta.
-- Stat shuffle runs only while a Pokemon has the saved Mega Stone record and is currently Mega'd. It shuffles the effective real/pseudo Mega statline and preserves BST.
+- Stat Shuffle applies to every Pokemon whenever selected and preserves that Pokemon's BST. When a Pokemon is real- or pseudo-Mega'd, the shuffle runs after the Mega statline is established, so it redistributes the full effective Mega BST rather than the pre-Mega stats.
 - Pseudo-Megas expose `isMega()`, save/load through `CustomPokemonData`, and show a compact gold `M` marker beside their name in battle info, party, and summary UI.
 - Mega Mode starts with a Mega Bracelet, puts all available Mega Stones in the Ultra reward generator, suppresses the Rogue stone generator, increases stone frequency, and ramps generated enemy Megas from 8% on wave 1 to 100% from wave 50.
-- Every Mega Stone reward/item description previews its source-to-Mega transition and all six stat deltas. The pseudo-Mega applies that delta only after the stone is assigned; optional shuffle then redistributes the already-effective Mega statline without changing its BST.
-- Verification: expanded Fun Mode suite 16/16, targeted TypeScript diagnostics clear, pre-commit Biome/ls-lint green, full staging build and deployment contract green, and desktop visual harness verified the six-option configuration screen, one-screen ability review, all four ability rows, short descriptions, reroll, START, and run entry with the granted Mega Bracelet.
+- Every Mega Stone reward/item description previews its source-to-Mega transition and all six stat deltas. The pseudo-Mega applies that delta only after the stone is assigned; Stat Shuffle then redistributes the already-effective Mega statline without changing its BST.
+- Verification after the Stat Shuffle correction: focused Fun Mode suite 17/17, no targeted TypeScript diagnostics, Biome has informational complexity notices only, and the full Vite production build is green. The repository-wide typecheck still has unrelated baseline failures outside the touched files.
+- UI approval gate: three selector/reroll directions are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options`. Do not treat the compact reroll layout as approved or deploy its revision until one option is selected. Production remains forbidden.
+- UI process rule: for new player-facing screens, prepare multiple labeled visual options on the Desktop for owner approval before locking in or deploying the layout; continue non-visual implementation and testing in parallel.
 - Exact staging artifact: `5a92e90a76586fb7c122ce23748abe7566606256`, deploy run `31333105827`. Topic branch only; production and `feat/elite-redux-port` remain untouched.

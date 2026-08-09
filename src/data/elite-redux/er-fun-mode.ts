@@ -18,7 +18,7 @@ export interface FunModeConfig {
   randomizeAbilities: boolean;
   randomizeLevelUpMoves: boolean;
   megaMode: boolean;
-  shuffleMegaStats: boolean;
+  shuffleStats: boolean;
   abilityRerollSeed: number;
 }
 
@@ -28,7 +28,7 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   randomizeAbilities: true,
   randomizeLevelUpMoves: true,
   megaMode: false,
-  shuffleMegaStats: false,
+  shuffleStats: false,
   abilityRerollSeed: 0,
 });
 
@@ -47,7 +47,7 @@ export function setFunModeConfig(config: FunModeConfig): void {
     randomizeAbilities: config.randomizeAbilities === true,
     randomizeLevelUpMoves: config.randomizeLevelUpMoves === true,
     megaMode: config.megaMode === true,
-    shuffleMegaStats: config.shuffleMegaStats === true,
+    shuffleStats: config.shuffleStats === true,
     abilityRerollSeed: Number.isFinite(config.abilityRerollSeed) ? Math.max(0, Math.floor(config.abilityRerollSeed)) : 0,
   };
 }
