@@ -167,6 +167,7 @@ fn game_state(
     let battle = BattleState {
         battle_id: BattleId::new(safe(7)),
         wave: battle_wave,
+        wave_seed: "m3-command-wave".to_owned(),
         turn: battle_turn,
         format,
         authority_seat: seat(1),

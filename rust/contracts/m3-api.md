@@ -468,6 +468,7 @@ pub struct GameState {
 pub struct BattleState {
     pub battle_id: BattleId,
     pub wave: WaveIndex,
+    pub wave_seed: String,
     pub turn: TurnIndex,
     pub format: BattleFormat,
     pub authority_seat: SeatId,
@@ -527,6 +528,14 @@ cannot safely be composite Rust structs. It contains exactly one unique entry
 for every format slot, sorted by side then position. Implementations may build a
 private `BTreeMap` index. Full Pokémon objects are never duplicated in field
 slots.
+
+`BattleState.wave_seed` is the exact production `BattleScene.waveSeed` string
+for this wave. It is distinct from `GameState.run_rng` and
+`BattleRngState.battle_seed`: supported speed-tie ordering opens an isolated
+seed-offset transaction from this original wave seed. A resolver must never
+substitute the run seed, battle seed, or a transient RNG override. The string
+is carried losslessly without operation-ID-style lexical normalization; the
+closed struct shape makes omission fail deserialization.
 
 ```rust
 pub struct PokemonState {

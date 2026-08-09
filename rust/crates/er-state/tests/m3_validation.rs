@@ -142,6 +142,7 @@ fn valid_game() -> Result<GameState, Box<dyn Error>> {
     let battle = BattleState {
         battle_id: BattleId::new(safe(7)),
         wave: wave(2)?,
+        wave_seed: "m3-wave-seed".to_owned(),
         turn: battle_turn,
         format,
         authority_seat: seat(1),

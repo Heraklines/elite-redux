@@ -824,6 +824,7 @@ jobs:
               "outside the signed": contract_dir / "m1-api.md",
               "JavaScript-safe range": contract_dir / "m1-api.md",
               "decision_operation_id": contract_dir / "m3-api.md",
+              "pub wave_seed: String": contract_dir / "m3-api.md",
               "Replacement control copies the stored faint source and actor": contract_dir / "m3-api.md",
               "M3_PRESENTATION_FAILED": contract_dir / "m3-presentation-control.md",
               "QuiescentPreparedTransaction": contract_dir / "m3-snapshot-trace.md",
@@ -864,6 +865,20 @@ jobs:
               raise SystemExit("stale unsigned-only M3 content canonical path remains")
 
           api_text = (contract_dir / "m3-api.md").read_text(encoding="utf-8")
+          battle_state_start = api_text.index("pub struct BattleState {")
+          battle_state_end = api_text.index("\n}\n", battle_state_start)
+          battle_state_shape = api_text[battle_state_start:battle_state_end]
+          canonical_wave_seed_shape = (
+              "    pub battle_id: BattleId,\n"
+              "    pub wave: WaveIndex,\n"
+              "    pub wave_seed: String,\n"
+              "    pub turn: TurnIndex,\n"
+          )
+          if canonical_wave_seed_shape not in battle_state_shape:
+              raise SystemExit(
+                  "BattleState must carry the exact wave seed adjacent to its wave and turn coordinates"
+              )
+
           proposal_start = api_text.index("pub struct BattleReplacementProposalV1 {")
           proposal_end = api_text.index("\n}\n", proposal_start)
           proposal_shape = api_text[proposal_start:proposal_end]

@@ -39,6 +39,9 @@ pub use er_types::battle_model::{
 pub struct BattleState {
     pub battle_id: BattleId,
     pub wave: WaveIndex,
+    /// Exact production `BattleScene.waveSeed` used by isolated seed-offset
+    /// mechanics such as the supported speed-tie shuffle.
+    pub wave_seed: String,
     pub turn: TurnIndex,
     pub format: BattleFormat,
     pub authority_seat: SeatId,

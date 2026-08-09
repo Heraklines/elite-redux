@@ -56,6 +56,7 @@ fn empty_battle_state() -> Result<BattleState, Box<dyn Error>> {
     Ok(BattleState {
         battle_id: BattleId::new(safe(7)),
         wave: WaveIndex::new(safe(2)).map_err(|error| format!("wave: {error}"))?,
+        wave_seed: "m3-wave-seed".to_owned(),
         turn,
         field: empty_field(&format)?,
         format,
@@ -94,6 +95,7 @@ fn battle_state_uses_the_frozen_closed_wire_shape_and_shared_rng_state()
     let expected_fields = [
         "battle_id",
         "wave",
+        "wave_seed",
         "turn",
         "format",
         "authority_seat",
@@ -116,6 +118,7 @@ fn battle_state_uses_the_frozen_closed_wire_shape_and_shared_rng_state()
             .iter()
             .all(|field| object.contains_key(*field))
     );
+    assert_eq!(encoded["wave_seed"], "m3-wave-seed");
     assert_eq!(encoded["battle_rng"]["battle_seed"], "m3-battle-seed");
     assert_eq!(encoded["battle_rng"]["turn"], 1);
     assert_eq!(
@@ -126,6 +129,13 @@ fn battle_state_uses_the_frozen_closed_wire_shape_and_shared_rng_state()
         serde_json::from_value::<BattleState>(encoded.clone())?,
         state
     );
+
+    let mut missing_wave_seed = encoded.clone();
+    missing_wave_seed
+        .as_object_mut()
+        .ok_or("battle state must serialize as an object")?
+        .remove("wave_seed");
+    assert!(serde_json::from_value::<BattleState>(missing_wave_seed).is_err());
 
     let mut malformed = encoded;
     malformed
