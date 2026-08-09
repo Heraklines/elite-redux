@@ -830,7 +830,9 @@ pub enum BattleUiProjectionError {
     SeatControl(#[from] BattleControlError),
     #[error("an actionable control projection must carry a decision operation identity")]
     MissingDecisionOperation,
-    #[error("a waiting or complete control projection must not carry a decision operation identity")]
+    #[error(
+        "a waiting or complete control projection must not carry a decision operation identity"
+    )]
     UnexpectedDecisionOperation,
     #[error("the projected menu owner does not match the projected seat")]
     MenuOwnerMismatch,
@@ -932,9 +934,7 @@ mod tests {
     use std::error::Error;
 
     use super::*;
-    use crate::battle_control::{
-        BattleControl, CommandRootControl, WaitingControl, WaitingReason,
-    };
+    use crate::battle_control::{BattleControl, CommandRootControl, WaitingControl, WaitingReason};
     use crate::battle_ids::{BattleSide, MenuInstanceId};
     use crate::battle_model::BattleOutcome;
     use crate::ids::{MenuOptionId, OperationId, SafeU53, SeatId};
@@ -1099,11 +1099,8 @@ mod tests {
     }
 
     #[test]
-    fn projection_requires_the_exact_decision_operation_presence()
-    -> Result<(), Box<dyn Error>> {
-        let operation_id = OperationId::new(
-            "battle/1/wave/1/turn/1/command/player/0/seat/1",
-        )?;
+    fn projection_requires_the_exact_decision_operation_presence() -> Result<(), Box<dyn Error>> {
+        let operation_id = OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/1")?;
         assert_eq!(
             projection(1, None, command_control(1)?, false),
             Err(BattleUiProjectionError::MissingDecisionOperation)
@@ -1133,8 +1130,7 @@ mod tests {
     }
 
     #[test]
-    fn projection_never_makes_waiting_or_complete_actionable()
-    -> Result<(), Box<dyn Error>> {
+    fn projection_never_makes_waiting_or_complete_actionable() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             projection(1, None, waiting_control()?, true),
             Err(BattleUiProjectionError::NonActionableControlMarkedActionable)
@@ -1159,9 +1155,7 @@ mod tests {
         };
         command.menu.control_id =
             "battle/01/wave/1/turn/1/control/player/0/seat/1/command".to_owned();
-        let operation_id = OperationId::new(
-            "battle/1/wave/1/turn/1/command/player/0/seat/1",
-        )?;
+        let operation_id = OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/1")?;
         assert_eq!(
             projection(1, Some(operation_id.clone()), control.clone(), true),
             Err(BattleUiProjectionError::SeatControl(
@@ -1169,35 +1163,19 @@ mod tests {
             ))
         );
 
-        let encoded = serde_json::to_string(&unchecked_projection(
-            1,
-            Some(operation_id),
-            control,
-            true,
-        ))?;
+        let encoded =
+            serde_json::to_string(&unchecked_projection(1, Some(operation_id), control, true))?;
         assert!(serde_json::from_str::<BattleUiProjection>(&encoded).is_err());
         Ok(())
     }
 
     #[test]
     fn invalid_projection_wires_are_rejected() -> Result<(), Box<dyn Error>> {
-        let operation_id = OperationId::new(
-            "battle/1/wave/1/turn/1/command/player/0/seat/1",
-        )?;
+        let operation_id = OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/1")?;
         let invalid = vec![
             unchecked_projection(1, None, command_control(1)?, false),
-            unchecked_projection(
-                1,
-                Some(operation_id.clone()),
-                waiting_control()?,
-                false,
-            ),
-            unchecked_projection(
-                1,
-                Some(operation_id),
-                command_control(2)?,
-                true,
-            ),
+            unchecked_projection(1, Some(operation_id.clone()), waiting_control()?, false),
+            unchecked_projection(1, Some(operation_id), command_control(2)?, true),
             unchecked_projection(1, None, waiting_control()?, true),
             unchecked_projection(
                 1,

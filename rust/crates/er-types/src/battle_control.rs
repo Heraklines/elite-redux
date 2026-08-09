@@ -984,12 +984,7 @@ fn validate_command_control_id(
     }
     let expected = format!(
         "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/{}",
-        context.battle_id,
-        context.wave,
-        context.turn,
-        field_slot.position,
-        context.seat,
-        kind,
+        context.battle_id, context.wave, context.turn, field_slot.position, context.seat, kind,
     );
     if menu.control_id.as_str() != expected.as_str() {
         return Err(BattleControlError::ControlIdMismatch);
@@ -1323,24 +1318,12 @@ mod tests {
         Ok(BattleControl::CommandRoot(CommandRootControl::new(
             PokemonId::new(safe(actor)?),
             field_slot(position),
-            menu(
-                instance_id,
-                owner_seat,
-                control_id,
-                selected_option_id,
-            )?,
+            menu(instance_id, owner_seat, control_id, selected_option_id)?,
         )?))
     }
 
     fn root(instance_id: u64, control_id: &str) -> Result<BattleControl, Box<dyn Error>> {
-        root_with(
-            instance_id,
-            1,
-            7,
-            0,
-            control_id,
-            "command/fight",
-        )
+        root_with(instance_id, 1, 7, 0, control_id, "command/fight")
     }
 
     fn move_control(
@@ -1367,12 +1350,7 @@ mod tests {
         Ok(BattleControl::PartySelect(PartySelectControl::new(
             PokemonId::new(safe(7)?),
             field_slot(0),
-            menu(
-                instance_id,
-                1,
-                control_id,
-                selected_option_id.as_str(),
-            )?,
+            menu(instance_id, 1, control_id, selected_option_id.as_str())?,
             selected_option_id.clone(),
             selected_option_id,
             Box::new(cancel_to),
@@ -1390,12 +1368,7 @@ mod tests {
                 FaintOccurrenceId::new(safe(9)?),
                 field_slot(0),
                 SeatId::new(safe(1)?),
-                menu(
-                    instance_id,
-                    1,
-                    control_id,
-                    selected_option_id.as_str(),
-                )?,
+                menu(instance_id, 1, control_id, selected_option_id.as_str())?,
                 selected_option_id.clone(),
                 selected_option_id,
             )?,
@@ -1461,10 +1434,7 @@ mod tests {
     fn contextual_control_ids_are_exact() -> Result<(), Box<dyn Error>> {
         assert!(matches!(
             plan(
-                root(
-                    1,
-                    "battle/01/wave/1/turn/1/control/player/0/seat/1/command",
-                )?,
+                root(1, "battle/01/wave/1/turn/1/control/player/0/seat/1/command",)?,
                 2,
             ),
             Err(BattleControlPlanError::Control(
@@ -1482,9 +1452,11 @@ mod tests {
             "RC/e1/b1/w1/t1/o9/f0/s1/control/replacement",
             "party/42/slot/3",
         )?;
-        assert!(replacement
-            .validate_control_ids(battle_id, wave, turn, seat, Some(&operation_id))
-            .is_ok());
+        assert!(
+            replacement
+                .validate_control_ids(battle_id, wave, turn, seat, Some(&operation_id))
+                .is_ok()
+        );
 
         let wrong_suffix = replacement_control(
             1,
@@ -1504,15 +1476,9 @@ mod tests {
         let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
         let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
         let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
-        let party_option_id =
-            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+        let party_option_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
 
-        let move_select = move_control(
-            2,
-            move_id,
-            "move/7/slot/2",
-            root(1, command_id)?,
-        )?;
+        let move_select = move_control(2, move_id, "move/7/slot/2", root(1, command_id)?)?;
         let target_select = BattleControl::TargetSelect(TargetSelectControl::new(
             PokemonId::new(safe(7)?),
             field_slot(0),
@@ -1548,8 +1514,8 @@ mod tests {
             &format!("{replacement_operation}/control/replacement"),
             "party/42/slot/3",
         )?;
-        let replacement_party_option = BattleControl::PartyOptionSelect(
-            PartyOptionSelectControl::new(
+        let replacement_party_option =
+            BattleControl::PartyOptionSelect(PartyOptionSelectControl::new(
                 PokemonId::new(safe(7)?),
                 field_slot(0),
                 PartyIndex::new(3)?,
@@ -1560,21 +1526,19 @@ mod tests {
                     "party-option/send-out",
                 )?,
                 Box::new(replacement),
-            )?,
-        );
+            )?);
         assert!(replacement_party_option.validate().is_ok());
         Ok(())
     }
 
     #[test]
-    fn cancel_restoration_rejects_wrong_variants_on_the_same_frontier()
-    -> Result<(), Box<dyn Error>> {
+    fn cancel_restoration_rejects_wrong_variants_on_the_same_frontier() -> Result<(), Box<dyn Error>>
+    {
         let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
         let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
         let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
         let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
-        let party_option_id =
-            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+        let party_option_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
 
         let wrong_target = TargetSelectControl::new(
             PokemonId::new(safe(7)?),
@@ -1595,12 +1559,7 @@ mod tests {
             )
         );
 
-        let prior_move = move_control(
-            4,
-            move_id,
-            "move/7/slot/2",
-            root(3, command_id)?,
-        )?;
+        let prior_move = move_control(4, move_id, "move/7/slot/2", root(3, command_id)?)?;
         let wrong_move = MoveSelectControl::new(
             PokemonId::new(safe(7)?),
             field_slot(0),
@@ -1638,8 +1597,7 @@ mod tests {
             Box::new(prior_move),
         );
         assert_eq!(
-            wrong_party_option
-                .expect_err("PartyOptionSelect must reject MoveSelect restoration"),
+            wrong_party_option.expect_err("PartyOptionSelect must reject MoveSelect restoration"),
             BattleControlError::CancelRestoration(
                 CancelRestorationError::PartyOptionSelectRequiresPartyOrReplacement
             )
@@ -1648,8 +1606,7 @@ mod tests {
     }
 
     #[test]
-    fn cancel_restoration_retains_coordinates_and_parent_selection()
-    -> Result<(), Box<dyn Error>> {
+    fn cancel_restoration_retains_coordinates_and_parent_selection() -> Result<(), Box<dyn Error>> {
         let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
         let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
 
@@ -1657,14 +1614,7 @@ mod tests {
             PokemonId::new(safe(7)?),
             field_slot(0),
             menu(2, 1, move_id, "move/7/slot/2")?,
-            Box::new(root_with(
-                1,
-                2,
-                7,
-                0,
-                command_id,
-                "command/fight",
-            )?),
+            Box::new(root_with(1, 2, 7, 0, command_id, "command/fight")?),
         );
         assert_eq!(
             owner_error.expect_err("restoration must retain the owner seat"),
@@ -1675,14 +1625,7 @@ mod tests {
             PokemonId::new(safe(7)?),
             field_slot(0),
             menu(4, 1, move_id, "move/7/slot/2")?,
-            Box::new(root_with(
-                3,
-                1,
-                8,
-                0,
-                command_id,
-                "command/fight",
-            )?),
+            Box::new(root_with(3, 1, 8, 0, command_id, "command/fight")?),
         );
         assert_eq!(
             actor_error.expect_err("restoration must retain the actor"),
@@ -1693,14 +1636,7 @@ mod tests {
             PokemonId::new(safe(7)?),
             field_slot(0),
             menu(6, 1, move_id, "move/7/slot/2")?,
-            Box::new(root_with(
-                5,
-                1,
-                7,
-                1,
-                command_id,
-                "command/fight",
-            )?),
+            Box::new(root_with(5, 1, 7, 1, command_id, "command/fight")?),
         );
         assert_eq!(
             field_error.expect_err("restoration must retain the field slot"),
@@ -1729,20 +1665,11 @@ mod tests {
             PokemonId::new(safe(7)?),
             field_slot(0),
             menu(10, 1, move_id, "move/7/slot/2")?,
-            Box::new(root_with(
-                9,
-                1,
-                7,
-                0,
-                command_id,
-                "command/switch",
-            )?),
+            Box::new(root_with(9, 1, 7, 0, command_id, "command/switch")?),
         );
         assert_eq!(
             fight_error.expect_err("MoveSelect must restore selected Fight"),
-            BattleControlError::CancelRestoration(
-                CancelRestorationError::CommandFightNotSelected
-            )
+            BattleControlError::CancelRestoration(CancelRestorationError::CommandFightNotSelected)
         );
         Ok(())
     }
@@ -1753,15 +1680,9 @@ mod tests {
         let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
         let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
         let party_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party";
-        let party_option_id =
-            "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
+        let party_option_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/party-option/3";
 
-        let wrong_move = move_control(
-            2,
-            move_id,
-            "move/7/slot/1",
-            root(1, command_id)?,
-        )?;
+        let wrong_move = move_control(2, move_id, "move/7/slot/1", root(1, command_id)?)?;
         let target_error = TargetSelectControl::new(
             PokemonId::new(safe(7)?),
             field_slot(0),
@@ -1792,9 +1713,7 @@ mod tests {
         );
         assert_eq!(
             switch_error.expect_err("PartySelect must restore selected Switch"),
-            BattleControlError::CancelRestoration(
-                CancelRestorationError::CommandSwitchNotSelected
-            )
+            BattleControlError::CancelRestoration(CancelRestorationError::CommandSwitchNotSelected)
         );
 
         let wrong_party_slot = party_control(
@@ -1811,8 +1730,7 @@ mod tests {
             Box::new(wrong_party_slot),
         );
         assert_eq!(
-            party_slot_error
-                .expect_err("PartyOptionSelect must retain the selected party slot"),
+            party_slot_error.expect_err("PartyOptionSelect must retain the selected party slot"),
             BattleControlError::CancelRestoration(
                 CancelRestorationError::PartyOptionSelectedSlotMismatch
             )
@@ -1821,8 +1739,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_cancel_wires_are_rejected_and_history_stays_bounded()
-    -> Result<(), Box<dyn Error>> {
+    fn invalid_cancel_wires_are_rejected_and_history_stays_bounded() -> Result<(), Box<dyn Error>> {
         let command_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/command";
         let move_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/move";
         let target_id = "battle/1/wave/1/turn/1/control/player/0/seat/1/target";
