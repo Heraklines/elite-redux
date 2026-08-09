@@ -1323,11 +1323,13 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         stale_repeat.snapshot.network.queued_packet_ids,
         expected_retry_packet_set
     );
-    assert!(!stale_repeat
-        .snapshot
-        .network
-        .queued_packet_ids
-        .contains(&tail_request_packet));
+    assert!(
+        !stale_repeat
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&tail_request_packet)
+    );
     steps.push(stale_repeat);
     let stale_release = pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?;
     assert_eq!(replica_frontier(&stale_release), Some((2, 2, 2)));
@@ -1441,10 +1443,12 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(final_snapshot.guest.live_resources, Default::default());
     assert!(final_snapshot.clock_timers.is_empty());
     assert!(final_snapshot.network.queued_packet_ids.is_empty());
-    assert!(!final_snapshot
-        .network
-        .queued_packet_ids
-        .contains(&retry_packet_id));
+    assert!(
+        !final_snapshot
+            .network
+            .queued_packet_ids
+            .contains(&retry_packet_id)
+    );
     assert!(final_snapshot.host.presenter.pending_event_ids.is_empty());
     assert!(final_snapshot.host.presenter.settled_event_ids.is_empty());
     assert!(final_snapshot.host.presenter.disposed);
