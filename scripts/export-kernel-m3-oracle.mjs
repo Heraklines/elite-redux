@@ -116,7 +116,6 @@ function runVitest(outputRoot) {
       TEST_PATH,
       "--pool=forks",
       "--maxWorkers=1",
-      "--minWorkers=1",
       "--no-file-parallelism",
     ],
     { cwd: REPO_ROOT, env, stdio: "inherit" },
