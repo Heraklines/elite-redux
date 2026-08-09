@@ -794,52 +794,59 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     );
     trace.push(reordered_proposal);
 
-    let first_proposal_delivery = fixture.pair.advance_time(safe(25)?)?;
+    let proposal_admission = fault(
+        &mut fixture.pair,
+        FaultOperation::Deliver {
+            packet_id: duplicate_proposal_packet,
+        },
+    )?;
     assert!(
-        first_proposal_delivery
+        proposal_admission
             .snapshot
             .network
             .queued_packet_ids
             .contains(&proposal_packet)
     );
     assert!(
-        !first_proposal_delivery
+        !proposal_admission
             .snapshot
             .network
             .queued_packet_ids
             .contains(&duplicate_proposal_packet)
     );
     assert_eq!(
-        authority_entry_effects(std::slice::from_ref(&first_proposal_delivery))?,
+        authority_entry_effects(std::slice::from_ref(&proposal_admission))?,
         vec![expected_entry.clone()]
     );
     assert_eq!(
-        material_effects(std::slice::from_ref(&first_proposal_delivery)),
-        vec![
-            expected_host_material.clone(),
-            expected_guest_material.clone(),
-        ]
+        material_effects(std::slice::from_ref(&proposal_admission)),
+        vec![expected_host_material.clone()]
     );
     assert_eq!(
-        control_effects(std::slice::from_ref(&first_proposal_delivery)),
-        vec![
-            expected_host_control.clone(),
-            expected_guest_control.clone(),
-        ]
+        control_effects(std::slice::from_ref(&proposal_admission)),
+        vec![expected_host_control.clone()]
     );
-    assert!(receipt_effects(std::slice::from_ref(&first_proposal_delivery))?.is_empty());
-    let after_first_proposal = first_proposal_delivery
+    assert!(receipt_effects(std::slice::from_ref(&proposal_admission))?.is_empty());
+    assert!(
+        proposal_admission
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&fixture.interaction_operation)
+    );
+    let after_proposal_admission = proposal_admission
         .snapshot
         .network
         .queued_packet_ids
         .clone();
-    let material_packet = after_first_proposal
+    let material_packet = after_proposal_admission
         .iter()
         .copied()
         .find(|packet_id| *packet_id != proposal_packet)
         .ok_or_else(|| error("authority did not enqueue the interaction material"))?;
-    assert_eq!(after_first_proposal.len(), 2);
-    trace.push(first_proposal_delivery);
+    assert_eq!(after_proposal_admission.len(), 2);
+    trace.push(proposal_admission);
 
     let delayed_material = fault(
         &mut fixture.pair,
@@ -882,6 +889,14 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert!(material_effects(std::slice::from_ref(&retry_delivery)).is_empty());
     assert!(control_effects(std::slice::from_ref(&retry_delivery)).is_empty());
     assert!(receipt_effects(std::slice::from_ref(&retry_delivery))?.is_empty());
+    assert!(
+        retry_delivery
+            .snapshot
+            .guest
+            .live_resources
+            .proposal_leases
+            .contains(&fixture.interaction_operation)
+    );
     let material_queue_before_duplicate = retry_delivery.snapshot.network.queued_packet_ids.clone();
     trace.push(retry_delivery);
 
@@ -940,6 +955,7 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
     assert!(control_effects(std::slice::from_ref(&early_material)).is_empty());
     trace.push(early_material);
 
+    // The delayed authority entry is the first accepted proposal delivery to the replica.
     let first_material = fixture.pair.advance_time(safe(40)?)?;
     assert!(
         first_material
@@ -990,6 +1006,29 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
             .proposal_leases
             .is_empty()
     );
+    let guest_material_index = first_material
+        .generated_effects
+        .iter()
+        .position(|effect| {
+            matches!(
+                effect,
+                KernelEffect::ApplyAuthorityMaterial { endpoint, .. }
+                    if *endpoint == fixture.guest
+            )
+        })
+        .ok_or_else(|| error("first interaction delivery did not apply guest material"))?;
+    let proposal_cancellations_before_material = first_material
+        .generated_effects
+        .iter()
+        .take(guest_material_index)
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::CancelTimer { endpoint, .. } if *endpoint == fixture.guest
+            )
+        })
+        .count();
+    assert_eq!(proposal_cancellations_before_material, 2);
     assert_eq!(
         actual_replica_frontier(&first_material.snapshot)?,
         expected_replica_frontier
