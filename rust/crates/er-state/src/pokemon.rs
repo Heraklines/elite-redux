@@ -164,6 +164,7 @@ pub struct PokemonState {
 
 impl PokemonState {
     /// Construct a loadable M3 record and check every state-local invariant.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: PokemonId,
         owner_seat: Option<SeatId>,
@@ -201,6 +202,7 @@ impl PokemonState {
     }
 
     /// Alias for callers that use the fallible-constructor naming convention.
+    #[allow(clippy::too_many_arguments)]
     pub fn try_new(
         id: PokemonId,
         owner_seat: Option<SeatId>,
@@ -249,12 +251,8 @@ impl PokemonState {
 
         for (slot, move_slot) in self.moves.iter().enumerate() {
             if let Some(move_slot) = move_slot {
-                validate_move_slot_metadata(move_slot).map_err(|source| {
-                    PokemonStateError::MoveSlot {
-                        slot,
-                        source,
-                    }
-                })?;
+                validate_move_slot_metadata(move_slot)
+                    .map_err(|source| PokemonStateError::MoveSlot { slot, source })?;
             }
         }
         Ok(())
@@ -383,16 +381,12 @@ pub fn validate_status_state(status: &StatusState) -> Result<(), StatusValidatio
                 });
             }
             if status.sleep_turns_remaining.is_some() {
-                return Err(StatusValidationError::SleepSubstateNotAllowed {
-                    kind: status.kind,
-                });
+                return Err(StatusValidationError::SleepSubstateNotAllowed { kind: status.kind });
             }
         }
         StatusKind::Burn | StatusKind::Poison => {
             if status.sleep_turns_remaining.is_some() {
-                return Err(StatusValidationError::SleepSubstateNotAllowed {
-                    kind: status.kind,
-                });
+                return Err(StatusValidationError::SleepSubstateNotAllowed { kind: status.kind });
             }
         }
         StatusKind::Toxic | StatusKind::Sleep => {
@@ -474,9 +468,7 @@ pub fn calculate_max_pp(
 /// Validate metadata that is independent of the immutable move definition.
 pub fn validate_move_slot_metadata(slot: &MoveSlotState) -> Result<(), PpValidationError> {
     if slot.pp_ups > MAX_PP_UPS {
-        return Err(PpValidationError::PpUpsOutOfRange {
-            value: slot.pp_ups,
-        });
+        return Err(PpValidationError::PpUpsOutOfRange { value: slot.pp_ups });
     }
     if slot.max_pp_override == Some(0) {
         return Err(PpValidationError::ZeroMaxPpOverride);
@@ -514,16 +506,11 @@ pub fn validate_move_slots(
     for (slot, (move_slot, base_pp)) in moves.iter().zip(base_pps).enumerate() {
         match (move_slot, base_pp) {
             (None, None) => {}
-            (None, Some(_)) => {
-                return Err(MoveSlotsValidationError::UnexpectedBasePp { slot });
-            }
-            (Some(_), None) => {
-                return Err(MoveSlotsValidationError::MissingBasePp { slot });
-            }
+            (None, Some(_)) => return Err(MoveSlotsValidationError::UnexpectedBasePp { slot }),
+            (Some(_), None) => return Err(MoveSlotsValidationError::MissingBasePp { slot }),
             (Some(move_slot), Some(base_pp)) => {
-                validate_move_slot(move_slot, base_pp).map_err(|source| {
-                    MoveSlotsValidationError::InvalidSlot { slot, source }
-                })?;
+                validate_move_slot(move_slot, base_pp)
+                    .map_err(|source| MoveSlotsValidationError::InvalidSlot { slot, source })?;
             }
         }
     }

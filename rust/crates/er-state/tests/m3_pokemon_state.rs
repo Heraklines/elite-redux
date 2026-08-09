@@ -5,7 +5,8 @@ use er_state::pokemon::{
     MoveSlotState, MoveSlotsValidationError, PokemonId, PokemonState, PokemonType, PokemonTyping,
     PpValidationError, SpeciesId, StatStages, StatStagesValidationError, StatusKind, StatusState,
     StatusValidationError, TypingPosition, TypingValidationError, calculate_max_pp,
-    move_slot_is_usable, normalize_max_pp_override, validate_ability_loadout, validate_m3_status_state,
+    move_slot_is_usable, normalize_max_pp_override, validate_ability_loadout,
+    validate_m3_status_state,
     validate_m3_typing, validate_move_slot, validate_move_slot_metadata, validate_move_slots,
     validate_status_state, validate_stat_stages, validate_typing,
 };
@@ -103,11 +104,13 @@ fn valid_state() -> Result<PokemonState, er_state::pokemon::PokemonStateError> {
 }
 
 #[test]
-fn constructs_round_trips_and_preserves_identity_ownership_and_exact_shape() -> Result<(), Box<dyn Error>> {
+fn canonical_state_round_trips_and_rejects_unknown_fields() -> Result<(), Box<dyn Error>> {
     let state = valid_state()?;
     assert_eq!(state.id, PokemonId::new(safe(17)));
     assert_eq!(state.owner_seat, Some(SeatId::new(safe(1))));
-    assert!(state.validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)]).is_ok());
+    assert!(state
+        .validate_with_base_pps([Some(35), Some(20), Some(15), Some(20)])
+        .is_ok());
 
     let encoded = serde_json::to_string(&state)?;
     assert!(encoded.contains(r#""owner_seat":1"#));
@@ -357,7 +360,7 @@ fn fixed_move_slots_require_content_resolved_pp_for_occupied_slots() -> Result<(
 }
 
 #[test]
-fn representable_constructor_preserves_deferred_values_for_later_rejection() -> Result<(), Box<dyn Error>> {
+fn representable_state_keeps_deferred_status() -> Result<(), Box<dyn Error>> {
     let mut state = valid_state()?;
     state.status = StatusState {
         kind: StatusKind::Sleep,
