@@ -1,0 +1,398 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:7bd1a215937037a618d9a5390487e117a207b72d:run-30835750818.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1
+platform: iPhone
+screen:   393x852 @3x  devmem:?
+boot:     boot-start@0ms -> ios-icons-deferred@1774ms -> ios-bgm-deferred@1775ms -> loading-complete@7503ms -> title-shown@12368ms -> ios-icons-bg-start@12369ms -> ios-icons-bg-done@18685ms
+lastSess: crashed after ios-bgm-deferred
+mode:     0  wave:null  difficulty:ace
+seed:     1BDwfkAmNWsCJtH1ngVgzSqI
+party:    
+
+----- DESCRIPTION -----
+crashes a lot
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:7bd1a215937037a618d9a5390487e117a207b72d:run-30835750818.1","source":"github","sha":"7bd1a215937037a618d9a5390487e117a207b72d","workflow":{"provider":"github-actions","runId":"30835750818","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"integrate/prod-bugs-20260802"},"deployment":null}
+
+----- CONSOLE -----
+[05:02:44.134] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:02:44.137] LOG: [ER] build {"version":1,"id":"github:7bd1a215937037a618d9a5390487e117a207b72d:run-30835750818.1","source":"github","sha":"7bd1a215937037a618d9a5390487e117a207b72d","workflow":{"provider":"github-actions","runId":"30835750818","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"integrate/prod-bugs-20260802"},"deployment":null}
+[05:02:49.943] DEBUG: Destroying loading scene
+[05:02:49.943] DEBUG: Destroyed loading scene
+[05:02:50.053] LOG: Seed: 1BDwfkAmNWsCJtH1ngVgzSqI
+[05:02:50.053] LOG: Wave Seed: 1BDwfkAmNWsCJtH1ngVgzSqI 0
+[05:02:51.440] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.440] LOG: Corm's variant icon does not exist. Replacing with default.
+[05:02:51.440] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.441] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.441] LOG: Blizzard Maw's variant icon does not exist. Replacing with default.
+[05:02:51.441] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.443] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.443] LOG: Lumber Sloth's variant icon does not exist. Replacing with default.
+[05:02:51.443] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.445] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.445] LOG: Iron Carapace's variant icon does not exist. Replacing with default.
+[05:02:51.445] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.447] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.447] LOG: Marbeep's variant icon does not exist. Replacing with default.
+[05:02:51.447] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.448] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.448] LOG: Bubbleo's variant icon does not exist. Replacing with default.
+[05:02:51.448] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.450] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.450] LOG: Burmy Eterna's variant icon does not exist. Replacing with default.
+[05:02:51.450] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.452] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.452] LOG: Iron Voca's variant icon does not exist. Replacing with default.
+[05:02:51.452] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.454] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.454] LOG: Crag Hopper's variant icon does not exist. Replacing with default.
+[05:02:51.454] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.456] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.456] LOG: Iron Palette's variant icon does not exist. Replacing with default.
+[05:02:51.456] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.458] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.458] LOG: Wispywaspy's variant icon does not exist. Replacing with default.
+[05:02:51.458] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.460] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.460] LOG: Iron Scythe's variant icon does not exist. Replacing with default.
+[05:02:51.460] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.462] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.462] LOG: Wooly Worm's variant icon does not exist. Replacing with default.
+[05:02:51.462] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.463] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.463] LOG: Heracreus's variant icon does not exist. Replacing with default.
+[05:02:51.463] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.465] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.465] LOG: Grotom's variant icon does not exist. Replacing with default.
+[05:02:51.465] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.467] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.467] LOG: Blocli's variant icon does not exist. Replacing with default.
+[05:02:51.467] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.469] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.469] LOG: Hippopotato's variant icon does not exist. Replacing with default.
+[05:02:51.469] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.470] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.470] LOG: Corn Tyrant's variant icon does not exist. Replacing with default.
+[05:02:51.470] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.472] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.472] LOG: Iron Spirals's variant icon does not exist. Replacing with default.
+[05:02:51.472] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.474] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.474] LOG: Iron Saber's variant icon does not exist. Replacing with default.
+[05:02:51.474] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.476] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.476] LOG: Ash-Greninja's variant icon does not exist. Replacing with default.
+[05:02:51.476] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.477] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.477] LOG: Polartic Bluemoon's variant icon does not exist. Replacing with default.
+[05:02:51.477] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.479] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.479] LOG: Lumbering Sloth Engulfed's variant icon does not exist. Replacing with default.
+[05:02:51.479] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.481] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.481] LOG: Clemont-Chesnaught's variant icon does not exist. Replacing with default.
+[05:02:51.481] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.482] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.482] LOG: Serena-Delphox's variant icon does not exist. Replacing with default.
+[05:02:51.482] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.484] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.484] LOG: Kipmodo's variant icon does not exist. Replacing with default.
+[05:02:51.484] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.486] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.486] LOG: Zapdos Ex's variant icon does not exist. Replacing with default.
+[05:02:51.486] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.487] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.487] LOG: Articuno Ex's variant icon does not exist. Replacing with default.
+[05:02:51.487] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.489] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.489] LOG: Moltres Ex's variant icon does not exist. Replacing with default.
+[05:02:51.489] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.491] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.491] LOG: Minccino Redux's variant icon does not exist. Replacing with default.
+[05:02:51.491] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.492] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.492] LOG: Sinistea Redux's variant icon does not exist. Replacing with default.
+[05:02:51.492] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.494] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.494] LOG: Cetoddle Redux's variant icon does not exist. Replacing with default.
+[05:02:51.494] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.496] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.496] LOG: Grotom Glass's variant icon does not exist. Replacing with default.
+[05:02:51.496] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.497] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.497] LOG: Grotom Roll's variant icon does not exist. Replacing with default.
+[05:02:51.497] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.499] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.499] LOG: Grotom Drum's variant icon does not exist. Replacing with default.
+[05:02:51.499] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.501] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.501] LOG: Grotom Kick's variant icon does not exist. Replacing with default.
+[05:02:51.501] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.503] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.503] LOG: Grotom Fill's variant icon does not exist. Replacing with default.
+[05:02:51.503] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.504] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.504] LOG: Rattata Redux's variant icon does not exist. Replacing with default.
+[05:02:51.504] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.506] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.506] LOG: Vanillite Redux's variant icon does not exist. Replacing with default.
+[05:02:51.506] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.508] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.508] LOG: Litwick Redux's variant icon does not exist. Replacing with default.
+[05:02:51.508] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.510] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.510] LOG: Drilbur Redux's variant icon does not exist. Replacing with default.
+[05:02:51.510] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.511] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.511] LOG: Swinub Redux's variant icon does not exist. Replacing with default.
+[05:02:51.511] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.513] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.513] LOG: Larvesta Redux's variant icon does not exist. Replacing with default.
+[05:02:51.513] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.515] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.515] LOG: Klefki Redux's variant icon does not exist. Replacing with default.
+[05:02:51.515] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.517] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.517] LOG: Bellsprout Redux's variant icon does not exist. Replacing with default.
+[05:02:51.517] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.518] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.518] LOG: Sawk Redux's variant icon does not exist. Replacing with default.
+[05:02:51.518] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.520] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.520] LOG: Throh Redux's variant icon does not exist. Replacing with default.
+[05:02:51.520] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.522] LOG: Swablu Redux's variant icon does not exist. Replacing with default.
+[05:02:51.522] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.523] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.523] LOG: Exeggcute Redux's variant icon does not exist. Replacing with default.
+[05:02:51.523] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.525] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.525] LOG: Kecleong's variant icon does not exist. Replacing with default.
+[05:02:51.525] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.527] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.527] LOG: Noibat Redux's variant icon does not exist. Replacing with default.
+[05:02:51.527] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.528] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.528] LOG: Honedge Redux's variant icon does not exist. Replacing with default.
+[05:02:51.528] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.530] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.530] LOG: Abra Redux's variant icon does not exist. Replacing with default.
+[05:02:51.530] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.532] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.532] LOG: Weedle Redux's variant icon does not exist. Replacing with default.
+[05:02:51.532] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.534] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.534] LOG: Stufful Redux's variant icon does not exist. Replacing with default.
+[05:02:51.534] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.536] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.536] LOG: Panpour Redux's variant icon does not exist. Replacing with default.
+[05:02:51.536] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.537] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.537] LOG: Pansage Redux's variant icon does not exist. Replacing with default.
+[05:02:51.537] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.539] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.539] LOG: Pansear Redux's variant icon does not exist. Replacing with default.
+[05:02:51.539] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.541] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.541] LOG: Slugma Redux's variant icon does not exist. Replacing with default.
+[05:02:51.541] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.543] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.543] LOG: Buizel Redux's variant icon does not exist. Replacing with default.
+[05:02:51.543] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.544] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.544] LOG: Azelf Redux's variant icon does not exist. Replacing with default.
+[05:02:51.544] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.546] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.546] LOG: Mesprit Redux's variant icon does not exist. Replacing with default.
+[05:02:51.546] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.547] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.547] LOG: Uxie Redux's variant icon does not exist. Replacing with default.
+[05:02:51.547] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.549] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.549] LOG: Machop Redux's variant icon does not exist. Replacing with default.
+[05:02:51.549] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.551] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.551] LOG: Solosis Redux's variant icon does not exist. Replacing with default.
+[05:02:51.551] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.553] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.553] LOG: Skarmory Redux's variant icon does not exist. Replacing with default.
+[05:02:51.553] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.554] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.554] LOG: Growlithe Redux's variant icon does not exist. Replacing with default.
+[05:02:51.554] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.556] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.556] LOG: Whismur Redux's variant icon does not exist. Replacing with default.
+[05:02:51.556] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.558] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.558] LOG: Gible Redux's variant icon does not exist. Replacing with default.
+[05:02:51.558] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.560] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.560] LOG: Deino Redux's variant icon does not exist. Replacing with default.
+[05:02:51.560] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.561] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.561] LOG: Pawniard Redux's variant icon does not exist. Replacing with default.
+[05:02:51.561] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.563] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.563] LOG: Mawile Redux's variant icon does not exist. Replacing with default.
+[05:02:51.563] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.565] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.565] LOG: Sableye Redux's variant icon does not exist. Replacing with default.
+[05:02:51.565] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.566] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.566] LOG: Houndour Redux's variant icon does not exist. Replacing with default.
+[05:02:51.566] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.568] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.568] LOG: Doduo Redux's variant icon does not exist. Replacing with default.
+[05:02:51.568] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.570] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.570] LOG: Larvitar Redux's variant icon does not exist. Replacing with default.
+[05:02:51.570] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.572] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.572] LOG: Iron Exo's variant icon does not exist. Replacing with default.
+[05:02:51.572] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.573] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.573] LOG: Dragonite Delivery's variant icon does not exist. Replacing with default.
+[05:02:51.573] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.575] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.575] LOG: Iron Heart's variant icon does not exist. Replacing with default.
+[05:02:51.575] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.577] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.577] LOG: Flygon Redux B's variant icon does not exist. Replacing with default.
+[05:02:51.577] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.578] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.578] LOG: Ribombee Redux's variant icon does not exist. Replacing with default.
+[05:02:51.578] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.580] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.580] LOG: Weavile Redux's variant icon does not exist. Replacing with default.
+[05:02:51.580] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.582] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.582] LOG: Bewear Angry's variant icon does not exist. Replacing with default.
+[05:02:51.582] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.583] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.583] LOG: Darkrai Nightmare's variant icon does not exist. Replacing with default.
+[05:02:51.583] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.585] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.585] LOG: Solrock System's variant icon does not exist. Replacing with default.
+[05:02:51.585] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.587] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.587] LOG: Spectrier Cloud's variant icon does not exist. Replacing with default.
+[05:02:51.587] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.588] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.588] LOG: Calyrex Cloud Rider's variant icon does not exist. Replacing with default.
+[05:02:51.588] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.590] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.590] LOG: Mawile Redux B's variant icon does not exist. Replacing with default.
+[05:02:51.590] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.592] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.592] LOG: Wigglytuff Apex's variant icon does not exist. Replacing with default.
+[05:02:51.592] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.594] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.594] LOG: Kartana Fallen's variant icon does not exist. Replacing with default.
+[05:02:51.594] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.595] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.595] LOG: Turtwig Redux's variant icon does not exist. Replacing with default.
+[05:02:51.595] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.597] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.597] LOG: Chimchar Redux's variant icon does not exist. Replacing with default.
+[05:02:51.597] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.599] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.599] LOG: Piplup Redux's variant icon does not exist. Replacing with default.
+[05:02:51.599] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.600] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.600] LOG: Bounsweet Redux's variant icon does not exist. Replacing with default.
+[05:02:51.600] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.602] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.602] LOG: Toxel Redux's variant icon does not exist. Replacing with default.
+[05:02:51.602] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.604] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.604] LOG: Trapinch Redux's variant icon does not exist. Replacing with default.
+[05:02:51.604] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.605] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.605] LOG: Crabrawler Redux's variant icon does not exist. Replacing with default.
+[05:02:51.605] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.607] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.607] LOG: Cleffa Redux's variant icon does not exist. Replacing with default.
+[05:02:51.607] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.609] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.609] LOG: Gligar Redux's variant icon does not exist. Replacing with default.
+[05:02:51.609] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.611] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.611] LOG: Psyduck Redux's variant icon does not exist. Replacing with default.
+[05:02:51.611] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.612] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.612] LOG: Seel Redux's variant icon does not exist. Replacing with default.
+[05:02:51.612] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.614] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.614] LOG: Snorunt Redux's variant icon does not exist. Replacing with default.
+[05:02:51.614] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.616] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.616] LOG: Darumaka Redux's variant icon does not exist. Replacing with default.
+[05:02:51.616] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.618] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.618] LOG: Happiny Redux's variant icon does not exist. Replacing with default.
+[05:02:51.618] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.620] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.620] LOG: Spiritomb Redux's variant icon does not exist. Replacing with default.
+[05:02:51.620] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.621] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.621] LOG: Dewpider Redux's variant icon does not exist. Replacing with default.
+[05:02:51.621] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.623] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.623] LOG: Mimikyu Apex's variant icon does not exist. Replacing with default.
+[05:02:51.623] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.625] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.625] LOG: Tinkatink Redux's variant icon does not exist. Replacing with default.
+[05:02:51.625] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.627] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.627] LOG: Scyther Redux's variant icon does not exist. Replacing with default.
+[05:02:51.627] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.629] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.629] LOG: Krabby Redux's variant icon does not exist. Replacing with default.
+[05:02:51.629] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.630] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.630] LOG: Shinx Redux's variant icon does not exist. Replacing with default.
+[05:02:51.630] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.632] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.632] LOG: Aron Redux's variant icon does not exist. Replacing with default.
+[05:02:51.632] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.634] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.634] LOG: Makuhita Redux's variant icon does not exist. Replacing with default.
+[05:02:51.634] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.636] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.636] LOG: Fogging's variant icon does not exist. Replacing with default.
+[05:02:51.636] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.638] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.638] LOG: Ralts Redux's variant icon does not exist. Replacing with default.
+[05:02:51.638] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.639] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.639] LOG: Merrykarp's variant icon does not exist. Replacing with default.
+[05:02:51.639] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.641] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.641] LOG: Munchlax Redux's variant icon does not exist. Replacing with default.
+[05:02:51.641] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.643] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.643] LOG: Spearow Redux's variant icon does not exist. Replacing with default.
+[05:02:51.643] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.645] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.645] LOG: Regitube's variant icon does not exist. Replacing with default.
+[05:02:51.645] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.647] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:51.647] LOG: Webbed Bruiser's variant icon does not exist. Replacing with default.
+[05:02:51.647] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[05:02:53.720] LOG: %cStart Phase LoginPhase color:green;
+[05:02:53.954] LOG: Client Session: JYueOJxuLvJC95j83nm1SU5TwjgjIOqI
+[05:02:54.736] DEBUG: Using cached system data
+[05:02:54.795] LOG: %cStart Phase TitlePhase color:green;
+[05:02:54.798] LOG: Getting Session Slot id: %d 4
+[05:02:54.814] LOG: use seasonal splash messages true
+[05:03:00.521] LOG: %cStart Phase TitlePhase color:green;
+[05:03:00.521] LOG: Getting Session Slot id: %d 4
+[05:03:00.536] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
