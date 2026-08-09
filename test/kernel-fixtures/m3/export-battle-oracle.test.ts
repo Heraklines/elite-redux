@@ -2919,7 +2919,7 @@ async function admitEnemyCommands(game: GameManager, id: string): Promise<void> 
     }
     const target =
       targets[index] && !targets[index].isFainted() ? targets[index].getBattlerIndex() : BattlerIndex.PLAYER;
-    await game.move.forceEnemyMove(MoveId.POUND, target);
+    await game.move.selectEnemyMove(MoveId.POUND, target);
   }
 }
 
