@@ -12,7 +12,7 @@ import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 
-type FunModeKey = keyof FunModeConfig;
+type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed">;
 
 const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[] = [
   {
@@ -39,7 +39,23 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
     description:
       "Level-up moves are random, but every Pokemon learns them at the same levels and cadence as its normal learnset.",
   },
+  {
+    key: "megaMode",
+    label: "Mega Mode",
+    description:
+      "Start with a Mega Bracelet. Pokemon without a real Mega can use any Mega Stone as a temporary stat-only Mega.",
+  },
+  {
+    key: "shuffleMegaStats",
+    label: "Shuffle Mega Stats",
+    description:
+      "While a Pokemon is Mega'd, redistribute its effective Mega stats while preserving the Mega form's total BST.",
+  },
 ];
+
+function hasEnabledMode(config: FunModeConfig): boolean {
+  return OPTIONS.some(option => config[option.key]);
+}
 
 export class FunModeSelectUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -74,7 +90,7 @@ export class FunModeSelectUiHandler extends UiHandler {
 
     const rowObjects: Phaser.GameObjects.GameObject[] = [];
     OPTIONS.forEach((option, index) => {
-      const y = 33 + index * 25;
+      const y = 32 + index * 21;
       const label = addTextObject(10, y, option.label, TextStyle.SETTINGS_LABEL).setOrigin(0, 0.5);
       const value = addTextObject(optionsWidth - 12, y, "ON", TextStyle.SETTINGS_LABEL).setOrigin(1, 0.5);
       this.valueTexts.push(value);
@@ -138,7 +154,7 @@ export class FunModeSelectUiHandler extends UiHandler {
         const key = OPTIONS[this.cursor].key;
         this.config[key] = !this.config[key];
         success = true;
-      } else if (Object.values(this.config).some(Boolean)) {
+      } else if (hasEnabledMode(this.config)) {
         setFunModeConfig(this.config);
         globalScene.phaseManager.unshiftNew("SelectStarterPhase");
         globalScene.phaseManager.getCurrentPhase().end();
@@ -176,10 +192,10 @@ export class FunModeSelectUiHandler extends UiHandler {
     });
     if (this.cursor < startIndex) {
       const optionsWidth = Math.floor(globalScene.scaledCanvas.width * 0.56);
-      this.cursorObject.setPosition(5, 27 + this.cursor * 25).setSize(optionsWidth - 10, 20);
+      this.cursorObject.setPosition(5, 26 + this.cursor * 21).setSize(optionsWidth - 10, 18);
       this.descriptionText.setText(OPTIONS[this.cursor].description);
     } else {
-      const anyEnabled = Object.values(this.config).some(Boolean);
+      const anyEnabled = hasEnabledMode(this.config);
       const { width, height } = globalScene.scaledCanvas;
       const optionsWidth = Math.floor(width * 0.56);
       this.cursorObject.setPosition(optionsWidth + 4, height - 23).setSize(width - optionsWidth - 8, 18);
@@ -189,7 +205,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.startText.setAlpha(anyEnabled ? 1 : 0.45);
     }
     if (this.cursor < startIndex) {
-      this.startText.setAlpha(Object.values(this.config).some(Boolean) ? 1 : 0.45);
+      this.startText.setAlpha(hasEnabledMode(this.config) ? 1 : 0.45);
     }
   }
 }

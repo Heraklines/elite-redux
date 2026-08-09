@@ -137,6 +137,13 @@ import {
 } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
+  applyFunMegaStatDelta,
+  getFunEnemyMegaChance,
+  getFunMegaStoneItems,
+  getFunRealMegaChoices,
+  shuffleFunMegaStats,
+} from "#data/elite-redux/er-fun-mega-mode";
+import {
   getFunModeConfig,
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
@@ -221,6 +228,7 @@ import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
+import type { FormChangeItem } from "#enums/form-change-item";
 import { HitResult } from "#enums/hit-result";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { MoveCategory } from "#enums/move-category";
@@ -2193,7 +2201,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   calculateBaseStats(): number[] {
-    const baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    let baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    if (this.isFunPseudoMega() && funMegaStone != null) {
+      baseStats = applyFunMegaStatDelta(baseStats, funMegaStone);
+    }
+    if (getFunModeConfig().shuffleMegaStats && funMegaStone != null && this.isMega()) {
+      baseStats = shuffleFunMegaStats(baseStats, this.id, funMegaStone);
+    }
     applyChallenges(ChallengeType.FLIP_STAT, this, baseStats);
     // Shuckle Juice
     globalScene.applyModifiers(PokemonBaseStatTotalModifier, this.isPlayer(), this, baseStats);
@@ -6268,9 +6283,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       SpeciesFormKey.PRIMAL,
     ] as string[];
     return (
-      megaForms.includes(this.getFormKey())
+      this.isFunPseudoMega()
+      || megaForms.includes(this.getFormKey())
       || (!!this.getFusionFormKey() && megaForms.includes(this.getFusionFormKey()!))
     );
+  }
+
+  public isFunPseudoMega(): boolean {
+    return this.customPokemonData.erFunPseudoMega === true && this.customPokemonData.erFunMegaStone != null;
+  }
+
+  public getFunMegaStone(): FormChangeItem | undefined {
+    return this.customPokemonData.erFunMegaStone;
   }
 
   private formUsesDerivedAbilities(formKey: string | null | undefined): boolean {
@@ -9089,11 +9113,28 @@ export class EnemyPokemon extends Pokemon {
     forRival = false,
   ) {
     let generatedFormIndex: number | undefined;
+    let generatedFunMegaStone: FormChangeItem | undefined;
+    let generatedFunPseudoMega = false;
     if (!dataSource && globalScene.gameMode.isFun) {
       const randomized = rollFunRandomSpecies();
       if (randomized) {
         species = randomized.species;
         generatedFormIndex = randomized.formIndex;
+      }
+      if (
+        getFunModeConfig().megaMode
+        && randSeedFloat() < getFunEnemyMegaChance(globalScene.currentBattle?.waveIndex ?? 1)
+      ) {
+        const baseFormIndex = generatedFormIndex ?? 0;
+        const realMegas = getFunRealMegaChoices(species, baseFormIndex);
+        if (realMegas.length > 0) {
+          const mega = randSeedItem(realMegas);
+          generatedFormIndex = mega.formIndex;
+          generatedFunMegaStone = mega.item;
+        } else {
+          generatedFunMegaStone = randSeedItem(getFunMegaStoneItems());
+          generatedFunPseudoMega = generatedFunMegaStone != null;
+        }
       }
     }
     super(
@@ -9120,6 +9161,13 @@ export class EnemyPokemon extends Pokemon {
     // round-trip change only the guest from `undefined/undefined` to `0/0`, despite identical gameplay
     // semantics.  `setBoss(false)` is the class's own neutral-state initializer and consumes no RNG.
     this.setBoss(boss, dataSource?.bossSegments);
+
+    if (!dataSource && generatedFunMegaStone != null) {
+      this.customPokemonData.erFunMegaStone = generatedFunMegaStone;
+      this.customPokemonData.erFunPseudoMega = generatedFunPseudoMega;
+      this.calculateStats();
+      this.hp = this.getMaxHp();
+    }
 
     if (Overrides.ENEMY_STATUS_OVERRIDE) {
       this.status = new Status(Overrides.ENEMY_STATUS_OVERRIDE, 0, 4);

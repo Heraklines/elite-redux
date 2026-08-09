@@ -7,14 +7,24 @@
 import { getGameMode } from "#app/game-mode";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
+  applyFunMegaStatDelta,
+  formatFunMegaStatDelta,
+  getFunEnemyMegaChance,
+  getFunMegaStoneMetadata,
+  shuffleFunMegaStats,
+} from "#data/elite-redux/er-fun-mega-mode";
+import {
   getFunModeConfig,
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
   getFunRandomTypes,
+  rerollFunAbilities,
   resetFunModeConfig,
   setFunModeConfig,
 } from "#data/elite-redux/er-fun-mode";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { CustomPokemonData } from "#data/pokemon/pokemon-data";
+import { FormChangeItem } from "#enums/form-change-item";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -39,12 +49,18 @@ describe("Fun Mode configuration", () => {
       randomizeTypes: true,
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
+      megaMode: true,
+      shuffleMegaStats: true,
+      abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
+      megaMode: true,
+      shuffleMegaStats: true,
+      abilityRerollSeed: 4,
     });
   });
 });
@@ -66,6 +82,14 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
     }
   });
 
+  it("rerolls the whole party seed without destabilizing the selected result", () => {
+    const before = [0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot));
+    rerollFunAbilities();
+    const after = [0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot));
+    expect(after).not.toEqual(before);
+    expect([0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot))).toEqual(after);
+  });
+
   it("retains learn levels while excluding unavailable moves", () => {
     const source: LevelMoves = [
       [1, MoveId.TACKLE],
@@ -81,6 +105,40 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
       expect(moveId).not.toBe(MoveId.STRUGGLE);
       expect(allMoves[moveId].isUnimplemented).toBe(false);
     }
+  });
+});
+
+describe("Fun Mega Mode statlines", () => {
+  it("derives a stone delta from the real source and Mega forms", () => {
+    const metadata = getFunMegaStoneMetadata(FormChangeItem.SWAMPERTITE);
+    expect(metadata).not.toBeNull();
+    expect(metadata!.statDelta.reduce((total, value) => total + value, 0)).toBe(100);
+    expect(formatFunMegaStatDelta(FormChangeItem.SWAMPERTITE)).toContain("Atk +40");
+  });
+
+  it("applies a pseudo-Mega delta before deterministically shuffling the effective line", () => {
+    const base = [80, 80, 80, 80, 80, 80];
+    const effective = applyFunMegaStatDelta(base, FormChangeItem.SWAMPERTITE);
+    const shuffled = shuffleFunMegaStats(effective, 123456, FormChangeItem.SWAMPERTITE);
+    expect(shuffled.reduce((total, value) => total + value, 0)).toBe(
+      effective.reduce((total, value) => total + value, 0),
+    );
+    expect([...shuffled].sort((a, b) => a - b)).toEqual([...effective].sort((a, b) => a - b));
+    expect(shuffleFunMegaStats(effective, 123456, FormChangeItem.SWAMPERTITE)).toEqual(shuffled);
+  });
+
+  it("persists the temporary pseudo-Mega record through CustomPokemonData", () => {
+    const restored = new CustomPokemonData(
+      new CustomPokemonData({ erFunMegaStone: FormChangeItem.SWAMPERTITE, erFunPseudoMega: true }),
+    );
+    expect(restored.erFunMegaStone).toBe(FormChangeItem.SWAMPERTITE);
+    expect(restored.erFunPseudoMega).toBe(true);
+  });
+
+  it("ramps enemy Mega frequency to certainty at wave 50", () => {
+    expect(getFunEnemyMegaChance(1)).toBeCloseTo(0.08);
+    expect(getFunEnemyMegaChance(50)).toBe(1);
+    expect(getFunEnemyMegaChance(100)).toBe(1);
   });
 });
 

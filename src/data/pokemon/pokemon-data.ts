@@ -12,6 +12,7 @@ import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { TypeDamageMultiplier } from "#data/type";
 import type { AbilityId } from "#enums/ability-id";
 import type { BerryType } from "#enums/berry-type";
+import type { FormChangeItem } from "#enums/form-change-item";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -163,6 +164,10 @@ export class CustomPokemonData {
    * {@linkcode ErOmniformMovesetStore | omniform-movesets.ts}.
    */
   public erOmniformMovesets?: ErOmniformMovesetStore | undefined;
+  /** Fun Mode's run-scoped Mega Stone record. Present only while the Pokemon is Mega'd. */
+  public erFunMegaStone?: FormChangeItem | undefined;
+  /** True when the Mega is a stat-delta pseudo form rather than a sprite/form change. */
+  public erFunPseudoMega = false;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -189,6 +194,8 @@ export class CustomPokemonData {
     this.coopPassiveAttr = data?.coopPassiveAttr ?? undefined;
     this.coopLuck = data?.coopLuck ?? undefined;
     this.erOmniformMovesets = data?.erOmniformMovesets ?? undefined;
+    this.erFunMegaStone = data?.erFunMegaStone ?? undefined;
+    this.erFunPseudoMega = data?.erFunPseudoMega ?? false;
   }
 }
 

@@ -15,6 +15,13 @@ import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
+import {
+  canUseFunMegaStone,
+  formatFunMegaStatDelta,
+  getFunMegaStoneItems,
+  getFunMegaStoneMetadata,
+} from "#data/elite-redux/er-fun-mega-mode";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
@@ -1641,6 +1648,14 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
         : FormChangeItem[formChangeItem].toLowerCase(),
       (_type, args) => new PokemonFormChangeItemModifier(this, (args[0] as PlayerPokemon).id, formChangeItem, true),
       (pokemon: PlayerPokemon) => {
+        if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+          const alreadyHoldingStone = globalScene.findModifier(
+            modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+          );
+          return !alreadyHoldingStone && canUseFunMegaStone(pokemon, this.formChangeItem)
+            ? null
+            : PartyUiHandler.NoEffectMessage;
+        }
         // Make sure the Pokemon has alternate forms
         if (
           Object.hasOwn(pokemonFormChanges, pokemon.species.speciesId) // Get all form changes for this species with an item trigger, including any compound triggers
@@ -1677,7 +1692,15 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
   }
 
   getDescription(): string {
-    return i18next.t("modifierType:ModifierType.FormChangeItemModifierType.description");
+    const description = i18next.t("modifierType:ModifierType.FormChangeItemModifierType.description");
+    if (!globalScene.gameMode.isFun || !getFunModeConfig().megaMode) {
+      return description;
+    }
+    const delta = formatFunMegaStatDelta(this.formChangeItem);
+    const metadata = getFunMegaStoneMetadata(this.formChangeItem);
+    return delta && metadata
+      ? `${description}\n${metadata.sourceName} -> ${metadata.targetName}\n${delta}`
+      : description;
   }
 
   getPregenArgs(): any[] {
@@ -2020,6 +2043,22 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
       (party: readonly Pokemon[], pregenArgs?: any[]) => {
         if (pregenArgs && pregenArgs.length === 1 && pregenArgs[0] in FormChangeItem) {
           return new FormChangeItemModifierType(pregenArgs[0] as FormChangeItem);
+        }
+
+        if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+          if (isRareFormChangeItem) {
+            return null;
+          }
+          const availableStones = getFunMegaStoneItems().filter(item =>
+            party.some(
+              pokemon =>
+                canUseFunMegaStone(pokemon, item)
+                && !globalScene.findModifier(
+                  modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+                ),
+            ),
+          );
+          return availableStones.length > 0 ? new FormChangeItemModifierType(randSeedItem(availableStones)) : null;
         }
 
         const formChangeItemPool = [

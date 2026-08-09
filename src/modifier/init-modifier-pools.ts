@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -384,8 +385,11 @@ function initUltraModifierPool() {
     ),
     new WeightedModifierType(
       modifierTypes.FORM_CHANGE_ITEM,
-      () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
-      24,
+      () =>
+        globalScene.gameMode.isFun && getFunModeConfig().megaMode
+          ? Math.min(12 + Math.floor(globalScene.currentBattle.waveIndex / 10) * 4, 36)
+          : Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
+      36,
     ),
     new WeightedModifierType(modifierTypes.AMULET_COIN, skipInLastClassicWaveOrDefault(3)),
     new WeightedModifierType(modifierTypes.EVIOLITE, (party: Pokemon[]) => {
@@ -722,7 +726,10 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.SUPER_EXP_CHARM, skipInLastClassicWaveOrDefault(8)),
     new WeightedModifierType(
       modifierTypes.RARE_FORM_CHANGE_ITEM,
-      () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
+      () =>
+        globalScene.gameMode.isFun && getFunModeConfig().megaMode
+          ? 0
+          : Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
       24,
     ),
     new WeightedModifierType(

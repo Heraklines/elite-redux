@@ -17,6 +17,9 @@ export interface FunModeConfig {
   randomizeTypes: boolean;
   randomizeAbilities: boolean;
   randomizeLevelUpMoves: boolean;
+  megaMode: boolean;
+  shuffleMegaStats: boolean;
+  abilityRerollSeed: number;
 }
 
 export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
@@ -24,6 +27,9 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   randomizeTypes: true,
   randomizeAbilities: true,
   randomizeLevelUpMoves: true,
+  megaMode: false,
+  shuffleMegaStats: false,
+  abilityRerollSeed: 0,
 });
 
 let currentConfig: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
@@ -40,11 +46,18 @@ export function setFunModeConfig(config: FunModeConfig): void {
     randomizeTypes: config.randomizeTypes === true,
     randomizeAbilities: config.randomizeAbilities === true,
     randomizeLevelUpMoves: config.randomizeLevelUpMoves === true,
+    megaMode: config.megaMode === true,
+    shuffleMegaStats: config.shuffleMegaStats === true,
+    abilityRerollSeed: Number.isFinite(config.abilityRerollSeed) ? Math.max(0, Math.floor(config.abilityRerollSeed)) : 0,
   };
 }
 
 export function resetFunModeConfig(): void {
   currentConfig = { ...DEFAULT_FUN_MODE_CONFIG };
+}
+
+export function rerollFunAbilities(): void {
+  currentConfig.abilityRerollSeed = (currentConfig.abilityRerollSeed + 1) >>> 0;
 }
 
 function mix32(value: number): number {
@@ -73,7 +86,8 @@ export function getFunRandomAbilityId(pokemonId: number, slot: number): AbilityI
     return null;
   }
   const pool = abilityPool();
-  return pool.length > 0 ? pool[deterministicIndex(pokemonId, 0x41 + slot, pool.length)] : null;
+  const rerolledId = mix32(pokemonId ^ Math.imul(currentConfig.abilityRerollSeed + 1, 0x85ebca6b));
+  return pool.length > 0 ? pool[deterministicIndex(rerolledId, 0x41 + slot, pool.length)] : null;
 }
 
 const FUN_TYPES: readonly PokemonType[] = [
