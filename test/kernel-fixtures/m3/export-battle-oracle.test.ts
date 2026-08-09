@@ -46,6 +46,7 @@ import { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 import { beginCoopRecording, endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
 import Phaser from "phaser";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
@@ -2412,6 +2413,13 @@ function outputRootPath(): string {
   return OUTPUT_ROOT;
 }
 
+function releaseScenarioPromptInterval(): void {
+  if (PromptHandler.runInterval != null) {
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
+  }
+}
+
 describe("M3A-05 fresh semantic oracle export", () => {
   beforeAll(() => {
     if (process.env.M3_ORACLE_SHA !== ORACLE_SHA) {
@@ -2426,6 +2434,7 @@ describe("M3A-05 fresh semantic oracle export", () => {
 
   afterAll(() => {
     activeTrace = null;
+    releaseScenarioPromptInterval();
     for (const restore of restoreHooks.splice(0).reverse()) {
       restore();
     }
@@ -2438,8 +2447,12 @@ describe("M3A-05 fresh semantic oracle export", () => {
     const sharedProvenance = provenance(hash);
     mkdirSync(resolve(root, "battle-cases"), { recursive: true });
     for (const id of CASE_IDS) {
-      const envelope = await exportCase(id, hash, sharedProvenance);
-      writeCanonical(resolve(root, "battle-cases", `${id}.json`), envelope);
+      try {
+        const envelope = await exportCase(id, hash, sharedProvenance);
+        writeCanonical(resolve(root, "battle-cases", `${id}.json`), envelope);
+      } finally {
+        releaseScenarioPromptInterval();
+      }
     }
     writeCanonical(resolve(root, "content-pack-v1.json"), {
       artifact_id: "content-pack-v1",
