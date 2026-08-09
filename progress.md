@@ -7780,3 +7780,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The ability review no longer hides descriptions behind Pokemon selection. Its two-column/six-card layout renders every party member's active ability, three innates, and all 24 short descriptions at once; only `REROLL ALL` and `START RUN` receive input focus.
 - Alternative all-description layouts are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`. The implemented baseline is the refined two-column Option A requested by the owner; visual iteration can continue without reverting the persistence or input work.
 - Verification: focused Fun Mode suite 18/18, touched-file TypeScript diagnostics clear, Biome clean except one pre-existing informational notice in `src/utils/data.ts`, and the full Vite production build is green. Staging canvas verification remains required before promotion; production remains forbidden.
+
+2026-08-09 - Fun Mode refined ability review
+
+- Replaced the interim card layout with the selected refined Option C: no title/header band, six compact full-width Pokemon rows, four always-visible ability columns per row, and smaller `REROLL ALL` / `START` controls.
+- Each Pokemon now receives six distinct deterministic randomized abilities. Slots 0-2 are three independently randomized choice abilities and slots 3-5 are three independently randomized innates; `REROLL ALL` regenerates the complete six-slot set.
+- A selected Pokemon shows a compact `R A1/3` indicator. `R` cycles that Pokemon's active choice ability, while every current ability name and description remains visible for the full party.
+- Long descriptions are word-safe paginated and rotate automatically every 2.8 seconds with dynamic text sizing, preventing them from overflowing their ability column.
+- Verification: focused Fun Mode suite 18/18, including six-slot uniqueness and reroll stability; touched-file TypeScript diagnostics clear; `git diff --check` clean; full Vite production build green. Production remains forbidden.

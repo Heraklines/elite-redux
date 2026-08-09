@@ -2756,7 +2756,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
     if (globalScene.gameMode.isFun) {
-      const randomized = getFunRandomAbilityId(this.id, 0);
+      const randomized = getFunRandomAbilityId(this.id, this.abilityIndex);
       if (randomized != null) {
         return allAbilities[randomized];
       }
@@ -2806,7 +2806,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     if (globalScene.gameMode.isFun) {
-      const randomized = getFunRandomAbilityId(this.id, 1);
+      const randomized = getFunRandomAbilityId(this.id, 3);
       if (randomized != null) {
         return allAbilities[randomized];
       }
@@ -2863,7 +2863,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (abilityId === AbilityId.NONE) {
           return AbilityId.NONE;
         }
-        return getFunRandomAbilityId(this.id, slot + 1) ?? abilityId;
+        return getFunRandomAbilityId(this.id, slot + 3) ?? abilityId;
       }) as [AbilityId, AbilityId, AbilityId];
     }
 

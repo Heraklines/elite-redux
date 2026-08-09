@@ -105,19 +105,23 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
   });
 
   it("selects only implemented abilities", () => {
-    for (let slot = 0; slot < 4; slot++) {
+    const ids = new Set();
+    for (let slot = 0; slot < 6; slot++) {
       const id = getFunRandomAbilityId(12345, slot);
       expect(id).not.toBeNull();
       expect(allAbilities[id!].unimplemented).toBe(false);
+      ids.add(id);
     }
+    expect(ids.size).toBe(6);
   });
 
   it("rerolls the whole party seed without destabilizing the selected result", () => {
-    const before = [0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot));
+    const slots = [0, 1, 2, 3, 4, 5];
+    const before = slots.map(slot => getFunRandomAbilityId(12345, slot));
     rerollFunAbilities();
-    const after = [0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot));
+    const after = slots.map(slot => getFunRandomAbilityId(12345, slot));
     expect(after).not.toEqual(before);
-    expect([0, 1, 2, 3].map(slot => getFunRandomAbilityId(12345, slot))).toEqual(after);
+    expect(slots.map(slot => getFunRandomAbilityId(12345, slot))).toEqual(after);
   });
 
   it("retains learn levels while excluding unavailable moves", () => {
