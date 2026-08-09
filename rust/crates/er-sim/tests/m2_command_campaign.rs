@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 
 use er_kernel::{
@@ -1161,6 +1161,8 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     steps.push(first_entry);
 
+    let before_stale_repeat_packets = pair.snapshot()?.network.queued_packet_ids;
+    assert!(before_stale_repeat_packets.contains(&tail_request_packet));
     let stale_repeat = pair.advance_time(safe(250))?;
     assert_eq!(stale_repeat.snapshot.host.ui.kind, UiViewKind::Waiting);
     assert_eq!(
@@ -1239,6 +1241,14 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         ]
     );
     assert_no_command_or_cursor_intent(&stale_repeat, seat(1));
+    assert_proposal_effect(
+        &stale_repeat,
+        GUEST_OPERATION,
+        guest_b_fingerprint(),
+        seat(1),
+        seat(0),
+        proposal_payload("b"),
+    );
     // The control projection has made this logical repeat stale. Its input
     // timer is consumed without a rearm; the retained TurnCommit proposal
     // lease is a separate protocol resource and remains live.
@@ -1299,14 +1309,25 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .proposal_leases
             .contains(&operation(GUEST_OPERATION))
     );
-    assert!(
-        !stale_repeat
-            .snapshot
-            .network
-            .queued_packet_ids
-            .contains(&tail_request_packet)
+    let retry_packet_ids = stale_repeat
+        .snapshot
+        .network
+        .queued_packet_ids
+        .difference(&before_stale_repeat_packets)
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(retry_packet_ids.len(), 1);
+    let retry_packet_id = retry_packet_ids[0];
+    let expected_retry_packet_set = retry_packet_ids.iter().copied().collect::<BTreeSet<_>>();
+    assert_eq!(
+        stale_repeat.snapshot.network.queued_packet_ids,
+        expected_retry_packet_set
     );
-    assert!(stale_repeat.snapshot.network.queued_packet_ids.is_empty());
+    assert!(!stale_repeat
+        .snapshot
+        .network
+        .queued_packet_ids
+        .contains(&tail_request_packet));
     steps.push(stale_repeat);
     let stale_release = pair.key_up(PairEndpoint::Guest, PhysicalKey::ArrowUp)?;
     assert_eq!(replica_frontier(&stale_release), Some((2, 2, 2)));
@@ -1364,7 +1385,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
             .proposal_leases
             .contains(&operation(GUEST_OPERATION))
     );
-    assert!(stale_release.snapshot.network.queued_packet_ids.is_empty());
+    assert_eq!(
+        stale_release.snapshot.network.queued_packet_ids,
+        expected_retry_packet_set
+    );
     steps.push(stale_release);
 
     let before_teardown = pair.snapshot()?;
@@ -1374,7 +1398,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert_eq!(before_teardown.guest.ui.kind, UiViewKind::Waiting);
     assert!(!before_teardown.guest.ui.actionable);
-    assert!(before_teardown.network.queued_packet_ids.is_empty());
+    assert_eq!(
+        before_teardown.network.queued_packet_ids,
+        expected_retry_packet_set
+    );
     assert!(
         before_teardown
             .host
@@ -1414,6 +1441,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     assert_eq!(final_snapshot.guest.live_resources, Default::default());
     assert!(final_snapshot.clock_timers.is_empty());
     assert!(final_snapshot.network.queued_packet_ids.is_empty());
+    assert!(!final_snapshot
+        .network
+        .queued_packet_ids
+        .contains(&retry_packet_id));
     assert!(final_snapshot.host.presenter.pending_event_ids.is_empty());
     assert!(final_snapshot.host.presenter.settled_event_ids.is_empty());
     assert!(final_snapshot.host.presenter.disposed);
@@ -1462,16 +1493,17 @@ fn raw_key_command_campaign_covers_projection_progression_and_determinism() -> T
             _ => None,
         })
         .collect::<Vec<_>>();
+    let expected_guest_proposal = ProposalMessage {
+        operation_id: operation(GUEST_OPERATION),
+        fingerprint: guest_b_fingerprint(),
+        from: seat(1),
+        to: seat(0),
+        connection_generation: ConnectionGeneration::ZERO,
+        payload: proposal_payload("b"),
+    };
     assert_eq!(
         proposals,
-        vec![ProposalMessage {
-            operation_id: operation(GUEST_OPERATION),
-            fingerprint: guest_b_fingerprint(),
-            from: seat(1),
-            to: seat(0),
-            connection_generation: ConnectionGeneration::ZERO,
-            payload: proposal_payload("b"),
-        }]
+        vec![expected_guest_proposal.clone(), expected_guest_proposal]
     );
     Ok(())
 }
