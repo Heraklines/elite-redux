@@ -2,10 +2,13 @@
 
 import { spawnSync } from "node:child_process";
 import {
+  basename,
+  dirname,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   statSync,
 } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -32,6 +35,20 @@ function gitStatus() {
   return result.stdout;
 }
 
+function realPathForContainment(path) {
+  const suffix = [];
+  let existing = path;
+  while (!existsSync(existing)) {
+    const parent = dirname(existing);
+    if (parent === existing) {
+      fail(`cannot resolve output-root parent ${path}`);
+    }
+    suffix.unshift(basename(existing));
+    existing = parent;
+  }
+  return resolve(realpathSync(existing), ...suffix);
+}
+
 function parseOutputRoot(argv) {
   if (argv.length !== 2 || argv[0] !== "--output-root" || typeof argv[1] !== "string") {
     fail("usage: node scripts/export-kernel-m3-oracle.mjs --output-root <absolute-directory>");
@@ -43,8 +60,11 @@ function parseOutputRoot(argv) {
   }
 
   const outputRoot = resolve(supplied);
-  const repoRelative = relative(REPO_ROOT, outputRoot);
-  if (repoRelative === "" || (!repoRelative.startsWith("..") && !repoRelative.startsWith("../"))) {
+  const realRepoRoot = realpathSync(REPO_ROOT);
+  const realOutputRoot = realPathForContainment(outputRoot);
+  const repoRelative = relative(realRepoRoot, realOutputRoot);
+  const insideCheckout = repoRelative === "" || (!isAbsolute(repoRelative) && !repoRelative.startsWith(".."));
+  if (insideCheckout) {
     fail("--output-root must be outside the checkout so generated evidence cannot dirty the source tree");
   }
 

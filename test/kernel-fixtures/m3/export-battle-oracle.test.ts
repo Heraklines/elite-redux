@@ -26,13 +26,21 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { Battle } from "#app/battle";
+import { DynamicQueueManager } from "#app/dynamic-queue-manager";
+import { MovePhasePriorityQueue } from "#app/queues/move-phase-priority-queue";
+import { PokemonPhasePriorityQueue } from "#app/queues/pokemon-phase-priority-queue";
 import { FaintPhase } from "#phases/faint-phase";
+import { MoveEffectPhase } from "#phases/move-effect-phase";
+import { MovePhase } from "#phases/move-phase";
+import { PostTurnStatusEffectPhase } from "#phases/post-turn-status-effect-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { TurnStartPhase } from "#phases/turn-start-phase";
 import { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -103,6 +111,8 @@ interface ObservationTrace {
   nextGlobalFaintId: number;
   nextRngSequence: number;
   activeAction: AnyRecord | null;
+  actionByPhase?: WeakMap<object, AnyRecord>;
+  tieOrderByPhase?: WeakMap<object, number>;
   identity?: WeakMap<object, number>;
   abilityOverrides?: WeakMap<object, number>;
 }
@@ -110,6 +120,7 @@ interface ObservationTrace {
 let activeTrace: ObservationTrace | null = null;
 let phaserGame: Phaser.Game;
 const restoreHooks: (() => void)[] = [];
+let productionSceneRandBattleSeedInt: BattleScene["randBattleSeedInt"] | undefined;
 
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
@@ -136,7 +147,17 @@ function sortedValue(value: unknown, path = "$", content = false): JsonValue {
     return Object.is(value, -0) ? 0 : value;
   }
   if (Array.isArray(value)) {
-    return value.map((child, index) => sortedValue(child, `${path}[${index}]`, content));
+    // The mutation trace intentionally retains raw command arrays.  Phaser's
+    // optional TurnMove argument is present as an explicit `undefined` in an
+    // array (for example, `args[1]` on an ordinary fight command).  Canonical
+    // JSON has a deterministic representation for that value: null in an
+    // array, while a property-valued undefined is omitted below.  Use
+    // Array.from so sparse arrays receive the same null treatment instead of
+    // preserving a hole that JSON.stringify would later erase implicitly.
+    return Array.from(value, (child, index) =>
+      child === undefined
+        ? (content ? fail("CONTENT_CANONICAL_VALUE", `${path}[${index}] is undefined`) : null)
+        : sortedValue(child, `${path}[${index}]`, content));
   }
   if (typeof value === "object") {
     const out: { [key: string]: JsonValue } = {};
@@ -144,7 +165,14 @@ function sortedValue(value: unknown, path = "$", content = false): JsonValue {
       if (content && !/^[\x00-\x7F]*$/u.test(key)) {
         fail("CONTENT_CANONICAL_KEY", `${path}.${key}`);
       }
-      out[key] = sortedValue((value as AnyRecord)[key], `${path}.${key}`, content);
+      const child = (value as AnyRecord)[key];
+      if (child === undefined) {
+        if (content) {
+          fail("CONTENT_CANONICAL_VALUE", `${path}.${key} is undefined`);
+        }
+        continue;
+      }
+      out[key] = sortedValue(child, `${path}.${key}`, content);
     }
     return out;
   }
@@ -232,6 +260,44 @@ function typeName(type: number): string {
   return name;
 }
 
+function abilityEffect(effect: unknown): AnyRecord {
+  switch (effect) {
+    case "NONE":
+      return { kind: "NONE" };
+    case "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE":
+      return { kind: "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE" };
+    case "NON_SUPER_EFFECTIVE_ATTACK_IMMUNITY":
+      return { kind: "NON_SUPER_EFFECTIVE_ATTACK_IMMUNITY" };
+    default:
+      fail("CONTENT_CANONICAL_VALUE", `unmapped ability effect ${String(effect)}`);
+  }
+}
+
+function capabilitySubjectValue(entry: AnyRecord): number | string {
+  const kind = entry.subject_kind;
+  const id = entry.subject_id;
+  if (kind === "STATUS") {
+    const status = ({ 1: "POISON", 3: "PARALYSIS", 6: "BURN" } as Record<number, string>)[id];
+    if (status == null) {
+      fail("CONTENT_CANONICAL_VALUE", `unmapped capability status ${String(id)}`);
+    }
+    return status;
+  }
+  if (kind === "WEATHER" || kind === "TERRAIN") {
+    if (id !== 0) {
+      fail("CONTENT_CANONICAL_VALUE", `unmapped capability ${kind} ${String(id)}`);
+    }
+    return "NONE";
+  }
+  if (kind === "MOVE" || kind === "ABILITY") {
+    if (!Number.isSafeInteger(id) || id < 0) {
+      fail("CONTENT_CANONICAL_VALUE", `invalid capability ${kind} ${String(id)}`);
+    }
+    return id;
+  }
+  fail("CONTENT_CANONICAL_VALUE", `unmapped capability subject ${String(kind)}`);
+}
+
 function contentPack(): { pack: AnyRecord; hash: string } {
   const slice = readJson("rust/fixtures/m3/m3-slice-manifest.json");
   const capability = readJson("rust/fixtures/m3/m3-capability-manifest.json");
@@ -286,11 +352,7 @@ function contentPack(): { pack: AnyRecord; hash: string } {
   }));
   const abilities = slice.ability_definitions.map((entry: AnyRecord) => ({
     id: entry.id,
-    effect: entry.effect === "NONE"
-      ? { kind: "NONE" }
-      : entry.effect === "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE"
-        ? { kind: "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE" }
-        : { kind: "NON_SUPER_EFFECTIVE_ATTACK_IMMUNITY" },
+    effect: abilityEffect(entry.effect),
     capability: capabilityStatus(),
   }));
   const multiplier = (value: string): string => {
@@ -312,11 +374,7 @@ function contentPack(): { pack: AnyRecord; hash: string } {
     entries: capability.entries.map((entry: AnyRecord) => ({
       subject: {
         kind: entry.subject_kind,
-        value: entry.subject_kind === "STATUS"
-          ? ({ 1: "POISON", 3: "PARALYSIS", 6: "BURN" } as Record<number, string>)[entry.subject_id]
-          : entry.subject_id === 0 && (entry.subject_kind === "WEATHER" || entry.subject_kind === "TERRAIN")
-            ? "NONE"
-            : entry.subject_id,
+        value: capabilitySubjectValue(entry),
       },
       status: { kind: entry.status },
       required_positive_cases: entry.positive_cases,
@@ -726,9 +784,10 @@ function scenarioFor(id: string): ScenarioSpec {
 }
 
 function restoreRealBattleRng(): void {
-  BattleScene.prototype.randBattleSeedInt = function (this: BattleScene, range: number, min = 0): number {
-    return this.currentBattle?.randSeedInt(range, min) ?? min;
-  };
+  if (productionSceneRandBattleSeedInt == null) {
+    fail("OBSERVATION_SEAM_MISSING", "BattleScene.randBattleSeedInt was not captured before test setup");
+  }
+  (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionSceneRandBattleSeedInt;
 }
 
 async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
@@ -823,17 +882,39 @@ function liveFingerprint(game: GameManager): string {
           turn: battle.turn,
           commands: battle.turnCommands,
           pre_commands: battle.preTurnCommands,
-          player: game.scene.getPlayerParty().map(simplePokemon),
-          enemy: game.scene.getEnemyParty().map(simplePokemon),
-          weather: game.scene.arena.weatherType,
-          terrain: game.scene.arena.terrainType,
-          tags: game.scene.arena.tags.map((tag: AnyRecord) => tag.tagType ?? tag.constructor?.name),
+          player: game.scene.getPlayerParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "PLAYER", index)),
+          enemy: game.scene.getEnemyParty().map((mon, index) => canonicalPokemon(activeTrace!, mon, "ENEMY", index)),
+          field: formatState(game),
+          weather: {
+            type: game.scene.arena.weatherType,
+            remaining_turns: game.scene.arena.weather?.turnsLeft ?? 0,
+          },
+          terrain: {
+            type: game.scene.arena.terrainType,
+            remaining_turns: game.scene.arena.terrain?.turnsLeft ?? 0,
+          },
+          tags: game.scene.arena.tags.map((tag: AnyRecord) => ({
+            type: tag.tagType,
+            side: tag.side,
+            turn_count: tag.turnCount,
+            layers: tag.layers,
+          })),
+          ignore_abilities: game.scene.arena.ignoreAbilities === true,
+          ignoring_effect_source: game.scene.arena.ignoringEffectSource,
         },
   };
   return createHash("sha256").update(canonicalBytes(value, false, false)).digest("hex");
 }
 
 function installObservationHooks(): void {
+  productionSceneRandBattleSeedInt = BattleScene.prototype.randBattleSeedInt;
+  restoreHooks.push(() => {
+    if (productionSceneRandBattleSeedInt != null) {
+      (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionSceneRandBattleSeedInt;
+    }
+    productionSceneRandBattleSeedInt = undefined;
+  });
+
   const originalBattleRand = Battle.prototype.randSeedInt;
   let battleDrawInProgress = false;
   (Battle.prototype as AnyRecord).randSeedInt = function (this: Battle, range: number, min = 0): number {
@@ -853,7 +934,14 @@ function installObservationHooks(): void {
     const after = battleRngState(game);
     const consuming = range > 1;
     assertFinite(result, `battle-rng/${activeTrace.scenarioId}/${activeTrace.nextRngSequence}`);
-    if (!Number.isInteger(result) || !Number.isSafeInteger(range) || !Number.isSafeInteger(min)) {
+    if (
+      !Number.isSafeInteger(range)
+      || range < 0
+      || !Number.isSafeInteger(min)
+      || (consuming && !Number.isSafeInteger(min + range - 1))
+      || !Number.isSafeInteger(result)
+      || (consuming ? result < min || result > min + range - 1 : result !== min)
+    ) {
       fail("RNG_DRAW_UNOBSERVABLE", `non-integral battle draw at ${activeTrace.scenarioId}`);
     }
     activeTrace.rngDraws.push({
@@ -872,6 +960,21 @@ function installObservationHooks(): void {
       before_fingerprint: fingerprint(before),
       after_fingerprint: fingerprint(after),
     });
+    if (activeTrace.collectMutations && JSON.stringify(before.battle) !== JSON.stringify(after.battle)) {
+      const phase = game.scene.phaseManager.getCurrentPhase();
+      if (phase == null || typeof phase.phaseName !== "string" || phase.phaseName.length === 0) {
+        fail("UNRECORDED_RNG_STATE_CHANGE", `battle RNG draw has no observed phase at ${activeTrace.scenarioId}`);
+      }
+      activeTrace.mutations.push({
+        sequence: activeTrace.mutations.length,
+        kind: "BATTLE_RNG_CHANGED",
+        phase: phase.phaseName,
+        cause: activeTrace.activeAction == null ? "TURN_RESOLUTION" : activeTrace.activeAction.sequence,
+        path: "battle/rng",
+        before: before.battle,
+        after: after.battle,
+      });
+    }
     return result;
   };
   restoreHooks.push(() => {
@@ -922,14 +1025,15 @@ function installObservationHooks(): void {
     if (!Number.isSafeInteger(result) || result < min || result > max) {
       fail("RNG_DRAW_UNOBSERVABLE", `direct Phaser integerInRange returned ${String(result)}`);
     }
-    const publicApi = seedOffset && /speed|shuffle|order/iu.test(stack) ? "FISHER_YATES_SWAP" : "INTEGER_IN_RANGE";
-    const reason = seedOffset && publicApi === "FISHER_YATES_SWAP" ? "SpeedTie" : rngReason(stack);
+    const callsite = callsiteId(stack);
+    const reason = rngReason(stack);
+    const publicApi = seedOffset && callsite === "src/utils/common.ts:151" ? "FISHER_YATES_SWAP" : "INTEGER_IN_RANGE";
     activeTrace.rngDraws.push({
       sequence: activeTrace.nextRngSequence++,
       stream: seedOffset ? "SEED_OFFSET" : "RUN",
       reason,
       public_api: publicApi,
-      callsite_id: callsiteId(stack),
+      callsite_id: callsite,
       minimum: min,
       cardinality,
       result,
@@ -981,12 +1085,13 @@ function installObservationHooks(): void {
         const stack = new Error().stack ?? "";
         const offset = game.scene.rngOffset;
         const seedOffset = offset !== 0 || game.scene.rngSeedOverride !== "";
+        const callsite = callsiteId(stack);
         activeTrace.rngDraws.push({
           sequence: activeTrace.nextRngSequence++,
           stream: seedOffset ? "SEED_OFFSET" : "RUN",
-          reason: seedOffset && /speed|shuffle|order/iu.test(stack) ? "SpeedTie" : rngReason(stack),
+          reason: rngReason(stack),
           public_api: "PICK",
-          callsite_id: callsiteId(stack),
+          callsite_id: callsite,
           minimum: 0,
           cardinality: values.length,
           result: resultIndex,
@@ -1016,32 +1121,158 @@ function installObservationHooks(): void {
     });
   }
 
+  const originalPriorityReorder = (PokemonPhasePriorityQueue.prototype as AnyRecord).reorder;
+  if (typeof originalPriorityReorder !== "function") {
+    fail("OBSERVATION_SEAM_MISSING", "PokemonPhasePriorityQueue.reorder is not callable");
+  }
+  (PokemonPhasePriorityQueue.prototype as AnyRecord).reorder = function (this: AnyRecord): void {
+    originalPriorityReorder.call(this);
+    const trace = activeTrace;
+    if (trace == null || !(this instanceof MovePhasePriorityQueue)) {
+      return;
+    }
+    const queue = this.queue;
+    if (!Array.isArray(queue)) {
+      fail("OBSERVATION_SEAM_MISSING", "MovePhasePriorityQueue did not expose its ordered queue");
+    }
+    let previousSpeed: number | undefined;
+    let previousPokemon: Pokemon | undefined;
+    let groupPosition = -1;
+    for (const phase of queue) {
+      if (!(phase instanceof MovePhase)) {
+        fail("ACTION_ORDER_UNOBSERVABLE", "MovePhase queue contained a non-move phase");
+      }
+      const pokemon = phase.pokemon;
+      const speed = pokemon.getEffectiveStat(Stat.SPD);
+      if (!Number.isSafeInteger(speed) || speed < 0 || speed > 0xffffffff) {
+        fail("ACTION_ORDER_UNOBSERVABLE", `invalid tie-group speed for Pokemon ${String(pokemon.id)}`);
+      }
+      if (previousSpeed !== speed) {
+        groupPosition = 0;
+      } else if (previousPokemon !== pokemon) {
+        groupPosition++;
+      }
+      trace.tieOrderByPhase?.set(phase, groupPosition);
+      previousSpeed = speed;
+      previousPokemon = pokemon;
+    }
+  };
+  restoreHooks.push(() => {
+    (PokemonPhasePriorityQueue.prototype as AnyRecord).reorder = originalPriorityReorder;
+  });
+
   const originalHandle = (TurnStartPhase.prototype as AnyRecord).handleTurnCommand;
   (TurnStartPhase.prototype as AnyRecord).handleTurnCommand = function (turnCommand: AnyRecord, pokemon: Pokemon): void {
-    if (activeTrace != null) {
-      const fieldIndex = pokemon.getFieldIndex();
-      const moveId = turnCommand?.move?.move;
-      const move = moveId == null ? null : pokemon.getMoveset().find(candidate => candidate.moveId === moveId)?.getMove();
-      const action = {
-        sequence: activeTrace.actionOrder.length,
-        actor_legacy_pid: pokemon.id,
-        source_slot: fieldSlot(activeTrace.game as GameManager, fieldIndex),
-        command: commandKind(turnCommand?.command),
-        target_slots: (turnCommand?.targets ?? []).map((target: number) => fieldSlot(activeTrace.game as GameManager, target)),
-        priority: move?.priority ?? 0,
-        effective_speed: pokemon.getStats(false)[Stat.SPD] ?? 0,
-        move_priority: move?.priority ?? 0,
-        tie_order: activeTrace.actionOrder.length,
-        skipped: !!turnCommand?.skip,
-        phase: "TurnStartPhase",
-      };
-      activeTrace.actionOrder.push(action);
-      activeTrace.activeAction = action;
+    if (activeTrace != null && turnCommand?.skip) {
+      const command = commandKind(turnCommand.command);
+      if (command !== "FIGHT" && command !== "SWITCH") {
+        fail("ACTION_ORDER_UNOBSERVABLE", `unsupported skipped command ${command}`);
+      }
+      recordResolvedAction(
+        activeTrace.game as GameManager,
+        null,
+        pokemon,
+        command === "SWITCH" ? "SWITCH" : "MOVE",
+        "SKIPPED_ACTOR_INACTIVE",
+      );
     }
     return originalHandle.call(this, turnCommand, pokemon);
   };
   restoreHooks.push(() => {
     (TurnStartPhase.prototype as AnyRecord).handleTurnCommand = originalHandle;
+  });
+
+  const originalPopNextPhase = DynamicQueueManager.prototype.popNextPhase;
+  (DynamicQueueManager.prototype as AnyRecord).popNextPhase = function (this: DynamicQueueManager, name: string): AnyRecord | undefined {
+    const phase = originalPopNextPhase.call(this, name as never) as AnyRecord | undefined;
+    if (activeTrace != null && name === "MovePhase" && phase != null) {
+      if (!(phase instanceof MovePhase)) {
+        fail("ACTION_ORDER_UNOBSERVABLE", "MovePhase queue returned a different phase type");
+      }
+      const pokemon = phase.pokemon;
+      const disposition = pokemon.isActive(true) ? "EXECUTED" : "SKIPPED_ACTOR_INACTIVE";
+      recordResolvedAction(activeTrace.game as GameManager, phase, pokemon, "MOVE", disposition);
+    }
+    return phase;
+  };
+  restoreHooks.push(() => {
+    (DynamicQueueManager.prototype as AnyRecord).popNextPhase = originalPopNextPhase;
+  });
+
+  const originalMoveStart = MovePhase.prototype.start;
+  MovePhase.prototype.start = function (this: MovePhase): void {
+    originalMoveStart.call(this);
+    const trace = activeTrace;
+    const action = trace?.actionByPhase?.get(this);
+    if (action == null) {
+      return;
+    }
+    const raw = this as AnyRecord;
+    if (raw.cancelled === true || raw.failed === true) {
+      action.disposition = raw.cancelled === true && this.pokemon.status?.effect === StatusEffect.PARALYSIS
+        ? "CANCELLED_BY_PARALYSIS"
+        : "NO_EFFECT";
+    }
+  };
+  restoreHooks.push(() => {
+    MovePhase.prototype.start = originalMoveStart;
+  });
+
+  const originalMoveEffectStart = MoveEffectPhase.prototype.start;
+  MoveEffectPhase.prototype.start = function (this: MoveEffectPhase): void {
+    originalMoveEffectStart.call(this);
+    const trace = activeTrace;
+    const user = this.getUserPokemon();
+    const action = trace?.activeAction;
+    const result = (this as AnyRecord).moveHistoryEntry?.result;
+    if (trace != null && action != null && user != null && action.actor_legacy_pid === user.id) {
+      if (result === MoveResult.MISS) {
+        action.disposition = "MISSED";
+      } else if (result === MoveResult.FAIL && action.disposition === "EXECUTED") {
+        action.disposition = "NO_EFFECT";
+      }
+    }
+  };
+  restoreHooks.push(() => {
+    MoveEffectPhase.prototype.start = originalMoveEffectStart;
+  });
+
+  const originalSwitchStart = SwitchSummonPhase.prototype.start;
+  SwitchSummonPhase.prototype.start = function (this: SwitchSummonPhase): void {
+    if (activeTrace != null) {
+      const pokemon = this.getPokemon();
+      const forcedReplacement = pokemon.isFainted();
+      recordResolvedAction(
+        activeTrace.game as GameManager,
+        this,
+        pokemon,
+        forcedReplacement ? "REPLACEMENT" : "SWITCH",
+        "EXECUTED",
+        forcedReplacement ? null : undefined,
+      );
+    }
+    return originalSwitchStart.call(this);
+  };
+  restoreHooks.push(() => {
+    SwitchSummonPhase.prototype.start = originalSwitchStart;
+  });
+
+  const originalResidualStart = PostTurnStatusEffectPhase.prototype.start;
+  PostTurnStatusEffectPhase.prototype.start = function (this: PostTurnStatusEffectPhase): void {
+    if (activeTrace != null) {
+      recordResolvedAction(
+        activeTrace.game as GameManager,
+        this,
+        this.getPokemon(),
+        "RESIDUAL_STATUS",
+        "EXECUTED",
+        null,
+      );
+    }
+    return originalResidualStart.call(this);
+  };
+  restoreHooks.push(() => {
+    PostTurnStatusEffectPhase.prototype.start = originalResidualStart;
   });
 
   wrapMutation(Pokemon.prototype, "damage", "HP_DAMAGE");
@@ -1053,6 +1284,17 @@ function installObservationHooks(): void {
 
   const originalFaintStart = FaintPhase.prototype.start;
   FaintPhase.prototype.start = function (this: FaintPhase): void {
+    if (activeTrace != null) {
+      const pokemon = this.getPokemon();
+      recordResolvedAction(
+        activeTrace.game as GameManager,
+        this,
+        pokemon,
+        "FAINT",
+        "EXECUTED",
+        null,
+      );
+    }
     originalFaintStart.call(this);
     if (activeTrace == null) {
       return;
@@ -1138,7 +1380,7 @@ function mutationSnapshot(value: AnyRecord): AnyRecord {
   if (value instanceof Battle) {
     return { turn: value.turn, commands: value.turnCommands, pre_commands: value.preTurnCommands };
   }
-  return { value: String(value) };
+  fail("UNRECORDED_STATE_CHANGE", `unsupported mutation target ${String(value?.constructor?.name ?? typeof value)}`);
 }
 
 function mutationPath(trace: ObservationTrace, value: AnyRecord, kind: string): string {
@@ -1151,24 +1393,54 @@ function mutationPath(trace: ObservationTrace, value: AnyRecord, kind: string): 
   return `battle/${kind.toLowerCase()}`;
 }
 
-function rngReason(stack: string): string {
-  if (/hitCheck/iu.test(stack)) return "Accuracy";
-  if (/getCriticalHitResult/iu.test(stack)) return "CriticalHit";
-  if (/getAttackDamage/iu.test(stack)) return "DamageVariance";
-  if (/paraly|confusion/iu.test(stack)) return "ParalysisActivation";
-  if (/applyMoveEffects|triggerMoveEffects|secondary|effect.?chance/iu.test(stack)) return "SecondaryEffect";
-  if (/speed|shuffle|order/iu.test(stack)) return "SpeedTie";
-  fail("UNMAPPED_RNG_REASON", stack.split("\n")[2] ?? stack);
+const RNG_REASON_BY_CALLSITE: Readonly<Record<string, string>> = Object.freeze({
+  "src/utils/common.ts:151": "SpeedTie",
+  "src/field/pokemon.ts:5550": "DamageVariance",
+  "src/field/pokemon.ts:5880": "CriticalHit",
+  "src/phases/move-effect-phase.ts:563": "Accuracy",
+  "src/phases/move-phase.ts:546": "ParalysisActivation",
+  "src/data/moves/move.ts:3502": "SecondaryEffect",
+  "src/data/moves/move.ts:3533": "SecondaryEffect",
+});
+
+const RNG_HELPER_CALLSITES = new Set([
+  "src/utils/common.ts:105",
+  "src/battle-scene.ts:1501",
+  "src/field/pokemon.ts:8007",
+  "src/field/pokemon.ts:8017",
+]);
+
+function stackCallsites(stack: string): string[] {
+  const callsites: string[] = [];
+  for (const line of stack.split("\n")) {
+    const match = line.match(/((?:src|test|scripts)[\\/][^()\s]+?\.ts):(\d+)(?::\d+)?/u);
+    if (match == null) {
+      continue;
+    }
+    const callsite = `${match[1].replaceAll("\\", "/")}:${match[2]}`;
+    if (!callsites.includes(callsite)) {
+      callsites.push(callsite);
+    }
+  }
+  return callsites;
 }
 
 function callsiteId(stack: string): string {
-  const lines = stack.split("\n").map(line => line.trim()).filter(Boolean);
-  const sourceLine = lines.find(line => /src[\\/].+\.ts:\d+/u.test(line));
-  const match = sourceLine?.match(/(?:^|[\\/])((?:src|test|scripts)[\\/].+?\.ts:\d+(?::\d+)?)/u);
-  if (match == null) {
-    fail("UNMAPPED_RNG_REASON", sourceLine ?? lines[2] ?? "unknown-callsite");
+  const callsites = stackCallsites(stack);
+  const sourceCallsite = callsites.find(callsite => callsite.startsWith("src/") && !RNG_HELPER_CALLSITES.has(callsite));
+  if (sourceCallsite == null) {
+    fail("UNMAPPED_RNG_REASON", callsites[0] ?? "unknown-callsite");
   }
-  return match[1].replaceAll("\\", "/");
+  return sourceCallsite;
+}
+
+function rngReason(stack: string): string {
+  const callsite = callsiteId(stack);
+  const reason = RNG_REASON_BY_CALLSITE[callsite];
+  if (reason == null) {
+    fail("UNMAPPED_RNG_REASON", callsite);
+  }
+  return reason;
 }
 
 function fingerprint(value: unknown): string {
@@ -1214,6 +1486,104 @@ function commandKind(command: number | undefined): string {
     default:
       fail("COMMAND_UNOBSERVABLE", `unknown command ${String(command)}`);
   }
+}
+
+function actionOperationId(game: GameManager, pokemon: Pokemon): string | null {
+  const battle = game.scene.currentBattle;
+  const flatIndex = pokemon.getBattlerIndex();
+  const location = battle.arrangement.locate(flatIndex);
+  if (location.side < 0) {
+    fail("ACTION_ORDER_UNOBSERVABLE", `unmapped action battler index ${String(flatIndex)}`);
+  }
+  const turnCommand = battle.turnCommands[flatIndex] as AnyRecord | undefined;
+  if (turnCommand == null) {
+    return null;
+  }
+  const kind = commandKind(turnCommand.command);
+  if (kind !== "FIGHT" && kind !== "SWITCH") {
+    fail("ACTION_ORDER_UNOBSERVABLE", `unsupported resolved command ${kind}`);
+  }
+  const turn = battle.turn;
+  if (location.side === 0) {
+    return `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${location.position}/seat/${location.position + 1}`;
+  }
+  const scriptCursor = turnCommand.cursor ?? 0;
+  if (!Number.isSafeInteger(scriptCursor) || scriptCursor < 0) {
+    fail("ACTION_ORDER_UNOBSERVABLE", `enemy command has invalid script cursor for ${String(pokemon.id)}`);
+  }
+  // Enemy FIGHT commands in the pinned production phase carry no cursor;
+  // script zero is the engine's explicit default for that command form.
+  return `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/enemy/${location.position}/script/${scriptCursor}`;
+}
+
+function recordResolvedAction(
+  game: GameManager,
+  phase: AnyRecord | null,
+  pokemon: Pokemon,
+  kind: "MOVE" | "SWITCH" | "RESIDUAL_STATUS" | "FAINT" | "REPLACEMENT",
+  disposition: string,
+  operationId?: string | null,
+): AnyRecord {
+  const trace = activeTrace;
+  if (trace == null) {
+    fail("ACTION_ORDER_UNOBSERVABLE", "resolved action observed without an active trace");
+  }
+  const battle = game.scene.currentBattle;
+  const speed = pokemon.getEffectiveStat(Stat.SPD);
+  if (!Number.isSafeInteger(speed) || speed < 0 || speed > 0xffffffff) {
+    fail("ACTION_ORDER_UNOBSERVABLE", `invalid effective speed for Pokemon ${String(pokemon.id)}`);
+  }
+  let timingModifier = 0;
+  let movePriority = 0;
+  let bracketModifier = 0;
+  if (kind === "MOVE") {
+    if (!(phase instanceof MovePhase)) {
+      fail("ACTION_ORDER_UNOBSERVABLE", "move action did not expose its MovePhase");
+    }
+    const move = phase.move.getMove();
+    timingModifier = phase.timingModifier;
+    movePriority = move.getPriority(pokemon, true);
+    bracketModifier = move.getPriorityModifier(pokemon, true);
+  }
+  if (
+    !Number.isSafeInteger(timingModifier)
+    || timingModifier < -128
+    || timingModifier > 127
+    || !Number.isSafeInteger(movePriority)
+    || movePriority < -128
+    || movePriority > 127
+    || !Number.isSafeInteger(bracketModifier)
+    || bracketModifier < -128
+    || bracketModifier > 127
+  ) {
+    fail("ACTION_ORDER_UNOBSERVABLE", `invalid move ordering tuple for Pokemon ${String(pokemon.id)}`);
+  }
+  const tieOrder = kind === "MOVE"
+    ? (phase == null ? undefined : trace.tieOrderByPhase?.get(phase))
+    : 0;
+  if (!Number.isSafeInteger(tieOrder) || (tieOrder as number) < 0) {
+    fail("ACTION_ORDER_UNOBSERVABLE", `missing seeded tie position for Pokemon ${String(pokemon.id)}`);
+  }
+  const action = {
+    sequence: trace.actionOrder.length,
+    actor_legacy_pid: pokemon.id,
+    resolved_turn: battle.turn,
+    source_slot: fieldSlot(game, pokemon.getBattlerIndex()),
+    operation_id: operationId === undefined ? actionOperationId(game, pokemon) : operationId,
+    kind,
+    effective_speed: speed,
+    timing_modifier: timingModifier,
+    move_priority: movePriority,
+    bracket_modifier: bracketModifier,
+    tie_order: tieOrder,
+    disposition,
+  };
+  trace.actionOrder.push(action);
+  trace.activeAction = action;
+  if (phase != null) {
+    trace.actionByPhase?.set(phase, action);
+  }
+  return action;
 }
 
 function buildIdentity(game: GameManager, trace: ObservationTrace): AnyRecord[] {
@@ -1274,13 +1644,38 @@ function applyTestOnlyContentProjection(game: GameManager, spec: ScenarioSpec, t
   });
 }
 
+function applyScenarioInitialState(game: GameManager, id: string): void {
+  if (id !== "pp-unusable-rejected") {
+    return;
+  }
+  const lead = game.scene.getPlayerField(false)[0];
+  const move = lead?.getMoveset()[0];
+  if (lead == null || move == null) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "PP rejection scenario has no observed lead move");
+  }
+  // This is fixture setup, not a turn mutation: the rejected command must
+  // start from the observed zero-PP frontier so it consumes neither PP nor
+  // RNG during admission.  Keep it before initial capture/trace collection.
+  move.ppUsed = move.getMovePp();
+}
+
 function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" | "ENEMY", partyIndex: number): AnyRecord {
   if (mon.isFusion() || mon.isTerastallized) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `fusion/Tera state on ${side}[${partyIndex}]`);
   }
-  const types = mon.getTypes(false, false, false, false).filter(type => type !== PokemonType.UNKNOWN);
-  if (types.length < 1 || types.length > 2) {
-    fail("CANONICAL_STATE_UNOBSERVABLE", `effective typing on ${side}[${partyIndex}] has ${types.length} entries`);
+  const rawTypes = mon.getTypes(false, false, false, false);
+  if (rawTypes.length < 1 || rawTypes.length > 2) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `effective typing on ${side}[${partyIndex}] has ${rawTypes.length} entries`);
+  }
+  // getTypes() represents the absence of a secondary type with a trailing
+  // UNKNOWN sentinel.  Remove only that documented slot sentinel; an
+  // UNKNOWN primary, UNKNOWN in any other position, STELLAR, or a third type
+  // remains an unsupported effective typing rather than being truncated.
+  const types = rawTypes.length === 2 && rawTypes[1] === PokemonType.UNKNOWN
+    ? rawTypes.slice(0, 1)
+    : rawTypes;
+  if (types.some(type => type === PokemonType.UNKNOWN || type === PokemonType.STELLAR)) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported effective typing on ${side}[${partyIndex}]`);
   }
   const stats = mon.getStats(false);
   if (stats.length < 6 || stats.some(value => !Number.isSafeInteger(value) || value < 0)) {
@@ -1291,36 +1686,89 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
     fail("CANONICAL_STATE_UNOBSERVABLE", `stat stages on ${side}[${partyIndex}]`);
   }
   const status = mon.status;
-  const passives = mon.getPassiveAbilities().slice(0, 3).map(ability => ability == null ? null : ability.id);
-  while (passives.length < 3) {
-    passives.push(null);
+  const passiveAbilities = mon.getPassiveAbilities();
+  if (passiveAbilities.length !== 3) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `passive slot count on ${side}[${partyIndex}]`);
   }
-  const suppressedSlots = (mon.summonData as AnyRecord).erSuppressedInnateSlots;
-  const passiveSuppressed = [0, 1, 2].map(index => {
-    if (suppressedSlots instanceof Set) {
-      return suppressedSlots.has(index);
+  const passives = passiveAbilities.map(ability => {
+    if (ability == null) {
+      return null;
     }
-    if (Array.isArray(suppressedSlots)) {
-      return suppressedSlots[index] === true;
+    if (!Number.isSafeInteger(ability.id) || ability.id < 0 || allAbilities[ability.id]?.id !== ability.id) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported passive ability on ${side}[${partyIndex}]`);
     }
-    if (suppressedSlots == null) {
-      return false;
-    }
-    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported passive suppression shape on ${side}[${partyIndex}]`);
+    return ability.id;
   });
-  const moveSlots = mon.getMoveset().slice(0, 4).map(move => ({
-    move_id: move.moveId,
-    pp_used: move.ppUsed,
-    pp_ups: move.ppUp ?? 0,
-    max_pp_override: move.maxPpOverride ?? null,
-  }));
+  const suppressedSlots = (mon.summonData as AnyRecord).erSuppressedInnateSlots;
+  if (
+    !Array.isArray(suppressedSlots)
+    || suppressedSlots.length !== 3
+    || suppressedSlots.some(value => typeof value !== "boolean")
+  ) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported passive suppression shape on ${side}[${partyIndex}]`);
+  }
+  const passiveSuppressed = suppressedSlots.slice();
+  const observedMoves = mon.getMoveset();
+  if (observedMoves.length > 4) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `move slot count on ${side}[${partyIndex}]`);
+  }
+  const moveSlots = observedMoves.map((move, moveSlot) => {
+    if (!Number.isSafeInteger(move.ppUsed) || move.ppUsed < 0) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid PP used on ${side}[${partyIndex}][${moveSlot}]`);
+    }
+    if (!Number.isSafeInteger(move.ppUp) || move.ppUp < 0 || move.ppUp > 3) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid PP Ups on ${side}[${partyIndex}][${moveSlot}]`);
+    }
+    if (
+      move.maxPpOverride != null
+      && (!Number.isSafeInteger(move.maxPpOverride) || move.maxPpOverride < 0)
+    ) {
+      fail("CANONICAL_STATE_UNOBSERVABLE", `invalid PP override on ${side}[${partyIndex}][${moveSlot}]`);
+    }
+    return {
+      move_id: move.moveId,
+      pp_used: move.ppUsed,
+      pp_ups: move.ppUp,
+      max_pp_override: move.maxPpOverride ?? null,
+    };
+  });
   while (moveSlots.length < 4) {
     moveSlots.push(null as never);
   }
   const maxHp = mon.getMaxHp();
+  if (!Number.isSafeInteger(maxHp) || maxHp < 1 || !Number.isSafeInteger(mon.hp) || mon.hp < 0 || mon.hp > maxHp) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `invalid HP state on ${side}[${partyIndex}]`);
+  }
   const activeAbility = mon.getAbility();
   if (!activeAbility || activeAbility.id == null) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `active ability on ${side}[${partyIndex}]`);
+  }
+  if (!Number.isSafeInteger(activeAbility.id) || activeAbility.id < 0 || allAbilities[activeAbility.id]?.id !== activeAbility.id) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported active ability on ${side}[${partyIndex}]`);
+  }
+  const abilitySuppressed = (mon.summonData as AnyRecord).abilitySuppressed;
+  if (typeof abilitySuppressed !== "boolean") {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported active suppression shape on ${side}[${partyIndex}]`);
+  }
+  const statusKindValue = statusKind(status?.effect);
+  const toxicTurnCount = status == null ? 0 : status.toxicTurnCount;
+  if (!Number.isSafeInteger(toxicTurnCount) || toxicTurnCount < 0) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `invalid toxic turn count on ${side}[${partyIndex}]`);
+  }
+  if ((statusKindValue.kind === "NONE" || statusKindValue.kind === "PARALYSIS") && toxicTurnCount !== 0) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `nonzero toxic turn count on ${side}[${partyIndex}]`);
+  }
+  // Status always stores the optional sleep companion.  The production
+  // Status constructor uses zero for every non-sleep effect, so that neutral
+  // sentinel is projected to the contract's null rather than leaked as a
+  // fabricated sleep countdown.  Any non-zero companion is unsupported.
+  const rawSleepTurnsRemaining = status?.sleepTurnsRemaining ?? 0;
+  if (!Number.isSafeInteger(rawSleepTurnsRemaining) || rawSleepTurnsRemaining < 0) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `invalid sleep companion on ${side}[${partyIndex}]`);
+  }
+  const sleepTurnsRemaining = rawSleepTurnsRemaining === 0 ? null : rawSleepTurnsRemaining;
+  if (sleepTurnsRemaining !== null) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported sleep companion on ${side}[${partyIndex}]`);
   }
   return {
     id: pokemonId(trace, mon),
@@ -1340,9 +1788,9 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
     hp: mon.hp,
     max_hp: maxHp,
     status: {
-      kind: statusKind(status?.effect),
-      toxic_turn_count: status?.toxicTurnCount ?? 0,
-      sleep_turns_remaining: status?.sleepTurnsRemaining ?? null,
+      kind: statusKindValue,
+      toxic_turn_count: toxicTurnCount,
+      sleep_turns_remaining: sleepTurnsRemaining,
     },
     stat_stages: {
       attack: stages[0],
@@ -1357,7 +1805,7 @@ function canonicalPokemon(trace: ObservationTrace, mon: Pokemon, side: "PLAYER" 
     abilities: {
       active: activeAbility.id,
       passives,
-      active_suppressed: !!(mon.summonData as AnyRecord).abilitySuppressed,
+      active_suppressed: abilitySuppressed,
       passive_suppressed: passiveSuppressed,
     },
     fainted: mon.isFainted(),
@@ -1502,6 +1950,23 @@ function settleFaintOccurrences(game: GameManager, trace: ObservationTrace): voi
 function captureState(game: GameManager, trace: ObservationTrace, contentHash: string): AnyRecord {
   const before = liveFingerprint(game);
   const battle = game.scene.currentBattle;
+  const arena = game.scene.arena;
+  if (arena.weatherType !== 0 || arena.terrainType !== 0 || !Array.isArray(arena.tags) || arena.tags.length > 0) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "selected M3 state contains non-neutral field conditions");
+  }
+  if (arena.ignoreAbilities === true || arena.ignoringEffectSource != null) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "selected M3 state suppresses abilities");
+  }
+  const weatherTurns = arena.weather?.turnsLeft ?? 0;
+  const terrainTurns = arena.terrain?.turnsLeft ?? 0;
+  if (
+    !Number.isSafeInteger(weatherTurns)
+    || weatherTurns < 0
+    || !Number.isSafeInteger(terrainTurns)
+    || terrainTurns < 0
+  ) {
+    fail("CANONICAL_STATE_UNOBSERVABLE", "invalid neutral field-condition duration");
+  }
   const state = {
     schema_version: 1,
     content_hash: `blake3-v1:${contentHash}`,
@@ -1520,15 +1985,15 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
       field: { slots: formatState(game).slots },
       weather: {
         kind: { kind: "NONE" },
-        remaining_turns: game.scene.arena.weather?.turnsLeft ?? 0,
+        remaining_turns: weatherTurns,
       },
       terrain: {
         kind: { kind: "NONE" },
-        remaining_turns: game.scene.arena.terrain?.turnsLeft ?? 0,
+        remaining_turns: terrainTurns,
       },
       arena_conditions: [],
       global_ability_suppression: {
-        ignore_abilities: !!game.scene.arena.ignoreAbilities,
+        ignore_abilities: arena.ignoreAbilities === true,
         source: null,
       },
       battle_rng: battleRngState(game).battle,
@@ -1541,9 +2006,6 @@ function captureState(game: GameManager, trace: ObservationTrace, contentHash: s
       outcome: outcome(game),
     },
   };
-  if (game.scene.arena.weatherType !== 0 || game.scene.arena.terrainType !== 0 || game.scene.arena.tags.length > 0) {
-    fail("CANONICAL_STATE_UNOBSERVABLE", "selected M3 state contains non-neutral field conditions");
-  }
   const after = liveFingerprint(game);
   if (before !== after) {
     fail("CAPTURE_MUTATED_STATE", `${trace.scenarioId} canonical capture changed live state`);
@@ -1767,9 +2229,6 @@ function admitPlayerCommands(game: GameManager, id: string): void {
     if (move == null) {
       fail("COMMAND_UNOBSERVABLE", `no selected move in player field ${String(battlerIndex)}`);
     }
-    if (id === "pp-unusable-rejected") {
-      move.ppUsed = move.getMovePp();
-    }
     const target = move.moveId === MoveId.PLAY_NICE ? undefined : BattlerIndex.ENEMY;
     game.move.select(move.moveId, battlerIndex as BattlerIndex, target);
   };
@@ -1815,26 +2274,18 @@ function normalizeActionOrder(game: GameManager, trace: ObservationTrace): AnyRe
   };
   return trace.actionOrder.map(action => {
     const mon = findByLegacyPid(action.actor_legacy_pid);
-    const side = action.source_slot.side === "PLAYER" ? "player" : "enemy";
-    const position = action.source_slot.position;
-    const operationId = action.source_slot.side === "PLAYER"
-      ? `battle/1/wave/${game.scene.currentBattle.waveIndex}/turn/${game.scene.currentBattle.turn}/command/player/${position}/seat/${position + 1}`
-      : `battle/1/wave/${game.scene.currentBattle.waveIndex}/turn/${game.scene.currentBattle.turn}/command/enemy/${position}/script/0`;
     return {
       sequence: action.sequence,
-      kind: action.command === "FIGHT" ? "MOVE" : action.command === "SWITCH" ? "SWITCH" : "MOVE",
+      kind: action.kind,
       actor: pokemonId(trace, mon),
       source_slot: action.source_slot,
-      command_operation_id: operationId,
+      command_operation_id: action.operation_id ?? null,
       effective_speed: action.effective_speed,
-      timing_modifier: 0,
+      timing_modifier: action.timing_modifier,
       move_priority: action.move_priority,
-      bracket_modifier: 0,
+      bracket_modifier: action.bracket_modifier,
       tie_order: action.tie_order,
-      disposition: action.skipped ? "SKIPPED_ACTOR_INACTIVE" : "EXECUTED",
-      source: side,
-      phase: action.phase,
-      target_slots: action.target_slots,
+      disposition: action.disposition,
     };
   });
 }
@@ -1853,11 +2304,14 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
     nextGlobalFaintId: 1,
     nextRngSequence: 0,
     activeAction: null,
+    actionByPhase: new WeakMap<object, AnyRecord>(),
+    tieOrderByPhase: new WeakMap<object, number>(),
     collectRng: false,
     collectMutations: false,
   };
   activeTrace = trace;
   applyTestOnlyContentProjection(game, spec, trace);
+  applyScenarioInitialState(game, id);
   const legacyIdentityMap = buildIdentity(game, trace);
   const initialState = captureState(game, trace, contentHash);
   const initialRng = battleRngState(game);
