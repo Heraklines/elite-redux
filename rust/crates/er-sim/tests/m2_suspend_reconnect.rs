@@ -1278,6 +1278,48 @@ fn delayed_recovery_pair(
     ))
 }
 
+fn assert_terminal_ui_semantics(
+    host_kernel_ui: &UiState,
+    guest_kernel_ui: &UiState,
+    host_view: &UiViewModel,
+    guest_view: &UiViewModel,
+    expected_reason: &str,
+) {
+    // Menu generations are endpoint-local stale-input fences, so compare only
+    // the semantic fields shared by the two terminal projections.
+    assert_eq!(host_kernel_ui.owner_seat, guest_kernel_ui.owner_seat);
+    assert_eq!(host_kernel_ui.actionable, guest_kernel_ui.actionable);
+    assert_eq!(host_kernel_ui.stack, guest_kernel_ui.stack);
+    assert_eq!(host_view.owner_seat, guest_view.owner_seat);
+    assert_eq!(host_view.actionable, guest_view.actionable);
+    assert_eq!(host_view.kind, guest_view.kind);
+    assert_eq!(host_view.cursor, guest_view.cursor);
+    assert_eq!(host_view.options, guest_view.options);
+    assert_eq!(host_view.prompt_key, guest_view.prompt_key);
+
+    for (endpoint, kernel_ui, view) in [
+        ("host", host_kernel_ui, host_view),
+        ("guest", guest_kernel_ui, guest_view),
+    ] {
+        assert_eq!(kernel_ui.generation, view.generation);
+        assert_eq!(view.kind, UiViewKind::Terminal);
+        assert!(!view.actionable);
+        assert_eq!(view.owner_seat, None);
+        assert_eq!(view.cursor, None);
+        assert!(view.options.is_empty());
+        assert_eq!(view.prompt_key.as_deref(), Some(expected_reason));
+        assert_eq!(kernel_ui.owner_seat, None);
+        assert!(!kernel_ui.actionable);
+        assert_eq!(kernel_ui.stack.len(), 1);
+        match kernel_ui.stack.first() {
+            Some(MenuState::Terminal(menu)) => {
+                assert_eq!(menu.prompt_key.as_deref(), Some(expected_reason));
+            }
+            other => panic!("{endpoint} terminal kernel UI was not a terminal menu: {other:?}"),
+        }
+    }
+}
+
 #[test]
 fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -> TestResult {
     let (mut pair, mut steps, recovery_timer_ids, recovery_request_packet_id, recovery_start_time) =
@@ -1395,21 +1437,12 @@ fn raw_recovery_request_timeout_pauses_while_suspended_and_terminalizes_once() -
     );
     assert_eq!(terminal_step.snapshot.host.ui.kind, UiViewKind::Terminal);
     assert_eq!(terminal_step.snapshot.guest.ui.kind, UiViewKind::Terminal);
-    assert_eq!(
-        terminal_step.snapshot.host.ui,
-        terminal_step.snapshot.guest.ui
-    );
-    assert_eq!(
-        terminal_step.snapshot.host.kernel.ui,
-        terminal_step.snapshot.guest.kernel.ui
-    );
-    assert!(!terminal_step.snapshot.host.ui.actionable);
-    assert!(!terminal_step.snapshot.guest.ui.actionable);
-    assert_eq!(terminal_step.snapshot.host.ui.owner_seat, None);
-    assert_eq!(terminal_step.snapshot.guest.ui.owner_seat, None);
-    assert_eq!(
-        terminal_step.snapshot.host.ui.prompt_key.as_deref(),
-        Some(EXPECTED_RECOVERY_TERMINAL_REASON)
+    assert_terminal_ui_semantics(
+        &terminal_step.snapshot.host.kernel.ui,
+        &terminal_step.snapshot.guest.kernel.ui,
+        &terminal_step.snapshot.host.ui,
+        &terminal_step.snapshot.guest.ui,
+        EXPECTED_RECOVERY_TERMINAL_REASON,
     );
     let terminal_snapshot = terminal_step.snapshot.clone();
     let terminal_reason = terminal_step.snapshot.terminal_reason.clone();
