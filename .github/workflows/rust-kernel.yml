@@ -523,7 +523,11 @@ jobs:
               "each_contract_must_have_exactly_one_fixture_before_m3b": True,
               "each_supporting_artifact_contract_must_be_published_before_m3b": True,
               "all_required_axes_must_be_gap_free": True,
-              "raw_input_axis_is_not_claimed_by_semantic_oracle_cases": True,
+              "semantic_oracle_unclaimed_subdimensions": [
+                  "RAW_PHYSICAL_INPUT",
+                  "RENDERER_COMPLETION_SETTLEMENT",
+                  "RUST_OWNED_CONTROL_IDENTITY_MENU_ALLOCATOR_HISTORY",
+              ],
               "published_fixture_requires_complete_content_hash": True,
               "exporter_output_root_must_be_empty": True,
               "independent_exact_sha_checkouts_required": True,

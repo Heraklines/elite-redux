@@ -101,21 +101,23 @@ command dispatcher routes FIGHT, BALL, RUN, POKEMON, and SHIFT and records a
 single-player command only after a command has committed
 (`oracle: src/phases/command-phase.ts:L1820-L1898`).
 
-**Gap.** The existing scenario driver does not expose a raw input event stream;
-it calls semantic game helpers and command handlers. The M3 specification
-requires raw `key_down`, `key_up`, `press`, hold, focus, and related events to
-be recorded when a raw driver is used, and forbids treating `select_move` or
-`submit_command` as raw input
+**Observed claim boundary.** The existing scenario driver does not expose a raw
+input event stream; it calls semantic game helpers and command handlers. The M3
+specification requires raw `key_down`, `key_up`, `press`, hold, focus, and
+related events to be recorded when a raw driver is used, and forbids treating
+`select_move` or `submit_command` as raw input
 (`C:\Users\micha\.codex\attachments\7e00bf5e-bf63-4b3b-af75-9aaa20adab3f\pasted-text.txt:L632-L660`).
-The future exporter must therefore keep two fields distinct:
+The exporter therefore keeps two fields distinct:
 
 1. `commands.input_events`: the actual raw driver events, including their
    order, payload, and target control; and
 2. `commands.semantic_intent` plus `commands.committed`: the scenario intent
    and the command that the engine accepted.
 
-For semantic-only cases, `input_events` must carry an explicit
-`raw_input_unobservable` gap and the case must not claim keyboard parity.
+For semantic-only cases, `input_events` is the canonical empty projection of
+the manifest-level unclaimed `RAW_PHYSICAL_INPUT` subdimension. It creates no
+per-case gap and makes no keyboard-parity claim. Raw-input behavior remains a
+mandatory non-oracle M3 test surface.
 
 ### Existing state capture and canonicalization
 
@@ -187,13 +189,17 @@ outcome, waves, log, state, and timing, not canonical state, RNG calls,
 mutations, action order, presentation events, or next control
 (`oracle: test/tools/run-scenario.test.ts:L2517-L2544`).
 
-**Gap.** No existing generic mutation ledger, complete RNG audit, raw-input
-trace, or single-player next-control serializer was identified in the pinned
-oracle. The replay recorder is passive and records resolved semantic commands,
-not state writes or RNG (`oracle: src/data/elite-redux/replay-recorder.ts:L7-L29`,
+**Gap and claim boundary.** No existing generic mutation ledger, complete RNG
+audit, raw-input trace, or single-player next-control serializer was identified
+in the pinned oracle. The replay recorder is passive and records resolved
+semantic commands, not state writes or RNG
+(`oracle: src/data/elite-redux/replay-recorder.ts:L7-L29`,
 `oracle: src/data/elite-redux/replay-recorder.ts:L184-L246`). The exporter must
 add test/exporter instrumentation rather than reinterpret the presentation
-recorder as a mechanics log.
+recorder as a mechanics log. Mutation and RNG evidence remain claimed and must
+be instrumented. Raw physical input and Rust-owned control/menu identity or
+allocator history are globally unclaimed semantic-oracle subdimensions, so
+their absence is not a case gap and they may not be invented by the exporter.
 
 ## Proposed exporter envelope
 
@@ -226,7 +232,17 @@ schema:
   "expected_presentation": [],
   "expected_final_state": { "canonical": {}, "checksum_state": {}, "checksum_preimage": "", "checksum": "" },
   "final_rng": { "phaser_state": {}, "battle_streams": [] },
-  "expected_next_control": {},
+  "expected_next_control": {
+    "control_kind": "Command",
+    "wave": 1,
+    "turn": 2,
+    "phase_name": "CommandPhase",
+    "queued_phases": [],
+    "pending_command_owners": [],
+    "ui_mode": "COMMAND",
+    "handler": "CommandUiHandler",
+    "cursor": 0
+  },
   "gaps": []
 }
 ```
@@ -234,9 +250,10 @@ schema:
 `expected_*` names intentionally match the M3 case projection required by the
 specification (`C:\Users\micha\.codex\attachments\7e00bf5e-bf63-4b3b-af75-9aaa20adab3f\pasted-text.txt:L911-L927`).
 The exporter may retain diagnostic fields in its raw output, but the fixture
-projection must preserve the ordered evidence rather than reduce the case to a
-final-state comparison. The differential requirement explicitly compares RNG
-sequence, action order, mutations, presentation, final state, and next control
+projection must preserve the ordered claimed evidence rather than reduce the
+case to a final-state comparison. The differential requirement explicitly
+compares RNG sequence, action order, mutations, semantic presentation, final
+state, and the observed next-control frontier
 (`C:\Users\micha\.codex\attachments\7e00bf5e-bf63-4b3b-af75-9aaa20adab3f\pasted-text.txt:L1009-L1022`).
 
 ### Initial and final RNG snapshots
@@ -260,14 +277,17 @@ The endpoint capture must compare RNG state before and after capture. The
 authoritative capture precedent is the required behavior: observation restores
 RNG and sequencing state (`oracle: src/data/elite-redux/coop/coop-battle-engine.ts:L3639-L3662`).
 
-### Raw command evidence and action order
+### Semantic command evidence and action order
 
-**Proposed.** A raw input event has `{seq, kind, key/button, pressed,
-payload, control_before, control_after}`. Every event delivered to the game
-input boundary is recorded, including focus/blur and held-input boundaries.
-The semantic scenario object and the committed command are recorded separately;
-the latter is checked against the existing post-commit recorder shape
+**Proposed.** The semantic scenario object and committed command are recorded
+as separate ordered values; the latter is checked against the existing
+post-commit recorder shape
 (`oracle: src/data/elite-redux/replay-single-recording.ts:L185-L223`).
+`commands.input_events` remains empty in these semantic fixtures because
+`RAW_PHYSICAL_INPUT` is globally unclaimed. It is not a successful raw-input
+trace. A separate raw-driver test that claims this subdimension must record
+`{seq, kind, key/button, pressed, payload, control_before, control_after}` for
+every delivered event, including focus/blur and held-input boundaries.
 
 An action entry has `{seq, actor, field_index, command, target, order,
 priority, source, phase}`. The exporter records the resolved list at the
@@ -378,25 +398,27 @@ oracle draw (`C:\Users\micha\.codex\attachments\0101a579-a555-4616-868f-53458232
 
 ### Presentation and next control
 
-**Proposed.** `expected_presentation` records ordered semantic presentation
-events with `{seq, kind, payload, source, authority_stage}`. When the co-op
-event stream is available, preserve its per-turn sequence and event kind rather
-than deriving events from final state. The authority-recorded,
-renderer-completed, skipped, and failed stages are retained when observable
+**Proposed.** `expected_presentation` records ordered authority semantic events
+with `{seq, kind, payload, source, authority_stage}`. When the co-op event stream
+is available, preserve its per-turn sequence and event kind rather than deriving
+events from final state. The authority-recorded stage is the fixture claim
 (`oracle: src/data/elite-redux/coop/coop-turn-recorder.ts:L76-L124`,
 `oracle: src/data/elite-redux/coop/coop-turn-recorder.ts:L212-L260`). In the
 headless runner, intercepted text is evidence of message output only; it is not
 evidence that a renderer completed the presentation
-(`oracle: test/tools/run-scenario.test.ts:L1311-L1415`). A missing renderer
-stage is therefore an explicit `renderer_completion_unobservable` gap, not an
-empty success list.
+(`oracle: test/tools/run-scenario.test.ts:L1311-L1415`). Renderer completion,
+settlement timing, skips, and renderer failures are globally excluded by
+`RENDERER_COMPLETION_SETTLEMENT`; their absence creates no case gap and no
+empty-success claim. Missing or unordered authority semantic events remain the
+blocking `PRESENTATION_UNOBSERVABLE` failure.
 
 `expected_next_control` is captured after the final committed action and all
-queued resolution phases settle, before the next driver event. It contains
-`phase_name`, ordered `queued_phases`, `ui_mode`, active handler/cursor when
-available, wave/turn, pending command owners, and a closed `control_kind` such
-as `Command`, `MoveSelect`, `TargetSelect`, `PartyReplacement`, `Reward`, or
-`Terminal`. The phase manager exposes the current phase and queued phase names
+queued resolution phases settle, before the next driver event. Its required
+fields are `control_kind`, wave, turn, `phase_name`, ordered `queued_phases`, and
+ordered `pending_command_owners`; `ui_mode`, handler, and cursor are included
+only when observed. Closed control kinds include `Command`, `MoveSelect`,
+`TargetSelect`, `PartyReplacement`, `Reward`, and `Terminal`. The phase manager
+exposes the current phase and queued phase names
 as read-only diagnostics (`oracle: src/phase-manager.ts:L395-L410`) and defines
 phase queue/start semantics (`oracle: src/phase-manager.ts:L578-L640`). UI mode
 and handler cursor are separately observable through
@@ -406,9 +428,12 @@ and handler cursor are separately observable through
 The co-op transport has a richer active-control snapshot with phase name,
 interaction counter, awaited interactions, barriers, and pending commands
 (`oracle: src/data/elite-redux/coop/coop-transport.ts:L910-L930`). That is a
-useful shape precedent, not proof of a single-player contract. The absence of a
-single-player serializer is an explicit gap; the exporter must fail or record
-`next_control_unobservable` if any required control field cannot be captured.
+useful shape precedent, not proof of Rust-owned single-player identities. The
+manifest globally excludes decision operation IDs, control/menu IDs, menu
+graphs, cancel history, menu-instance IDs, and allocator high-water/history.
+Those remain mandatory in the full M3 API and non-oracle tests, but are not
+semantic fixture fields. The exporter fails with `NEXT_CONTROL_UNOBSERVABLE` if
+any required semantic-frontier field cannot be captured.
 
 ## Determinism, provenance, and gate
 
@@ -426,8 +451,9 @@ provides the required key/array/number determinism precedent
 The gate compares the two output bytes and their SHA-256 hashes before any
 oracle-vs-Rust comparison. A mismatch fails with the first byte offset and
 decoded JSON path. If bytes match, the test separately validates that initial
-and final state/RNG, raw commands, RNG draws/reasons, actions, mutations,
-presentation, and next control are present and ordered. This catches a
+and final state/RNG, semantic intent and committed commands, RNG draws/reasons,
+actions, mutations, semantic presentation, and the observed next-control
+frontier are present and ordered. This catches a
 non-deterministic trace even when a final state happens to match, as required
 by the differential comparison contract
 (`C:\Users\micha\.codex\attachments\7e00bf5e-bf63-4b3b-af75-9aaa20adab3f\pasted-text.txt:L1009-L1022`).
@@ -450,8 +476,7 @@ The exporter should report failures using stable codes, at minimum:
 - `UNMAPPED_RNG_REASON`;
 - `UNRECORDED_STATE_CHANGE`;
 - `CAPTURE_MUTATED_STATE`;
-- `RAW_INPUT_UNOBSERVABLE`;
-- `PRESENTATION_UNOBSERVABLE` or `RENDERER_COMPLETION_UNOBSERVABLE`; and
+- `PRESENTATION_UNOBSERVABLE`; and
 - `NEXT_CONTROL_UNOBSERVABLE`.
 
 Each gap/failure record includes the required field or callsite, boundary
@@ -459,6 +484,8 @@ sequence, exact oracle path/line, and whether it blocks fixture generation.
 Unsupported or unobservable mechanics are surfaced rather than silently
 ignored, matching the specification's error policy
 (`C:\Users\micha\.codex\attachments\0101a579-a555-4616-868f-534582329ec2\pasted-text.txt:L942-L965`).
+The three exact manifest-level unclaimed subdimensions are global scope
+declarations, not case gaps; they cannot be extended or overridden per case.
 
 ## Owned future paths and proposed contract decisions
 
@@ -488,11 +515,14 @@ The proposed decisions for the contract steward are:
    map. A reachable unmapped callsite hard-fails generation.
 5. State and RNG capture is observational. Any capture-side normalization or
    state/RNG delta fails the exporter.
-6. Raw input, semantic intent, committed commands, resolved actions, mutations,
-   presentation, and next control are separate ordered axes; no axis is
-   reconstructed from final state or message text.
+6. Semantic intent, committed commands, resolved actions, mutations, authority
+   presentation, and the observed next-control frontier are separate ordered
+   evidence; no claimed value is reconstructed from final state or message
+   text. Raw physical input, renderer settlement, and Rust-owned control/menu
+   identity or allocator history are globally unclaimed semantic-oracle
+   subdimensions while remaining mandatory non-oracle M3 surfaces.
 7. Canonical serialization is sorted-key, ordered-array, stable-number UTF-8
    JSON, and two independent fresh processes must emit byte-identical output.
-8. Missing input, renderer, mutation, RNG-reason, content-hash, or next-control
-   evidence is an explicit gap with a blocking/non-blocking disposition, never
-   fabricated parity data.
+8. Missing claimed mutation, RNG-reason, semantic presentation, content-hash,
+   or semantic-frontier evidence is an explicit blocking gap, never fabricated
+   parity data. Globally unclaimed subdimensions create no per-case gaps.

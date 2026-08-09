@@ -205,7 +205,11 @@
     "each_contract_must_have_exactly_one_fixture_before_m3b": true,
     "each_supporting_artifact_contract_must_be_published_before_m3b": true,
     "all_required_axes_must_be_gap_free": true,
-    "raw_input_axis_is_not_claimed_by_semantic_oracle_cases": true,
+    "semantic_oracle_unclaimed_subdimensions": [
+      "RAW_PHYSICAL_INPUT",
+      "RENDERER_COMPLETION_SETTLEMENT",
+      "RUST_OWNED_CONTROL_IDENTITY_MENU_ALLOCATOR_HISTORY"
+    ],
     "published_fixture_requires_complete_content_hash": true,
     "exporter_output_root_must_be_empty": true,
     "independent_exact_sha_checkouts_required": true,

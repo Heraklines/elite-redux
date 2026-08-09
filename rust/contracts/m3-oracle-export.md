@@ -130,7 +130,7 @@ is a generation failure, not an accepted fixture transformation.
 
 ## Commands and raw input
 
-The command section keeps three ordered axes distinct:
+The command section keeps three ordered evidence streams distinct:
 
 - actual raw physical input events delivered to the input boundary;
 - semantic scenario intent used to arrange the oracle run;
@@ -138,9 +138,12 @@ The command section keeps three ordered axes distinct:
 
 Raw events include sequence, key/button, down/up/focus/blur kind, payload,
 seat/control identity, and control before/after. A semantic helper call is not
-raw-key evidence. A case whose existing oracle harness cannot expose raw input
-records the blocking `RAW_INPUT_UNOBSERVABLE` gap and is excluded from the
-raw-key parity claim; it does not emit an empty raw event list as success.
+raw-key evidence. The manifest globally excludes `RAW_PHYSICAL_INPUT` from the
+semantic-oracle claim, so published semantic cases claim only scenario intent
+and committed commands. Their canonical empty `commands.input_events`
+projection carries no raw-input parity meaning and does not create a per-case
+gap. Raw-key behavior remains mandatory in the M3 API and non-oracle hosted
+tests; a raw-driver fixture may claim it only by recording the actual events.
 
 ## RNG audit
 
@@ -189,18 +192,25 @@ boundaries. A changed canonical leaf without a corresponding mutation fails
 with `UNRECORDED_STATE_CHANGE`; the exporter may not synthesize an
 unknown-cause mutation to close the diff.
 
-Presentation is captured from the ordered semantic event stream. Authority
-recorded, renderer completed, intentionally skipped, and failed stages remain
-distinct when observable. Intercepted message text proves message output only,
-not renderer completion. Missing renderer evidence is
-`RENDERER_COMPLETION_UNOBSERVABLE`, not an empty successful settlement list.
+Presentation is captured from the ordered authority-recorded semantic event
+stream and is never reconstructed from final state or intercepted message text.
+The manifest globally excludes `RENDERER_COMPLETION_SETTLEMENT`; a published
+semantic case therefore claims the event plan, not renderer completion,
+settlement timing, intentional skips, or renderer failures. Those excluded
+values do not produce a per-case gap. Missing or unordered semantic event-plan
+evidence is the blocking `PRESENTATION_UNOBSERVABLE` failure.
 
 `expected_next_control` is captured after all causal phases settle and before
-the next driver input. It includes the closed control kind, wave/turn,
-phase/queue evidence, pending command owners, and every control/menu identity
-required by `m3-api.md`, including per-seat decision operation IDs and menu
-allocator before/after high-water marks. An incomplete control projection
-fails with `NEXT_CONTROL_UNOBSERVABLE`.
+the next driver input. Its required semantic frontier is the closed
+`control_kind`, wave, turn, `phase_name`, ordered `queued_phases`, and ordered
+`pending_command_owners`; `ui_mode`, handler, and cursor are included only when
+the pinned oracle exposes them. The manifest globally excludes
+`RUST_OWNED_CONTROL_IDENTITY_MENU_ALLOCATOR_HISTORY`, so this fixture projection
+does not claim decision operation IDs, control/menu IDs, menu graphs, cancel
+history, menu-instance IDs, or allocator high-water/history. Those values remain
+mandatory under `m3-api.md` and `m3-ui-navigation.md` and are proved by
+non-oracle M3 tests. A missing required semantic-frontier value fails with
+`NEXT_CONTROL_UNOBSERVABLE`.
 
 ## Gaps and failure policy
 
@@ -212,17 +222,18 @@ the exporter recognizes:
 - `UNMAPPED_RNG_REASON`;
 - `UNRECORDED_STATE_CHANGE`;
 - `CAPTURE_MUTATED_STATE`;
-- `RAW_INPUT_UNOBSERVABLE`;
 - `PRESENTATION_UNOBSERVABLE`;
-- `RENDERER_COMPLETION_UNOBSERVABLE`;
 - `NEXT_CONTROL_UNOBSERVABLE`;
 - `CONTENT_HASH_UNAVAILABLE`;
 - `CANONICAL_STATE_UNOBSERVABLE`.
 
-A gap on any axis required by a case's entry in `m3-coverage-map.json` blocks
-fixture publication. Unsupported and unobservable evidence is never encoded
-as `{}`, `[]`, `null`, a default value, or a successful no-op unless that exact
-empty/null value is itself the observed oracle value and the schema permits it.
+A gap on any claimed portion of an axis required by a case's entry in
+`m3-coverage-map.json` blocks fixture publication. The manifest's exact global
+unclaimed-subdimension list is the only exception; it never creates a case gap
+and may not be extended per case. Unsupported and unobservable claimed evidence
+is never encoded as `{}`, `[]`, `null`, a default value, or a successful no-op
+unless that exact empty/null value is itself the observed oracle value and the
+schema permits it.
 
 On the first M3A-05 exporter commit, the checked-in oracle directory may be
 absent but never partial. The hosted job still requires two clean-checkout
@@ -236,15 +247,16 @@ tree is checked in and the integration owner records all manifest entries.
 ## Manifest and differential gate
 
 `m3-oracle-manifest.json` binds every fixture path and SHA-256 to its scenario,
-coverage claims, oracle/exporter provenance, content hash, required axes, and
-gap-free status. Generated files not listed by the manifest are not parity
+coverage claims, oracle/exporter provenance, content hash, required axes,
+globally unclaimed semantic-oracle subdimensions, and gap-free status for every
+claimed value. Generated files not listed by the manifest are not parity
 evidence; listed files with a mismatched hash are rejected.
 
 The same manifest catalogs `content-pack-v1.json` and `rng-vectors-v1.json` as
 supporting artifacts. At G6 their publication arrays are truthfully empty;
 M3A-05 must generate each twice in fresh processes, then the integration owner
 records its SHA-256/provenance. M3B cannot start until every case and both
-supporting artifacts are published and gap-free.
+supporting artifacts are published and gap-free on every claimed value.
 
 The two supporting artifact envelopes are closed:
 
@@ -319,9 +331,9 @@ The Rust differential runner compares, in order:
 3. each consuming RNG draw and reason;
 4. action order;
 5. mutation ledger;
-6. presentation plan;
+6. authority-recorded semantic presentation plan;
 7. final canonical state and RNG;
-8. next logical control.
+8. observed semantic next-control frontier.
 
 It reports the first divergent axis, sequence, typed path/callsite, expected and
 actual values, and before/after fingerprints. A matching final state cannot
