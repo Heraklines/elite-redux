@@ -2864,15 +2864,10 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
     ) as AnyRecord;
     const ppBefore = exhausted.ppUsed;
     const rngDrawCountBefore = activeTrace?.rngDraws.length ?? 0;
-    const rejectionLogCount = game.textInterceptor.logs.length;
-    const messageHandler = game.scene.ui.getMessageHandler() as AnyRecord;
-    if (
-      typeof messageHandler.getPromptGeneration !== "function"
-      || typeof messageHandler.isAwaitingPromptAction !== "function"
-    ) {
-      fail("OBSERVATION_SEAM_MISSING", "PP rejection message handler lacks its public prompt identity");
+    const rejectionMessage = lead.trySelectMove(0)[1];
+    if (rejectionMessage.length === 0) {
+      fail("COMMAND_UNOBSERVABLE", "production exhausted-move admission exposed no rejection message");
     }
-    const promptGenerationBefore = messageHandler.getPromptGeneration();
 
     game.scene.ui.setCursor(Command.FIGHT);
     const openedFight = game.scene.ui.processInput(Button.ACTION);
@@ -2886,19 +2881,20 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
       fail("COMMAND_UNOBSERVABLE", "production Fight menu did not expose exhausted slot 0");
     }
 
-    const acceptedExhaustedMove = game.scene.ui.processInput(Button.ACTION);
+    const showTextSpy = vi.spyOn(game.scene.ui as AnyRecord, "showText");
+    let acceptedExhaustedMove = false;
+    let publishedRejectionMessage = false;
+    try {
+      acceptedExhaustedMove = game.scene.ui.processInput(Button.ACTION);
+      publishedRejectionMessage = showTextSpy.mock.calls.some(call => call[0] === rejectionMessage);
+    } finally {
+      showTextSpy.mockRestore();
+    }
     if (acceptedExhaustedMove) {
       fail("COMMAND_UNOBSERVABLE", "production Fight menu accepted an exhausted move");
     }
-    try {
-      await vi.waitUntil(
-        () =>
-          game.textInterceptor.logs.length > rejectionLogCount
-          && messageHandler.getPromptGeneration() > promptGenerationBefore,
-        { interval: 5, timeout: 5_000 },
-      );
-    } catch {
-      fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection did not publish its production message prompt");
+    if (!publishedRejectionMessage) {
+      fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection did not publish its production error text");
     }
     if (game.scene.ui.getMode() !== UiMode.MESSAGE && game.scene.ui.getMode() !== UiMode.FIGHT) {
       fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection left the production Fight/message surface");
@@ -2922,10 +2918,14 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
       fail("COMMAND_UNOBSERVABLE", "exhausted-move rejection changed PP or emitted an RNG draw");
     }
 
-    // The headless timer can finish and consume this short prompt before the
-    // polling turn observes MESSAGE.  Prompt generation above proves the same
-    // production surface opened; drive it only when it remains actionable.
+    // The headless timer can finish and consume this short prompt before a
+    // polling turn observes MESSAGE.  The synchronous production showText call
+    // above proves the same surface opened; drive it only if it remains open.
     if (game.scene.ui.getMode() === UiMode.MESSAGE) {
+      const messageHandler = game.scene.ui.getMessageHandler() as AnyRecord;
+      if (typeof messageHandler.isAwaitingPromptAction !== "function") {
+        fail("OBSERVATION_SEAM_MISSING", "PP rejection message handler lacks its public action state");
+      }
       try {
         await vi.waitUntil(
           () => game.scene.ui.getMode() === UiMode.FIGHT || messageHandler.isAwaitingPromptAction() === true,
