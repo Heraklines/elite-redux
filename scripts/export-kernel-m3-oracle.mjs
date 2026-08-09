@@ -136,12 +136,22 @@ function runVitest(outputRoot) {
       "--maxWorkers=1",
       "--no-file-parallelism",
     ],
-    { cwd: REPO_ROOT, env, stdio: "inherit" },
+    {
+      cwd: REPO_ROOT,
+      env,
+      encoding: "utf8",
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
   if (result.error) {
     fail(`Vitest exporter process failed to start: ${result.error.message}`);
   }
   if (result.status !== 0) {
+    const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/u).slice(-240).join("\n").trim();
+    if (diagnostic.length > 0) {
+      process.stderr.write(`${diagnostic}\n`);
+    }
     process.exitCode = result.status ?? 1;
     throw new Error(`Vitest exporter process failed with status ${result.status}`);
   }

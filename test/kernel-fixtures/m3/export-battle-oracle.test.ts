@@ -3193,6 +3193,9 @@ describe("M3A-05 fresh semantic oracle export", () => {
       try {
         const envelope = await exportCase(id, hash, sharedProvenance);
         writeCanonical(resolve(root, "battle-cases", `${id}.json`), envelope);
+      } catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        fail("ORACLE_CASE_FAILED", `${id}: ${detail}`);
       } finally {
         releaseScenarioHarness();
       }
