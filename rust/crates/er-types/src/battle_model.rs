@@ -30,9 +30,9 @@ impl<'de> Deserialize<'de> for CapabilityStatus {
 
         match CapabilityStatusWire::deserialize(deserializer)? {
             CapabilityStatusWire::Supported {} => Ok(Self::Supported),
-            CapabilityStatusWire::Unsupported { reason_code } => Ok(Self::Unsupported {
-                reason_code,
-            }),
+            CapabilityStatusWire::Unsupported { reason_code } => {
+                Ok(Self::Unsupported { reason_code })
+            }
         }
     }
 }
