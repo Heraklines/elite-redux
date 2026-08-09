@@ -1,6 +1,6 @@
 //! M3A-02 closed leaf enums and serializable battle value DTOs.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::OperationId;
 pub use crate::battle_ids::ContentPackHash;
@@ -9,11 +9,32 @@ use crate::battle_ids::{
     PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum CapabilityStatus {
     Supported,
     Unsupported { reason_code: UnsupportedReasonCode },
+}
+
+impl<'de> Deserialize<'de> for CapabilityStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+        enum CapabilityStatusWire {
+            Supported {},
+            Unsupported { reason_code: UnsupportedReasonCode },
+        }
+
+        match CapabilityStatusWire::deserialize(deserializer)? {
+            CapabilityStatusWire::Supported {} => Ok(Self::Supported),
+            CapabilityStatusWire::Unsupported { reason_code } => Ok(Self::Unsupported {
+                reason_code,
+            }),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -370,6 +391,8 @@ mod tests {
                 .is_err()
         );
 
+        let encoded = serde_json::to_string(&CapabilityStatus::Supported);
+        assert_eq!(encoded.ok(), Some(r#"{"kind":"SUPPORTED"}"#.to_owned()));
         let encoded = serde_json::to_string(&CapabilityStatus::Unsupported {
             reason_code: UnsupportedReasonCode::TargetingUnsupported,
         });
@@ -380,6 +403,12 @@ mod tests {
         assert!(
             serde_json::from_str::<CapabilityStatus>(r#"{"kind":"SUPPORTED","extra":true}"#,)
                 .is_err()
+        );
+        assert!(
+            serde_json::from_str::<CapabilityStatus>(
+                r#"{"kind":"UNSUPPORTED","reason_code":"TARGETING_UNSUPPORTED","extra":true}"#,
+            )
+            .is_err()
         );
     }
 
@@ -413,7 +442,10 @@ mod tests {
         let encoded = serde_json::to_string(&stats);
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {
-            assert_eq!(serde_json::from_str::<BattleStats>(&encoded).ok(), Some(stats));
+            assert_eq!(
+                serde_json::from_str::<BattleStats>(&encoded).ok(),
+                Some(stats)
+            );
         }
     }
 
@@ -426,10 +458,8 @@ mod tests {
             Some(r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#.to_owned())
         );
         assert_eq!(
-            serde_json::from_str::<WeatherKind>(
-                r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#,
-            )
-            .ok(),
+            serde_json::from_str::<WeatherKind>(r#"{"kind":"UNSUPPORTED_ORACLE_CODE","value":7}"#,)
+                .ok(),
             Some(weather)
         );
 
@@ -441,7 +471,10 @@ mod tests {
         let encoded = serde_json::to_string(&status);
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {
-            assert_eq!(serde_json::from_str::<StatusState>(&encoded).ok(), Some(status));
+            assert_eq!(
+                serde_json::from_str::<StatusState>(&encoded).ok(),
+                Some(status)
+            );
         }
     }
 }

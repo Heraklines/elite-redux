@@ -349,7 +349,7 @@ impl CanonicalHexBytes {
 }
 
 fn validate_canonical_hex(value: &str) -> Result<(), CanonicalHexBytesError> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return Err(CanonicalHexBytesError::OddLength);
     }
     for (index, digit) in value.bytes().enumerate() {
