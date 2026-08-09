@@ -22,12 +22,11 @@ interface AbilityRow {
 export class FunAbilityReviewUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private cursorObject: Phaser.GameObjects.NineSlice;
-  private readonly descriptionTexts: Phaser.GameObjects.Text[] = [];
   private readonly cards: Phaser.GameObjects.Container[] = [];
-  private readonly abilityTexts: Phaser.GameObjects.Text[][] = [];
+  private readonly abilityNameTexts: Phaser.GameObjects.Text[][] = [];
+  private readonly abilityDescriptionTexts: Phaser.GameObjects.Text[][] = [];
   private party: Pokemon[] = [];
   private onContinue: (() => void) | null = null;
-  private lastPartyCursor = 0;
 
   constructor(mode: UiMode | null = null) {
     super(mode);
@@ -43,69 +42,63 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     }).setOrigin(0);
     this.container.add([overlay, header, headerText]);
 
-    const cardWidth = Math.floor(width / 2) - 3;
+    const cardWidth = Math.floor(width / 2) - 2;
+    const abilityWidth = Math.floor((cardWidth - 10) / 2);
     for (let index = 0; index < 6; index++) {
       const column = index % 2;
       const row = Math.floor(index / 2);
-      const card = globalScene.add.container(column * (cardWidth + 2) + 1, 15 + row * 31);
-      const window = addWindow(0, 0, cardWidth, 30).setOrigin(0);
-      const nameText = addTextObject(18, 2, "", TextStyle.SETTINGS_LABEL, {
-        fontSize: "36px",
-        fixedWidth: (cardWidth - 21) * 6,
+      const card = globalScene.add.container(column * (cardWidth + 2) + 1, 15 + row * 49);
+      const window = addWindow(0, 0, cardWidth, 48).setOrigin(0);
+      const nameText = addTextObject(15, 1, "", TextStyle.SETTINGS_LABEL, {
+        fontSize: "30px",
+        fixedWidth: (cardWidth - 18) * 6,
         maxLines: 1,
       }).setOrigin(0);
       nameText.setName("pokemon-name");
-      const rows: Phaser.GameObjects.Text[] = [];
+      const names: Phaser.GameObjects.Text[] = [];
+      const descriptions: Phaser.GameObjects.Text[] = [];
       for (let slot = 0; slot < 4; slot++) {
-        const text = addTextObject(
-          18 + (slot % 2) * Math.floor((cardWidth - 20) / 2),
-          10 + Math.floor(slot / 2) * 9,
-          "",
-          TextStyle.SETTINGS_LABEL,
-          {
-            fontSize: "30px",
-            fixedWidth: Math.floor((cardWidth - 24) / 2) * 6,
-            maxLines: 1,
-          },
-        ).setOrigin(0);
-        rows.push(text);
+        const abilityX = 4 + (slot % 2) * (abilityWidth + 2);
+        const abilityY = 10 + Math.floor(slot / 2) * 18;
+        const name = addTextObject(abilityX, abilityY, "", TextStyle.SETTINGS_LABEL, {
+          fontSize: "22px",
+          fixedWidth: abilityWidth * 6,
+          maxLines: 1,
+        })
+          .setOrigin(0)
+          .setColor("#78e898");
+        const description = addTextObject(abilityX, abilityY + 5, "", TextStyle.SETTINGS_LABEL, {
+          fontSize: "18px",
+          fixedWidth: abilityWidth * 6,
+          maxLines: 3,
+        }).setOrigin(0);
+        description.setWordWrapWidth(abilityWidth * 6, true);
+        names.push(name);
+        descriptions.push(description);
       }
-      card.add([window, nameText, ...rows]);
+      card.add([window, nameText, ...names, ...descriptions]);
       this.cards.push(card);
-      this.abilityTexts.push(rows);
+      this.abilityNameTexts.push(names);
+      this.abilityDescriptionTexts.push(descriptions);
       this.container.add(card);
     }
 
-    const descriptionWindow = addWindow(1, 108, width - 2, 56).setOrigin(0);
-    for (let slot = 0; slot < 4; slot++) {
-      this.descriptionTexts.push(
-        addTextObject(6, 112 + slot * 12, "", TextStyle.SETTINGS_LABEL, {
-          fontSize: "30px",
-          fixedWidth: (width - 12) * 6,
-          maxLines: 1,
-        }).setOrigin(0),
-      );
-    }
-    const rerollWindow = addWindow(1, 165, Math.floor(width / 2) - 2, 14).setOrigin(0);
-    const startWindow = addWindow(Math.floor(width / 2), 165, Math.ceil(width / 2) - 1, 14).setOrigin(0);
-    const rerollText = addTextObject(rerollWindow.x + rerollWindow.width / 2, 172, "REROLL", TextStyle.SETTINGS_LABEL, {
-      fontSize: "54px",
-    }).setOrigin(0.5);
-    const startText = addTextObject(startWindow.x + startWindow.width / 2, 172, "START", TextStyle.SETTINGS_LABEL, {
-      fontSize: "54px",
+    const rerollWindow = addWindow(1, 163, Math.floor(width / 2) - 2, 16).setOrigin(0);
+    const startWindow = addWindow(Math.floor(width / 2), 163, Math.ceil(width / 2) - 1, 16).setOrigin(0);
+    const rerollText = addTextObject(
+      rerollWindow.x + rerollWindow.width / 2,
+      171,
+      "REROLL ALL",
+      TextStyle.SETTINGS_LABEL,
+      { fontSize: "48px" },
+    ).setOrigin(0.5);
+    const startText = addTextObject(startWindow.x + startWindow.width / 2, 171, "START RUN", TextStyle.SETTINGS_LABEL, {
+      fontSize: "48px",
     }).setOrigin(0.5);
     this.cursorObject = globalScene.add
-      .nineslice(3, 17, "summary_moves_cursor", undefined, cardWidth - 4, 26, 1, 1, 1, 1)
+      .nineslice(3, 165, "summary_moves_cursor", undefined, Math.floor(width / 2) - 5, 12, 1, 1, 1, 1)
       .setOrigin(0);
-    this.container.add([
-      descriptionWindow,
-      ...this.descriptionTexts,
-      rerollWindow,
-      startWindow,
-      rerollText,
-      startText,
-      this.cursorObject,
-    ]);
+    this.container.add([rerollWindow, startWindow, rerollText, startText, this.cursorObject]);
     this.container.setVisible(false);
     this.getUi().add(this.container);
   }
@@ -115,7 +108,6 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     this.party = (args[0] as Pokemon[]).slice(0, 6);
     this.onContinue = args[1] as () => void;
     this.cursor = 0;
-    this.lastPartyCursor = 0;
     this.container.setVisible(true);
     this.refresh();
     this.getUi().moveTo(this.container, this.getUi().length - 1);
@@ -124,36 +116,14 @@ export class FunAbilityReviewUiHandler extends UiHandler {
 
   public override processInput(button: Button): boolean {
     let success = false;
-    if (button === Button.LEFT || button === Button.RIGHT) {
-      if (this.cursor < this.party.length) {
-        const next = this.cursor + (button === Button.RIGHT ? 1 : -1);
-        if (next >= 0 && next < this.party.length) {
-          this.cursor = next;
-          this.lastPartyCursor = next;
-          success = true;
-        }
-      } else {
-        this.cursor = this.cursor === 6 ? 7 : 6;
-        success = true;
-      }
-    } else if (button === Button.UP) {
-      this.cursor = this.cursor >= 6 ? Math.max(0, this.party.length - 2) : Math.max(0, this.cursor - 2);
-      this.lastPartyCursor = this.cursor;
-      success = true;
-    } else if (button === Button.DOWN) {
-      this.cursor = this.cursor < Math.max(0, this.party.length - 2) ? this.cursor + 2 : 6;
-      if (this.cursor < this.party.length) {
-        this.lastPartyCursor = this.cursor;
-      }
+    if (button === Button.LEFT || button === Button.RIGHT || button === Button.UP || button === Button.DOWN) {
+      this.cursor = this.cursor === 0 ? 1 : 0;
       success = true;
     } else if (button === Button.ACTION || button === Button.SUBMIT) {
-      if (this.cursor < this.party.length) {
-        return false;
-      }
-      if (this.cursor === 6) {
+      if (this.cursor === 0) {
         rerollFunAbilities();
         success = true;
-      } else if (this.cursor === 7) {
+      } else {
         const callback = this.onContinue;
         this.getUi()
           .revertMode()
@@ -184,7 +154,6 @@ export class FunAbilityReviewUiHandler extends UiHandler {
 
   private refresh(): void {
     const { width } = globalScene.scaledCanvas;
-    const cardWidth = Math.floor(width / 2) - 3;
     this.cards.forEach((card, index) => {
       const pokemon = this.party[index];
       card.setVisible(!!pokemon);
@@ -197,33 +166,20 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       if (!pokemon) {
         return;
       }
-      const icon = globalScene.addPokemonIcon(pokemon, 2, 5, 0.38, 0.38, true).setName("pokemon-icon");
+      const icon = globalScene.addPokemonIcon(pokemon, 1, 2, 0.3, 0.3, true).setName("pokemon-icon");
       card.add(icon);
       const name = card.getAll().find(object => object.name === "pokemon-name") as Phaser.GameObjects.Text;
       name.setText(pokemon.getNameToRender({ useIllusion: false }));
       this.abilityRows(pokemon).forEach((ability, slot) => {
-        this.abilityTexts[index][slot].setText(`${slot === 0 ? "A" : `I${slot}`}: ${ability.name}`);
-        this.abilityTexts[index][slot].setColor(index === this.lastPartyCursor ? "#f8d870" : "#ffffff");
+        this.abilityNameTexts[index][slot].setText(`${slot === 0 ? "A" : `I${slot}`}  ${ability.name}`);
+        const description = this.abilityDescriptionTexts[index][slot];
+        description.setText(ability.description);
+        description.setFontSize(ability.description.length > 110 ? 12 : ability.description.length > 75 ? 15 : 18);
       });
     });
 
-    if (this.cursor < this.party.length) {
-      const column = this.cursor % 2;
-      const row = Math.floor(this.cursor / 2);
-      this.lastPartyCursor = this.cursor;
-      this.cursorObject.setPosition(column * (cardWidth + 2) + 3, 17 + row * 31).setSize(cardWidth - 4, 26);
-    } else {
-      const isStart = this.cursor === 7;
-      this.cursorObject
-        .setPosition(isStart ? Math.floor(width / 2) + 2 : 3, 167)
-        .setSize(Math.floor(width / 2) - 5, 10);
-    }
-
-    const selectedPokemon = this.party[Math.min(this.lastPartyCursor, Math.max(0, this.party.length - 1))];
-    const selectedAbilities = selectedPokemon ? this.abilityRows(selectedPokemon) : [];
-    this.descriptionTexts.forEach((text, slot) => {
-      const ability = selectedAbilities[slot];
-      text.setText(ability ? `${slot === 0 ? "A" : `I${slot}`}  ${ability.name}: ${ability.description}` : "");
-    });
+    this.cursorObject
+      .setPosition(this.cursor === 1 ? Math.floor(width / 2) + 2 : 3, 165)
+      .setSize(Math.floor(width / 2) - 5, 12);
   }
 }

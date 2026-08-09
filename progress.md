@@ -7772,3 +7772,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - UI approval gate: three selector/reroll directions are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options`. Do not treat the compact reroll layout as approved or deploy its revision until one option is selected. Production remains forbidden.
 - UI process rule: for new player-facing screens, prepare multiple labeled visual options on the Desktop for owner approval before locking in or deploying the layout; continue non-visual implementation and testing in parallel.
 - Exact staging artifact: `5a92e90a76586fb7c122ce23748abe7566606256`, deploy run `31333105827`. Topic branch only; production and `feat/elite-redux-port` remain untouched.
+
+2026-08-09 - Fun Mode UI continuation
+
+- Fun Mode's modifier selector now follows the Challenge Mode presentation and controls: 60/40 list/detail split, matching boolean arrows, orange description text, matching START bar/cursor, and a header `Last Setup` button.
+- Last Setup is saved per account when a Fun Mode run starts. It restores all six modifier choices and deliberately resets the ability-reroll seed instead of silently restoring a previous randomized party result.
+- The ability review no longer hides descriptions behind Pokemon selection. Its two-column/six-card layout renders every party member's active ability, three innates, and all 24 short descriptions at once; only `REROLL ALL` and `START RUN` receive input focus.
+- Alternative all-description layouts are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`. The implemented baseline is the refined two-column Option A requested by the owner; visual iteration can continue without reverting the persistence or input work.
+- Verification: focused Fun Mode suite 18/18, touched-file TypeScript diagnostics clear, Biome clean except one pre-existing informational notice in `src/utils/data.ts`, and the full Vite production build is green. Staging canvas verification remains required before promotion; production remains forbidden.

@@ -6,11 +6,14 @@ import {
   setFunModeConfig,
 } from "#data/elite-redux/er-fun-mode";
 import { Button } from "#enums/buttons";
+import { Color, ShadowColor } from "#enums/color";
 import { TextStyle } from "#enums/text-style";
 import type { UiMode } from "#enums/ui-mode";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
+import BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
 type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed">;
 
@@ -60,12 +63,15 @@ function hasEnabledMode(config: FunModeConfig): boolean {
 export class FunModeSelectUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private cursorObject: Phaser.GameObjects.NineSlice;
-  private descriptionText: Phaser.GameObjects.Text;
+  private descriptionText: BBCodeText;
   private startText: Phaser.GameObjects.Text;
+  private lastSetupButton: Phaser.GameObjects.NineSlice;
+  private lastSetupText: Phaser.GameObjects.Text;
   private readonly valueTexts: Phaser.GameObjects.Text[] = [];
   private readonly leftArrows: Phaser.GameObjects.Image[] = [];
   private readonly rightArrows: Phaser.GameObjects.Image[] = [];
   private startCursor: Phaser.GameObjects.NineSlice;
+  private onHeaderButton = false;
   private config: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
 
   constructor(mode: UiMode | null = null) {
@@ -81,6 +87,15 @@ export class FunModeSelectUiHandler extends UiHandler {
     const overlay = globalScene.add.rectangle(-1, -1, width, height, 0x424242, 0.8).setOrigin(0);
     const header = addWindow(0, 0, width, 24).setOrigin(0);
     const headerText = addTextObject(8, 4, "FUN MODE", TextStyle.HEADER_LABEL).setOrigin(0);
+    this.lastSetupText = addTextObject(0, 0, "Last Setup", TextStyle.SETTINGS_LABEL)
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.lastSetupText.setScale(this.lastSetupText.scaleX * 0.85, this.lastSetupText.scaleY * 0.85);
+    this.lastSetupButton = addWindow(0, 0, this.lastSetupText.displayWidth + 12, 18)
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.lastSetupButton.setPositionRelative(header, headerText.x + headerText.displayWidth + 10, header.height / 2);
+    this.lastSetupText.setPosition(this.lastSetupButton.x + 6, this.lastSetupButton.y);
     const rulesText = addTextObject(width - 6, 7, "Youngster rules  |  No Favor or Vouchers", TextStyle.SETTINGS_LABEL)
       .setOrigin(1, 0)
       .setAlpha(0.8);
@@ -107,8 +122,17 @@ export class FunModeSelectUiHandler extends UiHandler {
     this.cursorObject = globalScene.add
       .nineslice(4, 28, "summary_moves_cursor", undefined, optionsWidth - 8, 16, 1, 1, 1, 1)
       .setOrigin(0);
-    this.descriptionText = addTextObject(optionsWidth + 7, 31, "", TextStyle.SETTINGS_LABEL).setOrigin(0);
-    this.descriptionText.setWordWrapWidth((width - optionsWidth - 14) * 6);
+    this.descriptionText = new BBCodeText(globalScene, optionsWidth + 6, 28, "", {
+      fontFamily: "emerald",
+      fontSize: 84,
+      color: Color.ORANGE,
+      padding: { bottom: 6 },
+      wrap: { mode: "word", width: (width - optionsWidth - 12) * 6 },
+    })
+      .setScale(1 / 6)
+      .setShadow(4, 5, ShadowColor.ORANGE)
+      .setOrigin(0);
+    globalScene.add.existing(this.descriptionText);
     this.startText = addTextObject(0, 0, "START", TextStyle.SETTINGS_LABEL).setOrigin(0.5, 0.5);
     this.startText.setPosition(startWindow.x + startWindow.width / 2, startWindow.y + startWindow.height / 2);
     this.startCursor = globalScene.add
@@ -131,6 +155,8 @@ export class FunModeSelectUiHandler extends UiHandler {
       overlay,
       header,
       headerText,
+      this.lastSetupButton,
+      this.lastSetupText,
       rulesText,
       optionsWindow,
       descriptionWindow,
@@ -148,6 +174,7 @@ export class FunModeSelectUiHandler extends UiHandler {
   public override show(args: any[]): boolean {
     super.show(args);
     this.config = { ...getFunModeConfig() };
+    this.onHeaderButton = false;
     this.container.setVisible(true);
     this.setCursor(0);
     this.refresh();
@@ -157,32 +184,15 @@ export class FunModeSelectUiHandler extends UiHandler {
   }
 
   public override processInput(button: Button): boolean {
-    let success = false;
-    const startIndex = OPTIONS.length;
+    let success: boolean;
     if (button === Button.CANCEL) {
       globalScene.phaseManager.toTitleScreen();
       globalScene.phaseManager.getCurrentPhase().end();
       success = true;
-    } else if (button === Button.UP) {
-      success = this.setCursor(this.cursor === 0 ? startIndex : this.cursor - 1);
-    } else if (button === Button.DOWN) {
-      success = this.setCursor(this.cursor === startIndex ? 0 : this.cursor + 1);
-    } else if (this.cursor < startIndex && (button === Button.LEFT || button === Button.RIGHT)) {
-      const key = OPTIONS[this.cursor].key;
-      const value = button === Button.RIGHT;
-      success = this.config[key] !== value;
-      this.config[key] = value;
-    } else if (button === Button.ACTION || button === Button.SUBMIT) {
-      if (this.cursor < startIndex) {
-        const key = OPTIONS[this.cursor].key;
-        this.config[key] = !this.config[key];
-        success = true;
-      } else if (hasEnabledMode(this.config)) {
-        setFunModeConfig(this.config);
-        globalScene.phaseManager.unshiftNew("SelectStarterPhase");
-        globalScene.phaseManager.getCurrentPhase().end();
-        success = true;
-      }
+    } else if (this.onHeaderButton) {
+      success = this.processHeaderInput(button);
+    } else {
+      success = this.processMenuInput(button);
     }
 
     if (success) {
@@ -190,6 +200,67 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.refresh();
     }
     return success;
+  }
+
+  private processHeaderInput(button: Button): boolean {
+    if (button === Button.ACTION || button === Button.SUBMIT) {
+      return this.applyLastSetup();
+    }
+    if (button !== Button.UP && button !== Button.DOWN) {
+      return false;
+    }
+    this.setHeaderFocus(false);
+    return button === Button.UP ? this.setCursor(OPTIONS.length) : true;
+  }
+
+  private processMenuInput(button: Button): boolean {
+    if (button === Button.UP) {
+      return this.moveCursorUp();
+    }
+    if (button === Button.DOWN) {
+      return this.setCursor(this.cursor === OPTIONS.length ? 0 : this.cursor + 1);
+    }
+    if (button === Button.LEFT || button === Button.RIGHT) {
+      return this.setCurrentOption(button === Button.RIGHT);
+    }
+    if (button === Button.ACTION || button === Button.SUBMIT) {
+      return this.confirmCurrentSelection();
+    }
+    return button === Button.CYCLE_SHINY && this.applyLastSetup();
+  }
+
+  private moveCursorUp(): boolean {
+    if (this.cursor === 0 && loadLastFunModeConfig()) {
+      this.setHeaderFocus(true);
+      return true;
+    }
+    return this.setCursor(this.cursor === 0 ? OPTIONS.length : this.cursor - 1);
+  }
+
+  private setCurrentOption(value: boolean): boolean {
+    if (this.cursor >= OPTIONS.length) {
+      return false;
+    }
+    const key = OPTIONS[this.cursor].key;
+    const changed = this.config[key] !== value;
+    this.config[key] = value;
+    return changed;
+  }
+
+  private confirmCurrentSelection(): boolean {
+    if (this.cursor < OPTIONS.length) {
+      const key = OPTIONS[this.cursor].key;
+      this.config[key] = !this.config[key];
+      return true;
+    }
+    if (!hasEnabledMode(this.config)) {
+      return false;
+    }
+    saveLastFunModeConfig(this.config);
+    setFunModeConfig(this.config);
+    globalScene.phaseManager.unshiftNew("SelectStarterPhase");
+    globalScene.phaseManager.getCurrentPhase().end();
+    return true;
   }
 
   public override setCursor(cursor: number): boolean {
@@ -232,12 +303,12 @@ export class FunModeSelectUiHandler extends UiHandler {
         .setPosition(4, 28 + this.cursor * 16)
         .setSize(optionsWidth - 8, 16);
       this.startCursor.setVisible(false);
-      this.descriptionText.setText(OPTIONS[this.cursor].description);
+      this.setDescription(OPTIONS[this.cursor].description);
     } else {
       const anyEnabled = hasEnabledMode(this.config);
       this.cursorObject.setVisible(false);
       this.startCursor.setVisible(true);
-      this.descriptionText.setText(
+      this.setDescription(
         anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one randomizer before starting.",
       );
       this.startText.setAlpha(anyEnabled ? 1 : 0.45);
@@ -245,5 +316,37 @@ export class FunModeSelectUiHandler extends UiHandler {
     if (this.cursor < startIndex) {
       this.startText.setAlpha(hasEnabledMode(this.config) ? 1 : 0.45);
     }
+    this.updateLastSetupButton();
+  }
+
+  private setDescription(description: string): void {
+    this.descriptionText.setText(`[color=${Color.ORANGE}][shadow=${ShadowColor.ORANGE}]${description}`);
+  }
+
+  private setHeaderFocus(focused: boolean): void {
+    this.onHeaderButton = focused;
+    this.cursorObject.setVisible(!focused && this.cursor < OPTIONS.length);
+    this.startCursor.setVisible(!focused && this.cursor === OPTIONS.length);
+    this.updateLastSetupButton();
+  }
+
+  private updateLastSetupButton(): void {
+    const available = loadLastFunModeConfig() != null;
+    if (!available) {
+      this.onHeaderButton = false;
+    }
+    this.lastSetupButton.setVisible(available).setAlpha(this.onHeaderButton ? 1 : 0.6);
+    this.lastSetupText.setVisible(available).setAlpha(this.onHeaderButton ? 1 : 0.6);
+  }
+
+  private applyLastSetup(): boolean {
+    const saved = loadLastFunModeConfig();
+    if (!saved) {
+      return false;
+    }
+    this.config = { ...saved, abilityRerollSeed: 0 };
+    this.setHeaderFocus(false);
+    this.setCursor(0);
+    return true;
   }
 }
