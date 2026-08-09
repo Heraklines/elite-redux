@@ -137,6 +137,13 @@ import {
 } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
+  getFunModeConfig,
+  getFunRandomAbilityId,
+  getFunRandomLevelMoves,
+  getFunRandomTypes,
+  rollFunRandomSpecies,
+} from "#data/elite-redux/er-fun-mode";
+import {
   erBloodPactDealMultiplier,
   erBloodPactTakeMultiplier,
   erCapacitorElectricMultiplier,
@@ -2595,7 +2602,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return [teraType];
     }
 
-    const types = new Set(this.getBaseTypes(ignoreOverride, useIllusion));
+    const baseTypes = this.getBaseTypes(ignoreOverride, useIllusion);
+    const shouldUseRandomTypes =
+      globalScene.gameMode.isFun
+      && getFunModeConfig().randomizeTypes
+      && (ignoreOverride || this.summonData.types.length === 0);
+    const types = new Set(shouldUseRandomTypes ? getFunRandomTypes(this.id, baseTypes) : baseTypes);
 
     // become UNKNOWN if no types are present, or remove it if other types are present.
     // TODO: Move this after the added type checks once Roost is refactored to check removed types correctly
@@ -2728,6 +2740,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         return allAbilities[eventBoss.ability];
       }
     }
+    if (globalScene.gameMode.isFun) {
+      const randomized = getFunRandomAbilityId(this.id, 0);
+      if (randomized != null) {
+        return allAbilities[randomized];
+      }
+    }
     let abilityId = this.getSpeciesForm(ignoreOverride).getAbility(this.abilityIndex);
     if (abilityId === AbilityId.NONE) {
       abilityId = this.species.ability1;
@@ -2769,6 +2787,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const eventBoss = getDailyEventSeedBoss();
       if (eventBoss?.passive != null) {
         return allAbilities[eventBoss.passive];
+      }
+    }
+
+    if (globalScene.gameMode.isFun) {
+      const randomized = getFunRandomAbilityId(this.id, 1);
+      if (randomized != null) {
+        return allAbilities[randomized];
       }
     }
 
@@ -2817,7 +2842,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    const derivedIds = this.resolveDerivedPassiveIds();
+    let derivedIds = this.resolveDerivedPassiveIds();
+    if (globalScene.gameMode.isFun && getFunModeConfig().randomizeAbilities) {
+      derivedIds = derivedIds.map((abilityId, slot) => {
+        if (abilityId === AbilityId.NONE) {
+          return AbilityId.NONE;
+        }
+        return getFunRandomAbilityId(this.id, slot + 1) ?? abilityId;
+      }) as [AbilityId, AbilityId, AbilityId];
+    }
 
     if (slot0 === null) {
       slot0 = derivedIds[0] === AbilityId.NONE ? null : allAbilities[derivedIds[0]];
@@ -4389,7 +4422,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       Pokemon.getUniqueMoves(levelMoves, ret);
     }
 
-    return ret;
+    return globalScene.gameMode.isFun ? getFunRandomLevelMoves(this.id, ret) : ret;
   }
 
   /**
@@ -8226,9 +8259,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           this.battleData.lostItems.push({ typeId });
         }
       }
+      this.tryReceiveSymbiosisItem();
     }
 
     return true;
+  }
+
+  /** Transfer one adjacent Symbiosis holder's item after this Pokemon loses one. */
+  private tryReceiveSymbiosisItem(): void {
+    if (!this.isActive(true) || this.isFainted()) {
+      return;
+    }
+    for (const donor of this.getAdjacentAllies()) {
+      if (!donor.isActive(true) || donor.isFainted()) {
+        continue;
+      }
+      const source = donor.getActiveAbilitySources().find(entry => entry.ability.id === AbilityId.SYMBIOSIS);
+      if (!source) {
+        continue;
+      }
+      const item = donor
+        .getHeldItems()
+        .find(candidate => candidate.isTransferable && globalScene.canTransferHeldItemModifier(candidate, this));
+      if (!item) {
+        continue;
+      }
+      if (globalScene.tryTransferHeldItemModifier(item, this, false, 1, true)) {
+        globalScene.phaseManager.queueAbilityDisplay(donor, source.passive, true, source.passiveSlot ?? 0);
+        globalScene.phaseManager.queueAbilityDisplay(donor, source.passive, false, source.passiveSlot ?? 0);
+        return;
+      }
+    }
   }
 
   /**
@@ -9027,13 +9088,21 @@ export class EnemyPokemon extends Pokemon {
     dataSource?: PokemonData,
     forRival = false,
   ) {
+    let generatedFormIndex: number | undefined;
+    if (!dataSource && globalScene.gameMode.isFun) {
+      const randomized = rollFunRandomSpecies();
+      if (randomized) {
+        species = randomized.species;
+        generatedFormIndex = randomized.formIndex;
+      }
+    }
     super(
       236,
       84,
       species,
       level,
       dataSource?.abilityIndex,
-      dataSource?.formIndex,
+      dataSource?.formIndex ?? generatedFormIndex,
       dataSource?.gender,
       !shinyLock && dataSource ? dataSource.shiny : false,
       !shinyLock && dataSource ? dataSource.variant : undefined,
@@ -9078,7 +9147,9 @@ export class EnemyPokemon extends Pokemon {
       // Youngster). Over-ceiling species devolve or swap BEFORE the moveset
       // is generated, so the final mon's kit matches its final species.
       // Saved battles (dataSource) are restored untouched.
-      enforceErEliteBstCurve(this);
+      if (!globalScene.gameMode.isFun || !getFunModeConfig().randomizePokemon) {
+        enforceErEliteBstCurve(this);
+      }
       this.generateAndPopulateMoveset(forRival);
       if (shinyLock || Overrides.ENEMY_SHINY_OVERRIDE === false) {
         this.shiny = false;
@@ -9212,6 +9283,10 @@ export class EnemyPokemon extends Pokemon {
   }
 
   override generateAndPopulateMoveset(useRivalSignatures = false, formIndex?: number): void {
+    if (globalScene.gameMode.isFun && getFunModeConfig().randomizeLevelUpMoves) {
+      super.generateAndPopulateMoveset(useRivalSignatures);
+      return;
+    }
     switch (true) {
       case this.species.speciesId === SpeciesId.SMEARGLE:
         this.moveset = [

@@ -33,6 +33,7 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
+import { resetFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { loadEliteReduxCustomIconsInBackground } from "#data/elite-redux/er-ios-icon-preload";
 import { shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
 import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -406,6 +407,15 @@ export class TitlePhase extends Phase {
                 return true;
               }
               this.openShowdownTournaments(setModeAndEnd);
+              return true;
+            },
+          });
+          options.push({
+            semanticId: "fun-mode",
+            label: GameMode.getModeName(GameModes.FUN),
+            handler: () => {
+              resetFunModeConfig();
+              setModeAndEnd(GameModes.FUN);
               return true;
             },
           });
@@ -2278,7 +2288,9 @@ export class TitlePhase extends Phase {
       // ER Community Challenge: a community card already carries its full ruleset
       // (applied above), so skip the challenge-select screen and go straight to
       // starter-select - just like a coop guest mirroring the host's config.
-      if (
+      if (this.gameMode === GameModes.FUN) {
+        globalScene.phaseManager.pushNew("SelectFunModePhase");
+      } else if (
         (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP)
         && !isCoopGuest
         && !this.pendingCommunityConfig // B7 item 14a: a VERSUS (showdown) session goes Title/lobby -> SelectStarterPhase directly, never // the challenge picker. A correctly-launched versus run has gameMode SHOWDOWN (already excluded // here), but guard on the session KIND too so a versus run can never surface the picker even if // its gameMode were ever misread as COOP. Co-op (kind "coop") is unaffected.

@@ -74,11 +74,19 @@ describe("ability overhaul easy additions - vanilla abilities", () => {
     expectDescription(healer, "always", "user", "ally");
   });
 
-  it("adds Unnerve to Klutz while retaining its existing implementation marker", () => {
+  it("fully implements Klutz and adds Unnerve", () => {
     const klutz = allAbilities[AbilityId.KLUTZ];
     expectIncludesAbility(klutz, allAbilities[AbilityId.UNNERVE]);
-    expect(klutz.unimplemented).toBe(true);
+    expect(klutz.unimplemented).toBe(false);
+    expect(klutz.name).not.toContain("(N)");
     expectDescription(klutz, "held items", "berries");
+  });
+
+  it("marks Symbiosis as implemented with its transfer behavior described", () => {
+    const symbiosis = allAbilities[AbilityId.SYMBIOSIS];
+    expect(symbiosis.unimplemented).toBe(false);
+    expect(symbiosis.name).not.toContain("(N)");
+    expectDescription(symbiosis, "item", "ally", "consum");
   });
 
   it("adds first-entry party healing to Sweet Veil and Pastel Veil", () => {

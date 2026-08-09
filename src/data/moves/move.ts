@@ -274,6 +274,11 @@ export abstract class Move implements Localizable {
   }
   private nameAppend = "";
 
+  /** Whether this move is marked as completely unavailable. */
+  public get isUnimplemented(): boolean {
+    return this.nameAppend.includes("(N)");
+  }
+
   /**
    * Check if the move is of the given subclass without requiring `instanceof`.
    * @remarks

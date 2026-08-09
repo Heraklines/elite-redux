@@ -70,6 +70,7 @@ import { ErQuizUiHandler } from "#ui/er-quiz-ui-handler";
 import { ErShinyLabUiHandler } from "#ui/er-shiny-lab-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
+import { FunModeSelectUiHandler } from "#ui/fun-mode-select-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
 import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
 import { GhostTrainerEditorUiHandler } from "#ui/ghost-trainer-editor-ui-handler";
@@ -134,6 +135,7 @@ const transitionModes = [
   UiMode.POKEDEX,
   UiMode.POKEDEX_PAGE,
   UiMode.CHALLENGE_SELECT,
+  UiMode.FUN_MODE_SELECT,
   UiMode.RUN_HISTORY,
 ];
 
@@ -294,6 +296,7 @@ export class UI extends Phaser.GameObjects.Container {
       new TournamentListUiHandler(),
       new TournamentBracketUiHandler(),
       new ShowdownSyncCommandUiHandler(),
+      new FunModeSelectUiHandler(),
     ];
   }
 

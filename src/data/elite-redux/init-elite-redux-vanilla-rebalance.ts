@@ -353,6 +353,10 @@ const ABILITY_DESCRIPTION_OVERRIDES: ReadonlyMap<AbilityId, string> = new Map([
   ],
   [AbilityId.HEALER, "Always cures the user's and its ally's status conditions at the end of each turn."],
   [
+    AbilityId.SYMBIOSIS,
+    "Transfers the holder's item to an ally immediately after that ally consumes or loses its held item.",
+  ],
+  [
     AbilityId.KLUTZ,
     "The Pokemon cannot use held items. It also prevents opposing Pokemon from consuming Berries or other held items.",
   ],
@@ -567,6 +571,8 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
   [AbilityId.KLUTZ, ab => appendAbilityAttrs(ab, allAbilities[AbilityId.UNNERVE])],
+  // The transfer hook lives at Pokemon.loseHeldItem, the universal item-loss boundary.
+  [AbilityId.SYMBIOSIS, _ab => {}],
   [
     AbilityId.SWEET_VEIL,
     ab => {

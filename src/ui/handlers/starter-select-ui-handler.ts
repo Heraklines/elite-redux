@@ -7337,6 +7337,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             globalScene.phaseManager.clearPhaseQueue();
             globalScene.phaseManager.pushNew("SelectChallengePhase");
             globalScene.phaseManager.pushNew("EncounterPhase");
+          } else if (globalScene.gameMode.isFun) {
+            globalScene.phaseManager.clearPhaseQueue();
+            globalScene.phaseManager.pushNew("SelectFunModePhase");
+            globalScene.phaseManager.pushNew("EncounterPhase");
           } else {
             globalScene.phaseManager.toTitleScreen();
           }
@@ -7598,6 +7602,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               const showdownCallback = this.starterSelectCallback;
               this.starterSelectCallback = null;
               showdownCallback?.(showdownStarters);
+              return;
+            }
+            if (globalScene.gameMode.isFun) {
+              startRun("youngster");
               return;
             }
             // ER Community Challenge: a launched community card forces its run

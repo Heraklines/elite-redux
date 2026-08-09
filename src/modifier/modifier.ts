@@ -347,6 +347,9 @@ export class AddVoucherModifier extends ConsumableModifier {
    * @returns always `true`
    */
   override apply(): boolean {
+    if (globalScene.gameMode.isFun) {
+      return true;
+    }
     const voucherCounts = globalScene.gameData.voucherCounts;
     voucherCounts[this.voucherType] += this.count;
 
@@ -741,6 +744,12 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     // ER Negative Feedback (5923): a seeded held item is suppressed (no effect,
     // not removed) until end of the following turn.
     if (erIsHeldItemSuppressed(pokemon, this.type?.id)) {
+      return false;
+    }
+    // Klutz suppresses every held-item effect on its holder. Form-change items
+    // are identity triggers rather than battle bonuses and remain functional,
+    // matching ER's Mega Stone exception.
+    if (pokemon.hasAbility(AbilityId.KLUTZ) && !(this instanceof PokemonFormChangeItemModifier)) {
       return false;
     }
     return true;

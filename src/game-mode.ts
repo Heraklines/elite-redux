@@ -50,6 +50,8 @@ interface GameModeConfig {
   /** True for the Showdown mode: a single ephemeral 1v1 duel at level 100 (no
    *  shops, no exp progression, no waves beyond the first, not a saved run). */
   isShowdown?: boolean;
+  /** True for the solo Fun Mode randomizer run. */
+  isFun?: boolean;
   /** Excludes this mode from daily-seed/leaderboard logic. */
   nonDeterministic?: boolean;
 }
@@ -75,6 +77,7 @@ export class GameMode implements GameModeConfig {
   public isLLMDirector: boolean;
   public isCoop: boolean;
   public isShowdown: boolean;
+  public isFun: boolean;
   public nonDeterministic: boolean;
 
   constructor(modeId: GameModes, config: GameModeConfig, battleConfig?: FixedBattleConfigs) {
@@ -384,6 +387,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.CHALLENGE:
       case GameModes.LLM_DIRECTOR:
       case GameModes.COOP:
+      case GameModes.FUN:
         return waveIndex === 200;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -411,7 +415,10 @@ export class GameMode implements GameModeConfig {
    */
   isBattleClassicFinalBoss(waveIndex: number): boolean {
     return (
-      (this.modeId === GameModes.CLASSIC || this.modeId === GameModes.CHALLENGE || this.modeId === GameModes.COOP)
+      (this.modeId === GameModes.CLASSIC
+        || this.modeId === GameModes.CHALLENGE
+        || this.modeId === GameModes.COOP
+        || this.modeId === GameModes.FUN)
       && this.isWaveFinal(waveIndex)
     );
   }
@@ -485,6 +492,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
       case GameModes.COOP:
+      case GameModes.FUN:
         return 5000;
       case GameModes.DAILY:
         return 2500;
@@ -503,6 +511,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.LLM_DIRECTOR:
       case GameModes.COOP:
       case GameModes.SHOWDOWN:
+      case GameModes.FUN:
         return isBoss ? chances.classicBoss : chances.classicNonBoss;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -528,6 +537,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
         return i18next.t("gameMode:showdown");
+      case GameModes.FUN:
+        return "Fun Mode";
     }
   }
 
@@ -538,6 +549,7 @@ export class GameMode implements GameModeConfig {
     switch (this.modeId) {
       case GameModes.CLASSIC:
       case GameModes.COOP:
+      case GameModes.FUN:
         return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
       case GameModes.CHALLENGE:
         return CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES;
@@ -576,6 +588,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
         return i18next.t("gameMode:showdown");
+      case GameModes.FUN:
+        return "Fun Mode";
     }
   }
 }
@@ -666,5 +680,17 @@ export function getGameMode(gameMode: GameModes): GameMode {
         hasNoShop: true,
         nonDeterministic: true,
       });
+    case GameModes.FUN:
+      return new GameMode(
+        GameModes.FUN,
+        {
+          isClassic: true,
+          hasTrainers: true,
+          hasMysteryEncounters: true,
+          isFun: true,
+          nonDeterministic: true,
+        },
+        classicFixedBattles,
+      );
   }
 }

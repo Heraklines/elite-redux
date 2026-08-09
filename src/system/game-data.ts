@@ -65,6 +65,7 @@ import {
   restoreErCustomTrainerTracking,
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
+import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import {
   getLastGenericTrainerType,
@@ -1969,6 +1970,7 @@ export class GameData {
       // ER: persist the run difficulty so a reload keeps using the chosen ER
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
+      funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
@@ -5154,6 +5156,13 @@ export class GameData {
     }
 
     globalScene.gameMode = getGameMode(fromSession.gameMode || GameModes.CLASSIC);
+    if (globalScene.gameMode.isFun) {
+      if (fromSession.funModeConfig) {
+        setFunModeConfig(fromSession.funModeConfig);
+      } else {
+        resetFunModeConfig();
+      }
+    }
     if (fromSession.challenges) {
       globalScene.gameMode.challenges = fromSession.challenges.map(c => c.toChallenge());
     }
@@ -7205,7 +7214,7 @@ export class GameData {
     // were stockpiled outside the run, so it must NOT inherit the favour bonus —
     // otherwise hatching a backlog of eggs during a trivial high-favour challenge
     // would farm triple candy. Egg hatches still keep the always-on flat 35%.
-    if (count > 0) {
+    if (count > 0 && !globalScene.gameMode.isFun) {
       const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
       // #402: the lower difficulties' dedicated perk is CANDY (Youngster 2x,
       // Ace 1.5x). Run-scoped like favour, so egg-hatch backlogs are excluded.

@@ -2,6 +2,7 @@ import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
 import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
+import type { FunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
@@ -138,6 +139,8 @@ export interface SessionSaveData {
    * backwards compatibility with pre-existing saves (treated as "ace").
    */
   erDifficulty?: ErDifficulty;
+  /** Fun Mode randomizer toggles. Absent on every non-Fun and legacy save. */
+  funModeConfig?: FunModeConfig;
   /**
    * ER: stableKeys of trainers already encountered this run, so the difficulty's
    * trainer pool doesn't repeat across a save/load. Optional for backwards

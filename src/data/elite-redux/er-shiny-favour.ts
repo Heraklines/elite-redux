@@ -87,6 +87,9 @@ export function getChallengeFavour(challenge: Challenge): number {
 
 /** Total favour from all active challenges on the current run. */
 export function getRunShinyFavour(): number {
+  if (globalScene.gameMode?.isFun) {
+    return 0;
+  }
   const challenges = globalScene.gameMode?.challenges ?? [];
   return challenges.reduce((sum, c) => sum + getChallengeFavour(c), 0);
 }

@@ -4982,8 +4982,8 @@ export const ER_ABILITIES: readonly ErAbilityDraft[] = [
   },
   {
     "id": 828,
-    "name": "Overzealous (N)",
-    "description": "User's super-effective moves have +1 prio.",
+    "name": "Overzealous",
+    "description": "Gives +1 priority to the user's super-effective moves.",
     "archetype": "unknown"
   },
   {

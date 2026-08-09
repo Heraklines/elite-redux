@@ -812,7 +812,6 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.KLUTZ, 4, 1) //
-      .unimplemented()
       .build(),
     new AbBuilder(AbilityId.MOLD_BREAKER, 4) //
       .attr(PostSummonMessageAbAttr, (pokemon: Pokemon) =>
@@ -1287,7 +1286,6 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.SYMBIOSIS, 6) //
-      .unimplemented()
       .build(),
     new AbBuilder(AbilityId.TOUGH_CLAWS, 6) //
       .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.MAKES_CONTACT), 1.3)

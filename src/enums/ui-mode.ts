@@ -88,4 +88,6 @@ export enum UiMode {
   TOURNAMENT_BRACKET,
   /** Showdown Sync: the guest commands its canonical enemy-side team in dual-engine mode. */
   SHOWDOWN_SYNC_COMMAND,
+  /** Fun Mode: configure the run's independent randomizers. */
+  FUN_MODE_SELECT,
 }
