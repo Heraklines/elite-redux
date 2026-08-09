@@ -85,9 +85,21 @@ export function getFunRandomAbilityId(pokemonId: number, slot: number): AbilityI
   if (!currentConfig.randomizeAbilities) {
     return null;
   }
-  const pool = abilityPool();
+  const pool = [...abilityPool()];
   const rerolledId = mix32(pokemonId ^ Math.imul(currentConfig.abilityRerollSeed + 1, 0x85ebca6b));
-  return pool.length > 0 ? pool[deterministicIndex(rerolledId, 0x41 + slot, pool.length)] : null;
+  if (pool.length === 0) {
+    return null;
+  }
+  const normalizedSlot = Math.max(0, Math.floor(slot));
+  let selected = pool[0];
+  for (let index = 0; index <= normalizedSlot; index++) {
+    const poolIndex = deterministicIndex(rerolledId, 0x41 + index, pool.length);
+    selected = pool.splice(poolIndex, 1)[0];
+    if (pool.length === 0) {
+      break;
+    }
+  }
+  return selected;
 }
 
 const FUN_TYPES: readonly PokemonType[] = [
