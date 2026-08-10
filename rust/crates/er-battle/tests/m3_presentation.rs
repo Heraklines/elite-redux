@@ -25,10 +25,11 @@ use er_types::battle_model::{
 };
 use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
 use presentation::{
-    PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY, PresentationCausalEvent,
-    PresentationTransitionInput, ReplacementPresentationInput, TurnPresentationInput,
-    build_presentation_plan, build_replacement_presentation_plan, build_turn_presentation_plan,
-    presentation_event_id_for_position,
+    PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY, PresentationCause,
+    PresentationCausalEvent, PresentationStep, PresentationTransitionInput,
+    ReplacementPresentationInput, TurnPresentationInput, build_presentation_plan,
+    build_replacement_plan, build_replacement_presentation_plan, build_turn_plan,
+    build_turn_presentation_plan, presentation_event_id_for_position,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -177,7 +178,7 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
         )?,
     ];
 
-    let causal_events = vec![
+    let causal_events: Vec<PresentationCause> = vec![
         PresentationCausalEvent::move_used(safe(0)?, player, move_id, vec![enemy_slot]),
         PresentationCausalEvent::mutation(BattleMutation::PpChanged {
             pokemon: player,
@@ -233,12 +234,19 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
         }),
     ];
 
-    let plan = build_turn_presentation_plan(TurnPresentationInput::new(
+    let steps: &[PresentationStep] = &causal_events;
+    let input = TurnPresentationInput::new(
         &operation_id,
         &action_order,
-        &causal_events,
+        steps,
         BattleOutcome::Victory,
-    ))?;
+    );
+    let plan = build_turn_presentation_plan(input.clone())?;
+    let dispatched = build_presentation_plan(PresentationTransitionInput::Turn(input.clone()))?;
+    let compatibility = build_turn_plan(input)?;
+
+    assert_eq!(plan, dispatched);
+    assert_eq!(plan, compatibility);
 
     assert_eq!(
         tags(&plan),
@@ -333,9 +341,12 @@ fn replacement_plan_preserves_switch_ability_stage_terminal_causality() -> TestR
         ReplacementPresentationInput::new(&operation_id, &causal_events, BattleOutcome::Ongoing);
 
     let direct = build_replacement_presentation_plan(input.clone())?;
-    let dispatched = build_presentation_plan(PresentationTransitionInput::Replacement(input))?;
+    let dispatched =
+        build_presentation_plan(PresentationTransitionInput::Replacement(input.clone()))?;
+    let compatibility = build_replacement_plan(input)?;
 
     assert_eq!(direct, dispatched);
+    assert_eq!(direct, compatibility);
     assert_eq!(
         tags(&direct),
         vec![

@@ -58,11 +58,11 @@ fn move_id(value: u64) -> TestResult<MoveId> {
 }
 
 fn turn(value: u64) -> TestResult<TurnIndex> {
-    Ok(TurnIndex::new(safe(value)?))
+    Ok(TurnIndex::new(safe(value)?)?)
 }
 
 fn wave(value: u64) -> TestResult<WaveIndex> {
-    Ok(WaveIndex::new(safe(value)?))
+    Ok(WaveIndex::new(safe(value)?)?)
 }
 
 fn pokemon(

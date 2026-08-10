@@ -20,7 +20,7 @@ use er_content::moves::lookup_move;
 use er_content::pack::selected_type_chart;
 use er_types::battle_ids::MoveId;
 use er_types::battle_model::{
-    BattleStat, MoveEffectDefinition, MoveFlag, PokemonTyping, StatStages, StatusKind, StatusState,
+    MoveEffectDefinition, MoveFlag, PokemonTyping, StatStages, StatusKind, StatusState,
 };
 use serde_json::{Value, json};
 
