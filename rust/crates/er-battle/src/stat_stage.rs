@@ -168,7 +168,7 @@ pub const fn stage_for_stat(stages: &StatStages, stat: BattleStat) -> i8 {
 }
 
 /// Write one canonical stage after a caller has computed a mutation.
-pub const fn set_stage(stages: &mut StatStages, stat: BattleStat, stage: i8) {
+pub fn set_stage(stages: &mut StatStages, stat: BattleStat, stage: i8) {
     let stage = clamp_stage(stage);
     match stat {
         BattleStat::Attack => stages.attack = stage,
