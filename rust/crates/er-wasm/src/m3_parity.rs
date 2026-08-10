@@ -924,23 +924,3 @@ pub fn final_evidence_report_json_wasm(serialized_trace: &str) -> Result<String,
     replay_serialized_trace_json(serialized_trace)
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }
-
-/// Reconstruct and continue every required production pair snapshot from the
-/// exact canonical suite emitted by the hosted native fixture builder.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn continuation_evidence_report_json(
-    serialized_suite: &str,
-) -> Result<String, er_sim::snapshot::m3_continuation::M3ContinuationError> {
-    er_sim::snapshot::m3_continuation::replay_suite_json(serialized_suite)
-}
-
-/// wasm32/Node uses the same typed replay implementation as native; only the
-/// JavaScript error conversion lives at this boundary.
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = replayM3ContinuationSuite)]
-pub fn continuation_evidence_report_json_wasm(
-    serialized_suite: &str,
-) -> Result<String, JsValue> {
-    er_sim::snapshot::m3_continuation::replay_suite_json(serialized_suite)
-        .map_err(|error| JsValue::from_str(&error.to_string()))
-}
