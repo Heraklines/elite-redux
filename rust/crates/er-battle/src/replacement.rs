@@ -10,6 +10,7 @@ use er_state::field::FieldStateError;
 use er_state::format::{FormatTopologyError, owner_seat_for, validate_slot};
 use er_state::pokemon::PokemonState;
 use er_types::OperationId;
+use er_types::SeatId;
 use er_types::battle_command::{
     BattleCommandError, OfferedSwitchCommand, ReplacementSelection,
     validate_replacement_operation_id,
@@ -18,7 +19,6 @@ use er_types::battle_ids::{
     BattleId, BattleSide, FaintOccurrenceId, FieldSlot, PartyIndex, PokemonId,
 };
 use er_types::battle_model::{FaintOccurrence, FaintSource, ReplacementProgress};
-use er_types::SeatId;
 use thiserror::Error;
 
 use crate::resolver::BattleMutation;
@@ -78,9 +78,7 @@ pub enum ReplacementError {
     },
     #[error("there is no unresolved faint occurrence")]
     NoUnresolvedOccurrence,
-    #[error(
-        "faint occurrence {requested:?} is not the unresolved queue head {head:?}"
-    )]
+    #[error("faint occurrence {requested:?} is not the unresolved queue head {head:?}")]
     NotQueueHead {
         requested: FaintOccurrenceId,
         head: FaintOccurrenceId,
@@ -106,9 +104,7 @@ pub enum ReplacementError {
     StoredActorNotFainted { occurrence: FaintOccurrenceId },
     #[error("replacement party slot {party_slot:?} is absent")]
     CandidatePartySlotMissing { party_slot: PartyIndex },
-    #[error(
-        "replacement party slot {party_slot:?} contains {actual:?}, not selected {expected:?}"
-    )]
+    #[error("replacement party slot {party_slot:?} contains {actual:?}, not selected {expected:?}")]
     CandidatePartyIdentityMismatch {
         party_slot: PartyIndex,
         expected: PokemonId,
@@ -226,7 +222,10 @@ pub fn advance_replacement_progress(
         });
     }
     if before != ReplacementProgress::Pending {
-        return Err(ReplacementError::ProgressNotPending { occurrence, progress: before });
+        return Err(ReplacementError::ProgressNotPending {
+            occurrence,
+            progress: before,
+        });
     }
 
     let candidates = replacement_candidates_for_stored(battle, stored)?;
@@ -261,19 +260,29 @@ pub fn apply_selected_replacement(
     occurrence: FaintOccurrenceId,
     selection: &ReplacementSelection,
 ) -> Result<ReplacementResolution, ReplacementError> {
-    let ReplacementSelection::Selected { party_slot, pokemon } = *selection else {
+    let ReplacementSelection::Selected {
+        party_slot,
+        pokemon,
+    } = *selection
+    else {
         return Err(ReplacementError::NoLegalReplacementExternal);
     };
     let (index, stored) = validate_head(battle, occurrence)?;
     require_player_replacement(stored)?;
     let before = battle.faint_queue[index].replacement;
     if before != ReplacementProgress::Pending {
-        return Err(ReplacementError::ProgressNotPending { occurrence, progress: before });
+        return Err(ReplacementError::ProgressNotPending {
+            occurrence,
+            progress: before,
+        });
     }
     validate_selected_candidate(battle, stored, party_slot, pokemon)?;
     let field_index = field_index_for(battle, stored.field_slot)?;
 
-    let after = ReplacementProgress::Selected { party_slot, pokemon };
+    let after = ReplacementProgress::Selected {
+        party_slot,
+        pokemon,
+    };
     battle.faint_queue[index].replacement = after;
     let before_occupant = battle.field.slots[field_index].occupant;
     battle.field.slots[field_index].occupant = Some(pokemon);
@@ -310,10 +319,11 @@ pub fn resolve_no_legal_replacement(
     let (index, stored) = validate_head(battle, occurrence)?;
     require_player_replacement(stored)?;
     let before = battle.faint_queue[index].replacement;
-    if before != ReplacementProgress::Pending
-        && before != ReplacementProgress::NoLegalReplacement
-    {
-        return Err(ReplacementError::ProgressNotPending { occurrence, progress: before });
+    if before != ReplacementProgress::Pending && before != ReplacementProgress::NoLegalReplacement {
+        return Err(ReplacementError::ProgressNotPending {
+            occurrence,
+            progress: before,
+        });
     }
     if !replacement_candidates_for_stored(battle, stored)?.is_empty() {
         return Err(ReplacementError::LegalReplacementExists);
@@ -500,7 +510,11 @@ fn validate_stored_occurrence(
         owner_seat: occurrence.owner_seat,
         replacement: occurrence.replacement,
     };
-    if let ReplacementProgress::Selected { party_slot, pokemon } = occurrence.replacement {
+    if let ReplacementProgress::Selected {
+        party_slot,
+        pokemon,
+    } = occurrence.replacement
+    {
         validate_selected_candidate(battle, stored, party_slot, pokemon)?;
     }
     if occurrence.replacement == ReplacementProgress::NoLegalReplacement
@@ -570,10 +584,12 @@ fn replacement_candidates_for_stored(
         {
             continue;
         }
-        let index = u8::try_from(index)
-            .map_err(|_| ReplacementError::PartyIndexInvariant { index })?;
-        let party_slot = PartyIndex::new(index)
-            .map_err(|_| ReplacementError::PartyIndexInvariant { index: usize::from(index) })?;
+        let index =
+            u8::try_from(index).map_err(|_| ReplacementError::PartyIndexInvariant { index })?;
+        let party_slot =
+            PartyIndex::new(index).map_err(|_| ReplacementError::PartyIndexInvariant {
+                index: usize::from(index),
+            })?;
         candidates.push(OfferedSwitchCommand::new(party_slot, pokemon.id));
     }
     Ok(candidates)

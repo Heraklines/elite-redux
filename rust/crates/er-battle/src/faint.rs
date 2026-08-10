@@ -70,9 +70,7 @@ pub enum FaintQueueError {
     CandidateSlotMissing { slot: FieldSlot },
     #[error("faint candidate slot {slot:?} is empty")]
     CandidateSlotEmpty { slot: FieldSlot },
-    #[error(
-        "faint candidate Pokémon {pokemon:?} does not occupy its supplied slot {slot:?}"
-    )]
+    #[error("faint candidate Pokémon {pokemon:?} does not occupy its supplied slot {slot:?}")]
     CandidateActorMismatch { slot: FieldSlot, pokemon: PokemonId },
     #[error("faint candidate Pokémon {pokemon:?} is absent from the {side:?} party")]
     CandidatePartyMissing {
@@ -81,9 +79,7 @@ pub enum FaintQueueError {
     },
     #[error("faint candidate Pokémon {pokemon:?} appears more than once in its party")]
     CandidatePartyDuplicate { pokemon: PokemonId },
-    #[error(
-        "faint candidate Pokémon {pokemon:?} has owner {actual:?}, expected {expected:?}"
-    )]
+    #[error("faint candidate Pokémon {pokemon:?} has owner {actual:?}, expected {expected:?}")]
     CandidateOwnerMismatch {
         pokemon: PokemonId,
         actual: Option<SeatId>,
@@ -93,19 +89,14 @@ pub enum FaintQueueError {
     CandidateHpNonZero { pokemon: PokemonId, hp: u32 },
     #[error("faint candidate Pokémon {pokemon:?} is not marked fainted")]
     CandidateNotFainted { pokemon: PokemonId },
-    #[error(
-        "faint candidate Pokémon {pokemon:?} in {slot:?} already has an unresolved occurrence"
-    )]
+    #[error("faint candidate Pokémon {pokemon:?} in {slot:?} already has an unresolved occurrence")]
     CandidateAlreadyQueued { pokemon: PokemonId, slot: FieldSlot },
     #[error("faint occurrence allocator is exhausted at {next:?}")]
     OccurrenceAllocatorExhausted { next: FaintOccurrenceId },
     #[error("faint source turn occurrence overflowed u32")]
     TurnOccurrenceOverflow,
     #[error("faint source wave/turn does not match the current battle")]
-    SourceCoordinateMismatch {
-        wave: WaveIndex,
-        turn: TurnIndex,
-    },
+    SourceCoordinateMismatch { wave: WaveIndex, turn: TurnIndex },
     #[error("faint queue contains duplicate occurrence {id:?}")]
     DuplicateQueueOccurrence { id: FaintOccurrenceId },
     #[error("faint queue contains duplicate unresolved subject {pokemon:?} in {slot:?}")]
@@ -258,12 +249,7 @@ pub fn queue_faint_with_source(
             turn: source.resolved_turn,
         });
     }
-    queue_faint(
-        battle,
-        candidate,
-        source.epoch,
-        source.turn_occurrence,
-    )
+    queue_faint(battle, candidate, source.epoch, source.turn_occurrence)
 }
 
 /// Compatibility spelling used by integration callers that name queue writes
@@ -318,9 +304,7 @@ fn validate_queue_shape(battle: &BattleState) -> Result<(), FaintQueueError> {
                 next: battle.next_faint_occurrence,
             });
         }
-        if occurrence.source.wave != battle.wave
-            || occurrence.source.resolved_turn > battle.turn
-        {
+        if occurrence.source.wave != battle.wave || occurrence.source.resolved_turn > battle.turn {
             return Err(FaintQueueError::SourceCoordinateMismatch {
                 wave: occurrence.source.wave,
                 turn: occurrence.source.resolved_turn,
@@ -487,16 +471,26 @@ fn validate_stored_occurrence(
         | ReplacementProgress::Selected { .. }
         | ReplacementProgress::NoLegalReplacement
         | ReplacementProgress::Applied
-            if occurrence.slot.side == BattleSide::Player && expected_owner.is_some() => true,
+            if occurrence.slot.side == BattleSide::Player && expected_owner.is_some() =>
+        {
+            true
+        }
         ReplacementProgress::NotRequired | ReplacementProgress::Applied
-            if occurrence.slot.side == BattleSide::Enemy && expected_owner.is_none() => true,
+            if occurrence.slot.side == BattleSide::Enemy && expected_owner.is_none() =>
+        {
+            true
+        }
         _ => false,
     };
     if !progress_is_valid {
         return Err(FaintQueueError::InvalidStoredOccurrence { id: occurrence.id });
     }
 
-    if let ReplacementProgress::Selected { party_slot, pokemon } = occurrence.replacement {
+    if let ReplacementProgress::Selected {
+        party_slot,
+        pokemon,
+    } = occurrence.replacement
+    {
         let Some(selected) = party.get(usize::from(party_slot.get())) else {
             return Err(FaintQueueError::InvalidStoredOccurrence { id: occurrence.id });
         };

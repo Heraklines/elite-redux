@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::error::Error;
 
-use er_battle::command::NormalizedBattleCommand;
 use er_battle::ability::WONDER_GUARD_ABILITY_ID;
 use er_battle::ability_pipeline::{
     DefensiveAbilityInput, DefensiveAbilityOutcome, evaluate_defensive_ability,
 };
+use er_battle::command::NormalizedBattleCommand;
 use er_battle::damage::DamageInput;
 use er_battle::move_effect::{
     DefensiveAbilityBlockReason, DefensiveAbilityGate, DefensiveAbilityGateError,
@@ -27,7 +27,7 @@ use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
 use er_state::field::{FieldSlotState, FieldState};
-use er_state::format::BattleFormat;
+use er_state::format::{AdjacencyEdge, BattleFormat};
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusKind, StatusState,
 };
@@ -1767,6 +1767,258 @@ fn target_slot_outside_format_is_typed_and_atomic_before_pp_or_rng() -> TestResu
 }
 
 #[test]
+fn near_other_rejects_empty_and_nonadjacent_targets_before_pp_or_rng() -> TestResult {
+    let content = selected_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[1],
+        0,
+    )?;
+    let enemy_zero = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let enemy_one = pokemon(
+        3,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let rejected_slot = slot(BattleSide::Enemy, 1)?;
+
+    let mut empty = double_battle(actor.clone(), enemy_zero.clone(), enemy_one.clone())?;
+    empty
+        .field
+        .slots
+        .iter_mut()
+        .find(|entry| entry.slot == rejected_slot)
+        .ok_or_else(|| test_error("missing empty-target fixture slot"))?
+        .occupant = None;
+    let before_empty = empty.clone();
+    let mut empty_runtime = runtime_for_seed("empty-near-other-target")?;
+    let before_empty_runtime = empty_runtime.clone();
+    let empty_error = resolve_move(
+        &mut empty,
+        &fight_command(1, vec![rejected_slot])?,
+        &content,
+        &mut empty_runtime,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("empty near-other target unexpectedly resolved"))?;
+    assert!(matches!(
+        empty_error,
+        MovePipelineError::TargetSelection(TargetSelectionError::NearOtherNotCanonical {
+            slot,
+        }) if slot == rejected_slot
+    ));
+    assert_eq!(empty, before_empty);
+    assert_eq!(empty_runtime, before_empty_runtime);
+    assert!(empty_runtime.audit_entries().is_empty());
+
+    let actor_slot = slot(BattleSide::Player, 0)?;
+    let adjacent_target = slot(BattleSide::Enemy, 0)?;
+    let nonadjacent_format = BattleFormat::new(
+        2,
+        2,
+        vec![AdjacencyEdge::new(actor_slot, adjacent_target)?],
+    )?;
+    let mut nonadjacent = battle_with_format(
+        nonadjacent_format,
+        vec![actor],
+        vec![enemy_zero, enemy_one],
+        vec![
+            Some(pokemon_id(1)?),
+            None,
+            Some(pokemon_id(2)?),
+            Some(pokemon_id(3)?),
+        ],
+    )?;
+    let before_nonadjacent = nonadjacent.clone();
+    let mut nonadjacent_runtime = runtime_for_seed("nonadjacent-near-other-target")?;
+    let before_nonadjacent_runtime = nonadjacent_runtime.clone();
+    let nonadjacent_error = resolve_move(
+        &mut nonadjacent,
+        &fight_command(1, vec![rejected_slot])?,
+        &content,
+        &mut nonadjacent_runtime,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("nonadjacent near-other target unexpectedly resolved"))?;
+    assert!(matches!(
+        nonadjacent_error,
+        MovePipelineError::TargetSelection(TargetSelectionError::NearOtherNotCanonical {
+            slot,
+        }) if slot == rejected_slot
+    ));
+    assert_eq!(nonadjacent, before_nonadjacent);
+    assert_eq!(nonadjacent_runtime, before_nonadjacent_runtime);
+    assert!(nonadjacent_runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn near_other_rejects_zero_hp_nonfainted_target_before_pp_or_rng() -> TestResult {
+    let content = selected_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[1],
+        0,
+    )?;
+    let enemy_zero = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let enemy_one = pokemon(
+        3,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let rejected_slot = slot(BattleSide::Enemy, 1)?;
+    let mut battle = double_battle(actor, enemy_zero, enemy_one)?;
+    battle.enemy_party[1].hp = 0;
+    assert!(!battle.enemy_party[1].fainted);
+
+    let before_battle = battle.clone();
+    let mut runtime = runtime_for_seed("zero-hp-near-other-target")?;
+    let before_runtime = runtime.clone();
+    let error = resolve_move(
+        &mut battle,
+        &fight_command(1, vec![rejected_slot])?,
+        &content,
+        &mut runtime,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("zero-HP near-other target unexpectedly resolved"))?;
+    assert!(matches!(
+        error,
+        MovePipelineError::TargetSelection(TargetSelectionError::NearOtherNotCanonical {
+            slot,
+        }) if slot == rejected_slot
+    ));
+    assert_eq!(battle, before_battle);
+    assert_eq!(runtime, before_runtime);
+    assert!(runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn near_other_accepts_one_canonical_adjacent_ally() -> TestResult {
+    let content = selected_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[1],
+        0,
+    )?;
+    let mut ally = pokemon(
+        4,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    ally.owner_seat = Some(SeatId::new(safe(2)?));
+    let enemy_zero = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let enemy_one = pokemon(
+        3,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let ally_slot = slot(BattleSide::Player, 1)?;
+    let mut battle = battle_with_format(
+        BattleFormat::coop_double(),
+        vec![actor, ally],
+        vec![enemy_zero, enemy_one],
+        vec![
+            Some(pokemon_id(1)?),
+            Some(pokemon_id(4)?),
+            Some(pokemon_id(2)?),
+            Some(pokemon_id(3)?),
+        ],
+    )?;
+    let ally_hp_before = battle.player_party[1].hp;
+    let mut runtime = runtime_for_seed("adjacent-ally-near-other")?;
+    let result = resolve_move(
+        &mut battle,
+        &fight_command(1, vec![ally_slot])?,
+        &content,
+        &mut runtime,
+        &NoDefensiveAbilityGate,
+    )?;
+    assert_eq!(result.disposition, MovePipelineDisposition::Executed);
+    assert_eq!(result.targets.len(), 1);
+    assert_eq!(result.targets[0].slot, ally_slot);
+    assert!(battle.player_party[1].hp < ally_hp_before);
+    assert!(result.pp_mutation.is_some());
+    Ok(())
+}
+
+#[test]
 fn incomplete_play_nice_spread_is_typed_and_atomic_before_pp_or_rng() -> TestResult {
     let content = selected_content_pack()?;
     let actor = pokemon(
@@ -1909,17 +2161,11 @@ fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective()
         0,
     )?;
     target.abilities.active = WONDER_GUARD_ABILITY_ID;
-    let mut neutral_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
-    let mut neutral_runtime = runtime_with(
-        "wonder-guard-neutral",
-        PHYSICAL_RUN_STATE,
-        None,
-    )?;
+    let mut neutral_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
+    let mut neutral_runtime = runtime_with("wonder-guard-neutral", PHYSICAL_RUN_STATE, None)?;
+    let neutral_target_before = neutral_battle.enemy_party[0].clone();
+    let neutral_runtime_before = neutral_runtime.clone();
     let neutral_gate = RealAbilityGate { content: &content };
     let neutral = resolve_move(
         &mut neutral_battle,
@@ -1939,6 +2185,15 @@ fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective()
         }
     );
     assert!(neutral_target.hp_mutation.is_none());
+    assert_eq!(neutral_battle.enemy_party[0], neutral_target_before);
+    assert_eq!(
+        neutral_battle.player_party[0].moves[0]
+            .as_ref()
+            .ok_or_else(|| test_error("neutral Wonder Guard actor lost its move slot"))?
+            .pp_used,
+        1
+    );
+    assert_eq!(neutral_runtime, neutral_runtime_before);
     assert!(neutral_runtime.audit_entries().is_empty());
 
     let actor = pokemon(
@@ -1964,17 +2219,10 @@ fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective()
         0,
     )?;
     target.abilities.active = WONDER_GUARD_ABILITY_ID;
-    let mut super_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
-    let mut super_runtime = runtime_with(
-        "wonder-guard-super-effective",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-    )?;
+    let mut super_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
+    let mut super_runtime =
+        runtime_with("wonder-guard-super-effective", ALWAYS_HIT_RUN_STATE, None)?;
     let super_gate = RealAbilityGate { content: &content };
     let super_effective = resolve_move(
         &mut super_battle,
@@ -1984,7 +2232,9 @@ fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective()
         &super_gate,
     )?;
     let [super_target] = super_effective.targets.as_slice() else {
-        return Err(test_error("Wonder Guard super-effective case did not produce one target").into());
+        return Err(
+            test_error("Wonder Guard super-effective case did not produce one target").into(),
+        );
     };
     assert_eq!(super_target.disposition, TargetEffectDisposition::Executed);
     assert_eq!(

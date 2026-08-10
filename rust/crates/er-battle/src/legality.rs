@@ -530,7 +530,7 @@ fn legal_target_selections(
     actor_slot: FieldSlot,
     definition: &MoveDefinition,
 ) -> Vec<BattleTargetSelection> {
-    let candidates = target_candidates(battle, actor_slot, definition.target);
+    let candidates = canonical_target_candidates(battle, actor_slot, definition.target);
     match definition.target {
         MoveTarget::NearOther if candidates.len() == 1 => {
             vec![BattleTargetSelection::Implicit]
@@ -544,17 +544,20 @@ fn legal_target_selections(
     }
 }
 
-fn target_candidates(
+pub(crate) fn canonical_target_candidates(
     battle: &BattleState,
     actor_slot: FieldSlot,
     target_kind: MoveTarget,
 ) -> Vec<FieldSlot> {
-    battle
+    let mut candidates = battle
         .field
         .slots
         .iter()
         .filter_map(|entry| {
-            if entry.slot == actor_slot || !are_adjacent(battle, actor_slot, entry.slot) {
+            if entry.slot == actor_slot
+                || !slot_within_format_capacity(battle, entry.slot)
+                || !are_adjacent(battle, actor_slot, entry.slot)
+            {
                 return None;
             }
             if target_kind == MoveTarget::AllNearEnemies && entry.slot.side == actor_slot.side {
@@ -562,9 +565,19 @@ fn target_candidates(
             }
             let occupant = entry.occupant?;
             let pokemon = find_pokemon(battle, entry.slot.side, occupant)?;
-            (!pokemon.fainted).then_some(entry.slot)
+            (!pokemon.fainted && pokemon.hp > 0).then_some(entry.slot)
         })
-        .collect()
+        .collect::<Vec<_>>();
+    candidates.sort_unstable();
+    candidates
+}
+
+fn slot_within_format_capacity(battle: &BattleState, slot: FieldSlot) -> bool {
+    let capacity = match slot.side {
+        BattleSide::Player => battle.format.player_capacity,
+        BattleSide::Enemy => battle.format.enemy_capacity,
+    };
+    slot.position < capacity
 }
 
 fn are_adjacent(battle: &BattleState, left: FieldSlot, right: FieldSlot) -> bool {
@@ -814,7 +827,7 @@ fn normalize_command_in_battle(
             })?;
             let concrete_targets = match targets {
                 BattleTargetSelection::Implicit => {
-                    target_candidates(battle, field_slot, definition.target)
+                    canonical_target_candidates(battle, field_slot, definition.target)
                 }
                 BattleTargetSelection::Selected(targets) => targets.clone(),
             };

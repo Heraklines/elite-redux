@@ -6,7 +6,7 @@ use er_battle::faint::{
 };
 use er_battle::move_effect::FaintRequest;
 use er_battle::replacement::{
-    ReplacementError, apply_selected_replacement, advance_replacement_progress,
+    ReplacementError, advance_replacement_progress, apply_selected_replacement,
     compute_replacement_progress, resolve_no_legal_replacement, resolve_not_required,
     stored_faint_source, validate_stored_replacement_operation,
 };
@@ -54,11 +54,7 @@ fn living_pokemon(id: u64, owner_seat: Option<SeatId>) -> TestResult<PokemonStat
     pokemon(id, owner_seat, true)
 }
 
-fn pokemon(
-    id: u64,
-    owner_seat: Option<SeatId>,
-    living: bool,
-) -> TestResult<PokemonState> {
+fn pokemon(id: u64, owner_seat: Option<SeatId>, living: bool) -> TestResult<PokemonState> {
     let (hp, fainted) = if living { (100, false) } else { (0, true) };
     Ok(PokemonState::new(
         pokemon_id(id)?,
@@ -231,22 +227,25 @@ fn candidate_adapter_and_checked_queue_allocation_are_atomic() -> TestResult {
     assert_eq!(adapted.slot, battle.faint_queue[0].slot);
     assert_eq!(battle.faint_queue[0].source.epoch, epoch(17)?);
     assert_eq!(battle.faint_queue[0].source.turn_occurrence, 7);
-    assert_eq!(battle.faint_queue[0].replacement, ReplacementProgress::Pending);
-    assert_eq!(battle.faint_queue[0].id, FaintOccurrenceId::ZERO);
-    assert_eq!(battle.next_faint_occurrence, FaintOccurrenceId::new(safe(1)?));
     assert_eq!(
-        battle.field.occupant(&battle.format, slot(BattleSide::Player, 0)?)?,
+        battle.faint_queue[0].replacement,
+        ReplacementProgress::Pending
+    );
+    assert_eq!(battle.faint_queue[0].id, FaintOccurrenceId::ZERO);
+    assert_eq!(
+        battle.next_faint_occurrence,
+        FaintOccurrenceId::new(safe(1)?)
+    );
+    assert_eq!(
+        battle
+            .field
+            .occupant(&battle.format, slot(BattleSide::Player, 0)?)?,
         Some(pokemon_id(1)?)
     );
 
     let before_duplicate = battle.clone();
     assert!(matches!(
-        queue_faint(
-            &mut battle,
-            adapted,
-            epoch(17)?,
-            8,
-        ),
+        queue_faint(&mut battle, adapted, epoch(17)?, 8,),
         Err(FaintQueueError::CandidateAlreadyQueued { .. })
     ));
     assert_eq!(battle, before_duplicate);
@@ -255,12 +254,7 @@ fn candidate_adapter_and_checked_queue_allocation_are_atomic() -> TestResult {
     exhausted.next_faint_occurrence = FaintOccurrenceId::new(SafeU53::MAX);
     let before_exhausted = exhausted.clone();
     assert!(matches!(
-        queue_faint(
-            &mut exhausted,
-            adapted,
-            epoch(17)?,
-            7,
-        ),
+        queue_faint(&mut exhausted, adapted, epoch(17)?, 7,),
         Err(FaintQueueError::OccurrenceAllocatorExhausted { .. })
     ));
     assert_eq!(exhausted, before_exhausted);
@@ -280,12 +274,7 @@ fn candidate_adapter_and_checked_queue_allocation_are_atomic() -> TestResult {
     let mut zero_epoch = single_with_reserve()?;
     let before_zero_epoch = zero_epoch.clone();
     assert!(matches!(
-        queue_faint(
-            &mut zero_epoch,
-            adapted,
-            AuthorityEpoch::ZERO,
-            7,
-        ),
+        queue_faint(&mut zero_epoch, adapted, AuthorityEpoch::ZERO, 7,),
         Err(FaintQueueError::ZeroAuthorityEpoch)
     ));
     assert_eq!(zero_epoch, before_zero_epoch);
@@ -441,7 +430,10 @@ fn supplied_same_and_mixed_side_order_is_causal_and_turn_identity_is_separate() 
             .iter()
             .map(|occurrence| occurrence.id)
             .collect::<Vec<_>>(),
-        vec![FaintOccurrenceId::new(safe(0)?), FaintOccurrenceId::new(safe(1)?)]
+        vec![
+            FaintOccurrenceId::new(safe(0)?),
+            FaintOccurrenceId::new(safe(1)?)
+        ]
     );
     Ok(())
 }
@@ -489,9 +481,15 @@ fn selected_replacement_uses_head_source_and_preserves_tail_and_rng() -> TestRes
     assert_eq!(result.occurrence.replacement, ReplacementProgress::Applied);
     assert_eq!(result.selection, selection);
     assert_eq!(battle.battle_rng, rng_before);
-    assert_eq!(battle.faint_queue[0].replacement, ReplacementProgress::Applied);
+    assert_eq!(
+        battle.faint_queue[0].replacement,
+        ReplacementProgress::Applied
+    );
     assert_eq!(battle.faint_queue[1], tail);
-    assert_eq!(battle.field.occupant(&battle.format, head.slot)?, Some(pokemon_id(2)?));
+    assert_eq!(
+        battle.field.occupant(&battle.format, head.slot)?,
+        Some(pokemon_id(2)?)
+    );
     assert_eq!(
         result.mutations,
         vec![
@@ -508,7 +506,9 @@ fn selected_replacement_uses_head_source_and_preserves_tail_and_rng() -> TestRes
                 before: Some(pokemon_id(1)?),
                 after: Some(pokemon_id(2)?),
             },
-            BattleMutation::FaintResolved { occurrence: head.id },
+            BattleMutation::FaintResolved {
+                occurrence: head.id
+            },
         ]
     );
     Ok(())
@@ -571,14 +571,22 @@ fn stale_nonhead_and_candidate_rejections_are_zero_mutation() -> TestResult {
     assert_eq!(external_no_legal, before_external);
 
     let invalid_candidates = [
-        (PartyIndex::ZERO, pokemon_id(2)?, ReplacementError::CandidatePartyIdentityMismatch {
-            party_slot: PartyIndex::ZERO,
-            expected: pokemon_id(2)?,
-            actual: pokemon_id(1)?,
-        }),
-        (PartyIndex::new(5)?, pokemon_id(2)?, ReplacementError::CandidatePartySlotMissing {
-            party_slot: PartyIndex::new(5)?,
-        }),
+        (
+            PartyIndex::ZERO,
+            pokemon_id(2)?,
+            ReplacementError::CandidatePartyIdentityMismatch {
+                party_slot: PartyIndex::ZERO,
+                expected: pokemon_id(2)?,
+                actual: pokemon_id(1)?,
+            },
+        ),
+        (
+            PartyIndex::new(5)?,
+            pokemon_id(2)?,
+            ReplacementError::CandidatePartySlotMissing {
+                party_slot: PartyIndex::new(5)?,
+            },
+        ),
     ];
     for (party_slot, pokemon, expected) in invalid_candidates {
         let mut invalid = queued.clone();
@@ -674,18 +682,18 @@ fn no_legal_replacement_is_internal_progress_and_clears_slot_in_order() -> TestR
     assert_eq!(result.occurrence.replacement, ReplacementProgress::Applied);
     assert_eq!(battle.battle_rng, rng_before);
     assert_eq!(
-        battle.field.occupant(&battle.format, slot(BattleSide::Player, 0)?)?,
+        battle
+            .field
+            .occupant(&battle.format, slot(BattleSide::Player, 0)?)?,
         None
     );
-    assert_eq!(battle.faint_queue[0].replacement, ReplacementProgress::Applied);
+    assert_eq!(
+        battle.faint_queue[0].replacement,
+        ReplacementProgress::Applied
+    );
     assert_eq!(
         result.mutations,
         vec![
-            BattleMutation::FaintProgressChanged {
-                occurrence: occurrence.id,
-                before: ReplacementProgress::Pending,
-                after: ReplacementProgress::NoLegalReplacement,
-            },
             BattleMutation::FieldChanged {
                 slot: occurrence.slot,
                 before: Some(occurrence.pokemon),
@@ -693,6 +701,34 @@ fn no_legal_replacement_is_internal_progress_and_clears_slot_in_order() -> TestR
             },
             BattleMutation::FaintResolved {
                 occurrence: occurrence.id,
+            },
+        ]
+    );
+
+    let mut direct_battle = single_without_reserve()?;
+    let direct_occurrence = queue_faint(
+        &mut direct_battle,
+        candidate(BattleSide::Player, 0, 1)?,
+        epoch(3)?,
+        4,
+    )?
+    .occurrence;
+    let direct = resolve_no_legal_replacement(&mut direct_battle, direct_occurrence.id)?;
+    assert_eq!(
+        direct.mutations,
+        vec![
+            BattleMutation::FaintProgressChanged {
+                occurrence: direct_occurrence.id,
+                before: ReplacementProgress::Pending,
+                after: ReplacementProgress::NoLegalReplacement,
+            },
+            BattleMutation::FieldChanged {
+                slot: direct_occurrence.slot,
+                before: Some(direct_occurrence.pokemon),
+                after: None,
+            },
+            BattleMutation::FaintResolved {
+                occurrence: direct_occurrence.id,
             },
         ]
     );
@@ -726,7 +762,10 @@ fn enemy_not_required_resolution_is_stored_and_rng_free() -> TestResult {
         battle.field.occupant(&battle.format, occurrence.slot)?,
         None
     );
-    assert_eq!(battle.faint_queue[0].replacement, ReplacementProgress::Applied);
+    assert_eq!(
+        battle.faint_queue[0].replacement,
+        ReplacementProgress::Applied
+    );
     assert_eq!(
         result.mutations,
         vec![
@@ -769,7 +808,9 @@ fn stored_occurrence_validation_rejects_field_party_owner_actor_and_slot_drift()
         6,
     )?
     .occurrence;
-    party_missing.player_party.retain(|pokemon| pokemon.id != occurrence.pokemon);
+    party_missing
+        .player_party
+        .retain(|pokemon| pokemon.id != occurrence.pokemon);
     let before_party_missing = party_missing.clone();
     assert!(matches!(
         stored_faint_source(&party_missing, occurrence.id),

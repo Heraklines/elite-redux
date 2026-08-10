@@ -474,8 +474,8 @@ fn faint_queue_preserves_allocator_causality_and_stored_replacement_truth()
 }
 
 #[test]
-fn faint_queue_rejects_noncanonical_authority_and_unresolved_subjects()
--> Result<(), Box<dyn Error>> {
+fn faint_queue_rejects_noncanonical_authority_and_unresolved_subjects() -> Result<(), Box<dyn Error>>
+{
     let mut state = valid_game()?;
     let battle = state.battle.as_mut().ok_or("missing battle")?;
     battle.player_party[0] = pokemon(17, Some(seat(1)), true)?;

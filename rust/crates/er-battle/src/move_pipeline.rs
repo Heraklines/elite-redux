@@ -17,6 +17,7 @@ use er_types::battle_model::MoveTarget;
 use thiserror::Error;
 
 use crate::command::NormalizedBattleCommand;
+use crate::legality::canonical_target_candidates;
 use crate::move_effect::{
     DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult, resolve_target_effect,
 };
@@ -71,6 +72,8 @@ pub enum TargetSelectionError {
     Empty,
     #[error("near-other move requires exactly one target")]
     NearOtherCount,
+    #[error("near-other target {slot:?} is not one canonical active adjacent candidate")]
+    NearOtherNotCanonical { slot: FieldSlot },
     #[error("all-near-enemies move requires at least one target")]
     AllEnemiesCount,
     #[error("target {slot:?} is outside the battle format capacity")]
@@ -393,11 +396,12 @@ fn validate_targets(
     if move_target == MoveTarget::AllNearEnemies && targets.is_empty() {
         return Err(TargetSelectionError::AllEnemiesCount);
     }
+    let expected = canonical_target_candidates(battle, source_slot, move_target);
     for (index, target) in targets.iter().copied().enumerate() {
         if !slot_within_format_capacity(battle, target) {
             return Err(TargetSelectionError::SlotOutsideCapacity { slot: target });
         }
-        if target.side == actor_side {
+        if move_target == MoveTarget::AllNearEnemies && target.side == actor_side {
             return Err(TargetSelectionError::SameSide { slot: target });
         }
         if targets[..index].contains(&target) {
@@ -409,13 +413,20 @@ fn validate_targets(
             return Err(TargetSelectionError::NonCanonicalOrder);
         }
     }
-    if move_target == MoveTarget::AllNearEnemies {
-        let expected = canonical_active_opposing_targets(battle, source_slot);
-        if expected.is_empty() {
-            return Err(TargetSelectionError::AllEnemiesCount);
+    match move_target {
+        MoveTarget::NearOther => {
+            let target = targets[0];
+            if !expected.contains(&target) {
+                return Err(TargetSelectionError::NearOtherNotCanonical { slot: target });
+            }
         }
-        if targets != expected.as_slice() {
-            return Err(TargetSelectionError::AllEnemiesNotCanonical);
+        MoveTarget::AllNearEnemies => {
+            if expected.is_empty() {
+                return Err(TargetSelectionError::AllEnemiesCount);
+            }
+            if targets != expected.as_slice() {
+                return Err(TargetSelectionError::AllEnemiesNotCanonical);
+            }
         }
     }
     Ok(())
@@ -427,38 +438,6 @@ fn slot_within_format_capacity(battle: &BattleState, slot: FieldSlot) -> bool {
         er_types::battle_ids::BattleSide::Enemy => battle.format.enemy_capacity,
     };
     slot.position < capacity
-}
-
-fn canonical_active_opposing_targets(
-    battle: &BattleState,
-    source_slot: FieldSlot,
-) -> Vec<FieldSlot> {
-    let mut candidates = battle
-        .field
-        .slots
-        .iter()
-        .filter_map(|entry| {
-            let target_slot = entry.slot;
-            if target_slot.side == source_slot.side
-                || !slot_within_format_capacity(battle, target_slot)
-                || !are_adjacent(battle, source_slot, target_slot)
-            {
-                return None;
-            }
-            let target_id = entry.occupant?;
-            let target = find_pokemon(battle, target_slot, target_id)?;
-            (!target.fainted && target.hp > 0).then_some(target_slot)
-        })
-        .collect::<Vec<_>>();
-    candidates.sort_unstable();
-    candidates
-}
-
-fn are_adjacent(battle: &BattleState, left: FieldSlot, right: FieldSlot) -> bool {
-    battle.format.adjacency.iter().any(|edge| {
-        (edge.first == left && edge.second == right)
-            || (edge.first == right && edge.second == left)
-    })
 }
 
 fn deduct_pp(
