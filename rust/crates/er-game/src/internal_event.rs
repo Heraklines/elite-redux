@@ -41,6 +41,14 @@ impl CausalIdentity {
             control_id,
         }
     }
+
+    pub(crate) fn operation_id(&self) -> Option<&OperationId> {
+        self.operation_id.as_ref()
+    }
+
+    pub(crate) fn control_id(&self) -> Option<&str> {
+        self.control_id.as_deref()
+    }
 }
 
 /// Private semantic work requested from the game reducer.
@@ -145,6 +153,10 @@ impl UiEventPayload {
             action: BattleUiAction::Cancel { control_id },
         }
     }
+
+    pub(crate) fn into_parts(self) -> (SeatId, MenuInstanceId, BattleUiAction) {
+        (self.endpoint, self.menu_instance_id, self.action)
+    }
 }
 
 /// A game reducer request with its causal identity.
@@ -162,6 +174,10 @@ pub struct GameEventPayload {
 impl GameEventPayload {
     pub(crate) fn new(intent: GameIntent, causal: CausalIdentity) -> Self {
         Self { intent, causal }
+    }
+
+    pub(crate) fn into_parts(self) -> (GameIntent, CausalIdentity) {
+        (self.intent, self.causal)
     }
 }
 
