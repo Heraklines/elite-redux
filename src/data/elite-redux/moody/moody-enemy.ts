@@ -1,23 +1,14 @@
 import { globalScene } from "#app/global-scene";
-import { MOODY_BOONS } from "#data/elite-redux/moody/moody-catalog.generated";
-import { getMoodyBoonBudget, getMoodyModeState } from "#data/elite-redux/moody/moody-state";
+import { getMoodyBoonBudget, getMoodyModeState, rollMoodyBoonDefinition } from "#data/elite-redux/moody/moody-state";
 import type {
   MoodyBoonDefinition,
   MoodyBoonInstance,
   MoodyBoonTarget,
   MoodyEnemyBoonLoadout,
-  MoodyRarity,
 } from "#data/elite-redux/moody/moody-types";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
-
-const RARITY_WEIGHTS: Readonly<Record<MoodyRarity, number>> = {
-  great: 52,
-  ultra: 30,
-  rogue: 14,
-  master: 4,
-};
 
 let currentEnemyLoadout: MoodyEnemyBoonLoadout | null = null;
 
@@ -33,20 +24,6 @@ function mix32(value: number): number {
 
 function seededUnit(seed: number, salt: number): number {
   return mix32(seed ^ Math.imul(salt + 1, 0x9e3779b1)) / 0x1_0000_0000;
-}
-
-function rollDefinition(seed: number, salt: number): MoodyBoonDefinition {
-  const definitions: readonly MoodyBoonDefinition[] = MOODY_BOONS;
-  const catalog = definitions.filter(boon => boon.implementationStatus !== "blocked");
-  const total = catalog.reduce((sum, boon) => sum + RARITY_WEIGHTS[boon.rarity], 0);
-  let roll = seededUnit(seed, salt) * total;
-  for (const boon of catalog) {
-    roll -= RARITY_WEIGHTS[boon.rarity];
-    if (roll < 0) {
-      return boon;
-    }
-  }
-  return catalog.at(-1)!;
 }
 
 function bst(pokemon: Pokemon): number {
@@ -216,7 +193,7 @@ export function generateMoodyEnemyBoonLoadout(party: readonly Pokemon[], waveInd
   const boons: MoodyBoonInstance[] = [];
   const seed = mix32(state.seed ^ Math.imul(waveIndex + 1, 0x85ebca6b));
   for (let roll = 0; roll < budget; roll++) {
-    const definition = rollDefinition(seed, roll);
+    const definition = rollMoodyBoonDefinition(seed, roll)!;
     const existing = boons.find(boon => boon.boonId === definition.id);
     if (existing == null) {
       const target = assignTarget(definition, party);

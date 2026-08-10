@@ -21,7 +21,10 @@ import {
 } from "#data/elite-redux/coop/coop-shop-check-relay";
 import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
+import { getMoodyBoonsForPokemon, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
+import type { MoodyBoonInstance, MoodyRarity } from "#data/elite-redux/moody/moody-types";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { Button } from "#enums/buttons";
@@ -104,6 +107,94 @@ export function resolveItemManageVerticalCursor(
 }
 
 const defaultMessage = i18next.t("partyUiHandler:choosePokemon");
+
+const MOODY_RARITY_COLORS: Readonly<Record<MoodyRarity, number>> = {
+  great: 0x4aa3ff,
+  ultra: 0xf4d44d,
+  rogue: 0xd94b64,
+  master: 0xb96cff,
+};
+
+const MOODY_RARITY_PRIORITY: Readonly<Record<MoodyRarity, number>> = {
+  great: 0,
+  ultra: 1,
+  rogue: 2,
+  master: 3,
+};
+
+export interface MoodyPartySlotIndicator {
+  rarity: MoodyRarity;
+  color: number;
+}
+
+export interface MoodyPartySlotPresentation {
+  indicators: MoodyPartySlotIndicator[];
+  overflow: number;
+  summary: string;
+}
+
+function truncateMoodyLabel(label: string, maxLength: number): string {
+  return label.length <= maxLength ? label : `${label.slice(0, Math.max(1, maxLength - 3)).trimEnd()}...`;
+}
+
+/** Build the compact party-card representation from the live Moody catalog. */
+export function buildMoodyPartySlotPresentation(
+  boons: readonly MoodyBoonInstance[],
+): MoodyPartySlotPresentation | null {
+  const entries = boons
+    .map(boon => {
+      const definition = MOODY_BOON_BY_ID.get(boon.boonId);
+      if (definition == null) {
+        return null;
+      }
+      const evolution =
+        boon.evolutionId == null ? null : definition.evolutions.find(candidate => candidate.id === boon.evolutionId);
+      const label = evolution?.name ?? `${definition.name}${boon.rank === 2 ? " II" : boon.rank === 3 ? " III" : ""}`;
+      return { boon, definition, label };
+    })
+    .filter(entry => entry != null)
+    .toSorted(
+      (left, right) =>
+        MOODY_RARITY_PRIORITY[right.definition.rarity] - MOODY_RARITY_PRIORITY[left.definition.rarity]
+        || left.boon.acquiredAtWave - right.boon.acquiredAtWave,
+    );
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const visibleCount = entries.length > 3 ? 2 : entries.length;
+  const indicators = entries.slice(0, visibleCount).map(({ definition }) => ({
+    rarity: definition.rarity,
+    color: MOODY_RARITY_COLORS[definition.rarity],
+  }));
+  const overflow = entries.length - visibleCount;
+
+  const summaryParts: string[] = [];
+  for (const entry of entries) {
+    const candidate = truncateMoodyLabel(entry.label, 26);
+    const withCandidate = `Boons: ${[...summaryParts, candidate].join(", ")}`;
+    if (withCandidate.length > 40 && summaryParts.length > 0) {
+      break;
+    }
+    summaryParts.push(candidate);
+    if (withCandidate.length >= 34) {
+      break;
+    }
+  }
+  const hiddenSummaryCount = entries.length - summaryParts.length;
+  const summary = `Boons: ${summaryParts.join(", ")}${hiddenSummaryCount > 0 ? ` +${hiddenSummaryCount}` : ""}`;
+
+  return { indicators, overflow, summary };
+}
+
+export function getMoodyPartySlotPresentation(
+  pokemonId: number,
+  partySlot: number,
+  enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode,
+): MoodyPartySlotPresentation | null {
+  return enabled ? buildMoodyPartySlotPresentation(getMoodyBoonsForPokemon(pokemonId, partySlot)) : null;
+}
 
 /**
  * Co-op (#633): decode a `COOP_CHECK_OP_*` op code to a stable, greppable name for the
@@ -1567,6 +1658,14 @@ export class PartyUiHandler extends MessageUiHandler {
       if (this.fusionPreviewActive) {
         this.updateFusionPreview();
       }
+      if (
+        globalScene.gameMode?.isFun === true
+        && getFunModeConfig().moodyMode
+        && !this.transferMode
+        && !this.fusionPreviewActive
+      ) {
+        this.showPartyText();
+      }
     }
     return changed;
   }
@@ -1680,17 +1779,37 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   showPartyText() {
+    const focusedPokemon =
+      this.cursor >= 0 && this.cursor < this.partySlots.length ? this.partySlots[this.cursor].getPokemon() : null;
+    const presentation = focusedPokemon == null ? null : getMoodyPartySlotPresentation(focusedPokemon.id, this.cursor);
+
+    if (presentation == null) {
+      switch (this.partyUiMode) {
+        case PartyUiMode.MODIFIER_TRANSFER:
+          this.showText(i18next.t("partyUiHandler:partyTransfer"));
+          return;
+        case PartyUiMode.DISCARD:
+          this.showText(i18next.t("partyUiHandler:partyDiscard"));
+          return;
+        default:
+          this.showText("", 0);
+          return;
+      }
+    }
+
+    let text = "";
     switch (this.partyUiMode) {
       case PartyUiMode.MODIFIER_TRANSFER:
-        this.showText(i18next.t("partyUiHandler:partyTransfer"));
+        text = i18next.t("partyUiHandler:partyTransfer");
         break;
       case PartyUiMode.DISCARD:
-        this.showText(i18next.t("partyUiHandler:partyDiscard"));
-        break;
-      default:
-        this.showText("", 0);
+        text = i18next.t("partyUiHandler:partyDiscard");
         break;
     }
+
+    text = text.length > 0 ? `${text}\n${presentation.summary}` : presentation.summary;
+
+    this.showText(text, 0);
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -2626,6 +2745,27 @@ class PartySlot extends Phaser.GameObjects.Container {
           .setPosition(shinyStar.x, shinyStar.y)
           .setTint(getVariantTint(this.pokemon.fusionVariant));
         slotInfoContainer.add(fusionShinyStar);
+      }
+    }
+
+    const moodyPresentation = getMoodyPartySlotPresentation(this.pokemon.id, this.slotIndex);
+    if (moodyPresentation != null) {
+      let indicatorRight = this.slotBg.displayWidth - 3;
+      if (moodyPresentation.overflow > 0) {
+        const overflowText = addTextObject(0, 0, `+${moodyPresentation.overflow}`, TextStyle.PARTY)
+          .setOrigin(1, 0)
+          .setScale(0.67)
+          .setPosition(indicatorRight, 0);
+        slotInfoContainer.add(overflowText);
+        indicatorRight -= overflowText.displayWidth + 2;
+      }
+      for (const indicator of moodyPresentation.indicators) {
+        const marker = globalScene.add
+          .rectangle(indicatorRight, 1, 4, 3, indicator.color)
+          .setOrigin(1, 0)
+          .setStrokeStyle(1, 0x202028);
+        slotInfoContainer.add(marker);
+        indicatorRight -= 5;
       }
     }
 

@@ -4163,6 +4163,11 @@ export class BattleScene extends SceneBase {
 
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
+      if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+        setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(this.getEnemyParty(), this.currentBattle.waveIndex));
+      } else {
+        resetMoodyEnemyBoonLoadout();
+      }
       if (this.currentBattle.isClassicFinalBoss) {
         return resolve();
       }
@@ -4267,11 +4272,6 @@ export class BattleScene extends SceneBase {
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
-      if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
-        setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(party, this.currentBattle.waveIndex));
-      } else {
-        resetMoodyEnemyBoonLoadout();
-      }
       // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
       // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
       // each wild mon's baseline roll to the floor (never reduces a luckier roll).

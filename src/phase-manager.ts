@@ -148,6 +148,7 @@ import { SelectChallengePhase } from "#phases/select-challenge-phase";
 import { SelectFunModePhase } from "#phases/select-fun-mode-phase";
 import { SelectGenderPhase } from "#phases/select-gender-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { SelectMoodyBoonPhase } from "#phases/select-moody-boon-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { SelectTargetPhase } from "#phases/select-target-phase";
 import { ShiftSummonPhase } from "#phases/shift-summon-phase";
@@ -316,6 +317,7 @@ const PHASES = Object.freeze({
   SelectFunModePhase,
   SelectGenderPhase,
   SelectModifierPhase,
+  SelectMoodyBoonPhase,
   SelectStarterPhase,
   SelectTargetPhase,
   ShiftSummonPhase,

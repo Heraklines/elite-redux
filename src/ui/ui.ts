@@ -84,6 +84,8 @@ import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
 import { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
+import { MoodyBoonSelectUiHandler } from "#ui/moody-boon-select-ui-handler";
+import { MoodyLedgerUiHandler } from "#ui/moody-ledger-ui-handler";
 import { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import { NavigationManager } from "#ui/navigation-menu";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
@@ -139,6 +141,10 @@ const transitionModes = [
   UiMode.FUN_MODE_SELECT,
   UiMode.FUN_ABILITY_REVIEW,
   UiMode.RUN_HISTORY,
+  // Moody Mode screens are full-screen reward/ledger surfaces: fade in/out like the
+  // other full-screen transition modes.
+  UiMode.MOODY_BOON_SELECT,
+  UiMode.MOODY_LEDGER,
 ];
 
 const noTransitionModes = [
@@ -300,6 +306,8 @@ export class UI extends Phaser.GameObjects.Container {
       new ShowdownSyncCommandUiHandler(),
       new FunModeSelectUiHandler(),
       new FunAbilityReviewUiHandler(),
+      new MoodyBoonSelectUiHandler(),
+      new MoodyLedgerUiHandler(),
     ];
   }
 

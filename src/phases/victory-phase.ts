@@ -22,7 +22,9 @@ import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tra
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { isMoodyBoonRewardWave } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -335,6 +337,10 @@ export class VictoryPhase extends PokemonPhase {
             false,
             { kind: "wave-boundary" },
           );
+        }
+
+        if (isMoodyBoonRewardWave(currentWaveIndex) && gameMode.isFun && getFunModeConfig().moodyMode) {
+          globalScene.phaseManager.pushNew("SelectMoodyBoonPhase", currentWaveIndex);
         }
 
         if (fireBiomeShop) {

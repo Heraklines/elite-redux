@@ -4,6 +4,8 @@ import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { submitBugReport } from "#data/elite-redux/er-bug-report";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
 import { GameDataType } from "#enums/game-data-type";
@@ -32,6 +34,7 @@ enum MenuOptions {
   COMMUNITY,
   SAVE_AND_QUIT,
   LOG_OUT,
+  MOODY_LEDGER,
   // Showdown 1v1 (D4): concede the duel. Appended LAST so excluding it (every non-showdown context)
   // never shifts another option's index, keeping the processInput adjustedCursor mapping intact.
   FORFEIT,
@@ -92,6 +95,10 @@ export class MenuUiHandler extends MessageUiHandler {
       // A unilateral save-and-title transition destroys only one side of a shared run. Co-op
       // persistence/resume must cross the two-player transaction boundary instead.
       { condition: globalScene.gameMode.isCoop, options: [MenuOptions.SAVE_AND_QUIT] },
+      {
+        condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
+        options: [MenuOptions.MOODY_LEDGER],
+      },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -154,6 +161,10 @@ export class MenuUiHandler extends MessageUiHandler {
         condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
         options: [MenuOptions.FORFEIT],
       },
+      {
+        condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
+        options: [MenuOptions.MOODY_LEDGER],
+      },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -167,7 +178,9 @@ export class MenuUiHandler extends MessageUiHandler {
         .map(o =>
           o === MenuOptions.FORFEIT
             ? i18next.t("menuUiHandler:forfeit", { defaultValue: "Forfeit" })
-            : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
+            : o === MenuOptions.MOODY_LEDGER
+              ? "Moody Ledger"
+              : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
         )
         .join("\n"),
       TextStyle.WINDOW,
@@ -645,6 +658,11 @@ export class MenuUiHandler extends MessageUiHandler {
       // never affects the mapping of any other option).
       if (this.menuOptions[this.cursor] === MenuOptions.FORFEIT) {
         this.forfeitShowdown();
+        ui.playSelect();
+        return true;
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.MOODY_LEDGER) {
+        ui.setOverlayMode(UiMode.MOODY_LEDGER);
         ui.playSelect();
         return true;
       }

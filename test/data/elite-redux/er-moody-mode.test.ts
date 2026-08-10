@@ -6,8 +6,10 @@ import {
   getMoodyBoonOffers,
   getMoodyModeSaveData,
   initializeMoodyModeState,
+  isMoodyBoonRewardWave,
   resetMoodyModeState,
   restoreMoodyModeState,
+  rollMoodyBoonDefinition,
 } from "#data/elite-redux/moody/moody-state";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -31,6 +33,23 @@ describe("Moody Mode catalog", () => {
 });
 
 describe("Moody Mode run state", () => {
+  it("offers one draft at each ten-wave boss boundary", () => {
+    expect([1, 9, 11, 99].some(isMoodyBoonRewardWave)).toBe(false);
+    expect([10, 20, 50, 190].every(isMoodyBoonRewardWave)).toBe(true);
+    expect(isMoodyBoonRewardWave(200)).toBe(false);
+  });
+
+  it("rolls rarity before definitions so catalog counts do not skew the advertised weights", () => {
+    const counts = { great: 0, ultra: 0, rogue: 0, master: 0 };
+    for (let seed = 0; seed < 20_000; seed++) {
+      counts[rollMoodyBoonDefinition(seed, 73)!.rarity]++;
+    }
+    expect(counts.great / 20_000).toBeCloseTo(0.52, 1);
+    expect(counts.ultra / 20_000).toBeCloseTo(0.3, 1);
+    expect(counts.rogue / 20_000).toBeCloseTo(0.14, 1);
+    expect(counts.master / 20_000).toBeCloseTo(0.04, 1);
+  });
+
   it("generates a stable three-card boss draft for one seed and wave", () => {
     initializeMoodyModeState("stable-seed");
     const first = structuredClone(getMoodyBoonOffers(10));

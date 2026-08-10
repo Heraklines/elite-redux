@@ -14,6 +14,10 @@ const MOODY_STATE_VERSION = 1 as const;
 const MAX_UNIQUE_BOONS = 12;
 const UPGRADE_FOCUS_THRESHOLD = 8;
 
+export function isMoodyBoonRewardWave(waveIndex: number): boolean {
+  return Number.isSafeInteger(waveIndex) && waveIndex > 0 && waveIndex < 200 && waveIndex % 10 === 0;
+}
+
 const RARITY_WEIGHTS: Readonly<Record<MoodyRarity, number>> = {
   great: 52,
   ultra: 30,
@@ -210,21 +214,36 @@ export function restoreMoodyModeState(value: unknown): boolean {
   return true;
 }
 
-function weightedDefinition(seed: number, salt: number, excluded: ReadonlySet<string>): MoodyBoonDefinition | null {
+export function rollMoodyBoonDefinition(
+  seed: number,
+  salt: number,
+  excluded: ReadonlySet<string> = new Set(),
+): MoodyBoonDefinition | null {
   const catalog: readonly MoodyBoonDefinition[] = MOODY_BOONS;
   const eligible = catalog.filter(boon => boon.implementationStatus !== "blocked" && !excluded.has(boon.id));
   if (eligible.length === 0) {
     return null;
   }
-  const total = eligible.reduce((sum, boon) => sum + RARITY_WEIGHTS[boon.rarity], 0);
-  let roll = seededUnit(seed, salt) * total;
+
+  const byRarity = new Map<MoodyRarity, MoodyBoonDefinition[]>();
   for (const boon of eligible) {
-    roll -= RARITY_WEIGHTS[boon.rarity];
+    const group = byRarity.get(boon.rarity) ?? [];
+    group.push(boon);
+    byRarity.set(boon.rarity, group);
+  }
+  const availableRarities = (Object.keys(RARITY_WEIGHTS) as MoodyRarity[]).filter(rarity => byRarity.has(rarity));
+  const total = availableRarities.reduce((sum, rarity) => sum + RARITY_WEIGHTS[rarity], 0);
+  let roll = seededUnit(seed, salt) * total;
+  let selectedRarity = availableRarities.at(-1)!;
+  for (const rarity of availableRarities) {
+    roll -= RARITY_WEIGHTS[rarity];
     if (roll < 0) {
-      return boon;
+      selectedRarity = rarity;
+      break;
     }
   }
-  return eligible.at(-1)!;
+  const selectedGroup = byRarity.get(selectedRarity)!;
+  return selectedGroup[Math.floor(seededUnit(seed, salt + 1) * selectedGroup.length) % selectedGroup.length];
 }
 
 function chooseExisting(seed: number, salt: number, candidates: MoodyBoonInstance[]): MoodyBoonInstance | null {
@@ -255,7 +274,7 @@ function makeOffer(
     };
   }
   const owned = new Set(state.boons.map(boon => boon.boonId));
-  const definition = weightedDefinition(state.seed, salt + 2, new Set([...owned, ...excludedBoons]));
+  const definition = rollMoodyBoonDefinition(state.seed, salt + 2, new Set([...owned, ...excludedBoons]));
   if (definition != null) {
     return {
       offerId: `${state.draftIndex}:${cardIndex}:${definition.id}:new`,

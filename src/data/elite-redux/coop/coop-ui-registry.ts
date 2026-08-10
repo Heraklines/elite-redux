@@ -227,6 +227,13 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // Showdown Sync guest command surface: versus-only and driven locally by the guest; only the
   // serialized command crosses the Showdown relay. It is never part of a shared co-op interaction.
   [UiMode.SHOWDOWN_SYNC_COMMAND]: "local-only",
+
+  // Fun Mode "Moody Mode" screens. REVIEW (conservative): the post-boss boon DRAFT is a shared-run
+  // reward surface (like MODIFIER_SELECT) and the co-op owner/watcher wiring is not part of this
+  // bounded UI task - classify "local-only" so the staging tripwire still fires if it leaks into a
+  // partner-owned interaction unmirrored. The LEDGER is a read-only per-client view of run state.
+  [UiMode.MOODY_BOON_SELECT]: "local-only",
+  [UiMode.MOODY_LEDGER]: "local-only",
 };
 
 /**

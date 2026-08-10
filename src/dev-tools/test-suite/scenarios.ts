@@ -46,6 +46,7 @@ import {
   resolveErCustomTrainerMoveIds,
 } from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
+import { DEFAULT_FUN_MODE_CONFIG, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -1550,6 +1551,34 @@ const EASY_ABILITY_ADDITION_SCENARIOS: DevScenario[] = [
 ];
 
 export const DEV_SCENARIOS: DevScenario[] = [
+  {
+    label: "UI: Moody boss draft",
+    description:
+      "Starts a Fun run on wave 10 with only Moody Mode enabled.\n"
+      + "DO: defeat the harmless Magikarp and inspect the three-card boon draft, its long-text paging, targeting, and the Moody Ledger in the pause menu.\n"
+      + "EXPECT: exactly one mandatory draft appears before the biome market; selecting a boon records it in the ledger.",
+    gameMode: GameModes.FUN,
+    setup: () => {
+      resetDevOverrides();
+      setFunModeConfig({
+        ...DEFAULT_FUN_MODE_CONFIG,
+        randomizePokemon: false,
+        randomizeTypes: false,
+        randomizeAbilities: false,
+        randomizeLevelUpMoves: false,
+        moodyMode: true,
+      });
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 1,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.FLAMETHROWER, MoveId.SPLASH] })];
+    },
+  },
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
   ...EASY_ABILITY_ADDITION_SCENARIOS,
