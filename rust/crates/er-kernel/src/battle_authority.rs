@@ -470,12 +470,12 @@ pub(crate) fn prepare_authority_replacement(
                     vec![proposal],
                 ),
                 ReplacementAdmissionResult::Duplicate { .. } => {
-                    // An exact duplicate does not initiate a second resolver
-                    // or revision.  The caller should return its existing
-                    // staged stage rather than call this preparation again.
-                    return Err(AuthorityTransactionError::Duplicate {
-                        operation_id: proposal.operation_id,
-                    });
+                    // GameRuntime is the sole mutable fingerprint owner and
+                    // records the accepted replacement before emitting its
+                    // prepared resolver candidate. Seeing that exact
+                    // fingerprint here is therefore the expected read-only
+                    // proof, not a request to resolve a duplicate input.
+                    (proposal.selection, proposal.occurrence, vec![proposal])
                 }
             }
         }
