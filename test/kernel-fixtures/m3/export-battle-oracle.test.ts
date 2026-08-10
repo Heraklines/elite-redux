@@ -3095,7 +3095,14 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   await admitEnemyCommands(game, id);
   const rawCommitted = JSON.parse(JSON.stringify(game.scene.currentBattle.turnCommands)) as AnyRecord;
   const admitted = committedCommands(game, rawCommitted, trace);
-  await game.toEndOfTurn();
+  const settledBoundary = await game.phaseInterceptor.toFirst([
+    "TurnEndPhase",
+    "VictoryPhase",
+    "GameOverPhase",
+  ]);
+  if (settledBoundary === "TurnEndPhase") {
+    await game.toEndOfTurn();
+  }
   const recording = endCoopRecording();
   const presentation = presentationPlan(
     recording.events as AnyRecord[],
