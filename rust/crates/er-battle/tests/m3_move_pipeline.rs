@@ -12,9 +12,7 @@ use er_battle::move_pipeline::{
     MovePipelineDisposition, MovePipelineError, TargetSelectionError, WrongCommandKind,
     resolve_move,
 };
-use er_battle::status::{
-    ParalysisActivationOutcome, StatusApplicationOutcome, StatusRejection,
-};
+use er_battle::status::{ParalysisActivationOutcome, StatusApplicationOutcome, StatusRejection};
 use er_content::moves::{MoveDefinition, find_move};
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_rng::audit::RngReason;
@@ -38,14 +36,11 @@ use er_types::{OperationId, SafeU53, SeatId};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const PHYSICAL_RUN_STATE: &str =
-    "!rnd,1,0.3811805066652596,0.9677629834040999,0.4383429931476712";
+const PHYSICAL_RUN_STATE: &str = "!rnd,1,0.3811805066652596,0.9677629834040999,0.4383429931476712";
 const ALWAYS_HIT_RUN_STATE: &str =
     "!rnd,1,0.18032378423959017,0.9995999033562839,0.20317641110159457";
-const POISON_RUN_STATE: &str =
-    "!rnd,1,0.8064481162000448,0.858695080736652,0.13650441309437156";
-const FULL_STOP_RUN_STATE: &str =
-    "!rnd,1,0.6266140460502356,0.847576079890132,0.8177344433497638";
+const POISON_RUN_STATE: &str = "!rnd,1,0.8064481162000448,0.858695080736652,0.13650441309437156";
+const FULL_STOP_RUN_STATE: &str = "!rnd,1,0.6266140460502356,0.847576079890132,0.8177344433497638";
 const FULL_STOP_SAVED_SUBSTREAM: &str =
     "!rnd,1443036,0.583589319139719,0.47671497194096446,0.956423472147435";
 const MISS_SAVED_SUBSTREAM: &str =
@@ -313,7 +308,11 @@ fn direct_effect<G: DefensiveAbilityGate>(
     target: PokemonState,
     runtime: RngRuntime,
     gate: &G,
-) -> TestResult<(er_battle::move_effect::MoveTargetResult, PokemonState, RngRuntime)> {
+) -> TestResult<(
+    er_battle::move_effect::MoveTargetResult,
+    PokemonState,
+    RngRuntime,
+)> {
     let mut target = target;
     let mut runtime = runtime;
     let result = resolve_target_effect(
@@ -417,12 +416,7 @@ fn fight_is_accepted_and_switch_is_typed_wrong_kind_without_mutation() -> TestRe
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let mut runtime = runtime_with("KIWqW1vfLsjwb6GG", PHYSICAL_RUN_STATE, None)?;
     let command = fight_command(1, vec![target_slot()?])?;
     let result = resolve_move(
@@ -457,12 +451,8 @@ fn fight_is_accepted_and_switch_is_typed_wrong_kind_without_mutation() -> TestRe
         &[],
         0,
     )?;
-    let mut switch_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut switch_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = switch_battle.clone();
     let mut switch_runtime = runtime_for_seed("switch-battle")?;
     let before_runtime = switch_runtime.clone();
@@ -558,12 +548,7 @@ fn unusable_pp_rejection_is_typed_and_does_not_consume_rng() -> TestResult {
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = battle.clone();
     let mut runtime = runtime_for_seed("pp-unusable")?;
     let before_runtime = runtime.clone();
@@ -617,12 +602,7 @@ fn paralysis_full_stop_happens_before_pp_and_only_commits_activation_draw() -> T
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = battle.clone();
     let mut runtime = runtime_with(
         "Cr68377BkZCjiHsT",
@@ -686,12 +666,8 @@ fn selected_physical_and_special_damage_execute_and_consume_pp_once() -> TestRes
         &[],
         0,
     )?;
-    let mut physical_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut physical_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let mut physical_runtime = runtime_with("KIWqW1vfLsjwb6GG", PHYSICAL_RUN_STATE, None)?;
     let physical = resolve_move(
         &mut physical_battle,
@@ -702,16 +678,24 @@ fn selected_physical_and_special_damage_execute_and_consume_pp_once() -> TestRes
     )?;
     assert_eq!(physical.disposition, MovePipelineDisposition::Executed);
     assert_eq!(
-        physical.pp_mutation.map(|mutation| (mutation.before, mutation.after)),
+        physical
+            .pp_mutation
+            .map(|mutation| (mutation.before, mutation.after)),
         Some((0, 1))
     );
     let [physical_target] = physical.targets.as_slice() else {
         return Err(test_error("physical move did not produce one target").into());
     };
-    assert_eq!(physical_target.disposition, TargetEffectDisposition::Executed);
+    assert_eq!(
+        physical_target.disposition,
+        TargetEffectDisposition::Executed
+    );
     assert!(physical_target.damage.is_some());
     assert!(physical_target.hp_mutation.is_some());
-    assert_eq!(physical_battle.player_party[0].moves[0].map(|m| m.pp_used), Some(1));
+    assert_eq!(
+        physical_battle.player_party[0].moves[0].map(|m| m.pp_used),
+        Some(1)
+    );
     assert_reasons(
         &physical_runtime,
         &[
@@ -743,12 +727,8 @@ fn selected_physical_and_special_damage_execute_and_consume_pp_once() -> TestRes
         &[],
         0,
     )?;
-    let mut special_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut special_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let mut special_runtime = runtime_with("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None)?;
     let special = resolve_move(
         &mut special_battle,
@@ -829,7 +809,11 @@ fn spread_multiplier_and_crit_variance_order_are_explicit() -> TestResult {
     )?;
     assert_eq!(result.disposition, TargetEffectDisposition::Executed);
     assert!(result.critical.is_some());
-    assert!(result.damage.is_some_and(|damage| damage.variance.is_some()));
+    assert!(
+        result
+            .damage
+            .is_some_and(|damage| damage.variance.is_some())
+    );
     assert_reasons(
         &runtime,
         &[
@@ -893,7 +877,10 @@ fn native_immunity_and_defensive_block_precede_all_later_random_draws() -> TestR
         false,
         &immune_gate,
     )?;
-    assert_eq!(immune.disposition, TargetEffectDisposition::NativeTypeImmune);
+    assert_eq!(
+        immune.disposition,
+        TargetEffectDisposition::NativeTypeImmune
+    );
     assert_eq!(immune_target, before_target);
     assert_eq!(immune_runtime, immune_before_runtime);
     assert!(immune_runtime.audit_entries().is_empty());
@@ -1017,7 +1004,11 @@ fn miss_consumes_only_accuracy_and_always_hit_skips_accuracy() -> TestResult {
         &always_gate,
     )?;
     assert_eq!(always.disposition, TargetEffectDisposition::Executed);
-    assert!(always.accuracy.is_some_and(|accuracy| accuracy.draw().is_none()));
+    assert!(
+        always
+            .accuracy
+            .is_some_and(|accuracy| accuracy.draw().is_none())
+    );
     assert_reasons(
         &always_runtime,
         &[RngReason::CriticalHit, RngReason::DamageVariance],
@@ -1175,17 +1166,7 @@ fn powder_type_and_existing_status_immunities_reject_without_target_mutation() -
         ),
     ];
     for (types, status, expected_reason) in cases {
-        let target = pokemon(
-            2,
-            BattleSide::Enemy,
-            types,
-            status,
-            200,
-            200,
-            0,
-            &[],
-            0,
-        )?;
+        let target = pokemon(2, BattleSide::Enemy, types, status, 200, 200, 0, &[], 0)?;
         let before_target = target.clone();
         let gate = RecordingGate::new(GateBehavior::Block);
         let (result, target, runtime) = direct_effect(
@@ -1382,7 +1363,10 @@ fn inactive_target_skips_without_draw_and_faint_request_has_no_occurrence_identi
         false,
         &NoDefensiveAbilityGate,
     )?;
-    assert_eq!(inactive.disposition, TargetEffectDisposition::SkippedTargetInactive);
+    assert_eq!(
+        inactive.disposition,
+        TargetEffectDisposition::SkippedTargetInactive
+    );
     assert_eq!(inactive_target, target_before);
     assert_eq!(inactive_runtime, inactive_before_runtime);
     assert!(inactive_runtime.audit_entries().is_empty());
@@ -1409,12 +1393,7 @@ fn inactive_target_skips_without_draw_and_faint_request_has_no_occurrence_identi
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let mut runtime = runtime_with("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None)?;
     let result = resolve_move(
         &mut battle,
@@ -1470,12 +1449,7 @@ fn unsupported_move_and_invalid_content_fail_closed_with_typed_errors() -> TestR
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = battle.clone();
     let mut runtime = runtime_for_seed("unsupported-move")?;
     let before_runtime = runtime.clone();
@@ -1520,12 +1494,8 @@ fn unsupported_move_and_invalid_content_fail_closed_with_typed_errors() -> TestR
     )?;
     let mut invalid_content = content.clone();
     invalid_content.schema_version = 0;
-    let mut invalid_battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut invalid_battle =
+        single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let invalid_before_battle = invalid_battle.clone();
     let mut invalid_runtime = runtime_for_seed("invalid-content")?;
     let invalid_before_runtime = invalid_runtime.clone();
@@ -1540,12 +1510,10 @@ fn unsupported_move_and_invalid_content_fail_closed_with_typed_errors() -> TestR
     .ok_or_else(|| test_error("invalid content unexpectedly resolved"))?;
     assert!(matches!(
         invalid,
-        MovePipelineError::Content(
-            er_content::pack::ContentPackError::SchemaVersionMismatch {
-                expected: 1,
-                actual: 0,
-            }
-        )
+        MovePipelineError::Content(er_content::pack::ContentPackError::SchemaVersionMismatch {
+            expected: 1,
+            actual: 0,
+        })
     ));
     assert_eq!(invalid_battle, invalid_before_battle);
     assert_eq!(invalid_runtime, invalid_before_runtime);
@@ -1590,7 +1558,10 @@ fn unsupported_move_and_invalid_content_fail_closed_with_typed_errors() -> TestR
     )
     .err()
     .ok_or_else(|| test_error("invalid move definition unexpectedly resolved"))?;
-    assert!(matches!(direct, MoveEffectError::InvalidMoveDefinition { .. }));
+    assert!(matches!(
+        direct,
+        MoveEffectError::InvalidMoveDefinition { .. }
+    ));
     assert_eq!(target, target_before);
     assert_eq!(direct_runtime, direct_before_runtime);
     Ok(())
@@ -1621,12 +1592,7 @@ fn defensive_gate_error_is_typed_and_atomic_for_battle_and_rng() -> TestResult {
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = battle.clone();
     let mut runtime = runtime_with("KIWqW1vfLsjwb6GG", PHYSICAL_RUN_STATE, None)?;
     let before_runtime = runtime.clone();
@@ -1680,12 +1646,7 @@ fn target_selection_failure_is_typed_and_atomic_before_pp_or_rng() -> TestResult
         &[],
         0,
     )?;
-    let mut battle = single_battle(
-        actor,
-        target,
-        Some(pokemon_id(1)?),
-        Some(pokemon_id(2)?),
-    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
     let before_battle = battle.clone();
     let mut runtime = runtime_for_seed("empty-targets")?;
     let before_runtime = runtime.clone();

@@ -274,13 +274,7 @@ fn source_slot_validation_rejects_malformed_empty_and_actor_mismatch() -> TestRe
 
 #[test]
 fn malformed_field_rejects_duplicates_order_and_closure_without_mutation() -> TestResult {
-    let command = switch_command(
-        "malformed-field",
-        1,
-        slot(BattleSide::Player, 0)?,
-        1,
-        2,
-    )?;
+    let command = switch_command("malformed-field", 1, slot(BattleSide::Player, 0)?, 1, 2)?;
 
     let mut duplicate_slot = single_battle()?;
     let first_slot = duplicate_slot.field.slots[0].slot;
@@ -400,13 +394,7 @@ fn incoming_party_identity_owner_and_faint_state_are_revalidated() -> TestResult
 
 #[test]
 fn incoming_already_on_any_field_slot_is_rejected_without_mutation() -> TestResult {
-    let command = switch_command(
-        "already-fielded",
-        1,
-        slot(BattleSide::Player, 0)?,
-        1,
-        2,
-    )?;
+    let command = switch_command("already-fielded", 1, slot(BattleSide::Player, 0)?, 1, 2)?;
     let mut battle = single_battle()?;
     battle.field.slots[1].occupant = Some(pokemon_id(2)?);
     assert_rejected(battle, &command, |error| {

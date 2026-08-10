@@ -9,9 +9,7 @@
 use er_content::abilities::find_ability;
 use er_content::pack::{ContentPack, ContentPackError};
 use er_types::battle_ids::AbilityId;
-use er_types::battle_model::{
-    AbilityEffectDefinition, CapabilityStatus, UnsupportedReasonCode,
-};
+use er_types::battle_model::{AbilityEffectDefinition, CapabilityStatus, UnsupportedReasonCode};
 use er_types::ids::SafeU53;
 use thiserror::Error;
 
@@ -131,9 +129,8 @@ pub fn resolve_ability(
         .validate()
         .map_err(|source| AbilityError::InvalidContentPack { source })?;
 
-    let definition = find_ability(&content.abilities, ability_id).map_err(|_| {
-        unsupported(ability_id, AbilityUnsupportedReason::Missing)
-    })?;
+    let definition = find_ability(&content.abilities, ability_id)
+        .map_err(|_| unsupported(ability_id, AbilityUnsupportedReason::Missing))?;
 
     if let CapabilityStatus::Unsupported { reason_code } = &definition.capability {
         return Err(unsupported(
@@ -145,10 +142,7 @@ pub fn resolve_ability(
     }
 
     definition.validate().map_err(|source| {
-        unsupported(
-            ability_id,
-            AbilityUnsupportedReason::Definition { source },
-        )
+        unsupported(ability_id, AbilityUnsupportedReason::Definition { source })
     })?;
 
     Ok(ResolvedAbility {

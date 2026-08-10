@@ -5,9 +5,7 @@
 //! already-composed B04 type result, and receives semantic ability evidence
 //! that it may adapt into its own state mutations and presentation plan.
 
-use crate::ability::{
-    AbilityError, AbilitySuppressionReason, ResolvedAbility, resolve_ability,
-};
+use crate::ability::{AbilityError, AbilitySuppressionReason, ResolvedAbility, resolve_ability};
 use crate::stat_stage::{StatStageMutation, stage_mutation};
 use crate::type_effectiveness::TypeEffectiveness;
 use er_content::pack::ContentPack;
@@ -113,8 +111,7 @@ impl DefensiveAbilityOutcome {
     pub const fn blocked_type_effectiveness(self) -> Option<TypeEffectiveness> {
         match self {
             Self::Blocked {
-                type_effectiveness,
-                ..
+                type_effectiveness, ..
             } => Some(type_effectiveness),
             Self::Passed { .. } => None,
         }
@@ -472,12 +469,10 @@ fn evaluate_defensive_resolved(
     }
 
     match resolved.effect {
-        AbilityEffectDefinition::None => {
-            DefensiveAbilityOutcome::Passed {
-                ability_id: resolved.ability_id,
-                reason: DefensiveAbilityPassReason::None,
-            }
-        }
+        AbilityEffectDefinition::None => DefensiveAbilityOutcome::Passed {
+            ability_id: resolved.ability_id,
+            reason: DefensiveAbilityPassReason::None,
+        },
         AbilityEffectDefinition::PostSummonAdjacentOpponentAttackMinusOne => {
             DefensiveAbilityOutcome::Passed {
                 ability_id: resolved.ability_id,

@@ -25,15 +25,11 @@ use er_state::conditions::{
 };
 use er_state::field::{FieldSlotState, FieldState, FieldStateError};
 use er_state::format::BattleFormat;
-use er_state::pokemon::{
-    AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState,
-};
+use er_state::pokemon::{AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState};
 use er_types::battle_ids::{
     AbilityId, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, PokemonId, TurnIndex, WaveIndex,
 };
-use er_types::battle_model::{
-    MoveCategory, PokemonType, PokemonTyping, StatusKind,
-};
+use er_types::battle_model::{MoveCategory, PokemonType, PokemonTyping, StatusKind};
 use er_types::{SafeU53, SeatId};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -124,20 +120,8 @@ fn ability_battle(
     enemy_attack_stages: [i8; 2],
     source_occupant: Option<PokemonId>,
 ) -> TestResult<BattleState> {
-    let source = pokemon(
-        content,
-        1,
-        BattleSide::Player,
-        source_ability,
-        0,
-    )?;
-    let ally = pokemon(
-        content,
-        2,
-        BattleSide::Player,
-        NONE_ABILITY_ID,
-        0,
-    )?;
+    let source = pokemon(content, 1, BattleSide::Player, source_ability, 0)?;
+    let ally = pokemon(content, 2, BattleSide::Player, NONE_ABILITY_ID, 0)?;
     let enemy_zero = pokemon(
         content,
         3,
@@ -279,7 +263,11 @@ fn wonder_guard_uses_composed_native_effectiveness_and_status_bypass() -> TestRe
     ));
     assert!(matches!(
         evaluate_defensive_ability(
-            defensive_input(WONDER_GUARD_ABILITY_ID, MoveCategory::Special, super_effective),
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Special,
+                super_effective
+            ),
             &content,
         )?,
         DefensiveAbilityOutcome::Passed {
@@ -313,7 +301,11 @@ fn wonder_guard_uses_composed_native_effectiveness_and_status_bypass() -> TestRe
     assert_eq!(composed_neutral.multiplier, EffectivenessMultiplier::One);
     assert!(
         evaluate_defensive_ability(
-            defensive_input(WONDER_GUARD_ABILITY_ID, MoveCategory::Physical, composed_neutral),
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Physical,
+                composed_neutral
+            ),
             &content,
         )?
         .is_blocked()
@@ -330,7 +322,11 @@ fn wonder_guard_uses_composed_native_effectiveness_and_status_bypass() -> TestRe
     assert_eq!(composed_four.multiplier, EffectivenessMultiplier::Four);
     assert!(
         evaluate_defensive_ability(
-            defensive_input(WONDER_GUARD_ABILITY_ID, MoveCategory::Physical, composed_four),
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Physical,
+                composed_four
+            ),
             &content,
         )?
         .is_passed()
@@ -445,14 +441,12 @@ fn intimidate_uses_post_occupancy_canonical_adjacency_and_opponent_filter() -> T
     assert!(matches!(outcome, SwitchInOutcome::Triggered { .. }));
     assert_eq!(outcome.target_slots(), &[enemy_zero, enemy_one]);
     assert_eq!(outcome.mutations().len(), 2);
-    assert!(outcome
-        .mutations()
-        .iter()
-        .all(|change| change.mutation.stat == er_types::battle_model::BattleStat::Attack
-            && change.mutation.before == 0
-            && change.mutation.after == -1
-            && change.source_slot == player_zero
-            && change.target_slot != player_one));
+    assert!(outcome.mutations().iter().all(|change| change.mutation.stat
+        == er_types::battle_model::BattleStat::Attack
+        && change.mutation.before == 0
+        && change.mutation.after == -1
+        && change.source_slot == player_zero
+        && change.target_slot != player_one));
     assert_eq!(outcome.mutations()[0].target, pokemon_id(3)?);
     assert_eq!(outcome.mutations()[1].target, pokemon_id(4)?);
     Ok(())
@@ -483,11 +477,7 @@ fn intimidate_clamps_and_reports_no_mutation_at_the_attack_floor() -> TestResult
         [-6, -6],
         Some(pokemon_id(1)?),
     )?;
-    let floor = evaluate_switch_in(
-        &floor_battle,
-        slot(BattleSide::Player, 0)?,
-        &content,
-    )?;
+    let floor = evaluate_switch_in(&floor_battle, slot(BattleSide::Player, 0)?, &content)?;
     assert!(matches!(floor, SwitchInOutcome::NoMutation { .. }));
     assert_eq!(floor.target_slots().len(), 2);
     assert!(!floor.has_mutation());

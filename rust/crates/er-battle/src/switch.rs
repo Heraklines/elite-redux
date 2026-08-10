@@ -46,9 +46,7 @@ pub enum SwitchError {
     #[error("switch source slot {slot:?} is empty")]
     SourceSlotEmpty { slot: FieldSlot },
     /// The normalized actor must equal the source slot's current occupant.
-    #[error(
-        "switch actor {actor:?} does not match source slot {slot:?} occupant {occupant:?}"
-    )]
+    #[error("switch actor {actor:?} does not match source slot {slot:?} occupant {occupant:?}")]
     ActorMismatch {
         slot: FieldSlot,
         actor: PokemonId,
@@ -60,9 +58,7 @@ pub enum SwitchError {
     ActiveActorMissing { actor: PokemonId, side: BattleSide },
     /// The active actor's owner must be the canonical owner of its source
     /// position.
-    #[error(
-        "active actor {actor:?} on {slot:?} has owner {actual:?}, expected {expected:?}"
-    )]
+    #[error("active actor {actor:?} on {slot:?} has owner {actual:?}, expected {expected:?}")]
     ActiveOwnerMismatch {
         slot: FieldSlot,
         actor: PokemonId,
@@ -105,7 +101,10 @@ pub enum SwitchError {
     /// A destination already occupying any field slot cannot be installed a
     /// second time.
     #[error("incoming Pokémon {incoming:?} already occupies field slot {slot:?}")]
-    IncomingAlreadyOnField { incoming: PokemonId, slot: FieldSlot },
+    IncomingAlreadyOnField {
+        incoming: PokemonId,
+        slot: FieldSlot,
+    },
 }
 
 /// Stable semantic evidence for one successful switch.
@@ -288,12 +287,13 @@ fn validate_switch_command(
     }
 
     let party = party_for_side(battle, field_slot.side);
-    let incoming_state = party
-        .get(usize::from(party_slot.get()))
-        .ok_or(SwitchError::IncomingPartySlotMissing {
-            side: field_slot.side,
-            party_slot: *party_slot,
-        })?;
+    let incoming_state =
+        party
+            .get(usize::from(party_slot.get()))
+            .ok_or(SwitchError::IncomingPartySlotMissing {
+                side: field_slot.side,
+                party_slot: *party_slot,
+            })?;
     if incoming_state.id != *incoming {
         return Err(SwitchError::IncomingPartyIdentityMismatch {
             side: field_slot.side,
@@ -311,7 +311,9 @@ fn validate_switch_command(
         });
     }
     if incoming_state.fainted || incoming_state.hp == 0 {
-        return Err(SwitchError::IncomingFainted { incoming: *incoming });
+        return Err(SwitchError::IncomingFainted {
+            incoming: *incoming,
+        });
     }
     if let Some(entry) = battle
         .field

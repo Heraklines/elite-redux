@@ -11,17 +11,14 @@ use er_content::moves::find_move;
 use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
 use er_state::battle::BattleState;
-use er_state::pokemon::{
-    PpValidationError, PokemonState, move_slot_is_usable, validate_move_slot,
-};
+use er_state::pokemon::{PokemonState, PpValidationError, move_slot_is_usable, validate_move_slot};
 use er_types::battle_ids::{FieldSlot, MoveSlotIndex, PokemonId};
 use er_types::battle_model::MoveTarget;
 use thiserror::Error;
 
 use crate::command::NormalizedBattleCommand;
 use crate::move_effect::{
-    DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult,
-    resolve_target_effect,
+    DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult, resolve_target_effect,
 };
 use crate::status::{ParalysisActivationOutcome, StatusError, check_paralysis};
 
@@ -121,9 +118,7 @@ pub enum MovePipelineError {
         source: PpValidationError,
         move_id: er_types::battle_ids::MoveId,
     },
-    #[error(
-        "move {move_id:?} for actor {actor:?} has no usable PP ({pp_used}/{max_pp})"
-    )]
+    #[error("move {move_id:?} for actor {actor:?} has no usable PP ({pp_used}/{max_pp})")]
     PpUnavailable {
         actor: PokemonId,
         move_slot: MoveSlotIndex,
@@ -158,22 +153,27 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
     runtime: &mut RngRuntime,
     defensive_gate: &G,
 ) -> Result<MovePipelineResult, MovePipelineError> {
-    let (actor_id, source_slot, move_slot, command_move_id, targets) =
-        match command {
-            NormalizedBattleCommand::Fight {
-                actor,
-                field_slot,
-                move_slot,
-                move_id,
-                targets,
-                ..
-            } => (*actor, *field_slot, *move_slot, *move_id, targets.as_slice()),
-            NormalizedBattleCommand::Switch { .. } => {
-                return Err(MovePipelineError::WrongCommandKind(
-                    WrongCommandKind::Switch,
-                ));
-            }
-        };
+    let (actor_id, source_slot, move_slot, command_move_id, targets) = match command {
+        NormalizedBattleCommand::Fight {
+            actor,
+            field_slot,
+            move_slot,
+            move_id,
+            targets,
+            ..
+        } => (
+            *actor,
+            *field_slot,
+            *move_slot,
+            *move_id,
+            targets.as_slice(),
+        ),
+        NormalizedBattleCommand::Switch { .. } => {
+            return Err(MovePipelineError::WrongCommandKind(
+                WrongCommandKind::Switch,
+            ));
+        }
+    };
 
     // MovePhase's start guard is the first mechanical operation.  A queued
     // actor removed by an earlier phase is a semantic skip, not an error, and
@@ -214,12 +214,11 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
     content.validate().map_err(MovePipelineError::Content)?;
     let actor_snapshot = actor.clone();
     let move_slot_index = usize::from(move_slot.get());
-    let selected_move_slot = actor_snapshot.moves[move_slot_index].ok_or(
-        MovePipelineError::MissingMoveSlot {
+    let selected_move_slot =
+        actor_snapshot.moves[move_slot_index].ok_or(MovePipelineError::MissingMoveSlot {
             actor: actor_id,
             move_slot,
-        },
-    )?;
+        })?;
     if selected_move_slot.move_id != command_move_id {
         return Err(MovePipelineError::MoveIdentityMismatch {
             actor: actor_id,
@@ -228,23 +227,25 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
             actual: selected_move_slot.move_id,
         });
     }
-    let move_definition = find_move(&content.moves, command_move_id)
-        .map_err(|_| MovePipelineError::UnsupportedMove {
+    let move_definition = find_move(&content.moves, command_move_id).map_err(|_| {
+        MovePipelineError::UnsupportedMove {
             move_id: command_move_id,
-        })?;
+        }
+    })?;
 
     validate_targets(source_slot, targets, move_definition.target)?;
 
     // PP validity/usability is checked before the paralysis activation draw.
-    let max_pp = validate_move_slot(selected_move_slot, move_definition.base_pp).map_err(
-        |source| MovePipelineError::InvalidPp {
-            actor: actor_id,
-            move_slot,
-            source,
-            move_id: command_move_id,
-        },
-    )?;
-    if !move_slot_is_usable(selected_move_slot, move_definition.base_pp).map_err(|source| {
+    let max_pp =
+        validate_move_slot(&selected_move_slot, move_definition.base_pp).map_err(|source| {
+            MovePipelineError::InvalidPp {
+                actor: actor_id,
+                move_slot,
+                source,
+                move_id: command_move_id,
+            }
+        })?;
+    if !move_slot_is_usable(&selected_move_slot, move_definition.base_pp).map_err(|source| {
         MovePipelineError::InvalidPp {
             actor: actor_id,
             move_slot,
@@ -264,7 +265,7 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
     let mut staged_battle = battle.clone();
     let mut staged_runtime = runtime.clone();
     let paralysis = check_paralysis(&mut staged_runtime, actor_snapshot.status.kind)
-        .map_err(|source| MovePipelineError::Paralysis { source })?;
+        .map_err(MovePipelineError::Paralysis)?;
     if let ParalysisActivationOutcome::FullyParalyzed { .. } = paralysis {
         *runtime = staged_runtime;
         return Ok(MovePipelineResult {
@@ -280,12 +281,7 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
         });
     }
 
-    let pp_mutation = deduct_pp(
-        &mut staged_battle,
-        source_slot,
-        actor_id,
-        move_slot,
-    )?;
+    let pp_mutation = deduct_pp(&mut staged_battle, source_slot, actor_id, move_slot)?;
     let actor_snapshot = find_pokemon(&staged_battle, source_slot, actor_id)
         .ok_or(MovePipelineError::MissingActorState {
             actor: actor_id,
@@ -419,12 +415,12 @@ fn deduct_pp(
         },
     )?;
     let index = usize::from(move_slot.get());
-    let selected = actor.moves[index].as_mut().ok_or(
-        MovePipelineError::MissingMoveSlot {
+    let selected = actor.moves[index]
+        .as_mut()
+        .ok_or(MovePipelineError::MissingMoveSlot {
             actor: actor_id,
             move_slot,
-        },
-    )?;
+        })?;
     let before = selected.pp_used;
     let after = before.checked_add(1).ok_or(MovePipelineError::PpOverflow {
         actor: actor_id,

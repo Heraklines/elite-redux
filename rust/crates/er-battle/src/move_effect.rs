@@ -31,8 +31,7 @@ use crate::status::{
     apply_status_with_chance, burn_damage_multiplier,
 };
 use crate::type_effectiveness::{
-    EffectivenessMultiplier, TypeEffectiveness, TypeEffectivenessError,
-    resolve_type_effectiveness,
+    EffectivenessMultiplier, TypeEffectiveness, TypeEffectivenessError, resolve_type_effectiveness,
 };
 
 /// Typed input supplied to the defensive-ability seam.
@@ -73,7 +72,9 @@ pub enum DefensiveAbilityGateResult {
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum DefensiveAbilityGateError {
     #[error("defensive ability gate reached unsupported behavior: {reason:?}")]
-    Unsupported { reason: DefensiveAbilityGateUnsupportedReason },
+    Unsupported {
+        reason: DefensiveAbilityGateUnsupportedReason,
+    },
     #[error("defensive ability gate received an invalid selected-slice context")]
     InvalidContext,
 }
@@ -203,7 +204,10 @@ pub enum MoveEffectError {
     #[error("move {move_id:?} has a non-damaging category/power combination")]
     InvalidDamageCategory { move_id: MoveId },
     #[error("move {move_id:?} has an unsupported effect chance {chance:?}")]
-    UnsupportedEffectChance { move_id: MoveId, chance: EffectChance },
+    UnsupportedEffectChance {
+        move_id: MoveId,
+        chance: EffectChance,
+    },
     #[error("type-effectiveness resolution failed: {0}")]
     TypeEffectiveness(#[source] TypeEffectivenessError),
     #[error("defensive ability resolution failed: {0}")]
@@ -533,7 +537,8 @@ fn calculate_damaging_result(
     )
     .map_err(MoveEffectError::Status)?;
     let effectiveness_multiplier = multiplier_as_f64(effectiveness.multiplier);
-    let target_multiplier = if move_definition.target == er_types::battle_model::MoveTarget::AllNearEnemies
+    let target_multiplier = if move_definition.target
+        == er_types::battle_model::MoveTarget::AllNearEnemies
         && target_count > 1
     {
         0.75
@@ -563,9 +568,7 @@ fn calculate_damaging_result(
     .with_stab_multiplier(stab_multiplier)
     .with_effectiveness_multiplier(effectiveness_multiplier)
     .with_burned(burn_multiplier < 1.0);
-    input
-        .calculate(runtime)
-        .map_err(MoveEffectError::Damage)
+    input.calculate(runtime).map_err(MoveEffectError::Damage)
 }
 
 fn apply_hp_damage(
@@ -607,7 +610,8 @@ fn apply_non_damage_effects(
         match effect {
             MoveEffectDefinition::Damage => {}
             MoveEffectDefinition::ApplyStatus(status) => {
-                let chance = effect_chance(move_definition.effect_chance.clone(), move_definition.id)?;
+                let chance =
+                    effect_chance(move_definition.effect_chance.clone(), move_definition.id)?;
                 let outcome = apply_status_with_chance(
                     runtime,
                     StatusApplicationInput {
@@ -643,10 +647,7 @@ fn apply_non_damage_effects(
     Ok(())
 }
 
-fn effect_chance(
-    chance: EffectChance,
-    move_id: MoveId,
-) -> Result<Option<u8>, MoveEffectError> {
+fn effect_chance(chance: EffectChance, move_id: MoveId) -> Result<Option<u8>, MoveEffectError> {
     match chance {
         EffectChance::None => Ok(None),
         EffectChance::Percent(value) if value <= 100 => Ok(Some(value)),
@@ -669,9 +670,9 @@ fn secondary_stage_chance(
         Some(chance) => {
             let draw = runtime
                 .pokemon_rand_battle_seed_int(
-                    SafeU53::new(100).map_err(|_| MoveEffectError::SecondaryEffectRng(
-                        RngError::RangeOverflow,
-                    ))?,
+                    SafeU53::new(100).map_err(|_| {
+                        MoveEffectError::SecondaryEffectRng(RngError::RangeOverflow)
+                    })?,
                     SafeU53::ZERO,
                     RngReason::SecondaryEffect,
                     RngCallsiteId::secondary_stage(),
