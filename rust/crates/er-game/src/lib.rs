@@ -2,6 +2,8 @@
 
 pub mod command_menu;
 pub mod internal_event;
+mod local_battle;
+pub mod material;
 pub mod move_menu;
 pub mod party_menu;
 pub mod party_option_menu;
