@@ -1,5 +1,6 @@
 //! Atomic turn and stored-replacement orchestration.
 
+use er_content::moves::MoveDefinitionError;
 use er_content::pack::ContentPack;
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::RngError;
@@ -9,19 +10,27 @@ use er_state::battle::{
 use er_state::digest::compute_mechanical_state_digest;
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
+use er_state::validation::StateValidationError;
 use er_types::battle_command::{
-    CommandSet, ReplacementSelection, validate_turn_result_operation_id,
+    BattleCommandError, CommandSet, ReplacementSelection, validate_turn_result_operation_id,
 };
-use er_types::battle_ids::{AuthorityEpoch, BattleSide, FaintOccurrenceId, FieldSlot, PokemonId};
-use er_types::battle_model::{ActionDisposition, BattleStat, ResolvedAction, ResolvedActionKind};
+use er_types::battle_ids::{
+    AuthorityEpoch, BattleSide, FaintOccurrenceId, FieldSlot, MoveId, PokemonId,
+};
+use er_types::battle_model::{
+    ActionDisposition, BattleStat, CapabilitySubject, ResolvedAction, ResolvedActionKind,
+    StatusKind,
+};
 use er_types::{OperationId, SafeU53};
 
+use crate::ability::AbilityError;
 use crate::ability_pipeline::{
-    DefensiveAbilityInput, DefensiveAbilityOutcome, evaluate_defensive_ability,
-    evaluate_switch_in_ability,
+    AbilityPipelineError, DefensiveAbilityInput, DefensiveAbilityOutcome,
+    evaluate_defensive_ability, evaluate_switch_in_ability,
 };
 use crate::action_order::{
-    PendingAction, build_pending_action_queue_from_commands, effective_speed,
+    ActionOrderError, PendingAction, UnsupportedOrdering,
+    build_pending_action_queue_from_commands, effective_speed,
 };
 use crate::command::NormalizedBattleCommand;
 use crate::error::{BattleInvariantError, BattleResolveError};
@@ -29,23 +38,30 @@ use crate::faint::{FaintCandidate, FaintQueueError, queue_faint};
 use crate::legality::{CommandLegalityError, normalize_command_set, validate_state_content};
 use crate::move_effect::{
     DefensiveAbilityBlockReason, DefensiveAbilityGate, DefensiveAbilityGateError,
-    DefensiveAbilityGateInput, DefensiveAbilityGateResult, MoveTargetResult,
-    TargetEffectDisposition,
+    DefensiveAbilityGateInput, DefensiveAbilityGateResult, DefensiveAbilityGateUnsupportedReason,
+    MoveEffectError, MoveTargetResult, TargetEffectDisposition,
 };
-use crate::move_pipeline::{MovePipelineDisposition, MovePipelineResult, resolve_move};
+use crate::move_pipeline::{
+    MovePipelineDisposition, MovePipelineError, MovePipelineResult, TargetSelectionError,
+    resolve_move,
+};
 use crate::outcome::derive_battle_outcome;
 use crate::replacement::{
     apply_selected_replacement, compute_replacement_progress, resolve_no_legal_replacement,
     resolve_not_required, stored_faint_source, validate_stored_replacement_operation,
+    ReplacementError,
 };
 use crate::resolver::{
     BattleMutation, BattleNextDecision, BattleReplacementTransition, BattleTransition,
 };
-use crate::stat_stage::set_stage;
+use crate::stat_stage::{StatStageError, set_stage};
 use crate::status::{
-    StatusApplicationOutcome, StatusResidualInput, StatusResidualOutcome, resolve_residual,
+    StatusApplicationOutcome, StatusError, StatusResidualInput, StatusResidualOutcome,
+    resolve_residual,
 };
-use crate::switch::resolve_switch;
+use crate::switch::{SwitchError, resolve_switch};
+use crate::{accuracy::AccuracyError, critical::CriticalError, damage::DamageError};
+use crate::type_effectiveness::TypeEffectivenessError;
 
 /// Resolve one complete admitted turn as an atomic transition.
 pub fn resolve_turn(
@@ -57,9 +73,7 @@ pub fn resolve_turn(
 ) -> Result<BattleTransition, BattleResolveError> {
     validate_state_content(before, content)?;
     if authority_epoch == AuthorityEpoch::ZERO {
-        return Err(BattleResolveError::Faint(
-            FaintQueueError::ZeroAuthorityEpoch,
-        ));
+        return Err(map_faint_input_error(FaintQueueError::ZeroAuthorityEpoch));
     }
     let before_battle = active_battle(before)?;
     validate_turn_result_operation_id(
@@ -72,7 +86,8 @@ pub fn resolve_turn(
     let before_digest = compute_mechanical_state_digest(before)?;
     let normalized = normalize_command_set(before, commands, content)?;
     let mut queue =
-        build_pending_action_queue_from_commands(before, normalized.entries(), content)?;
+        build_pending_action_queue_from_commands(before, normalized.entries(), content)
+            .map_err(|source| map_action_order_error(source, before, false))?;
     let mut after = before.clone();
     let mut runtime = RngRuntime::from_states(
         before.run_rng.clone(),
@@ -83,7 +98,10 @@ pub fn resolve_turn(
     let mut mutations = Vec::new();
     let mut turn_occurrence = 0_u32;
 
-    while let Some(action) = queue.pop_next(&after, &mut runtime)? {
+    while let Some(action) = queue
+        .pop_next(&after, &mut runtime)
+        .map_err(|source| map_action_order_error(source, &after, true))?
+    {
         match &action.command {
             NormalizedBattleCommand::Switch { .. } => {
                 resolve_switch_action(
@@ -110,7 +128,8 @@ pub fn resolve_turn(
         }
         {
             let battle = active_battle_mut(&mut after)?;
-            drain_internal_faint_heads(battle, &mut mutations)?;
+            drain_internal_faint_heads(battle, &mut mutations)
+                .map_err(map_replacement_after_error)?;
             update_outcome(battle, &mut mutations);
             if battle.outcome != BattleOutcome::Ongoing {
                 break;
@@ -127,7 +146,8 @@ pub fn resolve_turn(
             &mut mutations,
         )?;
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations)?;
+        drain_internal_faint_heads(battle, &mut mutations)
+            .map_err(map_replacement_after_error)?;
         update_outcome(battle, &mut mutations);
     }
 
@@ -174,14 +194,18 @@ pub fn resolve_replacement(
 
     let primary = {
         let battle = active_battle_mut(&mut after)?;
-        let stored = stored_faint_source(battle, occurrence)?;
-        validate_stored_replacement_operation(material_operation_id, battle.battle_id, stored)?;
+        let stored = stored_faint_source(battle, occurrence)
+            .map_err(|source| map_replacement_error(source, false))?;
+        validate_stored_replacement_operation(material_operation_id, battle.battle_id, stored)
+            .map_err(|source| map_replacement_error(source, false))?;
         match selection {
             ReplacementSelection::Selected { .. } => {
-                apply_selected_replacement(battle, occurrence, selection)?
+                apply_selected_replacement(battle, occurrence, selection)
+                    .map_err(|source| map_replacement_error(source, false))?
             }
             ReplacementSelection::NoLegalReplacement => {
-                resolve_no_legal_replacement(battle, occurrence)?
+                resolve_no_legal_replacement(battle, occurrence)
+                    .map_err(|source| map_replacement_error(source, false))?
             }
         }
     };
@@ -189,7 +213,8 @@ pub fn resolve_replacement(
     let mut mutations = primary.mutations.clone();
     {
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations)?;
+        drain_internal_faint_heads(battle, &mut mutations)
+            .map_err(map_replacement_after_error)?;
         update_outcome(battle, &mut mutations);
     }
 
@@ -232,7 +257,27 @@ impl DefensiveAbilityGate for ContentDefensiveAbilityGate<'_> {
             },
             self.content,
         )
-        .map_err(|_| DefensiveAbilityGateError::InvalidContext)?;
+        .map_err(|source| match source {
+            AbilityPipelineError::Ability(AbilityError::UnsupportedContent { .. }) => {
+                DefensiveAbilityGateError::Unsupported {
+                    reason: DefensiveAbilityGateUnsupportedReason::UnsupportedAbilityEffect,
+                }
+            }
+            AbilityPipelineError::UnsupportedSuppression { .. } => {
+                DefensiveAbilityGateError::Unsupported {
+                    reason: DefensiveAbilityGateUnsupportedReason::DynamicSuppression,
+                }
+            }
+            AbilityPipelineError::Ability(_)
+            | AbilityPipelineError::Format(_)
+            | AbilityPipelineError::Field(_)
+            | AbilityPipelineError::MissingSourceOccupant { .. }
+            | AbilityPipelineError::MissingPartyPokemon { .. }
+            | AbilityPipelineError::MissingDefensiveTarget { .. }
+            | AbilityPipelineError::NativeTypeImmunityTerminal { .. } => {
+                DefensiveAbilityGateError::InvalidContext
+            }
+        })?;
 
         Ok(match outcome {
             DefensiveAbilityOutcome::Passed { .. } => DefensiveAbilityGateResult::Pass,
@@ -257,9 +302,13 @@ fn resolve_switch_action(
         let battle = active_battle_mut(state)?;
         resolve_switch(battle, &action.command, |updated, evidence| {
             evaluate_switch_in_ability(updated, evidence.slot, content)
-        })?
+        })
     };
-    let ability_outcome = resolution.post_switch?;
+    let resolution = resolution.map_err(map_switch_error)?;
+    let ability_subject = switch_ability_subject(state, action);
+    let ability_outcome = resolution
+        .post_switch
+        .map_err(|source| map_ability_pipeline_error(source, ability_subject))?;
 
     push_pending_action(action_order, action, ActionDisposition::Executed)?;
     mutations.push(resolution.mutation);
@@ -295,8 +344,9 @@ fn resolve_move_action(
     let rng_before = active_battle(state)?.battle_rng.clone();
     let result = {
         let battle = active_battle_mut(state)?;
-        resolve_move(battle, &action.command, content, runtime, gate)?
-    };
+        resolve_move(battle, &action.command, content, runtime, gate)
+    }
+    .map_err(|source| map_move_pipeline_error(source, state, action))?;
     sync_rng_state(state, runtime)?;
     let rng_after = active_battle(state)?.battle_rng.clone();
 
@@ -412,12 +462,14 @@ fn resolve_residual_phase(
             status: pokemon.status,
             hp: pokemon.hp,
             max_hp: pokemon.max_hp,
-        })?;
+        })
+        .map_err(|source| map_status_error(source, Some(pokemon.status.kind), None, true))?;
         let StatusResidualOutcome::Applied { mutation } = outcome else {
             continue;
         };
 
-        let speed = effective_speed(&pokemon)?;
+        let speed = effective_speed(&pokemon)
+            .map_err(|source| map_action_order_error(source, state, true))?;
         {
             let target = find_pokemon_mut(state, slot, pokemon_id)?;
             target.status = mutation.status_after;
@@ -464,14 +516,17 @@ fn queue_faint_action(
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
 ) -> Result<(), BattleResolveError> {
-    let speed = effective_speed(find_pokemon(state, candidate.slot, candidate.pokemon)?)?;
+    let speed = effective_speed(find_pokemon(state, candidate.slot, candidate.pokemon)?)
+        .map_err(|source| map_action_order_error(source, state, true))?;
     let queued = {
         let battle = active_battle_mut(state)?;
-        queue_faint(battle, candidate, authority_epoch, *turn_occurrence)?
-    };
+        queue_faint(battle, candidate, authority_epoch, *turn_occurrence)
+    }
+    .map_err(map_faint_error)?;
     *turn_occurrence = turn_occurrence
         .checked_add(1)
-        .ok_or(FaintQueueError::TurnOccurrenceOverflow)?;
+        .ok_or(FaintQueueError::TurnOccurrenceOverflow)
+        .map_err(map_faint_error)?;
     mutations.push(queued.mutation);
     push_non_command_action(
         action_order,
@@ -671,18 +726,22 @@ fn drain_internal_faint_heads(
         };
         match head.replacement {
             ReplacementProgress::NotRequired => {
-                let resolved = resolve_not_required(battle, head.id)?;
+                let resolved = resolve_not_required(battle, head.id)
+                    .map_err(map_replacement_after_error)?;
                 mutations.extend(resolved.mutations);
             }
             ReplacementProgress::NoLegalReplacement => {
-                let resolved = resolve_no_legal_replacement(battle, head.id)?;
+                let resolved = resolve_no_legal_replacement(battle, head.id)
+                    .map_err(map_replacement_after_error)?;
                 mutations.extend(resolved.mutations);
             }
             ReplacementProgress::Pending => {
-                if compute_replacement_progress(battle, head.id)?
+                if compute_replacement_progress(battle, head.id)
+                    .map_err(map_replacement_after_error)?
                     == ReplacementProgress::NoLegalReplacement
                 {
-                    let resolved = resolve_no_legal_replacement(battle, head.id)?;
+                    let resolved = resolve_no_legal_replacement(battle, head.id)
+                        .map_err(map_replacement_after_error)?;
                     mutations.extend(resolved.mutations);
                 } else {
                     return Ok(());
@@ -721,5 +780,666 @@ fn next_decision(battle: &BattleState, outcome: BattleOutcome) -> BattleNextDeci
         }
     } else {
         BattleNextDecision::CommandFrontier
+    }
+}
+
+fn map_state_error(source: StateValidationError, after_state: bool) -> BattleResolveError {
+    if after_state {
+        BattleInvariantError::invalid_after_state(source).into()
+    } else {
+        BattleInvariantError::invalid_before(source).into()
+    }
+}
+
+/// The frozen public surface has no lower-level variant for these branches.
+/// They are admitted-state contradictions, so they remain invariant failures
+/// rather than being coerced into a successful or alternate gameplay path.
+fn map_pipeline_contradiction(after_state: bool) -> BattleResolveError {
+    map_state_error(
+        StateValidationError::Command(BattleCommandError::AdmissionSourceMismatch),
+        after_state,
+    )
+}
+
+fn map_legality_command(source: BattleCommandError) -> BattleResolveError {
+    BattleResolveError::Legality(CommandLegalityError::Command(source))
+}
+
+fn map_unsupported_effect(subject: CapabilitySubject) -> BattleResolveError {
+    BattleInvariantError::UnsupportedEffectReached { subject }.into()
+}
+
+fn map_action_order_error(
+    source: ActionOrderError,
+    state: &GameState,
+    after_state: bool,
+) -> BattleResolveError {
+    match source {
+        ActionOrderError::MissingBattle => CommandLegalityError::MissingBattle.into(),
+        ActionOrderError::State(source) => map_state_error(source, after_state),
+        ActionOrderError::Content(source) => BattleResolveError::Content(source),
+        ActionOrderError::Rng(source) => BattleResolveError::Rng(source),
+        ActionOrderError::Unsupported(reason) => match reason {
+            UnsupportedOrdering::ArenaCondition => {
+                if let Some(subject) = arena_condition_subject(state) {
+                    map_unsupported_effect(subject)
+                } else {
+                    map_pipeline_contradiction(after_state)
+                }
+            }
+            UnsupportedOrdering::TrickRoom
+            | UnsupportedOrdering::ExplicitSetOrder
+            | UnsupportedOrdering::PursuitInterception
+            | UnsupportedOrdering::SelfSwitchingMove => {
+                map_pipeline_contradiction(after_state)
+            }
+        },
+        ActionOrderError::CommandCountMismatch { .. }
+        | ActionOrderError::UnexpectedCommand { .. }
+        | ActionOrderError::DuplicateCommand { .. }
+        | ActionOrderError::SwitchDestinationMismatch { .. }
+        | ActionOrderError::SwitchDestinationFainted { .. }
+        | ActionOrderError::MoveIdentityMismatch { .. } => {
+            CommandLegalityError::CommandSetMismatch.into()
+        }
+        ActionOrderError::MissingCommand { .. } => {
+            CommandLegalityError::IncompleteCommandFrontier.into()
+        }
+        ActionOrderError::ActorMismatch { slot, actor } => {
+            CommandLegalityError::ActorMismatch { slot, actor }.into()
+        }
+        ActionOrderError::UnknownActor { actor } => {
+            CommandLegalityError::NoLegalCommand { actor }.into()
+        }
+        ActionOrderError::FaintedActor { actor } => {
+            CommandLegalityError::ActorFainted { actor }.into()
+        }
+        ActionOrderError::MissingMoveSlot { actor, .. }
+        | ActionOrderError::InvalidSpeedStage { actor, .. }
+        | ActionOrderError::SpeedOverflow { actor } => {
+            CommandLegalityError::NoLegalCommand { actor }.into()
+        }
+        ActionOrderError::UnsupportedMove { move_id } => {
+            map_unsupported_effect(CapabilitySubject::Move(move_id))
+        }
+        ActionOrderError::UnsupportedSpeedStatus { status, .. } => {
+            map_unsupported_effect(CapabilitySubject::Status(status))
+        }
+        ActionOrderError::TieOrderOverflow => map_pipeline_contradiction(after_state),
+    }
+}
+
+fn arena_condition_subject(state: &GameState) -> Option<CapabilitySubject> {
+    state
+        .battle
+        .as_ref()?
+        .arena_conditions
+        .first()
+        .map(|condition| CapabilitySubject::ArenaCondition(condition.condition.clone()))
+}
+
+fn map_faint_input_error(source: FaintQueueError) -> BattleResolveError {
+    match source {
+        FaintQueueError::ZeroAuthorityEpoch => map_legality_command(
+            BattleCommandError::OperationGrammarMismatch {
+                context: "turn result",
+            },
+        ),
+        source => map_faint_error(source),
+    }
+}
+
+fn map_faint_error(source: FaintQueueError) -> BattleResolveError {
+    match source {
+        FaintQueueError::InvalidField { source } => {
+            map_state_error(StateValidationError::Field(source), true)
+        }
+        FaintQueueError::InvalidSlot { source, .. } => {
+            map_state_error(StateValidationError::Format(source), true)
+        }
+        FaintQueueError::CandidateActorMismatch { slot, pokemon } => map_state_error(
+            StateValidationError::CommandActorMismatch {
+                slot,
+                actor: pokemon,
+            },
+            true,
+        ),
+        FaintQueueError::CandidatePartyDuplicate { pokemon } => map_state_error(
+            StateValidationError::DuplicatePokemonId { pokemon },
+            true,
+        ),
+        FaintQueueError::CandidateOwnerMismatch {
+            pokemon,
+            actual,
+            expected,
+        } => match (expected, actual) {
+            (Some(_), actual) => map_state_error(
+                StateValidationError::InvalidPlayerOwner {
+                    pokemon,
+                    owner: actual,
+                },
+                true,
+            ),
+            (None, Some(owner)) => map_state_error(
+                StateValidationError::EnemyHasOwner { pokemon, owner },
+                true,
+            ),
+            (None, None) => map_pipeline_contradiction(true),
+        },
+        FaintQueueError::CandidateAlreadyQueued { slot, pokemon } => map_state_error(
+            StateValidationError::DuplicateUnresolvedFaint { slot, pokemon },
+            true,
+        ),
+        FaintQueueError::DuplicateQueueOccurrence { id } => map_state_error(
+            StateValidationError::DuplicateFaintOccurrence { id },
+            true,
+        ),
+        FaintQueueError::DuplicateQueueSubject { slot, pokemon } => map_state_error(
+            StateValidationError::DuplicateUnresolvedFaint { slot, pokemon },
+            true,
+        ),
+        FaintQueueError::QueueAllocatorMismatch { id, next } => map_state_error(
+            StateValidationError::FaintAllocatorMismatch { id, next },
+            true,
+        ),
+        FaintQueueError::NonCausalQueue => {
+            map_state_error(StateValidationError::NonCausalFaintQueue, true)
+        }
+        FaintQueueError::InvalidStoredOccurrence { id } => map_state_error(
+            StateValidationError::FaintCoordinateMismatch { id },
+            true,
+        ),
+        FaintQueueError::CandidateSlotMissing { .. }
+        | FaintQueueError::CandidateSlotEmpty { .. }
+        | FaintQueueError::CandidatePartyMissing { .. }
+        | FaintQueueError::CandidateHpNonZero { .. }
+        | FaintQueueError::CandidateNotFainted { .. }
+        | FaintQueueError::OccurrenceAllocatorExhausted { .. }
+        | FaintQueueError::TurnOccurrenceOverflow
+        | FaintQueueError::SourceCoordinateMismatch { .. }
+        | FaintQueueError::ZeroAuthorityEpoch => map_pipeline_contradiction(true),
+    }
+}
+
+fn map_switch_error(source: SwitchError) -> BattleResolveError {
+    match source {
+        SwitchError::NotSwitchCommand => map_pipeline_contradiction(true),
+        SwitchError::InvalidSourceTopology { source, .. } => {
+            map_state_error(StateValidationError::Format(source), true)
+        }
+        SwitchError::InvalidField { source } => {
+            map_state_error(StateValidationError::Field(source), true)
+        }
+        SwitchError::SourceSlotMissing { .. } => CommandLegalityError::CommandSetMismatch.into(),
+        SwitchError::SourceSlotEmpty { slot } => {
+            CommandLegalityError::EmptyFieldSlot { slot }.into()
+        }
+        SwitchError::ActorMismatch { slot, actor, .. } => {
+            CommandLegalityError::ActorMismatch { slot, actor }.into()
+        }
+        SwitchError::ActiveActorMissing { .. } => map_pipeline_contradiction(true),
+        SwitchError::ActiveOwnerMismatch {
+            slot,
+            actor,
+            expected,
+            actual,
+        } => map_state_error(
+            StateValidationError::FieldOwnerMismatch {
+                slot,
+                pokemon: actor,
+                expected,
+                actual,
+            },
+            true,
+        ),
+        SwitchError::ActiveActorFainted { actor } => {
+            CommandLegalityError::ActorFainted { actor }.into()
+        }
+        SwitchError::IncomingPartySlotMissing { .. }
+        | SwitchError::IncomingPartyIdentityMismatch { .. }
+        | SwitchError::IncomingFainted { .. }
+        | SwitchError::IncomingAlreadyOnField { .. } => {
+            CommandLegalityError::CommandSetMismatch.into()
+        }
+        SwitchError::IncomingOwnerMismatch {
+            slot,
+            incoming,
+            expected,
+            actual,
+        } => map_state_error(
+            StateValidationError::FieldOwnerMismatch {
+                slot,
+                pokemon: incoming,
+                expected,
+                actual,
+            },
+            true,
+        ),
+    }
+}
+
+fn map_ability_pipeline_error(
+    source: AbilityPipelineError,
+    subject: Option<CapabilitySubject>,
+) -> BattleResolveError {
+    match source {
+        AbilityPipelineError::Ability(source) => map_ability_error(source),
+        AbilityPipelineError::Format(source) => {
+            map_state_error(StateValidationError::Format(source), true)
+        }
+        AbilityPipelineError::Field(source) => {
+            map_state_error(StateValidationError::Field(source), true)
+        }
+        AbilityPipelineError::MissingSourceOccupant { slot }
+        | AbilityPipelineError::MissingDefensiveTarget { slot } => {
+            CommandLegalityError::EmptyFieldSlot { slot }.into()
+        }
+        AbilityPipelineError::MissingPartyPokemon {
+            slot, pokemon, ..
+        } => map_state_error(
+            StateValidationError::MissingFieldOccupant { slot, pokemon },
+            true,
+        ),
+        AbilityPipelineError::UnsupportedSuppression { .. } => subject
+            .map(map_unsupported_effect)
+            .unwrap_or_else(|| map_pipeline_contradiction(true)),
+        AbilityPipelineError::NativeTypeImmunityTerminal { .. } => {
+            map_pipeline_contradiction(true)
+        }
+    }
+}
+
+fn map_ability_error(source: AbilityError) -> BattleResolveError {
+    match source {
+        AbilityError::InvalidContentPack { source } => BattleResolveError::Content(source),
+        AbilityError::UnsupportedContent { ability_id, .. } => {
+            map_unsupported_effect(CapabilitySubject::Ability(ability_id))
+        }
+    }
+}
+
+fn switch_ability_subject(
+    state: &GameState,
+    action: &PendingAction,
+) -> Option<CapabilitySubject> {
+    let NormalizedBattleCommand::Switch { field_slot, .. } = &action.command else {
+        return None;
+    };
+    let incoming = action.incoming?;
+    let battle = state.battle.as_ref()?;
+    party_for_side(battle, field_slot.side)
+        .iter()
+        .find(|pokemon| pokemon.id == incoming)
+        .map(|pokemon| CapabilitySubject::Ability(pokemon.abilities.active))
+}
+
+fn move_target_ability_subject(
+    state: &GameState,
+    action: &PendingAction,
+) -> Option<CapabilitySubject> {
+    let battle = state.battle.as_ref()?;
+    action.targets.iter().find_map(|slot| {
+        let pokemon_id = battle
+            .field
+            .slots
+            .iter()
+            .find(|entry| entry.slot == *slot)
+            .and_then(|entry| entry.occupant)?;
+        party_for_side(battle, slot.side)
+            .iter()
+            .find(|pokemon| pokemon.id == pokemon_id)
+            .map(|pokemon| CapabilitySubject::Ability(pokemon.abilities.active))
+    })
+}
+
+fn move_actor_status(state: &GameState, action: &PendingAction) -> Option<StatusKind> {
+    let battle = state.battle.as_ref()?;
+    party_for_side(battle, action.source_slot.side)
+        .iter()
+        .find(|pokemon| pokemon.id == action.actor)
+        .map(|pokemon| pokemon.status.kind)
+}
+
+fn map_move_pipeline_error(
+    source: MovePipelineError,
+    state: &GameState,
+    action: &PendingAction,
+) -> BattleResolveError {
+    let move_id = action.move_id;
+    match source {
+        MovePipelineError::Content(source) => BattleResolveError::Content(source),
+        MovePipelineError::WrongCommandKind(_) => map_pipeline_contradiction(true),
+        MovePipelineError::MissingActorState { actor, slot } => map_state_error(
+            StateValidationError::MissingFieldOccupant {
+                slot,
+                pokemon: actor,
+            },
+            true,
+        ),
+        MovePipelineError::MissingTargetState { pokemon, slot } => map_state_error(
+            StateValidationError::MissingFieldOccupant { slot, pokemon },
+            true,
+        ),
+        MovePipelineError::MissingMoveSlot { actor, .. }
+        | MovePipelineError::MoveIdentityMismatch { actor, .. } => {
+            CommandLegalityError::NoLegalCommand { actor }.into()
+        }
+        MovePipelineError::UnsupportedMove { move_id } => {
+            map_unsupported_effect(CapabilitySubject::Move(move_id))
+        }
+        MovePipelineError::InvalidPp {
+            actor,
+            move_slot,
+            source,
+            ..
+        } => CommandLegalityError::InvalidPp {
+            pokemon: actor,
+            move_slot: usize::from(move_slot.get()),
+            source,
+        }
+        .into(),
+        MovePipelineError::PpUnavailable { actor, .. } => {
+            CommandLegalityError::NoLegalCommand { actor }.into()
+        }
+        MovePipelineError::PpOverflow { .. } => map_pipeline_contradiction(true),
+        MovePipelineError::TargetSelection(source) => map_target_selection_error(source),
+        MovePipelineError::Paralysis(source) => map_status_error(
+            source,
+            move_actor_status(state, action),
+            move_id,
+            true,
+        ),
+        MovePipelineError::Effect(source) => {
+            map_move_effect_error(source, state, action, move_id)
+        }
+    }
+}
+
+fn map_target_selection_error(source: TargetSelectionError) -> BattleResolveError {
+    match source {
+        TargetSelectionError::Empty | TargetSelectionError::AllEnemiesCount => {
+            map_legality_command(BattleCommandError::EmptyTargetSelection)
+        }
+        TargetSelectionError::Duplicate => {
+            map_legality_command(BattleCommandError::DuplicateTargetSelection)
+        }
+        TargetSelectionError::NonCanonicalOrder => {
+            map_legality_command(BattleCommandError::UnsortedTargetSelection)
+        }
+        TargetSelectionError::NearOtherCount
+        | TargetSelectionError::NearOtherNotCanonical { .. }
+        | TargetSelectionError::SlotOutsideCapacity { .. }
+        | TargetSelectionError::SameSide { .. }
+        | TargetSelectionError::AllEnemiesNotCanonical => {
+            map_legality_command(BattleCommandError::AdmissionSourceMismatch)
+        }
+    }
+}
+
+fn map_move_effect_error(
+    source: MoveEffectError,
+    state: &GameState,
+    action: &PendingAction,
+    move_id: Option<MoveId>,
+) -> BattleResolveError {
+    match source {
+        MoveEffectError::Content(source) => BattleResolveError::Content(source),
+        MoveEffectError::InvalidMoveDefinition { source, .. } => {
+            map_move_definition_error(source)
+        }
+        MoveEffectError::UnsupportedEffect { move_id, .. }
+        | MoveEffectError::UnsupportedEffectChance { move_id, .. } => {
+            map_unsupported_effect(CapabilitySubject::Move(move_id))
+        }
+        MoveEffectError::MissingDamagePower { .. }
+        | MoveEffectError::InvalidDamageCategory { .. }
+        | MoveEffectError::EmptyTargetSet
+        | MoveEffectError::HpDamageOverflow { .. } => map_pipeline_contradiction(true),
+        MoveEffectError::TypeEffectiveness(source) => {
+            map_type_effectiveness_error(source, move_id)
+        }
+        MoveEffectError::DefensiveAbility(source) => {
+            map_defensive_gate_error(source, state, action, move_id)
+        }
+        MoveEffectError::Accuracy(source) => map_accuracy_error(source, move_id),
+        MoveEffectError::Critical(source) => map_critical_error(source, move_id),
+        MoveEffectError::Damage(source) => map_damage_error(source),
+        MoveEffectError::Status(source) => map_status_error(
+            source,
+            move_actor_status(state, action),
+            move_id,
+            true,
+        ),
+        MoveEffectError::StatStage(source) => map_stat_stage_error(source, true),
+        MoveEffectError::SecondaryEffectRng(source) => BattleResolveError::Rng(source),
+    }
+}
+
+fn map_move_definition_error(source: MoveDefinitionError) -> BattleResolveError {
+    match source {
+        MoveDefinitionError::UnsupportedId { id }
+        | MoveDefinitionError::UnsupportedCapability { id }
+        | MoveDefinitionError::UnsupportedEffect { id, .. } => {
+            map_unsupported_effect(CapabilitySubject::Move(id))
+        }
+        MoveDefinitionError::UnsupportedStatus { status, .. } => {
+            map_unsupported_effect(CapabilitySubject::Status(status))
+        }
+        MoveDefinitionError::InvalidBasePp { .. }
+        | MoveDefinitionError::InvalidPower { .. }
+        | MoveDefinitionError::InvalidAccuracy { .. }
+        | MoveDefinitionError::InvalidEffectChance { .. }
+        | MoveDefinitionError::StatusMoveHasPower { .. }
+        | MoveDefinitionError::DamagingMoveHasNoPower { .. }
+        | MoveDefinitionError::DamagingMoveHasNoDamageEffect { .. }
+        | MoveDefinitionError::StatusMoveHasDamageEffect { .. }
+        | MoveDefinitionError::EmptyEffectList { .. }
+        | MoveDefinitionError::DuplicateFlag { .. }
+        | MoveDefinitionError::DuplicateEffect { .. }
+        | MoveDefinitionError::DefinitionMismatch { .. } => {
+            map_pipeline_contradiction(true)
+        }
+    }
+}
+
+fn map_type_effectiveness_error(
+    source: TypeEffectivenessError,
+    move_id: Option<MoveId>,
+) -> BattleResolveError {
+    match source {
+        TypeEffectivenessError::UnsupportedAttackType { .. } => move_id
+            .map(|move_id| map_unsupported_effect(CapabilitySubject::Move(move_id)))
+            .unwrap_or_else(|| map_pipeline_contradiction(true)),
+        TypeEffectivenessError::InvalidChart { .. }
+        | TypeEffectivenessError::InvalidDefenderTyping { .. }
+        | TypeEffectivenessError::CompositionOutOfRange { .. } => {
+            map_pipeline_contradiction(true)
+        }
+    }
+}
+
+fn map_defensive_gate_error(
+    source: DefensiveAbilityGateError,
+    state: &GameState,
+    action: &PendingAction,
+    move_id: Option<MoveId>,
+) -> BattleResolveError {
+    match source {
+        DefensiveAbilityGateError::Unsupported { .. } => move_target_ability_subject(state, action)
+            .or_else(|| move_id.map(CapabilitySubject::Move))
+            .map(map_unsupported_effect)
+            .unwrap_or_else(|| map_pipeline_contradiction(true)),
+        DefensiveAbilityGateError::InvalidContext => map_pipeline_contradiction(true),
+    }
+}
+
+fn map_accuracy_error(source: AccuracyError, move_id: Option<MoveId>) -> BattleResolveError {
+    match source {
+        AccuracyError::InvalidContext(_)
+        | AccuracyError::InvalidDraw { .. }
+        | AccuracyError::RangeOverflow { .. } => map_pipeline_contradiction(true),
+        AccuracyError::Unsupported { .. } => move_id
+            .map(|move_id| map_unsupported_effect(CapabilitySubject::Move(move_id)))
+            .unwrap_or_else(|| map_pipeline_contradiction(true)),
+        AccuracyError::Rng(source) => BattleResolveError::Rng(source),
+    }
+}
+
+fn map_critical_error(source: CriticalError, move_id: Option<MoveId>) -> BattleResolveError {
+    match source {
+        CriticalError::InvalidContext(_)
+        | CriticalError::InvalidDraw { .. }
+        | CriticalError::RangeOverflow { .. } => map_pipeline_contradiction(true),
+        CriticalError::Unsupported { .. } => move_id
+            .map(|move_id| map_unsupported_effect(CapabilitySubject::Move(move_id)))
+            .unwrap_or_else(|| map_pipeline_contradiction(true)),
+        CriticalError::Rng(source) => BattleResolveError::Rng(source),
+    }
+}
+
+fn map_damage_error(source: DamageError) -> BattleResolveError {
+    match source {
+        DamageError::InvalidLevel
+        | DamageError::StatusCategory
+        | DamageError::InvalidPower
+        | DamageError::InvalidOffensiveStat
+        | DamageError::InvalidDefensiveStat
+        | DamageError::InvalidPositiveMultiplier { .. }
+        | DamageError::InvalidNonNegativeMultiplier { .. }
+        | DamageError::NonFiniteArithmetic
+        | DamageError::InvalidDamageInteger
+        | DamageError::InvalidVarianceRange
+        | DamageError::JsMath(_) => map_pipeline_contradiction(true),
+        DamageError::Rng(source) => BattleResolveError::Rng(source),
+    }
+}
+
+fn map_stat_stage_error(source: StatStageError, after_state: bool) -> BattleResolveError {
+    match source {
+        StatStageError::UnsupportedStatus { status } => {
+            map_unsupported_effect(CapabilitySubject::Status(status))
+        }
+        StatStageError::NonFiniteValue
+        | StatStageError::EffectiveStatOverflow
+        | StatStageError::UnsupportedStat { .. } => map_pipeline_contradiction(after_state),
+    }
+}
+
+fn map_status_error(
+    source: StatusError,
+    fallback_status: Option<StatusKind>,
+    move_id: Option<MoveId>,
+    after_state: bool,
+) -> BattleResolveError {
+    match source {
+        StatusError::UnsupportedStatus { status } => {
+            map_unsupported_effect(CapabilitySubject::Status(status))
+        }
+        StatusError::UnsupportedBypass { .. } => fallback_status
+            .map(|status| map_unsupported_effect(CapabilitySubject::Status(status)))
+            .or_else(|| {
+                move_id.map(|move_id| map_unsupported_effect(CapabilitySubject::Move(move_id)))
+            })
+            .unwrap_or_else(|| map_pipeline_contradiction(after_state)),
+        StatusError::InvalidStatusState { .. }
+        | StatusError::InvalidMaxHp
+        | StatusError::InvalidHp
+        | StatusError::InvalidChance { .. }
+        | StatusError::TurnCountOverflow
+        | StatusError::SafeInteger(_) => map_pipeline_contradiction(after_state),
+        StatusError::Rng(source) => BattleResolveError::Rng(source),
+    }
+}
+
+fn map_replacement_after_error(source: ReplacementError) -> BattleResolveError {
+    map_replacement_error(source, true)
+}
+
+fn map_replacement_error(source: ReplacementError, after_state: bool) -> BattleResolveError {
+    match source {
+        ReplacementError::InvalidField { source } => {
+            map_state_error(StateValidationError::Field(source), after_state)
+        }
+        ReplacementError::InvalidSlot { source, .. } => {
+            map_state_error(StateValidationError::Format(source), after_state)
+        }
+        ReplacementError::NoUnresolvedOccurrence => {
+            CommandLegalityError::UnresolvedFaint.into()
+        }
+        ReplacementError::NotQueueHead { requested, .. } => {
+            CommandLegalityError::ReplacementNotCurrent {
+                occurrence: requested,
+            }
+            .into()
+        }
+        ReplacementError::ReplacementNotRequired { occurrence } => {
+            CommandLegalityError::ReplacementNotRequired { occurrence }.into()
+        }
+        ReplacementError::ProgressNotPending { occurrence, .. } => {
+            CommandLegalityError::ReplacementNotCurrent { occurrence }.into()
+        }
+        ReplacementError::InvalidStoredProgress { occurrence } => map_state_error(
+            StateValidationError::InvalidReplacementProgress { id: occurrence },
+            after_state,
+        ),
+        ReplacementError::StoredFieldMismatch { occurrence } => map_state_error(
+            StateValidationError::DetachedFaintOccurrence { id: occurrence },
+            after_state,
+        ),
+        ReplacementError::StoredPartyMissing { occurrence }
+        | ReplacementError::StoredPartyDuplicate { occurrence }
+        | ReplacementError::StoredActorNotFainted { occurrence } => map_state_error(
+            StateValidationError::InvalidFaintPokemon { id: occurrence },
+            after_state,
+        ),
+        ReplacementError::StoredOwnerMismatch { occurrence } => map_state_error(
+            StateValidationError::FaintOwnerMismatch { id: occurrence },
+            after_state,
+        ),
+        ReplacementError::CandidatePartySlotMissing { .. }
+        | ReplacementError::CandidatePartyIdentityMismatch { .. }
+        | ReplacementError::CandidateOwnerMismatch { .. }
+        | ReplacementError::CandidateNotLiving { .. }
+        | ReplacementError::CandidateAlreadyOnField { .. }
+        | ReplacementError::CandidatePartyDuplicate { .. } => {
+            if after_state {
+                map_pipeline_contradiction(true)
+            } else {
+                CommandLegalityError::CommandSetMismatch.into()
+            }
+        }
+        ReplacementError::LegalReplacementExists => {
+            if after_state {
+                map_pipeline_contradiction(true)
+            } else {
+                CommandLegalityError::LegalReplacementExists.into()
+            }
+        }
+        ReplacementError::NoLegalReplacementExternal => {
+            if after_state {
+                map_pipeline_contradiction(true)
+            } else {
+                map_legality_command(BattleCommandError::NoLegalReplacementProposal)
+            }
+        }
+        ReplacementError::MissingOwner => {
+            if after_state {
+                map_pipeline_contradiction(true)
+            } else {
+                map_legality_command(BattleCommandError::OperationGrammarMismatch {
+                    context: "replacement",
+                })
+            }
+        }
+        ReplacementError::Operation(source) => {
+            CommandLegalityError::Command(source).into()
+        }
+        ReplacementError::PartyIndexInvariant { index } => {
+            CommandLegalityError::SlotIndexInvariant { index }.into()
+        }
+        ReplacementError::StoredSourceCoordinateMismatch { occurrence } => map_state_error(
+            StateValidationError::FaintCoordinateMismatch { id: occurrence },
+            after_state,
+        ),
     }
 }

@@ -8,14 +8,7 @@ use er_state::validation::StateValidationError;
 use er_types::battle_model::CapabilitySubject;
 use thiserror::Error;
 
-use crate::ability_pipeline::AbilityPipelineError;
-use crate::action_order::ActionOrderError;
-use crate::faint::FaintQueueError;
 use crate::legality::CommandLegalityError;
-use crate::move_pipeline::MovePipelineError;
-use crate::replacement::ReplacementError;
-use crate::status::StatusError;
-use crate::switch::SwitchError;
 
 /// A failure found while validating the complete candidate transition.
 #[derive(Debug, Error)]
@@ -84,20 +77,6 @@ pub enum BattleResolveError {
     Digest(#[from] MechanicalDigestError),
     #[error(transparent)]
     Canonical(#[from] CanonicalError),
-    #[error(transparent)]
-    ActionOrder(#[from] ActionOrderError),
-    #[error(transparent)]
-    Ability(#[from] AbilityPipelineError),
-    #[error(transparent)]
-    Move(#[from] MovePipelineError),
-    #[error(transparent)]
-    Switch(#[from] SwitchError),
-    #[error(transparent)]
-    Faint(#[from] FaintQueueError),
-    #[error(transparent)]
-    Replacement(#[from] ReplacementError),
-    #[error(transparent)]
-    Status(#[from] StatusError),
 }
 
 impl From<CommandLegalityError> for BattleResolveError {
