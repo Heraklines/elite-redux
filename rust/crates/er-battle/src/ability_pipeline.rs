@@ -236,6 +236,10 @@ pub enum AbilityPipelineError {
     /// A defensive gate target must already be installed in the field.
     #[error("defensive target slot {slot:?} has no installed occupant")]
     MissingDefensiveTarget { slot: FieldSlot },
+    /// Ability suppression is represented for compatibility but is outside
+    /// the selected M3 mechanical-state slice.
+    #[error("ability suppression is outside the selected M3 slice: {reason:?}")]
+    UnsupportedSuppression { reason: AbilitySuppressionReason },
     /// Native type immunity is terminal and must not reach an ability gate for
     /// a damaging move.
     #[error(
@@ -279,28 +283,15 @@ pub fn evaluate_switch_in(
     )?;
 
     let resolved = resolve_ability(content, source.abilities.active)?;
+    validate_m3_suppression(
+        battle.global_ability_suppression.ignore_abilities,
+        source.abilities.active_suppressed,
+    )?;
     if resolved.is_none() {
         return Ok(SwitchInOutcome::NoOp {
             source: source_id,
             source_slot: incoming_slot,
             ability_id: resolved.ability_id,
-        });
-    }
-
-    if battle.global_ability_suppression.ignore_abilities {
-        return Ok(SwitchInOutcome::Suppressed {
-            source: source_id,
-            source_slot: incoming_slot,
-            ability_id: resolved.ability_id,
-            reason: AbilitySuppressionReason::Global,
-        });
-    }
-    if source.abilities.active_suppressed {
-        return Ok(SwitchInOutcome::Suppressed {
-            source: source_id,
-            source_slot: incoming_slot,
-            ability_id: resolved.ability_id,
-            reason: AbilitySuppressionReason::Active,
         });
     }
 
@@ -394,6 +385,14 @@ pub fn evaluate_defensive_ability(
     input: DefensiveAbilityInput,
     content: &ContentPack,
 ) -> Result<DefensiveAbilityOutcome, AbilityPipelineError> {
+    let resolved = resolve_ability(content, input.ability_id)?;
+    evaluate_defensive_resolved_input(input, resolved)
+}
+
+fn evaluate_defensive_resolved_input(
+    input: DefensiveAbilityInput,
+    resolved: ResolvedAbility,
+) -> Result<DefensiveAbilityOutcome, AbilityPipelineError> {
     if input.move_category != MoveCategory::Status && input.type_effectiveness.is_immune() {
         return Err(AbilityPipelineError::NativeTypeImmunityTerminal {
             ability_id: input.ability_id,
@@ -401,7 +400,6 @@ pub fn evaluate_defensive_ability(
         });
     }
 
-    let resolved = resolve_ability(content, input.ability_id)?;
     Ok(evaluate_defensive_resolved(input, resolved))
 }
 
@@ -439,16 +437,33 @@ pub fn evaluate_defensive_ability_for_target(
         },
     )?;
 
-    evaluate_defensive_ability(
-        DefensiveAbilityInput {
-            ability_id: target.abilities.active,
-            ability_suppressed: target.abilities.active_suppressed,
-            global_suppressed: battle.global_ability_suppression.ignore_abilities,
-            move_category,
-            type_effectiveness,
-        },
-        content,
-    )
+    let input = DefensiveAbilityInput {
+        ability_id: target.abilities.active,
+        ability_suppressed: target.abilities.active_suppressed,
+        global_suppressed: battle.global_ability_suppression.ignore_abilities,
+        move_category,
+        type_effectiveness,
+    };
+    let resolved = resolve_ability(content, input.ability_id)?;
+    validate_m3_suppression(input.global_suppressed, input.ability_suppressed)?;
+    evaluate_defensive_resolved_input(input, resolved)
+}
+
+fn validate_m3_suppression(
+    global_suppressed: bool,
+    ability_suppressed: bool,
+) -> Result<(), AbilityPipelineError> {
+    if global_suppressed {
+        Err(AbilityPipelineError::UnsupportedSuppression {
+            reason: AbilitySuppressionReason::Global,
+        })
+    } else if ability_suppressed {
+        Err(AbilityPipelineError::UnsupportedSuppression {
+            reason: AbilitySuppressionReason::Active,
+        })
+    } else {
+        Ok(())
+    }
 }
 
 fn evaluate_defensive_resolved(

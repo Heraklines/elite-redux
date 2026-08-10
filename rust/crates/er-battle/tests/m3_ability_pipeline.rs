@@ -350,9 +350,38 @@ fn wonder_guard_uses_composed_native_effectiveness_and_status_bypass() -> TestRe
 }
 
 #[test]
-fn damaging_native_immunity_is_terminal_before_wonder_guard() -> TestResult {
+fn damaging_native_immunity_validates_content_and_ability_before_terminal() -> TestResult {
     let content = selected_content_pack()?;
     let native_immunity = TypeEffectiveness::new(EffectivenessMultiplier::Zero);
+
+    let mut corrupt_content = content.clone();
+    corrupt_content.schema_version += 1;
+    assert!(matches!(
+        evaluate_defensive_ability(
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Physical,
+                native_immunity,
+            ),
+            &corrupt_content,
+        ),
+        Err(AbilityPipelineError::Ability(
+            AbilityError::InvalidContentPack {
+                source: ContentPackError::SchemaVersionMismatch { .. }
+            }
+        ))
+    ));
+
+    let unknown = ability_id(999)?;
+    assert!(matches!(
+        evaluate_defensive_ability(
+            defensive_input(unknown, MoveCategory::Physical, native_immunity),
+            &content,
+        ),
+        Err(AbilityPipelineError::Ability(
+            AbilityError::UnsupportedContent { ability_id, .. }
+        )) if ability_id == unknown
+    ));
 
     assert!(matches!(
         evaluate_defensive_ability(
@@ -485,7 +514,7 @@ fn intimidate_clamps_and_reports_no_mutation_at_the_attack_floor() -> TestResult
 }
 
 #[test]
-fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResult {
+fn m3_state_entrypoints_require_occupancy_and_reject_suppression() -> TestResult {
     let content = selected_content_pack()?;
     let source_slot = slot(BattleSide::Player, 0)?;
 
@@ -514,11 +543,22 @@ fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResul
         .global_ability_suppression
         .ignore_abilities = true;
     assert!(matches!(
-        evaluate_switch_in(&globally_suppressed, source_slot, &content)?,
-        SwitchInOutcome::Suppressed {
+        evaluate_switch_in(&globally_suppressed, source_slot, &content),
+        Err(AbilityPipelineError::UnsupportedSuppression {
             reason: AbilitySuppressionReason::Global,
-            ..
-        }
+        })
+    ));
+    assert!(matches!(
+        evaluate_defensive_ability_for_target(
+            &globally_suppressed,
+            slot(BattleSide::Enemy, 0)?,
+            MoveCategory::Physical,
+            TypeEffectiveness::new(EffectivenessMultiplier::One),
+            &content,
+        ),
+        Err(AbilityPipelineError::UnsupportedSuppression {
+            reason: AbilitySuppressionReason::Global,
+        })
     ));
 
     let mut actively_suppressed = ability_battle(
@@ -533,11 +573,27 @@ fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResul
     };
     source.abilities.active_suppressed = true;
     assert!(matches!(
-        evaluate_switch_in(&actively_suppressed, source_slot, &content)?,
-        SwitchInOutcome::Suppressed {
+        evaluate_switch_in(&actively_suppressed, source_slot, &content),
+        Err(AbilityPipelineError::UnsupportedSuppression {
             reason: AbilitySuppressionReason::Active,
-            ..
-        }
+        })
+    ));
+
+    let Some(target) = actively_suppressed.enemy_party.first_mut() else {
+        return Err("ability test target is absent".into());
+    };
+    target.abilities.active_suppressed = true;
+    assert!(matches!(
+        evaluate_defensive_ability_for_target(
+            &actively_suppressed,
+            slot(BattleSide::Enemy, 0)?,
+            MoveCategory::Physical,
+            TypeEffectiveness::new(EffectivenessMultiplier::One),
+            &content,
+        ),
+        Err(AbilityPipelineError::UnsupportedSuppression {
+            reason: AbilitySuppressionReason::Active,
+        })
     ));
     Ok(())
 }
