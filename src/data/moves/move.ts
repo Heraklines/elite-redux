@@ -58,6 +58,7 @@ import {
   erPunchingGloveStripsContact,
   erTacticalBlocksPowder,
 } from "#data/elite-redux/er-tactical-items";
+import { getMoodyMovePriorityDelta } from "#data/elite-redux/moody/moody-scene-adapter";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -1384,7 +1385,7 @@ export abstract class Move implements Localizable {
     applyMoveAttrs("IncrementMovePriorityAttr", user, null, this, priority);
     applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority });
 
-    return priority.value;
+    return priority.value + getMoodyMovePriorityDelta(user, this);
   }
 
   public getPriorityModifier(user: Pokemon, simulated = true): MovePriorityInBracket {

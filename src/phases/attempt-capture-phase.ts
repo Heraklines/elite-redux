@@ -19,6 +19,7 @@ import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
+import { getMoodyCaptureMultiplier } from "#data/elite-redux/moody/moody-scene-adapter";
 import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { Gender } from "#data/gender";
 import {
@@ -101,7 +102,10 @@ export class AttemptCapturePhase extends PokemonPhase {
     const statusMultiplier = pokemon.status ? getStatusEffectCatchRateMultiplier(pokemon.status.effect) : 1;
     const shinyMultiplier = pokemon.isShiny() ? timedEventManager.getShinyCatchMultiplier() : 1;
     const modifiedCatchRate = Math.round(
-      (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m) * statusMultiplier * shinyMultiplier,
+      (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m)
+        * statusMultiplier
+        * shinyMultiplier
+        * getMoodyCaptureMultiplier(pokemon),
     );
     const shakeProbability = Math.round(65536 / Math.pow(255 / modifiedCatchRate, 0.1875)); // Formula taken from gen 6
     const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate);

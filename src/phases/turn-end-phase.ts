@@ -10,6 +10,7 @@ import { isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { erApplyStickyBarbTurnEnd } from "#data/elite-redux/er-tactical-items";
+import { consumeMoodyDeferredDamage } from "#data/elite-redux/moody/moody-scene-adapter";
 import { recordTelemetryTurnOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -196,6 +197,14 @@ export class TurnEndPhase extends FieldPhase {
             });
           }
         }
+      }
+    }
+
+    for (const pokemon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
+      const debt = consumeMoodyDeferredDamage(pokemon);
+      if (debt > 0 && !pokemon.isFainted(true)) {
+        globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} pays its delayed damage debt!`);
+        pokemon.damageAndUpdate(debt, { result: HitResult.OTHER });
       }
     }
 

@@ -12,6 +12,7 @@ import {
   recordCoopEvent,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
+import { canMoodyActWhileAsleep, getMoodyPpCost } from "#data/elite-redux/moody/moody-scene-adapter";
 import { SpeciesFormChangePreMoveTrigger } from "#data/form-change-triggers";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import { getTerrainBlockMessage } from "#data/terrain";
@@ -374,6 +375,7 @@ export class MovePhase extends PokemonPhase {
 
     const bypassSleepHolder = new BooleanHolder(false);
     applyMoveAttrs("BypassSleepAttr", this.pokemon, null, this.move.getMove(), bypassSleepHolder);
+    bypassSleepHolder.value ||= canMoodyActWhileAsleep(this.pokemon, this.move.getMove());
     const cancel = !bypassSleepHolder.value;
     this.triggerStatus(StatusEffect.SLEEP, cancel);
     return cancel;
@@ -706,7 +708,11 @@ export class MovePhase extends PokemonPhase {
     if (!isIgnorePP(this.useMode)) {
       const move = this.move;
       // "commit" to using the move, deducting PP.
-      const ppUsed = 1 + this.getPpIncreaseFromPressure(this.getActiveTargetPokemon());
+      const ppUsed = getMoodyPpCost(
+        this.pokemon,
+        move,
+        1 + this.getPpIncreaseFromPressure(this.getActiveTargetPokemon()),
+      );
       move.usePp(ppUsed);
       globalScene.eventTarget.dispatchEvent(new MoveUsedEvent(this.pokemon.id, move.getMove(), move.ppUsed));
     }

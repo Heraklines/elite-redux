@@ -192,6 +192,13 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
+import {
+  applyMoodyDamageCalculation,
+  getMoodyAccuracyMultiplier,
+  getMoodyHealingMultiplier,
+  getMoodyStatMultiplier,
+  reduceMoodyDeferredDamage,
+} from "#data/elite-redux/moody/moody-scene-adapter";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -1871,11 +1878,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The numeric value of the desired {@linkcode Stat}.
    */
   getStat(stat: PermanentStat, bypassSummonData = true): number {
-    if (!bypassSummonData) {
-      // 0 = no override
-      return this.summonData.stats[stat] || this.stats[stat];
-    }
-    return this.stats[stat];
+    const rawStat = bypassSummonData ? this.stats[stat] : this.summonData.stats[stat] || this.stats[stat];
+    return Math.max(1, Math.floor(rawStat * getMoodyStatMultiplier(this, stat)));
   }
 
   /**
@@ -5197,7 +5201,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     // ER Zoom Lens (held by the attacker): +20% accuracy when the target has
     // already acted this turn.
-    return (accuracyMultiplier.value / evasionMultiplier.value) * erTacticalZoomLensMultiplier(this, target);
+    return (
+      (accuracyMultiplier.value / evasionMultiplier.value)
+      * erTacticalZoomLensMultiplier(this, target)
+      * getMoodyAccuracyMultiplier(this, target, sourceMove)
+    );
   }
 
   /**
@@ -5986,6 +5994,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage.value = Math.min(damage.value, opponentDamageBoostSuppressionCeiling);
     }
 
+    damage.value = applyMoodyDamageCalculation(source, this, move, damage.value, simulated);
+
     // debug message for when damage is applied
     if (!simulated) {
       console.log(`Move: ${move.name} | Attack damage: ${damage.value}`);
@@ -6264,8 +6274,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The true amount of HP restored; may be less than `amount` if `amount` would overheal
    */
   public heal(amount: number): number {
+    amount = Math.floor(amount * getMoodyHealingMultiplier(this));
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    reduceMoodyDeferredDamage(this, healAmount);
     // Healing is an HP presentation boundary just like damage. Record the authoritative post-heal
     // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
     // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
