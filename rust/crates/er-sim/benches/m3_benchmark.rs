@@ -1,37 +1,40 @@
-//! Deterministic M3 Battle-kernel workloads.
+//! Deterministic hosted M3 Battle-kernel workloads.
 //!
-//! The test harness reports only workload identity, input counts, and a
-//! deterministic checksum.  Wall time, RSS, and acceptance are intentionally
-//! owned by `scripts/benchmark-kernel-m3.mjs` on a hosted runner; this source
-//! does not contain fabricated performance values or a local baseline.
+//! Every player action enters through a physical raw-key event.  The only
+//! non-key inputs below are the public presentation-settlement boundary used
+//! by a hosted presenter.  The benchmark reports deterministic checksums and
+//! operation counts; wall time and RSS are measured by the hosted coordinator.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::{self, Write};
 use std::sync::Arc;
+use std::time::Instant;
 
-use er_content::pack::selected_content_pack;
-use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
+use er_content::pack::ContentPack;
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
 };
-use er_protocol::{AuthorityLogConfig, BackoffPolicy};
-use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_state::format::BattleFormat;
-use er_state::pokemon::{
-    AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
+use er_protocol::{
+    AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
+    ProposalLeaseConfig, RecoveryTransactionConfig,
 };
+use er_sim::{PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair};
+use er_state::battle::BattleState;
 use er_state::snapshot::GameState;
+use er_types::battle_control::BattleControl;
 use er_types::battle_command::{
     BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
     scripted_enemy_command_operation_id,
 };
 use er_types::battle_ids::{
-    BattleId, BattleSide, FieldSlot, GameModeId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex,
-    WaveIndex,
+    BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex,
 };
+use er_types::battle_model::BattleOutcome;
+use er_types::battle_ui::PresentationSettlementOutcome;
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
+    ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, PhysicalKey,
     RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 use serde::Serialize;
@@ -39,12 +42,30 @@ use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const EVENTWISE_ITERATIONS: u64 = 128;
-const TEARDOWN_ITERATIONS: u64 = 128;
-const CAMPAIGN_STEPS: u64 = 512;
+const RAW_MENU_EVENTS: u64 = 100_000;
+const SIMPLE_TURN_RESOLUTIONS: u64 = 10_000;
+const COMPLETE_SHORT_BATTLES: u64 = 1_000;
+const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
 const BENCHMARK_SEED: &str = "81985529216486895";
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+const PHYSICAL_HIT_FIXTURE: &str =
+    include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
+const VICTORY_FIXTURE: &str =
+    include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
+const DOUBLES_FIXTURE: &str =
+    include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json");
+const CONTENT_PACK_FIXTURE: &str =
+    include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct Counts {
+    turns: u64,
+    battles: u64,
+    inputs: u64,
+    rng_draws: u64,
+}
 
 fn safe(value: u64) -> SafeU53 {
     match SafeU53::new(value) {
@@ -57,158 +78,391 @@ fn seat(value: u64) -> SeatId {
     SeatId::new(safe(value))
 }
 
-fn pokemon_id(value: u64) -> PokemonId {
-    PokemonId::new(safe(value))
+fn invalid(message: impl Into<String>) -> Box<dyn Error> {
+    io::Error::new(io::ErrorKind::InvalidData, message.into()).into()
 }
 
-fn single_party_pokemon(
-    content: &er_content::pack::ContentPack,
-    id: u64,
-    owner_seat: Option<SeatId>,
-) -> TestResult<PokemonState> {
-    let species = content
-        .species
-        .first()
-        .ok_or("selected content has no species")?;
-    let move_id = content
-        .moves
-        .first()
-        .ok_or("selected content has no moves")?
-        .id;
-    Ok(PokemonState::new(
-        pokemon_id(id),
-        owner_seat,
-        species.id,
-        0,
-        25,
-        species.base_types,
-        BattleStats {
-            hp: 100,
-            attack: 100,
-            defense: 100,
-            special_attack: 100,
-            special_defense: 100,
-            speed: 100,
-        },
-        100,
-        100,
-        StatusState {
-            kind: er_types::battle_model::StatusKind::None,
-            toxic_turn_count: 0,
-            sleep_turns_remaining: None,
-        },
-        StatStages {
-            attack: 0,
-            defense: 0,
-            special_attack: 0,
-            special_defense: 0,
-            speed: 0,
-            accuracy: 0,
-            evasion: 0,
-        },
-        [
-            Some(MoveSlotState {
-                move_id,
-                pp_used: 0,
-                pp_ups: 0,
-                max_pp_override: None,
-            }),
-            None,
-            None,
-            None,
-        ],
-        AbilityLoadout {
-            active: er_types::battle_ids::AbilityId::ZERO,
-            passives: [None, None, None],
-            active_suppressed: false,
-            passive_suppressed: [false, false, false],
-        },
-        false,
-    )?)
+fn elapsed_ns(start: Instant) -> u64 {
+    match u64::try_from(start.elapsed().as_nanos()) {
+        Ok(value) => value,
+        Err(_) => u64::MAX,
+    }
 }
 
-fn battle_kernel(seed: &str, iteration: u64) -> TestResult<GameKernel> {
-    let content = selected_content_pack()?;
-    let battle_id = BattleId::new(safe(1));
-    let wave = WaveIndex::new(safe(1))?;
-    let turn = TurnIndex::new(safe(1))?;
-    let enemy_slot = FieldSlot::new(BattleSide::Enemy, 0)?;
-    let enemy_command = BattleCommand::fight(
-        pokemon_id(2),
-        MoveSlotIndex::ZERO,
-        BattleTargetSelection::implicit(),
-    )?;
-    let enemy_operation = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        turn,
-        enemy_slot,
-        safe(0),
-    )?;
-    let enemy_script = ScriptedEnemyBattleCommandV1::new(
-        enemy_operation,
-        battle_id,
-        wave,
-        turn,
-        safe(0),
-        pokemon_id(2),
-        enemy_slot,
-        enemy_command,
-    )?;
-    let run_state = GameState::new(
-        content.hash.clone(),
-        GameModeId::new(safe(1)),
-        wave,
-        battle_id,
-        RunRngState {
-            rdg: PhaserRdg::from_seed(seed).state(),
-        },
-        None,
-    )?;
-    let config = BattleGameConfig {
+fn fixture_value(source: &str) -> TestResult<Value> {
+    Ok(serde_json::from_str(source)?)
+}
+
+fn normalize_nested_kind(object: &mut Value, path: &str, field_name: &str) -> TestResult {
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+    let kind = object
+        .get(field_name)
+        .cloned()
+        .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
+    let normalized = match kind {
+        Value::String(_) => kind,
+        Value::Object(nested) => {
+            if nested.len() != 1 || !nested.contains_key("kind") {
+                return Err(invalid(format!(
+                    "{path}.{field_name} has an unsupported nested kind shape"
+                )));
+            }
+            let tag = nested
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid(format!("{path}.{field_name}.kind is not a string")))?;
+            Value::String(tag.to_owned())
+        }
+        other => {
+            return Err(invalid(format!(
+                "{path}.{field_name} has unsupported value {other}"
+            )));
+        }
+    };
+    object.insert(field_name.to_owned(), normalized);
+    Ok(())
+}
+
+fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
+    let canonical = state
+        .get_mut("canonical")
+        .ok_or_else(|| invalid("initial_state.canonical is missing"))?;
+    let battle = canonical
+        .get_mut("battle")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("initial_state.canonical.battle is invalid"))?;
+
+    let format_slots = battle
+        .get("format")
+        .and_then(Value::as_object)
+        .and_then(|format| format.get("slots"))
+        .cloned()
+        .ok_or_else(|| invalid("initial_state.canonical.battle.format.slots is missing"))?;
+    let field_slots = battle
+        .get("field")
+        .and_then(Value::as_object)
+        .and_then(|field| field.get("slots"))
+        .cloned()
+        .ok_or_else(|| invalid("initial_state.canonical.battle.field.slots is missing"))?;
+    if !format_slots.is_array() || !field_slots.is_array() {
+        return Err(invalid(
+            "initial_state canonical format.slots and field.slots must be arrays",
+        ));
+    }
+    if format_slots != field_slots {
+        return Err(invalid(
+            "initial_state canonical format.slots does not equal field.slots",
+        ));
+    }
+    let format = battle
+        .get_mut("format")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("initial_state.canonical.battle.format is invalid"))?;
+    if format.remove("slots").is_none() {
+        return Err(invalid(
+            "initial_state.canonical.battle.format.slots could not be removed",
+        ));
+    }
+
+    for party_name in ["player_party", "enemy_party"] {
+        let party = battle
+            .get_mut(party_name)
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "initial_state.canonical.battle.{party_name} is invalid"
+                ))
+            })?;
+        for (index, pokemon) in party.iter_mut().enumerate() {
+            let status = pokemon.get_mut("status").ok_or_else(|| {
+                invalid(format!(
+                    "initial_state.canonical.battle.{party_name}[{index}].status is missing"
+                ))
+            })?;
+            normalize_nested_kind(
+                status,
+                &format!("initial_state.canonical.battle.{party_name}[{index}].status"),
+                "kind",
+            )?;
+        }
+    }
+    for condition_name in ["weather", "terrain"] {
+        let condition = battle.get_mut(condition_name).ok_or_else(|| {
+            invalid(format!(
+                "initial_state.canonical.battle.{condition_name} is missing"
+            ))
+        })?;
+        normalize_nested_kind(
+            condition,
+            &format!("initial_state.canonical.battle.{condition_name}"),
+            "kind",
+        )?;
+    }
+    Ok(())
+}
+
+fn fixture_content_pack() -> TestResult<Arc<ContentPack>> {
+    let wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
+    let value = wire
+        .get("content_pack")
+        .cloned()
+        .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
+    Ok(Arc::new(serde_json::from_value(value)?))
+}
+
+fn canonical_state(fixture: &Value) -> TestResult<GameState> {
+    let mut initial_state = fixture
+        .get("initial_state")
+        .cloned()
+        .ok_or_else(|| invalid("battle fixture has no initial_state"))?;
+    normalize_legacy_initial_state(&mut initial_state)?;
+    let canonical = initial_state
+        .get("canonical")
+        .cloned()
+        .ok_or_else(|| invalid("battle fixture has no initial canonical state"))?;
+    Ok(serde_json::from_value(canonical)?)
+}
+
+fn lead_indices(battle: &BattleState, side: BattleSide, capacity: u8) -> TestResult<Vec<PartyIndex>> {
+    (0..capacity)
+        .map(|position| {
+            let slot = FieldSlot::new(side, position)?;
+            let pokemon_id = battle
+                .field
+                .occupant(&battle.format, slot)?
+                .ok_or_else(|| invalid(format!("{side:?} lead slot {position} is empty")))?;
+            let party = match side {
+                BattleSide::Player => &battle.player_party,
+                BattleSide::Enemy => &battle.enemy_party,
+            };
+            let index = party
+                .iter()
+                .position(|pokemon| pokemon.id == pokemon_id)
+                .ok_or_else(|| invalid(format!("lead {pokemon_id:?} is not in the party")))?;
+            Ok(PartyIndex::try_from(index as u64)?)
+        })
+        .collect()
+}
+
+fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicyV1> {
+    let mut commands = Vec::new();
+    for position in 0..battle.format.enemy_capacity {
+        let field_slot = FieldSlot::new(BattleSide::Enemy, position)?;
+        let actor = battle
+            .field
+            .occupant(&battle.format, field_slot)?
+            .ok_or_else(|| invalid(format!("enemy lead slot {position} is empty")))?;
+        let target_position = position.min(battle.format.player_capacity.saturating_sub(1));
+        let target = FieldSlot::new(BattleSide::Player, target_position)?;
+        let command = BattleCommand::fight(
+            actor,
+            MoveSlotIndex::ZERO,
+            BattleTargetSelection::selected(vec![target])?,
+        )?;
+        let operation_id = scripted_enemy_command_operation_id(
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            field_slot,
+            safe(u64::from(position)),
+        )?;
+        commands.push(ScriptedEnemyBattleCommandV1::new(
+            operation_id,
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            safe(u64::from(position)),
+            actor,
+            field_slot,
+            command,
+        )?);
+    }
+    Ok(ScriptedEnemyPolicyV1::new(safe(0), commands)?)
+}
+
+fn battle_config(
+    fixture: &Value,
+    local_seat: SeatId,
+    force_short_victory: bool,
+) -> TestResult<BattleGameConfig> {
+    let canonical = canonical_state(fixture)?;
+    let mut battle = canonical
+        .battle
+        .clone()
+        .ok_or_else(|| invalid("battle fixture has no active battle"))?;
+    if force_short_victory {
+        for pokemon in &mut battle.enemy_party {
+            pokemon.hp = 1;
+        }
+    }
+
+    let mut run_state = canonical;
+    run_state.battle = None;
+    run_state.next_battle_id = battle.battle_id.clone();
+    let player_leads = lead_indices(&battle, BattleSide::Player, battle.format.player_capacity)?;
+    let enemy_leads = lead_indices(&battle, BattleSide::Enemy, battle.format.enemy_capacity)?;
+    Ok(BattleGameConfig {
         run_state,
         start: BattleStartV1 {
-            schema_version: BATTLE_START_SCHEMA_VERSION,
-            format: BattleFormat::single(),
-            player_party: vec![single_party_pokemon(&content, 1, Some(seat(1)))?],
-            enemy_party: vec![single_party_pokemon(&content, 2, None)?],
-            player_leads: vec![PartyIndex::ZERO],
-            enemy_leads: vec![PartyIndex::ZERO],
+            schema_version: 1,
+            format: battle.format.clone(),
+            player_party: battle.player_party.clone(),
+            enemy_party: battle.enemy_party.clone(),
+            player_leads,
+            enemy_leads,
         },
-        local_seat: seat(1),
-        wave_seed: format!("{seed}/wave/{iteration}"),
-        scripted_enemy_policy: ScriptedEnemyPolicyV1::new(safe(0), vec![enemy_script])?,
-    };
-    let context = FrameContext {
-        session_id: SessionId::new(format!("m3-benchmark-session-{iteration}"))?,
-        run_id: RunId::new(format!("m3-benchmark-run-{iteration}"))?,
+        local_seat,
+        wave_seed: battle.wave_seed.clone(),
+        scripted_enemy_policy: scripted_enemy_policy(&battle)?,
+    })
+}
+
+fn context(
+    prefix: &str,
+    iteration: u64,
+    sender_seat_id: SeatId,
+    authority_seat_id: SeatId,
+    connection_generation: ConnectionGeneration,
+) -> TestResult<FrameContext> {
+    Ok(FrameContext {
+        session_id: SessionId::new(format!("{prefix}-session-{iteration}"))?,
+        run_id: RunId::new(format!("{prefix}-run-{iteration}"))?,
         session_epoch: safe(1),
-        seat_map_id: "m3-benchmark-single-seat".to_owned(),
+        seat_map_id: format!("{prefix}-seat-map-{iteration}"),
         membership_revision: MembershipRevision::new(safe(1)),
-        sender_seat_id: seat(1),
-        authority_seat_id: seat(1),
-        connection_generation: ConnectionGeneration::ZERO,
-    };
-    let protocol = BattleProtocolConfig {
+        sender_seat_id,
+        authority_seat_id,
+        connection_generation,
+    })
+}
+
+fn authority_protocol(
+    prefix: &str,
+    iteration: u64,
+    host: SeatId,
+    guest: Option<SeatId>,
+    connection_generation: ConnectionGeneration,
+) -> TestResult<BattleProtocolConfig> {
+    Ok(BattleProtocolConfig {
         role: BattleProtocolRoleConfig::Authority {
             log: AuthorityLogConfig {
-                local_context: context,
-                peer_bindings: Vec::new(),
-                owner_id: format!("m3-benchmark-authority-{iteration}"),
+                local_context: context(
+                    prefix,
+                    iteration,
+                    host,
+                    host,
+                    connection_generation,
+                )?,
+                peer_bindings: guest
+                    .into_iter()
+                    .map(|seat_id| PeerBinding {
+                        seat_id,
+                        connection_generation,
+                    })
+                    .collect(),
+                owner_id: format!("{prefix}:authority:{iteration}"),
                 retain_capacity: safe(32),
                 delivery_backoff: BackoffPolicy {
-                    initial_ms: safe(250),
-                    maximum_ms: safe(5_000),
+                    initial_ms: safe(1),
+                    maximum_ms: safe(64),
                     factor_numerator: safe(2),
                     factor_denominator: safe(1),
                 },
                 delivery_time_class: TimeClass::Connected,
                 max_delivery_attempts: Some(safe(8)),
             },
-            proposal_capacity: safe(32),
+            proposal_capacity: safe(64),
         },
-    };
-    Ok(GameKernel::new_battle(config, protocol, Arc::new(content))?)
+    })
+}
+
+fn replica_protocol(
+    prefix: &str,
+    iteration: u64,
+    host: SeatId,
+    guest: SeatId,
+    connection_generation: ConnectionGeneration,
+) -> TestResult<BattleProtocolConfig> {
+    let guest_context = context(
+        prefix,
+        iteration,
+        guest,
+        host,
+        connection_generation,
+    )?;
+    Ok(BattleProtocolConfig {
+        role: BattleProtocolRoleConfig::Replica {
+            replica: AuthorityReplicaConfig {
+                receipt_context: guest_context.clone(),
+                authority_seat_id: host,
+                authority_connection_generation: connection_generation,
+            },
+            proposal_leases: ProposalLeaseConfig {
+                owner_prefix: format!("{prefix}:proposal:{iteration}:"),
+                retry_initial_ms: safe(1),
+                retry_maximum_ms: safe(64),
+                absolute_ceiling_ms: safe(1_200_000),
+            },
+            recovery: RecoveryTransactionConfig {
+                local_context: guest_context,
+                request_timeout_ms: safe(300_000),
+                control_timeout_ms: safe(30_000),
+                pacing_ms: safe(16),
+                timer_owner_id: format!("{prefix}:recovery:{iteration}"),
+            },
+        },
+    })
+}
+
+fn new_local_kernel(
+    fixture: &Value,
+    content: &Arc<ContentPack>,
+    iteration: u64,
+) -> TestResult<GameKernel> {
+    let local_seat = seat(1);
+    let config = battle_config(fixture, local_seat, false)?;
+    let protocol = authority_protocol(
+        "m3-benchmark-local",
+        iteration,
+        local_seat,
+        None,
+        ConnectionGeneration::ZERO,
+    )?;
+    Ok(GameKernel::new_battle(config, protocol, Arc::clone(content))?)
+}
+
+fn new_pair(
+    fixture: &Value,
+    content: &Arc<ContentPack>,
+    iteration: u64,
+    force_short_victory: bool,
+) -> TestResult<SimulatedPair> {
+    let host = seat(1);
+    let guest = seat(2);
+    let generation = ConnectionGeneration::new(safe(1));
+    Ok(SimulatedPair::new_battle(SimulatedBattlePairConfig {
+        host_game: battle_config(fixture, host, force_short_victory)?,
+        host_protocol: authority_protocol(
+            "m3-benchmark-pair",
+            iteration,
+            host,
+            Some(guest),
+            generation,
+        )?,
+        guest_game: battle_config(fixture, guest, force_short_victory)?,
+        guest_protocol: replica_protocol(
+            "m3-benchmark-pair",
+            iteration,
+            host,
+            guest,
+            generation,
+        )?,
+        content: Arc::clone(content),
+        replay_seed: 0x4c,
+        initial_storage: BTreeMap::new(),
+    })?)
 }
 
 fn key_down(code: PhysicalKey) -> RawInputEvent {
@@ -224,9 +478,9 @@ fn key_up(code: PhysicalKey) -> RawInputEvent {
     RawInputEvent::KeyUp { code }
 }
 
-fn raw_input(event: RawInputEvent) -> KernelInput {
+fn raw_input(local_seat: SeatId, event: RawInputEvent) -> KernelInput {
     KernelInput::RawInput {
-        seat: seat(1),
+        seat: local_seat,
         event,
     }
 }
@@ -250,29 +504,462 @@ fn assert_no_legacy_success_effects(effects: &[KernelEffect]) {
     }));
 }
 
-fn assert_eventwise_kernel_parity(
-    left: &GameKernel,
-    right: &GameKernel,
-    left_effects: &[KernelEffect],
-    right_effects: &[KernelEffect],
-) {
-    assert_eq!(left_effects, right_effects, "event effects diverged");
-    assert_eq!(left.snapshot(), right.snapshot(), "event snapshots diverged");
+fn count_rng_draws(effects: &[KernelEffect]) -> u64 {
+    effects
+        .iter()
+        .filter_map(|effect| {
+            let KernelEffect::SendFrame { frame, .. } = effect else {
+                return None;
+            };
+            if frame.frame_type != FrameType::AuthorityEntry {
+                return None;
+            }
+            frame
+                .body
+                .get("material")
+                .and_then(|material| material.get("payload"))
+                .and_then(|payload| {
+                    payload
+                        .get("rng_audit")
+                        .or_else(|| payload.get("rngAudit"))
+                })
+                .and_then(Value::as_array)
+                .map(|draws| draws.len() as u64)
+        })
+        .sum()
+}
+
+fn run_kernel_input(
+    kernel: &mut GameKernel,
+    input: KernelInput,
+    checksum: &mut u64,
+    counts: &mut Counts,
+) -> TestResult<Vec<KernelEffect>> {
+    counts.inputs = counts.inputs.saturating_add(1);
+    let effects = kernel.step(input)?;
+    assert_no_legacy_success_effects(&effects);
+    counts.rng_draws = counts.rng_draws.saturating_add(count_rng_draws(&effects));
+    absorb(checksum, &effects)?;
+    absorb(checksum, &kernel.snapshot())?;
+    absorb(checksum, &kernel.state_digest())?;
+    absorb(checksum, &kernel.battle_ui_projection())?;
+    absorb(checksum, &kernel.live_resources())?;
+    Ok(effects)
+}
+
+fn raw_press_local(
+    kernel: &mut GameKernel,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    code: PhysicalKey,
+) -> TestResult<Vec<KernelEffect>> {
+    let local_seat = seat(1);
+    let mut effects = run_kernel_input(
+        kernel,
+        raw_input(local_seat, key_down(code.clone())),
+        checksum,
+        counts,
+    )?;
+    effects.extend(run_kernel_input(
+        kernel,
+        raw_input(local_seat, key_up(code)),
+        checksum,
+        counts,
+    )?);
+    Ok(effects)
+}
+
+fn settle_local_presentations(
+    kernel: &mut GameKernel,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    effects: &[KernelEffect],
+) -> TestResult<()> {
+    let mut events = Vec::<BattlePresentationEventId>::new();
+    for effect in effects {
+        if let KernelEffect::PresentBattle { event, .. } = effect
+            && !events.contains(&event.event_id)
+        {
+            events.push(event.event_id.clone());
+        }
+    }
+    for event_id in events {
+        run_kernel_input(
+            kernel,
+            KernelInput::BattlePresentationOutcome {
+                endpoint: seat(1),
+                event_id,
+                outcome: PresentationSettlementOutcome::Settled,
+            },
+            checksum,
+            counts,
+        )?;
+    }
+    Ok(())
+}
+
+fn dispose_local_kernel(
+    kernel: &mut GameKernel,
+    checksum: &mut u64,
+    reason: &str,
+) -> TestResult {
+    let effects = kernel.dispose(reason);
+    assert_no_legacy_success_effects(&effects);
+    absorb(checksum, &effects)?;
+    absorb(checksum, &kernel.live_resources())?;
+    assert!(kernel.is_disposed());
     assert_eq!(
-        left.state_digest(),
-        right.state_digest(),
-        "event state digests diverged"
+        kernel.live_resources(),
+        er_types::LiveResourceSnapshot::default()
+    );
+    Ok(())
+}
+
+fn assert_zero_pair_resources(snapshot: &er_sim::PairSnapshot) {
+    assert_eq!(
+        snapshot.host.live_resources,
+        er_types::LiveResourceSnapshot::default()
     );
     assert_eq!(
-        left.battle_ui_projection(),
-        right.battle_ui_projection(),
-        "event Battle UI projections diverged"
+        snapshot.guest.live_resources,
+        er_types::LiveResourceSnapshot::default()
     );
-    assert_eq!(
-        left.live_resources(),
-        right.live_resources(),
-        "event live-resource projections diverged"
-    );
+    assert!(snapshot.clock_timers.is_empty());
+    assert!(snapshot.network.queued_packet_ids.is_empty());
+    assert!(snapshot.network.disconnected_endpoints.is_empty());
+    assert!(snapshot.network.suspended_endpoints.is_empty());
+    assert!(snapshot.network.disposed);
+    assert!(snapshot.presenter.pending_event_ids.is_empty());
+    assert!(snapshot.presenter.settled_event_ids.is_empty());
+    assert!(snapshot.presenter.disposed);
+    for endpoint in [&snapshot.host, &snapshot.guest] {
+        assert!(endpoint.presenter.pending_event_ids.is_empty());
+        assert!(endpoint.presenter.settled_event_ids.is_empty());
+        assert!(endpoint.presenter.disposed);
+    }
+    assert!(snapshot.storage.keys.is_empty());
+    assert!(snapshot.storage.pending_request_ids.is_empty());
+    assert!(snapshot.storage.disposed);
+}
+
+fn pair_endpoint_for_seat(value: SeatId) -> TestResult<PairEndpoint> {
+    if value == seat(1) {
+        Ok(PairEndpoint::Host)
+    } else if value == seat(2) {
+        Ok(PairEndpoint::Guest)
+    } else {
+        Err(invalid(format!("pair effect used unknown seat {value:?}")))
+    }
+}
+
+fn record_pair_presentations(
+    step: &PairStep,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+) -> TestResult {
+    for effect in &step.generated_effects {
+        if let KernelEffect::PresentBattle { endpoint, event } = effect {
+            let key = (pair_endpoint_for_seat(*endpoint)?, event.event_id.clone());
+            if !pending.contains(&key) {
+                pending.push(key);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct TurnEvidence {
+    authority_turn_commits: u64,
+    replica_turn_commits: u64,
+}
+
+fn record_pair_turn_evidence(step: &PairStep, evidence: &mut TurnEvidence) -> TestResult {
+    for effect in &step.generated_effects {
+        let KernelEffect::SendFrame { from, frame } = effect else {
+            continue;
+        };
+        if frame.frame_type != FrameType::AuthorityEntry {
+            continue;
+        }
+        let kind = frame
+            .body
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("authority-entry frame has no string kind"))?;
+        if kind != "TURN_COMMIT" {
+            continue;
+        }
+        if *from == seat(1) {
+            evidence.authority_turn_commits =
+                evidence.authority_turn_commits.saturating_add(1);
+        } else if *from == seat(2) {
+            evidence.replica_turn_commits = evidence.replica_turn_commits.saturating_add(1);
+        } else {
+            return Err(invalid(format!(
+                "TURN_COMMIT frame used unknown sender seat {from:?}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn state_battle<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
+    let battle = state
+        .get("battle")
+        .ok_or_else(|| invalid(format!("{label} has no battle state")))?;
+    if !battle.is_object() {
+        return Err(invalid(format!("{label}.battle is not an object")));
+    }
+    Ok(battle)
+}
+
+fn state_turn(state: &Value, label: &str) -> TestResult<u64> {
+    state_battle(state, label)?
+        .get("turn")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| invalid(format!("{label}.battle.turn is not a non-negative integer")))
+}
+
+fn assert_local_victory_terminal(kernel: &GameKernel, label: &str) -> TestResult {
+    let snapshot = kernel.snapshot();
+    let outcome = state_battle(&snapshot.state, label)?
+        .get("outcome")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid(format!("{label}.battle.outcome is not a string")))?;
+    if outcome != "VICTORY" {
+        return Err(invalid(format!(
+            "{label}.battle.outcome is {outcome}, expected VICTORY"
+        )));
+    }
+    let projection = kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid(format!("{label} has no Battle UI projection")))?;
+    if projection.actionable {
+        return Err(invalid(format!(
+            "{label} remained actionable after terminal victory"
+        )));
+    }
+    if !matches!(
+        &projection.seat_control.control,
+        BattleControl::Complete(BattleOutcome::Victory)
+    ) {
+        return Err(invalid(format!(
+            "{label} control did not reach Complete(Victory)"
+        )));
+    }
+    if !kernel.live_resources().battle_presentations.is_empty() {
+        return Err(invalid(format!(
+            "{label} retained unsettled battle presentations"
+        )));
+    }
+    Ok(())
+}
+
+fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> TestResult {
+    let battle = state_battle(state, label)?;
+    let command_state = battle
+        .get("command_state")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid(format!("{label}.battle.command_state is invalid")))?;
+    let frontier = command_state
+        .get("frontier")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid(format!("{label}.battle.command_state.frontier is invalid")))?;
+    if frontier.is_empty() {
+        return Err(invalid(format!(
+            "{label}.battle.command_state.frontier is empty"
+        )));
+    }
+    let expected_fragment = format!("/turn/{expected_turn}/");
+    for (index, entry) in frontier.iter().enumerate() {
+        let operation_id = entry
+            .get("operation_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid(format!("{label}.frontier[{index}].operation_id is invalid")))?;
+        if !operation_id.contains(expected_fragment.as_str()) {
+            return Err(invalid(format!(
+                "{label}.frontier[{index}] is {operation_id}, expected turn {expected_turn}"
+            )));
+        }
+        let status_kind = entry
+            .get("status")
+            .and_then(Value::as_object)
+            .and_then(|status| status.get("kind"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid(format!("{label}.frontier[{index}].status.kind is invalid")))?;
+        if status_kind != "PENDING" {
+            return Err(invalid(format!(
+                "{label}.frontier[{index}] is not a pending supported control"
+            )));
+        }
+    }
+    let outcome = battle
+        .get("outcome")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid(format!("{label}.battle.outcome is invalid")))?;
+    if outcome != "ONGOING" {
+        return Err(invalid(format!(
+            "{label}.battle.outcome is {outcome}, expected ONGOING"
+        )));
+    }
+    Ok(())
+}
+
+fn assert_supported_turn_transition(
+    before: &Value,
+    after: &Value,
+    label: &str,
+) -> TestResult {
+    let before_turn = state_turn(before, &format!("{label} before"))?;
+    let expected_turn = before_turn
+        .checked_add(1)
+        .ok_or_else(|| invalid(format!("{label} turn counter exhausted")))?;
+    let after_turn = state_turn(after, &format!("{label} after"))?;
+    if after_turn != expected_turn {
+        return Err(invalid(format!(
+            "{label} advanced from turn {before_turn} to {after_turn}, expected exactly one turn"
+        )));
+    }
+    assert_frontier_at_turn(before, before_turn, &format!("{label} before"))?;
+    assert_frontier_at_turn(after, after_turn, &format!("{label} after"))?;
+    Ok(())
+}
+
+fn mechanical_state(state: &Value, label: &str) -> TestResult<Value> {
+    let mut mechanical = state.clone();
+    let object = mechanical
+        .as_object_mut()
+        .ok_or_else(|| invalid(format!("{label} is not an object")))?;
+    for field_name in ["terminal", "liveResources", "disposed"] {
+        object.remove(field_name);
+    }
+    Ok(mechanical)
+}
+
+fn assert_pair_control_convergence(snapshot: &er_sim::PairSnapshot) -> TestResult {
+    if mechanical_state(&snapshot.host.kernel.state, "two-client host state")?
+        != mechanical_state(&snapshot.guest.kernel.state, "two-client guest state")?
+    {
+        return Err(invalid(
+            "two-client supported turn host/guest mechanical state does not converge",
+        ));
+    }
+    let mut host_ui = snapshot.host.ui.clone();
+    let mut guest_ui = snapshot.guest.ui.clone();
+    host_ui.owner_seat = None;
+    guest_ui.owner_seat = None;
+    if host_ui != guest_ui {
+        return Err(invalid(
+            "two-client supported turn host/guest control projection does not converge",
+        ));
+    }
+    Ok(())
+}
+
+fn assert_two_client_supported_turn(
+    before: &er_sim::PairSnapshot,
+    after: &er_sim::PairSnapshot,
+    evidence: &TurnEvidence,
+) -> TestResult {
+    assert_supported_turn_transition(
+        &before.host.kernel.state,
+        &after.host.kernel.state,
+        "two-client host",
+    )?;
+    assert_supported_turn_transition(
+        &before.guest.kernel.state,
+        &after.guest.kernel.state,
+        "two-client guest",
+    )?;
+    if state_turn(&after.host.kernel.state, "two-client host after")?
+        != state_turn(&after.guest.kernel.state, "two-client guest after")?
+    {
+        return Err(invalid(
+            "two-client supported turn host/guest turn counters differ after delivery",
+        ));
+    }
+    if after.terminal_reason.is_some() {
+        return Err(invalid(
+            "two-client supported turn reached terminal state instead of a supported next control",
+        ));
+    }
+    assert_pair_control_convergence(after)?;
+    if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
+        return Err(invalid(format!(
+            "two-client supported turn authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
+            evidence.authority_turn_commits, evidence.replica_turn_commits
+        )));
+    }
+    Ok(())
+}
+
+fn run_pair_operation(
+    pair: &mut SimulatedPair,
+    operation: PairOperation,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult<PairStep> {
+    counts.inputs = counts.inputs.saturating_add(1);
+    let step = pair.apply(operation)?;
+    assert_no_legacy_success_effects(&step.generated_effects);
+    counts.rng_draws = counts
+        .rng_draws
+        .saturating_add(count_rng_draws(&step.generated_effects));
+    absorb(checksum, &step)?;
+    record_pair_presentations(&step, pending)?;
+    record_pair_turn_evidence(&step, evidence)?;
+    Ok(step)
+}
+
+fn raw_press_pair(
+    pair: &mut SimulatedPair,
+    endpoint: PairEndpoint,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+    code: PhysicalKey,
+) -> TestResult {
+    for event in [key_down(code.clone()), key_up(code)] {
+        run_pair_operation(
+            pair,
+            PairOperation::RawInput { endpoint, event },
+            checksum,
+            counts,
+            pending,
+            evidence,
+        )?;
+    }
+    Ok(())
+}
+
+fn settle_pair_presentations(
+    pair: &mut SimulatedPair,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult {
+    let mut cursor = 0;
+    while cursor < pending.len() {
+        let (endpoint, event_id) = pending[cursor].clone();
+        run_pair_operation(
+            pair,
+            PairOperation::BattlePresentationOutcome {
+                endpoint,
+                event_id,
+                outcome: PresentationSettlementOutcome::Settled,
+            },
+            checksum,
+            counts,
+            pending,
+            evidence,
+        )?;
+        cursor += 1;
+    }
+    Ok(())
 }
 
 fn report(
@@ -281,6 +968,9 @@ fn report(
     iterations: u64,
     steps: u64,
     checksum: u64,
+    content_load_elapsed_ns: u64,
+    execution_elapsed_ns: u64,
+    counts: &Counts,
     details: Value,
 ) -> TestResult {
     assert_ne!(checksum, FNV_OFFSET, "benchmark checksum must include work");
@@ -292,6 +982,13 @@ fn report(
         "steps": steps,
         "checksum": format!("{checksum:016x}"),
         "success": true,
+        "content_load_elapsed_ns": content_load_elapsed_ns,
+        "execution_elapsed_ns": execution_elapsed_ns,
+        "counts": counts,
+        "turns": counts.turns,
+        "battles": counts.battles,
+        "inputs": counts.inputs,
+        "rng_draws": counts.rng_draws,
         "details": details,
     });
     let mut stdout = io::stdout().lock();
@@ -305,134 +1002,331 @@ fn report(
 }
 
 #[test]
-fn m3_eventwise_battle_replay() -> TestResult {
+fn m3_raw_menu_events() -> TestResult {
+    let content_started = Instant::now();
+    let content = fixture_content_pack()?;
+    let content_load_elapsed_ns = elapsed_ns(content_started);
+    let fixture = fixture_value(PHYSICAL_HIT_FIXTURE)?;
+    let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
-    for iteration in 0..EVENTWISE_ITERATIONS {
-        let mut left = battle_kernel(BENCHMARK_SEED, iteration)?;
-        let mut right = battle_kernel(BENCHMARK_SEED, iteration)?;
-        for code in [PhysicalKey::Enter, PhysicalKey::Backspace] {
-            let pressed = raw_input(key_down(code.clone()));
-            let left_effects = left.step(pressed.clone())?;
-            let right_effects = right.step(pressed)?;
-            assert_eventwise_kernel_parity(&left, &right, &left_effects, &right_effects);
-            assert_no_legacy_success_effects(&left_effects);
-            absorb(&mut checksum, &left_effects)?;
-            absorb(&mut checksum, &left.snapshot())?;
-            absorb(&mut checksum, &left.battle_ui_projection())?;
-            absorb(&mut checksum, &left.live_resources())?;
-
-            let released = raw_input(key_up(code));
-            let left_effects = left.step(released.clone())?;
-            let right_effects = right.step(released)?;
-            assert_eventwise_kernel_parity(&left, &right, &left_effects, &right_effects);
-            assert_no_legacy_success_effects(&left_effects);
-            absorb(&mut checksum, &left_effects)?;
-            absorb(&mut checksum, &left.snapshot())?;
-            absorb(&mut checksum, &left.battle_ui_projection())?;
-            absorb(&mut checksum, &left.live_resources())?;
-        }
-        let left_dispose = left.dispose("m3 benchmark eventwise teardown");
-        let right_dispose = right.dispose("m3 benchmark eventwise teardown");
-        assert_eq!(left_dispose, right_dispose);
-        assert_no_legacy_success_effects(&left_dispose);
-        assert_eq!(
-            left.live_resources(),
-            er_types::LiveResourceSnapshot::default()
-        );
-        assert_eq!(
-            right.live_resources(),
-            er_types::LiveResourceSnapshot::default()
-        );
-        absorb(&mut checksum, &left_dispose)?;
-    }
-    report(
-        "eventwise-battle-replay",
-        BENCHMARK_SEED,
-        EVENTWISE_ITERATIONS,
-        0,
-        checksum,
-        json!({"external_events_per_iteration": 4}),
-    )
-}
-
-#[test]
-fn m3_zero_resource_teardown() -> TestResult {
-    let mut checksum = FNV_OFFSET;
-    for iteration in 0..TEARDOWN_ITERATIONS {
-        let mut kernel = battle_kernel(BENCHMARK_SEED, iteration)?;
-        let effects = kernel.step(raw_input(key_down(PhysicalKey::Enter)))?;
-        assert_no_legacy_success_effects(&effects);
-        absorb(&mut checksum, &effects)?;
-        let dispose_effects = kernel.dispose("m3 benchmark zero-resource teardown");
-        assert_no_legacy_success_effects(&dispose_effects);
-        assert!(kernel.is_disposed());
-        assert_eq!(
-            kernel.live_resources(),
-            er_types::LiveResourceSnapshot::default()
-        );
-        assert!(kernel.dispose("m3 benchmark repeated teardown").is_empty());
-        assert!(
-            kernel
-                .step(raw_input(key_down(PhysicalKey::Enter)))
-                .is_err(),
-            "zero-resource workload accepted input after teardown"
-        );
-        absorb(&mut checksum, &dispose_effects)?;
-        absorb(&mut checksum, &kernel.live_resources())?;
-    }
-    report(
-        "zero-resource-teardown",
-        BENCHMARK_SEED,
-        TEARDOWN_ITERATIONS,
-        0,
-        checksum,
-        json!({"resource_projection": "LiveResourceSnapshot::default"}),
-    )
-}
-
-#[test]
-fn m3_raw_event_campaign() -> TestResult {
-    let mut checksum = FNV_OFFSET;
-    let mut kernel = battle_kernel(BENCHMARK_SEED, CAMPAIGN_STEPS)?;
-    for cycle in 0..(CAMPAIGN_STEPS / 4) {
-        let code = if cycle % 2 == 0 {
-            PhysicalKey::Enter
-        } else {
-            PhysicalKey::Backspace
-        };
-        for event in [key_down(code.clone()), key_up(code)] {
-            let effects = kernel.step(raw_input(event))?;
-            assert_no_legacy_success_effects(&effects);
-            absorb(&mut checksum, &effects)?;
-            absorb(&mut checksum, &kernel.state_digest())?;
-            absorb(&mut checksum, &kernel.live_resources())?;
-        }
-        let navigation = if cycle % 2 == 0 {
+    let mut counts = Counts::default();
+    let mut kernel = new_local_kernel(&fixture, &content, RAW_MENU_EVENTS)?;
+    for index in 0..RAW_MENU_EVENTS {
+        let cycle = index / 4;
+        let code = if index % 4 < 2 {
+            if cycle % 2 == 0 {
+                PhysicalKey::Enter
+            } else {
+                PhysicalKey::Backspace
+            }
+        } else if cycle % 2 == 0 {
             PhysicalKey::ArrowDown
         } else {
             PhysicalKey::ArrowUp
         };
-        for event in [key_down(navigation.clone()), key_up(navigation)] {
-            let effects = kernel.step(raw_input(event))?;
-            assert_no_legacy_success_effects(&effects);
-            absorb(&mut checksum, &effects)?;
-            absorb(&mut checksum, &kernel.state_digest())?;
-            absorb(&mut checksum, &kernel.live_resources())?;
-        }
+        let event = if index % 2 == 0 {
+            key_down(code)
+        } else {
+            key_up(code)
+        };
+        run_kernel_input(
+            &mut kernel,
+            raw_input(seat(1), event),
+            &mut checksum,
+            &mut counts,
+        )?;
     }
-    let dispose_effects = kernel.dispose("m3 benchmark campaign teardown");
-    assert_no_legacy_success_effects(&dispose_effects);
-    assert_eq!(
-        kernel.live_resources(),
-        er_types::LiveResourceSnapshot::default()
-    );
-    absorb(&mut checksum, &dispose_effects)?;
+    dispose_local_kernel(&mut kernel, &mut checksum, "m3 raw menu events teardown")?;
     report(
-        "raw-event-campaign",
+        "raw-menu-events",
         BENCHMARK_SEED,
         0,
-        CAMPAIGN_STEPS,
+        RAW_MENU_EVENTS,
         checksum,
-        json!({"events": "raw key down/up only"}),
+        content_load_elapsed_ns,
+        elapsed_ns(execution_started),
+        &counts,
+        json!({
+            "input_architecture": "raw physical keydown/keyUp events",
+            "fixture": "physical-hit",
+        }),
+    )
+}
+
+#[test]
+fn m3_simple_turn_resolutions() -> TestResult {
+    let content_started = Instant::now();
+    let content = fixture_content_pack()?;
+    let content_load_elapsed_ns = elapsed_ns(content_started);
+    let fixture = fixture_value(PHYSICAL_HIT_FIXTURE)?;
+    let execution_started = Instant::now();
+    let mut checksum = FNV_OFFSET;
+    let mut counts = Counts::default();
+    for iteration in 0..SIMPLE_TURN_RESOLUTIONS {
+        let mut kernel = new_local_kernel(&fixture, &content, iteration)?;
+        let before = kernel.snapshot().state;
+        let mut effects = raw_press_local(
+            &mut kernel,
+            &mut checksum,
+            &mut counts,
+            PhysicalKey::Enter,
+        )?;
+        effects.extend(raw_press_local(
+            &mut kernel,
+            &mut checksum,
+            &mut counts,
+            PhysicalKey::Enter,
+        )?);
+        settle_local_presentations(&mut kernel, &mut checksum, &mut counts, &effects)?;
+        let after = kernel.snapshot().state;
+        assert_supported_turn_transition(&before, &after, "simple local")?;
+        counts.turns = counts.turns.saturating_add(1);
+        counts.battles = counts.battles.saturating_add(1);
+        dispose_local_kernel(&mut kernel, &mut checksum, "m3 simple turn teardown")?;
+    }
+    assert_eq!(counts.turns, SIMPLE_TURN_RESOLUTIONS);
+    assert_eq!(counts.battles, SIMPLE_TURN_RESOLUTIONS);
+    report(
+        "simple-turn-resolutions",
+        BENCHMARK_SEED,
+        SIMPLE_TURN_RESOLUTIONS,
+        0,
+        checksum,
+        content_load_elapsed_ns,
+        elapsed_ns(execution_started),
+        &counts,
+        json!({
+            "input_architecture": "raw physical keydown/keyUp plus presentation settlement",
+            "fixture": "physical-hit",
+        }),
+    )
+}
+
+#[test]
+fn m3_complete_short_battles() -> TestResult {
+    let content_started = Instant::now();
+    let content = fixture_content_pack()?;
+    let content_load_elapsed_ns = elapsed_ns(content_started);
+    let fixture = fixture_value(VICTORY_FIXTURE)?;
+    let execution_started = Instant::now();
+    let mut checksum = FNV_OFFSET;
+    let mut counts = Counts::default();
+    for iteration in 0..COMPLETE_SHORT_BATTLES {
+        let mut kernel = new_local_kernel(&fixture, &content, iteration)?;
+        let mut effects = raw_press_local(
+            &mut kernel,
+            &mut checksum,
+            &mut counts,
+            PhysicalKey::Enter,
+        )?;
+        effects.extend(raw_press_local(
+            &mut kernel,
+            &mut checksum,
+            &mut counts,
+            PhysicalKey::Enter,
+        )?);
+        settle_local_presentations(&mut kernel, &mut checksum, &mut counts, &effects)?;
+        assert_local_victory_terminal(&kernel, "m3 short battle")?;
+        counts.turns = counts.turns.saturating_add(1);
+        counts.battles = counts.battles.saturating_add(1);
+        dispose_local_kernel(&mut kernel, &mut checksum, "m3 short battle teardown")?;
+    }
+    assert_eq!(counts.turns, COMPLETE_SHORT_BATTLES);
+    assert_eq!(counts.battles, COMPLETE_SHORT_BATTLES);
+    report(
+        "complete-short-battles",
+        BENCHMARK_SEED,
+        COMPLETE_SHORT_BATTLES,
+        0,
+        checksum,
+        content_load_elapsed_ns,
+        elapsed_ns(execution_started),
+        &counts,
+        json!({
+            "input_architecture": "raw physical keydown/keyUp plus presentation settlement",
+            "fixture": "victory",
+            "terminal": "victory",
+        }),
+    )
+}
+
+#[test]
+fn m3_two_client_supported_turns() -> TestResult {
+    let content_started = Instant::now();
+    let content = fixture_content_pack()?;
+    let content_load_elapsed_ns = elapsed_ns(content_started);
+    let fixture = fixture_value(DOUBLES_FIXTURE)?;
+    let execution_started = Instant::now();
+    let mut checksum = FNV_OFFSET;
+    let mut counts = Counts::default();
+    for iteration in 0..TWO_CLIENT_SUPPORTED_TURNS {
+        let mut pair = new_pair(&fixture, &content, iteration, false)?;
+        let mut pending = Vec::new();
+        let mut setup_evidence = TurnEvidence::default();
+        run_pair_operation(
+            &mut pair,
+            PairOperation::Reconnect {
+                endpoint: PairEndpoint::Host,
+            },
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut setup_evidence,
+        )?;
+        let before = pair.snapshot()?;
+        let mut evidence = TurnEvidence::default();
+        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            for _ in 0..3 {
+                raw_press_pair(
+                    &mut pair,
+                    endpoint,
+                    &mut checksum,
+                    &mut counts,
+                    &mut pending,
+                    &mut evidence,
+                    PhysicalKey::Enter,
+                )?;
+            }
+        }
+        run_pair_operation(
+            &mut pair,
+            PairOperation::AdvanceTime { delta_ms: safe(2) },
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
+        settle_pair_presentations(
+            &mut pair,
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
+        let snapshot = pair.snapshot()?;
+        assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
+        counts.turns = counts.turns.saturating_add(1);
+        counts.battles = counts.battles.saturating_add(1);
+        let snapshot = pair.teardown("m3 supported turn teardown")?;
+        absorb(&mut checksum, &snapshot)?;
+    }
+    assert_eq!(counts.turns, TWO_CLIENT_SUPPORTED_TURNS);
+    assert_eq!(counts.battles, TWO_CLIENT_SUPPORTED_TURNS);
+    report(
+        "two-client-supported-turns",
+        BENCHMARK_SEED,
+        TWO_CLIENT_SUPPORTED_TURNS,
+        0,
+        checksum,
+        content_load_elapsed_ns,
+        elapsed_ns(execution_started),
+        &counts,
+        json!({
+            "input_architecture": "two authority/replica endpoints driven by raw physical keydown/keyUp",
+            "fixture": "doubles-single-target",
+            "endpoints": ["host", "guest"],
+        }),
+    )
+}
+
+#[test]
+fn m3_complete_supported_coop_battle() -> TestResult {
+    let content_started = Instant::now();
+    let content = fixture_content_pack()?;
+    let content_load_elapsed_ns = elapsed_ns(content_started);
+    let fixture = fixture_value(DOUBLES_FIXTURE)?;
+    let mut pair = new_pair(&fixture, &content, 1, true)?;
+    let mut setup_checksum = FNV_OFFSET;
+    let mut setup_counts = Counts::default();
+    let mut setup_pending = Vec::new();
+    let mut setup_evidence = TurnEvidence::default();
+    run_pair_operation(
+        &mut pair,
+        PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        },
+        &mut setup_checksum,
+        &mut setup_counts,
+        &mut setup_pending,
+        &mut setup_evidence,
+    )?;
+
+    // Pair construction and connection are initialization and intentionally
+    // stay outside the elapsed interval for this complete co-op workload.
+    let execution_started = Instant::now();
+    let mut checksum = FNV_OFFSET;
+    let mut counts = Counts {
+        battles: 1,
+        ..Counts::default()
+    };
+    let mut pending = Vec::new();
+    let mut evidence = TurnEvidence::default();
+    for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+        for press in 0..3 {
+            if endpoint == PairEndpoint::Guest && press == 2 {
+                raw_press_pair(
+                    &mut pair,
+                    endpoint,
+                    &mut checksum,
+                    &mut counts,
+                    &mut pending,
+                    &mut evidence,
+                    PhysicalKey::ArrowRight,
+                )?;
+            }
+            raw_press_pair(
+                &mut pair,
+                endpoint,
+                &mut checksum,
+                &mut counts,
+                &mut pending,
+                &mut evidence,
+                PhysicalKey::Enter,
+            )?;
+        }
+    }
+    run_pair_operation(
+        &mut pair,
+        PairOperation::AdvanceTime { delta_ms: safe(2) },
+        &mut checksum,
+        &mut counts,
+        &mut pending,
+        &mut evidence,
+    )?;
+    settle_pair_presentations(
+        &mut pair,
+        &mut checksum,
+        &mut counts,
+        &mut pending,
+        &mut evidence,
+    )?;
+    let snapshot = pair.snapshot()?;
+    if snapshot.terminal_reason.is_none() {
+        return Err(invalid(
+            "complete supported co-op workload did not reach a shared terminal boundary",
+        ));
+    }
+    counts.turns = 1;
+    counts.battles = 1;
+    let execution_elapsed_ns = elapsed_ns(execution_started);
+    absorb(&mut checksum, &snapshot)?;
+    let teardown_snapshot = pair.teardown("m3 complete co-op battle teardown")?;
+    assert_zero_pair_resources(&teardown_snapshot);
+    absorb(&mut checksum, &teardown_snapshot)?;
+    report(
+        "complete-supported-coop-battle",
+        BENCHMARK_SEED,
+        1,
+        0,
+        checksum,
+        content_load_elapsed_ns,
+        execution_elapsed_ns,
+        &counts,
+        json!({
+            "input_architecture": "two authority/replica endpoints driven by raw physical keydown/keyUp",
+            "fixture": "doubles-single-target with deterministic short-battle enemy boundary",
+            "initialization_excluded": true,
+            "terminal": "shared pair terminal boundary",
+        }),
     )
 }

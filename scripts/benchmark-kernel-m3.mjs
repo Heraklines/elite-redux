@@ -38,34 +38,67 @@ const MEASURE_ATTESTATION_ENV = "RUST_KERNEL_M3_ATTESTATION";
 const MEASURE_ATTESTATION_VALUE = "rust-kernel-m3-v1:measure:github-hosted";
 const MAX_U64 = 18_446_744_073_709_551_615n;
 const REGRESSION_FACTOR = 1.25;
+const CROSS_TARGET_SUITE_TARGET = Object.freeze({
+  metric: "execution_elapsed_ms",
+  operator: "<",
+  max_exclusive_ms: 30000,
+});
 
 const REQUIRED_WORKLOADS = Object.freeze([
   Object.freeze({
-    id: "eventwise-battle-replay",
-    test_name: "m3_eventwise_battle_replay",
-    iterations: 128,
-    schedules: 0,
-    steps: 0,
-    seed: "81985529216486895",
-    timeout_ms: 900000,
-  }),
-  Object.freeze({
-    id: "zero-resource-teardown",
-    test_name: "m3_zero_resource_teardown",
-    iterations: 128,
-    schedules: 0,
-    steps: 0,
-    seed: "81985529216486895",
-    timeout_ms: 900000,
-  }),
-  Object.freeze({
-    id: "raw-event-campaign",
-    test_name: "m3_raw_event_campaign",
+    id: "raw-menu-events",
+    test_name: "m3_raw_menu_events",
     iterations: 0,
     schedules: 0,
-    steps: 512,
+    steps: 100000,
     seed: "81985529216486895",
     timeout_ms: 900000,
+    target: Object.freeze({ metric: "execution_elapsed_ns", operator: "<", max_exclusive_ns: 5000000000 }),
+    target_counts: Object.freeze({ turns: 0, battles: 1, inputs: 100000, rng_draws: null }),
+  }),
+  Object.freeze({
+    id: "simple-turn-resolutions",
+    test_name: "m3_simple_turn_resolutions",
+    iterations: 10000,
+    schedules: 0,
+    steps: 0,
+    seed: "81985529216486895",
+    timeout_ms: 900000,
+    target: Object.freeze({ metric: "execution_elapsed_ns", operator: "<", max_exclusive_ns: 30000000000 }),
+    target_counts: Object.freeze({ turns: 10000, battles: 10000, inputs: null, rng_draws: null }),
+  }),
+  Object.freeze({
+    id: "complete-short-battles",
+    test_name: "m3_complete_short_battles",
+    iterations: 1000,
+    schedules: 0,
+    steps: 0,
+    seed: "81985529216486895",
+    timeout_ms: 900000,
+    target: Object.freeze({ metric: "execution_elapsed_ns", operator: "<", max_exclusive_ns: 30000000000 }),
+    target_counts: Object.freeze({ turns: 1000, battles: 1000, inputs: null, rng_draws: null }),
+  }),
+  Object.freeze({
+    id: "two-client-supported-turns",
+    test_name: "m3_two_client_supported_turns",
+    iterations: 1000,
+    schedules: 0,
+    steps: 0,
+    seed: "81985529216486895",
+    timeout_ms: 900000,
+    target: Object.freeze({ metric: "execution_elapsed_ns", operator: "<", max_exclusive_ns: 30000000000 }),
+    target_counts: Object.freeze({ turns: 1000, battles: 1000, inputs: null, rng_draws: null }),
+  }),
+  Object.freeze({
+    id: "complete-supported-coop-battle",
+    test_name: "m3_complete_supported_coop_battle",
+    iterations: 1,
+    schedules: 0,
+    steps: 0,
+    seed: "81985529216486895",
+    timeout_ms: 900000,
+    target: Object.freeze({ metric: "execution_elapsed_ns", operator: "<", max_exclusive_ns: 100000000 }),
+    target_counts: Object.freeze({ turns: 1, battles: 1, inputs: null, rng_draws: null }),
   }),
 ]);
 
@@ -225,7 +258,14 @@ function validateUnacceptedMeasurement(value, label) {
   if (value.status !== "not_measured" || value.accepted !== false) {
     fail(`${label} must remain not_measured and unaccepted until hosted measurement`);
   }
-  for (const field of ["elapsed_wall_ms", "peak_rss_bytes", "checksum"]) {
+  for (const field of [
+    "content_load_elapsed_ns",
+    "execution_elapsed_ns",
+    "elapsed_wall_ms",
+    "peak_rss_bytes",
+    "counts",
+    "checksum",
+  ]) {
     if (value[field] !== null) {
       fail(`${label}.${field} must be null before hosted measurement`);
     }
@@ -258,6 +298,9 @@ function validateManifest(manifestPath) {
   }
   if (manifest.ownership_schema_version !== OWNERSHIP_SCHEMA_VERSION) {
     fail("manifest ownership schema version is not 6");
+  }
+  if (JSON.stringify(manifest.cross_target_suite_target) !== JSON.stringify(CROSS_TARGET_SUITE_TARGET)) {
+    fail("manifest cross-target continuation-suite target is not the frozen 30-second limit");
   }
   assertObject(manifest.toolchain, "manifest.toolchain");
   for (const [key, expected] of Object.entries(TOOLCHAIN)) {
@@ -322,6 +365,15 @@ function validateManifest(manifestPath) {
         fail(`workload ${required.id}.${key} does not match frozen input`);
       }
     }
+    if (JSON.stringify(workload.target_counts) !== JSON.stringify(required.target_counts)) {
+      fail(`workload ${required.id}.target_counts does not match the published target`);
+    }
+    assertObject(workload.target_counts, `workload ${required.id}.target_counts`);
+    for (const field of ["turns", "battles", "inputs", "rng_draws"]) {
+      if (workload.target_counts[field] !== null) {
+        assertSafeInteger(workload.target_counts[field], `workload ${required.id}.target_counts.${field}`);
+      }
+    }
     assertCanonicalSeed(workload.seed, `workload ${required.id}.seed`);
     assertSafeInteger(workload.iterations, `workload ${required.id}.iterations`);
     assertSafeInteger(workload.schedules, `workload ${required.id}.schedules`);
@@ -330,9 +382,14 @@ function validateManifest(manifestPath) {
     if (workload.bench_target !== "m3_benchmark" || workload.requires_linux !== true) {
       fail(`workload ${required.id} has an invalid target contract`);
     }
-    if (workload.target !== null) {
-      fail(`workload ${required.id}.target must remain null until a hosted target is selected`);
+    if (JSON.stringify(workload.target) !== JSON.stringify(required.target)) {
+      fail(`workload ${required.id}.target does not match the frozen hard target`);
     }
+    assertObject(workload.target, `workload ${required.id}.target`);
+    if (workload.target.metric !== "execution_elapsed_ns" || workload.target.operator !== "<") {
+      fail(`workload ${required.id}.target must be an exclusive execution-time limit`);
+    }
+    assertSafeInteger(workload.target.max_exclusive_ns, `workload ${required.id}.target.max_exclusive_ns`);
     if (JSON.stringify(workload.source_paths) !== JSON.stringify(manifest.source_paths)) {
       fail(`workload ${required.id} must declare the benchmark source path`);
     }
@@ -386,10 +443,17 @@ function metadataResult(validated) {
     oracle_branch: ORACLE_BRANCH,
     protocol_version: PROTOCOL_VERSION,
     frame_protocol_version: FRAME_PROTOCOL_VERSION,
+    cross_target_suite_target: CROSS_TARGET_SUITE_TARGET,
     manifest_sha256: validated.manifestSha256,
     source_lock_sha256: validated.sourceLockSha256,
     content_identity_sha256: validated.contentIdentity,
     source_sha256: Object.fromEntries(validated.sourceHashes),
+    setup: {
+      status: "not_measured",
+      accepted: false,
+      elapsed_wall_ms: null,
+      peak_rss_bytes: null,
+    },
     workloads: REQUIRED_WORKLOADS.map(required => ({
       id: required.id,
       bench_target: TOOLCHAIN.bench_target,
@@ -398,12 +462,17 @@ function metadataResult(validated) {
       schedules: required.schedules,
       steps: required.steps,
       seed: required.seed,
+      target: required.target,
+      target_counts: required.target_counts,
       requires_linux: true,
       source_paths: validated.manifest.source_paths,
       status: "not_measured",
       accepted: false,
+      content_load_elapsed_ns: null,
+      execution_elapsed_ns: null,
       elapsed_wall_ms: null,
       peak_rss_bytes: null,
+      counts: null,
       checksum: null,
     })),
   };
@@ -454,9 +523,23 @@ function requireHostedMeasurement() {
 }
 
 function compileBench() {
+  const started = performance.now();
+  const cargo = process.env.CARGO ?? "cargo";
   const result = spawnSync(
-    process.env.CARGO ?? "cargo",
-    ["test", "--release", "-p", "er-sim", "--bench", "m3_benchmark", "--no-run", "--message-format=json"],
+    "/usr/bin/time",
+    [
+      "-f",
+      `${RSS_MARKER}%M`,
+      cargo,
+      "test",
+      "--release",
+      "-p",
+      "er-sim",
+      "--bench",
+      "m3_benchmark",
+      "--no-run",
+      "--message-format=json",
+    ],
     {
       cwd: RUST_ROOT,
       encoding: "utf8",
@@ -470,6 +553,14 @@ function compileBench() {
   if (result.status !== 0) {
     fail(`cargo setup failed with status ${result.status}: ${result.stderr ?? result.stdout ?? ""}`);
   }
+  const rssMatch = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.match(
+    new RegExp(`${RSS_MARKER}(\\d+)`, "u"),
+  );
+  if (!rssMatch) {
+    fail("cargo setup did not emit GNU time RSS marker");
+  }
+  const setupPeakRssBytes = Number(rssMatch[1]) * 1024;
+  assertSafeInteger(setupPeakRssBytes, "setup.peak_rss_bytes");
   for (const line of (result.stdout ?? "").split(/\r?\n/u)) {
     if (!line.trim().startsWith("{")) {
       continue;
@@ -486,7 +577,15 @@ function compileBench() {
         if (!existsSync(message.executable)) {
           fail("cargo reported a missing m3_benchmark executable");
         }
-        return message.executable;
+        return {
+          executable: message.executable,
+          setup: {
+            status: "measured",
+            accepted: true,
+            elapsed_wall_ms: Math.max(0, Math.round(performance.now() - started)),
+            peak_rss_bytes: setupPeakRssBytes,
+          },
+        };
       }
     } catch {
       // Cargo warnings are allowed around its JSON compiler-artifact stream.
@@ -507,7 +606,17 @@ function parseBenchmarkMarker(output, required) {
     fail(`${required.id} emitted invalid benchmark JSON: ${failureText(error)}`);
   }
   assertObject(marker, `${required.id} benchmark marker`);
-  for (const key of ["scenario_id", "seed", "iterations", "schedules", "steps", "checksum"]) {
+  for (const key of [
+    "scenario_id",
+    "seed",
+    "iterations",
+    "schedules",
+    "steps",
+    "checksum",
+    "content_load_elapsed_ns",
+    "execution_elapsed_ns",
+    "counts",
+  ]) {
     if (!(key in marker)) {
       fail(`${required.id} marker is missing ${key}`);
     }
@@ -529,6 +638,17 @@ function parseBenchmarkMarker(output, required) {
   }
   if (marker.success !== true || !/^[0-9a-f]{16}$/u.test(marker.checksum)) {
     fail(`${required.id} marker did not report a successful deterministic checksum`);
+  }
+  for (const field of ["content_load_elapsed_ns", "execution_elapsed_ns"]) {
+    assertSafeInteger(marker[field], `${required.id}.${field}`);
+  }
+  assertObject(marker.counts, `${required.id}.counts`);
+  for (const field of ["turns", "battles", "inputs", "rng_draws"]) {
+    assertSafeInteger(marker.counts[field], `${required.id}.counts.${field}`);
+    const expected = required.target_counts[field];
+    if (expected !== null && marker.counts[field] !== expected) {
+      fail(`${required.id}.counts.${field} does not match target ${expected}`);
+    }
   }
   return marker;
 }
@@ -555,6 +675,12 @@ function runWorkload(executable, required) {
   const peakRssBytes = Number(rssMatch[1]) * 1024;
   assertSafeInteger(peakRssBytes, `${required.id}.peak_rss_bytes`);
   const marker = parseBenchmarkMarker(result.stdout ?? "", required);
+  if (marker.execution_elapsed_ns >= required.target.max_exclusive_ns) {
+    fail(
+      `${required.id} execution elapsed ${marker.execution_elapsed_ns}ns `
+        + `did not meet the exclusive target ${required.target.max_exclusive_ns}ns`,
+    );
+  }
   return {
     id: required.id,
     test_name: required.test_name,
@@ -562,10 +688,15 @@ function runWorkload(executable, required) {
     schedules: required.schedules,
     steps: required.steps,
     seed: required.seed,
+    target: required.target,
+    target_counts: required.target_counts,
     status: "measured",
     accepted: true,
+    content_load_elapsed_ns: marker.content_load_elapsed_ns,
+    execution_elapsed_ns: marker.execution_elapsed_ns,
     elapsed_wall_ms: elapsed,
     peak_rss_bytes: peakRssBytes,
+    counts: marker.counts,
     checksum: marker.checksum,
     details: marker.details ?? null,
   };
@@ -607,6 +738,16 @@ function compareBaseline(current, baselinePath) {
   if (!Array.isArray(baseline.workloads) || baseline.workloads.length !== current.workloads.length) {
     fail("baseline does not contain exactly the current workload set");
   }
+  for (const field of ["elapsed_wall_ms", "peak_rss_bytes"]) {
+    const prior = baseline.setup?.[field];
+    const measured = current.setup?.[field];
+    if (!Number.isFinite(prior) || prior < 0 || !Number.isFinite(measured) || measured < 0) {
+      fail(`baseline setup.${field} is invalid`);
+    }
+    if (measured > prior * REGRESSION_FACTOR) {
+      fail(`setup.${field} exceeded the ${REGRESSION_FACTOR}x regression gate`);
+    }
+  }
   for (const workload of current.workloads) {
     const prior = baseline.workloads.find(candidate => candidate?.id === workload.id);
     if (!prior || prior.accepted !== true) {
@@ -617,7 +758,18 @@ function compareBaseline(current, baselinePath) {
         fail(`baseline ${workload.id}.${field} does not match current input`);
       }
     }
-    for (const field of ["elapsed_wall_ms", "peak_rss_bytes"]) {
+    if (JSON.stringify(prior.target_counts) !== JSON.stringify(workload.target_counts)) {
+      fail(`baseline ${workload.id}.target_counts does not match current input`);
+    }
+    if (JSON.stringify(prior.counts) !== JSON.stringify(workload.counts)) {
+      fail(`baseline ${workload.id}.counts does not match current deterministic counts`);
+    }
+    for (const field of [
+      "content_load_elapsed_ns",
+      "execution_elapsed_ns",
+      "elapsed_wall_ms",
+      "peak_rss_bytes",
+    ]) {
       if (!Number.isFinite(prior[field]) || prior[field] < 0) {
         fail(`baseline ${workload.id}.${field} is invalid`);
       }
@@ -633,7 +785,7 @@ function compareBaseline(current, baselinePath) {
   };
 }
 
-function measuredResult(validated, measurements) {
+function measuredResult(validated, setup, measurements) {
   return {
     schema_version: SCHEMA_VERSION,
     manifest_id: validated.manifest.manifest_id,
@@ -647,10 +799,12 @@ function measuredResult(validated, measurements) {
     oracle_branch: ORACLE_BRANCH,
     protocol_version: PROTOCOL_VERSION,
     frame_protocol_version: FRAME_PROTOCOL_VERSION,
+    cross_target_suite_target: CROSS_TARGET_SUITE_TARGET,
     manifest_sha256: validated.manifestSha256,
     source_lock_sha256: validated.sourceLockSha256,
     content_identity_sha256: validated.contentIdentity,
     source_sha256: Object.fromEntries(validated.sourceHashes),
+    setup,
     workloads: measurements,
   };
 }
@@ -677,9 +831,9 @@ function main() {
     return;
   }
   requireHostedMeasurement();
-  const executable = compileBench();
-  const measurements = REQUIRED_WORKLOADS.map(required => runWorkload(executable, required));
-  const result = measuredResult(validated, measurements);
+  const compiled = compileBench();
+  const measurements = REQUIRED_WORKLOADS.map(required => runWorkload(compiled.executable, required));
+  const result = measuredResult(validated, compiled.setup, measurements);
   result.regression_check = compareBaseline(result, options.baseline);
   writeOrPrint(result, options.output);
 }
