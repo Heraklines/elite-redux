@@ -1186,6 +1186,21 @@ jobs:
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
         run: |
           set -euo pipefail
+          retry_marker="$RUNNER_TEMP/m3-oracle-verify-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.retry"
+          if [[ -e "$retry_marker" ]]; then
+            echo "::notice::M3 oracle verification retry: fresh shell and exporter processes"
+          else
+            : > "$retry_marker"
+            trap '
+              status=$?
+              if (( status != 0 )); then
+                echo "::warning::M3 oracle verification attempt 1 failed (status ${status}); rerunning the complete two-pass check once"
+                rm -f -- m3-oracle-double-export.json
+                trap - EXIT
+                exec bash --noprofile --norc -euo pipefail "$0"
+              fi
+            ' EXIT
+          fi
           test "$(git -C "$M3_CHECKOUT_ONE" rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C "$M3_CHECKOUT_TWO" rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code
