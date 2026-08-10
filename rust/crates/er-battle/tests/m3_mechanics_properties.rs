@@ -30,14 +30,52 @@ fn property_error(message: impl Into<String>) -> Box<dyn Error> {
     Box::new(std::io::Error::other(message.into()))
 }
 
+fn normalize_oracle_status(status: &mut Value) -> Result<(), Box<dyn Error>> {
+    let kind = status
+        .get("kind")
+        .and_then(|value| value.get("kind"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| property_error("oracle status kind is not the frozen nested tag"))?
+        .to_owned();
+    status
+        .as_object_mut()
+        .ok_or_else(|| property_error("oracle status is not an object"))?
+        .insert("kind".to_owned(), Value::String(kind));
+    Ok(())
+}
+
 fn initial_battle() -> Result<BattleState, Box<dyn Error>> {
     let document: Value = serde_json::from_str(OUTCOME_FIXTURE)?;
-    let battle = document
+    let mut battle = document
         .get("initial_state")
         .and_then(|value| value.get("canonical"))
         .and_then(|value| value.get("battle"))
         .cloned()
         .ok_or_else(|| property_error("physical-hit: canonical initial battle is missing"))?;
+    let battle_object = battle
+        .as_object_mut()
+        .ok_or_else(|| property_error("physical-hit: canonical battle is not an object"))?;
+    for party_name in ["player_party", "enemy_party"] {
+        let party = battle_object
+            .get_mut(party_name)
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| property_error(format!("physical-hit: {party_name} is not an array")))?;
+        for pokemon in party {
+            let status = pokemon
+                .get_mut("status")
+                .ok_or_else(|| property_error("physical-hit: party member status is missing"))?;
+            normalize_oracle_status(status)?;
+        }
+    }
+    let format = battle_object
+        .get_mut("format")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| property_error("physical-hit: format is not an object"))?;
+    if format.remove("slots").is_none() {
+        return Err(property_error(
+            "physical-hit: frozen oracle format slots are missing",
+        ));
+    }
     Ok(serde_json::from_value(battle)?)
 }
 

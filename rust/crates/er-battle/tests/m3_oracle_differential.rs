@@ -774,6 +774,28 @@ fn status_outcome_label(outcome: &StatusApplicationOutcome) -> &'static str {
     }
 }
 
+fn status_state_from_oracle(
+    mut value: Value,
+    case_name: &str,
+    state_name: &str,
+) -> Result<StatusState, Box<dyn Error>> {
+    let kind = value
+        .get("kind")
+        .and_then(|value| value.get("kind"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: {state_name} status kind is not the frozen nested tag"
+            ))
+        })?
+        .to_owned();
+    value
+        .as_object_mut()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {state_name} status is invalid")))?
+        .insert("kind".to_owned(), Value::String(kind));
+    Ok(serde_json::from_value(value)?)
+}
+
 fn status_differential(case_name: &str, expected_label: &str) -> Result<(), Box<dyn Error>> {
     let document = parse_case(case_name)?;
     let move_id = semantic_move_id(&document, case_name)?;
@@ -781,15 +803,20 @@ fn status_differential(case_name: &str, expected_label: &str) -> Result<(), Box<
     let requested = status_kind_from_move(move_id)?;
     let initial_target = canonical_party_member(&document, case_name, false)?;
     let final_target = canonical_party_member(&document, case_name, true)?;
-    let initial_status: StatusState =
-        serde_json::from_value(initial_target.get("status").cloned().ok_or_else(|| {
+    let initial_status = status_state_from_oracle(
+        initial_target.get("status").cloned().ok_or_else(|| {
             FixtureError::new(format!("{case_name}: initial status is missing"))
-        })?)?;
-    let final_status: StatusState = serde_json::from_value(
+        })?,
+        case_name,
+        "initial",
+    )?;
+    let final_status = status_state_from_oracle(
         final_target
             .get("status")
             .cloned()
             .ok_or_else(|| FixtureError::new(format!("{case_name}: final status is missing")))?,
+        case_name,
+        "final",
     )?;
     let target_types: PokemonTyping = serde_json::from_value(
         initial_target
@@ -876,11 +903,13 @@ fn residual_differential() -> Result<(), Box<dyn Error>> {
     let case_name = "burn-residual";
     let document = parse_case(case_name)?;
     let final_target = canonical_party_member(&document, case_name, true)?;
-    let final_status: StatusState = serde_json::from_value(
+    let final_status = status_state_from_oracle(
         final_target
             .get("status")
             .cloned()
             .ok_or_else(|| FixtureError::new("burn-residual: final status is missing"))?,
+        case_name,
+        "final",
     )?;
     let max_hp = final_target
         .get("max_hp")

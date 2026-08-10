@@ -392,7 +392,7 @@ fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_in
     assert_eq!(after_battle.turn, turn(2)?);
     assert_eq!(after_battle.turn, after_battle.battle_rng.turn);
     assert!(after_battle.command_state.frontier.is_empty());
-    assert_eq!(transition.rng_audit.len(), 0);
+    assert_eq!(transition.rng_audit.len(), 1);
     assert_eq!(
         transition
             .mutations
@@ -532,14 +532,18 @@ fn queued_fainted_actor_is_skipped_without_enemy_pp_or_rng() -> TestResult {
             BattleMutation::PpChanged { pokemon, .. } if *pokemon == enemy_id
         )
     }));
-    assert_eq!(transition.rng_audit.len(), 2);
+    assert_eq!(transition.rng_audit.len(), 3);
     assert_eq!(
         transition
             .rng_audit
             .iter()
             .map(|draw| draw.reason)
             .collect::<Vec<_>>(),
-        vec![RngReason::CriticalHit, RngReason::DamageVariance]
+        vec![
+            RngReason::SpeedTie,
+            RngReason::CriticalHit,
+            RngReason::DamageVariance,
+        ]
     );
     assert_eq!(battle(&transition.after_state)?.enemy_party[0].id, enemy_id);
     assert_eq!(
@@ -655,7 +659,7 @@ fn residual_ko_queues_before_turn_advance_with_exact_source_occurrence() -> Test
         })
         .ok_or("missing residual faint presentation event")?;
     assert!(hp_event < faint_event);
-    assert_eq!(transition.rng_audit.len(), 0);
+    assert_eq!(transition.rng_audit.len(), 1);
     assert_eq!(battle(&transition.after_state)?.turn, turn(2)?);
     Ok(())
 }

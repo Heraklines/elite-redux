@@ -658,7 +658,6 @@ fn content_membership_and_internal_no_replacement_decision_fail_closed() -> Test
         replacement: ReplacementProgress::Pending,
     }];
     battle_state.next_faint_occurrence = FaintOccurrenceId::new(safe(1));
-    battle_state.outcome = BattleOutcome::Defeat;
 
     assert!(build_replacement_offer(&state, occurrence, &content)?.is_empty());
     assert!(

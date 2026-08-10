@@ -25,11 +25,11 @@ use er_types::battle_model::{
 };
 use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
 use presentation::{
-    PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY, PresentationCause,
-    PresentationCausalEvent, PresentationStep, PresentationTransitionInput,
-    ReplacementPresentationInput, TurnPresentationInput, build_presentation_plan,
-    build_replacement_plan, build_replacement_presentation_plan, build_turn_plan,
-    build_turn_presentation_plan, presentation_event_id_for_position,
+    PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY, PresentationCausalEvent,
+    PresentationCause, PresentationStep, PresentationTransitionInput, ReplacementPresentationInput,
+    TurnPresentationInput, build_presentation_plan, build_replacement_plan,
+    build_replacement_presentation_plan, build_turn_plan, build_turn_presentation_plan,
+    presentation_event_id_for_position,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -235,12 +235,8 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
     ];
 
     let steps: &[PresentationStep] = &causal_events;
-    let input = TurnPresentationInput::new(
-        &operation_id,
-        &action_order,
-        steps,
-        BattleOutcome::Victory,
-    );
+    let input =
+        TurnPresentationInput::new(&operation_id, &action_order, steps, BattleOutcome::Victory);
     let plan = build_turn_presentation_plan(input.clone())?;
     let dispatched = build_presentation_plan(PresentationTransitionInput::Turn(input.clone()))?;
     let compatibility = build_turn_plan(input)?;
