@@ -508,9 +508,10 @@ mod live_local_production {
 }
 
 mod live_coop_production {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
 
+    use er_canonical::{canonicalize, content_digest};
     use er_content::pack::ContentPack;
     use er_kernel::{
         BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1,
@@ -521,8 +522,9 @@ mod live_coop_production {
         RecoveryTransactionConfig,
     };
     use er_sim::snapshot::{
-        PairDeterminismDigest, RestorablePairSnapshotV2, RestorablePacketKindV2,
-        RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
+        FaultOperationV2, FrameCorruptionV2, PairDeterminismDigest, PairKernelTraceRecorder,
+        PairOperationV2, PacketDispositionV2, QueuedPacketSnapshotV2, RestorablePairSnapshotV2,
+        RestorablePacketKindV2, RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
     };
     use er_kernel::snapshot::RestorableKernelSnapshotV2;
     use er_sim::{
@@ -534,16 +536,229 @@ mod live_coop_production {
     };
     use er_types::battle_control::BattleControl;
     use er_types::battle_ids::{
-        BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, TurnIndex,
+        BattlePresentationEventId, BattleSide, CanonicalHexBytes, FieldSlot, MoveSlotIndex,
+        PartyIndex, TurnIndex,
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
         ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision, PhysicalKey,
-        RawInputEvent, SafeU53, SeatId, SessionId, TimeClass,
+        RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
     };
+    use serde::{Deserialize, Serialize};
     use serde_json::Value;
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+    const M3_CONTINUATION_SUITE_SCHEMA_VERSION: u32 = 1;
+    const M3_CONTINUATION_REPORT_SCHEMA_VERSION: u32 = 1;
+    const M3_CONTINUATION_SUITE_ID: &str =
+        "pokerogue-redux/m3/native-wasm-continuation/v1";
+    const REQUIRED_CONTINUATION_BOUNDARIES: [&str; 10] = [
+        "held-fight-before-keyup",
+        "doubles-one-command-pending",
+        "guest-proposal-delivery-pending",
+        "turn-packet-delayed",
+        "control-receipt-delayed",
+        "replacement-menu-open",
+        "recovery-fence-held",
+        "blocking-presentation-pending",
+        "terminal-before-teardown",
+        "mixed-network-fault-queue",
+    ];
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct M3ContinuationScenarioV1 {
+        boundary_id: String,
+        trace: er_sim::snapshot::PairKernelTraceV2,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct M3ContinuationSuiteV1 {
+        schema_version: u32,
+        suite_id: String,
+        content_pack: ContentPack,
+        scenarios: Vec<M3ContinuationScenarioV1>,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+    #[serde(deny_unknown_fields)]
+    struct M3ContinuationScenarioReportV1 {
+        boundary_id: String,
+        trace_digest: String,
+        initial_snapshot_digest: String,
+        initial_pair_determinism_digest: PairDeterminismDigest,
+        operation_count: SafeU53,
+        replayed_operation_count: SafeU53,
+        host_rng_draw_count: SafeU53,
+        guest_rng_draw_count: SafeU53,
+        final_entry_digest: String,
+        final_pair_determinism_digest: PairDeterminismDigest,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+    #[serde(deny_unknown_fields)]
+    struct M3ContinuationReportV1 {
+        schema_version: u32,
+        suite_id: String,
+        suite_digest: String,
+        content_hash: String,
+        scenario_count: SafeU53,
+        scenarios: Vec<M3ContinuationScenarioReportV1>,
+    }
+
+    fn safe_len(length: usize, field: &str) -> TestResult<SafeU53> {
+        Ok(SafeU53::new(u64::try_from(length)?).map_err(|error| {
+            invalid(format!("{field} length is not JS-safe: {error}"))
+        })?)
+    }
+
+    impl M3ContinuationSuiteV1 {
+        fn validate(&self) -> TestResult {
+            if self.schema_version != M3_CONTINUATION_SUITE_SCHEMA_VERSION {
+                return Err(invalid(format!(
+                    "schema_version is {}, expected {}",
+                    self.schema_version, M3_CONTINUATION_SUITE_SCHEMA_VERSION
+                )));
+            }
+            if self.suite_id != M3_CONTINUATION_SUITE_ID {
+                return Err(invalid(format!(
+                    "suite_id is {:?}, expected {:?}",
+                    self.suite_id, M3_CONTINUATION_SUITE_ID
+                )));
+            }
+            self.content_pack.validate()?;
+            if self.scenarios.len() != REQUIRED_CONTINUATION_BOUNDARIES.len() {
+                return Err(invalid(format!(
+                    "scenario count is {}, expected {}",
+                    self.scenarios.len(),
+                    REQUIRED_CONTINUATION_BOUNDARIES.len()
+                )));
+            }
+
+            let mut seen = BTreeSet::new();
+            for (index, (scenario, expected_id)) in self
+                .scenarios
+                .iter()
+                .zip(REQUIRED_CONTINUATION_BOUNDARIES)
+                .enumerate()
+            {
+                if scenario.boundary_id != expected_id {
+                    return Err(invalid(format!(
+                        "scenario {index} is {:?}, expected {expected_id:?}",
+                        scenario.boundary_id
+                    )));
+                }
+                if !seen.insert(scenario.boundary_id.as_str()) {
+                    return Err(invalid(format!(
+                        "duplicate boundary_id {:?}",
+                        scenario.boundary_id
+                    )));
+                }
+                scenario.trace.validate()?;
+                if scenario.trace.entries.is_empty() {
+                    return Err(invalid(format!(
+                        "boundary {:?} has no continuation operations",
+                        scenario.boundary_id
+                    )));
+                }
+                let initial = &scenario.trace.initial_snapshot;
+                if initial.host.content_hash != self.content_pack.hash
+                    || initial.guest.content_hash != self.content_pack.hash
+                {
+                    return Err(invalid(format!(
+                        "boundary {:?} content identity differs from the suite content pack",
+                        scenario.boundary_id
+                    )));
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn canonical_suite_json(suite: &M3ContinuationSuiteV1) -> TestResult<String> {
+        suite.validate()?;
+        Ok(canonicalize(suite)?)
+    }
+
+    fn parse_suite_json(input: &str) -> TestResult<M3ContinuationSuiteV1> {
+        let suite: M3ContinuationSuiteV1 = serde_json::from_str(input)?;
+        suite.validate()?;
+        Ok(suite)
+    }
+
+    fn replay_suite(suite: &M3ContinuationSuiteV1) -> TestResult<M3ContinuationReportV1> {
+        suite.validate()?;
+        let content = Arc::new(suite.content_pack.clone());
+        let mut scenarios = Vec::with_capacity(suite.scenarios.len());
+
+        for scenario in &suite.scenarios {
+            let replay = scenario
+                .trace
+                .replay_simulated_pair::<SimulatedPair, _>(
+                    Arc::clone(&content),
+                    |pair, operation, _virtual_time_ms| {
+                        pair.apply_trace_operation_v2(operation.clone())
+                    },
+                )?;
+            if let Some(divergence) = replay.first_divergence {
+                return Err(invalid(format!(
+                    "M3 continuation diverged at {}, operation {}, time {} ms, path {}, code {}",
+                    scenario.boundary_id,
+                    divergence.sequence,
+                    divergence.virtual_time_ms,
+                    divergence.path,
+                    divergence.code,
+                )));
+            }
+
+            let final_entry = scenario
+                .trace
+                .entries
+                .last()
+                .ok_or_else(|| invalid(format!("boundary {:?} has no final entry", scenario.boundary_id)))?;
+            let host_rng_draw_count = scenario
+                .trace
+                .entries
+                .iter()
+                .try_fold(0usize, |total, entry| total.checked_add(entry.host.rng_audit.len()))
+                .ok_or_else(|| invalid(format!("boundary {:?} host RNG count overflowed", scenario.boundary_id)))?;
+            let guest_rng_draw_count = scenario
+                .trace
+                .entries
+                .iter()
+                .try_fold(0usize, |total, entry| total.checked_add(entry.guest.rng_audit.len()))
+                .ok_or_else(|| invalid(format!("boundary {:?} guest RNG count overflowed", scenario.boundary_id)))?;
+            scenarios.push(M3ContinuationScenarioReportV1 {
+                boundary_id: scenario.boundary_id.clone(),
+                trace_digest: content_digest(&scenario.trace)?,
+                initial_snapshot_digest: content_digest(&scenario.trace.initial_snapshot)?,
+                initial_pair_determinism_digest: PairDeterminismDigest::compute(
+                    &scenario.trace.initial_snapshot,
+                )?,
+                operation_count: safe_len(scenario.trace.entries.len(), "scenario operations")?,
+                replayed_operation_count: replay.replayed_entries,
+                host_rng_draw_count: safe_len(host_rng_draw_count, "host RNG draws")?,
+                guest_rng_draw_count: safe_len(guest_rng_draw_count, "guest RNG draws")?,
+                final_entry_digest: content_digest(final_entry)?,
+                final_pair_determinism_digest: final_entry.pair_after.clone(),
+            });
+        }
+
+        Ok(M3ContinuationReportV1 {
+            schema_version: M3_CONTINUATION_REPORT_SCHEMA_VERSION,
+            suite_id: suite.suite_id.clone(),
+            suite_digest: content_digest(suite)?,
+            content_hash: suite.content_pack.hash.to_string(),
+            scenario_count: safe_len(scenarios.len(), "report scenarios")?,
+            scenarios,
+        })
+    }
+
+    fn replay_suite_json(input: &str) -> TestResult<String> {
+        Ok(canonicalize(&replay_suite(&parse_suite_json(input)?)?)?)
+    }
 
     const FORCED_REPLACEMENT_FIXTURE: &str =
         include_str!("../../../fixtures/m3/oracle/battle-cases/forced-replacement.json");
@@ -779,7 +994,7 @@ mod live_coop_production {
         host_game.local_seat = host;
         let mut guest_game = game;
         guest_game.local_seat = guest;
-        Ok(SimulatedPair::new(SimulatedBattlePairConfig {
+        Ok(SimulatedPair::new_battle(SimulatedBattlePairConfig {
             host_game,
             host_protocol: authority_protocol(host, guest, generation(1))?,
             guest_game,
@@ -1089,6 +1304,28 @@ mod live_coop_production {
         lease_live && packet_queued
     }
 
+    fn guest_proposal_admitted_with_delivery_pending(
+        snapshot: &RestorablePairSnapshotV2,
+    ) -> bool {
+        let admission_live = snapshot
+            .host
+            .protocol
+            .proposal_admission
+            .as_ref()
+            .is_some_and(|admission| !admission.fingerprints.is_empty());
+        let result_packet_pending = snapshot.network.packets.iter().any(|packet| {
+            packet.source == PairEndpoint::Host
+                && packet.destination == PairEndpoint::Guest
+                && matches!(
+                    packet.kind,
+                    RestorablePacketKindV2::AuthorityFrame
+                        | RestorablePacketKindV2::ReplacementProposal
+                )
+        });
+        let presentation_pending = !pending_battle_presentations(snapshot).is_empty();
+        admission_live && (result_packet_pending || presentation_pending)
+    }
+
     fn host_admission_with_blocking_presentation(
         snapshot: &RestorablePairSnapshotV2,
     ) -> bool {
@@ -1166,6 +1403,441 @@ mod live_coop_production {
         Err(invalid(
             "presentation settlement exceeded the deterministic boundary bound",
         ))
+    }
+
+    fn selected_content_pack_for_continuation() -> TestResult<Arc<ContentPack>> {
+        Ok(Arc::new(er_content::pack::selected_content_pack()?))
+    }
+
+    fn apply_trace_operation(
+        pair: &mut SimulatedPair,
+        operation: PairOperationV2,
+    ) -> TestResult {
+        let _observation = pair.apply_trace_operation_v2(operation)?;
+        Ok(())
+    }
+
+    fn raw_key_down_v2(endpoint: PairEndpoint, code: PhysicalKey) -> PairOperationV2 {
+        PairOperationV2::RawInput {
+            endpoint,
+            event: RawInputEvent::KeyDown {
+                code,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+        }
+    }
+
+    fn raw_key_up_v2(endpoint: PairEndpoint, code: PhysicalKey) -> PairOperationV2 {
+        PairOperationV2::RawInput {
+            endpoint,
+            event: RawInputEvent::KeyUp { code },
+        }
+    }
+
+    fn raw_press_v2(
+        pair: &mut SimulatedPair,
+        endpoint: PairEndpoint,
+        code: PhysicalKey,
+    ) -> TestResult {
+        apply_trace_operation(pair, raw_key_down_v2(endpoint, code.clone()))?;
+        apply_trace_operation(pair, raw_key_up_v2(endpoint, code))?;
+        Ok(())
+    }
+
+    fn advance_time_v2(pair: &mut SimulatedPair, delta_ms: u64) -> TestResult {
+        apply_trace_operation(
+            pair,
+            PairOperationV2::AdvanceTime {
+                delta_ms: safe(delta_ms),
+            },
+        )
+    }
+
+    fn prime_trace_pair(pair: &mut SimulatedPair) -> TestResult {
+        // `new_battle` starts the production protocol at generation one while
+        // the pair transport starts at generation zero.  Synchronize that
+        // public transport boundary before driving physical input.
+        apply_trace_operation(
+            pair,
+            PairOperationV2::Reconnect {
+                endpoint: PairEndpoint::Host,
+            },
+        )?;
+        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            for _ in 0..3 {
+                raw_press_v2(pair, endpoint, PhysicalKey::Enter)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn reach_one_doubles_command_pending(pair: &mut SimulatedPair) -> TestResult {
+        for attempt in 0..8 {
+            if one_doubles_command_pending(&pair.snapshot_v2()?) {
+                return Ok(());
+            }
+            raw_press_v2(pair, PairEndpoint::Host, PhysicalKey::Enter)?;
+            if attempt == 7 {
+                break;
+            }
+        }
+        Err(invalid(
+            "raw physical host input did not expose the doubles one-command-pending boundary",
+        ))
+    }
+
+    fn reach_guest_proposal_pending(pair: &mut SimulatedPair) -> TestResult {
+        apply_trace_operation(
+            pair,
+            PairOperationV2::Reconnect {
+                endpoint: PairEndpoint::Host,
+            },
+        )?;
+        reach_one_doubles_command_pending(pair)?;
+        for _ in 0..8 {
+            if guest_proposal_pending(&pair.snapshot_v2()?) {
+                return Ok(());
+            }
+            raw_press_v2(pair, PairEndpoint::Guest, PhysicalKey::Enter)?;
+        }
+        Err(invalid(
+            "raw physical guest input did not expose the proposal-delivery-pending boundary",
+        ))
+    }
+
+    fn reach_guest_proposal_admitted_with_delivery_pending(
+        pair: &mut SimulatedPair,
+    ) -> TestResult {
+        reach_guest_proposal_pending(pair)?;
+        let proposal = first_packet_v2(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::CommandProposal,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            generation(1),
+        )?;
+        apply_trace_operation(
+            pair,
+            PairOperationV2::Fault {
+                operation: FaultOperationV2::Deliver {
+                    packet_id: proposal.packet_id,
+                },
+            },
+        )?;
+        for tick in 0..128 {
+            if guest_proposal_admitted_with_delivery_pending(&pair.snapshot_v2()?) {
+                return Ok(());
+            }
+            advance_time_v2(pair, 1)?;
+            if tick == 127 {
+                break;
+            }
+        }
+        Err(invalid(
+            "guest proposal was not admitted with a live result/TURN/presentation delivery pending",
+        ))
+    }
+
+    fn settle_all_presentations_v2(pair: &mut SimulatedPair) -> TestResult {
+        for _ in 0..64 {
+            let pending = pending_battle_presentations(&pair.snapshot_v2()?);
+            if pending.is_empty() {
+                return Ok(());
+            }
+            for (endpoint, event_id) in pending {
+                apply_trace_operation(
+                    pair,
+                    PairOperationV2::BattlePresentationOutcome {
+                        endpoint,
+                        event_id,
+                        outcome: PresentationSettlementOutcome::Settled,
+                    },
+                )?;
+            }
+        }
+        Err(invalid(
+            "V2 presentation settlement exceeded the deterministic boundary bound",
+        ))
+    }
+
+    fn reach_replacement_menu_open(pair: &mut SimulatedPair) -> TestResult {
+        reach_guest_proposal_pending(pair)?;
+        for tick in 0..256 {
+            let snapshot = pair.snapshot_v2()?;
+            if replacement_menu_open(&snapshot) {
+                return Ok(());
+            }
+            if pending_battle_presentations(&snapshot).is_empty() {
+                advance_time_v2(pair, 1)?;
+            } else {
+                settle_all_presentations_v2(pair)?;
+            }
+            if tick == 255 {
+                break;
+            }
+        }
+        Err(invalid(
+            "raw production pair did not expose the replacement-menu-open boundary",
+        ))
+    }
+
+    fn reach_blocking_presentation_pending(pair: &mut SimulatedPair) -> TestResult {
+        reach_guest_proposal_pending(pair)?;
+        for tick in 0..128 {
+            if host_admission_with_blocking_presentation(&pair.snapshot_v2()?) {
+                return Ok(());
+            }
+            advance_time_v2(pair, 1)?;
+            if tick == 127 {
+                break;
+            }
+        }
+        Err(invalid(
+            "raw production pair did not expose the blocking-presentation boundary",
+        ))
+    }
+
+    fn first_packet_v2(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        packet_generation: ConnectionGeneration,
+    ) -> TestResult<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .find(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && packet.source_generation == packet_generation
+                    && packet.destination_generation == packet_generation
+            })
+            .cloned()
+            .ok_or_else(|| {
+                invalid(format!(
+                    "missing {kind:?} packet from {source:?} to {destination:?} at generation {}",
+                    packet_generation.get().get()
+                ))
+            })
+    }
+
+    fn last_packet_v2(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        packet_generation: ConnectionGeneration,
+    ) -> TestResult<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .rev()
+            .find(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && packet.source_generation == packet_generation
+                    && packet.destination_generation == packet_generation
+            })
+            .cloned()
+            .ok_or_else(|| {
+                invalid(format!(
+                    "missing trailing {kind:?} packet from {source:?} to {destination:?} at generation {}",
+                    packet_generation.get().get()
+                ))
+            })
+    }
+
+    fn packets_with_body_v2(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        body: &CanonicalHexBytes,
+    ) -> Vec<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .filter(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && packet.body.as_str() == body.as_str()
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn recovery_fence_held(snapshot: &RestorablePairSnapshotV2) -> bool {
+        snapshot
+            .guest
+            .protocol
+            .recovery
+            .as_ref()
+            .is_some_and(|recovery| {
+                recovery.fence.state == RecoveryFenceState::Held
+                    && recovery.phase.is_some()
+                    && recovery.request_id.is_some()
+            })
+    }
+
+    fn mixed_fault_queue(
+        snapshot: &RestorablePairSnapshotV2,
+        original_body: &CanonicalHexBytes,
+    ) -> bool {
+        let Some(guest_generation) = snapshot
+            .network
+            .links
+            .iter()
+            .find(|link| link.endpoint == PairEndpoint::Guest)
+            .map(|link| link.generation)
+        else {
+            return false;
+        };
+        let packets = snapshot
+            .network
+            .packets
+            .iter()
+            .filter(|packet| {
+                packet.kind == RestorablePacketKindV2::ControlReceipt
+                    && packet.source == PairEndpoint::Guest
+                    && packet.destination == PairEndpoint::Host
+                    && packet.disposition == PacketDispositionV2::Delayed
+                    && packet.source_generation != guest_generation
+                    && packet.destination_generation != guest_generation
+                    && packet.body.as_str() != original_body.as_str()
+            })
+            .collect::<Vec<_>>();
+        let Some(first) = packets.first() else {
+            return false;
+        };
+        packets
+            .iter()
+            .filter(|packet| packet.body.as_str() == first.body.as_str())
+            .count()
+            >= 2
+    }
+
+    fn battle_control_id(control: &BattleControl) -> Option<&str> {
+        match control {
+            BattleControl::CommandRoot(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::MoveSelect(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::TargetSelect(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::PartySelect(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::PartyOptionSelect(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::ReplacementSelect(value) => Some(value.menu.control_id.as_str()),
+            BattleControl::Waiting(_) | BattleControl::Complete(_) => None,
+        }
+    }
+
+    fn control_receipt_delayed_with_installed_control(
+        pair: &SimulatedPair,
+        snapshot: &RestorablePairSnapshotV2,
+        receipt_id: SafeU53,
+    ) -> TestResult<bool> {
+        let Some(receipt) = snapshot.network.packets.iter().find(|packet| {
+            packet.packet_id == receipt_id
+                && packet.kind == RestorablePacketKindV2::ControlReceipt
+                && packet.source == PairEndpoint::Guest
+                && packet.destination == PairEndpoint::Host
+                && packet.disposition == PacketDispositionV2::Delayed
+        }) else {
+            return Ok(false);
+        };
+        if receipt.delivery_deadline_ms <= receipt.enqueued_at_ms {
+            return Ok(false);
+        }
+        let Some(replica) = snapshot.guest.protocol.authority_replica.as_ref() else {
+            return Ok(false);
+        };
+        let Some(installed) = replica
+            .installed_controls
+            .iter()
+            .find(|control| control.revision == replica.frontier.control)
+        else {
+            return Ok(false);
+        };
+        if installed.identity.revision != installed.revision
+            || installed.identity.next_control_id.as_str() != installed.control_id.as_str()
+        {
+            return Ok(false);
+        }
+        let Some(projected) = snapshot
+            .guest
+            .game
+            .current_control
+            .seats
+            .iter()
+            .find(|entry| entry.seat == snapshot.guest.runtime_identity.local_seat)
+        else {
+            return Ok(false);
+        };
+        let Some(projected_control_id) = battle_control_id(&projected.control) else {
+            return Ok(false);
+        };
+        if installed.control_id.as_str() != projected_control_id {
+            return Ok(false);
+        }
+        let live = pair.snapshot()?;
+        Ok(live
+            .guest
+            .live_resources
+            .controls
+            .contains(&installed.control_id)
+            && live.network.queued_packet_ids.contains(&receipt_id))
+    }
+
+    fn trace_boundary_with_live_predicate(
+        boundary_id: &str,
+        pair: &mut SimulatedPair,
+        predicate: impl Fn(&SimulatedPair, &RestorablePairSnapshotV2) -> TestResult<bool>,
+        operations: Vec<PairOperationV2>,
+    ) -> TestResult<M3ContinuationScenarioV1> {
+        if operations.is_empty() {
+            return Err(invalid(format!(
+                "continuation boundary {boundary_id:?} has no later operation"
+            )));
+        }
+        let initial_snapshot = pair.snapshot_v2()?;
+        assert!(
+            predicate(pair, &initial_snapshot)?,
+            "live production pair did not satisfy continuation boundary {boundary_id}"
+        );
+        let mut recorder = PairKernelTraceRecorder::new(initial_snapshot)?;
+        for operation in operations {
+            let observation = pair.apply_trace_operation_v2(operation.clone())?;
+            recorder.record_observation(operation, observation)?;
+        }
+        let trace = recorder.finish()?;
+        assert!(
+            !trace.entries.is_empty(),
+            "continuation boundary {boundary_id} produced an empty trace"
+        );
+        Ok(M3ContinuationScenarioV1 {
+            boundary_id: boundary_id.to_owned(),
+            trace,
+        })
+    }
+
+    fn trace_boundary(
+        boundary_id: &str,
+        pair: &mut SimulatedPair,
+        predicate: impl Fn(&RestorablePairSnapshotV2) -> bool,
+        operations: Vec<PairOperationV2>,
+    ) -> TestResult<M3ContinuationScenarioV1> {
+        trace_boundary_with_live_predicate(
+            boundary_id,
+            pair,
+            |_, snapshot| Ok(predicate(snapshot)),
+            operations,
+        )
     }
 
     fn assert_zero_resource_teardown(snapshot: &er_sim::PairSnapshot) {
@@ -1474,6 +2146,651 @@ mod live_coop_production {
         );
         assert_zero_resource_teardown(&uninterrupted_teardown);
         assert_zero_resource_teardown(&restored_teardown);
+        Ok(())
+    }
+
+    fn build_hosted_continuation_suite(
+        content: Arc<ContentPack>,
+    ) -> TestResult<M3ContinuationSuiteV1> {
+        let mut scenarios = Vec::with_capacity(REQUIRED_CONTINUATION_BOUNDARIES.len());
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1101,
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Reconnect {
+                    endpoint: PairEndpoint::Host,
+                },
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                raw_key_down_v2(PairEndpoint::Host, PhysicalKey::Space),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                raw_key_up_v2(PairEndpoint::Host, PhysicalKey::Space),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                raw_key_down_v2(PairEndpoint::Host, PhysicalKey::Enter),
+            )?;
+            scenarios.push(trace_boundary(
+                "held-fight-before-keyup",
+                &mut pair,
+                |snapshot| {
+                    held_button(
+                        snapshot,
+                        PairEndpoint::Host,
+                        GameButton::Submit,
+                        PhysicalKey::Enter,
+                    ) && driver_key_down(snapshot, PairEndpoint::Host, PhysicalKey::Enter)
+                        && endpoint_has_fight(snapshot, PairEndpoint::Host)
+                },
+                vec![raw_key_up_v2(PairEndpoint::Host, PhysicalKey::Enter)],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1102,
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Reconnect {
+                    endpoint: PairEndpoint::Host,
+                },
+            )?;
+            reach_one_doubles_command_pending(&mut pair)?;
+            scenarios.push(trace_boundary(
+                "doubles-one-command-pending",
+                &mut pair,
+                one_doubles_command_pending,
+                vec![
+                    raw_key_down_v2(PairEndpoint::Guest, PhysicalKey::Enter),
+                    raw_key_up_v2(PairEndpoint::Guest, PhysicalKey::Enter),
+                ],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1103,
+            )?;
+            reach_guest_proposal_admitted_with_delivery_pending(&mut pair)?;
+            let pending_snapshot = pair.snapshot_v2()?;
+            let continuation = if let Some(packet) = pending_snapshot
+                .network
+                .packets
+                .iter()
+                .find(|packet| {
+                    packet.source == PairEndpoint::Host
+                        && packet.destination == PairEndpoint::Guest
+                        && matches!(
+                            packet.kind,
+                            RestorablePacketKindV2::AuthorityFrame
+                                | RestorablePacketKindV2::ReplacementProposal
+                        )
+                })
+            {
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: packet.packet_id,
+                    },
+                }
+            } else if let Some((endpoint, event_id)) =
+                pending_battle_presentations(&pending_snapshot).into_iter().next()
+            {
+                PairOperationV2::BattlePresentationOutcome {
+                    endpoint,
+                    event_id,
+                    outcome: PresentationSettlementOutcome::Settled,
+                }
+            } else {
+                PairOperationV2::AdvanceTime { delta_ms: safe(1) }
+            };
+            scenarios.push(trace_boundary(
+                "guest-proposal-delivery-pending",
+                &mut pair,
+                guest_proposal_admitted_with_delivery_pending,
+                vec![continuation],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1104,
+            )?;
+            prime_trace_pair(&mut pair)?;
+            let proposal = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::CommandProposal,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: proposal.packet_id,
+                    },
+                },
+            )?;
+            let turn = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::AuthorityFrame,
+                PairEndpoint::Host,
+                PairEndpoint::Guest,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Delay {
+                        packet_id: turn.packet_id,
+                        additional_ms: safe(100),
+                    },
+                },
+            )?;
+            let turn_id = turn.packet_id;
+            scenarios.push(trace_boundary(
+                "turn-packet-delayed",
+                &mut pair,
+                move |snapshot| {
+                    snapshot.network.packets.iter().any(|packet| {
+                        packet.packet_id == turn_id
+                            && packet.kind == RestorablePacketKindV2::AuthorityFrame
+                            && packet.source == PairEndpoint::Host
+                            && packet.destination == PairEndpoint::Guest
+                            && packet.disposition == PacketDispositionV2::Delayed
+                            && packet.delivery_deadline_ms > packet.enqueued_at_ms
+                    })
+                },
+                vec![PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver { packet_id: turn_id },
+                }],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1105,
+            )?;
+            prime_trace_pair(&mut pair)?;
+            let proposal = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::CommandProposal,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: proposal.packet_id,
+                    },
+                },
+            )?;
+            let turn = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::AuthorityFrame,
+                PairEndpoint::Host,
+                PairEndpoint::Guest,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: turn.packet_id,
+                    },
+                },
+            )?;
+            if !pair
+                .snapshot_v2()?
+                .network
+                .packets
+                .iter()
+                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+            {
+                settle_all_presentations_v2(&mut pair)?;
+            }
+            let receipt = last_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::ControlReceipt,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Delay {
+                        packet_id: receipt.packet_id,
+                        additional_ms: safe(100),
+                    },
+                },
+            )?;
+            let receipt_id = receipt.packet_id;
+            scenarios.push(trace_boundary_with_live_predicate(
+                "control-receipt-delayed",
+                &mut pair,
+                move |pair, snapshot| {
+                    control_receipt_delayed_with_installed_control(pair, snapshot, receipt_id)
+                },
+                vec![PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: receipt_id,
+                    },
+                }],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1106,
+            )?;
+            reach_replacement_menu_open(&mut pair)?;
+            scenarios.push(trace_boundary(
+                "replacement-menu-open",
+                &mut pair,
+                replacement_menu_open,
+                vec![
+                    raw_key_down_v2(PairEndpoint::Host, PhysicalKey::ArrowDown),
+                    raw_key_up_v2(PairEndpoint::Host, PhysicalKey::ArrowDown),
+                ],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1107,
+            )?;
+            prime_trace_pair(&mut pair)?;
+            let proposal = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::CommandProposal,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: proposal.packet_id,
+                    },
+                },
+            )?;
+            let turn = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::AuthorityFrame,
+                PairEndpoint::Host,
+                PairEndpoint::Guest,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: turn.packet_id,
+                    },
+                },
+            )?;
+            if !pair
+                .snapshot_v2()?
+                .network
+                .packets
+                .iter()
+                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+            {
+                settle_all_presentations_v2(&mut pair)?;
+            }
+            let receipt = last_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::ControlReceipt,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Delay {
+                        packet_id: receipt.packet_id,
+                        additional_ms: safe(100),
+                    },
+                },
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Reconnect {
+                    endpoint: PairEndpoint::Guest,
+                },
+            )?;
+            scenarios.push(trace_boundary(
+                "recovery-fence-held",
+                &mut pair,
+                recovery_fence_held,
+                vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1108,
+            )?;
+            reach_blocking_presentation_pending(&mut pair)?;
+            let (endpoint, event_id) = pending_battle_presentations(&pair.snapshot_v2()?)
+                .into_iter()
+                .next()
+                .ok_or_else(|| invalid("blocking-presentation boundary omitted its event"))?;
+            scenarios.push(trace_boundary(
+                "blocking-presentation-pending",
+                &mut pair,
+                host_admission_with_blocking_presentation,
+                vec![PairOperationV2::BattlePresentationOutcome {
+                    endpoint,
+                    event_id,
+                    outcome: PresentationSettlementOutcome::Settled,
+                }],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_victory_config()?,
+                Arc::clone(&content),
+                1109,
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Reconnect {
+                    endpoint: PairEndpoint::Host,
+                },
+            )?;
+            for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+                for _ in 0..8 {
+                    if endpoint_commands_complete(&pair.snapshot_v2()?, endpoint) {
+                        break;
+                    }
+                    raw_press_v2(&mut pair, endpoint, PhysicalKey::Enter)?;
+                }
+                assert!(
+                    endpoint_commands_complete(&pair.snapshot_v2()?, endpoint),
+                    "terminal fixture did not complete {endpoint:?} command selection"
+                );
+            }
+            for tick in 0..256 {
+                if terminal_reached(&pair.snapshot_v2()?) {
+                    break;
+                }
+                if pending_battle_presentations(&pair.snapshot_v2()?).is_empty() {
+                    advance_time_v2(&mut pair, 1)?;
+                } else {
+                    settle_all_presentations_v2(&mut pair)?;
+                }
+                if tick == 255 {
+                    break;
+                }
+            }
+            scenarios.push(trace_boundary(
+                "terminal-before-teardown",
+                &mut pair,
+                terminal_reached,
+                vec![PairOperationV2::AdvanceTime {
+                    delta_ms: SafeU53::ZERO,
+                }],
+            )?);
+        }
+
+        {
+            let mut pair = new_battle_pair(
+                forced_doubles_config()?,
+                Arc::clone(&content),
+                1110,
+            )?;
+            prime_trace_pair(&mut pair)?;
+            let proposal = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::CommandProposal,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: proposal.packet_id,
+                    },
+                },
+            )?;
+            let turn = first_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::AuthorityFrame,
+                PairEndpoint::Host,
+                PairEndpoint::Guest,
+                generation(1),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Deliver {
+                        packet_id: turn.packet_id,
+                    },
+                },
+            )?;
+            if !pair
+                .snapshot_v2()?
+                .network
+                .packets
+                .iter()
+                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+            {
+                settle_all_presentations_v2(&mut pair)?;
+            }
+            let receipt = last_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::ControlReceipt,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            let original_body = receipt.body.clone();
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Delay {
+                        packet_id: receipt.packet_id,
+                        additional_ms: safe(100),
+                    },
+                },
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Corrupt {
+                        packet_id: receipt.packet_id,
+                        corruption: FrameCorruptionV2::DeleteField {
+                            json_pointer: "/ctx/connectionGeneration".to_owned(),
+                        },
+                    },
+                },
+            )?;
+            let corrupted = last_packet_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::ControlReceipt,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                generation(1),
+            )?;
+            assert_ne!(
+                corrupted.body.as_str(),
+                original_body.as_str(),
+                "production frame corruption did not change the queued receipt body"
+            );
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Fault {
+                    operation: FaultOperationV2::Duplicate {
+                        packet_id: receipt.packet_id,
+                    },
+                },
+            )?;
+            let duplicated = packets_with_body_v2(
+                &pair.snapshot_v2()?,
+                RestorablePacketKindV2::ControlReceipt,
+                PairEndpoint::Guest,
+                PairEndpoint::Host,
+                &corrupted.body,
+            );
+            assert_eq!(duplicated.len(), 2);
+            apply_trace_operation(
+                &mut pair,
+                PairOperationV2::Reconnect {
+                    endpoint: PairEndpoint::Guest,
+                },
+            )?;
+            let original_body_for_predicate = original_body.clone();
+            scenarios.push(trace_boundary(
+                "mixed-network-fault-queue",
+                &mut pair,
+                move |snapshot| mixed_fault_queue(snapshot, &original_body_for_predicate),
+                vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
+            )?);
+        }
+
+        let suite = M3ContinuationSuiteV1 {
+            schema_version: M3_CONTINUATION_SUITE_SCHEMA_VERSION,
+            suite_id: M3_CONTINUATION_SUITE_ID.to_owned(),
+            content_pack: (*content).clone(),
+            scenarios,
+        };
+        suite.validate()?;
+        Ok(suite)
+    }
+
+    fn emit_hosted_continuation_artifacts(
+        suite_json: &str,
+        report_json: &str,
+    ) -> TestResult {
+        let Some(directory) = std::env::var_os("M3_CONTINUATION_ARTIFACT_DIR") else {
+            return Ok(());
+        };
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory)?;
+        std::fs::write(directory.join("suite.json"), suite_json.as_bytes())?;
+        std::fs::write(
+            directory.join("native-continuation-report.json"),
+            report_json.as_bytes(),
+        )?;
+        Ok(())
+    }
+
+    #[test]
+    fn hosted_m3_native_wasm_continuation_suite_emits_artifacts() -> TestResult {
+        let content = selected_content_pack_for_continuation()?;
+        let suite = build_hosted_continuation_suite(Arc::clone(&content))?;
+        assert_eq!(suite.scenarios.len(), REQUIRED_CONTINUATION_BOUNDARIES.len());
+        assert_eq!(
+            suite
+                .scenarios
+                .iter()
+                .map(|scenario| scenario.boundary_id.as_str())
+                .collect::<Vec<_>>(),
+            REQUIRED_CONTINUATION_BOUNDARIES.to_vec(),
+        );
+        assert!(suite
+            .scenarios
+            .iter()
+            .all(|scenario| !scenario.trace.entries.is_empty()));
+
+        let suite_json = canonical_suite_json(&suite)?;
+        let parsed_suite = parse_suite_json(&suite_json)?;
+        let reparsed_suite_json = canonical_suite_json(&parsed_suite)?;
+        assert_eq!(
+            suite_json.as_bytes(),
+            reparsed_suite_json.as_bytes(),
+            "canonical suite bytes changed after parse/re-canonicalize",
+        );
+
+        let report_json = replay_suite_json(&suite_json)?;
+        let replayed_report_json = replay_suite_json(&reparsed_suite_json)?;
+        assert_eq!(
+            report_json.as_bytes(),
+            replayed_report_json.as_bytes(),
+            "native continuation report bytes were not reproducible",
+        );
+
+        let report: Value = serde_json::from_str(&report_json)?;
+        assert_eq!(
+            report.get("scenario_count").and_then(Value::as_u64),
+            Some(u64::try_from(REQUIRED_CONTINUATION_BOUNDARIES.len())?),
+        );
+        assert_eq!(
+            report.get("content_hash").and_then(Value::as_str),
+            Some(content.hash.as_str()),
+        );
+        let report_scenarios = report
+            .get("scenarios")
+            .and_then(Value::as_array)
+            .ok_or_else(|| invalid("native continuation report omitted scenarios"))?;
+        assert_eq!(report_scenarios.len(), REQUIRED_CONTINUATION_BOUNDARIES.len());
+        for (index, (scenario, expected_id)) in report_scenarios
+            .iter()
+            .zip(REQUIRED_CONTINUATION_BOUNDARIES)
+            .enumerate()
+        {
+            assert_eq!(
+                scenario.get("boundary_id").and_then(Value::as_str),
+                Some(expected_id),
+                "report scenario {index} has the wrong boundary id",
+            );
+            let operation_count = scenario
+                .get("operation_count")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| invalid(format!("report scenario {index} omitted operation_count")))?;
+            let replayed_operation_count = scenario
+                .get("replayed_operation_count")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "report scenario {index} omitted replayed_operation_count"
+                    ))
+                })?;
+            assert_eq!(
+                operation_count,
+                replayed_operation_count,
+                "replayed operation count diverged for report scenario {index}",
+            );
+            assert_eq!(
+                operation_count,
+                u64::try_from(suite.scenarios[index].trace.entries.len())?,
+                "report operation count diverged from the native trace for report scenario {index}",
+            );
+        }
+
+        emit_hosted_continuation_artifacts(&suite_json, &report_json)?;
         Ok(())
     }
 }
