@@ -98,20 +98,14 @@ impl CriticalContext {
     /// Callers that need fail-closed input validation should use [`Self::new`]
     /// and supply the already-resolved stage.  This constructor is the only
     /// place where an out-of-range raw oracle stage is intentionally reduced.
-    pub const fn from_oracle_stage(raw_stage: i8, gate: CriticalGate) -> Self {
-        let critical_stage = if raw_stage < 0 {
-            0
-        } else if raw_stage > 3 {
-            3
-        } else {
-            raw_stage
-        };
+    pub fn from_oracle_stage(raw_stage: i8, gate: CriticalGate) -> Self {
+        let critical_stage = raw_stage.clamp(0, 3);
         Self::new(critical_stage, gate)
     }
 
     /// Validates the closed stage domain before a gate or RNG operation.
-    pub const fn validate(&self) -> Result<(), CriticalContextError> {
-        if self.critical_stage < 0 || self.critical_stage > 3 {
+    pub fn validate(&self) -> Result<(), CriticalContextError> {
+        if !(0..=3).contains(&self.critical_stage) {
             return Err(CriticalContextError::StageOutOfRange {
                 stage: self.critical_stage,
             });

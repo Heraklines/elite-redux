@@ -124,12 +124,12 @@ impl AccuracyContext {
         {
             return Err(AccuracyContextError::InvalidBaseAccuracy { accuracy: *accuracy });
         }
-        if self.source_accuracy_stage < -6 || self.source_accuracy_stage > 6 {
+        if !(-6..=6).contains(&self.source_accuracy_stage) {
             return Err(AccuracyContextError::InvalidSourceAccuracyStage {
                 stage: self.source_accuracy_stage,
             });
         }
-        if self.target_evasion_stage < -6 || self.target_evasion_stage > 6 {
+        if !(-6..=6).contains(&self.target_evasion_stage) {
             return Err(AccuracyContextError::InvalidTargetEvasionStage {
                 stage: self.target_evasion_stage,
             });
@@ -211,19 +211,9 @@ impl AccuracyContext {
         // The oracle caps the source ACC stage at +6 before comparing it with
         // target EVA.  Target EVA is intentionally not capped at this point;
         // the selected state validator supplies its [-6, +6] storage bound.
-        let source_stage = if self.source_accuracy_stage > 6 {
-            6
-        } else {
-            self.source_accuracy_stage
-        };
+        let source_stage = self.source_accuracy_stage.min(6);
         let raw_difference = source_stage - self.target_evasion_stage;
-        let stage_difference = if raw_difference > 6 {
-            6
-        } else if raw_difference < -6 {
-            -6
-        } else {
-            raw_difference
-        };
+        let stage_difference = raw_difference.clamp(-6, 6);
 
         let stage_multiplier = if stage_difference == 0 {
             1.0

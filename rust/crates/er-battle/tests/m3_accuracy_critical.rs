@@ -68,7 +68,7 @@ fn published_always_hit_skips_accuracy_draw() -> TestResult {
     let decision = context.resolve(&mut runtime)?;
 
     assert!(decision.is_hit());
-    assert_eq!(decision.draw(), None);
+    assert!(decision.draw().is_none());
     assert_eq!(
         decision.skipped_evidence().map(|evidence| evidence.reason),
         Some(AccuracySkipReason::AlwaysHits)
@@ -179,9 +179,10 @@ fn published_critical_fixture_uses_stage_zero_noncritical_draw() -> TestResult {
     assert!(decision.is_noncritical());
     assert_eq!(decision.draw(), Some(safe(3)?));
     assert_eq!(decision.multiplier(), 1.0);
-    assert_eq!(
-        decision.roll_evidence().map(|evidence| evidence.critical),
-        Some(false)
+    assert!(
+        decision
+            .roll_evidence()
+            .is_some_and(|evidence| !evidence.critical)
     );
     assert_eq!(runtime.audit_entries().len(), 1);
     let audit = &runtime.audit_entries()[0];
@@ -197,7 +198,7 @@ fn published_critical_fixture_uses_stage_zero_noncritical_draw() -> TestResult {
 
 #[test]
 fn critical_zero_is_the_only_hit_and_odds_follow_selected_slice() -> TestResult {
-    for (stage, odds) in CRITICAL_ODDS.into_iter().enumerate() {
+    for (stage, odds) in CRITICAL_ODDS.iter().copied().enumerate() {
         let context = CriticalContext::new(i8::try_from(stage)?, CriticalGate::Eligible);
         let decision = context.evaluate_draw(SafeU53::ZERO)?;
 
@@ -232,9 +233,10 @@ fn guaranteed_selected_odds_record_a_non_consuming_cardinality_one_audit() -> Te
 
     assert!(decision.is_critical());
     assert_eq!(decision.draw(), Some(SafeU53::ZERO));
-    assert_eq!(
-        decision.roll_evidence().map(|evidence| evidence.consumed),
-        Some(false)
+    assert!(
+        decision
+            .roll_evidence()
+            .is_some_and(|evidence| !evidence.consumed)
     );
     assert_eq!(runtime.audit_entries().len(), 1);
     let audit = &runtime.audit_entries()[0];
@@ -256,8 +258,8 @@ fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
     )?;
     let no_effect_accuracy = AccuracyContext::ordinary(75, 0, 0, AccuracyGate::NoEffect);
     let accuracy_decision = no_effect_accuracy.resolve(&mut accuracy_runtime)?;
-    assert_eq!(accuracy_decision.draw(), None);
-    assert_eq!(accuracy_runtime.audit_entries().len(), 0);
+    assert!(accuracy_decision.draw().is_none());
+    assert!(accuracy_runtime.audit_entries().is_empty());
 
     let mut critical_runtime = runtime_from_published_states(
         "7kmfnITLsaH6sVd8",
@@ -267,8 +269,8 @@ fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
     )?;
     let no_effect_critical = CriticalContext::new(0, CriticalGate::NoEffect);
     let critical_decision = no_effect_critical.resolve(&mut critical_runtime)?;
-    assert_eq!(critical_decision.draw(), None);
-    assert_eq!(critical_runtime.audit_entries().len(), 0);
+    assert!(critical_decision.draw().is_none());
+    assert!(critical_runtime.audit_entries().is_empty());
 
     let unsupported_accuracy = AccuracyContext::ordinary(
         75,
@@ -280,7 +282,7 @@ fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
         unsupported_accuracy.resolve(&mut accuracy_runtime),
         Err(AccuracyError::Unsupported { .. })
     ));
-    assert_eq!(accuracy_runtime.audit_entries().len(), 0);
+    assert!(accuracy_runtime.audit_entries().is_empty());
 
     let unsupported_critical = CriticalContext::new(
         0,
@@ -290,7 +292,7 @@ fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
         unsupported_critical.resolve(&mut critical_runtime),
         Err(CriticalError::Unsupported { .. })
     ));
-    assert_eq!(critical_runtime.audit_entries().len(), 0);
+    assert!(critical_runtime.audit_entries().is_empty());
     Ok(())
 }
 
