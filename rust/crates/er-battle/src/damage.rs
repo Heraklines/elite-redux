@@ -283,21 +283,21 @@ pub fn calculate_damage(
     // Number is intentionally not folded into the later products.
     let level_multiplier = (2.0 * f64::from(input.level)) / 5.0 + 2.0;
     let mut base_damage = level_multiplier * input.power;
-    base_damage = base_damage * input.offensive_stat;
-    base_damage = base_damage / input.defensive_stat;
-    base_damage = base_damage / 50.0;
-    base_damage = base_damage + 2.0;
+    base_damage *= input.offensive_stat;
+    base_damage /= input.defensive_stat;
+    base_damage /= 50.0;
+    base_damage += 2.0;
     if !base_damage.is_finite() {
         return Err(DamageError::NonFiniteArithmetic);
     }
 
     let mut damage_value = base_damage;
-    damage_value = damage_value * input.target_multiplier;
-    damage_value = damage_value * input.critical_multiplier;
-    damage_value = damage_value * random_multiplier;
-    damage_value = damage_value * input.stab_multiplier;
-    damage_value = damage_value * input.effectiveness_multiplier;
-    damage_value = damage_value * burn_multiplier;
+    damage_value *= input.target_multiplier;
+    damage_value *= input.critical_multiplier;
+    damage_value *= random_multiplier;
+    damage_value *= input.stab_multiplier;
+    damage_value *= input.effectiveness_multiplier;
+    damage_value *= burn_multiplier;
     if !damage_value.is_finite() {
         return Err(DamageError::NonFiniteArithmetic);
     }

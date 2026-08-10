@@ -6,6 +6,8 @@
 //! separate so a later resolver can consume one [`PendingAction`] at a time
 //! without inventing an actor or field-slot tie-break.
 
+use std::cmp::Reverse;
+
 use er_content::moves::find_move;
 use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
@@ -698,7 +700,7 @@ fn reorder_actions(
 
     // Slice::sort_by is stable.  Equal speeds compare equal, so the seeded
     // group order remains the only tie input.
-    shuffled.sort_by(|left, right| right.effective_speed.cmp(&left.effective_speed));
+    shuffled.sort_by_key(|action| Reverse(action.effective_speed));
     assign_tie_orders(&mut shuffled)?;
 
     if is_move_queue {

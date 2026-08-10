@@ -545,7 +545,7 @@ fn unsupported_arena_state_is_rejected_before_the_shuffle_boundary() -> TestResu
     let mut state = single_state(&content, 180, StatusKind::None, 0, &[1], 180, &[1])?;
     let battle = state.battle.as_mut().ok_or("missing battle")?;
     battle.arena_conditions.push(ArenaConditionState {
-        condition: ArenaConditionId::new(safe(1)?),
+        condition: ArenaConditionId::new("unsupported-arena-condition")?,
         scope: ArenaConditionScope::Both,
         turn_count: 1,
         layers: 1,
