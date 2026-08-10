@@ -357,12 +357,8 @@ pub fn resolve_residual(
             });
         }
     };
-    let residual_amount = std::cmp::max(1, input.max_hp / divisor);
-    let damage = if residual_amount > input.hp {
-        input.hp
-    } else {
-        residual_amount
-    };
+    let residual_amount = (input.max_hp / divisor).max(1);
+    let damage = residual_amount.min(input.hp);
     let next_turn_count = input
         .status
         .toxic_turn_count
@@ -393,22 +389,28 @@ pub fn status_type_immunity(
     target_types: PokemonTyping,
 ) -> Result<Option<PokemonType>, StatusError> {
     validate_supported_status(status)?;
-    let is_immune = |pokemon_type: PokemonType| {
-        target_types.primary == pokemon_type || target_types.secondary == Some(pokemon_type)
-    };
-    Ok(match status {
-        StatusKind::Poison if is_immune(PokemonType::Poison) => Some(PokemonType::Poison),
-        StatusKind::Poison if is_immune(PokemonType::Steel) => Some(PokemonType::Steel),
-        StatusKind::Paralysis if is_immune(PokemonType::Electric) => Some(PokemonType::Electric),
-        StatusKind::Burn if is_immune(PokemonType::Fire) => Some(PokemonType::Fire),
-        _ => None,
-    })
+    if type_blocks_status(status, target_types.primary) {
+        return Ok(Some(target_types.primary));
+    }
+    Ok(target_types
+        .secondary
+        .filter(|secondary| type_blocks_status(status, *secondary)))
 }
 
 /// Return whether the target's typing blocks a powder move.
 pub fn powder_immunity(target_types: PokemonTyping) -> bool {
     target_types.primary == PokemonType::Grass
         || target_types.secondary == Some(PokemonType::Grass)
+}
+
+const fn type_blocks_status(status: StatusKind, pokemon_type: PokemonType) -> bool {
+    matches!(
+        (status, pokemon_type),
+        (StatusKind::Poison, PokemonType::Poison)
+            | (StatusKind::Poison, PokemonType::Steel)
+            | (StatusKind::Paralysis, PokemonType::Electric)
+            | (StatusKind::Burn, PokemonType::Fire)
+    )
 }
 
 fn validate_supported_status(status: StatusKind) -> Result<(), StatusError> {

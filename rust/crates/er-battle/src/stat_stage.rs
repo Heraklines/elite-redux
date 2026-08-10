@@ -105,13 +105,7 @@ pub enum StatStageError {
 
 /// Clamp one stored or requested stage to the oracle's closed range.
 pub const fn clamp_stage(stage: i8) -> i8 {
-    if stage < MIN_STAT_STAGE {
-        MIN_STAT_STAGE
-    } else if stage > MAX_STAT_STAGE {
-        MAX_STAT_STAGE
-    } else {
-        stage
-    }
+    stage.clamp(MIN_STAT_STAGE, MAX_STAT_STAGE)
 }
 
 /// Return the stage used by an effective-stat lookup without mutating storage.
@@ -119,9 +113,8 @@ pub const fn apply_stage_policy(stage: i8, policy: StagePolicy) -> i8 {
     let stage = clamp_stage(stage);
     match policy {
         StagePolicy::Normal => stage,
-        StagePolicy::IgnoreNegative if stage < 0 => 0,
-        StagePolicy::IgnorePositive if stage > 0 => 0,
-        StagePolicy::IgnoreNegative | StagePolicy::IgnorePositive => stage,
+        StagePolicy::IgnoreNegative => stage.max(0),
+        StagePolicy::IgnorePositive => stage.min(0),
     }
 }
 
@@ -131,27 +124,16 @@ pub const fn apply_stage_policy(stage: i8, policy: StagePolicy) -> i8 {
 /// the oracle, with no intermediate floor or integer conversion.
 pub fn stage_ratio(stage: i8) -> f64 {
     let stage = i16::from(clamp_stage(stage));
-    let numerator = f64::from(std::cmp::max(2_i16, 2 + stage));
-    let denominator = f64::from(std::cmp::max(2_i16, 2 - stage));
-    let ratio = numerator / denominator;
-    if ratio > 4.0 {
-        4.0
-    } else {
-        ratio
-    }
+    let numerator = f64::from((2 + stage).max(2));
+    let denominator = f64::from((2 - stage).max(2));
+    (numerator / denominator).min(4.0)
 }
 
 /// Produce a typed stage mutation without changing a `StatStages` value.
 pub fn stage_mutation(stat: BattleStat, current: i8, delta: i8) -> StatStageMutation {
     let before = clamp_stage(current);
     let requested = i16::from(before) + i16::from(delta);
-    let after = if requested < i16::from(MIN_STAT_STAGE) {
-        MIN_STAT_STAGE
-    } else if requested > i16::from(MAX_STAT_STAGE) {
-        MAX_STAT_STAGE
-    } else {
-        requested as i8
-    };
+    let after = requested.clamp(i16::from(MIN_STAT_STAGE), i16::from(MAX_STAT_STAGE)) as i8;
     StatStageMutation {
         stat,
         before,
@@ -237,13 +219,10 @@ pub fn effective_stat(input: EffectiveStatInput) -> Result<EffectiveStatOutcome,
     }
 
     let floored = value.floor();
-    let value = if floored < 1.0 {
-        1
-    } else if floored > f64::from(u32::MAX) {
+    if floored > f64::from(u32::MAX) {
         return Err(StatStageError::EffectiveStatOverflow);
-    } else {
-        floored as u32
-    };
+    }
+    let value = floored.max(1.0) as u32;
 
     Ok(EffectiveStatOutcome {
         base_stat: input.base_stat,

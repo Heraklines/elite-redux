@@ -253,6 +253,23 @@ fn status_admission_covers_application_immunity_powder_and_no_overwrite() {
         ));
     }
 
+    let dual_poison_immune = apply_status(StatusApplicationInput {
+        requested: StatusKind::Poison,
+        current: clean,
+        target_types: typing(PokemonType::Steel, Some(PokemonType::Poison)),
+        powder: false,
+        bypass: StatusBypass::None,
+    });
+    assert!(matches!(
+        dual_poison_immune,
+        Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::TypeImmunity {
+                status: StatusKind::Poison,
+                immune_type: PokemonType::Steel,
+            }
+        })
+    ));
+
     let paralysis_immune = apply_status(StatusApplicationInput {
         requested: StatusKind::Paralysis,
         current: clean,
