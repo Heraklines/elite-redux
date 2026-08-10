@@ -8,7 +8,9 @@ use er_state::digest::MechanicalStateDigest;
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
 use er_types::battle_command::{CommandCollectionState, CommandSet, ReplacementSelection};
-use er_types::battle_ids::{FaintOccurrenceId, FieldSlot, MoveSlotIndex, PokemonId, TurnIndex};
+use er_types::battle_ids::{
+    FaintOccurrenceId, FieldSlot, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex,
+};
 use er_types::battle_model::{
     BattleOutcome, BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction, StatStages,
     StatusState,
@@ -163,12 +165,20 @@ fn causal_mutation_order_is_valid(
             };
             if head.id != *occurrence
                 || head.replacement != *before
+                || *before != ReplacementProgress::Pending
                 || field_occupant(battle, head.slot) != Some(Some(head.pokemon))
             {
                 return false;
             }
-            let Some(expected_after) = replacement_field_occupant(*after) else {
-                return false;
+            let expected_after = match *after {
+                ReplacementProgress::Selected {
+                    party_slot,
+                    pokemon,
+                } if selected_replacement_is_bound(battle, head, party_slot, pokemon, true) => {
+                    Some(pokemon)
+                }
+                ReplacementProgress::NoLegalReplacement => None,
+                _ => return false,
             };
             matches!(
                 (mutations.get(index + 1), mutations.get(index + 2)),
@@ -204,7 +214,7 @@ fn causal_mutation_order_is_valid(
             let Some(head) = unresolved_faint_head(battle) else {
                 return false;
             };
-            let Some(expected_after) = replacement_field_occupant(head.replacement) else {
+            let Some(expected_after) = replacement_field_occupant(battle, head) else {
                 return false;
             };
             stored.id == head.id
@@ -220,7 +230,7 @@ fn causal_mutation_order_is_valid(
             let Some(head) = unresolved_faint_head(battle) else {
                 return false;
             };
-            let Some(expected_after) = replacement_field_occupant(head.replacement) else {
+            let Some(expected_after) = replacement_field_occupant(battle, head) else {
                 return false;
             };
             head.id == *occurrence
@@ -237,6 +247,9 @@ fn causal_mutation_order_is_valid(
                 )
         }
         BattleMutation::BattleRngChanged { before, after } => {
+            if before.battle_seed != after.battle_seed {
+                return false;
+            }
             let before_turn = before.turn.get().get();
             let after_turn = after.turn.get().get();
             if after_turn == before_turn {
@@ -283,12 +296,47 @@ fn field_occupant(battle: &BattleState, slot: FieldSlot) -> Option<Option<Pokemo
         .map(|entry| entry.occupant)
 }
 
-const fn replacement_field_occupant(progress: ReplacementProgress) -> Option<Option<PokemonId>> {
-    match progress {
-        ReplacementProgress::Selected { pokemon, .. } => Some(Some(pokemon)),
+fn replacement_field_occupant(
+    battle: &BattleState,
+    occurrence: &FaintOccurrence,
+) -> Option<Option<PokemonId>> {
+    match occurrence.replacement {
+        ReplacementProgress::Selected {
+            party_slot,
+            pokemon,
+        } if selected_replacement_is_bound(
+            battle,
+            occurrence,
+            party_slot,
+            pokemon,
+            false,
+        ) => Some(Some(pokemon)),
         ReplacementProgress::NoLegalReplacement | ReplacementProgress::NotRequired => Some(None),
         ReplacementProgress::Pending | ReplacementProgress::Applied => None,
+        ReplacementProgress::Selected { .. } => None,
     }
+}
+
+fn selected_replacement_is_bound(
+    battle: &BattleState,
+    occurrence: &FaintOccurrence,
+    party_slot: PartyIndex,
+    pokemon: PokemonId,
+    require_off_field: bool,
+) -> bool {
+    let Some(candidate) = battle.player_party.get(usize::from(party_slot.get())) else {
+        return false;
+    };
+    candidate.id == pokemon
+        && candidate.owner_seat == occurrence.owner_seat
+        && candidate.hp > 0
+        && !candidate.fainted
+        && (!require_off_field
+            || battle
+                .field
+                .slots
+                .iter()
+                .all(|entry| entry.occupant != Some(pokemon)))
 }
 
 fn apply_evidence_mutation(state: &mut GameState, mutation: &BattleMutation) -> bool {
