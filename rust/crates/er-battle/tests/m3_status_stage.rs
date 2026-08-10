@@ -4,7 +4,7 @@ use std::error::Error;
 
 use er_battle::stat_stage::{
     EffectiveStatInput, StagePolicy, apply_stage_delta, effective_battle_stat, effective_speed,
-    js_signed_shift_right_one, stage_for_stat, stage_ratio,
+    effective_stat, js_signed_shift_right_one, stage_for_stat, stage_ratio,
 };
 use er_battle::status::{
     ParalysisActivationOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
@@ -134,7 +134,7 @@ fn all_seven_stages_use_the_published_ratio_table_and_caps() -> Result<(), Box<d
 
 #[test]
 fn critical_stage_policy_is_explicit_and_does_not_mutate_storage() -> Result<(), Box<dyn Error>> {
-    let negative = stat_stage::effective_stat(EffectiveStatInput {
+    let negative = effective_stat(EffectiveStatInput {
         stat: BattleStat::Attack,
         base_stat: 100,
         stage: -2,
@@ -144,7 +144,7 @@ fn critical_stage_policy_is_explicit_and_does_not_mutate_storage() -> Result<(),
     assert_eq!(negative.applied_stage, 0);
     assert_eq!(negative.value, 100);
 
-    let positive = stat_stage::effective_stat(EffectiveStatInput {
+    let positive = effective_stat(EffectiveStatInput {
         stat: BattleStat::Defense,
         base_stat: 100,
         stage: 2,

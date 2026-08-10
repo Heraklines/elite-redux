@@ -66,19 +66,20 @@ fn physical_base_damage_keeps_source_expression_order() -> TestResult {
 
     let level_multiplier = (2.0 * f64::from(input.level)) / 5.0 + 2.0;
     let mut expected_base = level_multiplier * input.power;
-    expected_base = expected_base * input.offensive_stat;
-    expected_base = expected_base / input.defensive_stat;
-    expected_base = expected_base / 50.0;
-    expected_base = expected_base + 2.0;
+    expected_base *= input.offensive_stat;
+    expected_base /= input.defensive_stat;
+    expected_base /= 50.0;
+    expected_base += 2.0;
     assert_eq!(result.base_damage, expected_base);
 
     let random_multiplier = (variance.roll.get() as f64) / 100.0;
     let mut expected_chain = expected_base * input.target_multiplier;
-    expected_chain = expected_chain * input.critical_multiplier;
-    expected_chain = expected_chain * random_multiplier;
-    expected_chain = expected_chain * input.stab_multiplier;
-    expected_chain = expected_chain * input.effectiveness_multiplier;
-    expected_chain = expected_chain * 1.0;
+    expected_chain *= input.critical_multiplier;
+    expected_chain *= random_multiplier;
+    expected_chain *= input.stab_multiplier;
+    expected_chain *= input.effectiveness_multiplier;
+    let neutral_burn_multiplier = 1.0;
+    expected_chain *= neutral_burn_multiplier;
     assert_eq!(result.pre_field_damage, to_dmg_value(expected_chain)?);
     assert_eq!(result.damage, result.pre_field_damage);
     Ok(())
@@ -102,11 +103,12 @@ fn stab_effectiveness_order_and_second_field_boundary_are_explicit() -> TestResu
 
     let random_multiplier = (variance.roll.get() as f64) / 100.0;
     let mut expected = result.base_damage * input.target_multiplier;
-    expected = expected * input.critical_multiplier;
-    expected = expected * random_multiplier;
-    expected = expected * input.stab_multiplier;
-    expected = expected * input.effectiveness_multiplier;
-    expected = expected * 1.0;
+    expected *= input.critical_multiplier;
+    expected *= random_multiplier;
+    expected *= input.stab_multiplier;
+    expected *= input.effectiveness_multiplier;
+    let neutral_burn_multiplier = 1.0;
+    expected *= neutral_burn_multiplier;
     let first = to_dmg_value(expected)?;
     let second = to_dmg_value((first.get() as f64) * input.field_multiplier)?;
 
@@ -151,11 +153,11 @@ fn burn_halves_physical_damage_but_not_special_damage() -> TestResult {
     };
     let random_multiplier = (variance.roll.get() as f64) / 100.0;
     let mut expected = burned_result.base_damage * burned.target_multiplier;
-    expected = expected * burned.critical_multiplier;
-    expected = expected * random_multiplier;
-    expected = expected * burned.stab_multiplier;
-    expected = expected * burned.effectiveness_multiplier;
-    expected = expected * burned_result.burn_multiplier;
+    expected *= burned.critical_multiplier;
+    expected *= random_multiplier;
+    expected *= burned.stab_multiplier;
+    expected *= burned.effectiveness_multiplier;
+    expected *= burned_result.burn_multiplier;
     assert_eq!(burned_result.pre_field_damage, to_dmg_value(expected)?);
 
     let special = DamageInput::new(100, MoveCategory::Special, 40.0, 148.0, 83.0).with_burned(true);
