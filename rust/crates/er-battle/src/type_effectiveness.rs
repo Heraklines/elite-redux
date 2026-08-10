@@ -243,8 +243,12 @@ pub fn compose_type_multipliers(
     first.compose(second)
 }
 
-/// Resolve the exact selected-slice effectiveness of one attack type against
-/// one canonical one- or two-type defender.
+/// Resolve the exact selected-slice effectiveness of one damaging attack type
+/// against one canonical one- or two-type defender.
+///
+/// The move pipeline must not call this chart for an ordinary status-category
+/// move: the pinned oracle treats those moves as neutral unless an explicitly
+/// selected immunity-respecting attribute says otherwise.
 pub fn resolve_type_effectiveness(
     chart: &TypeChart,
     attack_type: PokemonType,
@@ -255,7 +259,14 @@ pub fn resolve_type_effectiveness(
         .map_err(TypeEffectivenessError::InvalidChart)?;
     validate_m3_typing(defender_typing)
         .map_err(TypeEffectivenessError::InvalidDefenderTyping)?;
-    if attack_type == PokemonType::Stellar {
+    if !matches!(
+        attack_type,
+        PokemonType::Normal
+            | PokemonType::Fire
+            | PokemonType::Poison
+            | PokemonType::Grass
+            | PokemonType::Electric
+    ) {
         return Err(TypeEffectivenessError::UnsupportedAttackType {
             attack: attack_type,
         });

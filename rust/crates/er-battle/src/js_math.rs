@@ -58,7 +58,7 @@ pub fn js_round(value: f64) -> f64 {
     if value.is_nan() || value.is_infinite() || value == 0.0 {
         return value;
     }
-    if value >= -0.5 && value < 0.0 {
+    if (-0.5..0.0).contains(&value) {
         return -0.0;
     }
     js_floor(value + 0.5)
@@ -130,7 +130,7 @@ pub fn safe_integer_from_f64(value: f64) -> Result<i64, JsMathError> {
     }
 
     let limit = JS_MAX_SAFE_INTEGER as f64;
-    if value < -limit || value > limit {
+    if !(-limit..=limit).contains(&value) {
         return Err(JsMathError::OutsideSafeIntegerRange);
     }
 

@@ -282,6 +282,16 @@ fn malformed_or_unsupported_selected_inputs_fail_closed() -> TestResult {
             attack: PokemonType::Stellar
         })
     ));
+    assert!(matches!(
+        resolve_type_effectiveness(
+            &chart,
+            PokemonType::Water,
+            &typing(PokemonType::Normal, None)
+        ),
+        Err(TypeEffectivenessError::UnsupportedAttackType {
+            attack: PokemonType::Water
+        })
+    ));
 
     let mut malformed_chart = selected_type_chart();
     let entry = malformed_chart

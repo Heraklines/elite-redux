@@ -62,7 +62,9 @@ pub enum DamageError {
 /// `power`, the two effective stats, and every multiplier are deliberately
 /// supplied rather than reconstructed from content IDs.  The default
 /// constructor describes the neutral single-target path; builder methods add
-/// only the supported resolved factors.
+/// only the supported resolved factors. The move pipeline remains responsible
+/// for proving these values came from a capability-validated selected move and
+/// for rejecting every non-neutral arena or modifier hook before construction.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DamageInput {
     pub level: u32,
@@ -117,7 +119,11 @@ impl DamageInput {
         self
     }
 
-    /// Supplies the already-composed closed type-effectiveness modifier.
+    /// Supplies the already-composed closed type-chart modifier.
+    ///
+    /// This slot is after STAB in the frozen chain. It must not absorb an arena
+    /// attack-type multiplier, whose earlier source position is unsupported by
+    /// the selected neutral-arena slice.
     pub const fn with_effectiveness_multiplier(mut self, multiplier: f64) -> Self {
         self.effectiveness_multiplier = multiplier;
         self
