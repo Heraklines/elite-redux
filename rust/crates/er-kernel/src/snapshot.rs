@@ -973,10 +973,11 @@ impl RestorableKernelSnapshotV2 {
         if self.input_router.disposed != self.disposed
             || self.scheduler.disposed != owner_quiesced
             || self.protocol.disposed != owner_quiesced
+            || self.pending_presentations.disposed != owner_quiesced
         {
             return Err(invalid(
                 "disposed",
-                "scheduler/protocol must quiesce at terminal and all owners must quiesce at disposal",
+                "scheduler/protocol/presentation owners must quiesce at terminal and all owners must quiesce at disposal",
             ));
         }
         let mut protocol_timer_ids = Vec::new();
@@ -1095,10 +1096,23 @@ impl RestorableKernelSnapshotV2 {
                 "projection is not the exact current local control projection",
             ));
         }
+        let suspended = self.scheduler.pauses.iter().any(|pause| {
+            pause.reasons.iter().any(|reason| reason == "suspended")
+        });
+        let recovery_fenced = self
+            .protocol
+            .recovery
+            .as_ref()
+            .is_some_and(|recovery| !recovery.fence.control_projection_allowed);
         let expected_actionable = projected.control.is_actionable()
-            && self.pending_presentations.pending_barrier_ids.is_empty()
+            && self
+                .pending_presentations
+                .blocking_barrier_ids
+                .is_empty()
             && self.terminal.is_none()
-            && !self.disposed;
+            && !self.disposed
+            && !suspended
+            && !recovery_fenced;
         if self.ui.actionable != expected_actionable {
             return Err(invalid(
                 "ui.actionable",
