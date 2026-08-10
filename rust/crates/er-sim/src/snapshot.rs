@@ -621,7 +621,20 @@ impl PairDeterminismDigest {
     pub fn compute(snapshot: &RestorablePairSnapshotV2) -> Result<Self, SnapshotError> {
         let raw = content_digest(&PairDigestPreimage {
             domain: PAIR_DETERMINISM_DIGEST_DOMAIN,
-            snapshot,
+            schema_version: snapshot.schema_version,
+            sequence: snapshot.sequence,
+            replay_seed: &snapshot.replay_seed,
+            virtual_time_ms: snapshot.virtual_time_ms,
+            host: &snapshot.host.kernel_determinism_digest,
+            guest: &snapshot.guest.kernel_determinism_digest,
+            host_driver: &snapshot.host_driver,
+            guest_driver: &snapshot.guest_driver,
+            clock: &snapshot.clock,
+            network: &snapshot.network,
+            presenter: &snapshot.presenter,
+            storage: &snapshot.storage,
+            fault_script: &snapshot.fault_script,
+            fault_rng_state: &snapshot.fault_rng_state,
         })
         .map_err(|error| SnapshotError::Canonical {
             path: "pair_determinism_digest".to_owned(),
@@ -649,7 +662,20 @@ impl fmt::Display for PairDeterminismDigest {
 #[derive(Serialize)]
 struct PairDigestPreimage<'a> {
     domain: &'static str,
-    snapshot: &'a RestorablePairSnapshotV2,
+    schema_version: u32,
+    sequence: SafeU53,
+    replay_seed: &'a str,
+    virtual_time_ms: SafeU53,
+    host: &'a KernelDeterminismDigest,
+    guest: &'a KernelDeterminismDigest,
+    host_driver: &'a DetachedKeyboardDriverSnapshotV2,
+    guest_driver: &'a DetachedKeyboardDriverSnapshotV2,
+    clock: &'a VirtualClockSnapshotV2,
+    network: &'a FaultNetworkSnapshotV2,
+    presenter: &'a PresenterSnapshotV2,
+    storage: &'a StorageSnapshotV2,
+    fault_script: &'a FaultScriptSnapshotV2,
+    fault_rng_state: &'a FaultRngStateV2,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -873,14 +899,43 @@ impl FaultNetworkSnapshotV2 {
                 ));
             }
         }
+        let mut held_ranks = self
+            .packets
+            .iter()
+            .filter_map(|packet| match &packet.reorder_state {
+                PacketReorderStateV2::Stable => None,
+                PacketReorderStateV2::Held { rank } => Some(*rank),
+            })
+            .collect::<Vec<_>>();
+        held_ranks.sort_unstable();
+        for (index, rank) in held_ranks.iter().enumerate() {
+            let index = u64::try_from(index).map_err(|_| {
+                invalid("network.packets.reorder_state", "reorder rank exceeds u64")
+            })?;
+            let expected = SafeU53::new(index).map_err(|_| {
+                invalid("network.packets.reorder_state", "reorder rank exceeds SafeU53")
+            })?;
+            if *rank != expected {
+                return Err(invalid(
+                    "network.packets.reorder_state",
+                    "held reorder ranks must be zero-based, contiguous, and unique",
+                ));
+            }
+        }
         if self.links.len() != 2 {
             return Err(invalid(
                 "network.links",
                 "pair network must retain exactly host and guest links",
             ));
         }
-        if self.disposed && !self.packets.is_empty() {
-            return Err(invalid("network", "disposed network cannot retain packets"));
+        if self.disposed
+            && (!self.packets.is_empty()
+                || self.links.iter().any(|link| !link.connected || link.suspended))
+        {
+            return Err(invalid(
+                "network",
+                "disposed network cannot retain packets or disconnected/suspended links",
+            ));
         }
         Ok(())
     }
@@ -970,12 +1025,15 @@ impl StorageSnapshotV2 {
             "storage.pending_requests",
         )?;
         for value in &self.values {
+            if value.key.is_empty() {
+                return Err(invalid("storage.values.key", "must not be empty"));
+            }
             validate_bytes(&value.canonical_value, "storage.values.canonical_value")?;
         }
         for request in &self.pending_requests {
-            if let RestorableStorageRequestV2::Persist { value, .. } = &request.request {
-                validate_bytes(value, "storage.pending_requests.value")?;
-            }
+            request
+                .request
+                .validate("storage.pending_requests.request")?;
         }
         if let Some(next_request_id) = self.next_request_id {
             if self
@@ -1024,6 +1082,10 @@ impl FaultScriptSnapshotV2 {
             }
             if let FaultOperationV2::Corrupt { corruption, .. } = operation {
                 match corruption {
+                    FrameCorruptionV2::Replace { body }
+                    | FrameCorruptionV2::MalformedJson { body } => {
+                        validate_bytes(body, "fault_script.corruption.body")?;
+                    }
                     FrameCorruptionV2::DeleteField { json_pointer }
                     | FrameCorruptionV2::ReplaceField { json_pointer, .. }
                         if !json_pointer.starts_with('/') =>
@@ -1111,6 +1173,12 @@ impl RestorablePairSnapshotV2 {
                 "pair endpoints must be authority/replica compatible",
             ));
         }
+        if self.host.terminal != self.guest.terminal {
+            return Err(invalid(
+                "host.guest.terminal",
+                "both endpoints must retain the exact same shared terminal state",
+            ));
+        }
         if self.host_driver.seat != self.host.runtime_identity.local_seat
             || self.guest_driver.seat != self.guest.runtime_identity.local_seat
         {
@@ -1125,6 +1193,15 @@ impl RestorablePairSnapshotV2 {
         validate_driver_endpoint(&self.guest_driver, &self.guest, "guest_driver")?;
         self.clock.validate()?;
         self.network.validate()?;
+        for packet in &self.network.packets {
+            let ready = packet.delivery_deadline_ms <= self.virtual_time_ms;
+            if matches!(packet.disposition, PacketDispositionV2::Ready) != ready {
+                return Err(invalid(
+                    "network.packets.disposition",
+                    "READY must exactly match a deadline at or before pair virtual time",
+                ));
+            }
+        }
         self.presenter.validate()?;
         validate_presenter_endpoint(&self.presenter, PairEndpoint::Host, &self.host, "presenter.host")?;
         validate_presenter_endpoint(
