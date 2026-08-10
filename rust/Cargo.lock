@@ -148,6 +148,7 @@ dependencies = [
  "er-game",
  "er-protocol",
  "er-rng",
+ "er-sim",
  "er-state",
  "er-types",
  "serde",

@@ -16,6 +16,7 @@ er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
 er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }
+er-sim = { path = "../er-sim" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde_json.workspace = true
