@@ -1310,62 +1310,63 @@ mod live_coop_production {
         expected_operation_id: &OperationId,
         expected_fingerprint: &str,
     ) -> bool {
-        match packet.kind {
-            RestorablePacketKindV2::AuthorityFrame => {
-                let Ok(frame) = decode_canonical_packet::<NetworkFrame>(
-                    &packet.body,
-                    "proposal result authority frame",
-                ) else {
-                    return false;
-                };
-                if frame.frame_type != FrameType::AuthorityEntry
-                    || frame.context.connection_generation != generation(1)
-                {
-                    return false;
-                }
-                let Ok(entry) = serde_json::from_value::<AuthorityEntryBody>(frame.body) else {
-                    return false;
-                };
-                if entry.kind != AuthorityEntryKind::TurnCommit {
-                    return false;
-                }
-                let Ok(material) = serde_json::from_value::<
-                    er_game::material::BattleTurnMaterialV1,
-                >(entry.material.payload.clone()) else {
-                    return false;
-                };
-                let Ok(turn_result_operation_id) =
-                    er_types::battle_command::turn_result_operation_id(
-                        material.battle_id,
-                        material.wave,
-                        material.resolved_turn,
-                    )
-                else {
-                    return false;
-                };
-                turn_result_operation_id != *expected_operation_id
-                    && entry.operation_id == turn_result_operation_id
-                    && material.operation_id == turn_result_operation_id
-                    && material
-                        .commands
-                        .entries
-                        .iter()
-                        .filter(|command| command.operation_id() == expected_operation_id)
-                        .count()
-                        == 1
-            }
-            RestorablePacketKindV2::ReplacementProposal => {
-                let Ok(proposal) = decode_canonical_packet::<ProposalMessage>(
-                    &packet.body,
-                    "proposal result replacement",
-                ) else {
-                    return false;
-                };
-                proposal.operation_id == *expected_operation_id
-                    && proposal.fingerprint == expected_fingerprint
-            }
-            _ => false,
+        if packet.kind != RestorablePacketKindV2::AuthorityFrame {
+            return false;
         }
+        let Ok(frame) = decode_canonical_packet::<NetworkFrame>(
+            &packet.body,
+            "proposal result authority frame",
+        ) else {
+            return false;
+        };
+        if frame.frame_type != FrameType::AuthorityEntry
+            || frame.context.connection_generation != generation(1)
+        {
+            return false;
+        }
+        let Ok(entry) = serde_json::from_value::<AuthorityEntryBody>(frame.body) else {
+            return false;
+        };
+        if entry.kind != AuthorityEntryKind::TurnCommit {
+            return false;
+        }
+        let Ok(material) =
+            serde_json::from_value::<er_game::material::BattleTurnMaterialV1>(
+                entry.material.payload.clone(),
+            )
+        else {
+            return false;
+        };
+        if material.commands.validate().is_err() {
+            return false;
+        }
+        let Ok(turn_result_operation_id) = er_types::battle_command::turn_result_operation_id(
+            material.battle_id,
+            material.wave,
+            material.resolved_turn,
+        ) else {
+            return false;
+        };
+        turn_result_operation_id != *expected_operation_id
+            && entry.operation_id == turn_result_operation_id
+            && material.operation_id == turn_result_operation_id
+            && material
+                .commands
+                .entries
+                .iter()
+                .filter(|command| {
+                    matches!(
+                        command,
+                        AcceptedBattleCommand::Human {
+                            proposal,
+                            fingerprint,
+                        } if &proposal.operation_id == expected_operation_id
+                            && fingerprint.as_str() == expected_fingerprint
+                            && proposal.fingerprint().as_str() == expected_fingerprint
+                    )
+                })
+                .count()
+                == 1
     }
 
     fn guest_proposal_admitted_with_delivery_pending(
@@ -1425,11 +1426,7 @@ mod live_coop_production {
                 && packet.destination == PairEndpoint::Guest
                 && packet.source_generation == generation(1)
                 && packet.destination_generation == generation(1)
-                && matches!(
-                    packet.kind,
-                    RestorablePacketKindV2::AuthorityFrame
-                        | RestorablePacketKindV2::ReplacementProposal
-                )
+                && packet.kind == RestorablePacketKindV2::AuthorityFrame
                 && proposal_result_packet_matches(
                     packet,
                     expected_operation_id,
@@ -1656,7 +1653,7 @@ mod live_coop_production {
             }
         }
         Err(invalid(
-            "guest proposal was not admitted with a live result/TURN/presentation delivery pending",
+            "guest proposal was not admitted with its canonical Authority TURN delivery pending",
         ))
     }
 
@@ -1860,13 +1857,27 @@ mod live_coop_production {
         let Some(replica) = snapshot.guest.protocol.authority_replica.as_ref() else {
             return false;
         };
-        let local_context = &snapshot.guest.protocol.frame_context.context;
+        let Some(captured_frontier) = recovery.captured_frontier else {
+            return false;
+        };
+        let Some(captured_state) = recovery.captured_state else {
+            return false;
+        };
+        let local_context = &recovery.config.local_context;
+        let expected_request_id = format!(
+            "m3-recovery/rebind/{}/{}/{}/{}",
+            local_context.sender_seat_id,
+            local_context.connection_generation.get().get(),
+            replica.authority_generation.get().get(),
+            captured_state.control,
+        );
         if recovery.fence.state != RecoveryFenceState::Held
             || recovery.phase.is_none()
-            || recovery.request_id.as_deref() != Some("recovery-2")
+            || recovery.request_id.as_deref() != Some(expected_request_id.as_str())
+            || captured_frontier != captured_state.control
+            || captured_state != replica.frontier
             || replica.authority_generation != generation(2)
-            || recovery.config.local_context != *local_context
-            || recovery.config.local_context.connection_generation != generation(2)
+            || snapshot.guest.protocol.frame_context.context != *local_context
             || replica.receipt_context != *local_context
             || local_context.connection_generation != generation(2)
         {
@@ -2464,11 +2475,7 @@ mod live_coop_production {
                         && packet.destination == PairEndpoint::Guest
                         && packet.source_generation == generation(1)
                         && packet.destination_generation == generation(1)
-                        && matches!(
-                            packet.kind,
-                            RestorablePacketKindV2::AuthorityFrame
-                                | RestorablePacketKindV2::ReplacementProposal
-                        )
+                        && packet.kind == RestorablePacketKindV2::AuthorityFrame
                         && proposal_result_packet_matches(
                             packet,
                             &proposal_operation_id,
