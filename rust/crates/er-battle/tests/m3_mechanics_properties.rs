@@ -8,9 +8,8 @@ use er_battle::stat_stage::{
     effective_stat, stage_for_stat, stage_mutation, stage_ratio,
 };
 use er_battle::status::{
-    StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError,
-    StatusRejection, StatusResidualInput, StatusResidualOutcome, apply_status, powder_immunity,
-    resolve_residual,
+    StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError, StatusRejection,
+    StatusResidualInput, StatusResidualOutcome, apply_status, powder_immunity, resolve_residual,
 };
 use er_battle::type_effectiveness::{
     EffectivenessClass, EffectivenessMultiplier, compose_type_multipliers,
@@ -176,7 +175,8 @@ fn outcome_precedence_is_exhaustive_over_live_and_fainted_flags() -> Result<(), 
 }
 
 #[test]
-fn residual_status_bounds_and_turn_counters_hold_over_deterministic_grid() -> Result<(), Box<dyn Error>> {
+fn residual_status_bounds_and_turn_counters_hold_over_deterministic_grid()
+-> Result<(), Box<dyn Error>> {
     let statuses = [
         StatusKind::None,
         StatusKind::Paralysis,
@@ -382,7 +382,8 @@ fn stage_clamp_policy_and_mutation_are_exhaustive_and_idempotent() -> Result<(),
 }
 
 #[test]
-fn effective_stats_preserve_bounds_stage_policy_and_paralysis_order() -> Result<(), Box<dyn Error>> {
+fn effective_stats_preserve_bounds_stage_policy_and_paralysis_order() -> Result<(), Box<dyn Error>>
+{
     let stats = [
         BattleStat::Attack,
         BattleStat::Defense,
@@ -416,7 +417,10 @@ fn effective_stats_preserve_bounds_stage_policy_and_paralysis_order() -> Result<
                             stage_policy,
                         })?;
                         assert_eq!(outcome.input_stage, stage);
-                        assert_eq!(outcome.applied_stage, apply_stage_policy(stage, stage_policy));
+                        assert_eq!(
+                            outcome.applied_stage,
+                            apply_stage_policy(stage, stage_policy)
+                        );
                         assert!((0.25..=4.0).contains(&outcome.stage_ratio));
                         assert!(outcome.value >= 1);
                         assert_eq!(
@@ -432,7 +436,8 @@ fn effective_stats_preserve_bounds_stage_policy_and_paralysis_order() -> Result<
 }
 
 #[test]
-fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Result<(), Box<dyn Error>> {
+fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Result<(), Box<dyn Error>>
+{
     let single_values = [
         SingleTypeMultiplier::Zero,
         SingleTypeMultiplier::Half,
@@ -449,14 +454,8 @@ fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Resul
             let left = EffectivenessMultiplier::from_single_type(primary);
             let right = EffectivenessMultiplier::from_single_type(secondary);
             let expected = expected_composition(left, right);
-            assert_eq!(
-                compose_type_multipliers(primary, Some(secondary)),
-                expected
-            );
-            assert_eq!(
-                compose_type_multipliers(secondary, Some(primary)),
-                expected
-            );
+            assert_eq!(compose_type_multipliers(primary, Some(secondary)), expected);
+            assert_eq!(compose_type_multipliers(secondary, Some(primary)), expected);
             assert_eq!(left.compose(right), expected);
         }
     }
@@ -487,8 +486,14 @@ fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Resul
                 assert!(multiplier.is_super_effective());
             }
         }
-        assert_eq!(multiplier.is_non_super_effective(), !multiplier.is_super_effective());
-        assert_eq!(multiplier.allows_follow_up_resolution(), !multiplier.is_immune());
+        assert_eq!(
+            multiplier.is_non_super_effective(),
+            !multiplier.is_super_effective()
+        );
+        assert_eq!(
+            multiplier.allows_follow_up_resolution(),
+            !multiplier.is_immune()
+        );
     }
 
     let chart = selected_type_chart();
@@ -560,7 +565,12 @@ fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Resul
 fn status_admission_is_exhaustive_and_preserves_source_precedence() -> Result<(), Box<dyn Error>> {
     let types = supported_types();
     let requested_statuses = [StatusKind::Poison, StatusKind::Paralysis, StatusKind::Burn];
-    let current_statuses = [StatusKind::None, StatusKind::Poison, StatusKind::Paralysis, StatusKind::Burn];
+    let current_statuses = [
+        StatusKind::None,
+        StatusKind::Poison,
+        StatusKind::Paralysis,
+        StatusKind::Burn,
+    ];
 
     for primary in types {
         let mut target_typings = vec![PokemonTyping {
@@ -602,10 +612,16 @@ fn status_admission_is_exhaustive_and_preserves_source_precedence() -> Result<()
 
                         let expected = expected_status_rejection(requested, target_types, powder);
                         match (expected, outcome) {
-                            (Some("POWDER_IMMUNITY"), StatusApplicationOutcome::Rejected { reason }) => {
+                            (
+                                Some("POWDER_IMMUNITY"),
+                                StatusApplicationOutcome::Rejected { reason },
+                            ) => {
                                 assert_eq!(status_rejection_label(&reason), "POWDER_IMMUNITY");
                             }
-                            (Some("TYPE_IMMUNITY"), StatusApplicationOutcome::Rejected { reason }) => {
+                            (
+                                Some("TYPE_IMMUNITY"),
+                                StatusApplicationOutcome::Rejected { reason },
+                            ) => {
                                 assert_eq!(status_rejection_label(&reason), "TYPE_IMMUNITY");
                             }
                             (None, StatusApplicationOutcome::Applied { mutation }) => {

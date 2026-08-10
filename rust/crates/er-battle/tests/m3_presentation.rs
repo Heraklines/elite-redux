@@ -16,8 +16,8 @@ use er_battle::resolver::BattleMutation;
 use er_types::OperationId;
 use er_types::SafeU53;
 use er_types::battle_ids::{
-    AbilityId, AuthorityEpoch, BattlePresentationEventId, BattleSide, FaintOccurrenceId,
-    FieldSlot, MoveId, PokemonId, TurnIndex, WaveIndex,
+    AbilityId, AuthorityEpoch, BattlePresentationEventId, BattleSide, FaintOccurrenceId, FieldSlot,
+    MoveId, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
     ActionDisposition, BattleOutcome, BattleStat, FaintOccurrence, FaintSource,
@@ -65,11 +65,7 @@ fn status(kind: StatusKind, toxic_turn_count: u16) -> StatusState {
     }
 }
 
-fn occurrence(
-    id: u64,
-    slot: FieldSlot,
-    pokemon: PokemonId,
-) -> TestResult<FaintOccurrence> {
+fn occurrence(id: u64, slot: FieldSlot, pokemon: PokemonId) -> TestResult<FaintOccurrence> {
     Ok(FaintOccurrence {
         id: FaintOccurrenceId::new(safe(id)?),
         source: FaintSource {
@@ -182,12 +178,7 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
     ];
 
     let causal_events = vec![
-        PresentationCausalEvent::move_used(
-            safe(0)?,
-            player,
-            move_id,
-            vec![enemy_slot],
-        ),
+        PresentationCausalEvent::move_used(safe(0)?, player, move_id, vec![enemy_slot]),
         PresentationCausalEvent::mutation(BattleMutation::PpChanged {
             pokemon: player,
             move_slot: er_types::battle_ids::MoveSlotIndex::ZERO,
@@ -338,11 +329,8 @@ fn replacement_plan_preserves_switch_ability_stage_terminal_causality() -> TestR
             after: BattleOutcome::Defeat,
         }),
     ];
-    let input = ReplacementPresentationInput::new(
-        &operation_id,
-        &causal_events,
-        BattleOutcome::Ongoing,
-    );
+    let input =
+        ReplacementPresentationInput::new(&operation_id, &causal_events, BattleOutcome::Ongoing);
 
     let direct = build_replacement_presentation_plan(input.clone())?;
     let dispatched = build_presentation_plan(PresentationTransitionInput::Replacement(input))?;

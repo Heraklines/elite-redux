@@ -15,9 +15,7 @@ use er_battle::status::{
     StatusApplicationOutcome, StatusRejection, StatusResidualInput, StatusResidualOutcome,
     apply_status, resolve_residual,
 };
-use er_battle::type_effectiveness::{
-    EffectivenessMultiplier, resolve_type_effectiveness,
-};
+use er_battle::type_effectiveness::{EffectivenessMultiplier, resolve_type_effectiveness};
 use er_content::moves::lookup_move;
 use er_content::pack::selected_type_chart;
 use er_types::battle_ids::MoveId;
@@ -26,8 +24,7 @@ use er_types::battle_model::{
 };
 use serde_json::{Value, json};
 
-const ORACLE_MANIFEST: &str =
-    include_str!("../../../fixtures/m3/m3-oracle-manifest.json");
+const ORACLE_MANIFEST: &str = include_str!("../../../fixtures/m3/m3-oracle-manifest.json");
 
 const FROZEN_CASES: &[(&str, &str)] = &[
     (
@@ -52,21 +49,15 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "poison-type-immunity",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/poison-type-immunity.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/poison-type-immunity.json"),
     ),
     (
         "grass-powder-immunity",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/grass-powder-immunity.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/grass-powder-immunity.json"),
     ),
     (
         "existing-status-rejected",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/existing-status-rejected.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/existing-status-rejected.json"),
     ),
     (
         "speed-tie",
@@ -78,9 +69,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "pp-unusable-rejected",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json"),
     ),
     (
         "poison-application",
@@ -92,21 +81,15 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "paralysis-application",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/paralysis-application.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-application.json"),
     ),
     (
         "paralysis-full-stop",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/paralysis-full-stop.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-full-stop.json"),
     ),
     (
         "paralysis-speed-order",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/paralysis-speed-order.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-speed-order.json"),
     ),
     (
         "burn-application",
@@ -118,9 +101,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "burn-physical-penalty",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/burn-physical-penalty.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/burn-physical-penalty.json"),
     ),
     (
         "spread-stage-down",
@@ -132,27 +113,19 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "none-ability-no-trigger",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json"),
     ),
     (
         "intimidate-switch-in",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/intimidate-switch-in.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/intimidate-switch-in.json"),
     ),
     (
         "intimidate-stage-floor",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json"),
     ),
     (
         "wonder-guard-block",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/wonder-guard-block.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/wonder-guard-block.json"),
     ),
     (
         "wonder-guard-super-effective-pass",
@@ -162,9 +135,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "wonder-guard-status-pass",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json"),
     ),
     (
         "type-weakness",
@@ -176,9 +147,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "type-native-immunity",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/type-native-immunity.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/type-native-immunity.json"),
     ),
     (
         "voluntary-switch",
@@ -186,21 +155,15 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "doubles-single-target",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json"),
     ),
     (
         "same-side-simultaneous-faint",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/same-side-simultaneous-faint.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/same-side-simultaneous-faint.json"),
     ),
     (
         "mixed-side-simultaneous-faint",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/mixed-side-simultaneous-faint.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/mixed-side-simultaneous-faint.json"),
     ),
     (
         "forced-replacement",
@@ -208,9 +171,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
     ),
     (
         "no-legal-replacement",
-        include_str!(
-            "../../../fixtures/m3/oracle/battle-cases/no-legal-replacement.json"
-        ),
+        include_str!("../../../fixtures/m3/oracle/battle-cases/no-legal-replacement.json"),
     ),
     (
         "victory",
@@ -223,10 +184,7 @@ const FROZEN_CASES: &[(&str, &str)] = &[
 ];
 
 const REQUIRED_AXES: &[(&str, &[&str])] = &[
-    (
-        "INITIAL_STATE_AND_RNG",
-        &["initial_state", "initial_rng"],
-    ),
+    ("INITIAL_STATE_AND_RNG", &["initial_state", "initial_rng"]),
     ("ADMITTED_COMMANDS", &["commands"]),
     ("CONSUMING_RNG_DRAWS", &["expected_rng_draws", "final_rng"]),
     ("DYNAMIC_ACTION_ORDER", &["expected_action_order"]),
@@ -499,9 +457,7 @@ fn array_field<'a>(
     required(value, case_name, path, field_name)?
         .as_array()
         .ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: {path}.{field_name} is not an array"
-            ))
+            FixtureError::new(format!("{case_name}: {path}.{field_name} is not an array"))
         })
 }
 
@@ -515,9 +471,7 @@ fn string_field(
         .as_str()
         .map(str::to_owned)
         .ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: {path}.{field_name} is not a string"
-            ))
+            FixtureError::new(format!("{case_name}: {path}.{field_name} is not a string"))
         })
 }
 
@@ -611,9 +565,7 @@ fn first_divergence_at(path: &str, expected: &Value, actual: &Value) -> Option<S
             }
             None
         }
-        _ => Some(format!(
-            "at {path}: expected {expected}, actual {actual}"
-        )),
+        _ => Some(format!("at {path}: expected {expected}, actual {actual}")),
     }
 }
 
@@ -715,7 +667,9 @@ fn assert_causal_sequences(case_name: &str, document: &Value) -> Result<(), Fixt
     let final_rng = object_field(document, case_name, "$", "final_rng")?;
     let final_sequence = u64_field(final_rng, case_name, "final_rng", "next_sequence")?;
     let expected_draw_count = u64::try_from(rng_draws.len()).map_err(|error| {
-        FixtureError::new(format!("{case_name}: RNG draw count conversion failed: {error}"))
+        FixtureError::new(format!(
+            "{case_name}: RNG draw count conversion failed: {error}"
+        ))
     })?;
     if final_sequence != expected_draw_count {
         return Err(FixtureError::new(format!(
@@ -739,9 +693,9 @@ fn canonical_party_member<'a>(
     let canonical = object_field(state, case_name, state_name, "canonical")?;
     let battle = object_field(canonical, case_name, "canonical", "battle")?;
     let party = array_field(battle, case_name, "canonical.battle", "enemy_party")?;
-    party.first().ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: canonical enemy_party is empty"))
-    })
+    party
+        .first()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical enemy_party is empty")))
 }
 
 fn semantic_move_id(document: &Value, case_name: &str) -> Result<MoveId, Box<dyn Error>> {
@@ -752,14 +706,18 @@ fn semantic_move_id(document: &Value, case_name: &str) -> Result<MoveId, Box<dyn
     let intents = commands
         .get("semantic_intent")
         .and_then(Value::as_array)
-        .ok_or_else(|| FixtureError::new(format!("{case_name}: semantic_intent is not an array")))?;
+        .ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: semantic_intent is not an array"))
+        })?;
     let first_intent = intents
         .first()
         .ok_or_else(|| FixtureError::new(format!("{case_name}: semantic_intent is empty")))?;
     let action = first_intent
         .get("action")
         .and_then(Value::as_object)
-        .ok_or_else(|| FixtureError::new(format!("{case_name}: semantic action is not an object")))?;
+        .ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: semantic action is not an object"))
+        })?;
     let value = action
         .get("move_id")
         .and_then(Value::as_u64)
@@ -816,22 +774,17 @@ fn status_outcome_label(outcome: &StatusApplicationOutcome) -> &'static str {
     }
 }
 
-fn status_differential(
-    case_name: &str,
-    expected_label: &str,
-) -> Result<(), Box<dyn Error>> {
+fn status_differential(case_name: &str, expected_label: &str) -> Result<(), Box<dyn Error>> {
     let document = parse_case(case_name)?;
     let move_id = semantic_move_id(&document, case_name)?;
     let move_definition = lookup_move(move_id)?;
     let requested = status_kind_from_move(move_id)?;
     let initial_target = canonical_party_member(&document, case_name, false)?;
     let final_target = canonical_party_member(&document, case_name, true)?;
-    let initial_status: StatusState = serde_json::from_value(
-        initial_target
-            .get("status")
-            .cloned()
-            .ok_or_else(|| FixtureError::new(format!("{case_name}: initial status is missing")))?,
-    )?;
+    let initial_status: StatusState =
+        serde_json::from_value(initial_target.get("status").cloned().ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: initial status is missing"))
+        })?)?;
     let final_status: StatusState = serde_json::from_value(
         final_target
             .get("status")
@@ -855,9 +808,8 @@ fn status_differential(
     let actual_label = status_outcome_label(&outcome);
     let actual_status_kind = match &outcome {
         StatusApplicationOutcome::Applied { mutation } => mutation.after.kind,
-        StatusApplicationOutcome::Rejected { .. } | StatusApplicationOutcome::ChanceFailed { .. } => {
-            initial_status.kind
-        }
+        StatusApplicationOutcome::Rejected { .. }
+        | StatusApplicationOutcome::ChanceFailed { .. } => initial_status.kind,
     };
     let expected = json!({
         "outcome": expected_label,
@@ -913,7 +865,10 @@ fn stage_differential() -> Result<(), Box<dyn Error>> {
     });
     assert_no_divergence(case_name, &expected, &actual);
     assert_eq!(applied, mutation);
-    assert_eq!(stage_for_stat(&applied_stages, stat), stage_for_stat(&final_stages, stat));
+    assert_eq!(
+        stage_for_stat(&applied_stages, stat),
+        stage_for_stat(&final_stages, stat)
+    );
     Ok(())
 }
 
@@ -936,8 +891,7 @@ fn residual_differential() -> Result<(), Box<dyn Error>> {
         .and_then(Value::as_array)
         .and_then(|mutations| {
             mutations.iter().find(|mutation| {
-                mutation.get("phase").and_then(Value::as_str)
-                    == Some("PostTurnStatusEffectPhase")
+                mutation.get("phase").and_then(Value::as_str) == Some("PostTurnStatusEffectPhase")
                     && mutation.get("kind").and_then(Value::as_str) == Some("HP_DAMAGE")
             })
         })
@@ -957,7 +911,9 @@ fn residual_differential() -> Result<(), Box<dyn Error>> {
         toxic_turn_count: final_status
             .toxic_turn_count
             .checked_sub(1)
-            .ok_or_else(|| FixtureError::new("burn-residual: final turn count did not increment"))?,
+            .ok_or_else(|| {
+                FixtureError::new("burn-residual: final turn count did not increment")
+            })?,
         sleep_turns_remaining: None,
     };
     let outcome = resolve_residual(StatusResidualInput {
@@ -1020,8 +976,7 @@ fn oracle_manifest_and_compile_time_case_inventory_are_exact() -> Result<(), Box
                 .ok_or_else(|| FixtureError::new("manifest contract has invalid scenario_id"))
         })
         .collect::<Result<_, _>>()?;
-    let contract_name_refs: BTreeSet<&str> =
-        contract_names.iter().map(String::as_str).collect();
+    let contract_name_refs: BTreeSet<&str> = contract_names.iter().map(String::as_str).collect();
     assert_eq!(frozen_names, contract_name_refs);
     for fixture in published {
         assert_eq!(fixture.get("gap_free").and_then(Value::as_bool), Some(true));
@@ -1038,7 +993,8 @@ fn oracle_manifest_and_compile_time_case_inventory_are_exact() -> Result<(), Box
 }
 
 #[test]
-fn every_frozen_case_has_exact_identity_empty_gaps_and_eight_axis_envelope() -> Result<(), Box<dyn Error>> {
+fn every_frozen_case_has_exact_identity_empty_gaps_and_eight_axis_envelope()
+-> Result<(), Box<dyn Error>> {
     for &(expected_name, source) in FROZEN_CASES {
         let document = parse_document(expected_name, source)?;
         let actual_name = string_field(&document, expected_name, "$", "scenario_id")?;
@@ -1048,7 +1004,10 @@ fn every_frozen_case_has_exact_identity_empty_gaps_and_eight_axis_envelope() -> 
             1
         );
         let gaps = array_field(&document, expected_name, "$", "gaps")?;
-        assert!(gaps.is_empty(), "{expected_name}: frozen gaps are not empty");
+        assert!(
+            gaps.is_empty(),
+            "{expected_name}: frozen gaps are not empty"
+        );
         assert_axis_shape(expected_name, &document)?;
         assert_causal_sequences(expected_name, &document)?;
     }
@@ -1058,10 +1017,8 @@ fn every_frozen_case_has_exact_identity_empty_gaps_and_eight_axis_envelope() -> 
 #[test]
 fn quarantine_is_named_documented_and_disjoint_from_scalar_comparisons() {
     let representative_cases = expected_case_set(REPRESENTATIVE_CASES);
-    let quarantined_cases: BTreeSet<&str> = QUARANTINED_CASES
-        .iter()
-        .map(|entry| entry.name)
-        .collect();
+    let quarantined_cases: BTreeSet<&str> =
+        QUARANTINED_CASES.iter().map(|entry| entry.name).collect();
     assert!(representative_cases.is_disjoint(&quarantined_cases));
     assert_eq!(
         representative_cases
@@ -1073,8 +1030,16 @@ fn quarantine_is_named_documented_and_disjoint_from_scalar_comparisons() {
 
     let mut names = BTreeSet::new();
     for entry in QUARANTINED_CASES {
-        assert!(!entry.reason.trim().is_empty(), "{} is undocumented", entry.name);
-        assert!(names.insert(entry.name), "duplicate quarantined case {}", entry.name);
+        assert!(
+            !entry.reason.trim().is_empty(),
+            "{} is undocumented",
+            entry.name
+        );
+        assert!(
+            names.insert(entry.name),
+            "duplicate quarantined case {}",
+            entry.name
+        );
     }
     let representative_dimensions = expected_case_set(REPRESENTATIVE_DIMENSIONS);
     let quarantined_dimensions: BTreeSet<&str> = QUARANTINED_DIMENSIONS
@@ -1089,7 +1054,11 @@ fn quarantine_is_named_documented_and_disjoint_from_scalar_comparisons() {
             "{} is undocumented",
             entry.name
         );
-        assert!(names.insert(entry.name), "duplicate quarantined name {}", entry.name);
+        assert!(
+            names.insert(entry.name),
+            "duplicate quarantined name {}",
+            entry.name
+        );
     }
 }
 
@@ -1105,10 +1074,7 @@ fn first_divergence_diagnostic_is_deterministic() {
     });
     let first = first_divergence(&expected, &actual);
     assert_eq!(first, first_divergence(&expected, &actual));
-    assert_eq!(
-        first.as_deref(),
-        Some("at $.a[0].a: expected 2, actual 3")
-    );
+    assert_eq!(first.as_deref(), Some("at $.a[0].a: expected 2, actual 3"));
 }
 
 #[test]

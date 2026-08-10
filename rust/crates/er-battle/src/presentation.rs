@@ -200,12 +200,10 @@ pub fn presentation_event_id_for_position(
     position: usize,
 ) -> Result<BattlePresentationEventId, BattleInvariantError> {
     let original_position = position;
-    let position = u64::try_from(position).map_err(|_| {
-        BattleInvariantError::presentation_sequence_overflow(original_position)
-    })?;
-    let sequence = SafeU53::new(position).map_err(|_| {
-        BattleInvariantError::presentation_sequence_overflow(original_position)
-    })?;
+    let position = u64::try_from(position)
+        .map_err(|_| BattleInvariantError::presentation_sequence_overflow(original_position))?;
+    let sequence = SafeU53::new(position)
+        .map_err(|_| BattleInvariantError::presentation_sequence_overflow(original_position))?;
     Ok(BattlePresentationEventId::new(
         material_operation_id.clone(),
         sequence,

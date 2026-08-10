@@ -11,9 +11,7 @@ use er_content::species::find_species;
 use er_rng::audit::RngReason;
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_state::battle::{
-    BattleOutcome, BattleState, CommandCollectionState, ReplacementProgress,
-};
+use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState, ReplacementProgress};
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
@@ -204,10 +202,7 @@ fn battle(state: &GameState) -> TestResult<&BattleState> {
 }
 
 fn battle_mut(state: &mut GameState) -> TestResult<&mut BattleState> {
-    state
-        .battle
-        .as_mut()
-        .ok_or_else(|| "missing battle".into())
+    state.battle.as_mut().ok_or_else(|| "missing battle".into())
 }
 
 fn command_for_move(
@@ -237,14 +232,12 @@ fn admit_single_fights(
             current.battle_id,
             current.wave,
             current.turn,
-            current.player_party
+            current
+                .player_party
                 .first()
                 .ok_or("missing player actor")?
                 .id,
-            current.enemy_party
-                .first()
-                .ok_or("missing enemy actor")?
-                .id,
+            current.enemy_party.first().ok_or("missing enemy actor")?.id,
         )
     };
 
@@ -252,13 +245,8 @@ fn admit_single_fights(
     let enemy_command = command_for_move(enemy_actor, enemy_move, player_slot)?;
     let player_offer = build_command_offer(state, player_slot, content)?;
     let enemy_offer = build_scripted_enemy_offer(state, enemy_slot, &enemy_command, content)?;
-    let player_operation = player_command_operation_id(
-        battle_id,
-        battle_wave,
-        battle_turn,
-        player_slot,
-        seat(1)?,
-    )?;
+    let player_operation =
+        player_command_operation_id(battle_id, battle_wave, battle_turn, player_slot, seat(1)?)?;
     let enemy_operation = scripted_enemy_command_operation_id(
         battle_id,
         battle_wave,
@@ -332,7 +320,15 @@ fn outcome_precedence_prefers_defeat_when_both_parties_are_empty() -> TestResult
     let content = selected_content_pack()?;
     let mut state = state_with_parties(
         &content,
-        vec![pokemon(&content, 1, Some(seat(1)?), &[], 100, StatusKind::None, 100)?],
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[],
+            100,
+            StatusKind::None,
+            100,
+        )?],
         vec![pokemon(&content, 2, None, &[], 100, StatusKind::None, 100)?],
     )?;
     let battle = battle_mut(&mut state)?;
@@ -349,12 +345,29 @@ fn outcome_precedence_prefers_defeat_when_both_parties_are_empty() -> TestResult
 }
 
 #[test]
-fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_input() -> TestResult {
+fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_input() -> TestResult
+{
     let content = selected_content_pack()?;
     let mut state = state_with_parties(
         &content,
-        vec![pokemon(&content, 1, Some(seat(1)?), &[589], 100, StatusKind::None, 200)?],
-        vec![pokemon(&content, 2, None, &[589], 100, StatusKind::None, 100)?],
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[589],
+            100,
+            StatusKind::None,
+            200,
+        )?],
+        vec![pokemon(
+            &content,
+            2,
+            None,
+            &[589],
+            100,
+            StatusKind::None,
+            100,
+        )?],
     )?;
     let commands = admit_single_fights(&mut state, &content, 589, 589)?;
     let before = state.clone();
@@ -369,7 +382,10 @@ fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_in
 
     assert_eq!(transition.before_state, before);
     assert_eq!(transition.outcome, BattleOutcome::Ongoing);
-    assert_eq!(transition.next_decision, BattleNextDecision::CommandFrontier);
+    assert_eq!(
+        transition.next_decision,
+        BattleNextDecision::CommandFrontier
+    );
     let before_battle = battle(&before)?;
     let after_battle = battle(&transition.after_state)?;
     assert_eq!(before_battle.turn, turn(1)?);
@@ -411,8 +427,24 @@ fn zero_authority_and_wrong_turn_operation_reject_atomically() -> TestResult {
     let content = selected_content_pack()?;
     let mut state = state_with_parties(
         &content,
-        vec![pokemon(&content, 1, Some(seat(1)?), &[589], 100, StatusKind::None, 200)?],
-        vec![pokemon(&content, 2, None, &[589], 100, StatusKind::None, 100)?],
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[589],
+            100,
+            StatusKind::None,
+            200,
+        )?],
+        vec![pokemon(
+            &content,
+            2,
+            None,
+            &[589],
+            100,
+            StatusKind::None,
+            100,
+        )?],
     )?;
     let commands = admit_single_fights(&mut state, &content, 589, 589)?;
     let before = state.clone();
@@ -428,11 +460,8 @@ fn zero_authority_and_wrong_turn_operation_reject_atomically() -> TestResult {
     assert!(zero_epoch.is_err());
     assert_eq!(state, before);
 
-    let stale_operation = turn_result_operation_id(
-        battle(&before)?.battle_id,
-        battle(&before)?.wave,
-        turn(2)?,
-    )?;
+    let stale_operation =
+        turn_result_operation_id(battle(&before)?.battle_id, battle(&before)?.wave, turn(2)?)?;
     let stale = resolve_turn(
         &before,
         &commands,
@@ -452,7 +481,15 @@ fn queued_fainted_actor_is_skipped_without_enemy_pp_or_rng() -> TestResult {
     let enemy_id = pokemon_id(2)?;
     let mut state = state_with_parties(
         &content,
-        vec![pokemon(&content, 1, Some(seat(1)?), &[351], 100, StatusKind::None, 200)?],
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[351],
+            100,
+            StatusKind::None,
+            200,
+        )?],
         vec![
             pokemon(&content, 2, None, &[351], 1, StatusKind::None, 100)?,
             pokemon(&content, 3, None, &[], 100, StatusKind::None, 100)?,
@@ -478,9 +515,7 @@ fn queued_fainted_actor_is_skipped_without_enemy_pp_or_rng() -> TestResult {
     let skipped = transition
         .action_order
         .iter()
-        .find(|action| {
-            action.actor == enemy_id && action.kind == ResolvedActionKind::Move
-        })
+        .find(|action| action.actor == enemy_id && action.kind == ResolvedActionKind::Move)
         .ok_or("missing queued enemy action")?;
     assert_eq!(skipped.kind, ResolvedActionKind::Move);
     assert_eq!(skipped.disposition, ActionDisposition::SkippedActorInactive);
@@ -507,7 +542,10 @@ fn queued_fainted_actor_is_skipped_without_enemy_pp_or_rng() -> TestResult {
         vec![RngReason::CriticalHit, RngReason::DamageVariance]
     );
     assert_eq!(battle(&transition.after_state)?.enemy_party[0].id, enemy_id);
-    assert_eq!(battle(&transition.after_state)?.player_party[0].id, player_id);
+    assert_eq!(
+        battle(&transition.after_state)?.player_party[0].id,
+        player_id
+    );
     assert!(transition.presentation.iter().any(|event| {
         matches!(
             &event.kind,
@@ -529,7 +567,15 @@ fn residual_ko_queues_before_turn_advance_with_exact_source_occurrence() -> Test
     let enemy_id = pokemon_id(2)?;
     let mut state = state_with_parties(
         &content,
-        vec![pokemon(&content, 1, Some(seat(1)?), &[589], 100, StatusKind::None, 200)?],
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[589],
+            100,
+            StatusKind::None,
+            200,
+        )?],
         vec![
             pokemon(&content, 2, None, &[589], 1, StatusKind::Poison, 100)?,
             pokemon(&content, 3, None, &[], 100, StatusKind::None, 100)?,
@@ -572,8 +618,9 @@ fn residual_ko_queues_before_turn_advance_with_exact_source_occurrence() -> Test
         .mutations
         .iter()
         .find_map(|mutation| match mutation {
-            BattleMutation::FaintQueued { occurrence }
-                if occurrence.pokemon == enemy_id => Some(*occurrence),
+            BattleMutation::FaintQueued { occurrence } if occurrence.pokemon == enemy_id => {
+                Some(*occurrence)
+            }
             _ => None,
         })
         .ok_or("missing residual faint queue mutation")?;
@@ -642,7 +689,15 @@ fn player_faint_stays_pending_until_replacement_material_resolves_it() -> TestRe
         let mut state = state_with_parties(
             &content,
             player_party,
-            vec![pokemon(&content, 3, None, &[351], 100, StatusKind::None, 200)?],
+            vec![pokemon(
+                &content,
+                3,
+                None,
+                &[351],
+                100,
+                StatusKind::None,
+                200,
+            )?],
         )?;
         let commands = admit_single_fights(&mut state, &content, 589, 351)?;
         let before = state.clone();
@@ -699,8 +754,14 @@ fn player_faint_stays_pending_until_replacement_material_resolves_it() -> TestRe
             )?;
             let replacement_battle = battle(&replacement.after_state)?;
             assert_eq!(replacement.before_state, before_replacement);
-            assert_eq!(replacement.selection, ReplacementSelection::NoLegalReplacement);
-            assert_eq!(replacement.occurrence.replacement, ReplacementProgress::Applied);
+            assert_eq!(
+                replacement.selection,
+                ReplacementSelection::NoLegalReplacement
+            );
+            assert_eq!(
+                replacement.occurrence.replacement,
+                ReplacementProgress::Applied
+            );
             assert_eq!(replacement.outcome, BattleOutcome::Defeat);
             assert_eq!(
                 replacement.next_decision,
@@ -726,7 +787,8 @@ fn player_faint_stays_pending_until_replacement_material_resolves_it() -> TestRe
 }
 
 #[test]
-fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drains_tail() -> TestResult {
+fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drains_tail()
+-> TestResult {
     let content = selected_content_pack()?;
     let player_active = pokemon_id(1)?;
     let player_reserve = pokemon_id(2)?;
@@ -772,7 +834,9 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
         .as_ref()
         .and_then(|battle| battle.faint_queue.first().copied())
         .ok_or("missing stored replacement head")?;
-    let owner = stored.owner_seat.ok_or("missing stored replacement owner")?;
+    let owner = stored
+        .owner_seat
+        .ok_or("missing stored replacement owner")?;
     let player_slot = slot(BattleSide::Player, 0)?;
     let correct_operation = replacement_operation_id(
         stored.source.epoch,
@@ -793,25 +857,14 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
         owner,
     )?;
     let selection = ReplacementSelection::selected(PartyIndex::new(1)?, player_reserve);
-    let rejected = resolve_replacement(
-        &before,
-        head.id,
-        &selection,
-        &wrong_operation,
-        &content,
-    );
+    let rejected = resolve_replacement(&before, head.id, &selection, &wrong_operation, &content);
     assert!(rejected.is_err());
     assert_eq!(state, before);
 
     let before_turn = battle(&before)?.turn;
     let before_rng = battle(&before)?.battle_rng.clone();
-    let transition = resolve_replacement(
-        &before,
-        head.id,
-        &selection,
-        &correct_operation,
-        &content,
-    )?;
+    let transition =
+        resolve_replacement(&before, head.id, &selection, &correct_operation, &content)?;
     assert_eq!(transition.before_state, before);
     assert_eq!(transition.selection, selection);
     let after_battle = battle(&transition.after_state)?;
@@ -819,14 +872,19 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
     assert_eq!(after_battle.battle_rng, before_rng);
     assert_eq!(transition.after_state.run_rng, before.run_rng);
     assert_eq!(transition.outcome, BattleOutcome::Ongoing);
-    assert_eq!(transition.next_decision, BattleNextDecision::CommandFrontier);
+    assert_eq!(
+        transition.next_decision,
+        BattleNextDecision::CommandFrontier
+    );
     assert_eq!(after_battle.faint_queue.len(), 2);
     assert_eq!(after_battle.faint_queue[0].id, head.id);
     assert_eq!(after_battle.faint_queue[1].id, tail.id);
-    assert!(after_battle
-        .faint_queue
-        .iter()
-        .all(|occurrence| occurrence.replacement == ReplacementProgress::Applied));
+    assert!(
+        after_battle
+            .faint_queue
+            .iter()
+            .all(|occurrence| occurrence.replacement == ReplacementProgress::Applied)
+    );
     assert_eq!(
         after_battle
             .field
