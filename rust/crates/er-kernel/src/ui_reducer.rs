@@ -5,6 +5,13 @@ use er_types::{
     MenuOptionView, MenuState, SafeU53, SeatId, UiIntent, UiRejectReason, UiState, UiViewKind,
     UiViewModel,
 };
+use er_types::battle_control::{BattleControl, BattleControlError};
+use er_types::battle_ids::MenuInstanceId;
+use er_types::battle_ui::{
+    BattleMenu, BattleMenuError, BattleUiProjection, BattleUiProjectionError,
+    NavigationDirection,
+};
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CursorDirection {
@@ -557,6 +564,291 @@ impl UiReducer {
             })
             .collect()
     }
+}
+
+/// A battle-only UI intent. It is deliberately private to the kernel crate and
+/// carries only stable UI identity; `er-game` performs semantic option lookup
+/// and command construction after this boundary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum BattleUiIntent {
+    Activate {
+        seat: SeatId,
+        menu_instance_id: MenuInstanceId,
+        control_id: String,
+        option_id: MenuOptionId,
+    },
+    Cancel {
+        seat: SeatId,
+        menu_instance_id: MenuInstanceId,
+        control_id: String,
+    },
+}
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub(crate) enum BattleUiReject {
+    #[error("battle UI projection is invalid: {0}")]
+    Projection(#[from] BattleUiProjectionError),
+    #[error("battle UI menu is invalid: {0}")]
+    Menu(#[from] BattleMenuError),
+    #[error("battle UI control is invalid: {0}")]
+    Control(#[from] BattleControlError),
+    #[error("the input seat does not own the battle menu")]
+    WrongSeat,
+    #[error("the battle menu instance is stale")]
+    StaleMenuInstance,
+    #[error("the battle menu is not actionable")]
+    NonActionable,
+    #[error("the selected battle option is disabled or hidden")]
+    DisabledOption,
+    #[error("the button has no meaning for the active battle menu")]
+    UnsupportedButton,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BattleUiReduction {
+    pub changed: bool,
+    pub intents: Vec<BattleUiIntent>,
+}
+
+/// Exact graph traversal for one local seat's immutable battle control.
+///
+/// This reducer never examines `MenuOptionLayout`, never skips disabled
+/// visible options, and never manufactures a missing edge. Menu construction,
+/// history, party-column memory, and semantic option lookup remain owned by
+/// `er-game`.
+#[derive(Clone, Debug)]
+pub(crate) struct BattleUiReducer {
+    projection: BattleUiProjection,
+}
+
+impl BattleUiReducer {
+    pub(crate) fn new(projection: BattleUiProjection) -> Result<Self, BattleUiReject> {
+        projection.validate()?;
+        if let Some(menu) = menu_for_control(&projection.seat_control.control) {
+            menu.validate()?;
+        }
+        Ok(Self { projection })
+    }
+
+    pub(crate) fn projection(&self) -> &BattleUiProjection {
+        &self.projection
+    }
+
+    pub(crate) fn current_menu(&self) -> Option<&BattleMenu> {
+        menu_for_control(&self.projection.seat_control.control)
+    }
+
+    pub(crate) fn current_menu_instance_id(&self) -> Option<MenuInstanceId> {
+        self.current_menu().map(|menu| menu.instance_id)
+    }
+
+    pub(crate) fn owner_seat(&self) -> Option<SeatId> {
+        self.current_menu().map(|menu| menu.owner_seat)
+    }
+
+    pub(crate) fn is_actionable(&self) -> bool {
+        self.projection.actionable && self.current_menu().is_some()
+    }
+
+    pub(crate) fn install(
+        &mut self,
+        projection: BattleUiProjection,
+    ) -> Result<(), BattleUiReject> {
+        projection.validate()?;
+        if let Some(menu) = menu_for_control(&projection.seat_control.control) {
+            menu.validate()?;
+        }
+        self.projection = projection;
+        Ok(())
+    }
+
+    pub(crate) fn reduce(
+        &mut self,
+        seat: SeatId,
+        event: ButtonEvent,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        let menu_instance_id = self
+            .current_menu_instance_id()
+            .ok_or(BattleUiReject::UnsupportedButton)?;
+        self.reduce_at(seat, menu_instance_id, event)
+    }
+
+    pub(crate) fn reduce_at(
+        &mut self,
+        seat: SeatId,
+        expected_instance_id: MenuInstanceId,
+        event: ButtonEvent,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        if seat != self.projection.seat_control.seat {
+            return Err(BattleUiReject::WrongSeat);
+        }
+        let Some(menu) = self.current_menu() else {
+            return Err(BattleUiReject::UnsupportedButton);
+        };
+        if menu.owner_seat != seat {
+            return Err(BattleUiReject::WrongSeat);
+        }
+        if menu.instance_id != expected_instance_id {
+            return Err(BattleUiReject::StaleMenuInstance);
+        }
+        if !self.projection.actionable {
+            return Err(BattleUiReject::NonActionable);
+        }
+
+        let ButtonEvent::Pressed(button) = event else {
+            return Err(BattleUiReject::UnsupportedButton);
+        };
+        match button {
+            GameButton::Up => self.navigate(NavigationDirection::Up),
+            GameButton::Down => self.navigate(NavigationDirection::Down),
+            GameButton::Left => self.navigate(NavigationDirection::Left),
+            GameButton::Right => self.navigate(NavigationDirection::Right),
+            GameButton::Submit | GameButton::Action => {
+                self.activate(seat, expected_instance_id)
+            }
+            GameButton::Cancel => self.cancel(seat, expected_instance_id),
+            GameButton::Menu
+            | GameButton::Stats
+            | GameButton::CycleShiny
+            | GameButton::CycleForm
+            | GameButton::CycleGender
+            | GameButton::CycleAbility
+            | GameButton::CycleNature
+            | GameButton::CycleTera
+            | GameButton::SpeedUp
+            | GameButton::SlowDown
+            | GameButton::DevCustom => Err(BattleUiReject::UnsupportedButton),
+        }
+    }
+
+    fn navigate(
+        &mut self,
+        direction: NavigationDirection,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        let (current, edge_target) = {
+            let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+            menu.validate()?;
+            let current = menu.selected_option_id.clone();
+            let edge_target = menu
+                .navigation
+                .iter()
+                .find(|edge| edge.from == current && edge.direction == direction)
+                .map(|edge| edge.to.clone());
+            (current, edge_target)
+        };
+        let Some(target) = edge_target else {
+            return Ok(BattleUiReduction {
+                changed: false,
+                intents: Vec::new(),
+            });
+        };
+        let destination_visible = self
+            .current_menu()
+            .ok_or(BattleUiReject::UnsupportedButton)?
+            .option(target.clone())
+            .map(|option| option.visibility.is_visible())
+            .ok_or(BattleUiReject::Menu(BattleMenuError::UnknownNavigationEndpoint))?;
+        if !destination_visible {
+            return Err(BattleUiReject::Menu(BattleMenuError::HiddenNavigationEndpoint));
+        }
+        if target == current {
+            return Ok(BattleUiReduction {
+                changed: false,
+                intents: Vec::new(),
+            });
+        }
+        set_selected_option(&mut self.projection.seat_control.control, target)?;
+        Ok(BattleUiReduction {
+            changed: true,
+            intents: Vec::new(),
+        })
+    }
+
+    fn activate(
+        &self,
+        seat: SeatId,
+        menu_instance_id: MenuInstanceId,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+        let option = menu
+            .option(menu.selected_option_id.clone())
+            .ok_or(BattleUiReject::DisabledOption)?;
+        if !option.visibility.is_visible() || !option.enabled {
+            return Err(BattleUiReject::DisabledOption);
+        }
+        Ok(BattleUiReduction {
+            changed: false,
+            intents: vec![BattleUiIntent::Activate {
+                seat,
+                menu_instance_id,
+                control_id: menu.control_id.clone(),
+                option_id: option.option_id.clone(),
+            }],
+        })
+    }
+
+    fn cancel(
+        &self,
+        seat: SeatId,
+        menu_instance_id: MenuInstanceId,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+        if !control_allows_cancel(&self.projection.seat_control.control) {
+            return Err(BattleUiReject::UnsupportedButton);
+        }
+        Ok(BattleUiReduction {
+            changed: false,
+            intents: vec![BattleUiIntent::Cancel {
+                seat,
+                menu_instance_id,
+                control_id: menu.control_id.clone(),
+            }],
+        })
+    }
+}
+
+fn menu_for_control(control: &BattleControl) -> Option<&BattleMenu> {
+    match control {
+        BattleControl::CommandRoot(control) => Some(&control.menu),
+        BattleControl::MoveSelect(control) => Some(&control.menu),
+        BattleControl::TargetSelect(control) => Some(&control.menu),
+        BattleControl::PartySelect(control) => Some(&control.menu),
+        BattleControl::PartyOptionSelect(control) => Some(&control.menu),
+        BattleControl::ReplacementSelect(control) => Some(&control.menu),
+        BattleControl::Waiting(_) | BattleControl::Complete(_) => None,
+    }
+}
+
+fn set_selected_option(
+    control: &mut BattleControl,
+    option_id: MenuOptionId,
+) -> Result<(), BattleUiReject> {
+    let menu = match control {
+        BattleControl::CommandRoot(control) => &mut control.menu,
+        BattleControl::MoveSelect(control) => &mut control.menu,
+        BattleControl::TargetSelect(control) => &mut control.menu,
+        BattleControl::PartySelect(control) => &mut control.menu,
+        BattleControl::PartyOptionSelect(control) => &mut control.menu,
+        BattleControl::ReplacementSelect(control) => &mut control.menu,
+        BattleControl::Waiting(_) | BattleControl::Complete(_) => {
+            return Err(BattleUiReject::UnsupportedButton);
+        }
+    };
+    if !menu.is_visible(&option_id) {
+        return Err(BattleUiReject::Menu(BattleMenuError::HiddenNavigationEndpoint));
+    }
+    menu.selected_option_id = option_id;
+    Ok(())
+}
+
+fn control_allows_cancel(control: &BattleControl) -> bool {
+    matches!(
+        control,
+        BattleControl::MoveSelect(_)
+            | BattleControl::TargetSelect(_)
+            | BattleControl::PartySelect(_)
+            | BattleControl::PartyOptionSelect(_)
+    )
 }
 
 impl Default for UiReducer {

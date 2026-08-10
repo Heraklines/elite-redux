@@ -5,8 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use er_protocol::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 use er_types::{
     ButtonEvent, GameButton, InputFocus, InputMap, InputRouterOutput, InputTimerCommand,
-    PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass, TimerId, TimerOwner,
+    KeyBinding, PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass, TimerId, TimerOwner,
 };
+use er_types::battle_ids::MenuInstanceId;
 use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -390,6 +391,536 @@ impl From<SchedulerError> for InputRouteError {
             SchedulerError::UnknownTimer { timer_id } => Self::UnknownTimer { timer_id },
             other => Self::Scheduler(other),
         }
+    }
+}
+
+/// The physical identity retained by the battle-only input path.
+///
+/// This type deliberately does not implement `Serialize`: it is scheduler/UI
+/// bookkeeping, not a wire or campaign value.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) enum BattlePhysicalSource {
+    Keyboard(PhysicalKey),
+    Gamepad(u16),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BattleButtonEvent {
+    Pressed {
+        seat: SeatId,
+        button: GameButton,
+        menu_instance_id: MenuInstanceId,
+    },
+    Released {
+        seat: SeatId,
+        button: GameButton,
+        menu_instance_id: MenuInstanceId,
+    },
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct BattleInputOutput {
+    pub events: Vec<BattleButtonEvent>,
+    pub timers: Vec<InputTimerCommand>,
+}
+
+/// The battle router shares scheduler failure classification with the legacy
+/// router while keeping its state and identity domain separate.
+pub(crate) type BattleInputError = InputRouteError;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BattleHeldContext {
+    button: GameButton,
+    menu_instance_id: MenuInstanceId,
+    timer_id: Option<TimerId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BattleLockContext {
+    source: BattlePhysicalSource,
+    menu_instance_id: MenuInstanceId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BattleTimerContext {
+    endpoint: SeatId,
+    source: BattlePhysicalSource,
+    button: GameButton,
+    menu_instance_id: MenuInstanceId,
+    printable: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum BattlePhysicalPress {
+    Accepted(BattleHeldContext),
+    Blocked,
+    Suppressed,
+}
+
+/// Menu-instance-bound raw input for M3 battle mode.
+///
+/// `InputRouter` above remains the M1/M2 compatibility implementation. This
+/// router is intentionally not used by that path: a battle press carries its
+/// seat, physical source, logical button, and receiving menu instance all the
+/// way through repeat and key-up cleanup.
+#[derive(Clone, Debug)]
+pub(crate) struct BattleInputRouter {
+    map: InputMap,
+    pressed: BTreeMap<(SeatId, BattlePhysicalSource), BattlePhysicalPress>,
+    suppressed: BTreeSet<(SeatId, PhysicalKey)>,
+    held: BTreeMap<(SeatId, BattlePhysicalSource), BattleHeldContext>,
+    locks: BTreeMap<(SeatId, GameButton), BattleLockContext>,
+    timers: BTreeMap<TimerId, BattleTimerContext>,
+    focus: InputFocus,
+}
+
+impl BattleInputRouter {
+    pub(crate) fn new(map: InputMap) -> Self {
+        Self {
+            map: normalize_map(map),
+            pressed: BTreeMap::new(),
+            suppressed: BTreeSet::new(),
+            held: BTreeMap::new(),
+            locks: BTreeMap::new(),
+            timers: BTreeMap::new(),
+            focus: InputFocus::Game,
+        }
+    }
+
+    pub(crate) fn with_default_map() -> Self {
+        Self::new(Self::default_map())
+    }
+
+    pub(crate) fn default_map() -> InputMap {
+        InputMap {
+            keyboard: vec![
+                KeyBinding {
+                    key: PhysicalKey::ArrowUp,
+                    button: GameButton::Up,
+                },
+                KeyBinding {
+                    key: PhysicalKey::ArrowDown,
+                    button: GameButton::Down,
+                },
+                KeyBinding {
+                    key: PhysicalKey::ArrowLeft,
+                    button: GameButton::Left,
+                },
+                KeyBinding {
+                    key: PhysicalKey::ArrowRight,
+                    button: GameButton::Right,
+                },
+                KeyBinding {
+                    key: PhysicalKey::Enter,
+                    button: GameButton::Submit,
+                },
+                KeyBinding {
+                    key: PhysicalKey::Space,
+                    button: GameButton::Action,
+                },
+                KeyBinding {
+                    key: PhysicalKey::Backspace,
+                    button: GameButton::Cancel,
+                },
+            ],
+            gamepad: Vec::new(),
+            initial_repeat_delay_ms: FIXED_REPEAT_CADENCE_MS,
+            repeat_interval_ms: FIXED_REPEAT_CADENCE_MS,
+        }
+    }
+
+    pub(crate) fn input_map(&self) -> &InputMap {
+        &self.map
+    }
+
+    pub(crate) fn held_count(&self) -> usize {
+        self.held.len()
+    }
+
+    pub(crate) fn lock_count(&self) -> usize {
+        self.locks.len()
+    }
+
+    pub(crate) fn repeat_count(&self) -> usize {
+        self.timers.len()
+    }
+
+    pub(crate) fn owns_scheduled_timer(&self, scheduled: &ScheduledTimer) -> bool {
+        self.timers.get(&scheduled.timer_id).is_some_and(|context| {
+            scheduled.endpoint == context.endpoint
+                && scheduled.owner == TimerOwner::input_repeat(context.button)
+                && scheduled.delay_ms == self.map.repeat_interval_ms
+                && scheduled.time_class == TimeClass::HumanInput
+        })
+    }
+
+    pub(crate) fn is_held(&self, seat: SeatId, button: GameButton) -> bool {
+        self.locks.contains_key(&(seat, button))
+    }
+
+    pub(crate) fn handle(
+        &mut self,
+        endpoint: SeatId,
+        menu_instance_id: MenuInstanceId,
+        event: RawInputEvent,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        match event {
+            RawInputEvent::KeyDown {
+                code,
+                printable,
+                browser_repeat: _,
+                focus,
+            } => {
+                self.focus = focus;
+                self.keyboard_down(endpoint, menu_instance_id, code, printable, scheduler)
+            }
+            RawInputEvent::KeyUp { code } => self.keyboard_up(endpoint, code, scheduler),
+            RawInputEvent::GamepadDown { button } => {
+                self.gamepad_down(endpoint, menu_instance_id, button, scheduler)
+            }
+            RawInputEvent::GamepadUp { button } => self.gamepad_up(endpoint, button, scheduler),
+            RawInputEvent::FocusChanged(focus) => {
+                self.focus = focus;
+                Ok(BattleInputOutput::default())
+            }
+            RawInputEvent::WindowBlurred => Ok(self.clear(scheduler)),
+            RawInputEvent::WindowFocused => {
+                self.focus = InputFocus::Game;
+                Ok(BattleInputOutput::default())
+            }
+        }
+    }
+
+    pub(crate) fn timer_fired(
+        &mut self,
+        fired: ScheduledTimer,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let timer_id = fired.timer_id;
+        let Some(timer_context) = self.timers.get(&timer_id).cloned() else {
+            return Err(InputRouteError::UnknownTimer { timer_id });
+        };
+        if fired.endpoint != timer_context.endpoint
+            || fired.owner != TimerOwner::input_repeat(timer_context.button)
+            || fired.time_class != TimeClass::HumanInput
+            || scheduler.timer(timer_id).is_some()
+        {
+            return Err(InputRouteError::UnknownTimer { timer_id });
+        }
+
+        let held_key = (timer_context.endpoint, timer_context.source.clone());
+        let Some(held) = self.held.get(&held_key) else {
+            self.timers.remove(&timer_id);
+            return Ok(BattleInputOutput::default());
+        };
+        if held.timer_id != Some(timer_id)
+            || held.button != timer_context.button
+            || held.menu_instance_id != timer_context.menu_instance_id
+        {
+            return Err(InputRouteError::UnknownTimer { timer_id });
+        }
+
+        let events = if self.focus == InputFocus::TextEntry && timer_context.printable {
+            Vec::new()
+        } else {
+            vec![BattleButtonEvent::Pressed {
+                seat: timer_context.endpoint,
+                button: timer_context.button,
+                menu_instance_id: timer_context.menu_instance_id,
+            }]
+        };
+
+        let command = match scheduler.schedule(
+            timer_context.endpoint,
+            TimerOwner::input_repeat(timer_context.button),
+            self.map.repeat_interval_ms,
+            TimeClass::HumanInput,
+        ) {
+            Ok(command) => command,
+            Err(error) => {
+                self.timers.remove(&timer_id);
+                if let Some(held) = self.held.get_mut(&held_key) {
+                    held.timer_id = None;
+                }
+                return Err(error.into());
+            }
+        };
+        let SchedulerCommand::Schedule { timer } = command else {
+            self.timers.remove(&timer_id);
+            return Err(InputRouteError::SchedulerInvariant);
+        };
+
+        self.timers.remove(&timer_id);
+        self.timers.insert(
+            timer.timer_id,
+            BattleTimerContext {
+                endpoint: timer.endpoint,
+                source: timer_context.source,
+                button: timer_context.button,
+                menu_instance_id: timer_context.menu_instance_id,
+                printable: timer_context.printable,
+            },
+        );
+        if let Some(held) = self.held.get_mut(&held_key) {
+            held.timer_id = Some(timer.timer_id);
+        }
+
+        Ok(BattleInputOutput {
+            events,
+            timers: vec![InputTimerCommand::Schedule {
+                timer_id: timer.timer_id,
+                delay_ms: timer.delay_ms,
+            }],
+        })
+    }
+
+    pub(crate) fn clear(&mut self, scheduler: &mut KernelScheduler) -> BattleInputOutput {
+        let timers = self
+            .timers
+            .keys()
+            .copied()
+            .filter_map(|timer_id| match scheduler.cancel(timer_id) {
+                Some(SchedulerCommand::Cancel { timer_id, .. }) => {
+                    Some(InputTimerCommand::Cancel { timer_id })
+                }
+                Some(_) | None => None,
+            })
+            .collect();
+        self.pressed.clear();
+        self.suppressed.clear();
+        self.held.clear();
+        self.locks.clear();
+        self.timers.clear();
+        BattleInputOutput {
+            events: Vec::new(),
+            timers,
+        }
+    }
+
+    pub(crate) fn discard_timer(&mut self, timer_id: TimerId, scheduler: &mut KernelScheduler) {
+        let _ = scheduler.cancel(timer_id);
+        self.timers.remove(&timer_id);
+        for held in self.held.values_mut() {
+            if held.timer_id == Some(timer_id) {
+                held.timer_id = None;
+            }
+        }
+    }
+
+    fn keyboard_down(
+        &mut self,
+        endpoint: SeatId,
+        menu_instance_id: MenuInstanceId,
+        code: PhysicalKey,
+        printable: bool,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let source = BattlePhysicalSource::Keyboard(code.clone());
+        let key = (endpoint, source.clone());
+        if self.pressed.contains_key(&key) {
+            return Ok(BattleInputOutput::default());
+        }
+        if printable && self.focus == InputFocus::TextEntry {
+            self.suppressed.insert((endpoint, code));
+            self.pressed.insert(key, BattlePhysicalPress::Suppressed);
+            return Ok(BattleInputOutput::default());
+        }
+        let Some(button) = self.keyboard_button(&code) else {
+            return Ok(BattleInputOutput::default());
+        };
+        self.accept_physical(
+            endpoint,
+            menu_instance_id,
+            source,
+            button,
+            printable,
+            scheduler,
+        )
+    }
+
+    fn keyboard_up(
+        &mut self,
+        endpoint: SeatId,
+        code: PhysicalKey,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let source = BattlePhysicalSource::Keyboard(code.clone());
+        if self.suppressed.remove(&(endpoint, code)) {
+            self.pressed.remove(&(endpoint, source));
+            return Ok(BattleInputOutput::default());
+        }
+        self.release_physical(endpoint, source, scheduler)
+    }
+
+    fn gamepad_down(
+        &mut self,
+        endpoint: SeatId,
+        menu_instance_id: MenuInstanceId,
+        button_index: u16,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let source = BattlePhysicalSource::Gamepad(button_index);
+        let key = (endpoint, source.clone());
+        if self.pressed.contains_key(&key) {
+            return Ok(BattleInputOutput::default());
+        }
+        let Some(button) = self.gamepad_button(button_index) else {
+            return Ok(BattleInputOutput::default());
+        };
+        self.accept_physical(
+            endpoint,
+            menu_instance_id,
+            source,
+            button,
+            false,
+            scheduler,
+        )
+    }
+
+    fn gamepad_up(
+        &mut self,
+        endpoint: SeatId,
+        button_index: u16,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        self.release_physical(
+            endpoint,
+            BattlePhysicalSource::Gamepad(button_index),
+            scheduler,
+        )
+    }
+
+    fn keyboard_button(&self, code: &PhysicalKey) -> Option<GameButton> {
+        self.map
+            .keyboard
+            .iter()
+            .find(|binding| binding.key == *code)
+            .map(|binding| binding.button)
+    }
+
+    fn gamepad_button(&self, button_index: u16) -> Option<GameButton> {
+        self.map
+            .gamepad
+            .iter()
+            .find(|binding| binding.button_index == button_index)
+            .map(|binding| binding.button)
+    }
+
+    fn accept_physical(
+        &mut self,
+        endpoint: SeatId,
+        menu_instance_id: MenuInstanceId,
+        source: BattlePhysicalSource,
+        button: GameButton,
+        printable: bool,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let key = (endpoint, source.clone());
+        if self.locks.contains_key(&(endpoint, button)) {
+            self.pressed.insert(key, BattlePhysicalPress::Blocked);
+            return Ok(BattleInputOutput::default());
+        }
+
+        let command = scheduler.schedule(
+            endpoint,
+            TimerOwner::input_repeat(button),
+            self.map.initial_repeat_delay_ms,
+            TimeClass::HumanInput,
+        )?;
+        let SchedulerCommand::Schedule { timer } = command else {
+            return Err(InputRouteError::SchedulerInvariant);
+        };
+        let held = BattleHeldContext {
+            button,
+            menu_instance_id,
+            timer_id: Some(timer.timer_id),
+        };
+        self.pressed
+            .insert(key.clone(), BattlePhysicalPress::Accepted(held.clone()));
+        self.held.insert(key, held);
+        self.locks.insert(
+            (endpoint, button),
+            BattleLockContext {
+                source: source.clone(),
+                menu_instance_id,
+            },
+        );
+        self.timers.insert(
+            timer.timer_id,
+            BattleTimerContext {
+                endpoint,
+                source,
+                button,
+                menu_instance_id,
+                printable,
+            },
+        );
+        Ok(BattleInputOutput {
+            events: vec![BattleButtonEvent::Pressed {
+                seat: endpoint,
+                button,
+                menu_instance_id,
+            }],
+            timers: vec![InputTimerCommand::Schedule {
+                timer_id: timer.timer_id,
+                delay_ms: timer.delay_ms,
+            }],
+        })
+    }
+
+    fn release_physical(
+        &mut self,
+        endpoint: SeatId,
+        source: BattlePhysicalSource,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleInputError> {
+        let key = (endpoint, source.clone());
+        let Some(press) = self.pressed.remove(&key) else {
+            return Ok(BattleInputOutput::default());
+        };
+        let BattlePhysicalPress::Accepted(held) = press else {
+            return Ok(BattleInputOutput::default());
+        };
+        self.held.remove(&key);
+        if self
+            .locks
+            .get(&(endpoint, held.button))
+            .is_some_and(|lock| {
+                lock.source == source && lock.menu_instance_id == held.menu_instance_id
+            })
+        {
+            self.locks.remove(&(endpoint, held.button));
+        }
+
+        let timer_id = held.timer_id.or_else(|| {
+            self.timers.iter().find_map(|(timer_id, context)| {
+                (context.endpoint == endpoint
+                    && context.source == source
+                    && context.button == held.button)
+                    .then_some(*timer_id)
+            })
+        });
+        let timers = match timer_id {
+            Some(timer_id) => {
+                self.timers.remove(&timer_id);
+                match scheduler.cancel(timer_id) {
+                    Some(SchedulerCommand::Cancel { timer_id, .. }) => {
+                        vec![InputTimerCommand::Cancel { timer_id }]
+                    }
+                    Some(_) | None => Vec::new(),
+                }
+            }
+            None => Vec::new(),
+        };
+        Ok(BattleInputOutput {
+            events: vec![BattleButtonEvent::Released {
+                seat: endpoint,
+                button: held.button,
+                menu_instance_id: held.menu_instance_id,
+            }],
+            timers,
+        })
     }
 }
 
