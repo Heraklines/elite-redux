@@ -216,11 +216,12 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
         "CommandAdmissionSource::ScriptedEnemy",
         "build_scripted_enemy_offer",
         "validate_next_state_command_collection",
-        "validate_command_root_menu",
-        "validate_replacement_menu",
+        "project_battle_control_plan",
     ] {
         assert!(MATERIAL_SOURCE.contains(required), "missing frontier guard {required}");
     }
+    assert!(!MATERIAL_SOURCE.contains("fn validate_command_root_menu"));
+    assert!(!MATERIAL_SOURCE.contains("fn validate_replacement_menu"));
 }
 
 #[test]

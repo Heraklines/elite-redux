@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_battle::legality::{
-    build_command_offer, build_replacement_offer, build_scripted_enemy_offer,
+    build_command_offer, build_scripted_enemy_offer,
     normalize_command_set, validate_replacement_selection, validate_state_content,
 };
 use er_battle::command::NormalizedBattleCommand;
@@ -26,7 +26,7 @@ use er_state::digest::MechanicalStateDigest;
 use er_state::format::{canonical_slots, human_seats, owner_seat_for, validate_slot};
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommandOffer, CommandAdmissionSource, CommandCollectionState,
+    AcceptedBattleCommand, CommandAdmissionSource, CommandCollectionState,
     CommandFrontierEntry, CommandFrontierStatus, CommandSet, ReplacementSelection,
     player_command_operation_id, replacement_operation_id, scripted_enemy_command_operation_id,
     turn_result_operation_id,
@@ -34,7 +34,7 @@ use er_types::battle_command::{
 use er_types::battle_control::{
     BattleControl, BattleControlPlan, BattleControlPlanError, CommandRootControl,
     MoveSelectControl, PartyOptionSelectControl, PartySelectControl, ReplacementSelectControl,
-    SeatMenuInstanceAllocator, TargetSelectControl, WaitingControl, WaitingReason,
+    SeatMenuInstanceAllocator, TargetSelectControl, WaitingControl,
 };
 use er_types::battle_ids::{
     BattleId, BattleSide, FieldSlot, MenuInstanceId, MoveId, PokemonId, SafeU53, TurnIndex,
@@ -44,15 +44,15 @@ use er_types::battle_model::{
     FaintOccurrence, ReplacementProgress, ResolvedAction,
 };
 use er_types::battle_ui::{
-    BattleMenu, BattleMenuOption, BattlePresentationEvent, BattlePresentationKind,
-    MenuNavigationEdge, MenuOptionLayout, MenuOptionVisibility, NavigationDirection,
+    BattlePresentationEvent, BattlePresentationKind,
     PresentationBlockingPolicy, PresentationPlanDigest, PresentationSkipPolicy,
 };
 use er_types::battle_ids::ContentPackHash;
-use er_types::ids::MenuOptionId;
 use er_types::{OperationId, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::runtime::project_battle_control_plan;
 
 /// The schema version of both typed M3 material DTOs.
 pub const BATTLE_MATERIAL_SCHEMA_VERSION: u32 = 1;
@@ -319,6 +319,7 @@ pub fn apply_turn_material(
     validate_control_projection(
         &material.after_state,
         material.next_decision,
+        &material.menu_allocators_before,
         &material.next_control,
         content,
     )?;
@@ -393,6 +394,7 @@ pub fn apply_replacement_material(
     validate_control_projection(
         &material.after_state,
         material.next_decision,
+        &material.menu_allocators_before,
         &material.next_control,
         content,
     )?;
@@ -1685,333 +1687,21 @@ fn validate_endpoint_allocator_shape(
 fn validate_control_projection(
     after_state: &GameState,
     next_decision: BattleNextDecision,
+    allocator_before: &[SeatMenuInstanceAllocator],
     next_control: &BattleControlPlan,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    let battle = after_state
-        .battle
-        .as_ref()
-        .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-    let seats = human_seats(&battle.format)
-        .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-    if next_control.battle_id != battle.battle_id
-        || next_control.wave != battle.wave
-        || next_control.seats.len() != seats.len()
-        || next_control.seats.iter().map(|seat| seat.seat).collect::<Vec<_>>() != seats
-    {
-        return Err(BattleMaterialApplyError::InvalidControlProjection);
-    }
-    if next_control.turn != battle.turn {
-        return Err(BattleMaterialApplyError::InvalidControlProjection);
-    }
-
-    match next_decision {
-        BattleNextDecision::Complete(outcome) => {
-            if outcome == BattleOutcome::Ongoing
-                || next_control.seats.iter().any(|seat| {
-                    seat.decision_operation_id.is_some()
-                        || seat.control != BattleControl::Complete(outcome)
-                })
-            {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            }
-        }
-        BattleNextDecision::CommandFrontier => {
-            if battle.outcome != BattleOutcome::Ongoing
-                || battle
-                    .faint_queue
-                    .iter()
-                    .any(|occurrence| occurrence.replacement != ReplacementProgress::Applied)
-            {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            }
-            validate_fresh_command_frontier(after_state, battle, content)
-                .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-            let mut command_owners = BTreeSet::new();
-            for entry in &battle.command_state.frontier {
-                if entry.field_slot.side != BattleSide::Player {
-                    continue;
-                }
-                let owner = entry
-                    .owner_seat
-                    .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-                let actor = entry.actor;
-                let slot = entry.field_slot;
-                let expected_owner = owner_seat_for(&battle.format, slot)
-                    .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?
-                    .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-                if expected_owner != owner
-                    || !matches!(&entry.status, CommandFrontierStatus::Pending)
-                {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                }
-                command_owners.insert(owner);
-                let seat = next_control
-                    .seat(owner)
-                    .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-                let BattleControl::CommandRoot(control) = &seat.control else {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                };
-                if control.actor != actor || control.field_slot != slot {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                }
-                if seat.decision_operation_id.as_ref() != Some(&entry.operation_id) {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                }
-                validate_command_root_menu(
-                    &control.menu,
-                    owner,
-                    battle,
-                    slot,
-                    &entry.offer,
-                )?;
-            }
-            if command_owners.len() != seats.len() {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            }
-            for seat in &next_control.seats {
-                if !command_owners.contains(&seat.seat) {
-                    let BattleControl::Waiting(waiting) = &seat.control else {
-                        return Err(BattleMaterialApplyError::InvalidControlProjection);
-                    };
-                    if waiting.reason != WaitingReason::PartnerCommand
-                        || waiting.operation_ids.is_empty()
-                        || seat.decision_operation_id.is_some()
-                    {
-                        return Err(BattleMaterialApplyError::InvalidControlProjection);
-                    }
-                }
-            }
-        }
-        BattleNextDecision::Replacement { occurrence } => {
-            let faint = battle
-                .faint_queue
-                .iter()
-                .find(|candidate| candidate.id == occurrence)
-                .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-            let owner = faint
-                .owner_seat
-                .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-            let replacement_offer = build_replacement_offer(after_state, occurrence, content)
-                .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-            let expected_operation = replacement_operation_id(
-                faint.source.epoch,
-                battle.battle_id,
-                battle.wave,
-                faint.source.resolved_turn,
-                faint.source.turn_occurrence,
-                faint.slot,
-                owner,
-            )
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-
-            if replacement_offer.is_empty() {
-                for seat in &next_control.seats {
-                    let BattleControl::Waiting(waiting) = &seat.control else {
-                        return Err(BattleMaterialApplyError::InvalidControlProjection);
-                    };
-                    if seat.decision_operation_id.is_some()
-                        || waiting.reason != WaitingReason::ReplacementOwner
-                        || waiting.operation_ids != vec![expected_operation.clone()]
-                    {
-                        return Err(BattleMaterialApplyError::InvalidControlProjection);
-                    }
-                }
-                return Ok(());
-            }
-
-            let owner_control = next_control
-                .seat(owner)
-                .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-            let BattleControl::ReplacementSelect(control) = &owner_control.control else {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            };
-            if control.occurrence != faint.id
-                || control.source != faint.source
-                || control.actor != faint.pokemon
-                || control.field_slot != faint.slot
-                || control.owner_seat != owner
-            {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            }
-            if owner_control.decision_operation_id.as_ref() != Some(&expected_operation) {
-                return Err(BattleMaterialApplyError::InvalidControlProjection);
-            }
-            validate_replacement_menu(
-                control,
-                owner,
-                &expected_operation,
-                &replacement_offer,
-            )?;
-            for seat in &next_control.seats {
-                if seat.seat == owner {
-                    continue;
-                }
-                let BattleControl::Waiting(waiting) = &seat.control else {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                };
-                if waiting.reason != WaitingReason::ReplacementOwner
-                    || waiting.operation_ids != vec![expected_operation.clone()]
-                    || seat.decision_operation_id.is_some()
-                {
-                    return Err(BattleMaterialApplyError::InvalidControlProjection);
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_command_root_menu(
-    menu: &BattleMenu,
-    owner: SeatId,
-    battle: &BattleState,
-    slot: FieldSlot,
-    offer: &BattleCommandOffer,
-) -> Result<(), BattleMaterialApplyError> {
-    let control_id = format!(
-        "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/command",
-        battle.battle_id, battle.wave, battle.turn, slot.position, owner,
-    );
-    let mut options = Vec::new();
-    for move_offer in &offer.fight {
-        let option_id = MenuOptionId::new(format!(
-            "command/fight/{}",
-            move_offer.move_slot.get()
-        ))
-        .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        let row = u16::try_from(options.len())
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        options.push(
-            BattleMenuOption::new(
-                option_id.clone(),
-                "battle.command.fight",
-                MenuOptionVisibility::Visible,
-                true,
-                MenuOptionLayout::new(option_id, row, 0, 0),
-            )
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?,
-        );
-    }
-    for switch in &offer.switches {
-        let option_id = MenuOptionId::new(format!(
-            "command/switch/{}",
-            switch.party_slot.get()
-        ))
-        .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        let row = u16::try_from(options.len())
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        options.push(
-            BattleMenuOption::new(
-                option_id.clone(),
-                "battle.command.switch",
-                MenuOptionVisibility::Visible,
-                true,
-                MenuOptionLayout::new(option_id, row, 0, 0),
-            )
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?,
-        );
-    }
-    let selected = options
-        .first()
-        .map(|option| option.option_id.clone())
-        .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-    let navigation = adjacent_navigation(&options);
-    let expected = BattleMenu::new(
-        menu.instance_id,
-        owner,
-        control_id,
-        selected,
-        options,
-        navigation,
+    let projected = project_battle_control_plan(
+        after_state,
+        next_decision,
+        allocator_before,
+        content,
     )
     .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-    if menu != &expected {
+    if &projected != next_control {
         return Err(BattleMaterialApplyError::InvalidControlProjection);
     }
     Ok(())
-}
-
-fn validate_replacement_menu(
-    control: &ReplacementSelectControl,
-    owner: SeatId,
-    operation_id: &OperationId,
-    offer: &[er_types::battle_command::OfferedSwitchCommand],
-) -> Result<(), BattleMaterialApplyError> {
-    let control_id = format!("{operation_id}/control/replacement");
-    let mut options = Vec::new();
-    for switch in offer {
-        let option_id = MenuOptionId::new(format!(
-            "party/{}/slot/{}",
-            switch.pokemon,
-            switch.party_slot.get()
-        ))
-        .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        let row = u16::try_from(options.len())
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-        options.push(
-            BattleMenuOption::new(
-                option_id.clone(),
-                "battle.replacement.select",
-                MenuOptionVisibility::Visible,
-                true,
-                MenuOptionLayout::new(option_id, row, 0, 0),
-            )
-            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?,
-        );
-    }
-    let selected = options
-        .first()
-        .map(|option| option.option_id.clone())
-        .ok_or(BattleMaterialApplyError::InvalidControlProjection)?;
-    let navigation = adjacent_navigation(&options);
-    let expected = BattleMenu::new(
-        control.menu.instance_id,
-        owner,
-        control_id,
-        selected,
-        options,
-        navigation,
-    )
-    .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
-    if &control.menu != &expected {
-        return Err(BattleMaterialApplyError::InvalidControlProjection);
-    }
-    let expected_left = expected
-        .options
-        .first()
-        .ok_or(BattleMaterialApplyError::InvalidControlProjection)?
-        .option_id
-        .clone();
-    let expected_right = expected
-        .options
-        .last()
-        .ok_or(BattleMaterialApplyError::InvalidControlProjection)?
-        .option_id
-        .clone();
-    if control.last_left_option_id != expected_left
-        || control.last_right_option_id != expected_right
-    {
-        return Err(BattleMaterialApplyError::InvalidControlProjection);
-    }
-    Ok(())
-}
-
-fn adjacent_navigation(options: &[BattleMenuOption]) -> Vec<MenuNavigationEdge> {
-    let mut navigation = Vec::new();
-    for pair in options.windows(2) {
-        navigation.push(MenuNavigationEdge::new(
-            pair[0].option_id.clone(),
-            NavigationDirection::Down,
-            pair[1].option_id.clone(),
-        ));
-        navigation.push(MenuNavigationEdge::new(
-            pair[1].option_id.clone(),
-            NavigationDirection::Up,
-            pair[0].option_id.clone(),
-        ));
-    }
-    navigation
 }
 
 fn party_contains(battle: &BattleState, pokemon: PokemonId) -> bool {

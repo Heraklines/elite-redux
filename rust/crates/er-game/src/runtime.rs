@@ -61,6 +61,10 @@ use crate::internal_event::{
     BattleResolvedPayload, CausalIdentity, GameIntent, InternalEvent, PreparedBattleResolution,
     GameEventPayload, UiEventPayload,
 };
+use crate::authority_commands::{
+    PreparedAuthorityAdmission, PreparedAuthorityMenuPath, PreparedAuthorityReplacement,
+    PreparedAuthorityTurn, PreparedReplacementFingerprintEvidence,
+};
 use crate::command_menu::{
     CommandChoice, CommandMenuError, CommandRootSelection, build_command_root_control,
     select_command,
@@ -150,12 +154,6 @@ pub enum BattleUiResult {
 pub(crate) struct RuntimeAuthorityMenuPath {
     pub(crate) operation_id: er_types::OperationId,
     pub(crate) control: BattleControl,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct RuntimeAuthorityAdmission {
-    pub(crate) allocator_before: Vec<SeatMenuInstanceAllocator>,
-    pub(crate) remote_paths: BTreeMap<er_types::OperationId, RuntimeAuthorityMenuPath>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -480,16 +478,83 @@ impl GameRuntime {
         self.content.as_ref()
     }
 
-    /// Crate-internal C06 handoff data.  The integrated `authority_commands`
-    /// module converts this renamed helper record into its own frozen
-    /// `PreparedAuthorityAdmission`/`PreparedAuthorityMenuPath` types; those
-    /// public types are intentionally not redeclared in this isolated file.
+    fn prepared_authority_admission(&self) -> PreparedAuthorityAdmission {
+        let remote_paths = self
+            .authority_remote_paths
+            .iter()
+            .map(|(operation_id, path)| {
+                (
+                    operation_id.clone(),
+                    PreparedAuthorityMenuPath::from_game_runtime(
+                        path.operation_id.clone(),
+                        path.control.clone(),
+                    ),
+                )
+            })
+            .collect();
+        PreparedAuthorityAdmission::from_game_runtime(
+            self.control.menu_allocators.clone(),
+            remote_paths,
+        )
+    }
+
+    /// Close one runtime-produced TURN resolution into C06's authority-only
+    /// handoff. The transition and projected control are revalidated against
+    /// this exact runtime, so the kernel cannot combine loose candidates.
     #[doc(hidden)]
-    pub(crate) fn runtime_authority_admission(&self) -> RuntimeAuthorityAdmission {
-        RuntimeAuthorityAdmission {
-            allocator_before: self.control.menu_allocators.clone(),
-            remote_paths: self.authority_remote_paths.clone(),
+    pub fn prepare_authority_turn(
+        &self,
+        transition: er_battle::BattleTransition,
+        material_operation_id: &er_types::OperationId,
+        control_plan: BattleControlPlan,
+    ) -> Result<PreparedAuthorityTurn, GameRuntimeError> {
+        validate_turn_transition_identity(self, &transition, material_operation_id)?;
+        let expected = project_battle_control_plan(
+            &transition.after_state,
+            transition.next_decision,
+            &self.control.menu_allocators,
+            self.content.as_ref(),
+        )?;
+        if expected != control_plan {
+            return Err(GameRuntimeError::ControlProjectionMismatch);
         }
+        Ok(PreparedAuthorityTurn {
+            transition,
+            control_plan,
+            admission: self.prepared_authority_admission(),
+        })
+    }
+
+    /// Replacement counterpart to [`Self::prepare_authority_turn`]. The
+    /// fingerprint evidence is copied read-only from the runtime's sole
+    /// mutable ledger.
+    #[doc(hidden)]
+    pub fn prepare_authority_replacement(
+        &self,
+        transition: er_battle::BattleReplacementTransition,
+        material_operation_id: &er_types::OperationId,
+        control_plan: BattleControlPlan,
+    ) -> Result<PreparedAuthorityReplacement, GameRuntimeError> {
+        validate_replacement_transition_identity(self, &transition, material_operation_id)?;
+        let expected = project_battle_control_plan(
+            &transition.after_state,
+            transition.next_decision,
+            &self.control.menu_allocators,
+            self.content.as_ref(),
+        )?;
+        if expected != control_plan {
+            return Err(GameRuntimeError::ControlProjectionMismatch);
+        }
+        let replacement_fingerprints = PreparedReplacementFingerprintEvidence::from_game_runtime(
+            self.replacement_fingerprints.clone(),
+        )
+        .map_err(|_| invalid_config("replacement fingerprint evidence is invalid"))?;
+        Ok(PreparedAuthorityReplacement {
+            transition,
+            control_plan,
+            admission: self.prepared_authority_admission(),
+            replacement_fingerprints,
+        })
     }
 
     pub fn validate(&self) -> Result<(), GameRuntimeError> {
