@@ -132,6 +132,7 @@ function runVitest(outputRoot) {
       vitestEntry,
       "run",
       TEST_PATH,
+      "--reporter=default",
       "--pool=forks",
       "--maxWorkers=1",
       "--no-file-parallelism",
@@ -173,7 +174,9 @@ if (JSON.stringify(actual) !== JSON.stringify(expected)) {
 
 const finalStatus = gitStatus();
 if (finalStatus !== initialStatus) {
-  fail("export changed the checkout; generated evidence must remain outside the source tree");
+  fail(
+    `export changed the checkout; generated evidence must remain outside the source tree; initial=${JSON.stringify(initialStatus)} final=${JSON.stringify(finalStatus)}`,
+  );
 }
 
 console.log(`M3A-05 exporter: wrote ${actual.length} verified files to ${outputRoot}`);
