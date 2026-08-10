@@ -6,14 +6,17 @@
 //! acceptance still requires the owner bridge to extract and restore every
 //! live field, including queued packet bodies and continuation effects.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
 use er_canonical::content_digest;
 use er_content::pack::ContentPack;
 use er_kernel::snapshot::{
-    KernelDeterminismDigest, LiveResourceSnapshot, MechanicalStateDigest, PhysicalInputSourceV2,
+    restore_game_kernel, snapshot_game_kernel, GameKernelSnapshotBridge, KernelDeterminismDigest,
+    LiveResourceSnapshot, MechanicalStateDigest, PhysicalInputSourceV2,
     RestorableKernelSnapshotV2, RestorableTimerSnapshotV2, RngDraw,
+    validate_live_resources as validate_kernel_live_resources,
 };
 use er_types::battle_ids::{
     BattlePresentationEventId, CanonicalHexBytes,
@@ -588,6 +591,565 @@ pub enum KernelTraceV2 {
     Pair(PairKernelTraceV2),
 }
 
+/// A deterministic first-mismatch report for one trace boundary.
+///
+/// This is deliberately an in-memory diagnostic rather than another wire
+/// DTO.  The trace's frozen `failure` field remains the wire representation;
+/// this value adds the sequence and virtual-time coordinates needed to act on
+/// a replay failure without changing that schema.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TraceDivergenceV2 {
+    pub sequence: SafeU53,
+    pub virtual_time_ms: SafeU53,
+    pub owner: TraceFailureOwnerV2,
+    pub code: String,
+    pub path: String,
+    pub expected: Option<String>,
+    pub actual: Option<String>,
+}
+
+impl TraceDivergenceV2 {
+    pub fn failure(&self) -> TraceFailureEvidenceV2 {
+        TraceFailureEvidenceV2 {
+            owner: self.owner,
+            code: self.code.clone(),
+            path: self.path.clone(),
+            expected: self.expected.clone(),
+            actual: self.actual.clone(),
+        }
+    }
+}
+
+/// Replay result.  `replayed_entries` includes the entry at which the first
+/// divergence was found, matching the existing M2 replay-report convention.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TraceReplayReportV2 {
+    pub replayed_entries: SafeU53,
+    pub first_divergence: Option<TraceDivergenceV2>,
+}
+
+/// Post-input evidence supplied by an endpoint recorder/replay adapter.
+///
+/// The adapter is intentionally small: the authoritative before-state is
+/// held by `EndpointKernelTraceRecorder`, while the after snapshot is taken
+/// through the real public snapshot boundary.  RNG and internal-event vectors
+/// are supplied by the owner that can observe them; an adapter must not infer
+/// or synthesize them from a digest.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EndpointTraceObservationV2 {
+    pub virtual_time_ms: SafeU53,
+    pub effects: Vec<RestorableKernelEffectV2>,
+    pub after_snapshot: RestorableKernelSnapshotV2,
+    pub rng_audit: Vec<RngDraw>,
+    pub internal_events: Vec<InternalEventKindV1>,
+    pub live_resources: LiveResourceSnapshot,
+    pub failure: Option<TraceFailureEvidenceV2>,
+}
+
+/// Post-input evidence supplied by a pair recorder/replay adapter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PairTraceObservationV2 {
+    pub effects: Vec<PairTraceEffectV2>,
+    pub after_snapshot: RestorablePairSnapshotV2,
+    pub host_rng_audit: Vec<RngDraw>,
+    pub host_internal_events: Vec<InternalEventKindV1>,
+    pub host_live_resources: LiveResourceSnapshot,
+    pub guest_rng_audit: Vec<RngDraw>,
+    pub guest_internal_events: Vec<InternalEventKindV1>,
+    pub guest_live_resources: LiveResourceSnapshot,
+    pub failure: Option<TraceFailureEvidenceV2>,
+}
+
+/// A fail-atomic endpoint trace builder.
+///
+/// `record` derives all before/after digest-chain fields from the snapshots it
+/// owns.  It appends only after the candidate entry validates, so a malformed
+/// observation cannot leave a half-recorded trace.
+#[derive(Clone, Debug)]
+pub struct EndpointKernelTraceRecorder {
+    replay_seed: String,
+    initial_snapshot: RestorableKernelSnapshotV2,
+    current_snapshot: RestorableKernelSnapshotV2,
+    entries: Vec<KernelTraceEntryV2>,
+    previous_virtual_time_ms: Option<SafeU53>,
+    last_rng_sequence: Option<SafeU53>,
+    last_live_resources: Option<LiveResourceSnapshot>,
+}
+
+/// A fail-atomic pair trace builder.
+#[derive(Clone, Debug)]
+pub struct PairKernelTraceRecorder {
+    initial_snapshot: RestorablePairSnapshotV2,
+    current_snapshot: RestorablePairSnapshotV2,
+    entries: Vec<PairTraceEntryV2>,
+    host_last_rng_sequence: Option<SafeU53>,
+    guest_last_rng_sequence: Option<SafeU53>,
+}
+
+impl TraceFailureEvidenceV2 {
+    pub fn validate(&self, expected_owner: Option<TraceFailureOwnerV2>) -> Result<(), SnapshotError> {
+        if let Some(expected_owner) = expected_owner
+            && self.owner != expected_owner
+        {
+            return Err(invalid(
+                "failure.owner",
+                format!("expected {expected_owner:?}, got {:?}", self.owner),
+            ));
+        }
+        if self.code.is_empty() {
+            return Err(invalid("failure.code", "must not be empty"));
+        }
+        if self.path.is_empty() {
+            return Err(invalid("failure.path", "must not be empty"));
+        }
+        if self
+            .code
+            .chars()
+            .chain(self.path.chars())
+            .any(|character| character == '\n' || character == '\r' || character == '\0')
+        {
+            return Err(invalid(
+                "failure",
+                "code and path must not contain NUL or line-break characters",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl PairEnvironmentResourceSnapshotV2 {
+    pub fn from_snapshot(snapshot: &RestorablePairSnapshotV2) -> Self {
+        Self {
+            host_driver: snapshot.host_driver.clone(),
+            guest_driver: snapshot.guest_driver.clone(),
+            clock: snapshot.clock.clone(),
+            network: snapshot.network.clone(),
+            presenter: snapshot.presenter.clone(),
+            storage: snapshot.storage.clone(),
+            fault_script: snapshot.fault_script.clone(),
+            fault_rng_state: snapshot.fault_rng_state.clone(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), SnapshotError> {
+        self.host_driver.validate()?;
+        self.guest_driver.validate()?;
+        self.clock.validate()?;
+        self.network.validate()?;
+        self.presenter.validate()?;
+        self.storage.validate()?;
+        self.fault_script.validate()?;
+        self.fault_rng_state.validate()?;
+        Ok(())
+    }
+}
+
+impl EndpointKernelTraceRecorder {
+    pub fn new(
+        replay_seed: impl Into<String>,
+        initial_snapshot: RestorableKernelSnapshotV2,
+    ) -> Result<Self, SnapshotError> {
+        let replay_seed = replay_seed.into();
+        validate_seed(&replay_seed, "replay_seed")?;
+        initial_snapshot
+            .validate()
+            .map_err(|error| prefix_snapshot_error("initial_snapshot", error))?;
+        Ok(Self {
+            replay_seed,
+            current_snapshot: initial_snapshot.clone(),
+            initial_snapshot,
+            entries: Vec::new(),
+            previous_virtual_time_ms: None,
+            last_rng_sequence: None,
+            last_live_resources: None,
+        })
+    }
+
+    pub fn record(
+        &mut self,
+        input: RestorableKernelInputV2,
+        virtual_time_ms: SafeU53,
+        effects: Vec<RestorableKernelEffectV2>,
+        after_snapshot: RestorableKernelSnapshotV2,
+        rng_audit: Vec<RngDraw>,
+        internal_events: Vec<InternalEventKindV1>,
+        live_resources: LiveResourceSnapshot,
+        failure: Option<TraceFailureEvidenceV2>,
+    ) -> Result<(), SnapshotError> {
+        let sequence = one_based_sequence(self.entries.len(), "entries")?;
+        if self
+            .previous_virtual_time_ms
+            .is_some_and(|previous| virtual_time_ms < previous)
+        {
+            return Err(invalid(
+                "entries.virtual_time_ms",
+                "virtual time must not regress",
+            ));
+        }
+        validate_same_endpoint_snapshot(&self.current_snapshot, &after_snapshot)?;
+        after_snapshot
+            .validate()
+            .map_err(|error| prefix_snapshot_error("after_snapshot", error))?;
+        validate_endpoint_input(
+            &input,
+            self.current_snapshot.runtime_identity.local_seat,
+        )?;
+        validate_endpoint_effects(
+            &effects,
+            self.current_snapshot.runtime_identity.local_seat,
+        )?;
+        validate_rng_audit(
+            &rng_audit,
+            self.last_rng_sequence,
+            "rng_audit",
+        )?;
+        let rng_audit_digest_value = rng_audit_digest(&rng_audit)?;
+        validate_live_resources(&live_resources)?;
+        if let Some(failure) = &failure {
+            failure.validate(Some(TraceFailureOwnerV2::Endpoint))?;
+            if !effects.is_empty() {
+                return Err(invalid(
+                    "failure",
+                    "a rejected endpoint input must not publish effects",
+                ));
+            }
+            if after_snapshot != self.current_snapshot {
+                return Err(invalid(
+                    "failure",
+                    "a rejected endpoint input must retain the exact before snapshot",
+                ));
+            }
+            if self
+                .last_live_resources
+                .as_ref()
+                .is_some_and(|previous| previous != &live_resources)
+            {
+                return Err(invalid(
+                    "failure",
+                    "a rejected endpoint input must retain live resources",
+                ));
+            }
+        }
+
+        let entry = KernelTraceEntryV2 {
+            sequence,
+            virtual_time_ms,
+            input,
+            effects,
+            mechanical_before: self.current_snapshot.mechanical_digest.clone(),
+            mechanical_after: after_snapshot.mechanical_digest.clone(),
+            kernel_before: self.current_snapshot.kernel_determinism_digest.clone(),
+            kernel_after: after_snapshot.kernel_determinism_digest.clone(),
+            presentation_before: self.current_snapshot.presentation_plan_digest.clone(),
+            presentation_after: after_snapshot.presentation_plan_digest.clone(),
+            rng_audit,
+            rng_audit_digest: rng_audit_digest_value,
+            internal_events,
+            live_resources: live_resources.clone(),
+            failure,
+        };
+        validate_endpoint_entry_shape(&entry, self.current_snapshot.runtime_identity.local_seat)?;
+
+        self.previous_virtual_time_ms = Some(virtual_time_ms);
+        self.last_rng_sequence = entry.rng_audit.last().map(|draw| draw.sequence);
+        self.last_live_resources = Some(live_resources);
+        self.current_snapshot = after_snapshot;
+        self.entries.push(entry);
+        Ok(())
+    }
+
+    pub fn record_observation(
+        &mut self,
+        input: RestorableKernelInputV2,
+        observation: EndpointTraceObservationV2,
+    ) -> Result<(), SnapshotError> {
+        self.record(
+            input,
+            observation.virtual_time_ms,
+            observation.effects,
+            observation.after_snapshot,
+            observation.rng_audit,
+            observation.internal_events,
+            observation.live_resources,
+            observation.failure,
+        )
+    }
+
+    /// Capture the after-state from the owning kernel boundary, then append a
+    /// fully validated entry.  The bridge is implemented by the integration
+    /// owner; this keeps recorder callers on the real snapshot API.
+    pub fn record_with_kernel<B: GameKernelSnapshotBridge>(
+        &mut self,
+        input: RestorableKernelInputV2,
+        virtual_time_ms: SafeU53,
+        effects: Vec<RestorableKernelEffectV2>,
+        kernel: &B,
+        rng_audit: Vec<RngDraw>,
+        internal_events: Vec<InternalEventKindV1>,
+        live_resources: LiveResourceSnapshot,
+        failure: Option<TraceFailureEvidenceV2>,
+    ) -> Result<(), SnapshotError> {
+        let after_snapshot = snapshot_game_kernel(kernel)
+            .map_err(|error| invalid("after_snapshot", error.to_string()))?;
+        self.record(
+            input,
+            virtual_time_ms,
+            effects,
+            after_snapshot,
+            rng_audit,
+            internal_events,
+            live_resources,
+            failure,
+        )
+    }
+
+    pub fn trace(&self) -> EndpointKernelTraceV2 {
+        EndpointKernelTraceV2 {
+            schema_version: KERNEL_TRACE_SCHEMA_VERSION,
+            replay_seed: self.replay_seed.clone(),
+            initial_snapshot: self.initial_snapshot.clone(),
+            entries: self.entries.clone(),
+        }
+    }
+
+    pub fn finish(self) -> Result<EndpointKernelTraceV2, SnapshotError> {
+        let trace = self.trace();
+        trace.validate()?;
+        Ok(trace)
+    }
+}
+
+impl PairKernelTraceRecorder {
+    pub fn new(initial_snapshot: RestorablePairSnapshotV2) -> Result<Self, SnapshotError> {
+        initial_snapshot
+            .validate()
+            .map_err(|error| prefix_snapshot_error("initial_snapshot", error))?;
+        Ok(Self {
+            current_snapshot: initial_snapshot.clone(),
+            initial_snapshot,
+            entries: Vec::new(),
+            host_last_rng_sequence: None,
+            guest_last_rng_sequence: None,
+        })
+    }
+
+    pub fn record(
+        &mut self,
+        input: PairOperationV2,
+        effects: Vec<PairTraceEffectV2>,
+        after_snapshot: RestorablePairSnapshotV2,
+        host_rng_audit: Vec<RngDraw>,
+        host_internal_events: Vec<InternalEventKindV1>,
+        host_live_resources: LiveResourceSnapshot,
+        guest_rng_audit: Vec<RngDraw>,
+        guest_internal_events: Vec<InternalEventKindV1>,
+        guest_live_resources: LiveResourceSnapshot,
+        failure: Option<TraceFailureEvidenceV2>,
+    ) -> Result<(), SnapshotError> {
+        let trace_sequence = one_based_sequence(self.entries.len(), "entries")?;
+        validate_same_pair_snapshot(&self.current_snapshot, &after_snapshot)?;
+        after_snapshot
+            .validate()
+            .map_err(|error| prefix_snapshot_error("after_snapshot", error))?;
+        validate_pair_operation(&input)?;
+        validate_pair_effects(
+            &effects,
+            self.initial_snapshot.host.runtime_identity.local_seat,
+            self.initial_snapshot.guest.runtime_identity.local_seat,
+        )?;
+        validate_rng_audit(
+            &host_rng_audit,
+            self.host_last_rng_sequence,
+            "host.rng_audit",
+        )?;
+        validate_rng_audit(
+            &guest_rng_audit,
+            self.guest_last_rng_sequence,
+            "guest.rng_audit",
+        )?;
+        validate_live_resources(&host_live_resources)?;
+        validate_live_resources(&guest_live_resources)?;
+        let host_rng_audit_digest = rng_audit_digest(&host_rng_audit)?;
+        let guest_rng_audit_digest = rng_audit_digest(&guest_rng_audit)?;
+        if let Some(failure) = &failure {
+            failure.validate(None)?;
+            if matches!(failure.owner, TraceFailureOwnerV2::Endpoint) {
+                return Err(invalid(
+                    "failure.owner",
+                    "pair failures must belong to Host, Guest, or Environment",
+                ));
+            }
+            if !effects.is_empty() {
+                return Err(invalid(
+                    "failure",
+                    "a rejected pair input must not publish effects",
+                ));
+            }
+            if after_snapshot != self.current_snapshot {
+                return Err(invalid(
+                    "failure",
+                    "a rejected pair input must retain the exact before snapshot",
+                ));
+            }
+        }
+        let expected_after_sequence = advance_pair_sequence(
+            self.current_snapshot.sequence,
+            failure.is_none(),
+            "after_snapshot.sequence",
+        )?;
+        if after_snapshot.sequence != expected_after_sequence {
+            return Err(invalid(
+                "after_snapshot.sequence",
+                "pair sequence must increment exactly once for a successful operation and remain unchanged for a rejected operation",
+            ));
+        }
+        let expected_after_time = if failure.is_some() {
+            self.current_snapshot.virtual_time_ms
+        } else {
+            pair_operation_after_time(
+                &input,
+                self.current_snapshot.virtual_time_ms,
+                "after_snapshot.virtual_time_ms",
+            )?
+        };
+        if after_snapshot.virtual_time_ms != expected_after_time {
+            return Err(invalid(
+                "after_snapshot.virtual_time_ms",
+                "pair clock must apply the operation's deterministic time transition",
+            ));
+        }
+
+        let entry = PairTraceEntryV2 {
+            trace_sequence,
+            pair_sequence_before: self.current_snapshot.sequence,
+            virtual_time_ms: self.current_snapshot.virtual_time_ms,
+            input,
+            effects,
+            host: PairTraceEndpointEvidenceV2 {
+                mechanical_before: self.current_snapshot.host.mechanical_digest.clone(),
+                mechanical_after: after_snapshot.host.mechanical_digest.clone(),
+                kernel_before: self.current_snapshot.host.kernel_determinism_digest.clone(),
+                kernel_after: after_snapshot.host.kernel_determinism_digest.clone(),
+                presentation_before: self.current_snapshot.host.presentation_plan_digest.clone(),
+                presentation_after: after_snapshot.host.presentation_plan_digest.clone(),
+                rng_audit: host_rng_audit,
+                rng_audit_digest: host_rng_audit_digest,
+                internal_events: host_internal_events,
+                live_resources: host_live_resources,
+            },
+            guest: PairTraceEndpointEvidenceV2 {
+                mechanical_before: self.current_snapshot.guest.mechanical_digest.clone(),
+                mechanical_after: after_snapshot.guest.mechanical_digest.clone(),
+                kernel_before: self.current_snapshot.guest.kernel_determinism_digest.clone(),
+                kernel_after: after_snapshot.guest.kernel_determinism_digest.clone(),
+                presentation_before: self.current_snapshot.guest.presentation_plan_digest.clone(),
+                presentation_after: after_snapshot.guest.presentation_plan_digest.clone(),
+                rng_audit: guest_rng_audit,
+                rng_audit_digest: guest_rng_audit_digest,
+                internal_events: guest_internal_events,
+                live_resources: guest_live_resources,
+            },
+            pair_before: PairDeterminismDigest::compute(&self.current_snapshot)?,
+            pair_after: PairDeterminismDigest::compute(&after_snapshot)?,
+            environment_after: PairEnvironmentResourceSnapshotV2::from_snapshot(&after_snapshot),
+            failure,
+        };
+        validate_pair_entry_shape(
+            &entry,
+            self.initial_snapshot.host.runtime_identity.local_seat,
+            self.initial_snapshot.guest.runtime_identity.local_seat,
+            self.host_last_rng_sequence,
+            self.guest_last_rng_sequence,
+        )?;
+
+        self.host_last_rng_sequence = entry.host.rng_audit.last().map(|draw| draw.sequence);
+        self.guest_last_rng_sequence = entry.guest.rng_audit.last().map(|draw| draw.sequence);
+        self.current_snapshot = after_snapshot;
+        self.entries.push(entry);
+        Ok(())
+    }
+
+    pub fn record_observation(
+        &mut self,
+        input: PairOperationV2,
+        observation: PairTraceObservationV2,
+    ) -> Result<(), SnapshotError> {
+        self.record(
+            input,
+            observation.effects,
+            observation.after_snapshot,
+            observation.host_rng_audit,
+            observation.host_internal_events,
+            observation.host_live_resources,
+            observation.guest_rng_audit,
+            observation.guest_internal_events,
+            observation.guest_live_resources,
+            observation.failure,
+        )
+    }
+
+    /// Capture the after-state from the owning pair boundary, then append a
+    /// fully validated entry.  Effect origins and endpoint resource evidence
+    /// remain explicit because only the pair owner can observe their order.
+    pub fn record_with_pair<B: SimulatedPairSnapshotBridge>(
+        &mut self,
+        input: PairOperationV2,
+        effects: Vec<PairTraceEffectV2>,
+        pair: &B,
+        host_rng_audit: Vec<RngDraw>,
+        host_internal_events: Vec<InternalEventKindV1>,
+        host_live_resources: LiveResourceSnapshot,
+        guest_rng_audit: Vec<RngDraw>,
+        guest_internal_events: Vec<InternalEventKindV1>,
+        guest_live_resources: LiveResourceSnapshot,
+        failure: Option<TraceFailureEvidenceV2>,
+    ) -> Result<(), SnapshotError> {
+        let after_snapshot = snapshot_simulated_pair(pair)?;
+        self.record(
+            input,
+            effects,
+            after_snapshot,
+            host_rng_audit,
+            host_internal_events,
+            host_live_resources,
+            guest_rng_audit,
+            guest_internal_events,
+            guest_live_resources,
+            failure,
+        )
+    }
+
+    pub fn trace(&self) -> PairKernelTraceV2 {
+        PairKernelTraceV2 {
+            schema_version: KERNEL_TRACE_SCHEMA_VERSION,
+            initial_snapshot: self.initial_snapshot.clone(),
+            entries: self.entries.clone(),
+        }
+    }
+
+    pub fn finish(self) -> Result<PairKernelTraceV2, SnapshotError> {
+        let trace = self.trace();
+        trace.validate()?;
+        Ok(trace)
+    }
+}
+
+pub fn numbered_pair_effects(
+    effects: impl IntoIterator<Item = (PairEndpoint, RestorableKernelEffectV2)>,
+) -> Result<Vec<PairTraceEffectV2>, SnapshotError> {
+    effects
+        .into_iter()
+        .enumerate()
+        .map(|(index, (origin, effect))| {
+            Ok(PairTraceEffectV2 {
+                sequence: safe_u53_from_usize(index, "effects.sequence")?,
+                origin,
+                effect,
+            })
+        })
+        .collect()
+}
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct PairDeterminismDigest(String);
@@ -619,22 +1181,42 @@ impl PairDeterminismDigest {
     }
 
     pub fn compute(snapshot: &RestorablePairSnapshotV2) -> Result<Self, SnapshotError> {
+        Self::compute_components(
+            snapshot.schema_version,
+            snapshot.sequence,
+            &snapshot.replay_seed,
+            snapshot.virtual_time_ms,
+            &snapshot.host.kernel_determinism_digest,
+            &snapshot.guest.kernel_determinism_digest,
+            &PairEnvironmentResourceSnapshotV2::from_snapshot(snapshot),
+        )
+    }
+
+    pub fn compute_components(
+        schema_version: u32,
+        sequence: SafeU53,
+        replay_seed: &str,
+        virtual_time_ms: SafeU53,
+        host: &KernelDeterminismDigest,
+        guest: &KernelDeterminismDigest,
+        environment: &PairEnvironmentResourceSnapshotV2,
+    ) -> Result<Self, SnapshotError> {
         let raw = content_digest(&PairDigestPreimage {
             domain: PAIR_DETERMINISM_DIGEST_DOMAIN,
-            schema_version: snapshot.schema_version,
-            sequence: snapshot.sequence,
-            replay_seed: &snapshot.replay_seed,
-            virtual_time_ms: snapshot.virtual_time_ms,
-            host: &snapshot.host.kernel_determinism_digest,
-            guest: &snapshot.guest.kernel_determinism_digest,
-            host_driver: &snapshot.host_driver,
-            guest_driver: &snapshot.guest_driver,
-            clock: &snapshot.clock,
-            network: &snapshot.network,
-            presenter: &snapshot.presenter,
-            storage: &snapshot.storage,
-            fault_script: &snapshot.fault_script,
-            fault_rng_state: &snapshot.fault_rng_state,
+            schema_version,
+            sequence,
+            replay_seed,
+            virtual_time_ms,
+            host,
+            guest,
+            host_driver: &environment.host_driver,
+            guest_driver: &environment.guest_driver,
+            clock: &environment.clock,
+            network: &environment.network,
+            presenter: &environment.presenter,
+            storage: &environment.storage,
+            fault_script: &environment.fault_script,
+            fault_rng_state: &environment.fault_rng_state,
         })
         .map_err(|error| SnapshotError::Canonical {
             path: "pair_determinism_digest".to_owned(),
@@ -678,6 +1260,594 @@ struct PairDigestPreimage<'a> {
     fault_rng_state: &'a FaultRngStateV2,
 }
 
+impl EndpointKernelTraceV2 {
+    pub fn validate(&self) -> Result<(), SnapshotError> {
+        if self.schema_version != KERNEL_TRACE_SCHEMA_VERSION {
+            return Err(invalid(
+                "schema_version",
+                format!(
+                    "expected {KERNEL_TRACE_SCHEMA_VERSION}, got {}",
+                    self.schema_version
+                ),
+            ));
+        }
+        validate_seed(&self.replay_seed, "replay_seed")?;
+        self.initial_snapshot
+            .validate()
+            .map_err(|error| prefix_snapshot_error("initial_snapshot", error))?;
+
+        let local_seat = self.initial_snapshot.runtime_identity.local_seat;
+        let mut previous_virtual_time_ms = None;
+        let mut previous_rng_sequence = None;
+        let mut previous_live_resources = None;
+        let mut previous_mechanical = self.initial_snapshot.mechanical_digest.clone();
+        let mut previous_kernel = self.initial_snapshot.kernel_determinism_digest.clone();
+        let mut previous_presentation = self.initial_snapshot.presentation_plan_digest.clone();
+
+        for (index, entry) in self.entries.iter().enumerate() {
+            let expected_sequence = one_based_sequence(index, "entries.sequence")?;
+            if entry.sequence != expected_sequence {
+                return Err(invalid(
+                    format!("entries[{index}].sequence"),
+                    format!(
+                        "expected contiguous one-based sequence {expected_sequence}, got {}",
+                        entry.sequence
+                    ),
+                ));
+            }
+            if previous_virtual_time_ms
+                .is_some_and(|previous| entry.virtual_time_ms < previous)
+            {
+                return Err(invalid(
+                    format!("entries[{index}].virtual_time_ms"),
+                    "virtual time must not regress",
+                ));
+            }
+            if entry.mechanical_before != previous_mechanical {
+                return Err(invalid(
+                    format!("entries[{index}].mechanical_before"),
+                    "mechanical digest chain does not begin at the initial snapshot or prior after digest",
+                ));
+            }
+            if entry.kernel_before != previous_kernel {
+                return Err(invalid(
+                    format!("entries[{index}].kernel_before"),
+                    "kernel digest chain does not begin at the initial snapshot or prior after digest",
+                ));
+            }
+            if entry.presentation_before != previous_presentation {
+                return Err(invalid(
+                    format!("entries[{index}].presentation_before"),
+                    "presentation digest chain does not begin at the initial snapshot or prior after digest",
+                ));
+            }
+
+            validate_endpoint_entry_shape(entry, local_seat)?;
+            validate_rng_audit(
+                &entry.rng_audit,
+                previous_rng_sequence,
+                &format!("entries[{index}].rng_audit"),
+            )?;
+            if let Some(failure) = &entry.failure {
+                failure.validate(Some(TraceFailureOwnerV2::Endpoint))?;
+                if !entry.effects.is_empty() {
+                    return Err(invalid(
+                        format!("entries[{index}].failure"),
+                        "a rejected endpoint input must not publish effects",
+                    ));
+                }
+                if entry.mechanical_after != entry.mechanical_before
+                    || entry.kernel_after != entry.kernel_before
+                    || entry.presentation_after != entry.presentation_before
+                {
+                    return Err(invalid(
+                        format!("entries[{index}].failure"),
+                        "a rejected endpoint input must retain every digest",
+                    ));
+                }
+                if previous_live_resources
+                    .as_ref()
+                    .is_some_and(|previous| previous != &entry.live_resources)
+                {
+                    return Err(invalid(
+                        format!("entries[{index}].failure"),
+                        "a rejected endpoint input must retain live resources",
+                    ));
+                }
+            }
+
+            previous_virtual_time_ms = Some(entry.virtual_time_ms);
+            previous_rng_sequence = entry.rng_audit.last().map(|draw| draw.sequence);
+            previous_live_resources = Some(entry.live_resources.clone());
+            previous_mechanical = entry.mechanical_after.clone();
+            previous_kernel = entry.kernel_after.clone();
+            previous_presentation = entry.presentation_after.clone();
+        }
+        Ok(())
+    }
+
+    pub fn first_divergence(&self, actual: &Self) -> Option<TraceDivergenceV2> {
+        if self.schema_version != actual.schema_version {
+            return Some(divergence(
+                SafeU53::ZERO,
+                SafeU53::ZERO,
+                TraceFailureOwnerV2::Endpoint,
+                "SCHEMA_MISMATCH",
+                "schema_version",
+                &self.schema_version,
+                &actual.schema_version,
+            ));
+        }
+        if self.replay_seed != actual.replay_seed {
+            return Some(divergence(
+                SafeU53::ZERO,
+                SafeU53::ZERO,
+                TraceFailureOwnerV2::Endpoint,
+                "SEED_MISMATCH",
+                "replay_seed",
+                &self.replay_seed,
+                &actual.replay_seed,
+            ));
+        }
+        if self.initial_snapshot != actual.initial_snapshot {
+            return Some(divergence(
+                SafeU53::ZERO,
+                SafeU53::ZERO,
+                TraceFailureOwnerV2::Endpoint,
+                "INITIAL_SNAPSHOT_MISMATCH",
+                "initial_snapshot",
+                &self.initial_snapshot,
+                &actual.initial_snapshot,
+            ));
+        }
+        for (expected, observed) in self
+            .entries
+            .iter()
+            .zip(&actual.entries)
+        {
+            if let Some(divergence) = first_endpoint_entry_divergence(expected, observed) {
+                return Some(divergence);
+            }
+        }
+        if self.entries.len() != actual.entries.len() {
+            let index = self.entries.len().min(actual.entries.len());
+            let sequence = one_based_sequence(index, "entries.sequence").unwrap_or(SafeU53::MAX);
+            let virtual_time_ms = self
+                .entries
+                .get(index)
+                .or_else(|| actual.entries.get(index))
+                .map(|entry| entry.virtual_time_ms)
+                .unwrap_or(SafeU53::ZERO);
+            return Some(TraceDivergenceV2 {
+                sequence,
+                virtual_time_ms,
+                owner: TraceFailureOwnerV2::Endpoint,
+                code: "ENTRY_COUNT_MISMATCH".to_owned(),
+                path: "entries".to_owned(),
+                expected: Some(self.entries.len().to_string()),
+                actual: Some(actual.entries.len().to_string()),
+            });
+        }
+        None
+    }
+
+    pub fn replay_with<B, Restore, Step>(
+        &self,
+        restore: Restore,
+        mut step: Step,
+    ) -> Result<TraceReplayReportV2, SnapshotError>
+    where
+        Restore: FnOnce(RestorableKernelSnapshotV2) -> Result<B, SnapshotError>,
+        Step: FnMut(
+            &mut B,
+            &RestorableKernelInputV2,
+            SafeU53,
+        ) -> Result<EndpointTraceObservationV2, SnapshotError>,
+    {
+        self.validate()?;
+        let mut runtime = restore(self.initial_snapshot.clone())?;
+        let mut recorder = EndpointKernelTraceRecorder::new(
+            self.replay_seed.clone(),
+            self.initial_snapshot.clone(),
+        )?;
+        for (index, expected) in self.entries.iter().enumerate() {
+            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
+            if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
+                return Ok(TraceReplayReportV2 {
+                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
+                    first_divergence: Some(replay_error_divergence(
+                        expected.sequence,
+                        expected.virtual_time_ms,
+                        TraceFailureOwnerV2::Endpoint,
+                        error,
+                    )),
+                });
+            }
+            let actual = recorder
+                .trace()
+                .entries
+                .last()
+                .cloned()
+                .ok_or_else(|| invalid("replay", "recorder produced no entry"))?;
+            if let Some(divergence) = first_endpoint_entry_divergence(expected, &actual) {
+                return Ok(TraceReplayReportV2 {
+                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
+                    first_divergence: Some(divergence),
+                });
+            }
+        }
+        Ok(TraceReplayReportV2 {
+            replayed_entries: safe_u53_from_usize(self.entries.len(), "replayed_entries")?,
+            first_divergence: None,
+        })
+    }
+
+    /// Restore through the owning kernel snapshot bridge, leaving the actual
+    /// public `GameKernel` adapter in the integration-owned crate.
+    pub fn replay_game_kernel<B, Step>(
+        &self,
+        content: Arc<ContentPack>,
+        step: Step,
+    ) -> Result<TraceReplayReportV2, SnapshotError>
+    where
+        B: GameKernelSnapshotBridge,
+        Step: FnMut(
+            &mut B,
+            &RestorableKernelInputV2,
+            SafeU53,
+        ) -> Result<EndpointTraceObservationV2, SnapshotError>,
+    {
+        self.replay_with(
+            |snapshot| {
+                restore_game_kernel::<B>(snapshot, content)
+                    .map_err(|error| invalid("restore", error.to_string()))
+            },
+            step,
+        )
+    }
+}
+
+impl PairKernelTraceV2 {
+    pub fn validate(&self) -> Result<(), SnapshotError> {
+        if self.schema_version != KERNEL_TRACE_SCHEMA_VERSION {
+            return Err(invalid(
+                "schema_version",
+                format!(
+                    "expected {KERNEL_TRACE_SCHEMA_VERSION}, got {}",
+                    self.schema_version
+                ),
+            ));
+        }
+        self.initial_snapshot.validate()?;
+        let host_seat = self.initial_snapshot.host.runtime_identity.local_seat;
+        let guest_seat = self.initial_snapshot.guest.runtime_identity.local_seat;
+        let mut previous_pair_sequence = self.initial_snapshot.sequence;
+        let mut previous_virtual_time_ms = self.initial_snapshot.virtual_time_ms;
+        let mut previous_pair_digest = PairDeterminismDigest::compute(&self.initial_snapshot)?;
+        let mut previous_environment = PairEnvironmentResourceSnapshotV2::from_snapshot(&self.initial_snapshot);
+        let mut previous_host_mechanical = self.initial_snapshot.host.mechanical_digest.clone();
+        let mut previous_guest_mechanical = self.initial_snapshot.guest.mechanical_digest.clone();
+        let mut previous_host_kernel = self.initial_snapshot.host.kernel_determinism_digest.clone();
+        let mut previous_guest_kernel = self.initial_snapshot.guest.kernel_determinism_digest.clone();
+        let mut previous_host_presentation = self.initial_snapshot.host.presentation_plan_digest.clone();
+        let mut previous_guest_presentation = self.initial_snapshot.guest.presentation_plan_digest.clone();
+        let mut previous_host_live_resources = None;
+        let mut previous_guest_live_resources = None;
+        let mut host_last_rng_sequence = None;
+        let mut guest_last_rng_sequence = None;
+
+        for (index, entry) in self.entries.iter().enumerate() {
+            let expected_trace_sequence = one_based_sequence(index, "entries.trace_sequence")?;
+            if entry.trace_sequence != expected_trace_sequence {
+                return Err(invalid(
+                    format!("entries[{index}].trace_sequence"),
+                    format!(
+                        "expected contiguous one-based sequence {expected_trace_sequence}, got {}",
+                        entry.trace_sequence
+                    ),
+                ));
+            }
+            if entry.pair_sequence_before != previous_pair_sequence {
+                return Err(invalid(
+                    format!("entries[{index}].pair_sequence_before"),
+                    "pair sequence does not match the initial or prior operation outcome",
+                ));
+            }
+            if entry.virtual_time_ms != previous_virtual_time_ms {
+                return Err(invalid(
+                    format!("entries[{index}].virtual_time_ms"),
+                    "pair entry time must equal the pre-operation pair clock",
+                ));
+            }
+            if entry.pair_before != previous_pair_digest {
+                return Err(invalid(
+                    format!("entries[{index}].pair_before"),
+                    "pair-before digest does not match the prior complete pair state",
+                ));
+            }
+            if entry.host.mechanical_before != previous_host_mechanical
+                || entry.host.kernel_before != previous_host_kernel
+                || entry.host.presentation_before != previous_host_presentation
+            {
+                return Err(invalid(
+                    format!("entries[{index}].host"),
+                    "host before digest chain is not contiguous",
+                ));
+            }
+            if entry.guest.mechanical_before != previous_guest_mechanical
+                || entry.guest.kernel_before != previous_guest_kernel
+                || entry.guest.presentation_before != previous_guest_presentation
+            {
+                return Err(invalid(
+                    format!("entries[{index}].guest"),
+                    "guest before digest chain is not contiguous",
+                ));
+            }
+
+            validate_pair_entry_shape(
+                entry,
+                host_seat,
+                guest_seat,
+                host_last_rng_sequence,
+                guest_last_rng_sequence,
+            )?;
+            validate_rng_audit(
+                &entry.host.rng_audit,
+                host_last_rng_sequence,
+                &format!("entries[{index}].host.rng_audit"),
+            )?;
+            validate_rng_audit(
+                &entry.guest.rng_audit,
+                guest_last_rng_sequence,
+                &format!("entries[{index}].guest.rng_audit"),
+            )?;
+
+            let expected_after_sequence = advance_pair_sequence(
+                entry.pair_sequence_before,
+                entry.failure.is_none(),
+                &format!("entries[{index}].pair_sequence_before"),
+            )?;
+            let expected_after_time = if entry.failure.is_some() {
+                entry.virtual_time_ms
+            } else {
+                pair_operation_after_time(
+                    &entry.input,
+                    entry.virtual_time_ms,
+                    &format!("entries[{index}].virtual_time_ms"),
+                )?
+            };
+            if entry.environment_after.clock.now_ms != expected_after_time {
+                return Err(invalid(
+                    format!("entries[{index}].environment_after.clock.now_ms"),
+                    "environment clock does not match the operation's deterministic time transition",
+                ));
+            }
+            let expected_pair_after = PairDeterminismDigest::compute_components(
+                self.initial_snapshot.schema_version,
+                expected_after_sequence,
+                &self.initial_snapshot.replay_seed,
+                expected_after_time,
+                &entry.host.kernel_after,
+                &entry.guest.kernel_after,
+                &entry.environment_after,
+            )?;
+            if entry.pair_after != expected_pair_after {
+                return Err(invalid(
+                    format!("entries[{index}].pair_after"),
+                    "pair-after digest does not match endpoint digests and complete environment state",
+                ));
+            }
+            if let Some(failure) = &entry.failure {
+                failure.validate(None)?;
+                if matches!(failure.owner, TraceFailureOwnerV2::Endpoint) {
+                    return Err(invalid(
+                        format!("entries[{index}].failure.owner"),
+                        "pair failures must belong to Host, Guest, or Environment",
+                    ));
+                }
+                if entry.host.mechanical_after != entry.host.mechanical_before
+                    || entry.guest.mechanical_after != entry.guest.mechanical_before
+                    || entry.host.kernel_after != entry.host.kernel_before
+                    || entry.guest.kernel_after != entry.guest.kernel_before
+                    || entry.host.presentation_after != entry.host.presentation_before
+                    || entry.guest.presentation_after != entry.guest.presentation_before
+                    || entry.environment_after != previous_environment
+                {
+                    return Err(invalid(
+                        format!("entries[{index}].failure"),
+                        "a rejected pair input must retain both endpoints and all environment resources",
+                    ));
+                }
+                if previous_host_live_resources
+                    .as_ref()
+                    .is_some_and(|previous| previous != &entry.host.live_resources)
+                    || previous_guest_live_resources
+                        .as_ref()
+                        .is_some_and(|previous| previous != &entry.guest.live_resources)
+                {
+                    return Err(invalid(
+                        format!("entries[{index}].failure"),
+                        "a rejected pair input must retain live resources",
+                    ));
+                }
+            }
+
+            previous_pair_sequence = expected_after_sequence;
+            previous_virtual_time_ms = expected_after_time;
+            previous_pair_digest = entry.pair_after.clone();
+            previous_environment = entry.environment_after.clone();
+            previous_host_mechanical = entry.host.mechanical_after.clone();
+            previous_guest_mechanical = entry.guest.mechanical_after.clone();
+            previous_host_kernel = entry.host.kernel_after.clone();
+            previous_guest_kernel = entry.guest.kernel_after.clone();
+            previous_host_presentation = entry.host.presentation_after.clone();
+            previous_guest_presentation = entry.guest.presentation_after.clone();
+            previous_host_live_resources = Some(entry.host.live_resources.clone());
+            previous_guest_live_resources = Some(entry.guest.live_resources.clone());
+            host_last_rng_sequence = entry.host.rng_audit.last().map(|draw| draw.sequence);
+            guest_last_rng_sequence = entry.guest.rng_audit.last().map(|draw| draw.sequence);
+        }
+        Ok(())
+    }
+
+    pub fn first_divergence(&self, actual: &Self) -> Option<TraceDivergenceV2> {
+        if self.schema_version != actual.schema_version {
+            return Some(divergence(
+                SafeU53::ZERO,
+                self.initial_snapshot.virtual_time_ms,
+                TraceFailureOwnerV2::Environment,
+                "SCHEMA_MISMATCH",
+                "schema_version",
+                &self.schema_version,
+                &actual.schema_version,
+            ));
+        }
+        if self.initial_snapshot != actual.initial_snapshot {
+            return Some(divergence(
+                SafeU53::ZERO,
+                self.initial_snapshot.virtual_time_ms,
+                TraceFailureOwnerV2::Environment,
+                "INITIAL_SNAPSHOT_MISMATCH",
+                "initial_snapshot",
+                &self.initial_snapshot,
+                &actual.initial_snapshot,
+            ));
+        }
+        for (expected, observed) in self.entries.iter().zip(&actual.entries) {
+            if let Some(divergence) = first_pair_entry_divergence(expected, observed) {
+                return Some(divergence);
+            }
+        }
+        if self.entries.len() != actual.entries.len() {
+            let index = self.entries.len().min(actual.entries.len());
+            let sequence = one_based_sequence(index, "entries.trace_sequence").unwrap_or(SafeU53::MAX);
+            let virtual_time_ms = self
+                .entries
+                .get(index)
+                .or_else(|| actual.entries.get(index))
+                .map(|entry| entry.virtual_time_ms)
+                .unwrap_or(self.initial_snapshot.virtual_time_ms);
+            return Some(TraceDivergenceV2 {
+                sequence,
+                virtual_time_ms,
+                owner: TraceFailureOwnerV2::Environment,
+                code: "ENTRY_COUNT_MISMATCH".to_owned(),
+                path: "entries".to_owned(),
+                expected: Some(self.entries.len().to_string()),
+                actual: Some(actual.entries.len().to_string()),
+            });
+        }
+        None
+    }
+
+    pub fn replay_with<B, Restore, Step>(
+        &self,
+        restore: Restore,
+        mut step: Step,
+    ) -> Result<TraceReplayReportV2, SnapshotError>
+    where
+        Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>,
+        Step: FnMut(
+            &mut B,
+            &PairOperationV2,
+            SafeU53,
+        ) -> Result<PairTraceObservationV2, SnapshotError>,
+    {
+        self.validate()?;
+        let mut runtime = restore(self.initial_snapshot.clone())?;
+        let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
+        for (index, expected) in self.entries.iter().enumerate() {
+            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
+            if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
+                return Ok(TraceReplayReportV2 {
+                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
+                    first_divergence: Some(replay_error_divergence(
+                        expected.trace_sequence,
+                        expected.virtual_time_ms,
+                        TraceFailureOwnerV2::Environment,
+                        error,
+                    )),
+                });
+            }
+            let actual = recorder
+                .trace()
+                .entries
+                .last()
+                .cloned()
+                .ok_or_else(|| invalid("replay", "recorder produced no entry"))?;
+            if let Some(divergence) = first_pair_entry_divergence(expected, &actual) {
+                return Ok(TraceReplayReportV2 {
+                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
+                    first_divergence: Some(divergence),
+                });
+            }
+        }
+        Ok(TraceReplayReportV2 {
+            replayed_entries: safe_u53_from_usize(self.entries.len(), "replayed_entries")?,
+            first_divergence: None,
+        })
+    }
+
+    /// Restore through the owning pair snapshot bridge, leaving the concrete
+    /// `SimulatedPair` constructor in the integration-owned crate.
+    pub fn replay_simulated_pair<B, Step>(
+        &self,
+        content: Arc<ContentPack>,
+        step: Step,
+    ) -> Result<TraceReplayReportV2, SnapshotError>
+    where
+        B: SimulatedPairSnapshotBridge,
+        Step: FnMut(
+            &mut B,
+            &PairOperationV2,
+            SafeU53,
+        ) -> Result<PairTraceObservationV2, SnapshotError>,
+    {
+        self.replay_with(
+            |snapshot| restore_simulated_pair::<B>(snapshot, content),
+            step,
+        )
+    }
+}
+
+impl KernelTraceV2 {
+    pub fn validate(&self) -> Result<(), SnapshotError> {
+        match self {
+            Self::Endpoint(trace) => trace.validate(),
+            Self::Pair(trace) => trace.validate(),
+        }
+    }
+
+    pub fn first_divergence(&self, actual: &Self) -> Option<TraceDivergenceV2> {
+        match (self, actual) {
+            (Self::Endpoint(expected), Self::Endpoint(observed)) => {
+                expected.first_divergence(observed)
+            }
+            (Self::Pair(expected), Self::Pair(observed)) => expected.first_divergence(observed),
+            (Self::Endpoint(_), Self::Pair(_)) => {
+                Some(TraceDivergenceV2 {
+                    sequence: SafeU53::ZERO,
+                    virtual_time_ms: SafeU53::ZERO,
+                    owner: TraceFailureOwnerV2::Environment,
+                    code: "TRACE_KIND_MISMATCH".to_owned(),
+                    path: "kind".to_owned(),
+                    expected: Some("ENDPOINT".to_owned()),
+                    actual: Some("PAIR".to_owned()),
+                })
+            }
+            (Self::Pair(_), Self::Endpoint(_)) => Some(TraceDivergenceV2 {
+                sequence: SafeU53::ZERO,
+                virtual_time_ms: SafeU53::ZERO,
+                owner: TraceFailureOwnerV2::Environment,
+                code: "TRACE_KIND_MISMATCH".to_owned(),
+                path: "kind".to_owned(),
+                expected: Some("PAIR".to_owned()),
+                actual: Some("ENDPOINT".to_owned()),
+            }),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum SnapshotError {
     #[error("snapshot field {path} is invalid: {reason}")]
@@ -690,6 +1860,1021 @@ fn invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError 
     SnapshotError::Invalid {
         path: path.into(),
         reason: reason.into(),
+    }
+}
+
+fn divergence<T: Serialize, U: Serialize>(
+    sequence: SafeU53,
+    virtual_time_ms: SafeU53,
+    owner: TraceFailureOwnerV2,
+    code: &str,
+    path: &str,
+    expected: &T,
+    actual: &U,
+) -> TraceDivergenceV2 {
+    TraceDivergenceV2 {
+        sequence,
+        virtual_time_ms,
+        owner,
+        code: code.to_owned(),
+        path: path.to_owned(),
+        expected: serde_json::to_string(expected).ok(),
+        actual: serde_json::to_string(actual).ok(),
+    }
+}
+
+fn replay_error_divergence(
+    sequence: SafeU53,
+    virtual_time_ms: SafeU53,
+    owner: TraceFailureOwnerV2,
+    error: SnapshotError,
+) -> TraceDivergenceV2 {
+    let (path, reason) = match error {
+        SnapshotError::Invalid { path, reason } | SnapshotError::Canonical { path, reason } => {
+            (path, reason)
+        }
+    };
+    TraceDivergenceV2 {
+        sequence,
+        virtual_time_ms,
+        owner,
+        code: "REPLAY_OBSERVATION_INVALID".to_owned(),
+        path,
+        expected: None,
+        actual: Some(reason),
+    }
+}
+
+fn compare_field<T: PartialEq + Serialize>(
+    sequence: SafeU53,
+    virtual_time_ms: SafeU53,
+    owner: TraceFailureOwnerV2,
+    path: &str,
+    expected: &T,
+    actual: &T,
+) -> Option<TraceDivergenceV2> {
+    if expected == actual {
+        None
+    } else {
+        Some(divergence(
+            sequence,
+            virtual_time_ms,
+            owner,
+            "TRACE_DIVERGENCE",
+            path,
+            expected,
+            actual,
+        ))
+    }
+}
+
+fn first_endpoint_entry_divergence(
+    expected: &KernelTraceEntryV2,
+    actual: &KernelTraceEntryV2,
+) -> Option<TraceDivergenceV2> {
+    let sequence = expected.sequence;
+    let virtual_time_ms = expected.virtual_time_ms;
+    macro_rules! check {
+        ($path:literal, $expected:expr, $actual:expr) => {
+            if let Some(divergence) = compare_field(
+                sequence,
+                virtual_time_ms,
+                TraceFailureOwnerV2::Endpoint,
+                $path,
+                $expected,
+                $actual,
+            ) {
+                return Some(divergence);
+            }
+        };
+    }
+
+    check!("sequence", &expected.sequence, &actual.sequence);
+    check!(
+        "virtual_time_ms",
+        &expected.virtual_time_ms,
+        &actual.virtual_time_ms
+    );
+    check!("input", &expected.input, &actual.input);
+    check!("effects", &expected.effects, &actual.effects);
+    check!(
+        "mechanical_before",
+        &expected.mechanical_before,
+        &actual.mechanical_before
+    );
+    check!(
+        "mechanical_after",
+        &expected.mechanical_after,
+        &actual.mechanical_after
+    );
+    check!("kernel_before", &expected.kernel_before, &actual.kernel_before);
+    check!("kernel_after", &expected.kernel_after, &actual.kernel_after);
+    check!(
+        "presentation_before",
+        &expected.presentation_before,
+        &actual.presentation_before
+    );
+    check!(
+        "presentation_after",
+        &expected.presentation_after,
+        &actual.presentation_after
+    );
+    check!("rng_audit", &expected.rng_audit, &actual.rng_audit);
+    check!(
+        "rng_audit_digest",
+        &expected.rng_audit_digest,
+        &actual.rng_audit_digest
+    );
+    check!(
+        "internal_events",
+        &expected.internal_events,
+        &actual.internal_events
+    );
+    check!(
+        "live_resources",
+        &expected.live_resources,
+        &actual.live_resources
+    );
+    check!("failure", &expected.failure, &actual.failure);
+    None
+}
+
+fn first_pair_entry_divergence(
+    expected: &PairTraceEntryV2,
+    actual: &PairTraceEntryV2,
+) -> Option<TraceDivergenceV2> {
+    let sequence = expected.trace_sequence;
+    let virtual_time_ms = expected.virtual_time_ms;
+    macro_rules! check {
+        ($owner:expr, $path:literal, $expected:expr, $actual:expr) => {
+            if let Some(divergence) = compare_field(
+                sequence,
+                virtual_time_ms,
+                $owner,
+                $path,
+                $expected,
+                $actual,
+            ) {
+                return Some(divergence);
+            }
+        };
+    }
+
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "trace_sequence",
+        &expected.trace_sequence,
+        &actual.trace_sequence
+    );
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "pair_sequence_before",
+        &expected.pair_sequence_before,
+        &actual.pair_sequence_before
+    );
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "virtual_time_ms",
+        &expected.virtual_time_ms,
+        &actual.virtual_time_ms
+    );
+    check!(
+        pair_operation_owner(&expected.input),
+        "input",
+        &expected.input,
+        &actual.input
+    );
+    check!(
+        pair_effects_owner(expected, actual),
+        "effects",
+        &expected.effects,
+        &actual.effects
+    );
+
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.mechanical_before",
+        &expected.host.mechanical_before,
+        &actual.host.mechanical_before
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.mechanical_after",
+        &expected.host.mechanical_after,
+        &actual.host.mechanical_after
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.kernel_before",
+        &expected.host.kernel_before,
+        &actual.host.kernel_before
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.kernel_after",
+        &expected.host.kernel_after,
+        &actual.host.kernel_after
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.presentation_before",
+        &expected.host.presentation_before,
+        &actual.host.presentation_before
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.presentation_after",
+        &expected.host.presentation_after,
+        &actual.host.presentation_after
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.rng_audit",
+        &expected.host.rng_audit,
+        &actual.host.rng_audit
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.rng_audit_digest",
+        &expected.host.rng_audit_digest,
+        &actual.host.rng_audit_digest
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.internal_events",
+        &expected.host.internal_events,
+        &actual.host.internal_events
+    );
+    check!(
+        TraceFailureOwnerV2::Host,
+        "host.live_resources",
+        &expected.host.live_resources,
+        &actual.host.live_resources
+    );
+
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.mechanical_before",
+        &expected.guest.mechanical_before,
+        &actual.guest.mechanical_before
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.mechanical_after",
+        &expected.guest.mechanical_after,
+        &actual.guest.mechanical_after
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.kernel_before",
+        &expected.guest.kernel_before,
+        &actual.guest.kernel_before
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.kernel_after",
+        &expected.guest.kernel_after,
+        &actual.guest.kernel_after
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.presentation_before",
+        &expected.guest.presentation_before,
+        &actual.guest.presentation_before
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.presentation_after",
+        &expected.guest.presentation_after,
+        &actual.guest.presentation_after
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.rng_audit",
+        &expected.guest.rng_audit,
+        &actual.guest.rng_audit
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.rng_audit_digest",
+        &expected.guest.rng_audit_digest,
+        &actual.guest.rng_audit_digest
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.internal_events",
+        &expected.guest.internal_events,
+        &actual.guest.internal_events
+    );
+    check!(
+        TraceFailureOwnerV2::Guest,
+        "guest.live_resources",
+        &expected.guest.live_resources,
+        &actual.guest.live_resources
+    );
+
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "pair_before",
+        &expected.pair_before,
+        &actual.pair_before
+    );
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "pair_after",
+        &expected.pair_after,
+        &actual.pair_after
+    );
+    check!(
+        TraceFailureOwnerV2::Environment,
+        "environment_after",
+        &expected.environment_after,
+        &actual.environment_after
+    );
+    let failure_owner = expected
+        .failure
+        .as_ref()
+        .map_or(TraceFailureOwnerV2::Environment, |failure| failure.owner);
+    check!(
+        failure_owner,
+        "failure",
+        &expected.failure,
+        &actual.failure
+    );
+    None
+}
+
+fn pair_operation_owner(operation: &PairOperationV2) -> TraceFailureOwnerV2 {
+    let endpoint = match operation {
+        PairOperationV2::RawInput { endpoint, .. }
+        | PairOperationV2::Disconnect { endpoint }
+        | PairOperationV2::Reconnect { endpoint }
+        | PairOperationV2::BattlePresentationOutcome { endpoint, .. }
+        | PairOperationV2::StorageResult { endpoint, .. }
+        | PairOperationV2::Suspend { endpoint }
+        | PairOperationV2::Resume { endpoint } => Some(*endpoint),
+        PairOperationV2::AdvanceTime { .. } | PairOperationV2::Fault { .. } => None,
+    };
+    endpoint.map_or(TraceFailureOwnerV2::Environment, pair_endpoint_owner)
+}
+
+fn pair_effects_owner(
+    expected: &PairTraceEntryV2,
+    actual: &PairTraceEntryV2,
+) -> TraceFailureOwnerV2 {
+    for (expected_effect, actual_effect) in expected.effects.iter().zip(&actual.effects) {
+        if expected_effect != actual_effect {
+            return pair_endpoint_owner(expected_effect.origin);
+        }
+    }
+    expected
+        .effects
+        .get(actual.effects.len())
+        .or_else(|| actual.effects.get(expected.effects.len()))
+        .map_or(TraceFailureOwnerV2::Environment, |effect| {
+            pair_endpoint_owner(effect.origin)
+        })
+}
+
+fn pair_endpoint_owner(endpoint: PairEndpoint) -> TraceFailureOwnerV2 {
+    match endpoint {
+        PairEndpoint::Host => TraceFailureOwnerV2::Host,
+        PairEndpoint::Guest => TraceFailureOwnerV2::Guest,
+    }
+}
+
+fn prefix_snapshot_error(prefix: &str, error: SnapshotError) -> SnapshotError {
+    match error {
+        SnapshotError::Invalid { path, reason } => {
+            invalid(format!("{prefix}.{path}"), reason)
+        }
+        SnapshotError::Canonical { path, reason } => SnapshotError::Canonical {
+            path: format!("{prefix}.{path}"),
+            reason,
+        },
+    }
+}
+
+fn safe_u53_from_usize(value: usize, path: &str) -> Result<SafeU53, SnapshotError> {
+    let value = u64::try_from(value).map_err(|_| invalid(path, "index exceeds u64"))?;
+    SafeU53::new(value).map_err(|_| invalid(path, "index exceeds SafeU53"))
+}
+
+fn one_based_sequence(index: usize, path: &str) -> Result<SafeU53, SnapshotError> {
+    let value = safe_u53_from_usize(index, path)?.get();
+    let value = value
+        .checked_add(1)
+        .ok_or_else(|| invalid(path, "one-based sequence is exhausted"))?;
+    SafeU53::new(value).map_err(|_| invalid(path, "one-based sequence exceeds SafeU53"))
+}
+
+fn next_sequence(
+    sequence: SafeU53,
+    path: &str,
+) -> Result<SafeU53, SnapshotError> {
+    let value = sequence
+        .get()
+        .checked_add(1)
+        .ok_or_else(|| invalid(path, "sequence is exhausted"))?;
+    SafeU53::new(value).map_err(|_| invalid(path, "sequence exceeds SafeU53"))
+}
+
+fn validate_same_endpoint_snapshot(
+    before: &RestorableKernelSnapshotV2,
+    after: &RestorableKernelSnapshotV2,
+) -> Result<(), SnapshotError> {
+    if before.schema_version != after.schema_version {
+        return Err(invalid(
+            "after_snapshot.schema_version",
+            "schema version changed during one endpoint operation",
+        ));
+    }
+    if before.content_hash != after.content_hash {
+        return Err(invalid(
+            "after_snapshot.content_hash",
+            "content identity changed during one endpoint operation",
+        ));
+    }
+    if before.runtime_identity != after.runtime_identity {
+        return Err(invalid(
+            "after_snapshot.runtime_identity",
+            "runtime identity changed during one endpoint operation",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_same_pair_snapshot(
+    before: &RestorablePairSnapshotV2,
+    after: &RestorablePairSnapshotV2,
+) -> Result<(), SnapshotError> {
+    if before.schema_version != after.schema_version {
+        return Err(invalid(
+            "after_snapshot.schema_version",
+            "schema version changed during one pair operation",
+        ));
+    }
+    if before.replay_seed != after.replay_seed {
+        return Err(invalid(
+            "after_snapshot.replay_seed",
+            "replay seed changed during one pair operation",
+        ));
+    }
+    if before.host.runtime_identity != after.host.runtime_identity
+        || before.guest.runtime_identity != after.guest.runtime_identity
+    {
+        return Err(invalid(
+            "after_snapshot.runtime_identity",
+            "endpoint runtime identity changed during one pair operation",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_endpoint_input(
+    input: &RestorableKernelInputV2,
+    local_seat: SeatId,
+) -> Result<(), SnapshotError> {
+    match input {
+        RestorableKernelInputV2::NetworkFrame { endpoint, bytes }
+        | RestorableKernelInputV2::ProposalEnvelope { endpoint, bytes } => {
+            if *endpoint != local_seat {
+                return Err(invalid(
+                    "input.endpoint",
+                    "endpoint trace input belongs to a different seat",
+                ));
+            }
+            validate_bytes(bytes, "input.bytes")?;
+        }
+        RestorableKernelInputV2::RejectedCompatibility { bytes, .. } => {
+            validate_bytes(bytes, "input.bytes")?;
+        }
+        RestorableKernelInputV2::StorageResult {
+            endpoint,
+            result,
+            ..
+        } => {
+            if *endpoint != local_seat {
+                return Err(invalid(
+                    "input.endpoint",
+                    "endpoint trace input belongs to a different seat",
+                ));
+            }
+            validate_storage_result(result, "input.result")?;
+        }
+        RestorableKernelInputV2::RawInput { seat, .. } => {
+            if *seat != local_seat {
+                return Err(invalid(
+                    "input.seat",
+                    "endpoint trace input belongs to a different seat",
+                ));
+            }
+        }
+        RestorableKernelInputV2::TimerFired { endpoint, .. }
+        | RestorableKernelInputV2::BattlePresentationOutcome { endpoint, .. }
+        | RestorableKernelInputV2::TransportChanged { endpoint, .. }
+        | RestorableKernelInputV2::Suspend { endpoint }
+        | RestorableKernelInputV2::Resume { endpoint } => {
+            if *endpoint != local_seat {
+                return Err(invalid(
+                    "input.endpoint",
+                    "endpoint trace input belongs to a different seat",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_storage_result(
+    result: &RestorableStorageResultV2,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    if let RestorableStorageResultV2::Loaded { value: Some(value) } = result {
+        validate_bytes(value, path)?;
+    }
+    if let RestorableStorageResultV2::Failed { reason } = result
+        && reason.is_empty()
+    {
+        return Err(invalid(path, "failure reason must not be empty"));
+    }
+    Ok(())
+}
+
+fn validate_endpoint_effects(
+    effects: &[RestorableKernelEffectV2],
+    local_seat: SeatId,
+) -> Result<(), SnapshotError> {
+    for (index, effect) in effects.iter().enumerate() {
+        let path = format!("effects[{index}]");
+        match effect {
+            RestorableKernelEffectV2::SendFrame { from, bytes }
+            | RestorableKernelEffectV2::SendProposal { from, bytes } => {
+                if *from != local_seat {
+                    return Err(invalid(
+                        format!("{path}.from"),
+                        "endpoint trace may only emit from its local seat",
+                    ));
+                }
+                validate_bytes(bytes, &format!("{path}.bytes"))?;
+            }
+            RestorableKernelEffectV2::ScheduleTimer { timer } => {
+                if timer.registration.endpoint != local_seat {
+                    return Err(invalid(
+                        format!("{path}.timer.registration.endpoint"),
+                        "endpoint trace may only schedule a local timer",
+                    ));
+                }
+                validate_restorable_timer(timer, &path)?;
+            }
+            RestorableKernelEffectV2::CancelTimer { endpoint, .. }
+            | RestorableKernelEffectV2::BattleUiChanged { endpoint, .. }
+            | RestorableKernelEffectV2::PresentBattle { endpoint, .. }
+            | RestorableKernelEffectV2::Load { endpoint, .. }
+            | RestorableKernelEffectV2::Persist { endpoint, .. } => {
+                if *endpoint != local_seat {
+                    return Err(invalid(
+                        format!("{path}.endpoint"),
+                        "endpoint trace effect belongs to a different seat",
+                    ));
+                }
+                match effect {
+                    RestorableKernelEffectV2::BattleUiChanged { projection, .. } => projection
+                        .validate()
+                        .map_err(|error| invalid(format!("{path}.projection"), error.to_string()))?,
+                    RestorableKernelEffectV2::Load { request, .. }
+                    | RestorableKernelEffectV2::Persist { request, .. } => {
+                        request.validate(&format!("{path}.request"))?;
+                        match (effect, request) {
+                            (RestorableKernelEffectV2::Load { .. }, RestorableStorageRequestV2::Load { .. })
+                            | (RestorableKernelEffectV2::Persist { .. }, RestorableStorageRequestV2::Persist { .. }) => {}
+                            _ => {
+                                return Err(invalid(
+                                    format!("{path}.request"),
+                                    "Load and Persist effects must retain their matching request variant",
+                                ));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            RestorableKernelEffectV2::EnterSharedTerminal { terminal } => {
+                if terminal.terminal_id.is_empty() || terminal.reason.is_empty() {
+                    return Err(invalid(
+                        format!("{path}.terminal"),
+                        "terminal identity and reason must not be empty",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_restorable_timer(
+    timer: &RestorableTimerSnapshotV2,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    validate_timer_owner(&timer.registration.owner, &format!("{path}.registration.owner"))?;
+    if timer.registration.delay_ms != timer.original_delay_ms {
+        return Err(invalid(
+            format!("{path}.original_delay_ms"),
+            "scheduled timer original delay must equal its registration delay",
+        ));
+    }
+    if timer.remaining_active_ms > timer.original_delay_ms {
+        return Err(invalid(
+            format!("{path}.remaining_active_ms"),
+            "remaining active duration cannot exceed original delay",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_fault_operation(
+    operation: &FaultOperationV2,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    match operation {
+        FaultOperationV2::Reorder { packet_ids } => {
+            let mut sorted = packet_ids.clone();
+            sorted.sort_unstable();
+            strictly_sorted(&sorted, &format!("{path}.packet_ids"))?;
+        }
+        FaultOperationV2::Delay { .. }
+        | FaultOperationV2::Deliver { .. }
+        | FaultOperationV2::DeliverNext
+        | FaultOperationV2::Drop { .. }
+        | FaultOperationV2::Duplicate { .. } => {}
+        FaultOperationV2::Corrupt { corruption, .. } => match corruption {
+            FrameCorruptionV2::Replace { body }
+            | FrameCorruptionV2::MalformedJson { body } => {
+                validate_bytes(body, &format!("{path}.corruption.body"))?;
+            }
+            FrameCorruptionV2::DeleteField { json_pointer }
+            | FrameCorruptionV2::ReplaceField { json_pointer, .. }
+                if !json_pointer.starts_with('/') =>
+            {
+                return Err(invalid(
+                    format!("{path}.corruption.json_pointer"),
+                    "must be a non-root JSON pointer beginning with '/'",
+                ));
+            }
+            FrameCorruptionV2::ReplaceField {
+                canonical_value, ..
+            } => validate_bytes(
+                canonical_value,
+                &format!("{path}.corruption.canonical_value"),
+            )?,
+            _ => {}
+        },
+    }
+    Ok(())
+}
+
+fn validate_pair_operation(operation: &PairOperationV2) -> Result<(), SnapshotError> {
+    match operation {
+        PairOperationV2::Fault { operation } => validate_fault_operation(operation, "input.operation"),
+        PairOperationV2::StorageResult { result, .. } => {
+            validate_storage_result(result, "input.result")
+        }
+        PairOperationV2::RawInput { .. }
+        | PairOperationV2::AdvanceTime { .. }
+        | PairOperationV2::Disconnect { .. }
+        | PairOperationV2::Reconnect { .. }
+        | PairOperationV2::BattlePresentationOutcome { .. }
+        | PairOperationV2::Suspend { .. }
+        | PairOperationV2::Resume { .. } => Ok(()),
+    }
+}
+
+fn validate_rng_audit(
+    draws: &[RngDraw],
+    previous_sequence: Option<SafeU53>,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    let mut previous = previous_sequence;
+    for (index, draw) in draws.iter().enumerate() {
+        draw.validate()
+            .map_err(|error| invalid(format!("{path}[{index}]"), error.to_string()))?;
+        if let Some(previous) = previous {
+            let expected = next_sequence(previous, &format!("{path}[{index}].sequence"))?;
+            if draw.sequence != expected {
+                return Err(invalid(
+                    format!("{path}[{index}].sequence"),
+                    format!("expected contiguous RNG audit sequence {expected}, got {}", draw.sequence),
+                ));
+            }
+        }
+        previous = Some(draw.sequence);
+    }
+    Ok(())
+}
+
+fn rng_audit_digest(draws: &[RngDraw]) -> Result<String, SnapshotError> {
+    content_digest(draws).map_err(|error| SnapshotError::Canonical {
+        path: "rng_audit_digest".to_owned(),
+        reason: error.to_string(),
+    })
+}
+
+fn validate_rng_audit_digest(
+    draws: &[RngDraw],
+    digest: &str,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    let expected = rng_audit_digest(draws)?;
+    if digest != expected {
+        return Err(invalid(
+            path,
+            format!("digest does not match the canonical RNG audit vector; expected {expected}, got {digest}"),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_endpoint_entry_shape(
+    entry: &KernelTraceEntryV2,
+    local_seat: SeatId,
+) -> Result<(), SnapshotError> {
+    if entry.sequence == SafeU53::ZERO {
+        return Err(invalid("entry.sequence", "endpoint sequences are one-based"));
+    }
+    validate_endpoint_input(&entry.input, local_seat)?;
+    validate_endpoint_effects(&entry.effects, local_seat)?;
+    validate_rng_audit_digest(&entry.rng_audit, &entry.rng_audit_digest, "entry.rng_audit_digest")?;
+    validate_live_resources(&entry.live_resources)?;
+    if let Some(failure) = &entry.failure {
+        failure.validate(Some(TraceFailureOwnerV2::Endpoint))?;
+    }
+    Ok(())
+}
+
+fn validate_pair_entry_shape(
+    entry: &PairTraceEntryV2,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+    host_last_rng_sequence: Option<SafeU53>,
+    guest_last_rng_sequence: Option<SafeU53>,
+) -> Result<(), SnapshotError> {
+    if entry.trace_sequence == SafeU53::ZERO {
+        return Err(invalid("entry.trace_sequence", "pair trace sequences are one-based"));
+    }
+    validate_pair_operation(&entry.input)?;
+    validate_pair_effects(&entry.effects, host_seat, guest_seat)?;
+    validate_pair_endpoint_evidence(
+        &entry.host,
+        host_last_rng_sequence,
+        "host",
+    )?;
+    validate_pair_endpoint_evidence(
+        &entry.guest,
+        guest_last_rng_sequence,
+        "guest",
+    )?;
+    entry.environment_after.validate()?;
+    if entry.environment_after.host_driver.seat != host_seat
+        || entry.environment_after.guest_driver.seat != guest_seat
+    {
+        return Err(invalid(
+            "environment_after.driver.seat",
+            "environment driver seats must equal the pair endpoint identities",
+        ));
+    }
+    validate_pair_environment_projection(
+        &entry.environment_after,
+        &entry.host.live_resources,
+        &entry.guest.live_resources,
+    )?;
+    let expected_after_time = if entry.failure.is_some() {
+        entry.virtual_time_ms
+    } else {
+        pair_operation_after_time(
+            &entry.input,
+            entry.virtual_time_ms,
+            "entry.virtual_time_ms",
+        )?
+    };
+    if entry.environment_after.clock.now_ms != expected_after_time {
+        return Err(invalid(
+            "entry.environment_after.clock.now_ms",
+            "environment clock does not match the operation's deterministic time transition",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_pair_endpoint_evidence(
+    evidence: &PairTraceEndpointEvidenceV2,
+    previous_rng_sequence: Option<SafeU53>,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    validate_rng_audit(&evidence.rng_audit, previous_rng_sequence, &format!("{path}.rng_audit"))?;
+    validate_rng_audit_digest(
+        &evidence.rng_audit,
+        &evidence.rng_audit_digest,
+        &format!("{path}.rng_audit_digest"),
+    )?;
+    validate_live_resources(&evidence.live_resources)?;
+    Ok(())
+}
+
+fn validate_pair_effects(
+    effects: &[PairTraceEffectV2],
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<(), SnapshotError> {
+    for (index, effect) in effects.iter().enumerate() {
+        let expected_sequence = safe_u53_from_usize(index, &format!("effects[{index}].sequence"))?;
+        if effect.sequence != expected_sequence {
+            return Err(invalid(
+                format!("effects[{index}].sequence"),
+                format!("expected contiguous zero-based sequence {expected_sequence}, got {}", effect.sequence),
+            ));
+        }
+        let path = format!("effects[{index}]");
+        let carried_endpoint = pair_effect_endpoint(&effect.effect, host_seat, guest_seat, &path)?;
+        if let Some(carried_endpoint) = carried_endpoint
+            && carried_endpoint != effect.origin
+        {
+            return Err(invalid(
+                format!("{path}.origin"),
+                "effect origin does not agree with the carried seat/endpoint",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn pair_effect_endpoint(
+    effect: &RestorableKernelEffectV2,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+    path: &str,
+) -> Result<Option<PairEndpoint>, SnapshotError> {
+    let seat = match effect {
+        RestorableKernelEffectV2::SendFrame { from, bytes }
+        | RestorableKernelEffectV2::SendProposal { from, bytes } => {
+            validate_bytes(bytes, &format!("{path}.bytes"))?;
+            *from
+        }
+        RestorableKernelEffectV2::ScheduleTimer { timer } => {
+            validate_restorable_timer(timer, path)?;
+            timer.registration.endpoint
+        }
+        RestorableKernelEffectV2::CancelTimer { endpoint, .. }
+        | RestorableKernelEffectV2::BattleUiChanged { endpoint, .. }
+        | RestorableKernelEffectV2::PresentBattle { endpoint, .. }
+        | RestorableKernelEffectV2::Load { endpoint, .. }
+        | RestorableKernelEffectV2::Persist { endpoint, .. } => {
+            match effect {
+                RestorableKernelEffectV2::BattleUiChanged { projection, .. } => projection
+                    .validate()
+                    .map_err(|error| invalid(format!("{path}.projection"), error.to_string()))?,
+                RestorableKernelEffectV2::Load { request, .. }
+                | RestorableKernelEffectV2::Persist { request, .. } => {
+                    request.validate(&format!("{path}.request"))?;
+                    match (effect, request) {
+                        (RestorableKernelEffectV2::Load { .. }, RestorableStorageRequestV2::Load { .. })
+                        | (RestorableKernelEffectV2::Persist { .. }, RestorableStorageRequestV2::Persist { .. }) => {}
+                        _ => {
+                            return Err(invalid(
+                                format!("{path}.request"),
+                                "Load and Persist effects must retain their matching request variant",
+                            ));
+                        }
+                    }
+                }
+                _ => {}
+            }
+            *endpoint
+        }
+        RestorableKernelEffectV2::EnterSharedTerminal { terminal } => {
+            if terminal.terminal_id.is_empty() || terminal.reason.is_empty() {
+                return Err(invalid(
+                    format!("{path}.terminal"),
+                    "terminal identity and reason must not be empty",
+                ));
+            }
+            return Ok(None);
+        }
+    };
+    if seat == host_seat {
+        Ok(Some(PairEndpoint::Host))
+    } else if seat == guest_seat {
+        Ok(Some(PairEndpoint::Guest))
+    } else {
+        Err(invalid(
+            format!("{path}.origin"),
+            format!("seat {seat} is not one of the pair endpoint identities"),
+        ))
+    }
+}
+
+fn validate_pair_environment_projection(
+    environment: &PairEnvironmentResourceSnapshotV2,
+    host_resources: &LiveResourceSnapshot,
+    guest_resources: &LiveResourceSnapshot,
+) -> Result<(), SnapshotError> {
+    let mut timer_ids = BTreeSet::new();
+    for timer in &environment.clock.timers {
+        if !timer_ids.insert(timer.timer_id) {
+            return Err(invalid(
+                "environment_after.clock.timers",
+                "timer IDs must be unique across both endpoint schedulers",
+            ));
+        }
+    }
+    let mut expected_timer_ids = host_resources.timers.clone();
+    expected_timer_ids.extend(guest_resources.timers.iter().copied());
+    if timer_ids != expected_timer_ids {
+        return Err(invalid(
+            "environment_after.clock.timers",
+            "clock timer IDs must equal the host/guest live-resource timer projection",
+        ));
+    }
+
+    let pending_presentations = environment
+        .presenter
+        .pending
+        .iter()
+        .map(|entry| entry.event.event_id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut expected_presentations = host_resources.battle_presentations.clone();
+    expected_presentations.extend(guest_resources.battle_presentations.iter().cloned());
+    if pending_presentations != expected_presentations {
+        return Err(invalid(
+            "environment_after.presenter.pending",
+            "presenter pending event IDs must equal the endpoint live-resource projection",
+        ));
+    }
+
+    let pending_storage = environment
+        .storage
+        .pending_requests
+        .iter()
+        .map(|request| request.request.request_id())
+        .collect::<BTreeSet<_>>();
+    let mut expected_storage = host_resources.storage_requests.clone();
+    expected_storage.extend(guest_resources.storage_requests.iter().copied());
+    if pending_storage != expected_storage {
+        return Err(invalid(
+            "environment_after.storage.pending_requests",
+            "storage request IDs must equal the endpoint live-resource projection",
+        ));
+    }
+
+    let network_packets = environment
+        .network
+        .packets
+        .iter()
+        .map(|packet| packet.packet_id)
+        .collect::<BTreeSet<_>>();
+    let mut expected_packets = host_resources.network_packets.clone();
+    expected_packets.extend(guest_resources.network_packets.iter().copied());
+    if network_packets != expected_packets {
+        return Err(invalid(
+            "environment_after.network.packets",
+            "network packet IDs must equal the endpoint live-resource projection",
+        ));
+    }
+    Ok(())
+}
+
+fn pair_operation_after_time(
+    operation: &PairOperationV2,
+    before: SafeU53,
+    path: &str,
+) -> Result<SafeU53, SnapshotError> {
+    match operation {
+        PairOperationV2::AdvanceTime { delta_ms } => {
+            let value = before
+                .get()
+                .checked_add(delta_ms.get())
+                .ok_or_else(|| invalid(path, "virtual time addition overflowed u64"))?;
+            SafeU53::new(value).map_err(|_| invalid(path, "virtual time exceeds SafeU53"))
+        }
+        PairOperationV2::RawInput { .. }
+        | PairOperationV2::Fault { .. }
+        | PairOperationV2::Disconnect { .. }
+        | PairOperationV2::Reconnect { .. }
+        | PairOperationV2::BattlePresentationOutcome { .. }
+        | PairOperationV2::StorageResult { .. }
+        | PairOperationV2::Suspend { .. }
+        | PairOperationV2::Resume { .. } => Ok(before),
+    }
+}
+
+fn advance_pair_sequence(
+    before: SafeU53,
+    successful: bool,
+    path: &str,
+) -> Result<SafeU53, SnapshotError> {
+    if successful {
+        next_sequence(before, path)
+    } else {
+        Ok(before)
     }
 }
 
@@ -717,6 +2902,11 @@ fn validate_bytes(bytes: &CanonicalHexBytes, path: &str) -> Result<(), SnapshotE
         return Err(invalid(path, "canonical byte payload must not be empty"));
     }
     Ok(())
+}
+
+fn validate_live_resources(resources: &LiveResourceSnapshot) -> Result<(), SnapshotError> {
+    validate_kernel_live_resources(resources)
+        .map_err(|error| invalid("live_resources", error.to_string()))
 }
 
 fn endpoint_rank(endpoint: PairEndpoint) -> u8 {
