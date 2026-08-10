@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "manifest_id": "rust-kernel-m3-bench-v1",
+  "project": "PokéRogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+  "protocol_version": "er-coop-47",
+  "frame_protocol_version": 2,
+  "source_lock_schema_version": 1,
+  "ownership_schema_version": 6,
+  "toolchain": {
+    "channel": "1.97.1",
+    "profile": "minimal",
+    "package": "er-sim",
+    "bench_target": "m3_benchmark",
+    "build_profile": "release"
+  },
+  "content_identity": {
+    "algorithm": "sha256",
+    "definition": "sha256 of the exact manifest bytes plus sorted declared benchmark-source sha256 values"
+  },
+  "measurement_policy": {
+    "runner": "github-hosted-linux",
+    "rss_source": "GNU /usr/bin/time %M KiB, converted to bytes",
+    "kernel_clock_source": "none",
+    "preexisting_baseline": "none",
+    "acceptance": "unaccepted until a hosted measurement artifact records every workload",
+    "regression_comparison": "optional accepted same-input same-runner artifact; fail above 125 percent"
+  },
+  "measurement_state": {
+    "status": "unaccepted",
+    "accepted": false,
+    "reason": "No hosted measurement artifact is attached to this manifest",
+    "artifact": null,
+    "measured_at": null
+  },
+  "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+  "workloads": [
+    {
+      "id": "eventwise-battle-replay",
+      "description": "Raw eventwise replay through two independent production M3 Battle kernels",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_eventwise_battle_replay",
+      "iterations": 128,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": null,
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "zero-resource-teardown",
+      "description": "Battle input followed by idempotent disposal and complete zero-resource projection",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_zero_resource_teardown",
+      "iterations": 128,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": null,
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "raw-event-campaign",
+      "description": "Deterministic raw-key event campaign through menu transitions and teardown",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_raw_event_campaign",
+      "iterations": 0,
+      "schedules": 0,
+      "steps": 512,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": null,
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "checksum": null
+      }
+    }
+  ]
+}
