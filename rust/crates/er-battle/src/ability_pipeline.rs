@@ -239,6 +239,17 @@ pub enum AbilityPipelineError {
     /// A defensive gate target must already be installed in the field.
     #[error("defensive target slot {slot:?} has no installed occupant")]
     MissingDefensiveTarget { slot: FieldSlot },
+    /// Native type immunity is terminal and must not reach an ability gate for
+    /// a damaging move.
+    #[error(
+        "damaging move against ability {ability_id:?} reached the ability gate after native type immunity"
+    )]
+    NativeTypeImmunityTerminal {
+        /// The ability whose gate the caller attempted to enter.
+        ability_id: AbilityId,
+        /// The already-composed native immunity result.
+        type_effectiveness: TypeEffectiveness,
+    },
 }
 
 /// Evaluate the active ability on an already-installed switch-in source.
@@ -254,6 +265,7 @@ pub fn evaluate_switch_in(
 ) -> Result<SwitchInOutcome, AbilityPipelineError> {
     validate_format(&battle.format)?;
     validate_slot(&battle.format, incoming_slot)?;
+    battle.field.validate_for_format(&battle.format)?;
 
     let source_id = battle
         .field
@@ -385,6 +397,13 @@ pub fn evaluate_defensive_ability(
     input: DefensiveAbilityInput,
     content: &ContentPack,
 ) -> Result<DefensiveAbilityOutcome, AbilityPipelineError> {
+    if input.move_category != MoveCategory::Status && input.type_effectiveness.is_immune() {
+        return Err(AbilityPipelineError::NativeTypeImmunityTerminal {
+            ability_id: input.ability_id,
+            type_effectiveness: input.type_effectiveness,
+        });
+    }
+
     let resolved = resolve_ability(content, input.ability_id)?;
     Ok(evaluate_defensive_resolved(input, resolved))
 }
@@ -410,6 +429,7 @@ pub fn evaluate_defensive_ability_for_target(
 ) -> Result<DefensiveAbilityOutcome, AbilityPipelineError> {
     validate_format(&battle.format)?;
     validate_slot(&battle.format, target_slot)?;
+    battle.field.validate_for_format(&battle.format)?;
     let target_id = battle
         .field
         .occupant(&battle.format, target_slot)?

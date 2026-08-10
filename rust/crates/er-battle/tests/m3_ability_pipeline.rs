@@ -10,19 +10,20 @@ use er_battle::ability::{
     WONDER_GUARD_ABILITY_ID, resolve_ability,
 };
 use er_battle::ability_pipeline::{
-    DefensiveAbilityInput, DefensiveAbilityOutcome, DefensiveAbilityPassReason,
-    SwitchInOutcome, evaluate_defensive_ability, evaluate_switch_in,
+    AbilityPipelineError, DefensiveAbilityInput, DefensiveAbilityOutcome,
+    DefensiveAbilityPassReason, SwitchInOutcome, evaluate_defensive_ability,
+    evaluate_defensive_ability_for_target, evaluate_switch_in,
 };
 use er_battle::type_effectiveness::{
     EffectivenessMultiplier, TypeEffectiveness, resolve_type_effectiveness,
 };
-use er_content::pack::{ContentPack, selected_content_pack};
+use er_content::pack::{ContentPack, ContentPackError, selected_content_pack};
 use er_rng::battle::BattleRngState;
 use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState};
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
-use er_state::field::{FieldSlotState, FieldState};
+use er_state::field::{FieldSlotState, FieldState, FieldStateError};
 use er_state::format::BattleFormat;
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState,
@@ -59,7 +60,6 @@ fn pokemon(
     side: BattleSide,
     active: AbilityId,
     attack_stage: i8,
-    active_suppressed: bool,
 ) -> TestResult<PokemonState> {
     let species_id = match side {
         BattleSide::Player => er_types::battle_ids::SpeciesId::try_from_u64(19)?,
@@ -110,7 +110,7 @@ fn pokemon(
         AbilityLoadout {
             active,
             passives: [None, None, None],
-            active_suppressed,
+            active_suppressed: false,
             passive_suppressed: [false, false, false],
         },
         false,
@@ -121,8 +121,6 @@ fn ability_battle(
     content: &ContentPack,
     format: BattleFormat,
     source_ability: AbilityId,
-    source_suppressed: bool,
-    global_suppressed: bool,
     enemy_attack_stages: [i8; 2],
     source_occupant: Option<PokemonId>,
 ) -> TestResult<BattleState> {
@@ -132,7 +130,6 @@ fn ability_battle(
         BattleSide::Player,
         source_ability,
         0,
-        source_suppressed,
     )?;
     let ally = pokemon(
         content,
@@ -140,7 +137,6 @@ fn ability_battle(
         BattleSide::Player,
         NONE_ABILITY_ID,
         0,
-        false,
     )?;
     let enemy_zero = pokemon(
         content,
@@ -148,7 +144,6 @@ fn ability_battle(
         BattleSide::Enemy,
         NONE_ABILITY_ID,
         enemy_attack_stages[0],
-        false,
     )?;
     let enemy_one = pokemon(
         content,
@@ -156,7 +151,6 @@ fn ability_battle(
         BattleSide::Enemy,
         NONE_ABILITY_ID,
         enemy_attack_stages[1],
-        false,
     )?;
     let player_zero = slot(BattleSide::Player, 0)?;
     let player_one = slot(BattleSide::Player, 1)?;
@@ -196,7 +190,7 @@ fn ability_battle(
         },
         arena_conditions: Vec::new(),
         global_ability_suppression: GlobalAbilitySuppressionState {
-            ignore_abilities: global_suppressed,
+            ignore_abilities: false,
             source: None,
         },
         battle_rng: BattleRngState::new("m3-ability-battle", turn),
@@ -228,11 +222,31 @@ fn none_is_an_explicit_content_no_op_and_missing_ids_fail_closed() -> TestResult
         Err(error) => error,
     };
     assert!(matches!(
-        error,
-        AbilityError::UnsupportedContent { ability_id, .. } if ability_id == unknown
+        &error,
+        AbilityError::UnsupportedContent { ability_id, .. } if *ability_id == unknown
     ));
-    assert_eq!(error.ability_id(), unknown);
+    assert_eq!(error.ability_id(), Some(unknown));
     assert!(error.is_unsupported_content());
+    Ok(())
+}
+
+#[test]
+fn full_content_pack_corruption_is_not_misclassified_as_an_ability_id() -> TestResult {
+    let mut content = selected_content_pack()?;
+    content.schema_version += 1;
+
+    let error = match resolve_ability(&content, NONE_ABILITY_ID) {
+        Ok(_) => return Err("corrupt content pack unexpectedly resolved".into()),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        &error,
+        AbilityError::InvalidContentPack {
+            source: ContentPackError::SchemaVersionMismatch { .. }
+        }
+    ));
+    assert_eq!(error.ability_id(), None);
+    assert!(!error.is_unsupported_content());
     Ok(())
 }
 
@@ -340,6 +354,43 @@ fn wonder_guard_uses_composed_native_effectiveness_and_status_bypass() -> TestRe
 }
 
 #[test]
+fn damaging_native_immunity_is_terminal_before_wonder_guard() -> TestResult {
+    let content = selected_content_pack()?;
+    let native_immunity = TypeEffectiveness::new(EffectivenessMultiplier::Zero);
+
+    assert!(matches!(
+        evaluate_defensive_ability(
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Physical,
+                native_immunity,
+            ),
+            &content,
+        ),
+        Err(AbilityPipelineError::NativeTypeImmunityTerminal {
+            ability_id,
+            type_effectiveness,
+        }) if ability_id == WONDER_GUARD_ABILITY_ID
+            && type_effectiveness == native_immunity
+    ));
+    assert!(matches!(
+        evaluate_defensive_ability(
+            defensive_input(
+                WONDER_GUARD_ABILITY_ID,
+                MoveCategory::Status,
+                native_immunity,
+            ),
+            &content,
+        )?,
+        DefensiveAbilityOutcome::Passed {
+            reason: DefensiveAbilityPassReason::StatusMove,
+            ..
+        }
+    ));
+    Ok(())
+}
+
+#[test]
 fn wonder_guard_honors_active_and_global_suppression() -> TestResult {
     let content = selected_content_pack()?;
     let type_effectiveness = TypeEffectiveness::new(EffectivenessMultiplier::One);
@@ -382,8 +433,6 @@ fn intimidate_uses_post_occupancy_canonical_adjacency_and_opponent_filter() -> T
         &content,
         format,
         INTIMIDATE_ABILITY_ID,
-        false,
-        false,
         [0, 0],
         Some(pokemon_id(1)?),
     )?;
@@ -416,8 +465,6 @@ fn intimidate_clamps_and_reports_no_mutation_at_the_attack_floor() -> TestResult
         &content,
         BattleFormat::coop_double(),
         INTIMIDATE_ABILITY_ID,
-        false,
-        false,
         [-5, -6],
         Some(pokemon_id(1)?),
     )?;
@@ -433,8 +480,6 @@ fn intimidate_clamps_and_reports_no_mutation_at_the_attack_floor() -> TestResult
         &content,
         BattleFormat::coop_double(),
         INTIMIDATE_ABILITY_ID,
-        false,
-        false,
         [-6, -6],
         Some(pokemon_id(1)?),
     )?;
@@ -458,8 +503,6 @@ fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResul
         &content,
         BattleFormat::coop_double(),
         INTIMIDATE_ABILITY_ID,
-        false,
-        false,
         [0, 0],
         None,
     )?;
@@ -470,15 +513,16 @@ fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResul
         }) if slot == source_slot
     ));
 
-    let globally_suppressed = ability_battle(
+    let mut globally_suppressed = ability_battle(
         &content,
         BattleFormat::coop_double(),
         INTIMIDATE_ABILITY_ID,
-        false,
-        true,
         [0, 0],
         Some(pokemon_id(1)?),
     )?;
+    globally_suppressed
+        .global_ability_suppression
+        .ignore_abilities = true;
     assert!(matches!(
         evaluate_switch_in(&globally_suppressed, source_slot, &content)?,
         SwitchInOutcome::Suppressed {
@@ -487,21 +531,64 @@ fn intimidate_requires_installed_occupancy_and_honors_suppression() -> TestResul
         }
     ));
 
-    let actively_suppressed = ability_battle(
+    let mut actively_suppressed = ability_battle(
         &content,
         BattleFormat::coop_double(),
         INTIMIDATE_ABILITY_ID,
-        true,
-        false,
         [0, 0],
         Some(pokemon_id(1)?),
     )?;
+    let Some(source) = actively_suppressed.player_party.first_mut() else {
+        return Err("ability test source is absent".into());
+    };
+    source.abilities.active_suppressed = true;
     assert!(matches!(
         evaluate_switch_in(&actively_suppressed, source_slot, &content)?,
         SwitchInOutcome::Suppressed {
             reason: AbilitySuppressionReason::Active,
             ..
         }
+    ));
+    Ok(())
+}
+
+#[test]
+fn switch_and_target_evaluators_reject_malformed_field_closure() -> TestResult {
+    let content = selected_content_pack()?;
+    let source_slot = slot(BattleSide::Player, 0)?;
+    let target_slot = slot(BattleSide::Enemy, 0)?;
+    let mut battle = ability_battle(
+        &content,
+        BattleFormat::coop_double(),
+        INTIMIDATE_ABILITY_ID,
+        [0, 0],
+        Some(pokemon_id(1)?),
+    )?;
+    let _ = battle.field.slots.pop();
+
+    assert!(matches!(
+        evaluate_switch_in(&battle, source_slot, &content),
+        Err(AbilityPipelineError::Field(
+            FieldStateError::SlotCountMismatch {
+                expected: 4,
+                actual: 3,
+            }
+        ))
+    ));
+    assert!(matches!(
+        evaluate_defensive_ability_for_target(
+            &battle,
+            target_slot,
+            MoveCategory::Physical,
+            TypeEffectiveness::new(EffectivenessMultiplier::One),
+            &content,
+        ),
+        Err(AbilityPipelineError::Field(
+            FieldStateError::SlotCountMismatch {
+                expected: 4,
+                actual: 3,
+            }
+        ))
     ));
     Ok(())
 }
@@ -526,8 +613,6 @@ fn intimidate_respects_custom_canonical_nonadjacency() -> TestResult {
         &content,
         format,
         INTIMIDATE_ABILITY_ID,
-        false,
-        false,
         [0, 0],
         Some(pokemon_id(1)?),
     )?;
