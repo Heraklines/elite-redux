@@ -104,12 +104,12 @@ pub enum StatStageError {
 }
 
 /// Clamp one stored or requested stage to the oracle's closed range.
-pub const fn clamp_stage(stage: i8) -> i8 {
+pub fn clamp_stage(stage: i8) -> i8 {
     stage.clamp(MIN_STAT_STAGE, MAX_STAT_STAGE)
 }
 
 /// Return the stage used by an effective-stat lookup without mutating storage.
-pub const fn apply_stage_policy(stage: i8, policy: StagePolicy) -> i8 {
+pub fn apply_stage_policy(stage: i8, policy: StagePolicy) -> i8 {
     let stage = clamp_stage(stage);
     match policy {
         StagePolicy::Normal => stage,

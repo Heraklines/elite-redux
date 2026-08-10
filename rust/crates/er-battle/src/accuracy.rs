@@ -171,37 +171,37 @@ impl AccuracyContext {
                 return Err(AccuracyError::Unsupported { reason });
             }
             AccuracyGate::NoEffect => {
-                return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped {
-                    evidence: AccuracySkipEvidence {
+                return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped(
+                    AccuracySkipEvidence {
                         reason: AccuracySkipReason::NoEffect,
                         move_accuracy: self.move_accuracy.clone(),
                         source_accuracy_stage: self.source_accuracy_stage,
                         target_evasion_stage: self.target_evasion_stage,
                     },
-                }));
+                )));
             }
             AccuracyGate::Ineligible(reason) => {
-                return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped {
-                    evidence: AccuracySkipEvidence {
+                return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped(
+                    AccuracySkipEvidence {
                         reason: AccuracySkipReason::Ineligible(reason),
                         move_accuracy: self.move_accuracy.clone(),
                         source_accuracy_stage: self.source_accuracy_stage,
                         target_evasion_stage: self.target_evasion_stage,
                     },
-                }));
+                )));
             }
             AccuracyGate::Eligible => {}
         }
 
         if matches!(&self.move_accuracy, MoveAccuracy::AlwaysHits) {
-            return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped {
-                evidence: AccuracySkipEvidence {
+            return Ok(AccuracyPlan::Skipped(AccuracyDecision::Skipped(
+                AccuracySkipEvidence {
                     reason: AccuracySkipReason::AlwaysHits,
                     move_accuracy: self.move_accuracy.clone(),
                     source_accuracy_stage: self.source_accuracy_stage,
                     target_evasion_stage: self.target_evasion_stage,
                 },
-            }));
+            )));
         }
 
         let MoveAccuracy::Percent(accuracy_percent) = &self.move_accuracy else {
