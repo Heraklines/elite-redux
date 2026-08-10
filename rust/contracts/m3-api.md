@@ -1268,6 +1268,7 @@ pub enum BattleResolveError {
 pub fn resolve_turn(
     before: &GameState,
     commands: &CommandSet,
+    authority_epoch: AuthorityEpoch,
     material_operation_id: &OperationId,
     content: &ContentPack,
 ) -> Result<BattleTransition, BattleResolveError>;
@@ -1314,7 +1315,10 @@ pub struct BattleReplacementTransition {
 }
 ```
 
-`resolve_turn` is pure over its arguments. It requires `before.battle` and may
+`resolve_turn` is pure over its arguments. `authority_epoch` is the exact
+authenticated Authority V2 epoch of the command frontier being resolved; every
+new `FaintSource` created by the turn stores that value without defaulting,
+parsing, or local allocation. It requires `before.battle` and may
 mutate only the cloned canonical game/battle values required by the transition,
 including battle RNG. It validates both complete `GameState` values, computes
 mechanical digests over those values, preserves the exact JavaScript/RNG
