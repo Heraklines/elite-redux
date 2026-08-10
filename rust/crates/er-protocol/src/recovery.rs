@@ -1665,7 +1665,7 @@ impl RecoveryTransaction {
         actions
     }
 
-    fn terminalize_with_actions(
+fn terminalize_with_actions(
         &mut self,
         reason: String,
         scheduler: &mut KernelScheduler,
@@ -1685,6 +1685,546 @@ impl RecoveryTransaction {
         self.set_phase(RecoveryPhase::Terminalized);
         actions.push(RecoveryAction::Terminalize { reason });
         actions
+    }
+}
+
+impl crate::snapshot::RecoveryTransactionSnapshotBridge for RecoveryTransaction {
+    fn snapshot_v2(
+        &self,
+    ) -> Result<crate::snapshot::RecoveryRuntimeSnapshotV2, crate::snapshot::SnapshotError> {
+        let bundle = self
+            .bundle
+            .as_ref()
+            .map(|bundle| opaque_recovery_bundle_snapshot(bundle, "recovery.bundle"))
+            .transpose()?;
+        let timers = self
+            .timers
+            .iter()
+            .map(|(timer_id, timer)| {
+                if *timer_id != timer.timer.timer_id {
+                    return Err(recovery_snapshot_invalid(
+                        "recovery.timers",
+                        "recovery timer map key differs from registration identity",
+                    ));
+                }
+                Ok(crate::snapshot::RecoveryTimerSnapshotV2 {
+                    timer: timer.timer.clone(),
+                    kind: match timer.kind {
+                        RecoveryTimerKind::Request => crate::snapshot::RecoveryTimerKindV2::Request,
+                        RecoveryTimerKind::Control => crate::snapshot::RecoveryTimerKindV2::Control,
+                        RecoveryTimerKind::Pacing => crate::snapshot::RecoveryTimerKindV2::Pacing,
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, crate::snapshot::SnapshotError>>()?;
+        let snapshot = crate::snapshot::RecoveryRuntimeSnapshotV2 {
+            config: self.config.clone(),
+            fence: crate::snapshot::RecoveryFenceSnapshotV2 {
+                state: self.fence.state,
+                control_projection_allowed: self.fence.control_projection_allowed,
+                terminal_reason: self.fence.terminal_reason.clone(),
+            },
+            phase: self.phase,
+            request_id: self.request_id.clone(),
+            captured_frontier: self.captured_frontier,
+            captured_state: self.captured_state,
+            bundle,
+            timers,
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        validate_recovery_snapshot_state(&snapshot, self.bundle.as_ref())?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: crate::snapshot::RecoveryRuntimeSnapshotV2,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<Self, crate::snapshot::SnapshotError> {
+        snapshot.validate()?;
+        validate_recovery_config(&snapshot.config)?;
+
+        let bundle = snapshot
+            .bundle
+            .as_ref()
+            .map(|bundle| {
+                decode_recovery_bundle(
+                    &bundle.canonical_bundle_bytes,
+                    "recovery.bundle.canonical_bundle_bytes",
+                )
+            })
+            .transpose()?;
+        if let Some(bundle) = &bundle {
+            let Some(request_id) = snapshot.request_id.as_deref() else {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "a retained recovery bundle requires a request identity",
+                ));
+            };
+            let Some(captured_frontier) = snapshot.captured_frontier else {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "a retained recovery bundle requires a captured frontier",
+                ));
+            };
+            match validate_recovery_bundle(
+                &RecoveryValidationContext {
+                    expected_request_id: request_id.to_owned(),
+                    live_context: snapshot.config.local_context.clone(),
+                    captured_frontier,
+                },
+                bundle,
+            ) {
+                RecoveryBundleValidation::Valid { .. } => {}
+                RecoveryBundleValidation::Stale { .. }
+                | RecoveryBundleValidation::Mismatch { .. } => {
+                    return Err(recovery_snapshot_invalid(
+                        "recovery.bundle",
+                        "decoded recovery bundle contradicts the retained transaction state",
+                    ));
+                }
+            }
+        }
+
+        let mut timers = BTreeMap::new();
+        for retained in &snapshot.timers {
+            let kind = match retained.kind {
+                crate::snapshot::RecoveryTimerKindV2::Request => RecoveryTimerKind::Request,
+                crate::snapshot::RecoveryTimerKindV2::Control => RecoveryTimerKind::Control,
+                crate::snapshot::RecoveryTimerKindV2::Pacing => RecoveryTimerKind::Pacing,
+            };
+            let (owner, delay_ms) = expected_recovery_timer_registration(
+                &snapshot.config,
+                snapshot.request_id.as_deref(),
+                kind,
+            )?;
+            if retained.timer.endpoint != snapshot.config.local_context.sender_seat_id
+                || retained.timer.owner != owner
+                || retained.timer.delay_ms != delay_ms
+                || retained.timer.time_class != TimeClass::Recovery
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "recovery timer metadata does not match its retained kind and configuration",
+                ));
+            }
+            if scheduler.is_disposed() || scheduler.timer(retained.timer.timer_id) != Some(&retained.timer) {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "retained recovery timer is not the exact registration in the restored scheduler",
+                ));
+            }
+            if timers
+                .insert(
+                    retained.timer.timer_id,
+                    RecoveryTimer {
+                        timer: retained.timer.clone(),
+                        kind,
+                    },
+                )
+                .is_some()
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "duplicate recovery timer identity",
+                ));
+            }
+        }
+
+        validate_recovery_snapshot_state(&snapshot, bundle.as_ref())?;
+        if snapshot.disposed && !timers.is_empty() {
+            return Err(recovery_snapshot_invalid(
+                "recovery",
+                "disposed recovery cannot retain timers",
+            ));
+        }
+
+        Ok(Self {
+            config: snapshot.config,
+            fence: RecoveryFence {
+                state: snapshot.fence.state,
+                control_projection_allowed: snapshot.fence.control_projection_allowed,
+                terminal_reason: snapshot.fence.terminal_reason,
+            },
+            phase: snapshot.phase,
+            request_id: snapshot.request_id,
+            captured_frontier: snapshot.captured_frontier,
+            captured_state: snapshot.captured_state,
+            bundle,
+            timers,
+            disposed: snapshot.disposed,
+        })
+    }
+}
+
+fn validate_recovery_config(
+    config: &RecoveryTransactionConfig,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    if config.request_timeout_ms == SafeU53::ZERO
+        || config.control_timeout_ms == SafeU53::ZERO
+        || config.pacing_ms == SafeU53::ZERO
+        || config.local_context.seat_map_id.is_empty()
+        || TimerOwner::new(config.timer_owner_id.clone(), "recovery/config", "recovery").is_err()
+    {
+        return Err(recovery_snapshot_invalid(
+            "recovery.config",
+            "recovery configuration is invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_recovery_snapshot_state(
+    snapshot: &crate::snapshot::RecoveryRuntimeSnapshotV2,
+    bundle: Option<&RecoveryBundle>,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    let phase = snapshot.phase;
+    if snapshot.captured_frontier.is_some() != snapshot.captured_state.is_some() {
+        return Err(recovery_snapshot_invalid(
+            "recovery.captured_frontier",
+            "captured frontier and captured state must be present together",
+        ));
+    }
+    if let (Some(captured_frontier), Some(captured_state)) =
+        (snapshot.captured_frontier, snapshot.captured_state)
+    {
+        if captured_frontier != captured_state.control
+            || captured_state.control > captured_state.material
+            || captured_state.material > captured_state.received
+        {
+            return Err(recovery_snapshot_invalid(
+                "recovery.captured_state",
+                "captured frontier does not contain an ordered control frontier",
+            ));
+        }
+    }
+
+    match phase {
+        None => {
+            if snapshot.disposed
+                || snapshot.request_id.is_some()
+                || snapshot.captured_frontier.is_some()
+                || snapshot.captured_state.is_some()
+                || bundle.is_some()
+                || !snapshot.timers.is_empty()
+                || snapshot.fence.state != RecoveryFenceState::Open
+                || snapshot.fence.control_projection_allowed
+                || snapshot.fence.terminal_reason.is_some()
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery",
+                    "an unstarted recovery transaction must retain only an open empty owner",
+                ));
+            }
+        }
+        Some(RecoveryPhase::Terminalized) => {
+            if snapshot.fence.state != RecoveryFenceState::Terminal
+                || snapshot.fence.control_projection_allowed
+                || snapshot
+                    .fence
+                    .terminal_reason
+                    .as_deref()
+                    .is_none_or(str::is_empty)
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.fence",
+                    "a terminalized transaction requires an exact terminal fence",
+                ));
+            }
+            if snapshot.request_id.is_some() != snapshot.captured_frontier.is_some() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery",
+                    "terminalized request and captured state must be complete or absent",
+                ));
+            }
+            if snapshot.request_id.is_none() && bundle.is_some() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "an unrequested terminalized recovery cannot retain a bundle",
+                ));
+            }
+            if !snapshot.timers.is_empty() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "a terminalized recovery cannot retain timers",
+                ));
+            }
+        }
+        Some(RecoveryPhase::Acked | RecoveryPhase::Released) => {
+            if snapshot.disposed && phase == Some(RecoveryPhase::Acked) {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.phase",
+                    "a disposed recovery cannot retain the transient acknowledged phase",
+                ));
+            }
+            if snapshot.fence.state != RecoveryFenceState::Open
+                || snapshot.fence.control_projection_allowed
+                || snapshot.fence.terminal_reason.is_some()
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.fence",
+                    "an acknowledged or released recovery requires an open fence",
+                ));
+            }
+            if snapshot.request_id.is_none() || snapshot.captured_frontier.is_none() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery",
+                    "an acknowledged or released recovery requires request and captured state",
+                ));
+            }
+            if !snapshot.disposed && bundle.is_none() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "a live released recovery must retain its canonical bundle",
+                ));
+            }
+            if !snapshot.timers.is_empty() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "an acknowledged or released recovery cannot retain timers",
+                ));
+            }
+        }
+        Some(phase) => {
+            if snapshot.disposed {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.phase",
+                    "a disposed recovery must be released or terminalized",
+                ));
+            }
+            if snapshot.fence.state != RecoveryFenceState::Held
+                || snapshot.fence.terminal_reason.is_some()
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.fence",
+                    "an active recovery phase requires a held fence",
+                ));
+            }
+            if snapshot.request_id.is_none() || snapshot.captured_frontier.is_none() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery",
+                    "an active recovery phase requires request and captured state",
+                ));
+            }
+            let bundle_required = matches!(
+                phase,
+                RecoveryPhase::Validated
+                    | RecoveryPhase::MaterialApplied
+                    | RecoveryPhase::FrontierInstalled
+                    | RecoveryPhase::ControlInstalled
+            );
+            if bundle_required != bundle.is_some() {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "bundle presence does not match the active recovery phase",
+                ));
+            }
+            if matches!(phase, RecoveryPhase::FenceAcquired | RecoveryPhase::FrontierCaptured | RecoveryPhase::Requested)
+                && bundle.is_some()
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.bundle",
+                    "pre-validation recovery phases cannot retain a bundle",
+                ));
+            }
+            if phase == RecoveryPhase::FrontierInstalled
+                && !snapshot.fence.control_projection_allowed
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.fence.control_projection_allowed",
+                    "frontier-installed recovery must allow its exact control projection",
+                ));
+            }
+            if matches!(phase, RecoveryPhase::FenceAcquired | RecoveryPhase::FrontierCaptured | RecoveryPhase::Requested | RecoveryPhase::Validated | RecoveryPhase::MaterialApplied)
+                && snapshot.fence.control_projection_allowed
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.fence.control_projection_allowed",
+                    "control projection is not allowed before frontier installation",
+                ));
+            }
+            let mut request_timers = 0;
+            let mut control_timers = 0;
+            let mut pacing_timers = 0;
+            for timer in &snapshot.timers {
+                match timer.kind {
+                    crate::snapshot::RecoveryTimerKindV2::Request => request_timers += 1,
+                    crate::snapshot::RecoveryTimerKindV2::Control => control_timers += 1,
+                    crate::snapshot::RecoveryTimerKindV2::Pacing => pacing_timers += 1,
+                }
+            }
+            let timer_shape = match phase {
+                RecoveryPhase::Requested => request_timers == 1 && control_timers == 0 && pacing_timers == 0,
+                RecoveryPhase::FrontierInstalled => {
+                    request_timers == 0 && control_timers == 1 && pacing_timers <= 1
+                }
+                _ => request_timers == 0 && control_timers == 0 && pacing_timers == 0,
+            };
+            if !timer_shape {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.timers",
+                    "retained recovery timer kinds do not match the phase",
+                ));
+            }
+            if phase == RecoveryPhase::ControlInstalled
+                && bundle.is_some_and(|bundle| bundle.frontier != Revision::ZERO)
+            {
+                return Err(recovery_snapshot_invalid(
+                    "recovery.phase",
+                    "control-installed is only a valid quiescent phase for an empty frontier",
+                ));
+            }
+        }
+    }
+
+    if let Some(request_id) = &snapshot.request_id {
+        if request_id.is_empty() {
+            return Err(recovery_snapshot_invalid(
+                "recovery.request_id",
+                "request identity must not be empty",
+            ));
+        }
+    }
+    if let (Some(snapshot_bundle), Some(bundle)) = (&snapshot.bundle, bundle) {
+        if snapshot_bundle.correlation_id != bundle.request_id
+            || snapshot.request_id.as_deref() != Some(bundle.request_id.as_str())
+        {
+            return Err(recovery_snapshot_invalid(
+                "recovery.bundle",
+                "canonical bundle identity differs from the active request",
+            ));
+        }
+    }
+    if snapshot.disposed && (!snapshot.timers.is_empty() || bundle.is_some()) {
+        return Err(recovery_snapshot_invalid(
+            "recovery",
+            "disposed recovery cannot retain timers or a bundle",
+        ));
+    }
+    Ok(())
+}
+
+fn expected_recovery_timer_registration(
+    config: &RecoveryTransactionConfig,
+    request_id: Option<&str>,
+    kind: RecoveryTimerKind,
+) -> Result<(TimerOwner, SafeU53), crate::snapshot::SnapshotError> {
+    let Some(request_id) = request_id else {
+        return Err(recovery_snapshot_invalid(
+            "recovery.timers",
+            "a retained recovery timer requires a request identity",
+        ));
+    };
+    let (address_prefix, delay_ms, reason) = match kind {
+        RecoveryTimerKind::Request => (
+            "recovery",
+            config.request_timeout_ms,
+            "authority-v2 recovery request deadline",
+        ),
+        RecoveryTimerKind::Control => (
+            "recovery-control",
+            config.control_timeout_ms,
+            "await exact Authority V2 recovery control proof",
+        ),
+        RecoveryTimerKind::Pacing => (
+            "recovery-control",
+            pacing_delay(config.pacing_ms),
+            "await exact Authority V2 recovery control proof",
+        ),
+    };
+    let owner = TimerOwner::new(
+        config.timer_owner_id.clone(),
+        format!(
+            "{address_prefix}/{}/{}/{}",
+            config.local_context.session_id, config.local_context.run_id, request_id
+        ),
+        reason,
+    )
+    .map_err(|error| recovery_snapshot_invalid("recovery.timers.owner", error.to_string()))?;
+    Ok((owner, delay_ms))
+}
+
+fn opaque_recovery_bundle_snapshot(
+    bundle: &RecoveryBundle,
+    path: &str,
+) -> Result<crate::snapshot::OpaqueRecoveryBundleSnapshotV2, crate::snapshot::SnapshotError> {
+    let canonical_bundle_bytes = er_canonical::canonical_bytes(bundle)
+        .map_err(|error| recovery_snapshot_canonical(path, error.to_string()))?;
+    Ok(crate::snapshot::OpaqueRecoveryBundleSnapshotV2 {
+        correlation_id: bundle.request_id.clone(),
+        canonical_bundle_bytes: er_types::battle_ids::CanonicalHexBytes::from_bytes(
+            &canonical_bundle_bytes,
+        ),
+    })
+}
+
+fn decode_recovery_bundle(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<RecoveryBundle, crate::snapshot::SnapshotError> {
+    let raw = decode_recovery_hex(bytes, path)?;
+    let bundle = serde_json::from_slice::<RecoveryBundle>(&raw)
+        .map_err(|error| recovery_snapshot_canonical(path, error.to_string()))?;
+    let canonical = er_canonical::canonical_bytes(&bundle)
+        .map_err(|error| recovery_snapshot_canonical(path, error.to_string()))?;
+    if canonical != raw {
+        return Err(recovery_snapshot_canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
+    }
+    Ok(bundle)
+}
+
+fn decode_recovery_hex(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
+    let raw = bytes.as_str().as_bytes();
+    if raw.len() % 2 != 0 {
+        return Err(recovery_snapshot_canonical(path, "canonical payload has odd hex length"));
+    }
+    let mut decoded = Vec::with_capacity(raw.len() / 2);
+    for pair in raw.chunks_exact(2) {
+        let Some(high) = recovery_hex_digit(pair[0]) else {
+            return Err(recovery_snapshot_canonical(path, "invalid hex"));
+        };
+        let Some(low) = recovery_hex_digit(pair[1]) else {
+            return Err(recovery_snapshot_canonical(path, "invalid hex"));
+        };
+        decoded.push((high << 4) | low);
+    }
+    if decoded.is_empty() {
+        return Err(recovery_snapshot_canonical(path, "canonical payload must not be empty"));
+    }
+    Ok(decoded)
+}
+
+fn recovery_hex_digit(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
+fn recovery_snapshot_invalid(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn recovery_snapshot_canonical(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
     }
 }
 

@@ -1581,6 +1581,411 @@ fn invalid_registration(reason: &str) -> ProposalLeaseError {
     }
 }
 
+impl crate::snapshot::ProposalAdmissionSnapshotBridge for ProposalAdmissionLedger {
+    fn snapshot_v2(
+        &self,
+    ) -> Result<crate::snapshot::ProposalAdmissionSnapshotV2, crate::snapshot::SnapshotError> {
+        let snapshot = crate::snapshot::ProposalAdmissionSnapshotV2 {
+            capacity: self.capacity,
+            fingerprints: self
+                .fingerprints
+                .iter()
+                .map(|(operation_id, fingerprint)| {
+                    crate::snapshot::ProposalFingerprintSnapshotV2 {
+                        operation_id: operation_id.clone(),
+                        fingerprint: fingerprint.clone(),
+                    }
+                })
+                .collect(),
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: crate::snapshot::ProposalAdmissionSnapshotV2,
+    ) -> Result<Self, crate::snapshot::SnapshotError> {
+        snapshot.validate()?;
+        let mut fingerprints = BTreeMap::new();
+        for entry in &snapshot.fingerprints {
+            if fingerprints
+                .insert(entry.operation_id.clone(), entry.fingerprint.clone())
+                .is_some()
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_admission.fingerprints",
+                    "duplicate proposal operation identity",
+                ));
+            }
+        }
+        Ok(Self {
+            capacity: snapshot.capacity,
+            fingerprints,
+            disposed: snapshot.disposed,
+        })
+    }
+}
+
+impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
+    fn snapshot_v2(
+        &self,
+    ) -> Result<crate::snapshot::ProposalLeaseSnapshotV2, crate::snapshot::SnapshotError> {
+        let leases = self
+            .leases
+            .iter()
+            .map(|(operation_id, lease)| {
+                if operation_id != &lease.proposal.operation_id {
+                    return Err(proposal_snapshot_invalid(
+                        "proposal_leases.leases",
+                        "lease map key differs from proposal operation identity",
+                    ));
+                }
+                Ok(crate::snapshot::ActiveProposalLeaseSnapshotV2 {
+                    operation_id: operation_id.clone(),
+                    proposal: opaque_proposal_snapshot(
+                        &lease.proposal,
+                        "proposal_leases.leases.proposal",
+                    )?,
+                    retry_attempt: lease.retry_attempt,
+                    retry_timer: lease.retry_timer,
+                    absolute_timer: lease.absolute_timer,
+                    timer_endpoint: lease.timer_endpoint,
+                    absolute_delay_ms: lease.absolute_delay_ms,
+                })
+            })
+            .collect::<Result<Vec<_>, crate::snapshot::SnapshotError>>()?;
+        let timer_targets = self
+            .timer_targets
+            .iter()
+            .map(|(timer_id, target)| crate::snapshot::ProposalTimerTargetSnapshotV2 {
+                timer_id: *timer_id,
+                operation_id: target.operation_id.clone(),
+                kind: match target.kind {
+                    ProposalTimerKind::Retry => crate::snapshot::ProposalTimerKindV2::Retry,
+                    ProposalTimerKind::Absolute => crate::snapshot::ProposalTimerKindV2::Absolute,
+                },
+                endpoint: target.endpoint,
+                owner: target.owner.clone(),
+                delay_ms: target.delay_ms,
+                time_class: target.time_class,
+            })
+            .collect();
+        let snapshot = crate::snapshot::ProposalLeaseSnapshotV2 {
+            config: self.config.clone(),
+            leases,
+            committed_tombstones: self.committed_tombstones.iter().cloned().collect(),
+            timer_targets,
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: crate::snapshot::ProposalLeaseSnapshotV2,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<Self, crate::snapshot::SnapshotError> {
+        snapshot.validate()?;
+        validate_proposal_lease_config(&snapshot.config)?;
+
+        let mut leases = BTreeMap::new();
+        for retained in &snapshot.leases {
+            let proposal = decode_proposal_message(
+                &retained.proposal.canonical_envelope_bytes,
+                "proposal_leases.leases.proposal.canonical_envelope_bytes",
+            )?;
+            if proposal.operation_id != retained.operation_id
+                || proposal.fingerprint.is_empty()
+                || proposal.from != retained.timer_endpoint
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.leases",
+                    "retained proposal identity, fingerprint, or timer endpoint is contradictory",
+                ));
+            }
+            if retained.absolute_delay_ms == SafeU53::ZERO
+                || retained.absolute_delay_ms > snapshot.config.absolute_ceiling_ms
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.leases.absolute_delay_ms",
+                    "absolute lease delay is outside the configured ceiling",
+                ));
+            }
+            if leases
+                .insert(
+                    retained.operation_id.clone(),
+                    ActiveProposalLease {
+                        proposal,
+                        retry_attempt: retained.retry_attempt,
+                        retry_timer: retained.retry_timer,
+                        absolute_timer: retained.absolute_timer,
+                        timer_endpoint: retained.timer_endpoint,
+                        absolute_delay_ms: retained.absolute_delay_ms,
+                    },
+                )
+                .is_some()
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.leases",
+                    "duplicate retained proposal operation identity",
+                ));
+            }
+        }
+
+        let committed_tombstones = snapshot
+            .committed_tombstones
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let mut timer_targets = BTreeMap::new();
+        for target in &snapshot.timer_targets {
+            let kind = match target.kind {
+                crate::snapshot::ProposalTimerKindV2::Retry => ProposalTimerKind::Retry,
+                crate::snapshot::ProposalTimerKindV2::Absolute => ProposalTimerKind::Absolute,
+            };
+            let Some(lease) = leases.get(&target.operation_id) else {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.timer_targets",
+                    "timer target has no retained proposal lease",
+                ));
+            };
+            let expected_timer = match kind {
+                ProposalTimerKind::Retry => lease.retry_timer,
+                ProposalTimerKind::Absolute => lease.absolute_timer,
+            };
+            if expected_timer != Some(target.timer_id)
+                || target.endpoint != lease.timer_endpoint
+                || target.time_class
+                    != match kind {
+                        ProposalTimerKind::Retry => TimeClass::Connected,
+                        ProposalTimerKind::Absolute => TimeClass::Absolute,
+                    }
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.timer_targets",
+                    "timer target does not identify the lease's exact timer",
+                ));
+            }
+            let expected_owner = proposal_timer_owner(
+                &snapshot.config,
+                &lease.proposal,
+                match kind {
+                    ProposalTimerKind::Retry => "v2 proposal retry",
+                    ProposalTimerKind::Absolute => "v2 proposal absolute ceiling",
+                },
+            )?;
+            let expected_delay = match kind {
+                ProposalTimerKind::Retry => proposal_retry_delay(&snapshot.config, lease.retry_attempt),
+                ProposalTimerKind::Absolute => lease.absolute_delay_ms,
+            };
+            if target.owner != expected_owner || target.delay_ms != expected_delay {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.timer_targets",
+                    "timer target owner or delay differs from the retained lease",
+                ));
+            }
+            let expected_registration = ScheduledTimer {
+                endpoint: target.endpoint,
+                timer_id: target.timer_id,
+                owner: target.owner.clone(),
+                delay_ms: target.delay_ms,
+                time_class: target.time_class,
+            };
+            if scheduler.is_disposed()
+                || scheduler.timer(target.timer_id) != Some(&expected_registration)
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.timer_targets",
+                    "retained proposal timer is not the exact registration in the restored scheduler",
+                ));
+            }
+            if timer_targets
+                .insert(
+                    target.timer_id,
+                    ProposalTimerTarget {
+                        operation_id: target.operation_id.clone(),
+                        kind,
+                        endpoint: target.endpoint,
+                        owner: target.owner.clone(),
+                        delay_ms: target.delay_ms,
+                        time_class: target.time_class,
+                    },
+                )
+                .is_some()
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.timer_targets",
+                    "duplicate proposal timer identity",
+                ));
+            }
+        }
+
+        for (operation_id, lease) in &leases {
+            if committed_tombstones.contains(operation_id) {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases",
+                    "a committed proposal cannot retain an active lease",
+                ));
+            }
+            if lease.retry_timer.is_some() && lease.absolute_timer.is_some()
+                && lease.retry_timer == lease.absolute_timer
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.leases",
+                    "proposal retry and absolute timers cannot share an identity",
+                ));
+            }
+            if lease.retry_timer.is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
+                || lease.absolute_timer.is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
+            {
+                return Err(proposal_snapshot_invalid(
+                    "proposal_leases.leases",
+                    "active lease timer is missing its retained target",
+                ));
+            }
+        }
+
+        Ok(Self {
+            config: snapshot.config,
+            leases,
+            committed_tombstones,
+            timer_targets,
+            disposed: snapshot.disposed,
+        })
+    }
+}
+
+fn validate_proposal_lease_config(
+    config: &ProposalLeaseConfig,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    if config.owner_prefix.is_empty()
+        || config.owner_prefix.encode_utf16().count() > 256
+        || config
+            .owner_prefix
+            .chars()
+            .any(|character| character <= '\u{001f}' || character == '\u{007f}')
+        || config.retry_initial_ms == SafeU53::ZERO
+        || config.retry_maximum_ms == SafeU53::ZERO
+        || config.retry_initial_ms > config.retry_maximum_ms
+        || config.absolute_ceiling_ms == SafeU53::ZERO
+    {
+        return Err(proposal_snapshot_invalid(
+            "proposal_leases.config",
+            "proposal lease owner and timing configuration are invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn proposal_retry_delay(config: &ProposalLeaseConfig, retry_attempt: u32) -> SafeU53 {
+    let maximum = config.retry_maximum_ms.get();
+    let mut delay = config.retry_initial_ms.get();
+    let mut remaining = retry_attempt.min(63);
+    while remaining > 0 && delay < maximum {
+        delay = delay.saturating_mul(2).min(maximum);
+        remaining -= 1;
+    }
+    SafeU53::new(delay).unwrap_or(config.retry_maximum_ms)
+}
+
+fn proposal_timer_owner(
+    config: &ProposalLeaseConfig,
+    proposal: &RetainedProposal,
+    reason: &str,
+) -> Result<TimerOwner, crate::snapshot::SnapshotError> {
+    TimerOwner::new(
+        format!("{}{}", config.owner_prefix, proposal.operation_id),
+        proposal.operation_id.as_str(),
+        reason,
+    )
+    .map_err(|error| proposal_snapshot_invalid("proposal_leases.timer_targets.owner", error.to_string()))
+}
+
+fn opaque_proposal_snapshot(
+    proposal: &RetainedProposal,
+    path: &str,
+) -> Result<crate::snapshot::OpaqueProposalEnvelopeSnapshotV2, crate::snapshot::SnapshotError> {
+    let canonical_envelope_bytes = er_canonical::canonical_bytes(proposal)
+        .map_err(|error| proposal_snapshot_canonical(path, error.to_string()))?;
+    Ok(crate::snapshot::OpaqueProposalEnvelopeSnapshotV2 {
+        operation_id: proposal.operation_id.clone(),
+        canonical_envelope_bytes: er_types::battle_ids::CanonicalHexBytes::from_bytes(
+            &canonical_envelope_bytes,
+        ),
+    })
+}
+
+fn decode_proposal_message(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<ProposalMessage, crate::snapshot::SnapshotError> {
+    let raw = decode_proposal_hex(bytes, path)?;
+    let proposal = serde_json::from_slice::<ProposalMessage>(&raw)
+        .map_err(|error| proposal_snapshot_canonical(path, error.to_string()))?;
+    let canonical = er_canonical::canonical_bytes(&proposal)
+        .map_err(|error| proposal_snapshot_canonical(path, error.to_string()))?;
+    if canonical != raw {
+        return Err(proposal_snapshot_canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
+    }
+    Ok(proposal)
+}
+
+fn decode_proposal_hex(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
+    let raw = bytes.as_str().as_bytes();
+    if raw.len() % 2 != 0 {
+        return Err(proposal_snapshot_canonical(path, "canonical payload has odd hex length"));
+    }
+    let mut decoded = Vec::with_capacity(raw.len() / 2);
+    for pair in raw.chunks_exact(2) {
+        let Some(high) = proposal_hex_digit(pair[0]) else {
+            return Err(proposal_snapshot_canonical(path, "invalid hex"));
+        };
+        let Some(low) = proposal_hex_digit(pair[1]) else {
+            return Err(proposal_snapshot_canonical(path, "invalid hex"));
+        };
+        decoded.push((high << 4) | low);
+    }
+    if decoded.is_empty() {
+        return Err(proposal_snapshot_canonical(path, "canonical payload must not be empty"));
+    }
+    Ok(decoded)
+}
+
+fn proposal_hex_digit(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
+fn proposal_snapshot_invalid(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn proposal_snapshot_canonical(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ProposalLeaseConfig, ProposalLeaseError, ProposalLeaseManager, ProposalLeaseSpec};

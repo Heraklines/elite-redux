@@ -4,11 +4,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, AuthorityReceipt,
-    ConnectionGeneration, ControlProjectionOutcome, FrameContext, Material,
-    MaterialApplicationOutcome, NextControl, OperationId, RecoveredFrontierTerminal, Revision,
-    SafeU53, SeatId, validate_authority_material_digest, validate_authority_operation_id,
+    AwaitSuccessorControl, CommandControlTarget, ConnectionGeneration, ControlAddress,
+    ControlProjectionOutcome, FrameContext, InteractionControlAddress, InteractionSuccessor,
+    Material, MaterialApplicationOutcome, NextControl, OperationId, RecoveredFrontierTerminal,
+    ReplacementControl, ReplacementControlAddress, Revision, SafeU53, SeatId, SharedInteractionControl,
+    TerminalControl, validate_authority_material_digest, validate_authority_operation_id,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::Value;
 use thiserror::Error;
 
 use crate::{SuccessorValidator, control_id_of};
@@ -173,7 +176,7 @@ struct RecoveryFrontierProof {
 /// already keyed by it.  That makes every comparison path use the same
 /// complete value: revision, all entry material/control fields, and all
 /// authenticated frame-context dimensions.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 struct EntryIdentity {
     revision: Revision,
     context: FrameContext,
@@ -182,6 +185,22 @@ struct EntryIdentity {
     material: Material,
     next_control: NextControl,
     subsumes: Vec<Revision>,
+    material_payload_known: bool,
+}
+
+impl PartialEq for EntryIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.revision == other.revision
+            && self.context == other.context
+            && self.operation_id == other.operation_id
+            && self.kind == other.kind
+            && self.material.digest == other.material.digest
+            && (!self.material_payload_known
+                || !other.material_payload_known
+                || self.material.payload == other.material.payload)
+            && self.next_control == other.next_control
+            && self.subsumes == other.subsumes
+    }
 }
 
 impl EntryIdentity {
@@ -194,6 +213,7 @@ impl EntryIdentity {
             material: entry.material.clone(),
             next_control: entry.next_control.clone(),
             subsumes: entry.subsumes.clone(),
+            material_payload_known: true,
         }
     }
 
@@ -1130,4 +1150,778 @@ fn is_valid_successor_control(control: &NextControl) -> bool {
         return false;
     };
     SuccessorValidator::new().validate(&value).is_ok()
+}
+
+impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
+    fn snapshot_v2(
+        &self,
+    ) -> Result<crate::snapshot::AuthorityReplicaSnapshotV2, crate::snapshot::SnapshotError> {
+        let pending = self
+            .pending
+            .as_ref()
+            .map(|pending| {
+                Ok(crate::snapshot::PendingReplicaEntrySnapshotV2 {
+                    entry: opaque_authority_entry_snapshot(&pending.entry, "authority_replica.pending")?,
+                    stage: match pending.stage {
+                        PendingStage::Admitted => crate::snapshot::PendingReplicaStageV2::Admitted,
+                        PendingStage::MaterialApplied => {
+                            crate::snapshot::PendingReplicaStageV2::MaterialApplied
+                        }
+                    },
+                })
+            })
+            .transpose()?;
+        let installed_controls = self
+            .installed_controls
+            .iter()
+            .map(|(revision, installed)| {
+                let identity = identity_snapshot_from_identity(&installed.identity);
+                if *revision != identity.revision || installed.control_id != identity.next_control_id {
+                    return Err(snapshot_invalid(
+                        "authority_replica.installed_controls",
+                        "installed control identity is internally inconsistent",
+                    ));
+                }
+                Ok(crate::snapshot::InstalledControlSnapshotV2 {
+                    revision: *revision,
+                    identity,
+                    control_id: installed.control_id.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, crate::snapshot::SnapshotError>>()?;
+        let snapshot = crate::snapshot::AuthorityReplicaSnapshotV2 {
+            receipt_context: self.receipt_context.clone(),
+            authority_seat: self.authority_seat_id,
+            authority_generation: self.authority_connection_generation,
+            frontier: self.frontier,
+            pending,
+            requested_tail_from: self.requested_tail_from,
+            installed_controls,
+            recovery_proof: self
+                .recovery_proof
+                .as_ref()
+                .map(|proof| identity_snapshot_from_identity(&proof.identity)),
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        validate_replica_snapshot_state(
+            &snapshot,
+            self.pending.as_ref(),
+            Some(&self.installed_controls),
+            self.recovery_proof.as_ref().map(|proof| &proof.identity),
+        )?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: crate::snapshot::AuthorityReplicaSnapshotV2,
+    ) -> Result<Self, crate::snapshot::SnapshotError> {
+        snapshot.validate()?;
+        validate_replica_snapshot_config(&snapshot)?;
+
+        let pending = snapshot
+            .pending
+            .as_ref()
+            .map(|pending| {
+                let entry = decode_authority_entry(
+                    &pending.entry.canonical_entry_bytes,
+                    "authority_replica.pending.entry.canonical_entry_bytes",
+                )?;
+                if !is_valid_entry(&entry) {
+                    return Err(snapshot_invalid(
+                        "authority_replica.pending.entry",
+                        "decoded pending AuthorityEntry is invalid",
+                    ));
+                }
+                Ok(PendingReplicaEntry {
+                    entry,
+                    stage: match pending.stage {
+                        crate::snapshot::PendingReplicaStageV2::Admitted => PendingStage::Admitted,
+                        crate::snapshot::PendingReplicaStageV2::MaterialApplied => {
+                            PendingStage::MaterialApplied
+                        }
+                    },
+                })
+            })
+            .transpose()?;
+
+        let mut installed_controls = BTreeMap::new();
+        for control in &snapshot.installed_controls {
+            let identity = entry_identity_from_snapshot(
+                &control.identity,
+                "authority_replica.installed_controls.identity",
+            )?;
+            if control.revision != identity.revision || control.control_id != identity_snapshot_next_control_id(&identity) {
+                return Err(snapshot_invalid(
+                    "authority_replica.installed_controls",
+                    "installed control identity or control ID is contradictory",
+                ));
+            }
+            if installed_controls
+                .insert(
+                    control.revision,
+                    InstalledControl {
+                        identity,
+                        control_id: control.control_id.clone(),
+                    },
+                )
+                .is_some()
+            {
+                return Err(snapshot_invalid(
+                    "authority_replica.installed_controls",
+                    "duplicate installed control revision",
+                ));
+            }
+        }
+
+        let recovery_proof = snapshot
+            .recovery_proof
+            .as_ref()
+            .map(|proof| entry_identity_from_snapshot(proof, "authority_replica.recovery_proof"))
+            .transpose()?;
+
+        validate_replica_snapshot_state(
+            &snapshot,
+            pending.as_ref(),
+            Some(&installed_controls),
+            recovery_proof.as_ref(),
+        )?;
+
+        Ok(Self {
+            receipt_context: snapshot.receipt_context,
+            authority_seat_id: snapshot.authority_seat,
+            authority_connection_generation: snapshot.authority_generation,
+            frontier: snapshot.frontier,
+            pending,
+            requested_tail_from: snapshot.requested_tail_from,
+            installed_controls,
+            recovery_proof: recovery_proof.map(|identity| RecoveryFrontierProof { identity }),
+            disposed: snapshot.disposed,
+        })
+    }
+}
+
+fn validate_replica_snapshot_config(
+    snapshot: &crate::snapshot::AuthorityReplicaSnapshotV2,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    if !is_valid_context(&snapshot.receipt_context)
+        || snapshot.receipt_context.authority_seat_id != snapshot.authority_seat
+        || snapshot.receipt_context.sender_seat_id == snapshot.authority_seat
+    {
+        return Err(snapshot_invalid(
+            "authority_replica.receipt_context",
+            "replica configuration is not a receiving-peer context",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_replica_snapshot_state(
+    snapshot: &crate::snapshot::AuthorityReplicaSnapshotV2,
+    pending: Option<&PendingReplicaEntry>,
+    installed_controls: Option<&BTreeMap<Revision, InstalledControl>>,
+    recovery_proof: Option<&EntryIdentity>,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    if !(snapshot.frontier.control <= snapshot.frontier.material
+        && snapshot.frontier.material <= snapshot.frontier.received)
+    {
+        return Err(snapshot_invalid(
+            "authority_replica.frontier",
+            "control <= material <= received must hold",
+        ));
+    }
+
+    let expected_context = authority_entry_context(
+        &snapshot.receipt_context,
+        snapshot.authority_seat,
+        snapshot.authority_generation,
+    );
+    if let Some(installed_controls) = installed_controls {
+        for (revision, installed) in installed_controls {
+            if *revision != installed.identity.revision
+                || *revision > snapshot.frontier.control
+                || installed.control_id != identity_snapshot_next_control_id(&installed.identity)
+                || installed.identity.context != expected_context
+            {
+                return Err(snapshot_invalid(
+                    "authority_replica.installed_controls",
+                    "installed control is outside the live frontier or authenticated context",
+                ));
+            }
+            if !is_valid_entry(&installed.identity.to_entry()) {
+                return Err(snapshot_invalid(
+                    "authority_replica.installed_controls",
+                    "installed control identity is invalid",
+                ));
+            }
+        }
+    } else {
+        for control in &snapshot.installed_controls {
+            if control.revision > snapshot.frontier.control
+                || control.identity.context != expected_context
+                || control.control_id != control.identity.next_control_id
+            {
+                return Err(snapshot_invalid(
+                    "authority_replica.installed_controls",
+                    "installed control is outside the live frontier or authenticated context",
+                ));
+            }
+        }
+    }
+
+    if let Some(pending) = pending {
+        if pending.entry.context != expected_context
+            || pending.entry.revision != snapshot.frontier.received
+        {
+            return Err(snapshot_invalid(
+                "authority_replica.pending",
+                "pending entry does not match the authenticated received frontier",
+            ));
+        }
+        let Some(previous) = previous_revision(pending.entry.revision) else {
+            return Err(snapshot_invalid(
+                "authority_replica.pending",
+                "pending revision must be positive",
+            ));
+        };
+        let frontier_matches = match pending.stage {
+            PendingStage::Admitted => {
+                snapshot.frontier.material == previous && snapshot.frontier.control == previous
+            }
+            PendingStage::MaterialApplied => {
+                snapshot.frontier.material == pending.entry.revision
+                    && snapshot.frontier.control == previous
+            }
+        };
+        if !frontier_matches {
+            return Err(snapshot_invalid(
+                "authority_replica.pending",
+                "pending stage does not match the ordered frontier",
+            ));
+        }
+    } else if snapshot.frontier.received != snapshot.frontier.material
+        || snapshot.frontier.material != snapshot.frontier.control
+    {
+        return Err(snapshot_invalid(
+            "authority_replica.frontier",
+            "a replica without pending state must have one complete frontier",
+        ));
+    }
+
+    if let Some(requested) = snapshot.requested_tail_from
+        && requested != next_revision(snapshot.frontier.control).unwrap_or(Revision::ZERO)
+    {
+        return Err(snapshot_invalid(
+            "authority_replica.requested_tail_from",
+            "tail request does not identify the current missing revision",
+        ));
+    }
+
+    match (recovery_proof, pending) {
+        (Some(proof), Some(pending)) if pending.stage == PendingStage::MaterialApplied => {
+            if proof != &EntryIdentity::from_entry(&pending.entry)
+                || proof.context != expected_context
+                || proof.revision != pending.entry.revision
+            {
+                return Err(snapshot_invalid(
+                    "authority_replica.recovery_proof",
+                    "recovery proof does not equal the complete pending entry identity",
+                ));
+            }
+        }
+        (Some(_), _) => {
+            return Err(snapshot_invalid(
+                "authority_replica.recovery_proof",
+                "recovery proof requires a material-applied pending entry",
+            ));
+        }
+        (None, _) => {}
+    }
+    if recovery_proof.is_none() && snapshot.recovery_proof.is_some() {
+        return Err(snapshot_invalid(
+            "authority_replica.recovery_proof",
+            "recovery proof could not be reconstructed",
+        ));
+    }
+
+    if snapshot.disposed
+        && (pending.is_some()
+            || snapshot.requested_tail_from.is_some()
+            || installed_controls.is_some_and(|controls| !controls.is_empty())
+            || recovery_proof.is_some())
+    {
+        return Err(snapshot_invalid(
+            "authority_replica",
+            "disposed replica cannot retain pending or installed state",
+        ));
+    }
+    Ok(())
+}
+
+fn identity_snapshot_from_identity(
+    identity: &EntryIdentity,
+) -> crate::snapshot::AuthorityEntryIdentitySnapshotV2 {
+    crate::snapshot::AuthorityEntryIdentitySnapshotV2 {
+        revision: identity.revision,
+        context: identity.context.clone(),
+        operation_id: identity.operation_id.clone(),
+        kind: identity.kind,
+        material_digest: identity.material.digest.clone(),
+        next_control_id: control_id_of(&identity.next_control),
+        subsumes: identity.subsumes.clone(),
+    }
+}
+
+fn identity_snapshot_next_control_id(identity: &EntryIdentity) -> String {
+    control_id_of(&identity.next_control)
+}
+
+fn opaque_authority_entry_snapshot(
+    entry: &AuthorityEntry,
+    path: &str,
+) -> Result<crate::snapshot::OpaqueAuthorityEntrySnapshotV2, crate::snapshot::SnapshotError> {
+    let canonical_entry_bytes = er_canonical::canonical_bytes(entry)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    Ok(crate::snapshot::OpaqueAuthorityEntrySnapshotV2 {
+        identity: identity_snapshot_from_identity(&EntryIdentity::from_entry(entry)),
+        canonical_entry_bytes: er_types::battle_ids::CanonicalHexBytes::from_bytes(
+            &canonical_entry_bytes,
+        ),
+    })
+}
+
+fn decode_authority_entry(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<AuthorityEntry, crate::snapshot::SnapshotError> {
+    decode_snapshot_canonical(bytes, path)
+}
+
+fn decode_snapshot_canonical<T>(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<T, crate::snapshot::SnapshotError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    let raw = decode_snapshot_hex(bytes, path)?;
+    let decoded = serde_json::from_slice::<T>(&raw)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    let canonical = er_canonical::canonical_bytes(&decoded)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    if canonical != raw {
+        return Err(snapshot_canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
+    }
+    Ok(decoded)
+}
+
+fn decode_snapshot_hex(
+    bytes: &er_types::battle_ids::CanonicalHexBytes,
+    path: &str,
+) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
+    let raw = bytes.as_str().as_bytes();
+    if raw.len() % 2 != 0 {
+        return Err(snapshot_canonical(path, "canonical payload has odd hex length"));
+    }
+    let mut decoded = Vec::with_capacity(raw.len() / 2);
+    for pair in raw.chunks_exact(2) {
+        let Some(high) = snapshot_hex_digit(pair[0]) else {
+            return Err(snapshot_canonical(path, "invalid hex"));
+        };
+        let Some(low) = snapshot_hex_digit(pair[1]) else {
+            return Err(snapshot_canonical(path, "invalid hex"));
+        };
+        decoded.push((high << 4) | low);
+    }
+    if decoded.is_empty() {
+        return Err(snapshot_canonical(path, "canonical payload must not be empty"));
+    }
+    Ok(decoded)
+}
+
+fn snapshot_hex_digit(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
+fn entry_identity_from_snapshot(
+    identity: &crate::snapshot::AuthorityEntryIdentitySnapshotV2,
+    path: &str,
+) -> Result<EntryIdentity, crate::snapshot::SnapshotError> {
+    identity.validate()?;
+    if !is_valid_context(&identity.context)
+        || validate_authority_operation_id(identity.operation_id.as_str()).is_err()
+        || validate_authority_material_digest(identity.material_digest.as_str()).is_err()
+    {
+        return Err(snapshot_invalid(path, "entry identity is malformed"));
+    }
+    let next_control = parse_control_id(&identity.next_control_id)
+        .ok_or_else(|| snapshot_invalid(path, "next control identity is not reversible"))?;
+    let material = Material {
+        digest: identity.material_digest.clone(),
+        payload: Value::Null,
+    };
+    let entry = AuthorityEntry {
+        context: identity.context.clone(),
+        revision: identity.revision,
+        operation_id: identity.operation_id.clone(),
+        kind: identity.kind,
+        material: material.clone(),
+        next_control: next_control.clone(),
+        subsumes: identity.subsumes.clone(),
+    };
+    if !is_valid_entry(&entry) || control_id_of(&next_control) != identity.next_control_id {
+        return Err(snapshot_invalid(path, "entry identity is invalid"));
+    }
+    Ok(EntryIdentity {
+        revision: identity.revision,
+        context: identity.context.clone(),
+        operation_id: identity.operation_id.clone(),
+        kind: identity.kind,
+        material,
+        next_control,
+        subsumes: identity.subsumes.clone(),
+        material_payload_known: false,
+    })
+}
+
+fn snapshot_invalid(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn snapshot_canonical(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> crate::snapshot::SnapshotError {
+    crate::snapshot::SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn parse_control_id(value: &str) -> Option<NextControl> {
+    let control = if value.starts_with("COMMAND_FRONTIER/") {
+        parse_command_control_id(value)
+    } else if value.starts_with("REPLACEMENT/") {
+        parse_replacement_control_id(value)
+    } else if value.starts_with("SHARED_INTERACTION/") {
+        parse_shared_interaction_control_id(value)
+    } else if value.starts_with("AWAIT_SUCCESSOR/") {
+        parse_await_successor_control_id(value)
+    } else if value.starts_with("TERMINAL/") {
+        parse_terminal_control_id(value)
+    } else {
+        None
+    }?;
+    (is_valid_successor_control(&control) && control_id_of(&control) == value).then_some(control)
+}
+
+fn parse_command_control_id(value: &str) -> Option<NextControl> {
+    let mut parts = value.split('/');
+    if parts.next()? != "COMMAND_FRONTIER" {
+        return None;
+    }
+    let epoch = parse_prefixed_u53(parts.next()?, "e")?;
+    let wave = parse_prefixed_u53(parts.next()?, "w")?;
+    let turn = parse_prefixed_u53(parts.next()?, "t")?;
+    let targets = parts.next()?;
+    if parts.next().is_some() || targets.is_empty() {
+        return None;
+    }
+    let commands = targets
+        .split(',')
+        .map(|target| {
+            let mut fields = target.split(':');
+            Some(CommandControlTarget {
+                field_index: parse_prefixed_u53(fields.next()?, "f")?,
+                owner_seat_id: parse_prefixed_seat(fields.next()?, "s")?,
+                pokemon_id: parse_prefixed_u53(fields.next()?, "p")?,
+            })
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(NextControl::CommandFrontier(
+        er_types::CommandFrontierControl {
+            epoch,
+            wave,
+            turn,
+            commands,
+        },
+    ))
+}
+
+fn parse_replacement_control_id(value: &str) -> Option<NextControl> {
+    let mut parts = value.split('/');
+    if parts.next()? != "REPLACEMENT" {
+        return None;
+    }
+    let operation_id = parse_operation_id(parts.next()?)?;
+    let owner_seat_id = parse_prefixed_seat(parts.next()?, "s")?;
+    let epoch = parse_prefixed_u53(parts.next()?, "e")?;
+    let wave = parse_prefixed_u53(parts.next()?, "w")?;
+    let turn = parse_prefixed_u53(parts.next()?, "t")?;
+    let occurrence = parse_prefixed_u53(parts.next()?, "o")?;
+    let field_index = parse_prefixed_u53(parts.next()?, "f")?;
+    let remaining = parts.next()?.strip_prefix("remaining:")?;
+    if parts.next().is_some() {
+        return None;
+    }
+    let remaining = if remaining.is_empty() {
+        Vec::new()
+    } else {
+        remaining
+            .split(',')
+            .map(parse_replacement_address)
+            .collect::<Option<Vec<_>>>()?
+    };
+    Some(NextControl::Replacement(ReplacementControl {
+        operation_id,
+        owner_seat_id,
+        epoch,
+        wave,
+        turn,
+        occurrence,
+        field_index,
+        remaining,
+    }))
+}
+
+fn parse_replacement_address(value: &str) -> Option<ReplacementControlAddress> {
+    let mut fields = value.split(':');
+    Some(ReplacementControlAddress {
+        operation_id: parse_operation_id(fields.next()?)?,
+        owner_seat_id: parse_prefixed_seat(fields.next()?, "s")?,
+        epoch: parse_prefixed_u53(fields.next()?, "e")?,
+        wave: parse_prefixed_u53(fields.next()?, "w")?,
+        turn: parse_prefixed_u53(fields.next()?, "t")?,
+        occurrence: parse_prefixed_u53(fields.next()?, "o")?,
+        field_index: parse_prefixed_u53(fields.next()?, "f")?,
+    })
+    .filter(|_| fields.next().is_none())
+}
+
+fn parse_shared_interaction_control_id(value: &str) -> Option<NextControl> {
+    let mut parts = value.split('/');
+    if parts.next()? != "SHARED_INTERACTION" {
+        return None;
+    }
+    let surface_class = decode_uri_component(parts.next()?)?;
+    let operation_kind = decode_uri_component(parts.next()?)?;
+    let operation_id = parse_operation_id(parts.next()?)?;
+    let owner_seat_id = parse_prefixed_seat(parts.next()?, "s")?;
+    let epoch = parse_prefixed_u53(parts.next()?, "e")?;
+    let wave = parse_prefixed_u53(parts.next()?, "w")?;
+    let turn = parse_prefixed_u53(parts.next()?, "t")?;
+    let operation_kinds = parts.next()?.strip_prefix("results:")?;
+    let operation_ids = parts.next()?.strip_prefix("resultIds:")?;
+    if parts.next().is_some() || operation_kinds.is_empty() || operation_ids.is_empty() {
+        return None;
+    }
+    let operation_kinds = operation_kinds
+        .split(',')
+        .map(decode_uri_component)
+        .collect::<Option<Vec<_>>>()?;
+    let operation_ids = if operation_ids == "*" {
+        None
+    } else {
+        Some(
+            operation_ids
+                .split(',')
+                .map(parse_operation_id)
+                .collect::<Option<Vec<_>>>()?,
+        )
+    };
+    Some(NextControl::SharedInteraction(SharedInteractionControl {
+        operation_id,
+        owner_seat_id,
+        epoch,
+        wave,
+        turn,
+        surface_class,
+        operation_kind,
+        successor: InteractionSuccessor {
+            operation_kinds,
+            operation_ids,
+        },
+    }))
+}
+
+fn parse_await_successor_control_id(value: &str) -> Option<NextControl> {
+    let mut parts = value.split('/');
+    if parts.next()? != "AWAIT_SUCCESSOR" {
+        return None;
+    }
+    let after_operation_id = parse_operation_id(parts.next()?)?;
+    let epoch = parse_prefixed_u53(parts.next()?, "e")?;
+    let wave = parse_prefixed_u53(parts.next()?, "w")?;
+    let turn = parse_prefixed_u53(parts.next()?, "t")?;
+    let allowed_kinds = parts
+        .next()?
+        .split(',')
+        .map(parse_authority_entry_kind)
+        .collect::<Option<Vec<_>>>()?;
+    let interaction_addresses = parts.next()?.strip_prefix("interactionAddresses:")?;
+    let control_addresses = parts.next()?.strip_prefix("controlAddresses:")?;
+    let next_wave = parts.next()?.strip_prefix("nextWave:")?;
+    let expected = parts.next()?.strip_prefix("next:")?;
+    if parts.next().is_some() || allowed_kinds.is_empty() {
+        return None;
+    }
+    let allowed_interaction_addresses = parse_interaction_addresses(interaction_addresses)?;
+    let allowed_control_addresses = parse_control_addresses(control_addresses)?;
+    let allow_next_wave_start = match next_wave {
+        "0" => false,
+        "1" => true,
+        _ => return None,
+    };
+    let expected_operation_id = if expected == "*" {
+        None
+    } else {
+        Some(parse_operation_id(expected)?)
+    };
+    Some(NextControl::AwaitSuccessor(AwaitSuccessorControl {
+        after_operation_id,
+        epoch,
+        wave,
+        turn,
+        allowed_kinds,
+        allowed_interaction_addresses,
+        allowed_control_addresses,
+        allow_next_wave_start,
+        expected_operation_id,
+    }))
+}
+
+fn parse_interaction_addresses(
+    value: &str,
+) -> Option<Option<Vec<InteractionControlAddress>>> {
+    if value == "*" {
+        return Some(None);
+    }
+    if value.is_empty() {
+        return None;
+    }
+    Some(Some(
+        value
+            .split(',')
+            .map(|address| {
+                let mut fields = address.split(':');
+                Some(InteractionControlAddress {
+                    surface_class: decode_uri_component(fields.next()?)?,
+                    operation_kind: decode_uri_component(fields.next()?)?,
+                    wave: parse_prefixed_u53(fields.next()?, "w")?,
+                    turn: parse_prefixed_u53(fields.next()?, "t")?,
+                })
+                .filter(|_| fields.next().is_none())
+            })
+            .collect::<Option<Vec<_>>>()?,
+    ))
+}
+
+fn parse_control_addresses(value: &str) -> Option<Option<Vec<ControlAddress>>> {
+    if value == "*" {
+        return Some(None);
+    }
+    if value.is_empty() {
+        return None;
+    }
+    Some(Some(
+        value
+            .split(',')
+            .map(|address| {
+                let mut fields = address.split(':');
+                let material_kind = fields.next()?.to_owned();
+                let wave = parse_prefixed_u53(fields.next()?, "w")?;
+                let turn = parse_prefixed_u53(fields.next()?, "t")?;
+                let operation_id = fields.next()?.strip_prefix("id")?;
+                let operation_id = if operation_id == "*" {
+                    None
+                } else {
+                    Some(parse_operation_id(operation_id)?)
+                };
+                if fields.next().is_some() {
+                    return None;
+                }
+                Some(ControlAddress {
+                    material_kind,
+                    wave,
+                    turn,
+                    operation_id,
+                })
+            })
+            .collect::<Option<Vec<_>>>()?,
+    ))
+}
+
+fn parse_terminal_control_id(value: &str) -> Option<NextControl> {
+    let encoded = value.strip_prefix("TERMINAL/")?;
+    Some(NextControl::Terminal(TerminalControl {
+        terminal_id: decode_uri_component(encoded)?,
+    }))
+}
+
+fn parse_prefixed_u53(value: &str, prefix: &str) -> Option<SafeU53> {
+    let value = value.strip_prefix(prefix)?.parse::<u64>().ok()?;
+    SafeU53::new(value).ok()
+}
+
+fn parse_prefixed_seat(value: &str, prefix: &str) -> Option<SeatId> {
+    Some(SeatId::new(parse_prefixed_u53(value, prefix)?))
+}
+
+fn parse_operation_id(value: &str) -> Option<OperationId> {
+    OperationId::new(decode_uri_component(value)?).ok()
+}
+
+fn parse_authority_entry_kind(value: &str) -> Option<AuthorityEntryKind> {
+    match value {
+        "TURN_COMMIT" => Some(AuthorityEntryKind::TurnCommit),
+        "REPLACEMENT_COMMIT" => Some(AuthorityEntryKind::ReplacementCommit),
+        "INTERACTION_COMMIT" => Some(AuthorityEntryKind::InteractionCommit),
+        "CONTROL_COMMIT" => Some(AuthorityEntryKind::ControlCommit),
+        "WAVE_ADVANCE" => Some(AuthorityEntryKind::WaveAdvance),
+        "TERMINAL_COMMIT" => Some(AuthorityEntryKind::TerminalCommit),
+        _ => None,
+    }
+}
+
+fn decode_uri_component(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] != b'%' {
+            decoded.push(bytes[index]);
+            index += 1;
+            continue;
+        }
+        if index + 2 >= bytes.len() {
+            return None;
+        }
+        let high = snapshot_hex_digit_ascii(bytes[index + 1])?;
+        let low = snapshot_hex_digit_ascii(bytes[index + 2])?;
+        decoded.push((high << 4) | low);
+        index += 3;
+    }
+    String::from_utf8(decoded).ok()
+}
+
+fn snapshot_hex_digit_ascii(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
 }
