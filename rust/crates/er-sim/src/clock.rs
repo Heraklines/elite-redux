@@ -15,6 +15,45 @@ pub struct ClockTimerSnapshot {
     pub paused: bool,
 }
 
+/// The complete state owned by [`VirtualClock`].  This is deliberately kept
+/// separate from `ClockTimerSnapshot`: the latter is the older diagnostic
+/// projection and does not contain the endpoint counters, pause reasons, or
+/// the deadline used to order due timers.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VirtualClockState {
+    pub now_ms: SafeU53,
+    pub endpoints: Vec<ClockEndpointState>,
+    pub timers: Vec<ClockTimerState>,
+    pub disposed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClockEndpointState {
+    pub endpoint: SeatId,
+    pub counters: Vec<ClockCounterState>,
+    pub pause_reasons: Vec<ClockPauseState>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClockCounterState {
+    pub time_class: TimeClass,
+    pub now_ms: SafeU53,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClockPauseState {
+    pub time_class: TimeClass,
+    pub reasons: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClockTimerState {
+    pub timer: ScheduledTimer,
+    pub remaining_active_ms: SafeU53,
+    pub deadline_ms: SafeU53,
+    pub paused: bool,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ClockEvent {
@@ -33,6 +72,8 @@ pub enum VirtualClockError {
     InvalidCommand { reason: String },
     #[error("virtual clock is disposed")]
     Disposed,
+    #[error("virtual clock state is invalid: {reason}")]
+    InvalidState { reason: String },
 }
 
 #[derive(Debug, Default)]
@@ -46,6 +87,115 @@ pub struct VirtualClock {
 impl VirtualClock {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Export every clock-owned field in deterministic order.
+    pub fn export_state(&self) -> VirtualClockState {
+        VirtualClockState {
+            now_ms: self.now_ms,
+            endpoints: self
+                .endpoints
+                .iter()
+                .map(|(endpoint, clock)| ClockEndpointState {
+                    endpoint: *endpoint,
+                    counters: ALL_TIME_CLASSES
+                        .into_iter()
+                        .map(|time_class| ClockCounterState {
+                            time_class,
+                            now_ms: clock.counters[&time_class],
+                        })
+                        .collect(),
+                    pause_reasons: clock
+                        .pause_reasons
+                        .iter()
+                        .map(|(time_class, reasons)| ClockPauseState {
+                            time_class: *time_class,
+                            reasons: reasons.iter().cloned().collect(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+            timers: self
+                .timers
+                .values()
+                .map(|timer| ClockTimerState {
+                    timer: timer.timer.clone(),
+                    remaining_active_ms: timer.remaining_active_ms,
+                    deadline_ms: timer.deadline_ms,
+                    paused: self.is_endpoint_class_paused(
+                        timer.timer.endpoint,
+                        timer.timer.time_class,
+                    ),
+                })
+                .collect(),
+            disposed: self.disposed,
+        }
+    }
+
+    pub fn restorable_state(&self) -> VirtualClockState {
+        self.export_state()
+    }
+
+    /// Construct a fresh owner only after validating the complete state.
+    pub fn from_state(state: VirtualClockState) -> Result<Self, VirtualClockError> {
+        state.validate()?;
+
+        let endpoints = state
+            .endpoints
+            .into_iter()
+            .map(|endpoint| {
+                let counters = endpoint
+                    .counters
+                    .into_iter()
+                    .map(|counter| (counter.time_class, counter.now_ms))
+                    .collect();
+                let pause_reasons = endpoint
+                    .pause_reasons
+                    .into_iter()
+                    .map(|pause| (pause.time_class, pause.reasons.into_iter().collect()))
+                    .collect();
+                (
+                    endpoint.endpoint,
+                    EndpointClock {
+                        counters,
+                        pause_reasons,
+                    },
+                )
+            })
+            .collect();
+        let timers = state
+            .timers
+            .into_iter()
+            .map(|timer| {
+                (
+                    (timer.timer.endpoint, timer.timer.timer_id),
+                    TimerState {
+                        timer: timer.timer,
+                        remaining_active_ms: timer.remaining_active_ms,
+                        deadline_ms: timer.deadline_ms,
+                    },
+                )
+            })
+            .collect();
+
+        Ok(Self {
+            now_ms: state.now_ms,
+            endpoints,
+            timers,
+            disposed: state.disposed,
+        })
+    }
+
+    pub fn from_restorable_state(state: VirtualClockState) -> Result<Self, VirtualClockError> {
+        Self::from_state(state)
+    }
+
+    /// Replace an owner atomically.  Validation and construction happen on a
+    /// fresh value, so an invalid state leaves this clock untouched.
+    pub fn restore_state(&mut self, state: VirtualClockState) -> Result<(), VirtualClockError> {
+        let restored = Self::from_state(state)?;
+        *self = restored;
+        Ok(())
     }
 
     pub fn now(&self) -> SafeU53 {
@@ -385,6 +535,156 @@ impl EndpointClock {
 
     fn is_active(&self, time_class: TimeClass) -> bool {
         time_class == TimeClass::Absolute || !self.is_paused(time_class)
+    }
+
+}
+
+impl VirtualClockState {
+    pub fn validate(&self) -> Result<(), VirtualClockError> {
+        if self.disposed && (!self.endpoints.is_empty() || !self.timers.is_empty()) {
+            return Err(VirtualClockError::InvalidState {
+                reason: "disposed clock cannot retain endpoint or timer state".to_owned(),
+            });
+        }
+
+        for pair in self.endpoints.windows(2) {
+            if pair[0].endpoint >= pair[1].endpoint {
+                return Err(VirtualClockError::InvalidState {
+                    reason: "endpoints must be strictly sorted and unique".to_owned(),
+                });
+            }
+        }
+
+        let endpoint_map = self
+            .endpoints
+            .iter()
+            .map(|endpoint| (endpoint.endpoint, endpoint))
+            .collect::<BTreeMap<_, _>>();
+
+        for endpoint in &self.endpoints {
+            if endpoint.counters.len() != ALL_TIME_CLASSES.len() {
+                return Err(VirtualClockError::InvalidState {
+                    reason: format!(
+                        "endpoint {} must contain one counter for every time class",
+                        endpoint.endpoint
+                    ),
+                });
+            }
+            for (counter, expected_class) in endpoint
+                .counters
+                .iter()
+                .zip(ALL_TIME_CLASSES)
+            {
+                if counter.time_class != expected_class {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "endpoint {} counters must be ordered by time class",
+                            endpoint.endpoint
+                        ),
+                    });
+                }
+                if counter.now_ms > self.now_ms {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "endpoint {} counter for {:?} exceeds clock time",
+                            endpoint.endpoint, counter.time_class
+                        ),
+                    });
+                }
+                if counter.time_class == TimeClass::Absolute && counter.now_ms != self.now_ms {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "endpoint {} absolute counter must equal clock time",
+                            endpoint.endpoint
+                        ),
+                    });
+                }
+            }
+
+            for pair in endpoint.pause_reasons.windows(2) {
+                if pair[0].time_class >= pair[1].time_class {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "endpoint {} pause classes must be strictly sorted and unique",
+                            endpoint.endpoint
+                        ),
+                    });
+                }
+            }
+            for pause in &endpoint.pause_reasons {
+                if pause.time_class == TimeClass::Absolute {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: "absolute time cannot have pause reasons".to_owned(),
+                    });
+                }
+                if pause.reasons.is_empty()
+                    || pause.reasons.windows(2).any(|pair| pair[0] >= pair[1])
+                    || pause.reasons.iter().any(|reason| reason.is_empty())
+                {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "endpoint {} pause reasons must be non-empty, sorted, and unique",
+                            endpoint.endpoint
+                        ),
+                    });
+                }
+            }
+        }
+
+        for pair in self.timers.windows(2) {
+            let left = (pair[0].timer.endpoint, pair[0].timer.timer_id);
+            let right = (pair[1].timer.endpoint, pair[1].timer.timer_id);
+            if left >= right {
+                return Err(VirtualClockError::InvalidState {
+                    reason: "timers must be strictly sorted and unique".to_owned(),
+                });
+            }
+        }
+
+        for timer in &self.timers {
+            let key = (timer.timer.endpoint, timer.timer.timer_id);
+            let Some(endpoint) = endpoint_map.get(&timer.timer.endpoint) else {
+                return Err(VirtualClockError::InvalidState {
+                    reason: format!("timer {:?} has no endpoint state", key),
+                });
+            };
+            if timer.remaining_active_ms > timer.timer.delay_ms {
+                return Err(VirtualClockError::InvalidState {
+                    reason: format!(
+                        "timer {:?} remaining duration exceeds its original delay",
+                        key,
+                    ),
+                });
+            }
+            let expected_paused = endpoint
+                .pause_reasons
+                .iter()
+                .any(|pause| pause.time_class == timer.timer.time_class);
+            if timer.paused != expected_paused {
+                return Err(VirtualClockError::InvalidState {
+                    reason: format!("timer {:?} has an inconsistent pause state", key),
+                });
+            }
+            let expected_deadline = add_time(self.now_ms, timer.remaining_active_ms)?;
+            if timer.paused {
+                if timer.deadline_ms > expected_deadline {
+                    return Err(VirtualClockError::InvalidState {
+                        reason: format!(
+                            "paused timer {:?} deadline is later than its active deadline",
+                            key
+                        ),
+                    });
+                }
+            } else if timer.deadline_ms != expected_deadline {
+                return Err(VirtualClockError::InvalidState {
+                    reason: format!(
+                        "active timer {:?} deadline does not match remaining duration",
+                        key
+                    ),
+                });
+            }
+        }
+        Ok(())
     }
 }
 

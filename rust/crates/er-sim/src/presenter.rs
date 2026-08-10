@@ -30,6 +30,53 @@ pub struct BattlePresentationCompletion {
     pub outcome: PresentationSettlementOutcome,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct PresenterPendingState {
+    pub endpoint: SeatId,
+    pub event: PresentationEvent,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PresenterOutcomeState {
+    pub endpoint: SeatId,
+    pub event_id: PresentationEventId,
+    pub outcome: PresentationOutcome,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresenterBattlePendingState {
+    pub endpoint: SeatId,
+    pub event: BattlePresentationEvent,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresenterBattleOutcomeState {
+    pub endpoint: SeatId,
+    pub event_id: BattlePresentationEventId,
+    pub outcome: PresentationSettlementOutcome,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresenterTombstoneState {
+    pub endpoint: SeatId,
+    pub event_id: BattlePresentationEventId,
+}
+
+/// Complete neutral state for either presenter implementation.  The mode is
+/// an owner seam, not a new wire field; a production M3 pair may choose to
+/// accept only `FaultControlled` while legacy callers can still round-trip the
+/// instant adapter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PresenterState {
+    pub mode: PresenterMode,
+    pub pending: Vec<PresenterPendingState>,
+    pub outcomes: Vec<PresenterOutcomeState>,
+    pub battle_pending: Vec<PresenterBattlePendingState>,
+    pub battle_outcomes: Vec<PresenterBattleOutcomeState>,
+    pub tombstones: Vec<PresenterTombstoneState>,
+    pub disposed: bool,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresenterDiagnostics {
@@ -56,6 +103,10 @@ pub enum PresenterError {
     },
     #[error("battle presentation settlement outcome is invalid")]
     InvalidBattleOutcome,
+    #[error("presenter state is invalid: {reason}")]
+    InvalidState { reason: String },
+    #[error("presenter mode does not match the requested owner")]
+    ModeMismatch,
 }
 
 pub trait Presenter: fmt::Debug {
@@ -109,7 +160,151 @@ pub trait Presenter: fmt::Debug {
 
     fn diagnostics(&self) -> PresenterDiagnostics;
 
+    fn mode(&self) -> PresenterMode;
+
+    fn export_state(&self) -> Result<PresenterState, PresenterError>;
+
+    fn restorable_state(&self) -> Result<PresenterState, PresenterError> {
+        self.export_state()
+    }
+
     fn dispose(&mut self);
+}
+
+/// Restore a presenter without downcasting a trait object.  Validation is
+/// completed before any owner is returned, and each concrete constructor is
+/// fresh-owner/fail-atomic.
+pub fn restore_presenter(state: PresenterState) -> Result<Box<dyn Presenter>, PresenterError> {
+    state.validate()?;
+    match state.mode {
+        PresenterMode::Instant => Ok(Box::new(InstantPresenter::from_state(state)?)),
+        PresenterMode::FaultControlled => Ok(Box::new(FaultPresenter::from_state(state)?)),
+    }
+}
+
+impl PresenterState {
+    pub fn validate(&self) -> Result<(), PresenterError> {
+        if has_duplicate_or_unsorted(self.pending.iter().map(|entry| {
+            (entry.endpoint, entry.event.event_id)
+        })) {
+            return Err(PresenterError::InvalidState {
+                reason: "legacy pending events must be strictly sorted and unique".to_owned(),
+            });
+        }
+        if has_duplicate_or_unsorted(
+            self.outcomes
+                .iter()
+                .map(|entry| (entry.endpoint, entry.event_id)),
+        ) {
+            return Err(PresenterError::InvalidState {
+                reason: "legacy outcomes must be strictly sorted and unique".to_owned(),
+            });
+        }
+        if has_duplicate_or_unsorted(self.battle_pending.iter().map(|entry| {
+            (entry.endpoint, entry.event.event_id.clone())
+        })) {
+            return Err(PresenterError::InvalidState {
+                reason: "battle pending events must be strictly sorted and unique".to_owned(),
+            });
+        }
+        if has_duplicate_or_unsorted(self.battle_outcomes.iter().map(|entry| {
+            (entry.endpoint, entry.event_id.clone())
+        })) {
+            return Err(PresenterError::InvalidState {
+                reason: "battle outcomes must be strictly sorted and unique".to_owned(),
+            });
+        }
+        if has_duplicate_or_unsorted(
+            self.tombstones
+                .iter()
+                .map(|entry| (entry.endpoint, entry.event_id.clone())),
+        ) {
+            return Err(PresenterError::InvalidState {
+                reason: "battle tombstones must be strictly sorted and unique".to_owned(),
+            });
+        }
+
+        let pending = self
+            .battle_pending
+            .iter()
+            .map(|entry| (entry.endpoint, entry.event.event_id.clone()))
+            .collect::<BTreeSet<_>>();
+        let outcomes = self
+            .battle_outcomes
+            .iter()
+            .map(|entry| (entry.endpoint, entry.event_id.clone()))
+            .collect::<BTreeSet<_>>();
+        let tombstones = self
+            .tombstones
+            .iter()
+            .map(|entry| (entry.endpoint, entry.event_id.clone()))
+            .collect::<BTreeSet<_>>();
+        if pending.iter().any(|key| outcomes.contains(key) || tombstones.contains(key))
+            || outcomes != tombstones
+        {
+            return Err(PresenterError::InvalidState {
+                reason: "battle pending identities must be unsettled and outcomes must match tombstones"
+                    .to_owned(),
+            });
+        }
+
+        let legacy_pending = self
+            .pending
+            .iter()
+            .map(|entry| (entry.endpoint, entry.event.event_id))
+            .collect::<BTreeSet<_>>();
+        let legacy_outcomes = self
+            .outcomes
+            .iter()
+            .map(|entry| (entry.endpoint, entry.event_id))
+            .collect::<BTreeSet<_>>();
+        if legacy_pending
+            .iter()
+            .any(|key| legacy_outcomes.contains(key))
+        {
+            return Err(PresenterError::InvalidState {
+                reason: "legacy pending identities must not have outcomes".to_owned(),
+            });
+        }
+
+        if self.mode == PresenterMode::Instant
+            && (!self.pending.is_empty() || !self.battle_pending.is_empty())
+        {
+            return Err(PresenterError::InvalidState {
+                reason: "instant presenter cannot retain pending events".to_owned(),
+            });
+        }
+        for outcome in &self.battle_outcomes {
+            outcome
+                .outcome
+                .validate()
+                .map_err(|error| PresenterError::InvalidState {
+                    reason: error.to_string(),
+                })?;
+        }
+        if self.disposed
+            && (!self.pending.is_empty()
+                || !self.outcomes.is_empty()
+                || !self.battle_pending.is_empty()
+                || !self.battle_outcomes.is_empty()
+                || !self.tombstones.is_empty())
+        {
+            return Err(PresenterError::InvalidState {
+                reason: "disposed presenter cannot retain pending, outcome, or tombstone state"
+                    .to_owned(),
+            });
+        }
+        Ok(())
+    }
+}
+
+fn has_duplicate_or_unsorted<T, I>(values: I) -> bool
+where
+    T: Ord,
+    I: IntoIterator<Item = T>,
+{
+    let values = values.into_iter().collect::<Vec<_>>();
+    values.windows(2).any(|pair| pair[0] >= pair[1])
 }
 
 #[derive(Debug, Default)]
@@ -123,6 +318,77 @@ pub struct InstantPresenter {
 impl InstantPresenter {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn export_state(&self) -> Result<PresenterState, PresenterError> {
+        let state = PresenterState {
+            mode: PresenterMode::Instant,
+            pending: Vec::new(),
+            outcomes: self
+                .settled
+                .iter()
+                .map(|((endpoint, event_id), outcome)| PresenterOutcomeState {
+                    endpoint: *endpoint,
+                    event_id: *event_id,
+                    outcome: outcome.clone(),
+                })
+                .collect(),
+            battle_pending: Vec::new(),
+            battle_outcomes: self
+                .battle_settled
+                .iter()
+                .map(|((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
+                    endpoint: *endpoint,
+                    event_id: event_id.clone(),
+                    outcome: outcome.clone(),
+                })
+                .collect(),
+            tombstones: self
+                .battle_settled
+                .keys()
+                .map(|(endpoint, event_id)| PresenterTombstoneState {
+                    endpoint: *endpoint,
+                    event_id: event_id.clone(),
+                })
+                .collect(),
+            disposed: self.disposed,
+        };
+        state.validate()?;
+        Ok(state)
+    }
+
+    pub fn restorable_state(&self) -> Result<PresenterState, PresenterError> {
+        self.export_state()
+    }
+
+    pub fn from_restorable_state(state: PresenterState) -> Result<Self, PresenterError> {
+        Self::from_state(state)
+    }
+
+    pub fn from_state(state: PresenterState) -> Result<Self, PresenterError> {
+        state.validate()?;
+        if state.mode != PresenterMode::Instant {
+            return Err(PresenterError::ModeMismatch);
+        }
+        Ok(Self {
+            settled: state
+                .outcomes
+                .into_iter()
+                .map(|outcome| ((outcome.endpoint, outcome.event_id), outcome.outcome))
+                .collect(),
+            battle_settled: state
+                .battle_outcomes
+                .into_iter()
+                .map(|outcome| ((outcome.endpoint, outcome.event_id), outcome.outcome))
+                .collect(),
+            disposed: state.disposed,
+        })
+    }
+
+    pub fn restore_state(&mut self, state: PresenterState) -> Result<(), PresenterError> {
+        let restored = Self::from_state(state)?;
+        *self = restored;
+        Ok(())
     }
 }
 
@@ -173,7 +439,7 @@ impl Presenter for InstantPresenter {
         if self.disposed {
             return Err(PresenterError::Disposed);
         }
-        let event_id = event.event_id;
+        let event_id = event.event_id.clone();
         let key = (endpoint, event_id.clone());
         if self.battle_settled.contains_key(&key) {
             return Err(PresenterError::BattleAlreadySettled { event_id });
@@ -240,6 +506,14 @@ impl Presenter for InstantPresenter {
         }
     }
 
+    fn mode(&self) -> PresenterMode {
+        PresenterMode::Instant
+    }
+
+    fn export_state(&self) -> Result<PresenterState, PresenterError> {
+        InstantPresenter::export_state(self)
+    }
+
     fn dispose(&mut self) {
         self.disposed = true;
         self.settled.clear();
@@ -249,17 +523,118 @@ impl Presenter for InstantPresenter {
 
 #[derive(Debug, Default)]
 pub struct FaultPresenter {
-    pending: BTreeSet<(SeatId, PresentationEventId)>,
+    pending: BTreeMap<(SeatId, PresentationEventId), PresentationEvent>,
     settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
-    battle_pending: BTreeSet<(SeatId, BattlePresentationEventId)>,
+    battle_pending: BTreeMap<(SeatId, BattlePresentationEventId), BattlePresentationEvent>,
     battle_settled:
         BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
+    battle_tombstones: BTreeSet<(SeatId, BattlePresentationEventId)>,
     disposed: bool,
 }
 
 impl FaultPresenter {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn export_state(&self) -> Result<PresenterState, PresenterError> {
+        let state = PresenterState {
+            mode: PresenterMode::FaultControlled,
+            pending: self
+                .pending
+                .iter()
+                .map(|((endpoint, _), event)| PresenterPendingState {
+                    endpoint: *endpoint,
+                    event: event.clone(),
+                })
+                .collect(),
+            outcomes: self
+                .settled
+                .iter()
+                .map(|((endpoint, event_id), outcome)| PresenterOutcomeState {
+                    endpoint: *endpoint,
+                    event_id: *event_id,
+                    outcome: outcome.clone(),
+                })
+                .collect(),
+            battle_pending: self
+                .battle_pending
+                .iter()
+                .map(|((endpoint, _), event)| PresenterBattlePendingState {
+                    endpoint: *endpoint,
+                    event: event.clone(),
+                })
+                .collect(),
+            battle_outcomes: self
+                .battle_settled
+                .iter()
+                .map(|((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
+                    endpoint: *endpoint,
+                    event_id: event_id.clone(),
+                    outcome: outcome.clone(),
+                })
+                .collect(),
+            tombstones: self
+                .battle_tombstones
+                .iter()
+                .map(|(endpoint, event_id)| PresenterTombstoneState {
+                    endpoint: *endpoint,
+                    event_id: event_id.clone(),
+                })
+                .collect(),
+            disposed: self.disposed,
+        };
+        state.validate()?;
+        Ok(state)
+    }
+
+    pub fn restorable_state(&self) -> Result<PresenterState, PresenterError> {
+        self.export_state()
+    }
+
+    pub fn from_restorable_state(state: PresenterState) -> Result<Self, PresenterError> {
+        Self::from_state(state)
+    }
+
+    pub fn from_state(state: PresenterState) -> Result<Self, PresenterError> {
+        state.validate()?;
+        if state.mode != PresenterMode::FaultControlled {
+            return Err(PresenterError::ModeMismatch);
+        }
+        Ok(Self {
+            pending: state
+                .pending
+                .into_iter()
+                .map(|pending| ((pending.endpoint, pending.event.event_id), pending.event))
+                .collect(),
+            settled: state
+                .outcomes
+                .into_iter()
+                .map(|outcome| ((outcome.endpoint, outcome.event_id), outcome.outcome))
+                .collect(),
+            battle_pending: state
+                .battle_pending
+                .into_iter()
+                .map(|pending| ((pending.endpoint, pending.event.event_id.clone()), pending.event))
+                .collect(),
+            battle_settled: state
+                .battle_outcomes
+                .into_iter()
+                .map(|outcome| ((outcome.endpoint, outcome.event_id.clone()), outcome.outcome))
+                .collect(),
+            battle_tombstones: state
+                .tombstones
+                .into_iter()
+                .map(|tombstone| (tombstone.endpoint, tombstone.event_id))
+                .collect(),
+            disposed: state.disposed,
+        })
+    }
+
+    pub fn restore_state(&mut self, state: PresenterState) -> Result<(), PresenterError> {
+        let restored = Self::from_state(state)?;
+        *self = restored;
+        Ok(())
     }
 
     pub fn duplicate_completion(
@@ -294,7 +669,7 @@ impl Presenter for FaultPresenter {
             });
         }
 
-        self.pending.insert(key);
+        self.pending.entry(key).or_insert(event);
         Ok(Vec::new())
     }
 
@@ -308,7 +683,7 @@ impl Presenter for FaultPresenter {
             return Err(PresenterError::Disposed);
         }
         let key = (endpoint, event_id);
-        if !self.pending.remove(&key) {
+        if self.pending.remove(&key).is_none() {
             if self.settled.contains_key(&key) {
                 return Err(PresenterError::AlreadySettled { event_id });
             }
@@ -327,12 +702,12 @@ impl Presenter for FaultPresenter {
         if self.disposed {
             return Err(PresenterError::Disposed);
         }
-        let event_id = event.event_id;
+        let event_id = event.event_id.clone();
         let key = (endpoint, event_id.clone());
         if self.battle_settled.contains_key(&key) {
             return Err(PresenterError::BattleAlreadySettled { event_id });
         }
-        self.battle_pending.insert(key);
+        self.battle_pending.entry(key).or_insert(event);
         Ok(Vec::new())
     }
 
@@ -349,7 +724,7 @@ impl Presenter for FaultPresenter {
             .validate()
             .map_err(|_| PresenterError::InvalidBattleOutcome)?;
         let key = (endpoint, event_id.clone());
-        if !self.battle_pending.remove(&key) {
+        if self.battle_pending.remove(&key).is_none() {
             if self.battle_settled.contains_key(&key) {
                 return Err(PresenterError::BattleAlreadySettled { event_id });
             }
@@ -357,13 +732,16 @@ impl Presenter for FaultPresenter {
         }
 
         self.battle_settled.insert(key, outcome.clone());
+        self.battle_tombstones.insert((endpoint, event_id.clone()));
         Ok(vec![BattlePresentationCompletion { event_id, outcome }])
     }
 
     fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         self.pending
             .iter()
-            .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
+            .filter_map(|((key_endpoint, event_id), _)| {
+                (*key_endpoint == endpoint).then_some(*event_id)
+            })
             .collect()
     }
 
@@ -380,7 +758,7 @@ impl Presenter for FaultPresenter {
     ) -> BTreeSet<BattlePresentationEventId> {
         self.battle_pending
             .iter()
-            .filter_map(|(key_endpoint, event_id)| {
+            .filter_map(|((key_endpoint, event_id), _)| {
                 (*key_endpoint == endpoint).then_some(event_id.clone())
             })
             .collect()
@@ -400,10 +778,18 @@ impl Presenter for FaultPresenter {
 
     fn diagnostics(&self) -> PresenterDiagnostics {
         PresenterDiagnostics {
-            pending_event_ids: self.pending.iter().map(|(_, event_id)| *event_id).collect(),
+            pending_event_ids: self.pending.keys().map(|(_, event_id)| *event_id).collect(),
             settled_event_ids: self.settled.keys().map(|(_, event_id)| *event_id).collect(),
             disposed: self.disposed,
         }
+    }
+
+    fn mode(&self) -> PresenterMode {
+        PresenterMode::FaultControlled
+    }
+
+    fn export_state(&self) -> Result<PresenterState, PresenterError> {
+        FaultPresenter::export_state(self)
     }
 
     fn dispose(&mut self) {
@@ -412,5 +798,6 @@ impl Presenter for FaultPresenter {
         self.settled.clear();
         self.battle_pending.clear();
         self.battle_settled.clear();
+        self.battle_tombstones.clear();
     }
 }

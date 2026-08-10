@@ -18,6 +18,76 @@ pub struct NetworkPacket {
     pub deliver_at_ms: SafeU53,
 }
 
+pub const FAULT_NETWORK_RNG_ALGORITHM_VERSION: u32 = 1;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultNetworkPacketKind {
+    AuthorityFrame,
+    CommandProposal,
+    ReplacementProposal,
+    ControlReceipt,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultNetworkPacketDisposition {
+    Queued,
+    Delayed,
+    Ready,
+}
+
+/// Exact RNG state for the pinned mulberry32 implementation.  `state_bits` is
+/// a fixed-width binary representation of the complete u32 state so a bridge
+/// can carry it through the frozen string-only snapshot field without loss.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultNetworkRngState {
+    pub algorithm_version: u32,
+    pub state_bits: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultNetworkGenerationState {
+    pub endpoint: SeatId,
+    pub generation: ConnectionGeneration,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaultNetworkPacketState {
+    pub packet: NetworkPacket,
+    pub queue_order_id: SafeU53,
+    pub enqueued_at_ms: SafeU53,
+    pub source_generation: ConnectionGeneration,
+    pub destination_generation: ConnectionGeneration,
+    pub stale: bool,
+    pub kind: FaultNetworkPacketKind,
+    pub payload_corrupted: bool,
+    pub disposition: FaultNetworkPacketDisposition,
+    /// The zero-based rank among explicitly reordered packet identities.
+    pub reorder_rank: Option<SafeU53>,
+}
+
+/// Complete mechanical state of [`FaultNetwork`]. Packet records are
+/// canonicalized by `queue_order_id`; those IDs are relabeled whenever a
+/// fault changes vector order, so sorting the records reconstructs the exact
+/// owner queue without an extra rank field.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaultNetworkState {
+    pub seed: u64,
+    pub rng: FaultNetworkRngState,
+    pub observed_now_ms: SafeU53,
+    pub endpoints: [SeatId; 2],
+    pub generations: Vec<FaultNetworkGenerationState>,
+    pub packets: Vec<FaultNetworkPacketState>,
+    pub reordered_packet_ids: Vec<SafeU53>,
+    pub next_packet_id: Option<SafeU53>,
+    pub next_queue_order_id: Option<SafeU53>,
+    pub disconnected: Vec<SeatId>,
+    pub suspended: Vec<SeatId>,
+    pub dropped_count: SafeU53,
+    pub duplicated_count: SafeU53,
+    pub corrupted_count: SafeU53,
+    pub disposed: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum FrameCorruption {
@@ -149,6 +219,8 @@ pub enum FaultNetworkError {
     Disposed,
     #[error("packet id space is exhausted")]
     PacketIdExhausted,
+    #[error("queue-order id space is exhausted")]
+    QueueOrderExhausted,
     #[error("packet {packet_id} is not queued")]
     UnknownPacket { packet_id: SafeU53 },
     #[error("endpoint {endpoint} is disconnected")]
@@ -159,6 +231,8 @@ pub enum FaultNetworkError {
     InvalidFault { reason: String },
     #[error("packet {packet_id} carries an opaque proposal and cannot be frame-corrupted")]
     PayloadIsNotFrame { packet_id: SafeU53 },
+    #[error("fault network state is invalid: {reason}")]
+    InvalidState { reason: String },
 }
 
 #[derive(Debug)]
@@ -170,6 +244,7 @@ pub struct FaultNetwork {
     queue: Vec<QueuedPacket>,
     reordered_packet_ids: BTreeSet<SafeU53>,
     next_packet_id: u64,
+    next_queue_order_id: u64,
     disconnected: BTreeSet<SeatId>,
     suspended: BTreeSet<SeatId>,
     dropped_count: SafeU53,
@@ -191,13 +266,131 @@ impl FaultNetwork {
             queue: Vec::new(),
             reordered_packet_ids: BTreeSet::new(),
             next_packet_id: 0,
+            next_queue_order_id: 0,
             disconnected: BTreeSet::new(),
             suspended: BTreeSet::new(),
             dropped_count: SafeU53::ZERO,
             duplicated_count: SafeU53::ZERO,
             corrupted_count: SafeU53::ZERO,
             disposed: false,
+            last_observed_now_ms: SafeU53::ZERO,
         }
+    }
+
+    /// Export complete causal state without collapsing packet bodies into
+    /// diagnostics or deriving queue order from vector positions.
+    pub fn export_state(&self) -> FaultNetworkState {
+        let reorder_ranks = self
+            .queue
+            .iter()
+            .filter(|packet| self.reordered_packet_ids.contains(&packet.packet.packet_id))
+            .enumerate()
+            .map(|(rank, packet)| (packet.packet.packet_id, safe_u53_from_usize(rank)))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut packets = self
+            .queue
+            .iter()
+            .map(|packet| FaultNetworkPacketState {
+                packet: packet.packet.clone(),
+                queue_order_id: packet.queue_order_id,
+                enqueued_at_ms: packet.enqueued_at_ms,
+                source_generation: packet.source_generation,
+                destination_generation: packet.destination_generation,
+                stale: packet.stale,
+                kind: packet.kind,
+                payload_corrupted: packet.payload_corrupted,
+                disposition: packet.disposition,
+                reorder_rank: reorder_ranks.get(&packet.packet.packet_id).copied(),
+            })
+            .collect::<Vec<_>>();
+        packets.sort_by_key(|packet| packet.queue_order_id);
+
+        FaultNetworkState {
+            seed: self.seed,
+            rng: self.rng.export_state(),
+            observed_now_ms: self.last_observed_now_ms,
+            endpoints: self.endpoints,
+            generations: self
+                .generations
+                .iter()
+                .map(|(endpoint, generation)| FaultNetworkGenerationState {
+                    endpoint: *endpoint,
+                    generation: *generation,
+                })
+                .collect(),
+            packets,
+            reordered_packet_ids: self.reordered_packet_ids.iter().copied().collect(),
+            next_packet_id: allocator_state(self.next_packet_id),
+            next_queue_order_id: allocator_state(self.next_queue_order_id),
+            disconnected: self.disconnected.iter().copied().collect(),
+            suspended: self.suspended.iter().copied().collect(),
+            dropped_count: self.dropped_count,
+            duplicated_count: self.duplicated_count,
+            corrupted_count: self.corrupted_count,
+            disposed: self.disposed,
+        }
+    }
+
+    pub fn restorable_state(&self) -> FaultNetworkState {
+        self.export_state()
+    }
+
+    /// Construct a fresh network only after validating every allocator,
+    /// endpoint, packet, generation, reorder, and RNG field.
+    pub fn from_state(state: FaultNetworkState) -> Result<Self, FaultNetworkError> {
+        state.validate()?;
+
+        let generations = state
+            .generations
+            .into_iter()
+            .map(|entry| (entry.endpoint, entry.generation))
+            .collect();
+        let queue = state
+            .packets
+            .into_iter()
+            .map(|packet| QueuedPacket {
+                packet: packet.packet,
+                queue_order_id: packet.queue_order_id,
+                enqueued_at_ms: packet.enqueued_at_ms,
+                source_generation: packet.source_generation,
+                destination_generation: packet.destination_generation,
+                stale: packet.stale,
+                kind: packet.kind,
+                payload_corrupted: packet.payload_corrupted,
+                disposition: packet.disposition,
+            })
+            .collect();
+        let reordered_packet_ids = state.reordered_packet_ids.into_iter().collect();
+
+        Ok(Self {
+            seed: state.seed,
+            rng: SeededRng::from_state(state.rng)?,
+            last_observed_now_ms: state.observed_now_ms,
+            endpoints: state.endpoints,
+            generations,
+            queue,
+            reordered_packet_ids,
+            next_packet_id: allocator_value(state.next_packet_id),
+            next_queue_order_id: allocator_value(state.next_queue_order_id),
+            disconnected: state.disconnected.into_iter().collect(),
+            suspended: state.suspended.into_iter().collect(),
+            dropped_count: state.dropped_count,
+            duplicated_count: state.duplicated_count,
+            corrupted_count: state.corrupted_count,
+            disposed: state.disposed,
+        })
+    }
+
+    pub fn from_restorable_state(state: FaultNetworkState) -> Result<Self, FaultNetworkError> {
+        Self::from_state(state)
+    }
+
+    /// Replace an owner atomically through a fresh validated construction.
+    pub fn restore_state(&mut self, state: FaultNetworkState) -> Result<(), FaultNetworkError> {
+        let restored = Self::from_state(state)?;
+        *self = restored;
+        Ok(())
     }
 
     pub fn enqueue(
@@ -220,8 +413,10 @@ impl FaultNetwork {
 
         let source_generation = self.connection_generation(from);
         let destination_generation = self.connection_generation(to);
+        let (kind, payload_corrupted) = classify_payload(&payload);
         let (deliver_at_ms, next_rng) = self.next_delivery_time(now_ms)?;
-        let packet_id = self.allocate_packet_id()?;
+        let (packet_id, queue_order_id, next_packet_id, next_queue_order_id) =
+            self.peek_packet_and_queue_ids()?;
         self.queue.push(QueuedPacket {
             packet: NetworkPacket {
                 packet_id,
@@ -230,32 +425,43 @@ impl FaultNetwork {
                 connection_generation,
                 payload,
                 deliver_at_ms,
-            },
+                },
+            queue_order_id,
+            enqueued_at_ms: now_ms,
             source_generation,
             destination_generation,
             // Retain an explicitly stale send for deterministic drop/reap behavior, but never
             // allow it to cross either endpoint's current incarnation boundary.
             stale: connection_generation != source_generation
                 || connection_generation != destination_generation,
+            kind,
+            payload_corrupted,
+            disposition: if deliver_at_ms <= now_ms {
+                FaultNetworkPacketDisposition::Ready
+            } else {
+                FaultNetworkPacketDisposition::Queued
+            },
         });
         self.rng = next_rng;
+        self.next_packet_id = next_packet_id;
+        self.next_queue_order_id = next_queue_order_id;
+        self.observe_now(now_ms);
         Ok(packet_id)
     }
 
     pub fn apply(
         &mut self,
         operation: FaultOperation,
-        _now_ms: SafeU53,
+        now_ms: SafeU53,
     ) -> Result<Vec<NetworkEvent>, FaultNetworkError> {
         self.ensure_live()?;
-        match operation {
+        let events = match operation {
             FaultOperation::Deliver { packet_id } => self.deliver_packet(packet_id),
             FaultOperation::DeliverNext => {
-                let Some(packet_id) = self.queue.first().map(|queued| queued.packet.packet_id)
-                else {
-                    return Ok(Vec::new());
-                };
-                self.deliver_packet(packet_id)
+                match self.queue.first().map(|queued| queued.packet.packet_id) {
+                    Some(packet_id) => self.deliver_packet(packet_id),
+                    None => Ok(Vec::new()),
+                }
             }
             FaultOperation::Drop { packet_id } => self.drop_packet(packet_id),
             FaultOperation::Duplicate { packet_id } => {
@@ -280,11 +486,14 @@ impl FaultNetwork {
                 self.corrupt_packet(packet_id, corruption)?;
                 Ok(Vec::new())
             }
-        }
+        }?;
+        self.observe_now(now_ms);
+        Ok(events)
     }
 
     pub fn deliver_due(&mut self, now_ms: SafeU53) -> Result<Vec<NetworkEvent>, FaultNetworkError> {
         self.ensure_live()?;
+        self.observe_now(now_ms);
         let mut events = self.reap_stale_packets();
         while let Some(index) = self.next_reordered_due_index(now_ms) {
             let packet_id = self.queue[index].packet.packet_id;
@@ -362,6 +571,23 @@ impl FaultNetwork {
             .map(|queued| &queued.packet)
     }
 
+    pub fn packet_kind(&self, packet_id: SafeU53) -> Option<FaultNetworkPacketKind> {
+        self.queue
+            .iter()
+            .find(|queued| queued.packet.packet_id == packet_id)
+            .map(|queued| queued.kind)
+    }
+
+    pub fn packet_disposition(
+        &self,
+        packet_id: SafeU53,
+    ) -> Option<FaultNetworkPacketDisposition> {
+        self.queue
+            .iter()
+            .find(|queued| queued.packet.packet_id == packet_id)
+            .map(|queued| queued.disposition)
+    }
+
     pub fn queued_packets(&self) -> Vec<NetworkPacket> {
         self.queue
             .iter()
@@ -419,14 +645,43 @@ impl FaultNetwork {
         self.endpoints.contains(&endpoint)
     }
 
-    fn allocate_packet_id(&mut self) -> Result<SafeU53, FaultNetworkError> {
+    fn observe_now(&mut self, now_ms: SafeU53) {
+        if now_ms > self.last_observed_now_ms {
+            self.last_observed_now_ms = now_ms;
+        }
+        for queued in &mut self.queue {
+            if queued.packet.deliver_at_ms <= self.last_observed_now_ms {
+                queued.disposition = FaultNetworkPacketDisposition::Ready;
+            }
+        }
+    }
+
+    fn peek_packet_and_queue_ids(
+        &self,
+    ) -> Result<(SafeU53, SafeU53, u64, u64), FaultNetworkError> {
+        let (packet_id, next_packet_id) = self.peek_packet_id()?;
+        let queue_order_id = SafeU53::new(self.next_queue_order_id)
+            .map_err(|_| FaultNetworkError::QueueOrderExhausted)?;
+        let next_queue_order_id = self
+            .next_queue_order_id
+            .checked_add(1)
+            .ok_or(FaultNetworkError::QueueOrderExhausted)?;
+        Ok((
+            packet_id,
+            queue_order_id,
+            next_packet_id,
+            next_queue_order_id,
+        ))
+    }
+
+    fn peek_packet_id(&self) -> Result<(SafeU53, u64), FaultNetworkError> {
         let packet_id =
             SafeU53::new(self.next_packet_id).map_err(|_| FaultNetworkError::PacketIdExhausted)?;
-        self.next_packet_id = self
+        let next_packet_id = self
             .next_packet_id
             .checked_add(1)
             .ok_or(FaultNetworkError::PacketIdExhausted)?;
-        Ok(packet_id)
+        Ok((packet_id, next_packet_id))
     }
 
     fn next_delivery_time(
@@ -485,10 +740,15 @@ impl FaultNetwork {
 
     fn duplicate_packet(&mut self, packet_id: SafeU53) -> Result<(), FaultNetworkError> {
         let index = self.packet_index(packet_id)?;
-        let mut duplicate = self.queue[index].clone();
-        let duplicate_id = self.allocate_packet_id()?;
+        let (duplicate_id, next_packet_id) = self.peek_packet_id()?;
+        let mut queue = self.queue.clone();
+        let mut duplicate = queue[index].clone();
         duplicate.packet.packet_id = duplicate_id;
-        self.queue.insert(index + 1, duplicate);
+        queue.insert(index + 1, duplicate);
+        let next_queue_order_id = relabel_queue_order_ids(&mut queue, self.next_queue_order_id)?;
+        self.queue = queue;
+        self.next_packet_id = next_packet_id;
+        self.next_queue_order_id = next_queue_order_id;
         increment_diagnostic_counter(&mut self.duplicated_count);
         Ok(())
     }
@@ -510,6 +770,12 @@ impl FaultNetwork {
             SafeU53::new(deliver_at).map_err(|_| FaultNetworkError::InvalidFault {
                 reason: "packet delay exceeds SafeU53".to_owned(),
             })?;
+        self.queue[index].disposition =
+            if self.queue[index].packet.deliver_at_ms <= self.last_observed_now_ms {
+                FaultNetworkPacketDisposition::Ready
+            } else {
+                FaultNetworkPacketDisposition::Delayed
+            };
         Ok(())
     }
 
@@ -529,12 +795,26 @@ impl FaultNetwork {
         }
 
         let mut reordered = Vec::with_capacity(self.queue.len());
-        for packet_id in packet_ids {
-            let index = self.packet_index(packet_id)?;
-            reordered.push(self.queue.remove(index));
+        for packet_id in &packet_ids {
+            let packet = self
+                .queue
+                .iter()
+                .find(|queued| queued.packet.packet_id == *packet_id)
+                .cloned()
+                .ok_or(FaultNetworkError::UnknownPacket {
+                    packet_id: *packet_id,
+                })?;
+            reordered.push(packet);
         }
-        reordered.append(&mut self.queue);
+        reordered.extend(
+            self.queue
+                .iter()
+                .filter(|queued| !seen.contains(&queued.packet.packet_id))
+                .cloned(),
+        );
+        let next_queue_order_id = relabel_queue_order_ids(&mut reordered, self.next_queue_order_id)?;
         self.queue = reordered;
+        self.next_queue_order_id = next_queue_order_id;
         self.reordered_packet_ids = seen;
         Ok(())
     }
@@ -603,17 +883,328 @@ impl FaultNetwork {
         };
         corrupt_raw_frame(raw, corruption)
             .map_err(|reason| FaultNetworkError::InvalidFault { reason })?;
+        self.queue[index].payload_corrupted = true;
         increment_diagnostic_counter(&mut self.corrupted_count);
         Ok(())
     }
 }
 
+impl FaultNetworkState {
+    pub fn validate(&self) -> Result<(), FaultNetworkError> {
+        if self.endpoints[0] == self.endpoints[1] {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "network endpoints must be distinct".to_owned(),
+            });
+        }
+        self.rng.validate()?;
+
+        if self.generations.len() != 2
+            || self
+                .generations
+                .windows(2)
+                .any(|pair| pair[0].endpoint >= pair[1].endpoint)
+            || self
+                .generations
+                .iter()
+                .map(|entry| entry.endpoint)
+                .any(|endpoint| !self.endpoints.contains(&endpoint))
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "generations must contain both configured endpoints in sorted order"
+                    .to_owned(),
+            });
+        }
+        if self
+            .generations
+            .iter()
+            .map(|entry| entry.endpoint)
+            .collect::<Vec<_>>()
+            != sorted_endpoints(self.endpoints)
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "generation endpoint identities do not match configured order".to_owned(),
+            });
+        }
+
+        if self
+            .disconnected
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+            || self
+                .suspended
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+            || self
+                .disconnected
+                .iter()
+                .chain(self.suspended.iter())
+                .any(|endpoint| !self.endpoints.contains(endpoint))
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "connection sets must be sorted and contain only configured endpoints"
+                    .to_owned(),
+            });
+        }
+
+        if self
+            .reordered_packet_ids
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "reordered packet identities must be strictly sorted and unique"
+                    .to_owned(),
+            });
+        }
+
+        let generations = self
+            .generations
+            .iter()
+            .map(|entry| (entry.endpoint, entry.generation))
+            .collect::<BTreeMap<_, _>>();
+        let reordered = self
+            .reordered_packet_ids
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let mut packet_ids = BTreeSet::new();
+        let mut queue_order_ids = BTreeSet::new();
+        let mut seen_reorder_ids = BTreeSet::new();
+        let mut expected_reorder_rank = 0_u64;
+        let mut previous_queue_order_id = None;
+        for queued in &self.packets {
+            let packet_id = queued.packet.packet_id;
+            if !packet_ids.insert(packet_id) {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet ID {packet_id} is duplicated"),
+                });
+            }
+            if !queue_order_ids.insert(queued.queue_order_id) {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!(
+                        "queue-order ID {} is duplicated",
+                        queued.queue_order_id
+                    ),
+                });
+            }
+            if previous_queue_order_id
+                .is_some_and(|previous| previous >= queued.queue_order_id)
+            {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: "packets must be strictly sorted by queue-order ID".to_owned(),
+                });
+            }
+            previous_queue_order_id = Some(queued.queue_order_id);
+            if !self.endpoints.contains(&queued.packet.from)
+                || !self.endpoints.contains(&queued.packet.to)
+            {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} references an unknown endpoint"),
+                });
+            }
+            if queued.packet.deliver_at_ms < queued.enqueued_at_ms {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} deadline precedes enqueue time"),
+                });
+            }
+            if queued.enqueued_at_ms > self.observed_now_ms {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} was enqueued after the observed clock"),
+                });
+            }
+
+            let expected_stale = self.disconnected.contains(&queued.packet.from)
+                || self.disconnected.contains(&queued.packet.to)
+                || generations.get(&queued.packet.from).copied()
+                    != Some(queued.source_generation)
+                || generations.get(&queued.packet.to).copied()
+                    != Some(queued.destination_generation)
+                || Some(queued.packet.connection_generation)
+                    != generations.get(&queued.packet.from).copied()
+                || Some(queued.packet.connection_generation)
+                    != generations.get(&queued.packet.to).copied();
+            if queued.stale != expected_stale {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} has an inconsistent stale flag"),
+                });
+            }
+
+            let family_matches = matches!(
+                (&queued.kind, &queued.packet.payload),
+                (
+                    FaultNetworkPacketKind::AuthorityFrame
+                        | FaultNetworkPacketKind::ControlReceipt,
+                    NetworkPayload::Frame(_)
+                ) | (
+                    FaultNetworkPacketKind::CommandProposal
+                        | FaultNetworkPacketKind::ReplacementProposal,
+                    NetworkPayload::Proposal(_)
+                )
+            );
+            if !family_matches {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} has an inconsistent kind family"),
+                });
+            }
+            if !queued.payload_corrupted {
+                let parsed_kind = classify_payload_strict(&queued.packet.payload).map_err(|reason| {
+                    FaultNetworkError::InvalidState {
+                        reason: format!("packet {packet_id} has an unparseable body: {reason}"),
+                    }
+                })?;
+                if parsed_kind != queued.kind {
+                    return Err(FaultNetworkError::InvalidState {
+                        reason: format!("packet {packet_id} kind does not match its body"),
+                    });
+                }
+            }
+            let due = queued.packet.deliver_at_ms <= self.observed_now_ms;
+            if due != (queued.disposition == FaultNetworkPacketDisposition::Ready) {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!("packet {packet_id} has an inconsistent disposition"),
+                });
+            }
+
+            match (reordered.contains(&packet_id), queued.reorder_rank) {
+                (true, Some(rank)) => {
+                    if rank.get() != expected_reorder_rank
+                        || !seen_reorder_ids.insert(packet_id)
+                    {
+                        return Err(FaultNetworkError::InvalidState {
+                            reason: format!(
+                                "packet {packet_id} has an inconsistent reorder rank"
+                            ),
+                        });
+                    }
+                    expected_reorder_rank = expected_reorder_rank.saturating_add(1);
+                }
+                (false, None) => {}
+                _ => {
+                    return Err(FaultNetworkError::InvalidState {
+                        reason: format!("packet {packet_id} has an inconsistent reorder identity"),
+                    });
+                }
+            }
+        }
+        if seen_reorder_ids != reordered {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "reordered identities must refer to queued packets".to_owned(),
+            });
+        }
+        let reorder_len = u64::try_from(reordered.len()).map_err(|_| {
+            FaultNetworkError::InvalidState {
+                reason: "reorder identity count exceeds u64".to_owned(),
+            }
+        })?;
+        if expected_reorder_rank != reorder_len {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "reorder ranks must cover exactly the explicitly held packets".to_owned(),
+            });
+        }
+
+        if self.packets.iter().any(|packet| {
+            !allocator_contains(self.next_packet_id, packet.packet.packet_id)
+                || !allocator_contains(self.next_queue_order_id, packet.queue_order_id)
+        }) {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "allocators must be above every queued packet and queue-order ID"
+                    .to_owned(),
+            });
+        }
+        if self.disposed
+            && (!self.packets.is_empty()
+                || !self.reordered_packet_ids.is_empty()
+                || !self.disconnected.is_empty()
+                || !self.suspended.is_empty())
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "disposed network cannot retain queue or connection state".to_owned(),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl FaultNetworkRngState {
+    pub fn validate(&self) -> Result<(), FaultNetworkError> {
+        if self.algorithm_version != FAULT_NETWORK_RNG_ALGORITHM_VERSION {
+            return Err(FaultNetworkError::InvalidState {
+                reason: format!(
+                    "unsupported RNG algorithm version {}; expected {}",
+                    self.algorithm_version, FAULT_NETWORK_RNG_ALGORITHM_VERSION
+                ),
+            });
+        }
+        if self.state_bits.len() != 32
+            || !self
+                .state_bits
+                .bytes()
+                .all(|bit| matches!(bit, b'0' | b'1'))
+        {
+            return Err(FaultNetworkError::InvalidState {
+                reason: "RNG state_bits must be exactly 32 binary bits".to_owned(),
+            });
+        }
+        Ok(())
+    }
+}
+
+fn sorted_endpoints(endpoints: [SeatId; 2]) -> Vec<SeatId> {
+    let mut sorted = endpoints.to_vec();
+    sorted.sort_unstable();
+    sorted
+}
+
+fn allocator_contains(next: Option<SafeU53>, allocated: SafeU53) -> bool {
+    next.map_or(true, |next| allocated < next)
+}
+
+fn allocator_state(next: u64) -> Option<SafeU53> {
+    (next <= SafeU53::MAX.get())
+        .then(|| SafeU53::new(next).expect("checked SafeU53 allocator value"))
+}
+
+fn allocator_value(next: Option<SafeU53>) -> u64 {
+    next.map_or(SafeU53::MAX.get().saturating_add(1), |next| next.get())
+}
+
+fn safe_u53_from_usize(value: usize) -> SafeU53 {
+    let value = u64::try_from(value).expect("queue length must fit u64");
+    SafeU53::new(value).expect("queue reorder rank must fit SafeU53")
+}
+
+/// Assign a fresh, strictly increasing queue-order range to the already
+/// staged delivery vector. All IDs are allocated before any packet is
+/// touched, so exhaustion leaves the owner byte-for-byte unchanged.
+fn relabel_queue_order_ids(
+    queue: &mut [QueuedPacket],
+    next_queue_order_id: u64,
+) -> Result<u64, FaultNetworkError> {
+    let mut ids = Vec::with_capacity(queue.len());
+    let mut next = next_queue_order_id;
+    for _ in queue.iter() {
+        ids.push(SafeU53::new(next).map_err(|_| FaultNetworkError::QueueOrderExhausted)?);
+        next = next
+            .checked_add(1)
+            .ok_or(FaultNetworkError::QueueOrderExhausted)?;
+    }
+    for (queued, queue_order_id) in queue.iter_mut().zip(ids) {
+        queued.queue_order_id = queue_order_id;
+    }
+    Ok(next)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct QueuedPacket {
     packet: NetworkPacket,
+    queue_order_id: SafeU53,
+    enqueued_at_ms: SafeU53,
     source_generation: ConnectionGeneration,
     destination_generation: ConnectionGeneration,
     stale: bool,
+    kind: FaultNetworkPacketKind,
+    payload_corrupted: bool,
+    disposition: FaultNetworkPacketDisposition,
 }
 
 #[derive(Clone, Debug)]
@@ -624,6 +1215,23 @@ struct SeededRng {
 impl SeededRng {
     fn new(seed: u64) -> Self {
         Self { state: seed as u32 }
+    }
+
+    fn export_state(&self) -> FaultNetworkRngState {
+        FaultNetworkRngState {
+            algorithm_version: FAULT_NETWORK_RNG_ALGORITHM_VERSION,
+            state_bits: format!("{:032b}", self.state),
+        }
+    }
+
+    fn from_state(state: FaultNetworkRngState) -> Result<Self, FaultNetworkError> {
+        state.validate()?;
+        let parsed = u32::from_str_radix(&state.state_bits, 2).map_err(|_| {
+            FaultNetworkError::InvalidState {
+                reason: "RNG state_bits could not be parsed as u32".to_owned(),
+            }
+        })?;
+        Ok(Self { state: parsed })
     }
 
     fn next_u32(&mut self) -> u32 {
@@ -713,6 +1321,35 @@ fn parse_raw_frame(raw: &RawFrame) -> Result<serde_json::Value, String> {
         RawFrame::JsonText(text) => serde_json::from_str(text)
             .map_err(|error| format!("raw frame is not valid JSON: {error}")),
         RawFrame::JsonValue(value) => Ok(value.clone()),
+    }
+}
+
+fn classify_payload(payload: &NetworkPayload) -> (FaultNetworkPacketKind, bool) {
+    match classify_payload_strict(payload) {
+        Ok(kind) => (kind, false),
+        Err(_) => (FaultNetworkPacketKind::AuthorityFrame, true),
+    }
+}
+
+fn classify_payload_strict(
+    payload: &NetworkPayload,
+) -> Result<FaultNetworkPacketKind, String> {
+    match payload {
+        NetworkPayload::Proposal(proposal) => {
+            if proposal.fingerprint.starts_with("brp1-") {
+                Ok(FaultNetworkPacketKind::ReplacementProposal)
+            } else {
+                Ok(FaultNetworkPacketKind::CommandProposal)
+            }
+        }
+        NetworkPayload::Frame(raw) => {
+            let value = parse_raw_frame(raw)?;
+            let kind = match value.get("t").and_then(Value::as_str) {
+                Some("authorityReceipt") => FaultNetworkPacketKind::ControlReceipt,
+                _ => FaultNetworkPacketKind::AuthorityFrame,
+            };
+            Ok(kind)
+        }
     }
 }
 

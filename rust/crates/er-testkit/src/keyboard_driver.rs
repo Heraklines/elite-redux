@@ -1,5 +1,6 @@
 //! Representative raw-keystroke driver with no semantic-choice bypass API.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_kernel::{GameKernel, KernelError, LiveResourceSnapshot};
@@ -9,9 +10,30 @@ use er_types::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DriverHoldState {
+    pub key: PhysicalKey,
+    pub remaining_ms: SafeU53,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetachedKeyboardDriverState {
+    pub seat: SeatId,
+    pub focus: InputFocus,
+    pub pressed_keys: Vec<PhysicalKey>,
+    pub active_holds: Vec<DriverHoldState>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DetachedKeyboardStateData {
+    focus: InputFocus,
+    pressed_keys: BTreeSet<PhysicalKey>,
+    active_holds: BTreeMap<PhysicalKey, SafeU53>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetachedKeyboardDriver {
     seat: SeatId,
-    focus: InputFocus,
+    state: RefCell<DetachedKeyboardStateData>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,7 +47,11 @@ impl DetachedKeyboardDriver {
     pub fn new(seat: SeatId) -> Self {
         Self {
             seat,
-            focus: InputFocus::Game,
+            state: RefCell::new(DetachedKeyboardStateData {
+                focus: InputFocus::Game,
+                pressed_keys: BTreeSet::new(),
+                active_holds: BTreeMap::new(),
+            }),
         }
     }
 
@@ -34,19 +60,23 @@ impl DetachedKeyboardDriver {
     }
 
     pub fn input_focus(&self) -> InputFocus {
-        self.focus
+        self.state.borrow().focus
     }
 
     pub fn key_down(&self, code: PhysicalKey, printable: bool) -> RawInputEvent {
+        self.state.borrow_mut().pressed_keys.insert(code.clone());
         RawInputEvent::KeyDown {
             code,
             printable,
             browser_repeat: false,
-            focus: self.focus,
+            focus: self.input_focus(),
         }
     }
 
     pub fn key_up(&self, code: PhysicalKey) -> RawInputEvent {
+        let mut state = self.state.borrow_mut();
+        state.pressed_keys.remove(&code);
+        state.active_holds.remove(&code);
         RawInputEvent::KeyUp { code }
     }
 
@@ -59,19 +89,316 @@ impl DetachedKeyboardDriver {
 
     pub fn hold_for(&self, code: PhysicalKey, duration_ms: SafeU53) -> KeyHoldPlan {
         KeyHoldPlan {
-            key_down: self.key_down(code.clone(), is_printable(&code)),
+            key_down: RawInputEvent::KeyDown {
+                code: code.clone(),
+                printable: is_printable(&code),
+                browser_repeat: false,
+                focus: self.input_focus(),
+            },
             duration_ms,
-            key_up: self.key_up(code),
+            key_up: RawInputEvent::KeyUp { code },
         }
     }
 
     pub fn blur(&self) -> RawInputEvent {
+        let mut state = self.state.borrow_mut();
+        state.pressed_keys.clear();
+        state.active_holds.clear();
         RawInputEvent::WindowBlurred
     }
 
     pub fn focus(&mut self, focus: InputFocus) -> RawInputEvent {
-        self.focus = focus;
+        self.state.get_mut().focus = focus;
         RawInputEvent::FocusChanged(focus)
+    }
+
+    pub fn export_state(&self) -> DetachedKeyboardDriverState {
+        let state = self.state.borrow();
+        DetachedKeyboardDriverState {
+            seat: self.seat,
+            focus: state.focus,
+            pressed_keys: state.pressed_keys.iter().cloned().collect(),
+            active_holds: state
+                .active_holds
+                .iter()
+                .map(|(key, remaining_ms)| DriverHoldState {
+                    key: key.clone(),
+                    remaining_ms: *remaining_ms,
+                })
+                .collect(),
+        }
+    }
+
+    pub fn restorable_state(&self) -> DetachedKeyboardDriverState {
+        self.export_state()
+    }
+
+    pub fn from_state(
+        state: DetachedKeyboardDriverState,
+    ) -> Result<Self, DetachedKeyboardDriverError> {
+        state.validate()?;
+        let pressed_keys = state.pressed_keys.into_iter().collect();
+        let active_holds = state
+            .active_holds
+            .into_iter()
+            .map(|hold| (hold.key, hold.remaining_ms))
+            .collect();
+        Ok(Self {
+            seat: state.seat,
+            state: RefCell::new(DetachedKeyboardStateData {
+                focus: state.focus,
+                pressed_keys,
+                active_holds,
+            }),
+        })
+    }
+
+    pub fn from_restorable_state(
+        state: DetachedKeyboardDriverState,
+    ) -> Result<Self, DetachedKeyboardDriverError> {
+        Self::from_state(state)
+    }
+
+    pub fn restore_state(
+        &mut self,
+        state: DetachedKeyboardDriverState,
+    ) -> Result<(), DetachedKeyboardDriverError> {
+        let restored = Self::from_state(state)?;
+        *self = restored;
+        Ok(())
+    }
+
+    pub fn pressed_keys(&self) -> BTreeSet<PhysicalKey> {
+        self.state.borrow().pressed_keys.clone()
+    }
+
+    pub fn active_holds(&self) -> Vec<DriverHoldState> {
+        self.export_state().active_holds
+    }
+
+    /// Record a hold after the key-down boundary has been applied. This is a
+    /// neutral owner operation; it emits no synthetic input event.
+    pub fn set_active_hold(
+        &self,
+        key: PhysicalKey,
+        remaining_ms: SafeU53,
+    ) -> Result<(), DetachedKeyboardDriverError> {
+        if remaining_ms == SafeU53::ZERO {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "active hold duration must be positive".to_owned(),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        if !state.pressed_keys.contains(&key) {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "an active hold must reference a pressed key".to_owned(),
+            });
+        }
+        state.active_holds.insert(key, remaining_ms);
+        Ok(())
+    }
+
+    /// Clear a neutral hold record at the key-up boundary.
+    pub fn clear_active_hold(&self, key: &PhysicalKey) {
+        self.state.borrow_mut().active_holds.remove(key);
+    }
+
+    /// Decrement neutral holds as pair time advances, dropping exactly the
+    /// holds that reach zero.
+    pub fn advance_active_holds(&self, delta_ms: SafeU53) {
+        let mut state = self.state.borrow_mut();
+        let mut expired = Vec::new();
+        for (key, remaining_ms) in &mut state.active_holds {
+            let next = remaining_ms.get().saturating_sub(delta_ms.get());
+            *remaining_ms = SafeU53::new(next).expect("saturated active hold remains SafeU53");
+            if *remaining_ms == SafeU53::ZERO {
+                expired.push(key.clone());
+            }
+        }
+        for key in expired {
+            state.active_holds.remove(&key);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DetachedKeyboardDriverError {
+    InvalidState { reason: String },
+}
+
+impl std::fmt::Display for DetachedKeyboardDriverError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidState { reason } => {
+                write!(formatter, "keyboard driver state is invalid: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DetachedKeyboardDriverError {}
+
+pub trait DetachedKeyboardDriverRestorable {
+    fn export_state(&self) -> DetachedKeyboardDriverState;
+
+    fn restorable_state(&self) -> DetachedKeyboardDriverState {
+        self.export_state()
+    }
+
+    fn from_state(
+        state: DetachedKeyboardDriverState,
+    ) -> Result<DetachedKeyboardDriver, DetachedKeyboardDriverError>
+    where
+        Self: Sized;
+
+    fn from_restorable_state(
+        state: DetachedKeyboardDriverState,
+    ) -> Result<DetachedKeyboardDriver, DetachedKeyboardDriverError>
+    where
+        Self: Sized,
+    {
+        Self::from_state(state)
+    }
+
+    fn restore_state(
+        &mut self,
+        state: DetachedKeyboardDriverState,
+    ) -> Result<(), DetachedKeyboardDriverError>;
+
+    fn pressed_keys(&self) -> BTreeSet<PhysicalKey>;
+
+    fn active_holds(&self) -> Vec<DriverHoldState>;
+
+    fn set_active_hold(
+        &self,
+        key: PhysicalKey,
+        remaining_ms: SafeU53,
+    ) -> Result<(), DetachedKeyboardDriverError>;
+
+    fn clear_active_hold(&self, key: &PhysicalKey);
+
+    fn advance_active_holds(&self, delta_ms: SafeU53);
+}
+
+impl DetachedKeyboardDriverRestorable for DetachedKeyboardDriver {
+    fn export_state(&self) -> DetachedKeyboardDriverState {
+        let state = self.state.borrow();
+        DetachedKeyboardDriverState {
+            seat: self.seat,
+            focus: state.focus,
+            pressed_keys: state.pressed_keys.iter().cloned().collect(),
+            active_holds: state
+                .active_holds
+                .iter()
+                .map(|(key, remaining_ms)| DriverHoldState {
+                    key: key.clone(),
+                    remaining_ms: *remaining_ms,
+                })
+                .collect(),
+        }
+    }
+
+    fn from_state(
+        state: DetachedKeyboardDriverState,
+    ) -> Result<DetachedKeyboardDriver, DetachedKeyboardDriverError> {
+        state.validate()?;
+        let pressed_keys = state.pressed_keys.into_iter().collect();
+        let active_holds = state
+            .active_holds
+            .into_iter()
+            .map(|hold| (hold.key, hold.remaining_ms))
+            .collect();
+        Ok(DetachedKeyboardDriver {
+            seat: state.seat,
+            state: RefCell::new(DetachedKeyboardStateData {
+                focus: state.focus,
+                pressed_keys,
+                active_holds,
+            }),
+        })
+    }
+
+    fn restore_state(
+        &mut self,
+        state: DetachedKeyboardDriverState,
+    ) -> Result<(), DetachedKeyboardDriverError> {
+        let restored = DetachedKeyboardDriver::from_state(state)?;
+        *self = restored;
+        Ok(())
+    }
+
+    fn pressed_keys(&self) -> BTreeSet<PhysicalKey> {
+        self.state.borrow().pressed_keys.clone()
+    }
+
+    fn active_holds(&self) -> Vec<DriverHoldState> {
+        self.export_state().active_holds
+    }
+
+    fn set_active_hold(
+        &self,
+        key: PhysicalKey,
+        remaining_ms: SafeU53,
+    ) -> Result<(), DetachedKeyboardDriverError> {
+        if remaining_ms == SafeU53::ZERO {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "active hold duration must be positive".to_owned(),
+            });
+        }
+        let mut state = self.state.borrow_mut();
+        if !state.pressed_keys.contains(&key) {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "an active hold must reference a pressed key".to_owned(),
+            });
+        }
+        state.active_holds.insert(key, remaining_ms);
+        Ok(())
+    }
+
+    fn clear_active_hold(&self, key: &PhysicalKey) {
+        self.state.borrow_mut().active_holds.remove(key);
+    }
+
+    fn advance_active_holds(&self, delta_ms: SafeU53) {
+        let mut state = self.state.borrow_mut();
+        let mut expired = Vec::new();
+        for (key, remaining_ms) in &mut state.active_holds {
+            let next = remaining_ms.get().saturating_sub(delta_ms.get());
+            *remaining_ms = SafeU53::new(next).expect("saturated active hold remains SafeU53");
+            if *remaining_ms == SafeU53::ZERO {
+                expired.push(key.clone());
+            }
+        }
+        for key in expired {
+            state.active_holds.remove(&key);
+        }
+    }
+}
+
+impl DetachedKeyboardDriverState {
+    pub fn validate(&self) -> Result<(), DetachedKeyboardDriverError> {
+        if self.pressed_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "pressed keys must be strictly sorted and unique".to_owned(),
+            });
+        }
+        if self
+            .active_holds
+            .windows(2)
+            .any(|pair| pair[0].key >= pair[1].key)
+        {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "active holds must be strictly sorted and unique by key".to_owned(),
+            });
+        }
+        if self.active_holds.iter().any(|hold| {
+            hold.remaining_ms == SafeU53::ZERO || !self.pressed_keys.contains(&hold.key)
+        }) {
+            return Err(DetachedKeyboardDriverError::InvalidState {
+                reason: "active holds must have positive duration and a pressed key".to_owned(),
+            });
+        }
+        Ok(())
     }
 }
 
