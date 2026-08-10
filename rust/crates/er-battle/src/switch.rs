@@ -5,6 +5,7 @@
 //! own ability, status, stage, faint, outcome, or presentation-ID policy.
 
 use er_state::battle::BattleState;
+use er_state::field::FieldStateError;
 use er_state::format::{FormatTopologyError, owner_seat_for, validate_slot};
 use er_state::pokemon::PokemonState;
 use er_types::battle_ids::{BattleSide, FieldSlot, PartyIndex, PokemonId};
@@ -31,6 +32,12 @@ pub enum SwitchError {
         slot: FieldSlot,
         #[source]
         source: FormatTopologyError,
+    },
+    /// Canonical field ordering, uniqueness, or format closure is invalid.
+    #[error("switch field is invalid: {source}")]
+    InvalidField {
+        #[source]
+        source: FieldStateError,
     },
     /// The normalized source slot is absent from the canonical field vector.
     #[error("switch source slot {slot:?} is absent from the field")]
@@ -158,18 +165,20 @@ pub fn validate_switch(
 ///
 /// 1. install the incoming identity in the canonical field slot;
 /// 2. construct field and `Switched` semantic evidence;
-/// 3. call `post_switch` with the updated battle and that evidence.
+/// 3. call `post_switch` with a read-only view of the updated battle and that
+///    evidence.
 ///
-/// The callback is intentionally generic.  B07 can return its own typed
-/// trigger/effect evidence without making this module depend on the ability
-/// implementation or on a private command model.
+/// The callback is intentionally generic and read-only over canonical state.
+/// B07 can plan and return its own typed trigger/effect evidence without
+/// making this module depend on the ability implementation or permitting
+/// untracked callback mutation.
 pub fn resolve_switch<T, F>(
     battle: &mut BattleState,
     command: &NormalizedBattleCommand,
     post_switch: F,
 ) -> Result<SwitchResolution<T>, SwitchError>
 where
-    F: FnOnce(&mut BattleState, &SwitchEvidence) -> T,
+    F: FnOnce(&BattleState, &SwitchEvidence) -> T,
 {
     let validated = validate_switch_command(battle, command)?;
     battle.field.slots[validated.source_index].occupant = Some(validated.incoming);
@@ -206,7 +215,7 @@ pub fn apply_switch<T, F>(
     post_switch: F,
 ) -> Result<SwitchResolution<T>, SwitchError>
 where
-    F: FnOnce(&mut BattleState, &SwitchEvidence) -> T,
+    F: FnOnce(&BattleState, &SwitchEvidence) -> T,
 {
     resolve_switch(battle, command, post_switch)
 }
@@ -226,6 +235,10 @@ fn validate_switch_command(
         return Err(SwitchError::NotSwitchCommand);
     };
 
+    battle
+        .field
+        .validate_for_format(&battle.format)
+        .map_err(|source| SwitchError::InvalidField { source })?;
     validate_slot(&battle.format, *field_slot).map_err(|source| {
         SwitchError::InvalidSourceTopology {
             slot: *field_slot,
