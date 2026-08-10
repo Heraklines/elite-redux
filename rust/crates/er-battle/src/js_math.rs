@@ -58,7 +58,7 @@ pub fn js_round(value: f64) -> f64 {
     if value.is_nan() || value.is_infinite() || value == 0.0 {
         return value;
     }
-    if (-0.5..0.0).contains(&value) {
+    if value >= -0.5 && value < 0.0 {
         return -0.0;
     }
     js_floor(value + 0.5)
