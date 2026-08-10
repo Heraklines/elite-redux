@@ -1,0 +1,785 @@
+//! M3C-09 local raw-key campaigns against the public Battle kernel boundary.
+//!
+//! The command driver below deliberately knows only physical keydown/keyup
+//! events.  Presentation settlement is kept outside that driver because it is
+//! a renderer/environment callback, not a semantic command-selection escape
+//! hatch.
+
+use std::error::Error;
+use std::sync::Arc;
+
+use er_kernel::{
+    BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1,
+    GameKernel, KernelEffect, KernelInput,
+};
+use er_protocol::{AuthorityLogConfig, BackoffPolicy};
+use er_testkit::m3_fixture::load_m3_fixture_catalog;
+use er_types::battle_command::{
+    BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
+    scripted_enemy_command_operation_id,
+};
+use er_types::battle_control::BattleControl;
+use er_types::battle_ids::{BattleId, BattleSide, FieldSlot, MoveSlotIndex, TurnIndex, WaveIndex};
+use er_types::battle_model::BattleOutcome;
+use er_types::battle_ui::{
+    BattlePresentationEvent, BattlePresentationKind, PresentationSettlementOutcome,
+};
+use er_types::{
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
+    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+};
+use serde_json::{Value, json};
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+#[derive(Clone, Debug)]
+struct BattleFixture {
+    fixture: Value,
+}
+
+fn invalid_data(message: impl Into<String>) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, message.into())
+}
+
+fn field<'a>(object: &'a Value, key: &str) -> TestResult<&'a Value> {
+    object
+        .get(key)
+        .ok_or_else(|| invalid_data(format!("fixture is missing field {key:?}")))
+        .map_err(Into::into)
+}
+
+fn seat(value: u64) -> TestResult<SeatId> {
+    Ok(SeatId::new(SafeU53::new(value)?))
+}
+
+fn published_case(scenario_id: &str) -> TestResult<BattleFixture> {
+    let catalog = load_m3_fixture_catalog()?;
+    if !catalog.is_evidence_published() {
+        return Err(invalid_data("M3 oracle evidence is not published").into());
+    }
+    Ok(BattleFixture {
+        fixture: catalog.load_published_case::<Value>(scenario_id)?,
+    })
+}
+
+fn published_content_pack() -> TestResult<Value> {
+    let catalog = load_m3_fixture_catalog()?;
+    if !catalog.is_evidence_published() {
+        return Err(invalid_data("M3 oracle evidence is not published").into());
+    }
+    let artifact = catalog.load_published_supporting_artifact::<Value>("content-pack-v1")?;
+    Ok(field(&artifact, "content_pack")?.clone())
+}
+
+fn canonical_state(fixture: &BattleFixture) -> TestResult<&Value> {
+    field(field(&fixture.fixture, "initial_state")?, "canonical")
+}
+
+fn initial_battle(fixture: &BattleFixture) -> TestResult<&Value> {
+    field(canonical_state(fixture)?, "battle")
+}
+
+fn kernel_format(battle: &Value) -> TestResult<Value> {
+    // Oracle canonical state retains a legacy `format.slots` mirror.  The
+    // production BattleFormat is the stricter topology-only public DTO.
+    let mut format = field(battle, "format")?.clone();
+    format
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("battle format is not an object"))?
+        .remove("slots");
+    Ok(format)
+}
+
+fn enemy_actor(battle: &Value) -> TestResult<er_types::battle_ids::PokemonId> {
+    let slots = field(field(battle, "field")?, "slots")?
+        .as_array()
+        .ok_or_else(|| invalid_data("battle field slots are not an array"))?;
+    let actor = slots.iter().find_map(|entry| {
+        let slot = entry.get("slot")?;
+        (slot.get("side")?.as_str() == Some("ENEMY")
+            && slot.get("position")?.as_u64() == Some(0))
+        .then(|| entry.get("occupant")?.as_u64())
+        .flatten()
+    });
+    let actor = actor.ok_or_else(|| invalid_data("single fixture has no enemy lead"))?;
+    Ok(er_types::battle_ids::PokemonId::new(SafeU53::new(actor)?))
+}
+
+fn scripted_enemy_policy(battle: &Value) -> TestResult<ScriptedEnemyPolicyV1> {
+    let actor = enemy_actor(battle)?;
+    let battle_id: BattleId = serde_json::from_value(field(battle, "battle_id")?.clone())?;
+    let turn_number = field(battle, "turn")?
+        .as_u64()
+        .ok_or_else(|| invalid_data("battle turn is not an unsigned integer"))?;
+    let wave: WaveIndex = serde_json::from_value(field(battle, "wave")?.clone())?;
+    let enemy_slot = FieldSlot {
+        side: BattleSide::Enemy,
+        position: 0,
+    };
+
+    // The first real turn consumes cursor zero.  Cursor one is also supplied
+    // so an ongoing single campaign can build its next real enemy frontier.
+    let mut commands = Vec::new();
+    for cursor_number in 0..=1_u64 {
+        let cursor = SafeU53::new(cursor_number)?;
+        let turn = TurnIndex::new(SafeU53::new(turn_number + cursor_number)?)?;
+        let operation_id = scripted_enemy_command_operation_id(
+            battle_id,
+            wave,
+            turn,
+            enemy_slot,
+            cursor,
+        )?;
+        let command = BattleCommand::fight(
+            actor,
+            MoveSlotIndex::ZERO,
+            BattleTargetSelection::implicit(),
+        )?;
+        commands.push(ScriptedEnemyBattleCommandV1::new(
+            operation_id,
+            battle_id,
+            wave,
+            turn,
+            cursor,
+            actor,
+            enemy_slot,
+            command,
+        )?);
+    }
+    Ok(ScriptedEnemyPolicyV1::new(SafeU53::ZERO, commands)?)
+}
+
+fn battle_config(fixture: &BattleFixture) -> TestResult<BattleGameConfig> {
+    let canonical = canonical_state(fixture)?;
+    let battle = initial_battle(fixture)?;
+    let format = kernel_format(battle)?;
+    let player_capacity = field(&format, "player_capacity")?
+        .as_u64()
+        .ok_or_else(|| invalid_data("player capacity is not an unsigned integer"))?;
+    let enemy_capacity = field(&format, "enemy_capacity")?
+        .as_u64()
+        .ok_or_else(|| invalid_data("enemy capacity is not an unsigned integer"))?;
+    if player_capacity != 1 || enemy_capacity != 1 {
+        return Err(invalid_data("M3C-09 raw campaigns require a single battle format").into());
+    }
+
+    // `initial_state` is post-construction evidence.  Rebuild the public
+    // constructor's pre-battle run state from the fixture's independent RNG
+    // witness and the current battle ID.
+    let mut run_state = canonical.clone();
+    let run_state_object = run_state
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("canonical game state is not an object"))?;
+    run_state_object.insert("battle".to_owned(), Value::Null);
+    run_state_object.insert(
+        "next_battle_id".to_owned(),
+        field(battle, "battle_id")?.clone(),
+    );
+    run_state_object.insert(
+        "run_rng".to_owned(),
+        field(field(&fixture.fixture, "initial_rng")?, "run")?.clone(),
+    );
+
+    let wave_seed = field(battle, "wave_seed")?
+        .as_str()
+        .ok_or_else(|| invalid_data("battle wave seed is not a string"))?
+        .to_owned();
+    Ok(BattleGameConfig {
+        run_state: serde_json::from_value(run_state)?,
+        start: BattleStartV1 {
+            schema_version: 1,
+            format: serde_json::from_value(format)?,
+            player_party: serde_json::from_value(field(battle, "player_party")?.clone())?,
+            enemy_party: serde_json::from_value(field(battle, "enemy_party")?.clone())?,
+            player_leads: serde_json::from_value(json!([0]))?,
+            enemy_leads: serde_json::from_value(json!([0]))?,
+        },
+        local_seat: seat(1)?,
+        wave_seed,
+        scripted_enemy_policy: scripted_enemy_policy(battle)?,
+    })
+}
+
+fn battle_protocol() -> TestResult<BattleProtocolConfig> {
+    let local_seat = seat(1)?;
+    let context = FrameContext {
+        session_id: SessionId::new("m3c09-raw-local-session")?,
+        run_id: RunId::new("m3c09-raw-local-run")?,
+        session_epoch: SafeU53::new(1)?,
+        seat_map_id: "m3c09-raw-local-seat-map".to_owned(),
+        membership_revision: MembershipRevision::new(SafeU53::new(1)?),
+        sender_seat_id: local_seat,
+        authority_seat_id: local_seat,
+        connection_generation: ConnectionGeneration::ZERO,
+    };
+    Ok(BattleProtocolConfig {
+        role: BattleProtocolRoleConfig::Authority {
+            log: AuthorityLogConfig {
+                local_context: context,
+                peer_bindings: Vec::new(),
+                owner_id: "m3c09-raw-local-authority".to_owned(),
+                retain_capacity: SafeU53::new(64)?,
+                delivery_backoff: BackoffPolicy {
+                    initial_ms: SafeU53::new(250)?,
+                    maximum_ms: SafeU53::new(5_000)?,
+                    factor_numerator: SafeU53::new(2)?,
+                    factor_denominator: SafeU53::new(1)?,
+                },
+                delivery_time_class: TimeClass::Connected,
+                max_delivery_attempts: None,
+            },
+            proposal_capacity: SafeU53::new(64)?,
+        },
+    })
+}
+
+fn new_kernel(fixture: &BattleFixture) -> TestResult<GameKernel> {
+    let content = published_content_pack()?;
+    let expected_hash = field(canonical_state(fixture)?, "content_hash")?;
+    assert_eq!(field(&content, "hash")?, expected_hash);
+    Ok(GameKernel::new_battle(
+        battle_config(fixture)?,
+        battle_protocol()?,
+        Arc::new(serde_json::from_value(content)?),
+    )?)
+}
+
+/// Raw-only command driver.  It has no semantic command/proposal/reducer API.
+struct RawKeyDriver<'kernel> {
+    kernel: &'kernel mut GameKernel,
+    seat: SeatId,
+}
+
+impl<'kernel> RawKeyDriver<'kernel> {
+    fn new(kernel: &'kernel mut GameKernel, seat: SeatId) -> Self {
+        Self { kernel, seat }
+    }
+
+    fn key_down(&mut self, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+        let effects = self.kernel.step(KernelInput::RawInput {
+            seat: self.seat,
+            event: RawInputEvent::KeyDown {
+                code,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+        })?;
+        assert_no_compatibility_effects(&effects);
+        Ok(effects)
+    }
+
+    fn key_up(&mut self, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+        let effects = self.kernel.step(KernelInput::RawInput {
+            seat: self.seat,
+            event: RawInputEvent::KeyUp { code },
+        })?;
+        assert_no_compatibility_effects(&effects);
+        Ok(effects)
+    }
+
+    fn press(&mut self, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+        let mut effects = self.key_down(code.clone())?;
+        effects.extend(self.key_up(code)?);
+        Ok(effects)
+    }
+}
+
+fn raw_key_down(kernel: &mut GameKernel, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+    RawKeyDriver::new(kernel, seat(1)?).key_down(code)
+}
+
+fn raw_key_up(kernel: &mut GameKernel, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+    RawKeyDriver::new(kernel, seat(1)?).key_up(code)
+}
+
+fn raw_press(kernel: &mut GameKernel, code: PhysicalKey) -> TestResult<Vec<KernelEffect>> {
+    RawKeyDriver::new(kernel, seat(1)?).press(code)
+}
+
+fn assert_no_compatibility_effects(effects: &[KernelEffect]) {
+    assert!(
+        !effects.iter().any(|effect| {
+            matches!(
+                effect,
+                KernelEffect::UiChanged { .. }
+                    | KernelEffect::UiIntent { .. }
+                    | KernelEffect::Present { .. }
+                    | KernelEffect::ApplyAuthorityMaterial { .. }
+                    | KernelEffect::ProjectAuthorityControl { .. }
+            )
+        }),
+        "Battle mode emitted a compatibility effect: {effects:?}"
+    );
+}
+
+fn control(kernel: &GameKernel) -> TestResult<&BattleControl> {
+    Ok(&kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("kernel did not expose a Battle UI projection"))?
+        .seat_control
+        .control)
+}
+
+fn selected_option(kernel: &GameKernel) -> TestResult<String> {
+    let option = match control(kernel)? {
+        BattleControl::CommandRoot(value) => &value.menu.selected_option_id,
+        BattleControl::MoveSelect(value) => &value.menu.selected_option_id,
+        BattleControl::TargetSelect(value) => &value.menu.selected_option_id,
+        BattleControl::PartySelect(value) => &value.menu.selected_option_id,
+        BattleControl::PartyOptionSelect(value) => &value.menu.selected_option_id,
+        BattleControl::ReplacementSelect(value) => &value.menu.selected_option_id,
+        BattleControl::Waiting(_) | BattleControl::Complete(_) => {
+            return Err(invalid_data("current control has no menu selection").into());
+        }
+    };
+    Ok(option.as_str().to_owned())
+}
+
+fn game_state_json(kernel: &GameKernel) -> TestResult<Value> {
+    Ok(field(&kernel.snapshot().state, "game")?.clone())
+}
+
+fn comparable_game_state(state: &Value) -> TestResult<Value> {
+    // The frozen oracle stores only human pending commands and uses a
+    // one-based faint allocator.  The production runtime additionally stores
+    // pre-admitted scripted-enemy frontier entries and owns a zero-based
+    // allocator.  Compare every other canonical mechanics field exactly;
+    // allocator movement is asserted independently by the campaigns below.
+    let mut comparable = state.clone();
+    let battle = comparable
+        .get_mut("battle")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid_data("game state has no active battle object"))?;
+    battle.remove("command_state");
+    battle.remove("next_faint_occurrence");
+    battle
+        .get_mut("format")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid_data("game state has no battle format object"))?
+        .remove("slots");
+    Ok(comparable)
+}
+
+fn assert_fixture_state(
+    kernel: &GameKernel,
+    fixture: &BattleFixture,
+    fixture_field: &str,
+) -> TestResult {
+    let expected = field(field(&fixture.fixture, fixture_field)?, "canonical")?;
+    assert_eq!(
+        comparable_game_state(&game_state_json(kernel)?)?,
+        comparable_game_state(expected)?,
+    );
+    Ok(())
+}
+
+fn next_faint_occurrence(kernel: &GameKernel) -> TestResult<u64> {
+    let state = game_state_json(kernel)?;
+    field(field(&state, "battle")?, "next_faint_occurrence")?
+        .as_u64()
+        .ok_or_else(|| invalid_data("next_faint_occurrence is not an unsigned integer"))
+        .map_err(Into::into)
+}
+
+fn oracle_presentation_count(fixture: &BattleFixture) -> TestResult<usize> {
+    Ok(field(&fixture.fixture, "expected_presentation")?
+        .as_array()
+        .ok_or_else(|| invalid_data("expected presentation is not an array"))?
+        .len())
+}
+
+fn presentation_events(effects: &[KernelEffect]) -> Vec<BattlePresentationEvent> {
+    effects
+        .iter()
+        .filter_map(|effect| match effect {
+            KernelEffect::PresentBattle { event, .. } => Some(event.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn settle_presentations(
+    kernel: &mut GameKernel,
+    events: &[BattlePresentationEvent],
+) -> TestResult<Vec<KernelEffect>> {
+    let mut effects = Vec::new();
+    for event in events {
+        let settled = kernel.step(KernelInput::BattlePresentationOutcome {
+            endpoint: seat(1)?,
+            event_id: event.event_id.clone(),
+            outcome: PresentationSettlementOutcome::Settled,
+        })?;
+        assert_no_compatibility_effects(&settled);
+        effects.extend(settled);
+    }
+    Ok(effects)
+}
+
+fn has_move_used(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::MoveUsed { .. }))
+}
+
+fn has_hp_changed(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::HpChanged { .. }))
+}
+
+fn has_fainted(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::Fainted { .. }))
+}
+
+fn has_switched(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::Switched { .. }))
+}
+
+fn has_battle_won(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::BattleWon))
+}
+
+fn has_battle_lost(events: &[BattlePresentationEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(&event.kind, BattlePresentationKind::BattleLost))
+}
+
+fn battle_outcome(kernel: &GameKernel) -> TestResult<String> {
+    let state = game_state_json(kernel)?;
+    Ok(field(field(&state, "battle")?, "outcome")?
+        .as_str()
+        .ok_or_else(|| invalid_data("battle outcome is not a string"))?
+        .to_owned())
+}
+
+fn field_occupant(state: &Value, side: &str, position: u64) -> Option<u64> {
+    state
+        .get("battle")?
+        .get("field")?
+        .get("slots")?
+        .as_array()?
+        .iter()
+        .find_map(|entry| {
+            let slot = entry.get("slot")?;
+            (slot.get("side")?.as_str() == Some(side)
+                && slot.get("position")?.as_u64() == Some(position))
+            .then(|| entry.get("occupant")?.as_u64())
+            .flatten()
+        })
+}
+
+fn single_replacement_case(
+    forced: &BattleFixture,
+    single_format: &Value,
+) -> TestResult<BattleFixture> {
+    let mut fixture = forced.fixture.clone();
+    let initial_state = field(&fixture, "initial_state")?;
+    let canonical = field(initial_state, "canonical")?;
+    let battle = field(canonical, "battle")?;
+    let player_party = field(battle, "player_party")?
+        .as_array()
+        .ok_or_else(|| invalid_data("forced replacement player party is not an array"))?;
+    let enemy_party = field(battle, "enemy_party")?
+        .as_array()
+        .ok_or_else(|| invalid_data("forced replacement enemy party is not an array"))?;
+    let active = player_party
+        .first()
+        .cloned()
+        .ok_or_else(|| invalid_data("forced replacement has no active player"))?;
+    let reserve = player_party
+        .get(2)
+        .cloned()
+        .ok_or_else(|| invalid_data("forced replacement has no seat-one reserve"))?;
+    let enemy = enemy_party
+        .first()
+        .cloned()
+        .ok_or_else(|| invalid_data("forced replacement has no enemy lead"))?;
+
+    let initial_state = field_mut(&mut fixture, "initial_state")?;
+    let canonical = field_mut(initial_state, "canonical")?;
+    let battle = field_mut(canonical, "battle")?;
+    let battle_object = battle
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("forced replacement battle is not an object"))?;
+    battle_object.insert("format".to_owned(), single_format.clone());
+    battle_object.insert("player_party".to_owned(), json!([active, reserve]));
+    battle_object.insert("enemy_party".to_owned(), json!([enemy]));
+    Ok(BattleFixture { fixture })
+}
+
+fn field_mut<'a>(object: &'a mut Value, key: &str) -> TestResult<&'a mut Value> {
+    object
+        .get_mut(key)
+        .ok_or_else(|| invalid_data(format!("fixture is missing mutable field {key:?}")))
+        .map_err(Into::into)
+}
+
+fn published_single_replacement_case() -> TestResult<BattleFixture> {
+    let forced = published_case("forced-replacement")?;
+    let single_source = published_case("physical-hit")?;
+    let single_format = kernel_format(initial_battle(&single_source)?)?;
+    single_replacement_case(&forced, &single_format)
+}
+
+#[test]
+fn raw_driver_contains_only_raw_keydown_and_keyup_kernel_inputs() -> TestResult {
+    let source = include_str!("m3_raw_key_local.rs");
+    let start = source
+        .find("impl<'kernel> RawKeyDriver")
+        .ok_or_else(|| invalid_data("raw driver implementation is missing"))?;
+    let end = source
+        .find("fn assert_no_compatibility_effects")
+        .ok_or_else(|| invalid_data("raw driver boundary marker is missing"))?;
+    let driver_source = &source[start..end];
+    assert!(driver_source.contains("KernelInput::RawInput"));
+    assert_eq!(
+        driver_source.matches("KernelInput::").count(),
+        driver_source.matches("KernelInput::RawInput").count(),
+        "raw driver contains a non-RawInput kernel path",
+    );
+    assert_eq!(driver_source.matches("RawInputEvent::").count(), 2);
+    assert_eq!(driver_source.matches("RawInputEvent::KeyDown").count(), 1);
+    assert_eq!(driver_source.matches("RawInputEvent::KeyUp").count(), 1);
+    for forbidden in [
+        "KernelInput::ProposalReceived",
+        "KernelInput::MaterialApplied",
+        "KernelInput::ControlProjected",
+        "KernelInput::PresentationSettled",
+        "KernelInput::BattlePresentationOutcome",
+        "BattleCommand",
+        "UiIntent",
+    ] {
+        assert!(
+            !driver_source.contains(forbidden),
+            "raw driver contains semantic or compatibility bypass {forbidden}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn raw_singles_walk_party_and_duplicate_keydown_cannot_bleed_into_new_menu() -> TestResult {
+    let fixture = published_single_replacement_case()?;
+    let mut kernel = new_kernel(&fixture)?;
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+
+    let mut all_effects = Vec::new();
+    all_effects.extend(raw_key_down(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+
+    let duplicate = raw_key_down(&mut kernel, PhysicalKey::Enter)?;
+    assert!(duplicate.is_empty(), "held Enter leaked into the new menu");
+    let release = raw_key_up(&mut kernel, PhysicalKey::Enter)?;
+    assert_eq!(release.len(), 1, "Enter release was not exact timer cleanup");
+    assert!(matches!(&release[0], KernelEffect::CancelTimer { .. }));
+    all_effects.extend(release);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+
+    all_effects.extend(raw_press(&mut kernel, PhysicalKey::Backspace)?);
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+
+    all_effects.extend(raw_press(&mut kernel, PhysicalKey::ArrowDown)?);
+    assert_eq!(selected_option(&kernel)?, "command/switch");
+    all_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::PartySelect(_)));
+
+    all_effects.extend(raw_press(&mut kernel, PhysicalKey::Backspace)?);
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+    assert_no_compatibility_effects(&all_effects);
+    Ok(())
+}
+
+#[test]
+fn raw_singles_complete_a_real_turn_and_settle_every_presentation() -> TestResult {
+    let fixture = published_case("physical-hit")?;
+    let mut kernel = new_kernel(&fixture)?;
+    assert_fixture_state(&kernel, &fixture, "initial_state")?;
+    let faint_allocator_before = next_faint_occurrence(&kernel)?;
+
+    let mut effects = Vec::new();
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+    assert!(!kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+        .actionable);
+
+    let events = presentation_events(&effects);
+    assert_eq!(events.len(), oracle_presentation_count(&fixture)?);
+    assert!(has_move_used(&events));
+    assert!(has_hp_changed(&events));
+    assert_eq!(battle_outcome(&kernel)?, "ONGOING");
+
+    effects.extend(settle_presentations(&mut kernel, &events)?);
+    assert_no_compatibility_effects(&effects);
+    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before);
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+    assert!(kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+        .actionable);
+    assert!(kernel.live_resources().battle_presentations.is_empty());
+    Ok(())
+}
+
+#[test]
+fn raw_singles_target_path_reaches_fixture_exact_defeat() -> TestResult {
+    let fixture = published_case("defeat")?;
+    let mut kernel = new_kernel(&fixture)?;
+    assert_fixture_state(&kernel, &fixture, "initial_state")?;
+    let faint_allocator_before = next_faint_occurrence(&kernel)?;
+    let mut effects = Vec::new();
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::TargetSelect(_)));
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::Complete(BattleOutcome::Defeat)
+    ));
+
+    let events = presentation_events(&effects);
+    assert_eq!(events.len(), oracle_presentation_count(&fixture)? + 1);
+    assert!(has_move_used(&events));
+    assert!(has_hp_changed(&events));
+    assert!(has_fainted(&events));
+    assert!(has_battle_lost(&events));
+    effects.extend(settle_presentations(&mut kernel, &events)?);
+    assert_no_compatibility_effects(&effects);
+    assert_eq!(battle_outcome(&kernel)?, "DEFEAT");
+    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_eq!(
+        next_faint_occurrence(&kernel)?,
+        faint_allocator_before + 1,
+    );
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::Complete(BattleOutcome::Defeat)
+    ));
+    assert!(!kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+        .actionable);
+    assert!(kernel.live_resources().battle_presentations.is_empty());
+    Ok(())
+}
+
+#[test]
+fn raw_singles_victory_path_reaches_terminal_control_after_settlement() -> TestResult {
+    let fixture = published_case("victory")?;
+    let mut kernel = new_kernel(&fixture)?;
+    assert_fixture_state(&kernel, &fixture, "initial_state")?;
+    let faint_allocator_before = next_faint_occurrence(&kernel)?;
+    let mut effects = Vec::new();
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+    effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::Complete(BattleOutcome::Victory)
+    ));
+
+    let events = presentation_events(&effects);
+    assert_eq!(events.len(), oracle_presentation_count(&fixture)? + 1);
+    assert!(has_move_used(&events));
+    assert!(has_hp_changed(&events));
+    assert!(has_fainted(&events));
+    assert!(has_battle_won(&events));
+    effects.extend(settle_presentations(&mut kernel, &events)?);
+    assert_no_compatibility_effects(&effects);
+    assert_eq!(battle_outcome(&kernel)?, "VICTORY");
+    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_eq!(
+        next_faint_occurrence(&kernel)?,
+        faint_allocator_before + 1,
+    );
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::Complete(BattleOutcome::Victory)
+    ));
+    assert!(kernel.live_resources().battle_presentations.is_empty());
+    Ok(())
+}
+
+#[test]
+fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> TestResult {
+    let fixture = published_single_replacement_case()?;
+    let mut kernel = new_kernel(&fixture)?;
+    let faint_allocator_before = next_faint_occurrence(&kernel)?;
+
+    let mut first_effects = Vec::new();
+    first_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
+    first_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::TargetSelect(_)));
+    first_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(control(&kernel)?, BattleControl::ReplacementSelect(_)));
+    assert!(!kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+        .actionable);
+    let first_events = presentation_events(&first_effects);
+    assert!(has_fainted(&first_events));
+    first_effects.extend(settle_presentations(&mut kernel, &first_events)?);
+    assert_no_compatibility_effects(&first_effects);
+    assert!(matches!(control(&kernel)?, BattleControl::ReplacementSelect(_)));
+    assert!(kernel
+        .battle_ui_projection()
+        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+        .actionable);
+    assert_eq!(
+        next_faint_occurrence(&kernel)?,
+        faint_allocator_before + 1,
+    );
+    let state = game_state_json(&kernel)?;
+    assert_eq!(
+        state
+            .get("battle")
+            .and_then(|battle| battle.get("faint_queue"))
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(1)
+    );
+
+    let mut replacement_effects = Vec::new();
+    replacement_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::PartyOptionSelect(_)
+    ));
+    replacement_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
+    let replacement_events = presentation_events(&replacement_effects);
+    assert!(has_switched(&replacement_events));
+    replacement_effects.extend(settle_presentations(&mut kernel, &replacement_events)?);
+    assert_no_compatibility_effects(&replacement_effects);
+
+    let final_state = game_state_json(&kernel)?;
+    assert_eq!(field_occupant(&final_state, "PLAYER", 0), Some(3));
+    assert_eq!(
+        final_state
+            .get("battle")
+            .and_then(|battle| battle.get("faint_queue"))
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(0)
+    );
+    assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
+    assert_eq!(
+        next_faint_occurrence(&kernel)?,
+        faint_allocator_before + 1,
+    );
+    assert!(kernel.live_resources().battle_presentations.is_empty());
+    Ok(())
+}
