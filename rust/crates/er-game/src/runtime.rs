@@ -2927,14 +2927,25 @@ fn rebuild_remote_command_path(
     let mut paths = Vec::new();
     let mut first_failure = None;
     let mut prior_controls = Vec::new();
+    // A remote proof replays from the authority-installed root without
+    // installing its leaf.  If the proposal completes the frontier before a
+    // history transition is emitted, that live root is the only exact replay
+    // source available to snapshot/restore.
+    if let Some(control) = runtime
+        .control
+        .seat(proposal.owner_seat)
+        .map(|entry| &entry.control)
+    {
+        if matches!(control, BattleControl::CommandRoot(_)) {
+            push_unique_replay_control(&mut prior_controls, control);
+        }
+    }
     for history in histories.iter().filter(|history| history.seat == proposal.owner_seat) {
         for control in &history.controls {
-            if !matches!(control, BattleControl::CommandRoot(_))
-                || prior_controls.iter().any(|previous| previous == control)
-            {
+            if !matches!(control, BattleControl::CommandRoot(_)) {
                 continue;
             }
-            prior_controls.push(control.clone());
+            push_unique_replay_control(&mut prior_controls, control);
         }
     }
     for prior_control in prior_controls {
@@ -3018,6 +3029,24 @@ fn rebuild_remote_replacement_path(
         .copied()
         .ok_or_else(|| snapshot_invalid("state.battle.faint_queue", "replacement occurrence is absent"))?;
     let mut prior_controls = Vec::new();
+    // Replacement proofs use the same installed-parent rule as commands: the
+    // current replacement control is a valid prior when admission is captured
+    // before the common material boundary records a history transition.
+    if let Some(control) = runtime
+        .control
+        .seat(owner)
+        .map(|entry| &entry.control)
+    {
+        if let BattleControl::ReplacementSelect(value) = control {
+            if value.occurrence == occurrence
+                && value.owner_seat == owner
+                && value.field_slot == faint.slot
+                && value.source == faint.source
+            {
+                push_unique_replay_control(&mut prior_controls, control);
+            }
+        }
+    }
     for history in histories.iter().filter(|history| history.seat == owner) {
         for control in &history.controls {
             let BattleControl::ReplacementSelect(value) = control else {
@@ -3027,11 +3056,10 @@ fn rebuild_remote_replacement_path(
                 || value.owner_seat != owner
                 || value.field_slot != faint.slot
                 || value.source != faint.source
-                || prior_controls.iter().any(|previous| previous == control)
             {
                 continue;
             }
-            prior_controls.push(control.clone());
+            push_unique_replay_control(&mut prior_controls, control);
         }
     }
 
@@ -3160,6 +3188,12 @@ fn rebuild_remote_replacement_path(
             "authority_remote_paths.replacement",
             "more than one replacement proposal matches the live tombstone",
         )),
+    }
+}
+
+fn push_unique_replay_control(prior_controls: &mut Vec<BattleControl>, control: &BattleControl) {
+    if !prior_controls.iter().any(|previous| previous == control) {
+        prior_controls.push(control.clone());
     }
 }
 
