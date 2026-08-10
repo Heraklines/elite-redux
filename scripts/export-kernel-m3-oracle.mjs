@@ -70,7 +70,7 @@ function parseOutputRoot(argv) {
     if (!statSync(outputRoot).isDirectory()) {
       fail("--output-root must name a directory");
     }
-    if (readdirSync(outputRoot).length !== 0) {
+    if (readdirSync(outputRoot).length > 0) {
       fail("--output-root must not contain any entries");
     }
   } else {

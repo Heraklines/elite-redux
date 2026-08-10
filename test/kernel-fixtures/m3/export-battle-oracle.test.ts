@@ -1637,9 +1637,6 @@ function installObservationHooks(): void {
       const game = activeTrace.game as GameManager;
       const partyIndex = game.scene.getPlayerParty().indexOf(pokemon);
       ownerSeat = resolvePlayerOwnerSeat(game, pokemon, partyIndex);
-      if (ownerSeat !== slot.position + 1) {
-        fail("CANONICAL_STATE_UNOBSERVABLE", `faint ${String(id)} conflicts with its owner seat`);
-      }
       const branch = activeTrace.faintBranchByPhase?.get(this);
       if (branch?.kind === "SWITCH_QUEUED") {
         const source = branch.source as AnyRecord | undefined;
@@ -1972,7 +1969,9 @@ function actionOperationId(game: GameManager, pokemon: Pokemon): string | null {
   }
   const turn = battle.turn;
   if (location.side === 0) {
-    return `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${location.position}/seat/${location.position + 1}`;
+    const partyIndex = game.scene.getPlayerParty().indexOf(pokemon);
+    const ownerSeat = resolvePlayerOwnerSeat(game, pokemon, partyIndex);
+    return `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${location.position}/seat/${ownerSeat}`;
   }
   const scriptCursor = turnCommand.cursor ?? 0;
   if (!Number.isSafeInteger(scriptCursor) || scriptCursor < 0) {
@@ -2439,9 +2438,6 @@ function commandFrontier(game: GameManager): AnyRecord[] {
       const turn = battle.turn;
       const partyIndex = game.scene.getPlayerParty().indexOf(mon);
       const ownerSeat = resolvePlayerOwnerSeat(game, mon, partyIndex);
-      if (ownerSeat !== position + 1) {
-        fail("COMMAND_UNOBSERVABLE", `active command owner conflicts with player field ${String(position)}`);
-      }
       return {
         operation_id: `battle/1/wave/${battle.waveIndex}/turn/${turn}/command/player/${position}/seat/${ownerSeat}`,
         owner_seat: ownerSeat,
@@ -2583,13 +2579,9 @@ function committedCommands(game: GameManager, rawCommands: AnyRecord, trace: Obs
     );
     const player = location.side === 0;
     const position = location.position;
-    const ownerSeat = player ? position + 1 : null;
-    if (player) {
-      const partyIndex = game.scene.getPlayerParty().indexOf(actor);
-      if (resolvePlayerOwnerSeat(game, actor, partyIndex) !== ownerSeat) {
-        fail("COMMAND_UNOBSERVABLE", `command actor at ${String(key)} conflicts with its owner seat`);
-      }
-    }
+    const ownerSeat = player
+      ? resolvePlayerOwnerSeat(game, actor, game.scene.getPlayerParty().indexOf(actor))
+      : null;
     const operationId = player
       ? `battle/1/wave/${battle.waveIndex}/turn/${battle.turn}/command/player/${position}/seat/${ownerSeat}`
       : `battle/1/wave/${battle.waveIndex}/turn/${battle.turn}/command/enemy/${position}/script/${turnCommand.cursor ?? 0}`;
@@ -2774,7 +2766,8 @@ function nextControl(game: GameManager): AnyRecord {
       }
       const fieldIndex = mon.getBattlerIndex();
       if (commands[fieldIndex] == null) {
-        pending.push(mon.getFieldIndex() + 1);
+        const partyIndex = game.scene.getPlayerParty().indexOf(mon);
+        pending.push(resolvePlayerOwnerSeat(game, mon, partyIndex));
       }
     }
   }
