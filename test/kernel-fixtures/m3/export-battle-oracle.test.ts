@@ -219,6 +219,14 @@ function b3(bytes: Buffer): string {
 function provenance(contentPackHash: string): AnyRecord {
   const nodeVersion = process.version;
   const phaserVersion = readJson("node_modules/phaser/package.json").version;
+  const exporterCommitSha = git(
+    "log",
+    "-1",
+    "--format=%H",
+    "--",
+    "scripts/export-kernel-m3-oracle.mjs",
+    "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+  );
   if (process.platform !== "linux" || process.arch !== "x64") {
     fail("ORACLE_RUNTIME", `expected hosted linux/x64, got ${process.platform}/${process.arch}`);
   }
@@ -228,7 +236,7 @@ function provenance(contentPackHash: string): AnyRecord {
   return {
     oracle_game_sha: ORACLE_SHA,
     oracle_tree_sha: git("rev-parse", `${ORACLE_SHA}^{tree}`),
-    exporter_commit_sha: git("rev-parse", "HEAD"),
+    exporter_commit_sha: exporterCommitSha,
     content_pack_hash: contentPackHash,
     node_version: nodeVersion,
     phaser_version: phaserVersion,
