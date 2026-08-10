@@ -256,13 +256,25 @@ fn fight(
     move_value: u64,
     target_side: BattleSide,
 ) -> TestResult<NormalizedBattleCommand> {
+    fight_at(operation_name, actor, side, 0, move_value, target_side, 0)
+}
+
+fn fight_at(
+    operation_name: &str,
+    actor: u64,
+    side: BattleSide,
+    position: u8,
+    move_value: u64,
+    target_side: BattleSide,
+    target_position: u8,
+) -> TestResult<NormalizedBattleCommand> {
     Ok(NormalizedBattleCommand::Fight {
         operation_id: operation(operation_name)?,
         actor: pokemon_id(actor)?,
-        field_slot: slot(side, 0)?,
+        field_slot: slot(side, position)?,
         move_slot: MoveSlotIndex::ZERO,
         move_id: move_id(move_value)?,
-        targets: vec![slot(target_side, 0)?],
+        targets: vec![slot(target_side, target_position)?],
     })
 }
 
@@ -296,12 +308,14 @@ fn voluntary_switch_is_constructed_before_the_move_stage() -> TestResult {
     let content = selected_content_pack()?;
     let state = double_state(&content)?;
     let commands = vec![
-        fight(
+        fight_at(
             "move-player-one",
             2,
             BattleSide::Player,
             1,
+            1,
             BattleSide::Enemy,
+            0,
         )?,
         fight(
             "move-enemy-zero",
@@ -310,12 +324,14 @@ fn voluntary_switch_is_constructed_before_the_move_stage() -> TestResult {
             1,
             BattleSide::Player,
         )?,
-        fight(
+        fight_at(
             "move-enemy-one",
             5,
             BattleSide::Enemy,
             1,
+            1,
             BattleSide::Player,
+            0,
         )?,
         switch("switch-player-zero")?,
     ];
@@ -393,13 +409,13 @@ fn paralysis_and_stage_math_are_applied_to_live_speed() -> TestResult {
     live_player.stat_stages.speed = 2;
     let mut rng = runtime(&live)?;
     let first = queue.pop_next(&live, &mut rng)?.ok_or("empty live queue")?;
-    assert_eq!(first.actor, pokemon_id(2)?);
-    assert_eq!(first.effective_speed, 100);
+    assert_eq!(first.actor, pokemon_id(1)?);
+    assert_eq!(first.effective_speed, 180);
     let second = queue
         .pop_next(&live, &mut rng)?
         .ok_or("missing second action")?;
-    assert_eq!(second.actor, pokemon_id(1)?);
-    assert_eq!(second.effective_speed, 180);
+    assert_eq!(second.actor, pokemon_id(2)?);
+    assert_eq!(second.effective_speed, 100);
     Ok(())
 }
 

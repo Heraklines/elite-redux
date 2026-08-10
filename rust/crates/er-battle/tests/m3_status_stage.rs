@@ -1,16 +1,17 @@
 //! Deterministic M3B-05 stage/status checks.
-//!
-//! The source modules are included directly because this lane cannot edit the
-//! integration-owned `er-battle/src/lib.rs` module declarations.  Integration
-//! will expose the same public modules after the lane branches are merged.
-
-#[path = "../src/stat_stage.rs"]
-mod stat_stage;
-#[path = "../src/status.rs"]
-mod status;
 
 use std::error::Error;
 
+use er_battle::stat_stage::{
+    EffectiveStatInput, StagePolicy, apply_stage_delta, effective_battle_stat, effective_speed,
+    js_signed_shift_right_one, stage_for_stat, stage_ratio,
+};
+use er_battle::status::{
+    ParalysisActivationOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
+    StatusChanceOutcome, StatusError, StatusRejection, StatusResidualInput, StatusResidualOutcome,
+    apply_status, apply_status_with_chance, burn_damage_multiplier, check_paralysis,
+    resolve_residual, roll_status_chance, status_type_immunity,
+};
 use er_rng::audit::{RngReason, RngStream};
 use er_rng::battle::{BattleRngState, RngRuntime};
 use er_rng::phaser::{PhaserRdgState, RunRngState};
@@ -19,16 +20,6 @@ use er_types::battle_ids::TurnIndex;
 use er_types::battle_model::{
     BattleStat, BattleStats, MoveCategory, PokemonType, PokemonTyping, StatStages, StatusKind,
     StatusState,
-};
-use stat_stage::{
-    EffectiveStatInput, StagePolicy, apply_stage_delta, effective_battle_stat, effective_speed,
-    js_signed_shift_right_one, stage_for_stat, stage_ratio,
-};
-use status::{
-    ParalysisActivationOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
-    StatusChanceOutcome, StatusError, StatusRejection, StatusResidualInput, StatusResidualOutcome,
-    apply_status, apply_status_with_chance, burn_damage_multiplier, check_paralysis,
-    resolve_residual, roll_status_chance, status_type_immunity,
 };
 
 fn typing(primary: PokemonType, secondary: Option<PokemonType>) -> PokemonTyping {
