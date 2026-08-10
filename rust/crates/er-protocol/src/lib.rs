@@ -7,6 +7,7 @@ pub mod recovery;
 pub mod replacement_material;
 pub mod replica;
 pub mod scheduler;
+pub mod snapshot;
 pub mod successor;
 pub mod validation;
 
@@ -17,6 +18,7 @@ pub use recovery::*;
 pub use replacement_material::*;
 pub use replica::*;
 pub use scheduler::*;
+pub use snapshot::*;
 pub use successor::*;
 pub use validation::*;
 

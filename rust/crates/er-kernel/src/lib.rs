@@ -7,6 +7,7 @@ mod battle_replica;
 mod battle_ui;
 pub mod input_router;
 pub mod kernel;
+pub mod snapshot;
 pub mod ui_reducer;
 
 pub use input_router::{InputRouteError, InputRouter};
