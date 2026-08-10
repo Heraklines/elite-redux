@@ -1,9 +1,11 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
 import {
   addMoodyCurse,
+  commitMoodyCurseOffer,
   createMoodyModeState,
   getMoodyBoonBudget,
   getMoodyBoonOffers,
+  getMoodyCurseOffers,
   getMoodyModeSaveData,
   initializeMoodyModeState,
   isMoodyBoonRewardWave,
@@ -60,6 +62,20 @@ describe("Moody Mode run state", () => {
 
     initializeMoodyModeState("stable-seed");
     expect(getMoodyBoonOffers(10)).toEqual(first);
+  });
+
+  it("generates and commits exactly one deterministic opening curse", () => {
+    initializeMoodyModeState("opening-curse");
+    const first = structuredClone(getMoodyCurseOffers());
+    expect(first).toHaveLength(3);
+    expect(new Set(first.map(offer => offer.curseId)).size).toBe(3);
+
+    initializeMoodyModeState("opening-curse");
+    expect(getMoodyCurseOffers()).toEqual(first);
+    const committed = commitMoodyCurseOffer(first[0], { pokemonIds: [42] });
+    expect(committed).toMatchObject({ curseId: first[0].curseId, target: { pokemonIds: [42] } });
+    expect(getMoodyCurseOffers()).toEqual([]);
+    expect(() => commitMoodyCurseOffer(first[1])).toThrow("active draft");
   });
 
   it("round-trips boon, curse, and threat state defensively", () => {

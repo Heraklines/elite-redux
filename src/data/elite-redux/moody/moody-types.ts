@@ -83,6 +83,11 @@ export interface MoodyCurseInstance {
   progress?: MoodyBoonProgress;
 }
 
+export interface MoodyCurseOffer {
+  offerId: string;
+  curseId: string;
+}
+
 export interface MoodyThreatRecord {
   pokemonId: number;
   damageDealt: number;

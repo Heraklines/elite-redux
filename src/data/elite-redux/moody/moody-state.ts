@@ -6,6 +6,7 @@ import type {
   MoodyBoonProgress,
   MoodyBoonTarget,
   MoodyCurseInstance,
+  MoodyCurseOffer,
   MoodyModeSaveData,
   MoodyRarity,
 } from "#data/elite-redux/moody/moody-types";
@@ -35,6 +36,7 @@ export const MOODY_CURSE_BY_ID = new Map<string, (typeof MOODY_CURSES)[number]>(
 let currentState: MoodyModeSaveData | null = null;
 let pendingOffers: MoodyBoonOffer[] | null = null;
 let pendingOfferWave = -1;
+let pendingCurseOffers: MoodyCurseOffer[] | null = null;
 
 function mix32(value: number): number {
   let mixed = value >>> 0;
@@ -79,12 +81,14 @@ export function initializeMoodyModeState(seed: string | number): void {
   currentState = createMoodyModeState(seed);
   pendingOffers = null;
   pendingOfferWave = -1;
+  pendingCurseOffers = null;
 }
 
 export function resetMoodyModeState(): void {
   currentState = null;
   pendingOffers = null;
   pendingOfferWave = -1;
+  pendingCurseOffers = null;
 }
 
 export function getMoodyModeState(): Readonly<MoodyModeSaveData> | null {
@@ -211,7 +215,58 @@ export function restoreMoodyModeState(value: unknown): boolean {
   };
   pendingOffers = null;
   pendingOfferWave = -1;
+  pendingCurseOffers = null;
   return true;
+}
+
+export function getMoodyCurseOffers(): readonly MoodyCurseOffer[] {
+  if (currentState == null) {
+    throw new Error("Moody Mode state is not initialized");
+  }
+  if (currentState.curses.length > 0) {
+    return [];
+  }
+  if (pendingCurseOffers != null) {
+    return pendingCurseOffers;
+  }
+
+  const available = [...MOODY_CURSES];
+  const offers: MoodyCurseOffer[] = [];
+  for (let cardIndex = 0; cardIndex < 3; cardIndex++) {
+    const selectedIndex = Math.floor(seededUnit(currentState.seed, 0x43555253 + cardIndex) * available.length);
+    const [definition] = available.splice(selectedIndex, 1);
+    if (definition == null) {
+      throw new Error("Moody Mode has no eligible curse offer");
+    }
+    offers.push({
+      offerId: `curse:0:${cardIndex}:${definition.id}`,
+      curseId: definition.id,
+    });
+  }
+  pendingCurseOffers = offers;
+  return offers;
+}
+
+export function commitMoodyCurseOffer(offer: MoodyCurseOffer, target?: MoodyBoonTarget): MoodyCurseInstance {
+  if (
+    currentState == null
+    || currentState.curses.length > 0
+    || pendingCurseOffers?.some(candidate => candidate.offerId === offer.offerId) !== true
+  ) {
+    throw new Error("Moody curse offer is not part of the active draft");
+  }
+  if (!MOODY_CURSE_BY_ID.has(offer.curseId)) {
+    throw new Error(`Unknown Moody curse ${offer.curseId}`);
+  }
+
+  const instance: MoodyCurseInstance = {
+    curseId: offer.curseId,
+    acquiredAtWave: 0,
+    ...(target == null ? {} : { target: structuredClone(target) }),
+  };
+  currentState.curses.push(instance);
+  pendingCurseOffers = null;
+  return instance;
 }
 
 export function rollMoodyBoonDefinition(
