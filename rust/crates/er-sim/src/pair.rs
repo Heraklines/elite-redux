@@ -8,7 +8,7 @@ use er_content::pack::ContentPack;
 use er_kernel::{BattleGameConfig, BattleProtocolConfig, GameKernel, KernelConfig};
 use er_kernel::snapshot::{
     GameKernelSnapshotBridge, KernelDeterminismDigest, PresentationOutcomeSnapshotV1,
-    RestorableKernelSnapshotV2,
+    RestorableKernelSnapshotV2, RestorableTimerSnapshotV2, RngDraw,
 };
 use er_protocol::{ScheduledTimer, SchedulerCommand, control_id_of};
 use er_testkit::{
@@ -41,15 +41,18 @@ use crate::{
 };
 use crate::snapshot::{
     DetachedKeyboardDriverSnapshotV2, DriverHoldSnapshotV2, FaultNetworkSnapshotV2,
-    FaultRngStateV2, FrameCorruptionV2, PacketDispositionV2, PacketReorderStateV2,
-    PairClockTimerSnapshotV2,
+    FaultOperationV2, FaultRngStateV2, FrameCorruptionV2, InternalEventKindV1,
+    PacketDispositionV2, PacketReorderStateV2, PairClockTimerSnapshotV2,
     PairPresenterEventSnapshotV2, PairPresenterOutcomeSnapshotV2,
-    PairPresenterTombstoneSnapshotV2, PresenterSnapshotV2, QueuedPacketSnapshotV2,
-    RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION, RestorablePacketKindV2, RestorablePairSnapshotV2,
-    RestorableStorageRequestV2, SimulatedPairSnapshotBridge, SnapshotError,
-    StorageFaultSnapshotV2, StorageRequestSnapshotV2, StorageSnapshotV2,
-    StorageValueSnapshotV2, VirtualClockSnapshotV2, restore_simulated_pair,
-    snapshot_simulated_pair,
+    PairPresenterTombstoneSnapshotV2, PairTraceObservationV2, PairOperationV2,
+    PresenterSnapshotV2, QueuedPacketSnapshotV2, RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
+    RestorableKernelEffectV2, RestorablePacketKindV2, RestorablePairSnapshotV2,
+    RestorableStorageRequestV2, RestorableStorageResultV2,
+    SimulatedPairSnapshotBridge, SnapshotError, StorageFaultSnapshotV2,
+    StorageRequestSnapshotV2, StorageSnapshotV2, StorageValueSnapshotV2,
+    TraceFailureEvidenceV2, TraceFailureOwnerV2, VirtualClockSnapshotV2,
+    numbered_pair_effects, restore_simulated_pair, snapshot_simulated_pair,
+    validate_pair_operation,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -260,6 +263,7 @@ pub struct SimulatedPair {
     // This deterministic private value is the narrow witness for cross-domain
     // timer/network ordering without changing the frozen public schema.
     last_boundary_order: Vec<BoundaryOrderEvent>,
+    trace_audit: PairTraceAuditState,
     disposed: bool,
 }
 
@@ -278,7 +282,17 @@ struct PairRollbackState {
     terminal_reason: Option<String>,
     fault_script: crate::snapshot::FaultScriptSnapshotV2,
     last_boundary_order: Vec<BoundaryOrderEvent>,
+    trace_audit: PairTraceAuditState,
     disposed: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+struct PairTraceAuditState {
+    effect_origins: Vec<PairEndpoint>,
+    host_rng_audit: Vec<RngDraw>,
+    host_internal_events: Vec<InternalEventKindV1>,
+    guest_rng_audit: Vec<RngDraw>,
+    guest_internal_events: Vec<InternalEventKindV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -347,6 +361,7 @@ impl SimulatedPair {
             terminal_reason: None,
             fault_script: empty_fault_script(),
             last_boundary_order: Vec::new(),
+            trace_audit: PairTraceAuditState::default(),
             disposed: false,
         })
     }
@@ -415,6 +430,7 @@ impl SimulatedPair {
             terminal_reason: None,
             fault_script: empty_fault_script(),
             last_boundary_order: Vec::new(),
+            trace_audit: PairTraceAuditState::default(),
             disposed: false,
         })
     }
@@ -437,6 +453,114 @@ impl SimulatedPair {
         content: Arc<ContentPack>,
     ) -> Result<Self, SnapshotError> {
         Self::from_snapshot(snapshot, content)
+    }
+
+    /// Apply one frozen external operation through the real pair and return
+    /// the exact evidence consumed by `PairKernelTraceRecorder`.
+    #[doc(hidden)]
+    pub fn apply_trace_operation_v2(
+        &mut self,
+        operation: PairOperationV2,
+    ) -> Result<PairTraceObservationV2, SnapshotError> {
+        validate_pair_operation(&operation)?;
+        let live_operation = thaw_pair_operation_v2(&operation)?;
+        let failure_owner = pair_operation_failure_owner(&operation);
+        let before_snapshot = self.snapshot_v2()?;
+        let before_host_live_resources = self.host_kernel.live_resources();
+        let before_guest_live_resources = self.guest_kernel.live_resources();
+        let rollback = self
+            .capture_rollback_state()
+            .map_err(|error| pair_snapshot_invalid("trace.rollback", error.to_string()))?;
+
+        match self.apply(live_operation) {
+            Ok(step) => {
+                let observation = (|| {
+                    if self.trace_audit.effect_origins.len() != step.generated_effects.len() {
+                        return Err(pair_snapshot_invalid(
+                            "trace.effects",
+                            "effect-origin count differs from the generated-effect count",
+                        ));
+                    }
+                    let effects = self
+                        .trace_audit
+                        .effect_origins
+                        .iter()
+                        .copied()
+                        .zip(&step.generated_effects)
+                        .filter_map(|(origin, effect)| {
+                            freeze_trace_effect(effect)
+                                .transpose()
+                                .map(|result| result.map(|effect| (origin, effect)))
+                        })
+                        .collect::<Result<Vec<_>, SnapshotError>>()?;
+                    let effects = numbered_pair_effects(effects)?;
+                    let after_snapshot = self.snapshot_v2()?;
+                    Ok(PairTraceObservationV2 {
+                        effects,
+                        after_snapshot,
+                        host_rng_audit: self.trace_audit.host_rng_audit.clone(),
+                        host_internal_events: self.trace_audit.host_internal_events.clone(),
+                        host_live_resources: self.host_kernel.live_resources(),
+                        guest_rng_audit: self.trace_audit.guest_rng_audit.clone(),
+                        guest_internal_events: self.trace_audit.guest_internal_events.clone(),
+                        guest_live_resources: self.guest_kernel.live_resources(),
+                        failure: None,
+                    })
+                })();
+                match observation {
+                    Ok(observation) => Ok(observation),
+                    Err(error) => Err(self.restore_after_trace_error(rollback, error)),
+                }
+            }
+            Err(error) => {
+                let after_snapshot = match self.snapshot_v2() {
+                    Ok(snapshot) => snapshot,
+                    Err(snapshot_error) => {
+                        return Err(self.restore_after_trace_error(rollback, snapshot_error));
+                    }
+                };
+                if after_snapshot != before_snapshot {
+                    return Err(self.restore_after_trace_error(
+                        rollback,
+                        pair_snapshot_invalid(
+                            "trace.failure",
+                            "rejected pair operation did not retain the exact before snapshot",
+                        ),
+                    ));
+                }
+                Ok(PairTraceObservationV2 {
+                    effects: Vec::new(),
+                    after_snapshot,
+                    host_rng_audit: Vec::new(),
+                    host_internal_events: Vec::new(),
+                    host_live_resources: before_host_live_resources,
+                    guest_rng_audit: Vec::new(),
+                    guest_internal_events: Vec::new(),
+                    guest_live_resources: before_guest_live_resources,
+                    failure: Some(TraceFailureEvidenceV2 {
+                        owner: failure_owner,
+                        code: pair_failure_code(&error).to_owned(),
+                        path: "pair.apply".to_owned(),
+                        expected: None,
+                        actual: Some(error.to_string()),
+                    }),
+                })
+            }
+        }
+    }
+
+    fn restore_after_trace_error(
+        &mut self,
+        rollback: PairRollbackState,
+        error: SnapshotError,
+    ) -> SnapshotError {
+        match self.restore_rollback_state(rollback) {
+            Ok(()) => error,
+            Err(rollback_error) => pair_snapshot_invalid(
+                "trace.rollback",
+                format!("{error}; restoring the trace boundary failed: {rollback_error}"),
+            ),
+        }
     }
 
     fn capture_restorable_pair_snapshot_v2(
@@ -586,6 +710,7 @@ impl SimulatedPair {
             terminal_reason,
             fault_script,
             last_boundary_order: Vec::new(),
+            trace_audit: PairTraceAuditState::default(),
             disposed,
         };
         let restored_snapshot = pair.capture_restorable_pair_snapshot_v2()?;
@@ -628,6 +753,7 @@ impl SimulatedPair {
         &mut self,
         operation: PairOperation,
     ) -> Result<PairStep, SimulatedPairError> {
+        self.trace_audit = PairTraceAuditState::default();
         let operation_for_step = operation.clone();
         let mut generated_effects = Vec::new();
         let mut work = VecDeque::new();
@@ -701,6 +827,7 @@ impl SimulatedPair {
             terminal_reason: self.terminal_reason.clone(),
             fault_script: self.fault_script.clone(),
             last_boundary_order: self.last_boundary_order.clone(),
+            trace_audit: self.trace_audit.clone(),
             disposed: self.disposed,
         })
     }
@@ -723,6 +850,7 @@ impl SimulatedPair {
             terminal_reason,
             fault_script,
             last_boundary_order,
+            trace_audit,
             disposed,
         } = state;
         let clock = crate::VirtualClock::from_state(clock).map_err(clock_error)?;
@@ -743,6 +871,7 @@ impl SimulatedPair {
         self.terminal_reason = terminal_reason;
         self.fault_script = fault_script;
         self.last_boundary_order = last_boundary_order;
+        self.trace_audit = trace_audit;
         self.disposed = disposed;
         Ok(())
     }
@@ -1457,6 +1586,9 @@ impl SimulatedPair {
                 PairWork::Input { endpoint, input } => {
                     let effects =
                         self.step_kernel_input(endpoint, input, generated_events, budget)?;
+                    self.trace_audit
+                        .effect_origins
+                        .extend(std::iter::repeat(endpoint).take(effects.len()));
                     generated_effects.extend(effects.iter().cloned());
                     for effect in effects.into_iter().rev() {
                         work.push_front(PairWork::Effect(effect));
@@ -1467,6 +1599,9 @@ impl SimulatedPair {
                     for (endpoint, input) in inputs {
                         let effects =
                             self.step_kernel_input(endpoint, input, generated_events, budget)?;
+                        self.trace_audit
+                            .effect_origins
+                            .extend(std::iter::repeat(endpoint).take(effects.len()));
                         generated_effects.extend(effects.iter().cloned());
                         batch_effects.extend(effects);
                     }
@@ -1496,7 +1631,26 @@ impl SimulatedPair {
             *generated_events += 1;
         }
 
-        self.kernel_mut(endpoint).step(input).map_err(kernel_error)
+        let effects = self.kernel_mut(endpoint).step(input).map_err(kernel_error)?;
+        let (rng_audit, internal_events) = self.kernel(endpoint).m3_trace_audit();
+        let internal_events = internal_events
+            .into_iter()
+            .map(freeze_internal_event_kind);
+        match endpoint {
+            PairEndpoint::Host => {
+                self.trace_audit.host_rng_audit.extend(rng_audit);
+                self.trace_audit
+                    .host_internal_events
+                    .extend(internal_events);
+            }
+            PairEndpoint::Guest => {
+                self.trace_audit.guest_rng_audit.extend(rng_audit);
+                self.trace_audit
+                    .guest_internal_events
+                    .extend(internal_events);
+            }
+        }
+        Ok(effects)
     }
 
     fn consume_effect(
@@ -1825,6 +1979,13 @@ impl SimulatedPair {
         }
     }
 
+    fn kernel(&self, endpoint: PairEndpoint) -> &GameKernel {
+        match endpoint {
+            PairEndpoint::Host => &self.host_kernel,
+            PairEndpoint::Guest => &self.guest_kernel,
+        }
+    }
+
     fn seat(&self, endpoint: PairEndpoint) -> SeatId {
         match endpoint {
             PairEndpoint::Host => self.host_seat,
@@ -1960,6 +2121,274 @@ fn map_kernel_snapshot_error(error: er_kernel::snapshot::SnapshotError) -> Snaps
         er_kernel::snapshot::SnapshotError::Canonical { path, reason } => {
             pair_snapshot_canonical(path, reason)
         }
+    }
+}
+
+fn freeze_internal_event_kind(
+    kind: er_game::internal_event::InternalEventKind,
+) -> InternalEventKindV1 {
+    match kind {
+        er_game::internal_event::InternalEventKind::Button => InternalEventKindV1::Button,
+        er_game::internal_event::InternalEventKind::Ui => InternalEventKindV1::Ui,
+        er_game::internal_event::InternalEventKind::Game => InternalEventKindV1::Game,
+        er_game::internal_event::InternalEventKind::Protocol => InternalEventKindV1::Protocol,
+        er_game::internal_event::InternalEventKind::BattleResolved => {
+            InternalEventKindV1::BattleResolved
+        }
+        er_game::internal_event::InternalEventKind::AuthorityEntryReady => {
+            InternalEventKindV1::AuthorityEntryReady
+        }
+        er_game::internal_event::InternalEventKind::MaterialInstalled => {
+            InternalEventKindV1::MaterialInstalled
+        }
+        er_game::internal_event::InternalEventKind::ControlInstalled => {
+            InternalEventKindV1::ControlInstalled
+        }
+    }
+}
+
+fn thaw_pair_operation_v2(operation: &PairOperationV2) -> Result<PairOperation, SnapshotError> {
+    Ok(match operation {
+        PairOperationV2::RawInput { endpoint, event } => PairOperation::RawInput {
+            endpoint: *endpoint,
+            event: event.clone(),
+        },
+        PairOperationV2::AdvanceTime { delta_ms } => PairOperation::AdvanceTime {
+            delta_ms: *delta_ms,
+        },
+        PairOperationV2::Fault { operation } => PairOperation::Fault {
+            operation: thaw_fault_operation_v2(operation)?,
+        },
+        PairOperationV2::Disconnect { endpoint } => PairOperation::Disconnect {
+            endpoint: *endpoint,
+        },
+        PairOperationV2::Reconnect { endpoint } => PairOperation::Reconnect {
+            endpoint: *endpoint,
+        },
+        PairOperationV2::BattlePresentationOutcome {
+            endpoint,
+            event_id,
+            outcome,
+        } => PairOperation::BattlePresentationOutcome {
+            endpoint: *endpoint,
+            event_id: event_id.clone(),
+            outcome: outcome.clone(),
+        },
+        PairOperationV2::StorageResult {
+            endpoint,
+            request_id,
+            result,
+        } => PairOperation::StorageResult {
+            endpoint: *endpoint,
+            request_id: *request_id,
+            result: thaw_storage_result_v2(result)?,
+        },
+        PairOperationV2::Suspend { endpoint } => PairOperation::Suspend {
+            endpoint: *endpoint,
+        },
+        PairOperationV2::Resume { endpoint } => PairOperation::Resume {
+            endpoint: *endpoint,
+        },
+    })
+}
+
+fn thaw_fault_operation_v2(operation: &FaultOperationV2) -> Result<FaultOperation, SnapshotError> {
+    Ok(match operation {
+        FaultOperationV2::Deliver { packet_id } => FaultOperation::Deliver {
+            packet_id: *packet_id,
+        },
+        FaultOperationV2::DeliverNext => FaultOperation::DeliverNext,
+        FaultOperationV2::Drop { packet_id } => FaultOperation::Drop {
+            packet_id: *packet_id,
+        },
+        FaultOperationV2::Duplicate { packet_id } => FaultOperation::Duplicate {
+            packet_id: *packet_id,
+        },
+        FaultOperationV2::Delay {
+            packet_id,
+            additional_ms,
+        } => FaultOperation::Delay {
+            packet_id: *packet_id,
+            additional_ms: *additional_ms,
+        },
+        FaultOperationV2::Reorder { packet_ids } => FaultOperation::Reorder {
+            packet_ids: packet_ids.clone(),
+        },
+        FaultOperationV2::Corrupt {
+            packet_id,
+            corruption,
+        } => FaultOperation::Corrupt {
+            packet_id: *packet_id,
+            corruption: match corruption {
+                FrameCorruptionV2::Replace { body } => crate::FrameCorruption::Replace {
+                    value: decode_canonical_value(body, "trace.input.corruption.body")?,
+                },
+                FrameCorruptionV2::DeleteField { json_pointer } => {
+                    crate::FrameCorruption::DeleteField {
+                        json_pointer: json_pointer.clone(),
+                    }
+                }
+                FrameCorruptionV2::ReplaceField {
+                    json_pointer,
+                    canonical_value,
+                } => crate::FrameCorruption::ReplaceField {
+                    json_pointer: json_pointer.clone(),
+                    value: decode_canonical_value(
+                        canonical_value,
+                        "trace.input.corruption.canonical_value",
+                    )?,
+                },
+                FrameCorruptionV2::MalformedJson { body } => {
+                    let bytes = decode_hex(body, "trace.input.corruption.body")?;
+                    let text = String::from_utf8(bytes).map_err(|error| {
+                        pair_snapshot_invalid(
+                            "trace.input.corruption.body",
+                            format!("must be UTF-8: {error}"),
+                        )
+                    })?;
+                    crate::FrameCorruption::MalformedJson { text }
+                }
+            },
+        },
+    })
+}
+
+fn thaw_storage_result_v2(
+    result: &RestorableStorageResultV2,
+) -> Result<StorageResult, SnapshotError> {
+    Ok(match result {
+        RestorableStorageResultV2::Loaded { value } => StorageResult::Loaded {
+            value: value
+                .as_ref()
+                .map(|value| decode_canonical_value(value, "trace.input.storage_result.value"))
+                .transpose()?,
+        },
+        RestorableStorageResultV2::Persisted => StorageResult::Persisted,
+        RestorableStorageResultV2::Failed { reason } => StorageResult::Failed {
+            reason: reason.clone(),
+        },
+    })
+}
+
+fn freeze_trace_effect(
+    effect: &KernelEffect,
+) -> Result<Option<RestorableKernelEffectV2>, SnapshotError> {
+    Ok(match effect {
+        KernelEffect::SendFrame { from, frame } => Some(RestorableKernelEffectV2::SendFrame {
+            from: *from,
+            bytes: canonical_value_bytes(frame, "trace.effects.send_frame")?,
+        }),
+        KernelEffect::SendProposal { proposal } => {
+            Some(RestorableKernelEffectV2::SendProposal {
+                from: proposal.from,
+                bytes: canonical_value_bytes(proposal, "trace.effects.send_proposal")?,
+            })
+        }
+        KernelEffect::ScheduleTimer {
+            endpoint,
+            timer_id,
+            owner,
+            delay_ms,
+            time_class,
+        } => Some(RestorableKernelEffectV2::ScheduleTimer {
+            timer: RestorableTimerSnapshotV2 {
+                registration: ScheduledTimer {
+                    endpoint: *endpoint,
+                    timer_id: *timer_id,
+                    owner: owner.clone(),
+                    delay_ms: *delay_ms,
+                    time_class: *time_class,
+                },
+                original_delay_ms: *delay_ms,
+                remaining_active_ms: *delay_ms,
+            },
+        }),
+        KernelEffect::CancelTimer { endpoint, timer_id } => {
+            Some(RestorableKernelEffectV2::CancelTimer {
+                endpoint: *endpoint,
+                timer_id: *timer_id,
+            })
+        }
+        KernelEffect::BattleUiChanged {
+            endpoint,
+            projection,
+        } => Some(RestorableKernelEffectV2::BattleUiChanged {
+            endpoint: *endpoint,
+            projection: projection.clone(),
+        }),
+        KernelEffect::PresentBattle { endpoint, event } => {
+            Some(RestorableKernelEffectV2::PresentBattle {
+                endpoint: *endpoint,
+                event: event.clone(),
+            })
+        }
+        KernelEffect::Persist { endpoint, request } => {
+            let request = match &request.value {
+                None => RestorableStorageRequestV2::Load {
+                    request_id: request.request_id,
+                    key: request.key.clone(),
+                },
+                Some(value) => RestorableStorageRequestV2::Persist {
+                    request_id: request.request_id,
+                    key: request.key.clone(),
+                    value: canonical_value_bytes(value, "trace.effects.persist.value")?,
+                },
+            };
+            Some(match request {
+                request @ RestorableStorageRequestV2::Load { .. } => {
+                    RestorableKernelEffectV2::Load {
+                        endpoint: *endpoint,
+                        request,
+                    }
+                }
+                request @ RestorableStorageRequestV2::Persist { .. } => {
+                    RestorableKernelEffectV2::Persist {
+                        endpoint: *endpoint,
+                        request,
+                    }
+                }
+            })
+        }
+        KernelEffect::EnterSharedTerminal { terminal } => {
+            Some(RestorableKernelEffectV2::EnterSharedTerminal {
+                terminal: terminal.clone(),
+            })
+        }
+        KernelEffect::UiChanged { .. }
+        | KernelEffect::UiIntent { .. }
+        | KernelEffect::Present { .. }
+        | KernelEffect::ApplyAuthorityMaterial { .. }
+        | KernelEffect::ProjectAuthorityControl { .. } => None,
+    })
+}
+
+fn pair_operation_failure_owner(operation: &PairOperationV2) -> TraceFailureOwnerV2 {
+    match operation {
+        PairOperationV2::RawInput { endpoint, .. }
+        | PairOperationV2::Disconnect { endpoint }
+        | PairOperationV2::Reconnect { endpoint }
+        | PairOperationV2::BattlePresentationOutcome { endpoint, .. }
+        | PairOperationV2::StorageResult { endpoint, .. }
+        | PairOperationV2::Suspend { endpoint }
+        | PairOperationV2::Resume { endpoint } => match endpoint {
+            PairEndpoint::Host => TraceFailureOwnerV2::Host,
+            PairEndpoint::Guest => TraceFailureOwnerV2::Guest,
+        },
+        PairOperationV2::AdvanceTime { .. } | PairOperationV2::Fault { .. } => {
+            TraceFailureOwnerV2::Environment
+        }
+    }
+}
+
+fn pair_failure_code(error: &SimulatedPairError) -> &'static str {
+    match error {
+        SimulatedPairError::InvalidConfig { .. } => "PAIR_INVALID_CONFIG",
+        SimulatedPairError::Disposed => "PAIR_DISPOSED",
+        SimulatedPairError::Kernel { .. } => "KERNEL_TRANSITION_FAILED",
+        SimulatedPairError::Clock { .. } => "CLOCK_TRANSITION_FAILED",
+        SimulatedPairError::Network { .. } => "NETWORK_TRANSITION_FAILED",
+        SimulatedPairError::Adapter { .. } => "ADAPTER_TRANSITION_FAILED",
+        SimulatedPairError::EventBudgetExceeded { .. } => "EVENT_BUDGET_EXCEEDED",
     }
 }
 

@@ -2516,7 +2516,7 @@ fn validate_fault_operation(
     Ok(())
 }
 
-fn validate_pair_operation(operation: &PairOperationV2) -> Result<(), SnapshotError> {
+pub(crate) fn validate_pair_operation(operation: &PairOperationV2) -> Result<(), SnapshotError> {
     match operation {
         PairOperationV2::Fault { operation } => validate_fault_operation(operation, "input.operation"),
         PairOperationV2::StorageResult { result, .. } => {
@@ -2896,7 +2896,10 @@ fn validate_fault_corruption(
             validate_canonical_json::<RawFrame>(body, &format!("{path}.body"))?;
         }
         FrameCorruptionV2::MalformedJson { body } => {
-            validate_bytes(body, &format!("{path}.body"))?;
+            let body_path = format!("{path}.body");
+            let bytes = decode_canonical_bytes(body, &body_path)?;
+            std::str::from_utf8(&bytes)
+                .map_err(|error| invalid(body_path.as_str(), format!("must be UTF-8: {error}")))?;
         }
         FrameCorruptionV2::DeleteField { json_pointer } => {
             validate_json_pointer(json_pointer, &format!("{path}.json_pointer"))?;
@@ -2932,16 +2935,7 @@ fn validate_canonical_json<T>(
 where
     T: DeserializeOwned + Serialize,
 {
-    validate_bytes(value, path)?;
-    let encoded = value.as_str().as_bytes();
-    let mut bytes = Vec::with_capacity(encoded.len() / 2);
-    for pair in encoded.chunks_exact(2) {
-        let high = canonical_hex_value(pair[0])
-            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
-        let low = canonical_hex_value(pair[1])
-            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
-        bytes.push((high << 4) | low);
-    }
+    let bytes = decode_canonical_bytes(value, path)?;
     let decoded = serde_json::from_slice::<T>(&bytes).map_err(|error| SnapshotError::Canonical {
         path: path.to_owned(),
         reason: error.to_string(),
@@ -2957,6 +2951,26 @@ where
         });
     }
     Ok(())
+}
+
+fn decode_canonical_bytes(
+    value: &CanonicalHexBytes,
+    path: &str,
+) -> Result<Vec<u8>, SnapshotError> {
+    validate_bytes(value, path)?;
+    let encoded = value.as_str().as_bytes();
+    if encoded.len() % 2 != 0 {
+        return Err(invalid(path, "canonical payload contains an odd number of hexadecimal digits"));
+    }
+    let mut bytes = Vec::with_capacity(encoded.len() / 2);
+    for pair in encoded.chunks_exact(2) {
+        let high = canonical_hex_value(pair[0])
+            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
+        let low = canonical_hex_value(pair[1])
+            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
+        bytes.push((high << 4) | low);
+    }
+    Ok(bytes)
 }
 
 fn canonical_hex_value(value: u8) -> Option<u8> {

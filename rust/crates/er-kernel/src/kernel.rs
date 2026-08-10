@@ -481,6 +481,25 @@ impl GameKernel {
         }
     }
 
+    /// Return the exact causal audit emitted by the most recent production
+    /// Battle step. This observation seam is read-only and is not snapshot
+    /// state; replay obtains it again by executing the same external input.
+    #[doc(hidden)]
+    pub fn m3_trace_audit(
+        &self,
+    ) -> (
+        Vec<crate::snapshot::RngDraw>,
+        Vec<er_game::internal_event::InternalEventKind>,
+    ) {
+        self.battle.as_ref().map_or_else(
+            || (Vec::new(), Vec::new()),
+            |battle| {
+                let (rng_audit, internal_events) = battle.trace_audit();
+                (rng_audit.to_vec(), internal_events.to_vec())
+            },
+        )
+    }
+
     /// Capture the complete, closed production-M3 endpoint owner graph.
     pub fn snapshot_v2(&self) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
         snapshot_game_kernel(self)

@@ -142,11 +142,15 @@ dependencies = [
 name = "er-kernel"
 version = "0.1.0"
 dependencies = [
+ "er-battle",
  "er-canonical",
  "er-content",
  "er-game",
  "er-protocol",
+ "er-rng",
+ "er-state",
  "er-types",
+ "serde",
  "serde_json",
  "thiserror",
 ]
@@ -178,8 +182,12 @@ name = "er-sim"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-content",
+ "er-game",
  "er-kernel",
  "er-protocol",
+ "er-rng",
+ "er-state",
  "er-testkit",
  "er-types",
  "serde",
@@ -232,6 +240,7 @@ dependencies = [
  "er-battle",
  "er-canonical",
  "er-content",
+ "er-game",
  "er-kernel",
  "er-protocol",
  "er-rng",

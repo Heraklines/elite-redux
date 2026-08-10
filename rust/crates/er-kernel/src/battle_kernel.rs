@@ -10,9 +10,9 @@ use std::sync::Arc;
 use er_content::pack::ContentPack;
 use er_game::internal_event::{
     AuthorityEntryReadyPayload, BattleResolvedPayload, ButtonEventPayload,
-    ControlInstalledPayload, InternalEvent, InternalEventQueue, MaterialApplyResult as EventApplyResult,
-    MaterialInstalledPayload, MaterialKind, PresentationBarrier, PreparedAuthorityEntry,
-    PreparedBattleResolution, UiEventPayload,
+    ControlInstalledPayload, InternalEvent, InternalEventKind, InternalEventQueue,
+    MaterialApplyResult as EventApplyResult, MaterialInstalledPayload, MaterialKind,
+    PresentationBarrier, PreparedAuthorityEntry, PreparedBattleResolution, UiEventPayload,
 };
 use er_game::material::{
     BattleMaterialApplyContext, MaterialApplyResult, decode_replacement_material,
@@ -77,7 +77,7 @@ use crate::input_router::{BattleButtonEvent, BattleInputOutput, InputRouteError}
 use crate::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use crate::snapshot::{
     BattleKernelRuntimeIdentitySnapshotV1, InputRouterSnapshotV2,
-    PendingPresentationsSnapshotV1, SnapshotError,
+    PendingPresentationsSnapshotV1, RngDraw, SnapshotError,
 };
 use crate::ui_reducer::{BattleUiIntent, BattleUiReject};
 
@@ -132,6 +132,8 @@ pub(crate) struct BattleMode {
     presentation_revisions: BTreeMap<BattlePresentationEventId, Revision>,
     suspended: bool,
     terminal_fenced: bool,
+    last_rng_audit: Vec<RngDraw>,
+    last_internal_events: Vec<InternalEventKind>,
 }
 
 pub(crate) struct BattleModeSnapshotParts {
@@ -303,6 +305,8 @@ impl BattleMode {
             presentation_revisions: BTreeMap::new(),
             suspended: false,
             terminal_fenced: false,
+            last_rng_audit: Vec::new(),
+            last_internal_events: Vec::new(),
         };
         mode.validate_quiescent().map_err(|error| protocol_init(&error.to_string()))?;
         Ok(mode)
@@ -320,7 +324,9 @@ impl BattleMode {
             .and_then(|()| transaction.drain())
             .and_then(|()| transaction.validate_quiescent());
         match staged {
-            Ok(()) => {}
+            Ok(()) => {
+                transaction.capture_trace_audit();
+            }
             Err(BattleKernelError::RecoveryRequired {
                 operation_id,
                 reason,
@@ -329,6 +335,7 @@ impl BattleMode {
                     BattleTransaction::new(self.clone(), scheduler.clone(), terminal.clone());
                 recovery.start_correlated_recovery(operation_id, reason)?;
                 recovery.validate_quiescent()?;
+                recovery.capture_trace_audit();
                 *self = recovery.staged;
                 *scheduler = recovery.scheduler;
                 *terminal = recovery.terminal;
@@ -339,6 +346,7 @@ impl BattleMode {
                     BattleTransaction::new(self.clone(), scheduler.clone(), terminal.clone());
                 terminal_transition.enter_prescribed_terminal(reason)?;
                 terminal_transition.validate_quiescent()?;
+                terminal_transition.capture_trace_audit();
                 *self = terminal_transition.staged;
                 *scheduler = terminal_transition.scheduler;
                 *terminal = terminal_transition.terminal;
@@ -354,6 +362,10 @@ impl BattleMode {
 
     pub(crate) fn protocol_config(&self) -> &BattleProtocolConfig {
         &self.protocol_config
+    }
+
+    pub(crate) fn trace_audit(&self) -> (&[RngDraw], &[InternalEventKind]) {
+        (&self.last_rng_audit, &self.last_internal_events)
     }
 
     pub(crate) fn projection(&self) -> &BattleUiProjection {
@@ -582,6 +594,8 @@ impl BattleMode {
             presentation_revisions,
             suspended: scheduler_has_reason(scheduler, "suspended"),
             terminal_fenced: disposed || terminal.is_some(),
+            last_rng_audit: Vec::new(),
+            last_internal_events: Vec::new(),
         };
         mode.validate_quiescent()
             .map_err(|error| battle_snapshot_invalid("battle", error))?;
@@ -1836,10 +1850,12 @@ fn snapshot_canonical(path: impl Into<String>, reason: impl Into<String>) -> Sna
 
 impl BattleTransaction {
     fn new(
-        staged: BattleMode,
+        mut staged: BattleMode,
         scheduler: KernelScheduler,
         terminal: Option<TerminalState>,
     ) -> Self {
+        staged.last_rng_audit.clear();
+        staged.last_internal_events.clear();
         Self {
             staged,
             scheduler,
@@ -1851,6 +1867,10 @@ impl BattleTransaction {
             pending_replica_material: None,
             pending_presentation_probes: BTreeMap::new(),
         }
+    }
+
+    fn capture_trace_audit(&mut self) {
+        self.staged.last_internal_events = self.queue.processed_kinds().to_vec();
     }
 
     fn translate(&mut self, input: KernelInput) -> Result<(), BattleKernelError> {
@@ -2281,6 +2301,9 @@ impl BattleTransaction {
                 material_operation_id,
                 next_control,
             } => {
+                self.staged
+                    .last_rng_audit
+                    .extend(transition.rng_audit.iter().cloned());
                 let human_proposals = transition
                     .accepted_commands
                     .entries
