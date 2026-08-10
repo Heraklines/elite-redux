@@ -10,6 +10,8 @@ pub mod damage;
 pub mod error;
 pub mod js_math;
 pub mod legality;
+pub mod move_effect;
+pub mod move_pipeline;
 pub mod resolver;
 pub mod stat_stage;
 pub mod status;

@@ -390,9 +390,6 @@ fn validate_targets(
     if move_target == MoveTarget::AllNearEnemies && targets.is_empty() {
         return Err(TargetSelectionError::AllEnemiesCount);
     }
-    if source_slot.side != actor_side {
-        return Err(TargetSelectionError::SameSide { slot: source_slot });
-    }
     for (index, target) in targets.iter().copied().enumerate() {
         if target.side == actor_side {
             return Err(TargetSelectionError::SameSide { slot: target });
