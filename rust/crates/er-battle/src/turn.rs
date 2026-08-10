@@ -368,26 +368,26 @@ fn append_target_mutations(target: &MoveTargetResult, mutations: &mut Vec<Battle
         });
     }
     for status in &target.status_effects {
-        if let StatusApplicationOutcome::Applied { mutation } = status {
-            if let Some(pokemon) = target.pokemon {
-                mutations.push(BattleMutation::StatusChanged {
-                    pokemon,
-                    before: mutation.before,
-                    after: mutation.after,
-                });
-            }
+        if let StatusApplicationOutcome::Applied { mutation } = status
+            && let Some(pokemon) = target.pokemon
+        {
+            mutations.push(BattleMutation::StatusChanged {
+                pokemon,
+                before: mutation.before,
+                after: mutation.after,
+            });
         }
     }
     for stage in &target.stat_stage_effects {
-        if stage.changed {
-            if let Some(pokemon) = target.pokemon {
-                mutations.push(BattleMutation::StatStageChanged {
-                    pokemon,
-                    stat: stage.stat,
-                    before: stage.before,
-                    after: stage.after,
-                });
-            }
+        if stage.changed
+            && let Some(pokemon) = target.pokemon
+        {
+            mutations.push(BattleMutation::StatStageChanged {
+                pokemon,
+                stat: stage.stat,
+                before: stage.before,
+                after: stage.after,
+            });
         }
     }
 }
@@ -593,7 +593,7 @@ fn find_pokemon(
     party_for_side(battle, slot.side)
         .iter()
         .find(|candidate| candidate.id == pokemon)
-        .ok_or_else(|| CommandLegalityError::ActorMismatch {
+        .ok_or(CommandLegalityError::ActorMismatch {
             slot,
             actor: pokemon,
         })
@@ -609,7 +609,7 @@ fn find_pokemon_mut(
     party_for_side_mut(battle, slot.side)
         .iter_mut()
         .find(|candidate| candidate.id == pokemon)
-        .ok_or_else(|| CommandLegalityError::ActorMismatch {
+        .ok_or(CommandLegalityError::ActorMismatch {
             slot,
             actor: pokemon,
         })
