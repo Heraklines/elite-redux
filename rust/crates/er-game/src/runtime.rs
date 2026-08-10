@@ -3790,7 +3790,34 @@ pub fn project_battle_control_plan(
     let seats = human_seats(&battle.format)?;
     match decision {
         BattleNextDecision::CommandFrontier => {
-            project_command_frontier(state, &seats, allocator_before, content)
+            // Only pending player frontier entries are actionable.  Keep the
+            // allocator vector in lockstep because BattleControlPlan requires
+            // allocator seats to exactly match its projected control seats.
+            let actionable_seats = seats
+                .iter()
+                .copied()
+                .filter(|seat| {
+                    battle.command_state.frontier.iter().any(|entry| {
+                        entry.owner_seat == Some(*seat)
+                            && matches!(&entry.status, CommandFrontierStatus::Pending)
+                    })
+                })
+                .collect::<Vec<_>>();
+            let actionable_allocators = actionable_seats
+                .iter()
+                .filter_map(|seat| {
+                    allocator_before
+                        .iter()
+                        .find(|allocator| allocator.seat == *seat)
+                        .cloned()
+                })
+                .collect::<Vec<_>>();
+            project_command_frontier(
+                state,
+                &actionable_seats,
+                &actionable_allocators,
+                content,
+            )
         }
         BattleNextDecision::Replacement { occurrence } => {
             project_replacement(state, occurrence, &seats, allocator_before)

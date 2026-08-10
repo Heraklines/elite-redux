@@ -300,10 +300,11 @@ mod m3_oracle_control_axis8 {
     //! M3 oracle differential evidence for the `NEXT_LOGICAL_CONTROL` axis.
     //!
     //! The oracle's final-state envelope is legacy-observable evidence.  This
-    //! test parses its canonical state, removes only the legacy `format.slots`
-    //! mirror, and asks the production game-owned decision/projector to derive the
-    //! typed control plan.  The legacy phase queue is deliberately not recreated:
-    //! it has no er-game contract.  The semantic control identity, seat ownership,
+    //! test parses its canonical state, normalizes only the closed legacy enum
+    //! and stale-occupant encodings, removes the legacy `format.slots` mirror,
+    //! and asks the production game-owned decision/projector to derive the typed
+    //! control plan.  The legacy phase queue is deliberately not recreated: it
+    //! has no er-game contract.  The semantic control identity, seat ownership,
     //! operation binding, complete menu graph, actionability, and terminal
     //! outcome are compared at the production boundary instead.
 
@@ -327,6 +328,19 @@ mod m3_oracle_control_axis8 {
     use serde_json::Value;
 
     type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+    const LEGACY_STALE_OCCUPANT_CATALOGUE: &[(&str, &str, u64, u64)] = &[
+        ("defeat", "PLAYER", 0, 1),
+        ("mixed-side-simultaneous-faint", "PLAYER", 1, 1),
+        ("no-legal-replacement", "PLAYER", 0, 1),
+        ("no-legal-replacement", "PLAYER", 1, 2),
+        ("same-side-simultaneous-faint", "PLAYER", 0, 1),
+        ("same-side-simultaneous-faint", "PLAYER", 1, 2),
+        ("victory", "ENEMY", 0, 2),
+        ("wonder-guard-status-pass", "ENEMY", 0, 2),
+        ("wonder-guard-super-effective-pass", "ENEMY", 0, 2),
+    ];
+    const LEGACY_STALE_OCCUPANT_COUNT: usize = 9;
 
     fn boxed(message: impl Into<String>) -> Box<dyn Error> {
         Box::new(std::io::Error::new(
@@ -611,6 +625,516 @@ mod m3_oracle_control_axis8 {
         )
     }
 
+    fn require_legacy_format_slots_mirror(case: &str, canonical: &Value) -> TestResult {
+        let battle = canonical
+            .get("battle")
+            .and_then(Value::as_object)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle is invalid")))?;
+        let format_slots = battle
+            .get("format")
+            .and_then(Value::as_object)
+            .and_then(|format| format.get("slots"))
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: canonical.battle.format.slots is missing"
+                ))
+            })?;
+        let field_slots = battle
+            .get("field")
+            .and_then(Value::as_object)
+            .and_then(|field| field.get("slots"))
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: canonical.battle.field.slots is missing"
+                ))
+            })?;
+        require(
+            case,
+            format_slots.is_array() && field_slots.is_array() && format_slots == field_slots,
+            format!(
+                "legacy format.slots mirror differs from field.slots: format={format_slots}, field={field_slots}"
+            ),
+        )
+    }
+
+    fn normalize_nested_kind(
+        case: &str,
+        path: &str,
+        object: &mut Value,
+        field_name: &str,
+    ) -> TestResult {
+        let object = object
+            .as_object_mut()
+            .ok_or_else(|| boxed(format!("{case}: {path} is not an object")))?;
+        let kind = object
+            .get(field_name)
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: {path}.{field_name} is missing")))?;
+        let normalized = match kind {
+            Value::String(_) => kind,
+            Value::Object(nested) => {
+                if nested.len() != 1 || !nested.contains_key("kind") {
+                    return Err(boxed(format!(
+                        "{case}: {path}.{field_name} has an unsupported nested kind shape"
+                    )));
+                }
+                let tag = nested
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        boxed(format!(
+                            "{case}: {path}.{field_name}.kind is not a string"
+                        ))
+                    })?;
+                Value::String(tag.to_owned())
+            }
+            other => {
+                return Err(boxed(format!(
+                    "{case}: {path}.{field_name} has unsupported value {other}"
+                )));
+            }
+        };
+        object.insert(field_name.to_owned(), normalized);
+        Ok(())
+    }
+
+    fn legacy_replacement_queue_is_resolved(case: &str, queue: &Value) -> TestResult<bool> {
+        let queue = queue
+            .as_array()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.faint_queue is not an array")))?;
+        let mut all_applied = true;
+        for (index, occurrence) in queue.iter().enumerate() {
+            let occurrence_path = format!("canonical.battle.faint_queue[{index}]");
+            let occurrence = occurrence.as_object().ok_or_else(|| {
+                boxed(format!("{case}: {occurrence_path} is not an object"))
+            })?;
+            let occurrence_slot = occurrence.get("slot").ok_or_else(|| {
+                boxed(format!("{case}: {occurrence_path}.slot is missing"))
+            })?;
+            let occurrence_slot = occurrence_slot.as_object().ok_or_else(|| {
+                boxed(format!(
+                    "{case}: {occurrence_path}.slot is not an object"
+                ))
+            })?;
+            let occurrence_side = occurrence_slot
+                .get("side")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {occurrence_path}.slot.side is not a string"
+                    ))
+                })?;
+            if !matches!(occurrence_side, "PLAYER" | "ENEMY") {
+                return Err(boxed(format!(
+                    "{case}: {occurrence_path}.slot.side has unsupported value {occurrence_side:?}"
+                )));
+            }
+            occurrence_slot
+                .get("position")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {occurrence_path}.slot.position is not an unsigned integer"
+                    ))
+                })?;
+            let _occurrence_pokemon = occurrence
+                .get("pokemon")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {occurrence_path}.pokemon is not an unsigned integer"
+                    ))
+                })?;
+            let replacement = occurrence
+                .get("replacement")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {occurrence_path}.replacement is not an object"
+                    ))
+                })?;
+            let kind = replacement
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {occurrence_path}.replacement.kind is not a string"
+                    ))
+                })?;
+            if !matches!(
+                kind,
+                "NOT_REQUIRED" | "PENDING" | "SELECTED" | "NO_LEGAL_REPLACEMENT" | "APPLIED"
+            ) {
+                return Err(boxed(format!(
+                    "{case}: {occurrence_path}.replacement.kind has unsupported value {kind:?}"
+                )));
+            }
+            if kind != "APPLIED" {
+                all_applied = false;
+            }
+        }
+        Ok(all_applied)
+    }
+
+    fn legacy_stale_occupant_is_known_shape(
+        case: &str,
+        outcome: &Value,
+        command_state: &Value,
+        slot: &Value,
+        side: &str,
+        owner_seat: Option<u64>,
+        queue_is_resolved: bool,
+    ) -> TestResult<bool> {
+        if !queue_is_resolved {
+            return Ok(false);
+        }
+        let outcome = outcome
+            .as_str()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.outcome is not a string")))?;
+        let command_state = command_state
+            .as_object()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.command_state is invalid")))?;
+        let frontier = command_state
+            .get("frontier")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: canonical.battle.command_state.frontier is not an array"
+                ))
+            })?;
+        match outcome {
+            "VICTORY" | "DEFEAT" => return Ok(frontier.is_empty()),
+            "ONGOING" => {}
+            other => {
+                return Err(boxed(format!(
+                    "{case}: canonical.battle.outcome has unsupported value {other:?}"
+                )));
+            }
+        }
+        if side != "PLAYER" || owner_seat.is_none() {
+            return Ok(false);
+        }
+
+        let mut has_pending_human = false;
+        for (index, entry) in frontier.iter().enumerate() {
+            let entry_path = format!("canonical.battle.command_state.frontier[{index}]");
+            let entry = entry
+                .as_object()
+                .ok_or_else(|| boxed(format!("{case}: {entry_path} is not an object")))?;
+            let entry_slot = entry.get("field_slot").ok_or_else(|| {
+                boxed(format!("{case}: {entry_path}.field_slot is missing"))
+            })?;
+            let entry_slot_object = entry_slot.as_object().ok_or_else(|| {
+                boxed(format!("{case}: {entry_path}.field_slot is not an object"))
+            })?;
+            let entry_side = entry_slot_object
+                .get("side")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {entry_path}.field_slot.side is not a string"
+                    ))
+                })?;
+            if !matches!(entry_side, "PLAYER" | "ENEMY") {
+                return Err(boxed(format!(
+                    "{case}: {entry_path}.field_slot.side has unsupported value {entry_side:?}"
+                )));
+            }
+            entry_slot_object
+                .get("position")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {entry_path}.field_slot.position is not an unsigned integer"
+                    ))
+                })?;
+            let status = entry
+                .get("status")
+                .and_then(Value::as_object)
+                .ok_or_else(|| boxed(format!("{case}: {entry_path}.status is invalid")))?;
+            let status_kind = status
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    boxed(format!("{case}: {entry_path}.status.kind is not a string"))
+                })?;
+            if !matches!(status_kind, "PENDING" | "RETAINED" | "ADMITTED") {
+                return Err(boxed(format!(
+                    "{case}: {entry_path}.status.kind has unsupported value {status_kind:?}"
+                )));
+            }
+            let entry_owner = match entry.get("owner_seat") {
+                Some(Value::Null) => None,
+                Some(value) => Some(value.as_u64().ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {entry_path}.owner_seat is not null or an unsigned integer"
+                    ))
+                })?),
+                None => {
+                    return Err(boxed(format!(
+                        "{case}: {entry_path}.owner_seat is missing"
+                    )));
+                }
+            };
+            if entry_owner == owner_seat {
+                return Ok(false);
+            }
+            if entry_slot == slot {
+                return Ok(false);
+            }
+            if status_kind == "PENDING" && entry_owner.is_some() {
+                has_pending_human = true;
+            }
+        }
+        Ok(has_pending_human)
+    }
+
+    fn normalize_legacy_stale_occupants(
+        case: &str,
+        battle: &mut serde_json::Map<String, Value>,
+    ) -> TestResult {
+        if LEGACY_STALE_OCCUPANT_CATALOGUE.len() != LEGACY_STALE_OCCUPANT_COUNT {
+            return Err(boxed(format!(
+                "legacy stale-occupant catalogue count changed: expected {LEGACY_STALE_OCCUPANT_COUNT}, got {}",
+                LEGACY_STALE_OCCUPANT_CATALOGUE.len()
+            )));
+        }
+        let expected_for_case = LEGACY_STALE_OCCUPANT_CATALOGUE
+            .iter()
+            .filter(|entry| entry.0 == case)
+            .collect::<Vec<_>>();
+        let mut normalized_count = 0;
+        let player_party = battle.get("player_party").cloned().ok_or_else(|| {
+            boxed(format!("{case}: canonical.battle.player_party is missing"))
+        })?;
+        let enemy_party = battle.get("enemy_party").cloned().ok_or_else(|| {
+            boxed(format!("{case}: canonical.battle.enemy_party is missing"))
+        })?;
+        let faint_queue = battle.get("faint_queue").cloned().ok_or_else(|| {
+            boxed(format!("{case}: canonical.battle.faint_queue is missing"))
+        })?;
+        let outcome = battle.get("outcome").cloned().ok_or_else(|| {
+            boxed(format!("{case}: canonical.battle.outcome is missing"))
+        })?;
+        let command_state = battle.get("command_state").cloned().ok_or_else(|| {
+            boxed(format!("{case}: canonical.battle.command_state is missing"))
+        })?;
+        let queue_is_resolved = legacy_replacement_queue_is_resolved(case, &faint_queue)?;
+        let field = battle
+            .get_mut("field")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.field is invalid")))?;
+        let slots = field
+            .get_mut("slots")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.field.slots is invalid")))?;
+
+        for (index, entry) in slots.iter_mut().enumerate() {
+            let path = format!("canonical.battle.field.slots[{index}]");
+            let entry = entry
+                .as_object_mut()
+                .ok_or_else(|| boxed(format!("{case}: {path} is not an object")))?;
+            let slot = entry
+                .get("slot")
+                .cloned()
+                .ok_or_else(|| boxed(format!("{case}: {path}.slot is missing")))?;
+            let slot_object = slot
+                .as_object()
+                .ok_or_else(|| boxed(format!("{case}: {path}.slot is not an object")))?;
+            let side = slot_object
+                .get("side")
+                .and_then(Value::as_str)
+                .ok_or_else(|| boxed(format!("{case}: {path}.slot.side is not a string")))?;
+            if !matches!(side, "PLAYER" | "ENEMY") {
+                return Err(boxed(format!(
+                    "{case}: {path}.slot.side has unsupported value {side:?}"
+                )));
+            }
+            let position = slot_object
+                .get("position")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {path}.slot.position is not an unsigned integer"
+                    ))
+                })?;
+            let expected_slot = expected_for_case
+                .iter()
+                .find(|entry| entry.1 == side && entry.2 == position);
+            let occupant = entry
+                .get("occupant")
+                .cloned()
+                .ok_or_else(|| boxed(format!("{case}: {path}.occupant is missing")))?;
+            let Some(occupant_id) = occupant.as_u64() else {
+                if occupant.is_null() {
+                    if expected_slot.is_some() {
+                        return Err(boxed(format!(
+                            "{case}: known legacy stale occupant at {side} position {position} is missing"
+                        )));
+                    }
+                    continue;
+                }
+                return Err(boxed(format!(
+                    "{case}: {path}.occupant is not null or an unsigned integer"
+                )));
+            };
+            if let Some(expected_slot) = expected_slot {
+                if expected_slot.3 != occupant_id {
+                    return Err(boxed(format!(
+                        "{case}: known legacy stale occupant at {side} position {position} has unexpected pokemon {occupant_id}, expected {}",
+                        expected_slot.3
+                    )));
+                }
+            }
+            let party = match side {
+                "PLAYER" => &player_party,
+                "ENEMY" => &enemy_party,
+                _ => unreachable!("field slot side was validated above"),
+            };
+            let party = party.as_array().ok_or_else(|| {
+                boxed(format!("{case}: canonical.battle.{side}_party is not an array"))
+            })?;
+            let matching_pokemon = party.iter().filter(|pokemon| {
+                pokemon
+                    .get("id")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|id| id == occupant_id)
+            }).collect::<Vec<_>>();
+            let pokemon = match matching_pokemon.as_slice() {
+                [] => {
+                    if expected_slot.is_some() {
+                        return Err(boxed(format!(
+                            "{case}: known legacy stale occupant at {side} position {position} has no matching party pokemon {occupant_id}"
+                        )));
+                    }
+                    continue;
+                }
+                [pokemon] => *pokemon,
+                _ => {
+                    return Err(boxed(format!(
+                        "{case}: field occupant {occupant_id} has duplicate party records"
+                    )));
+                }
+            };
+            let hp = pokemon
+                .get("hp")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {path}.occupant party record has no unsigned hp"
+                    ))
+                })?;
+            let fainted = pokemon
+                .get("fainted")
+                .and_then(Value::as_bool)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {path}.occupant party record has no boolean fainted flag"
+                    ))
+                })?;
+            let owner_seat = match pokemon.get("owner_seat") {
+                Some(Value::Null) => None,
+                Some(value) => Some(value.as_u64().ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: {path}.occupant party record owner_seat is not null or an unsigned integer"
+                    ))
+                })?),
+                None => {
+                    return Err(boxed(format!(
+                        "{case}: {path}.occupant party record owner_seat is missing"
+                    )));
+                }
+            };
+            if hp != 0 || !fainted {
+                if expected_slot.is_some() {
+                    return Err(boxed(format!(
+                        "{case}: known legacy stale occupant at {side} position {position} is not hp=0 and fainted=true"
+                    )));
+                }
+                continue;
+            }
+            if expected_slot.is_none() {
+                return Err(boxed(format!(
+                    "{case}: hp=0/fainted field occupant at {side} position {position} is outside the known legacy catalogue"
+                )));
+            }
+            if (side == "PLAYER" && owner_seat.is_none())
+                || (side == "ENEMY" && owner_seat.is_some())
+            {
+                return Err(boxed(format!(
+                    "{case}: known legacy stale occupant at {side} position {position} has an invalid owner seat"
+                )));
+            }
+            if !legacy_stale_occupant_is_known_shape(
+                case,
+                &outcome,
+                &command_state,
+                &slot,
+                side,
+                owner_seat,
+                queue_is_resolved,
+            )? {
+                return Err(boxed(format!(
+                    "{case}: known legacy stale occupant at {side} position {position} is not a resolved terminal or excluded frontier state"
+                )));
+            }
+            entry.insert("occupant".to_owned(), Value::Null);
+            normalized_count += 1;
+        }
+        if normalized_count != expected_for_case.len() {
+            return Err(boxed(format!(
+                "{case}: normalized {normalized_count} known legacy stale occupants, expected {}",
+                expected_for_case.len()
+            )));
+        }
+        Ok(())
+    }
+
+    fn normalize_legacy_state(case: &str, state: &mut Value) -> TestResult {
+        let battle = state
+            .get_mut("battle")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle is invalid")))?;
+
+        for party_name in ["player_party", "enemy_party"] {
+            let party = battle
+                .get_mut(party_name)
+                .and_then(Value::as_array_mut)
+                .ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: canonical.battle.{party_name} is invalid"
+                    ))
+                })?;
+            for (index, pokemon) in party.iter_mut().enumerate() {
+                let status = pokemon.get_mut("status").ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: canonical.battle.{party_name}[{index}].status is missing"
+                    ))
+                })?;
+                normalize_nested_kind(
+                    case,
+                    &format!("canonical.battle.{party_name}[{index}].status"),
+                    status,
+                    "kind",
+                )?;
+            }
+        }
+        for condition_name in ["weather", "terrain"] {
+            let condition = battle.get_mut(condition_name).ok_or_else(|| {
+                boxed(format!(
+                    "{case}: canonical.battle.{condition_name} is missing"
+                ))
+            })?;
+            normalize_nested_kind(
+                case,
+                &format!("canonical.battle.{condition_name}"),
+                condition,
+                "kind",
+            )?;
+        }
+        normalize_legacy_stale_occupants(case, battle)
+    }
+
     fn parse_expected_final_state(case: &str, fixture: &Value) -> TestResult<GameState> {
         let expected_final_state = required(case, fixture, "expected_final_state")?;
         require_object_keys(
@@ -626,7 +1150,9 @@ mod m3_oracle_control_axis8 {
             );
         }
         let canonical = required(case, expected_final_state, "canonical")?;
+        require_legacy_format_slots_mirror(case, canonical)?;
         let mut production_canonical = canonical.clone();
+        normalize_legacy_state(case, &mut production_canonical)?;
         let format = production_canonical
             .get_mut("battle")
             .and_then(Value::as_object_mut)
@@ -753,33 +1279,63 @@ mod m3_oracle_control_axis8 {
     ) -> TestResult {
         require(
             case,
-            plan.menu_allocators.len() == before.len(),
+            plan.menu_allocators.len() == plan.seats.len(),
             format!(
-                "menu allocator seat count differs: expected {}, got {}",
-                before.len(),
+                "menu allocator seat count differs from projected seats: expected {}, got {}",
+                plan.seats.len(),
                 plan.menu_allocators.len()
             ),
         )?;
+        let projected_seats = plan
+            .seats
+            .iter()
+            .map(|entry| entry.seat)
+            .collect::<Vec<_>>();
+        let allocator_seats = plan
+            .menu_allocators
+            .iter()
+            .map(|allocator| allocator.seat)
+            .collect::<Vec<_>>();
+        require(
+            case,
+            projected_seats == allocator_seats,
+            format!(
+                "projected allocator seats differ from projected controls: expected {projected_seats:?}, got {allocator_seats:?}"
+            ),
+        )?;
         for previous in before {
+            let Some(actual) = plan.allocator(previous.seat) else {
+                require(
+                    case,
+                    !projected_seats.contains(&previous.seat),
+                    format!(
+                        "projected plan omitted allocator for projected seat {}",
+                        previous.seat
+                    ),
+                )?;
+                continue;
+            };
             let expected = if consumed.contains(&previous.seat) {
                 next_menu_instance(case, previous.next_menu_instance_id)?
             } else {
                 previous.next_menu_instance_id
             };
-            let actual = plan
-                .allocator(previous.seat)
-                .ok_or_else(|| {
-                    boxed(format!(
-                        "{case}: projected plan omitted allocator for seat {}",
-                        previous.seat
-                    ))
-                })?;
             require(
                 case,
                 actual.next_menu_instance_id == expected,
                 format!(
                     "allocator mismatch for seat {}: expected next {}, got {}",
                     previous.seat, expected, actual.next_menu_instance_id
+                ),
+            )?;
+        }
+        for allocator in &plan.menu_allocators {
+            require(
+                case,
+                before.iter().any(|previous| previous.seat == allocator.seat),
+                format!(
+                    "projected plan introduced allocator for unknown seat {}",
+                    allocator.seat
                 ),
             )?;
         }
@@ -1018,18 +1574,23 @@ mod m3_oracle_control_axis8 {
             .battle
             .as_ref()
             .ok_or_else(|| boxed(format!("{case}: command projection has no battle")))?;
-        let human_count = usize::from(battle.format.player_capacity);
-        let frontier_human_count = battle
+        let frontier_command_seats = battle
             .command_state
             .frontier
             .iter()
-            .filter(|entry| entry.owner_seat.is_some())
-            .count();
+            .filter(|entry| matches!(&entry.status, CommandFrontierStatus::Pending))
+            .filter_map(|entry| entry.owner_seat)
+            .collect::<Vec<_>>();
+        let projected_command_seats = plan
+            .seats
+            .iter()
+            .map(|entry| entry.seat)
+            .collect::<Vec<_>>();
         require(
             case,
-            frontier_human_count == human_count,
+            frontier_command_seats == projected_command_seats,
             format!(
-                "final command frontier has {frontier_human_count} human entries, expected {human_count}"
+                "pending command frontier seats differ: expected {frontier_command_seats:?}, got {projected_command_seats:?}"
             ),
         )?;
 
