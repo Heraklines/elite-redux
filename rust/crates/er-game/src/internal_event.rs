@@ -13,7 +13,7 @@ use er_types::battle_command::{BattleCommandProposalV1, BattleReplacementProposa
 use er_types::battle_control::BattleControlPlan;
 use er_types::battle_ids::{AuthorityEpoch, FaintOccurrenceId, MenuInstanceId};
 use er_types::{
-    AuthorityEntryKind, ButtonEvent, FrameContext, OperationId, Revision, SeatId, UiIntent,
+    AuthorityEntryKind, ButtonEvent, FrameContext, MenuOptionId, OperationId, Revision, SeatId,
 };
 use thiserror::Error;
 
@@ -21,13 +21,20 @@ use thiserror::Error;
 pub const INTERNAL_EVENT_BUDGET: usize = 4_096;
 
 /// A typed identity carried through the private game reducer.
+///
+/// This value is public only because `er-kernel` is a separate crate that
+/// composes the closed event vocabulary.  It is hidden from generated docs so
+/// campaign code does not mistake the kernel integration boundary for a
+/// semantic input API.
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalIdentity {
-    pub operation_id: Option<OperationId>,
-    pub control_id: Option<String>,
+    operation_id: Option<OperationId>,
+    control_id: Option<String>,
 }
 
 impl CausalIdentity {
+    #[doc(hidden)]
     pub fn new(operation_id: Option<OperationId>, control_id: Option<String>) -> Self {
         Self {
             operation_id,
@@ -41,6 +48,11 @@ impl CausalIdentity {
 /// `NoLegalReplacement` is deliberately not representable as an external
 /// proposal.  The game reducer creates it only after inspecting the stored
 /// faint occurrence and validating the current party state.
+///
+/// This semantic value remains public solely for composition by the separate
+/// `er-kernel` crate and is hidden from generated docs as an integration-only
+/// boundary.
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GameIntent {
     CommandProposal {
@@ -57,6 +69,23 @@ pub enum GameIntent {
     },
 }
 
+impl GameIntent {
+    /// Build the automatic no-legal-replacement intent after the game has
+    /// projected a replacement frontier and found no legal candidate.
+    ///
+    /// This constructor is crate-private by design.  `NoLegalReplacement`
+    /// is deterministic internal work, never a public semantic submission.
+    pub(crate) fn no_legal_replacement(
+        occurrence: FaintOccurrenceId,
+        authority_epoch: AuthorityEpoch,
+    ) -> Self {
+        Self::NoLegalReplacement {
+            occurrence,
+            authority_epoch,
+        }
+    }
+}
+
 /// A button event after the input reducer captured the endpoint menu ID.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ButtonEventPayload {
@@ -65,19 +94,75 @@ pub struct ButtonEventPayload {
     pub event: ButtonEvent,
 }
 
-/// A UI intent after the UI reducer captured the endpoint menu ID.
+/// A typed Battle-mode UI action after the kernel UI reducer captured the
+/// endpoint menu ID.
+///
+/// Battle mode carries only the stable identity required by the game boundary,
+/// never a legacy semantic intent or a serde/JSON value.  The fields are
+/// private so callers cannot construct a semantic event with a struct literal.
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventPayload {
-    pub endpoint: SeatId,
-    pub menu_instance_id: MenuInstanceId,
-    pub intent: UiIntent,
+    endpoint: SeatId,
+    menu_instance_id: MenuInstanceId,
+    action: BattleUiAction,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum BattleUiAction {
+    Activate {
+        control_id: String,
+        option_id: MenuOptionId,
+    },
+    Cancel {
+        control_id: String,
+    },
+}
+
+impl UiEventPayload {
+    #[doc(hidden)]
+    pub fn activate(
+        endpoint: SeatId,
+        menu_instance_id: MenuInstanceId,
+        control_id: String,
+        option_id: MenuOptionId,
+    ) -> Self {
+        Self {
+            endpoint,
+            menu_instance_id,
+            action: BattleUiAction::Activate {
+                control_id,
+                option_id,
+            },
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn cancel(endpoint: SeatId, menu_instance_id: MenuInstanceId, control_id: String) -> Self {
+        Self {
+            endpoint,
+            menu_instance_id,
+            action: BattleUiAction::Cancel { control_id },
+        }
+    }
 }
 
 /// A game reducer request with its causal identity.
+///
+/// This payload is public only for the separate `er-kernel` integration
+/// consumer.  Private fields and a doc-hidden constructor keep semantic
+/// event creation visibly behind that boundary.
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GameEventPayload {
-    pub intent: GameIntent,
-    pub causal: CausalIdentity,
+    intent: GameIntent,
+    causal: CausalIdentity,
+}
+
+impl GameEventPayload {
+    pub(crate) fn new(intent: GameIntent, causal: CausalIdentity) -> Self {
+        Self { intent, causal }
+    }
 }
 
 /// An already-admitted protocol action.  The wire frame and proposal
@@ -212,6 +297,11 @@ pub struct ControlInstalledPayload {
 }
 
 /// The closed private event vocabulary for one kernel step.
+///
+/// The enum is public only so the separate `er-kernel` crate can own the FIFO
+/// and compose reducer outputs.  It is hidden from generated docs because its
+/// variants are internal causal work, not a campaign-facing API.
+#[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InternalEvent {
     Button(ButtonEventPayload),
@@ -225,6 +315,11 @@ pub enum InternalEvent {
 }
 
 /// Stable event-kind evidence used by traces and budget failures.
+///
+/// This is a read-only integration/tracing value.  It is public for the
+/// separate kernel consumer and hidden from generated docs with the rest of
+/// the internal event boundary.
+#[doc(hidden)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum InternalEventKind {
     Button,
@@ -238,6 +333,21 @@ pub enum InternalEventKind {
 }
 
 impl InternalEvent {
+    /// Construct the automatic no-legal-replacement causal event.
+    ///
+    /// This remains crate-private so only game/kernel logic that has already
+    /// projected the replacement frontier can enqueue this semantic work.
+    pub(crate) fn no_legal_replacement(
+        occurrence: FaintOccurrenceId,
+        authority_epoch: AuthorityEpoch,
+        causal: CausalIdentity,
+    ) -> Self {
+        Self::Game(GameEventPayload::new(
+            GameIntent::no_legal_replacement(occurrence, authority_epoch),
+            causal,
+        ))
+    }
+
     pub const fn kind(&self) -> InternalEventKind {
         match self {
             Self::Button(_) => InternalEventKind::Button,
@@ -253,6 +363,7 @@ impl InternalEvent {
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[doc(hidden)]
 pub enum InternalEventQueueError {
     #[error("internal event budget exceeded after {processed} events; remaining queue has {remaining} events")]
     InternalEventBudgetExceeded {
@@ -265,44 +376,73 @@ pub enum InternalEventQueueError {
 /// Kernel-facing FIFO bookkeeping.  It does not reduce events or own any
 /// game state; callers pop one event, apply exactly one reducer, then append
 /// returned events in source order.
+///
+/// This public type is an unavoidable cross-crate integration seam because
+/// `er-kernel` owns the production queue.  It is deliberately hidden from
+/// generated docs and exposes only mechanical FIFO/budget evidence.
+#[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InternalEventQueue {
     events: VecDeque<InternalEvent>,
     processed: usize,
+    processed_kinds: Vec<InternalEventKind>,
 }
 
 impl InternalEventQueue {
+    #[doc(hidden)]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[doc(hidden)]
     pub fn from_events(events: impl IntoIterator<Item = InternalEvent>) -> Self {
         let mut queue = Self::new();
         queue.push_all_source_order(events);
         queue
     }
 
+    /// Mechanical source-order admission for the separate kernel owner.  It
+    /// is doc-hidden so this mutable queue seam is not a campaign API.
+    #[doc(hidden)]
     pub fn push(&mut self, event: InternalEvent) {
         self.events.push_back(event);
     }
 
+    /// Enqueue automatic no-legal-replacement work after game-owned
+    /// replacement projection.  This is deliberately crate-private; callers
+    /// cannot inject the semantic event through the public queue seam.
+    pub(crate) fn enqueue_no_legal_replacement(
+        &mut self,
+        occurrence: FaintOccurrenceId,
+        authority_epoch: AuthorityEpoch,
+        causal: CausalIdentity,
+    ) {
+        self.events.push_back(InternalEvent::no_legal_replacement(
+            occurrence,
+            authority_epoch,
+            causal,
+        ));
+    }
+
+    #[doc(hidden)]
     pub fn push_all_source_order(&mut self, events: impl IntoIterator<Item = InternalEvent>) {
         self.events.extend(events);
     }
 
     pub fn pop(&mut self) -> Result<Option<InternalEvent>, InternalEventQueueError> {
-        let Some(event) = self.events.pop_front() else {
-            return Ok(None);
-        };
-        if self.processed >= INTERNAL_EVENT_BUDGET {
-            self.events.push_front(event);
+        if self.processed >= INTERNAL_EVENT_BUDGET && !self.events.is_empty() {
             return Err(InternalEventQueueError::InternalEventBudgetExceeded {
                 processed: self.processed,
                 remaining: self.events.len(),
                 remaining_kinds: self.remaining_kinds(),
             });
         }
+        let Some(event) = self.events.pop_front() else {
+            return Ok(None);
+        };
+        let kind = event.kind();
         self.processed += 1;
+        self.processed_kinds.push(kind);
         Ok(Some(event))
     }
 
@@ -316,6 +456,17 @@ impl InternalEventQueue {
 
     pub const fn processed(&self) -> usize {
         self.processed
+    }
+
+    /// Return the exact source-order kinds already processed by this queue.
+    ///
+    /// The slice is intentionally read-only: the kernel trace must observe
+    /// the queue's causal ledger, never rewrite it.  This method is public
+    /// only for the separate `er-kernel` consumer and is hidden from generated
+    /// docs with the rest of the integration boundary.
+    #[doc(hidden)]
+    pub fn processed_kinds(&self) -> &[InternalEventKind] {
+        &self.processed_kinds
     }
 
     pub fn remaining_kinds(&self) -> Vec<InternalEventKind> {
