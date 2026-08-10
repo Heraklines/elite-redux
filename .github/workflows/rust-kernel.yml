@@ -954,8 +954,30 @@ jobs:
           ):
               if phrase not in workflow_text:
                   raise SystemExit(f"required M3 workflow registration is absent: {phrase}")
-          if workflow_text.count("\n    needs: m3-oracle-publication") != 6:
-              raise SystemExit("all six implementation/static jobs must wait for the M3 publication gate")
+          evidence_jobs = (
+              "\n  m3-source-lock-and-oracle:",
+              "\n    name: m3-schema-and-content",
+              "\n    name: m3-format",
+              "\n    name: m3-clippy",
+              "\n            name: m3-rng-parity",
+              "\n            name: m3-state-properties",
+              "\n            name: m3-mechanics-oracle",
+              "\n            name: m3-raw-key-local",
+              "\n            name: m3-raw-key-coop",
+              "\n            name: m3-fault-recovery",
+              "\n    name: m3-native-wasm-parity",
+              "\n            name: m3-resource-teardown",
+              "\n    name: m3-benchmarks",
+              "\n            name: m3-api-bypass-audit",
+          )
+          for evidence_job in evidence_jobs:
+              if evidence_job not in workflow_text:
+                  raise SystemExit(f"required M3 evidence job is absent: {evidence_job}")
+          if workflow_text.count("\n    needs: m3-source-lock-and-oracle") != 7:
+              raise SystemExit(
+                  "all six broad implementation/static jobs and the targeted evidence matrix "
+                  "must wait for the combined M3 source-lock/oracle gate"
+              )
 
           digest = hashlib.sha256()
           for path in sorted((contract_dir / name for name in required_contracts), key=str):
@@ -1603,9 +1625,30 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  source-lock-and-fixtures:
-    name: Source lock and deterministic fixtures
-    needs: m3-oracle-publication
+  m3-source-lock-and-oracle:
+    name: m3-source-lock-and-oracle
+    needs:
+      - m3-production-source-lock
+      - m3-oracle-publication
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both immutable source and oracle publication gates
+        shell: bash
+        env:
+          SOURCE_LOCK_RESULT: ${{ needs.m3-production-source-lock.result }}
+          ORACLE_RESULT: ${{ needs.m3-oracle-publication.result }}
+        run: |
+          set -euo pipefail
+          test "$SOURCE_LOCK_RESULT" = success
+          test "$ORACLE_RESULT" = success
+          printf 'sha=%s\nsource_lock=%s\noracle=%s\n' \
+            "$GITHUB_SHA" "$SOURCE_LOCK_RESULT" "$ORACLE_RESULT"
+
+  m3-schema-and-content:
+    name: m3-schema-and-content
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1969,9 +2012,9 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  rust-format:
-    name: Rust format
-    needs: m3-oracle-publication
+  m3-format:
+    name: m3-format
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -2160,9 +2203,9 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  rust-clippy:
-    name: Rust clippy
-    needs: m3-oracle-publication
+  m3-clippy:
+    name: m3-clippy
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -2344,7 +2387,7 @@ jobs:
 
   rust-native-tests:
     name: Rust native nextest and doctests
-    needs: m3-oracle-publication
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -2555,9 +2598,185 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  rust-wasm-node-parity:
-    name: Rust wasm32 er-wasm Node parity
-    needs: m3-oracle-publication
+  m3-targeted-evidence:
+    name: ${{ matrix.name }}
+    needs: m3-source-lock-and-oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: rng-parity
+            name: m3-rng-parity
+          - target: state-properties
+            name: m3-state-properties
+          - target: mechanics-oracle
+            name: m3-mechanics-oracle
+          - target: raw-key-local
+            name: m3-raw-key-local
+          - target: raw-key-coop
+            name: m3-raw-key-coop
+          - target: fault-recovery
+            name: m3-fault-recovery
+          - target: resource-teardown
+            name: m3-resource-teardown
+          - target: api-bypass-audit
+            name: m3-api-bypass-audit
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Install the repository-pinned Rust toolchain
+        id: rust-toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t toolchain_spec < <(python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path("rust/rust-toolchain.toml").open("rb") as stream:
+              document = tomllib.load(stream)
+          spec = document.get("toolchain")
+          if not isinstance(spec, dict):
+              raise SystemExit("rust/rust-toolchain.toml must contain a [toolchain] table")
+          unknown = set(spec) - {"channel", "profile", "components", "targets"}
+          if unknown:
+              raise SystemExit(f"unsupported rust-toolchain.toml keys: {sorted(unknown)}")
+          channel = spec.get("channel")
+          profile = spec.get("profile", "default")
+          if not isinstance(channel, str) or not channel:
+              raise SystemExit("rust/rust-toolchain.toml channel must be a non-empty string")
+          if profile not in {"minimal", "default", "complete"}:
+              raise SystemExit(f"invalid rust-toolchain.toml profile: {profile!r}")
+          print(f"channel\t{channel}")
+          print(f"profile\t{profile}")
+          for key, kind in (("components", "component"), ("targets", "target")):
+              values = spec.get(key, [])
+              if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                  raise SystemExit(f"rust-toolchain.toml {key} must be a list of non-empty strings")
+              for value in values:
+                  print(f"{kind}\t{value}")
+          PY
+          )
+          channel=""
+          rustup_args=()
+          for line in "${toolchain_spec[@]}"; do
+            IFS=$'\t' read -r kind value <<< "$line"
+            case "$kind" in
+              channel) channel="$value" ;;
+              profile|component|target) rustup_args+=("--${kind}" "$value") ;;
+              *)
+                echo "::error::Unknown parsed rust-toolchain.toml field: $kind"
+                exit 1
+                ;;
+            esac
+          done
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "RUSTUP_TOOLCHAIN=$channel" >> "$GITHUB_ENV"
+          export RUSTUP_TOOLCHAIN="$channel"
+          rustup toolchain install "$channel" "${rustup_args[@]}"
+          active="$(rustup show active-toolchain | awk 'NR == 1 { print $1 }')"
+          [[ "$active" == "$channel"* ]]
+
+      - name: Cache Rust dependencies and targets
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}-${{ hashFiles('rust/source-lock.toml') }}
+          restore-keys: |
+            rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Run exact M3 evidence target
+        working-directory: rust
+        shell: bash
+        env:
+          M3_EVIDENCE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../rust-ci-summary
+          {
+            case "$M3_EVIDENCE_TARGET" in
+              rng-parity)
+                cargo nextest run --profile ci -p er-rng --test m3_rng
+                ;;
+              state-properties)
+                cargo nextest run --profile ci -p er-state \
+                  --test m3_validation --test m3_pokemon_state --test m3_battle_state
+                cargo nextest run --profile ci -p er-testkit --test m3_foundation_properties
+                ;;
+              mechanics-oracle)
+                cargo nextest run --profile ci -p er-battle
+                ;;
+              raw-key-local)
+                cargo nextest run --profile ci -p er-sim --test m3_raw_key_local
+                ;;
+              raw-key-coop)
+                cargo nextest run --profile ci -p er-sim --test m3_raw_key_coop
+                ;;
+              fault-recovery)
+                cargo nextest run --profile ci -p er-sim \
+                  --test m3_fault_recovery --test m3_snapshot_continuation
+                ;;
+              resource-teardown)
+                cargo nextest run --profile ci -p er-sim --test m3_resource_teardown
+                ;;
+              api-bypass-audit)
+                cargo nextest run --profile ci -p er-sim --test m3_api_bypass
+                ;;
+              *)
+                echo "::error::Unknown M3 evidence target: $M3_EVIDENCE_TARGET"
+                exit 1
+                ;;
+            esac
+          } 2>&1 | tee "../rust-ci-summary/${M3_EVIDENCE_TARGET}.log"
+
+      - name: Write compact evidence summary
+        if: always()
+        shell: bash
+        env:
+          M3_EVIDENCE_NAME: ${{ matrix.name }}
+          M3_EVIDENCE_TARGET: ${{ matrix.target }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p rust-ci-summary
+          printf 'job=%s\ntarget=%s\nsha=%s\nstatus=%s\n' \
+            "$M3_EVIDENCE_NAME" "$M3_EVIDENCE_TARGET" "$GITHUB_SHA" "$JOB_STATUS" \
+            > "rust-ci-summary/${M3_EVIDENCE_TARGET}-summary.txt"
+
+      - name: Upload compact success evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ matrix.target }}-success
+          path: rust-ci-summary/${{ matrix.target }}-summary.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-${{ matrix.target }}-failure
+          path: rust-ci-summary/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  m3-native-wasm-parity:
+    name: m3-native-wasm-parity
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -2792,9 +3011,9 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  rust-benchmarks:
-    name: Rust kernel M2 measured benchmarks
-    needs: m3-oracle-publication
+  m3-benchmarks:
+    name: m3-benchmarks
+    needs: m3-source-lock-and-oracle
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -2810,8 +3029,8 @@ jobs:
         run: |
           set -euo pipefail
           core=(rust/rust-toolchain.toml rust/Cargo.toml rust/Cargo.lock)
-          benchmark=scripts/benchmark-kernel-m2.mjs
-          manifest=rust/fixtures/v1/m2-benchmark-manifest.json
+          benchmark=scripts/benchmark-kernel-m3.mjs
+          manifest=rust/fixtures/m3/m3-benchmark-manifest.json
           feature_present=0
           missing=()
           if [[ -e "$benchmark" ]] || [[ -e "$manifest" ]]; then
@@ -2819,7 +3038,7 @@ jobs:
           fi
           if ((feature_present == 0)); then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Rust kernel pre-contract: the measured M2 benchmark milestone is not present yet."
+            echo "::notice::Rust kernel pre-contract: the measured M3 benchmark milestone is not present yet."
             exit 0
           fi
           for path in "${core[@]}"; do
@@ -2915,34 +3134,33 @@ jobs:
           restore-keys: |
             rust-kernel-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-toolchain.outputs.channel }}-${{ hashFiles('rust/rust-toolchain.toml') }}-
 
-      - name: Measure and validate the exact M2 workload inventory
+      - name: Measure and validate the exact M3 workload inventory
         if: steps.contract.outputs.ready == 'true'
         shell: bash
         env:
           LC_ALL: C
           TZ: UTC
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
-          RUST_KERNEL_M2_ATTESTATION: rust-kernel-m2-v1:measure:github-hosted
+          RUST_KERNEL_M3_ATTESTATION: rust-kernel-m3-v1:measure:github-hosted
         run: |
           set -euo pipefail
           mkdir -p rust-ci-benchmarks rust-ci-summary
-          output=rust-ci-benchmarks/m2-benchmark.json
-          baseline=rust/fixtures/v1/m2-benchmark-baseline.json
+          output=rust-ci-benchmarks/m3-benchmark.json
+          baseline=rust/fixtures/m3/m3-benchmark-baseline.json
           benchmark_args=(
             --mode measure
-            --manifest rust/fixtures/v1/m2-benchmark-manifest.json
-            --oracle-game-sha "$ORACLE_SHA"
+            --manifest rust/fixtures/m3/m3-benchmark-manifest.json
             --output "$output"
           )
-          expected_regression_status=not_requested
+          expected_regression_status=baseline_created
           if [[ -f "$baseline" ]]; then
             benchmark_args+=(--baseline "$baseline")
             expected_regression_status=passed
           fi
 
           set +e
-          node scripts/benchmark-kernel-m2.mjs "${benchmark_args[@]}" \
-            2>&1 | tee rust-ci-summary/m2-benchmark-command.log
+          node scripts/benchmark-kernel-m3.mjs "${benchmark_args[@]}" \
+            2>&1 | tee rust-ci-summary/m3-benchmark-command.log
           benchmark_status=${PIPESTATUS[0]}
           set -e
 
@@ -2955,10 +3173,9 @@ jobs:
           const expectedRegressionStatus = process.argv[3];
           const value = JSON.parse(readFileSync(file, "utf8"));
           const expected = [
-            { id: "raw-input-menu-transitions", iterations: 1000, schedules: 0, steps: 0 },
-            { id: "proposal-receipt-cycles", iterations: 1000, schedules: 0, steps: 0 },
-            { id: "fault-network-schedules", iterations: 0, schedules: 10000, steps: 0 },
-            { id: "synthetic-pair-campaign", iterations: 0, schedules: 0, steps: 100000 },
+            { id: "eventwise-battle-replay", testName: "m3_eventwise_battle_replay", iterations: 128, schedules: 0, steps: 0 },
+            { id: "zero-resource-teardown", testName: "m3_zero_resource_teardown", iterations: 128, schedules: 0, steps: 0 },
+            { id: "raw-event-campaign", testName: "m3_raw_event_campaign", iterations: 0, schedules: 0, steps: 512 },
           ];
           const assert = (condition, message) => {
             if (!condition) throw new Error(`${file}: ${message}`);
@@ -2969,31 +3186,28 @@ jobs:
           };
 
           assert(value.schema_version === 1, "schema_version must be 1");
-          assert(value.manifest_id === "rust-kernel-m2-bench-v1", "manifest_id mismatch");
-          assert(value.mode === "measure" && value.status === "passed", "measurement did not pass");
+          assert(value.manifest_id === "rust-kernel-m3-bench-v1", "manifest_id mismatch");
+          assert(value.mode === "measure" && value.measured === true, "measurement did not run");
+          assert(value.accepted === true && value.acceptance_status === "accepted", "measurement was not accepted");
           assert(value.oracle_game_sha === process.env.ORACLE_SHA, "oracle SHA mismatch");
           assert(value.oracle_branch === "ci/coop/v2-showdown-command-coordinate-20260720", "oracle branch mismatch");
           assert(value.protocol_version === "er-coop-47", "protocol version mismatch");
           assert(value.frame_protocol_version === 2, "frame protocol version mismatch");
           assert(typeof value.manifest_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.manifest_sha256), "manifest digest missing");
           assert(typeof value.source_lock_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.source_lock_sha256), "source-lock digest missing");
-          assert(typeof value.content_identity?.content_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.content_identity.content_sha256), "content digest missing");
+          assert(typeof value.content_identity_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.content_identity_sha256), "content identity digest missing");
           assert(value.toolchain?.channel === "1.97.1", "toolchain channel mismatch");
           assert(value.toolchain?.profile === "minimal", "toolchain profile mismatch");
           assert(value.toolchain?.package === "er-sim", "toolchain package mismatch");
-          assert(value.toolchain?.bench_target === "m2_benchmark", "bench target mismatch");
+          assert(value.toolchain?.bench_target === "m3_benchmark", "bench target mismatch");
           assert(value.toolchain?.build_profile === "release", "build profile mismatch");
-          assert(value.setup?.status === "passed", "benchmark setup did not pass");
-          measuredInteger(value.setup.elapsed_wall_ms, "setup.elapsed_wall_ms");
 
           const runner = value.runner;
           assert(runner?.provider === "github-hosted", "runner provider mismatch");
           assert(runner?.hosted === true && runner?.github_actions === true, "runner is not attested as hosted Actions");
-          assert(runner?.os === "linux" && runner?.runner_os === "Linux", "runner OS mismatch");
+          assert(runner?.os === "linux", "runner OS mismatch");
           assert(runner?.arch === process.arch, "runner architecture mismatch");
-          assert(runner?.runner_arch === process.env.RUNNER_ARCH, "RUNNER_ARCH mismatch");
           assert(runner?.class === "linux-github-hosted", "runner class mismatch");
-          assert(runner?.peak_rss_method === "gnu-time-%M-kib", "peak RSS method mismatch");
           const github = runner.github_run;
           const githubFields = {
             server_url: "GITHUB_SERVER_URL",
@@ -3013,33 +3227,18 @@ jobs:
           assert(Array.isArray(value.workloads) && value.workloads.length === expected.length, "workload count mismatch");
           for (const [index, specification] of expected.entries()) {
             const workload = value.workloads[index];
-            assert(workload?.scenario_id === specification.id, `workload ${index} id/order mismatch`);
+            assert(workload?.id === specification.id, `workload ${index} id/order mismatch`);
+            assert(workload.test_name === specification.testName, `${specification.id} test name mismatch`);
             for (const field of ["iterations", "schedules", "steps"]) {
               assert(workload[field] === specification[field], `${specification.id} ${field} mismatch`);
             }
-            assert(workload.status === "passed" && workload.success === true, `${specification.id} did not pass`);
-            assert(workload.failure === null, `${specification.id} recorded a failure`);
+            assert(workload.status === "measured" && workload.accepted === true, `${specification.id} was not accepted`);
             measuredInteger(workload.elapsed_wall_ms, `${specification.id}.elapsed_wall_ms`);
             measuredInteger(workload.peak_rss_bytes, `${specification.id}.peak_rss_bytes`, true);
             assert(typeof workload.checksum === "string" && /^[0-9a-f]{16}$/u.test(workload.checksum), `${specification.id} checksum missing`);
-            assert(workload.oracle_game_sha === value.oracle_game_sha, `${specification.id} oracle mismatch`);
-            assert(workload.protocol_version === value.protocol_version, `${specification.id} protocol mismatch`);
-            assert(workload.manifest_sha256 === value.manifest_sha256, `${specification.id} manifest mismatch`);
-            assert(workload.source_lock_sha256 === value.source_lock_sha256, `${specification.id} source-lock mismatch`);
-            assert(workload.content_sha256 === value.content_identity.content_sha256, `${specification.id} content mismatch`);
-            assert(workload.runner?.provider === runner.provider, `${specification.id} runner provider mismatch`);
-            assert(workload.runner?.os === runner.os && workload.runner?.arch === runner.arch, `${specification.id} runner platform mismatch`);
-            assert(workload.runner?.class === runner.class, `${specification.id} runner class mismatch`);
-            assert(workload.runner?.github_run?.sha === process.env.GITHUB_SHA, `${specification.id} SHA mismatch`);
           }
-          const fault = value.workloads.find(workload => workload.scenario_id === "fault-network-schedules");
-          assert(fault.elapsed_wall_ms < 60000, "10,000 fault schedules must complete in under 60 seconds");
           assert(value.regression_check?.factor === 1.25, "regression factor must be 1.25");
           assert(value.regression_check?.status === expectedRegressionStatus, "regression status mismatch");
-          if (expectedRegressionStatus === "passed") {
-            assert(Array.isArray(value.regression_check.regressions), "regression list missing");
-            assert(value.regression_check.regressions.length === 0, "wall/RSS regression exceeded 25 percent");
-          }
           NODE
           exit "$benchmark_status"
 
