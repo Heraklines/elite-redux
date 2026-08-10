@@ -13,12 +13,13 @@ use std::sync::Arc;
 
 use er_canonical::{canonicalize_value, content_digest, fixture_digest};
 use er_content::pack::{ContentPack, selected_content_pack};
+use er_game::internal_event::InternalEventKind;
 use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
 };
-use er_kernel::snapshot::RestorableKernelSnapshotV2;
+use er_kernel::snapshot::{RestorableKernelSnapshotV2, RngDraw};
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::format::BattleFormat;
@@ -72,6 +73,10 @@ pub struct M3ParityObservation {
     pub state_digest: String,
     pub snapshot_digest: String,
     pub ui_projection_digest: String,
+    pub rng_audit: Vec<RngDraw>,
+    pub rng_audit_digest: String,
+    pub internal_events: Vec<String>,
+    pub internal_events_digest: String,
     pub live_resources: er_types::LiveResourceSnapshot,
     pub live_resources_digest: String,
 }
@@ -399,12 +404,27 @@ fn canonical_error(field: &'static str, error: impl fmt::Display) -> M3ParityErr
     }
 }
 
+fn internal_event_kind_name(kind: InternalEventKind) -> &'static str {
+    match kind {
+        InternalEventKind::Button => "BUTTON",
+        InternalEventKind::Ui => "UI",
+        InternalEventKind::Game => "GAME",
+        InternalEventKind::Protocol => "PROTOCOL",
+        InternalEventKind::BattleResolved => "BATTLE_RESOLVED",
+        InternalEventKind::AuthorityEntryReady => "AUTHORITY_ENTRY_READY",
+        InternalEventKind::MaterialInstalled => "MATERIAL_INSTALLED",
+        InternalEventKind::ControlInstalled => "CONTROL_INSTALLED",
+    }
+}
+
 fn observe(
     kernel: &GameKernel,
     sequence: SafeU53,
     virtual_time_ms: SafeU53,
     input_kind: &str,
     effects: &[KernelEffect],
+    rng_audit: Vec<RngDraw>,
+    internal_events: Vec<InternalEventKind>,
 ) -> Result<M3ParityObservation, M3ParityError> {
     let projection = kernel
         .battle_ui_projection()
@@ -417,6 +437,15 @@ fn observe(
         content_digest(&snapshot).map_err(|error| canonical_error("snapshot", error))?;
     let ui_projection_digest = content_digest(projection)
         .map_err(|error| canonical_error("battle_ui_projection", error))?;
+    let rng_audit_digest = content_digest(&rng_audit)
+        .map_err(|error| canonical_error("rng_audit", error))?;
+    let internal_events = internal_events
+        .into_iter()
+        .map(internal_event_kind_name)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let internal_events_digest = content_digest(&internal_events)
+        .map_err(|error| canonical_error("internal_events", error))?;
     let live_resources_digest = content_digest(&live_resources)
         .map_err(|error| canonical_error("live_resources", error))?;
     Ok(M3ParityObservation {
@@ -428,6 +457,10 @@ fn observe(
         state_digest: kernel.state_digest(),
         snapshot_digest,
         ui_projection_digest,
+        rng_audit,
+        rng_audit_digest,
+        internal_events,
+        internal_events_digest,
         live_resources_digest,
         live_resources,
     })
@@ -445,12 +478,15 @@ fn step_observation(
             side: "trace",
             reason: error.to_string(),
         })?;
+    let (rng_audit, internal_events) = kernel.m3_trace_audit();
     observe(
         kernel,
         sequence,
         event.virtual_time_ms,
         "RAW_INPUT",
         &effects,
+        rng_audit,
+        internal_events,
     )
 }
 
@@ -737,12 +773,15 @@ fn settle_pending_presentations(
                     side: "presentation",
                     reason: error.to_string(),
                 })?;
+            let (rng_audit, internal_events) = kernel.m3_trace_audit();
             observations.push(observe(
                 kernel,
                 sequence,
                 virtual_time_ms,
                 "BATTLE_PRESENTATION_OUTCOME",
                 &effects,
+                rng_audit,
+                internal_events,
             )?);
             *settlement_count = (*settlement_count).saturating_add(1);
             *continuation_input_count = (*continuation_input_count).saturating_add(1);
@@ -828,6 +867,10 @@ fn observation_value(observation: &M3ParityObservation) -> Value {
         "state_digest": observation.state_digest,
         "snapshot_digest": observation.snapshot_digest,
         "ui_projection_digest": observation.ui_projection_digest,
+        "rng_audit": observation.rng_audit,
+        "rng_audit_digest": observation.rng_audit_digest,
+        "internal_events": observation.internal_events,
+        "internal_events_digest": observation.internal_events_digest,
         "live_resources": observation.live_resources,
         "live_resources_digest": observation.live_resources_digest,
     })

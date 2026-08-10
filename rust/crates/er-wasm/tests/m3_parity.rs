@@ -60,8 +60,26 @@ fn assert_eventwise_contract() -> TestResult {
         assert!(!observation.state_digest.is_empty());
         assert!(!observation.snapshot_digest.is_empty());
         assert!(!observation.ui_projection_digest.is_empty());
+        assert!(!observation.rng_audit_digest.is_empty());
+        assert!(!observation.internal_events_digest.is_empty());
         assert!(!observation.live_resources_digest.is_empty());
     }
+    let rng_audit = report
+        .observations
+        .iter()
+        .flat_map(|observation| &observation.rng_audit)
+        .collect::<Vec<_>>();
+    assert!(!rng_audit.is_empty(), "M3 parity trace emitted no RNG audit");
+    for draw in &rng_audit {
+        draw.validate()?;
+    }
+    assert!(rng_audit.windows(2).all(|pair| {
+        pair[0]
+            .sequence
+            .get()
+            .checked_add(1)
+            .is_some_and(|expected| pair[1].sequence.get() == expected)
+    }));
     assert!(
         report
             .observations
