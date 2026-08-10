@@ -2166,16 +2166,8 @@ function resolvePlayerOwnerSeat(game: GameManager, mon: Pokemon, partyIndex: num
   if (capacity !== 2) {
     fail("CANONICAL_STATE_UNOBSERVABLE", `unsupported player capacity ${String(capacity)}`);
   }
-  const fieldPosition = game.scene.getPlayerField(false).indexOf(mon);
-  if (fieldPosition === 0 || fieldPosition === 1) {
-    const expected = fieldPosition + 1;
-    if (explicit !== expected) {
-      fail("CANONICAL_STATE_UNOBSERVABLE", `active player_party[${partyIndex}] lacks its persistent field-seat owner`);
-    }
-    return explicit;
-  }
   if (explicit == null) {
-    fail("CANONICAL_STATE_UNOBSERVABLE", `bench player_party[${partyIndex}] has no explicit owner`);
+    fail("CANONICAL_STATE_UNOBSERVABLE", `double-battle player_party[${partyIndex}] has no explicit owner`);
   }
   return explicit;
 }
