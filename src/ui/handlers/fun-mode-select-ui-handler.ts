@@ -68,8 +68,8 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
   },
   {
     key: "weatherRoulette",
-    label: "Weather Roulette",
-    description: "Every encounter begins with a random standard or Elite Redux weather, including clear weather.",
+    label: "Weather Chaos",
+    description: "Every encounter begins with random weather/terrain, including clear weather.",
   },
   {
     key: "scrambleMoves",
@@ -84,7 +84,7 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
   },
 ];
 
-const VISIBLE_OPTION_ROWS = 7;
+const VISIBLE_OPTION_ROWS = 9;
 
 function hasEnabledMode(config: FunModeConfig): boolean {
   return OPTIONS.some(option => config[option.key]);
@@ -102,8 +102,10 @@ export class FunModeSelectUiHandler extends UiHandler {
   private readonly leftArrows: Phaser.GameObjects.Image[] = [];
   private readonly rightArrows: Phaser.GameObjects.Image[] = [];
   private startCursor: Phaser.GameObjects.NineSlice;
-  private scrollText: Phaser.GameObjects.Text;
+  private scrollUpArrow: Phaser.GameObjects.Image;
+  private scrollDownArrow: Phaser.GameObjects.Image;
   private onHeaderButton = false;
+  private startRegionOption: 0 | 1 = 0;
   private visibleStart = 0;
   private config: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
 
@@ -184,11 +186,18 @@ export class FunModeSelectUiHandler extends UiHandler {
       )
       .setOrigin(0)
       .setVisible(false);
-    this.scrollText = addTextObject(optionsWidth - 8, height - 31, "", TextStyle.SETTINGS_LABEL, {
-      fontSize: "30px",
-    })
-      .setOrigin(1, 1)
-      .setAlpha(0.6);
+    this.scrollUpArrow = globalScene.add
+      .image(optionsWidth - 6, 30, "cursor")
+      .setScale(0.45)
+      .setAngle(-90)
+      .setAlpha(0.8)
+      .setVisible(false);
+    this.scrollDownArrow = globalScene.add
+      .image(optionsWidth - 6, height - 8, "cursor")
+      .setScale(0.45)
+      .setAngle(90)
+      .setAlpha(0.8)
+      .setVisible(false);
 
     this.container.add([
       overlay,
@@ -205,7 +214,8 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.descriptionText,
       this.startText,
       this.startCursor,
-      this.scrollText,
+      this.scrollUpArrow,
+      this.scrollDownArrow,
     ]);
     this.container.setVisible(false);
     ui.add(this.container);
@@ -215,6 +225,7 @@ export class FunModeSelectUiHandler extends UiHandler {
     super.show(args);
     this.config = { ...getFunModeConfig() };
     this.onHeaderButton = false;
+    this.startRegionOption = 0;
     this.visibleStart = 0;
     this.container.setVisible(true);
     this.setCursor(0);
@@ -227,9 +238,17 @@ export class FunModeSelectUiHandler extends UiHandler {
   public override processInput(button: Button): boolean {
     let success: boolean;
     if (button === Button.CANCEL) {
-      globalScene.phaseManager.toTitleScreen();
-      globalScene.phaseManager.getCurrentPhase().end();
-      success = true;
+      if (this.onHeaderButton) {
+        this.setHeaderFocus(false);
+        success = true;
+      } else if (this.cursor === OPTIONS.length) {
+        this.startRegionOption = 0;
+        success = this.setCursor(OPTIONS.length - 1);
+      } else {
+        globalScene.phaseManager.toTitleScreen();
+        globalScene.phaseManager.getCurrentPhase().end();
+        success = true;
+      }
     } else if (this.onHeaderButton) {
       success = this.processHeaderInput(button);
     } else {
@@ -262,6 +281,10 @@ export class FunModeSelectUiHandler extends UiHandler {
       return this.setCursor(this.cursor === OPTIONS.length ? 0 : this.cursor + 1);
     }
     if (button === Button.LEFT || button === Button.RIGHT) {
+      if (this.cursor === OPTIONS.length && loadLastFunModeConfig()) {
+        this.startRegionOption = this.startRegionOption === 0 ? 1 : 0;
+        return true;
+      }
       return this.setCurrentOption(button === Button.RIGHT);
     }
     if (button === Button.ACTION || button === Button.SUBMIT) {
@@ -295,7 +318,10 @@ export class FunModeSelectUiHandler extends UiHandler {
       return true;
     }
     if (!hasEnabledMode(this.config)) {
-      return false;
+      return this.startRegionOption === 1 && this.applyLastSetup();
+    }
+    if (this.startRegionOption === 1) {
+      return this.applyLastSetup();
     }
     saveLastFunModeConfig(this.config);
     setFunModeConfig(this.config);
@@ -341,7 +367,7 @@ export class FunModeSelectUiHandler extends UiHandler {
         .setY(rowY)
         .setVisible(visible)
         .setAlpha(enabled ? 1 : 0.55);
-      rightArrow.setPosition(optionsWidth - 12, rowY + 4).setVisible(visible && !enabled);
+      rightArrow.setPosition(optionsWidth - 20, rowY + 4).setVisible(visible && !enabled);
       leftArrow
         .setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y)
         .setVisible(visible && enabled);
@@ -355,6 +381,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       }
     });
     if (this.cursor < startIndex) {
+      this.startRegionOption = 0;
       this.cursorObject
         .setVisible(true)
         .setPosition(4, 28 + (this.cursor - this.visibleStart) * 16)
@@ -363,17 +390,28 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.setDescription(OPTIONS[this.cursor].description);
     } else {
       const anyEnabled = hasEnabledMode(this.config);
+      const canReuse = loadLastFunModeConfig() != null;
+      if (!anyEnabled && canReuse) {
+        this.startRegionOption = 1;
+      } else if (!canReuse) {
+        this.startRegionOption = 0;
+      }
       this.cursorObject.setVisible(false);
       this.startCursor.setVisible(true);
-      this.setDescription(
-        anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one randomizer before starting.",
-      );
-      this.startText.setAlpha(anyEnabled ? 1 : 0.45);
+      if (this.startRegionOption === 1) {
+        this.startText.setText("Reuse Last Setup  (L/R: switch)").setAlpha(1);
+        this.setDescription("Restore the modifier choices used for your previous Fun Mode run.");
+      } else {
+        this.startText.setText("START").setAlpha(anyEnabled ? 1 : 0.45);
+        this.setDescription(
+          anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one randomizer before starting.",
+        );
+      }
     }
-    this.scrollText.setText(
-      `${this.visibleStart + 1}-${Math.min(startIndex, this.visibleStart + VISIBLE_OPTION_ROWS)} / ${startIndex}`,
-    );
+    this.scrollUpArrow.setVisible(this.visibleStart > 0);
+    this.scrollDownArrow.setVisible(this.visibleStart + VISIBLE_OPTION_ROWS < startIndex);
     if (this.cursor < startIndex) {
+      this.startText.setText("START");
       this.startText.setAlpha(hasEnabledMode(this.config) ? 1 : 0.45);
     }
     this.updateLastSetupButton();
@@ -405,6 +443,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       return false;
     }
     this.config = { ...saved, abilityRerollSeed: 0 };
+    this.startRegionOption = 0;
     this.setHeaderFocus(false);
     this.setCursor(0);
     return true;

@@ -6,6 +6,7 @@
 
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -255,6 +256,19 @@ const FUN_WEATHERS: readonly WeatherType[] = [
 
 export function rollFunWeather(): WeatherType | null {
   return currentConfig.weatherRoulette ? randSeedItem(FUN_WEATHERS) : null;
+}
+
+const FUN_TERRAINS: readonly TerrainType[] = [
+  TerrainType.NONE,
+  TerrainType.MISTY,
+  TerrainType.ELECTRIC,
+  TerrainType.GRASSY,
+  TerrainType.PSYCHIC,
+  TerrainType.TOXIC,
+];
+
+export function rollFunTerrain(): TerrainType | null {
+  return currentConfig.weatherRoulette ? randSeedItem(FUN_TERRAINS) : null;
 }
 
 export interface FunRandomSpeciesChoice {

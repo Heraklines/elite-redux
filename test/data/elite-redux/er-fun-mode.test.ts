@@ -25,6 +25,7 @@ import {
   getFunScrambledMoveId,
   rerollFunAbilities,
   resetFunModeConfig,
+  rollFunTerrain,
   rollFunWeather,
   setFunModeConfig,
 } from "#data/elite-redux/er-fun-mode";
@@ -36,9 +37,9 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-beforeAll(() => {
+beforeEach(() => {
   Phaser.Math.RND = new Phaser.Math.RandomDataGenerator(["er-fun-mode-test"]);
 });
 
@@ -236,10 +237,12 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
     expect(getFunEvolutionTarget(12345, 1, 0)).toEqual(target);
   });
 
-  it("rolls weather only when Weather Roulette is enabled", () => {
+  it("rolls weather and terrain only when Weather Chaos is enabled", () => {
     expect(rollFunWeather()).toBeNull();
+    expect(rollFunTerrain()).toBeNull();
     setFunModeConfig({ ...getFunModeConfig(), weatherRoulette: true });
     expect(rollFunWeather()).not.toBeNull();
+    expect(rollFunTerrain()).not.toBeNull();
   });
 });
 
