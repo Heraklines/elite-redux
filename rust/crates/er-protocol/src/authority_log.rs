@@ -8,11 +8,18 @@ use er_types::{
     SeatId, TimeClass, TimerId, TimerOwner, validate_authority_material_digest,
     validate_authority_operation_id,
 };
+use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
 use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
+use crate::snapshot::{
+    AuthorityDeliveryLeaseSnapshotV2, AuthorityDeliveryPeerStageSnapshotV2,
+    AuthorityDeliveryStageV2, AuthorityEntryIdentitySnapshotV2, AuthorityLogSnapshotBridge,
+    AuthorityLogSnapshotV2, OpaqueAuthorityEntrySnapshotV2, PeerBindingSnapshotV2,
+    RetiredOperationStageSnapshotV2, SnapshotError,
+};
 
 pub const DEFAULT_RETAIN_CAPACITY: u64 = 512;
 pub const DEFAULT_DELIVERY_INITIAL_MS: u64 = 250;
@@ -926,6 +933,23 @@ impl AuthorityLog {
     }
 
     fn validate_entry(&self, entry: &AuthorityEntry) -> Result<(), AuthorityLogError> {
+        self.validate_entry_shape(entry)?;
+        if let Some(previous) = &self.latest_committed {
+            if matches!(previous.next_control, NextControl::Terminal(_)) {
+                return Err(AuthorityLogError::TerminalPredecessor);
+            }
+            if !control_allows_successor_entry(
+                &previous.next_control,
+                &previous.operation_id,
+                entry,
+            ) {
+                return Err(AuthorityLogError::SuccessorRejected);
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_entry_shape(&self, entry: &AuthorityEntry) -> Result<(), AuthorityLogError> {
         if !valid_frame_context(&entry.context) {
             return Err(AuthorityLogError::InvalidEntry {
                 reason: "entry context is malformed".to_owned(),
@@ -967,18 +991,6 @@ impl AuthorityLog {
             return Err(AuthorityLogError::InvalidEntry {
                 reason: "subsumed revisions must be positive".to_owned(),
             });
-        }
-        if let Some(previous) = &self.latest_committed {
-            if matches!(previous.next_control, NextControl::Terminal(_)) {
-                return Err(AuthorityLogError::TerminalPredecessor);
-            }
-            if !control_allows_successor_entry(
-                &previous.next_control,
-                &previous.operation_id,
-                entry,
-            ) {
-                return Err(AuthorityLogError::SuccessorRejected);
-            }
         }
         Ok(())
     }
@@ -1087,6 +1099,544 @@ impl AuthorityLog {
             self.retired_operation_stages.remove(&oldest);
         }
     }
+}
+
+impl AuthorityLogSnapshotBridge for AuthorityLog {
+    fn snapshot_v2(&self) -> Result<AuthorityLogSnapshotV2, SnapshotError> {
+        if !self.prepared.is_empty() {
+            return Err(snapshot_invalid(
+                "authority_log.prepared",
+                "a public authority snapshot cannot contain a prepared commit",
+            ));
+        }
+
+        let retained = self
+            .retained
+            .iter()
+            .map(|(revision, lease)| {
+                Ok(AuthorityDeliveryLeaseSnapshotV2 {
+                    revision: *revision,
+                    entry: authority_entry_snapshot(
+                        &lease.entry,
+                        "authority_log.retained.entry",
+                    )?,
+                    owner: lease.owner.clone(),
+                    peer_stages: lease
+                        .peer_stages
+                        .iter()
+                        .map(|(seat, peer)| AuthorityDeliveryPeerStageSnapshotV2 {
+                            seat: *seat,
+                            generation: peer.connection_generation,
+                            stage: authority_delivery_stage(peer.stage),
+                        })
+                        .collect(),
+                    timer_id: lease.timer_id,
+                    attempts: CanonicalU64Decimal::new(lease.attempts.to_string())
+                        .map_err(|error| {
+                            snapshot_canonical(
+                                "authority_log.retained.attempts",
+                                error.to_string(),
+                            )
+                        })?,
+                    next_delay_ms: lease.next_delay_ms,
+                    stopped: lease.stopped,
+                    subsumption_done: lease.subsumption_done,
+                })
+            })
+            .collect::<Result<Vec<_>, SnapshotError>>()?;
+        let retired_operation_stages = self
+            .retired_operation_stages
+            .iter()
+            .map(|(operation_id, stage)| RetiredOperationStageSnapshotV2 {
+                operation_id: operation_id.clone(),
+                stage: authority_delivery_stage(*stage),
+            })
+            .collect();
+        let snapshot = AuthorityLogSnapshotV2 {
+            local_context: self.local_context.clone(),
+            peer_bindings: self
+                .peer_bindings
+                .iter()
+                .map(|(seat, generation)| PeerBindingSnapshotV2 {
+                    seat: *seat,
+                    generation: *generation,
+                })
+                .collect(),
+            owner_id: self.owner_id.clone(),
+            retain_capacity: self.retain_capacity,
+            delivery_backoff: self.delivery_backoff,
+            delivery_time_class: self.delivery_time_class,
+            max_delivery_attempts: self.max_delivery_attempts,
+            retained,
+            next_prepared_token: self.next_token,
+            latest_committed: self
+                .latest_committed
+                .as_ref()
+                .map(|entry| authority_entry_snapshot(entry, "authority_log.latest_committed"))
+                .transpose()?,
+            head_revision: self.head_revision,
+            retired_operation_stages,
+            retired_operation_order: self.retired_operation_order.iter().cloned().collect(),
+            capacity_refusals: self.capacity_refusals,
+            send_failures: self.send_failures,
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: AuthorityLogSnapshotV2,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<Self, SnapshotError> {
+        // This is deliberately the first operation: no owner or scheduler
+        // state is inspected or changed before the closed DTO validates.
+        snapshot.validate()?;
+        if snapshot
+            .next_prepared_token
+            .is_some_and(|token| token == SafeU53::ZERO)
+        {
+            return Err(snapshot_invalid(
+                "authority_log.next_prepared_token",
+                "the prepared-token allocator starts at one",
+            ));
+        }
+
+        let config = AuthorityLogConfig {
+            local_context: snapshot.local_context.clone(),
+            peer_bindings: snapshot
+                .peer_bindings
+                .iter()
+                .map(|binding| PeerBinding {
+                    seat_id: binding.seat,
+                    connection_generation: binding.generation,
+                })
+                .collect(),
+            owner_id: snapshot.owner_id.clone(),
+            retain_capacity: snapshot.retain_capacity,
+            delivery_backoff: snapshot.delivery_backoff,
+            delivery_time_class: snapshot.delivery_time_class,
+            max_delivery_attempts: snapshot.max_delivery_attempts,
+        };
+        validate_config(&config, !config.peer_bindings.is_empty()).map_err(|error| {
+            snapshot_invalid("authority_log", error.to_string())
+        })?;
+
+        let AuthorityLogSnapshotV2 {
+            local_context,
+            peer_bindings: snapshot_peer_bindings,
+            owner_id,
+            retain_capacity,
+            delivery_backoff,
+            delivery_time_class,
+            max_delivery_attempts,
+            retained,
+            next_prepared_token,
+            latest_committed,
+            head_revision,
+            retired_operation_stages,
+            retired_operation_order,
+            capacity_refusals,
+            send_failures,
+            disposed,
+        } = snapshot;
+
+        let mut peer_bindings = BTreeMap::new();
+        for binding in snapshot_peer_bindings {
+            if peer_bindings
+                .insert(binding.seat, binding.generation)
+                .is_some()
+            {
+                return Err(snapshot_invalid(
+                    "authority_log.peer_bindings",
+                    "peer binding seats must be unique",
+                ));
+            }
+        }
+
+        let latest_committed = latest_committed
+            .map(|entry| {
+                authority_entry_from_snapshot(&entry, "authority_log.latest_committed")
+            })
+            .transpose()?;
+        if let Some(entry) = &latest_committed {
+            if entry.revision != head_revision || entry.revision == Revision::ZERO {
+                return Err(snapshot_invalid(
+                    "authority_log.latest_committed",
+                    "latest committed entry must be the positive head revision",
+                ));
+            }
+        } else if head_revision != Revision::ZERO {
+            return Err(snapshot_invalid(
+                "authority_log.head_revision",
+                "a non-zero head requires a latest committed entry",
+            ));
+        }
+
+        let mut retired_stages = BTreeMap::new();
+        for retired in retired_operation_stages {
+            if !valid_semantic_operation_id(&retired.operation_id) {
+                return Err(snapshot_invalid(
+                    "authority_log.retired_operation_stages.operation_id",
+                    "retired operation IDs must be valid semantic operation IDs",
+                ));
+            }
+            if retired_stages
+                .insert(
+                    retired.operation_id,
+                    authority_delivery_stage_rank(retired.stage),
+                )
+                .is_some()
+            {
+                return Err(snapshot_invalid(
+                    "authority_log.retired_operation_stages",
+                    "retired operation IDs must be unique",
+                ));
+            }
+        }
+        if retired_operation_order.len() as u64 > retain_capacity.get() {
+            return Err(snapshot_invalid(
+                "authority_log.retired_operation_order",
+                "retired operation order exceeds retention capacity",
+            ));
+        }
+        let retired_operation_order_set = retired_operation_order
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if retired_operation_order_set.len() != retired_operation_order.len()
+            || retired_operation_order_set
+                != retired_stages.keys().cloned().collect::<BTreeSet<_>>()
+        {
+            return Err(snapshot_invalid(
+                "authority_log.retired_operation_order",
+                "retired causal order must contain exactly the retired operation IDs",
+            ));
+        }
+
+        let mut restored = Self {
+            local_context,
+            peer_bindings,
+            owner_id,
+            retain_capacity,
+            delivery_backoff,
+            delivery_time_class,
+            max_delivery_attempts,
+            retained: BTreeMap::new(),
+            prepared: BTreeMap::new(),
+            next_token: next_prepared_token,
+            latest_committed,
+            head_revision,
+            retired_operation_stages: retired_stages,
+            retired_operation_order: VecDeque::from(retired_operation_order),
+            capacity_refusals,
+            send_failures,
+            disposed,
+        };
+
+        if let Some(entry) = restored.latest_committed.as_ref() {
+            restored
+                .validate_entry_shape(entry)
+                .map_err(|error| snapshot_invalid("authority_log.latest_committed", error.to_string()))?;
+        }
+
+        let mut timer_ids = BTreeSet::new();
+        for lease_snapshot in retained {
+            let revision = lease_snapshot.revision;
+            if revision == Revision::ZERO || revision > restored.head_revision {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.revision",
+                    "retained revisions must be positive and no greater than the head",
+                ));
+            }
+            let entry = authority_entry_from_snapshot(
+                &lease_snapshot.entry,
+                "authority_log.retained.entry",
+            )?;
+            if entry.revision != revision {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.revision",
+                    "retained revision must equal the decoded entry revision",
+                ));
+            }
+            restored
+                .validate_entry_shape(&entry)
+                .map_err(|error| snapshot_invalid("authority_log.retained.entry", error.to_string()))?;
+
+            let expected_owner = delivery_timer_owner(&restored.owner_id, revision)?;
+            if lease_snapshot.owner != expected_owner {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.owner",
+                    "delivery timer owner does not match the authority revision",
+                ));
+            }
+            let mut peer_stages = BTreeMap::new();
+            for stage in lease_snapshot.peer_stages {
+                let Some(expected_generation) = restored.peer_bindings.get(&stage.seat) else {
+                    return Err(snapshot_invalid(
+                        "authority_log.retained.peer_stages",
+                        "delivery stage names an unbound peer",
+                    ));
+                };
+                if *expected_generation != stage.generation {
+                    return Err(snapshot_invalid(
+                        "authority_log.retained.peer_stages",
+                        "delivery stage generation differs from its peer binding",
+                    ));
+                }
+                if peer_stages
+                    .insert(
+                        stage.seat,
+                        PeerStage {
+                            connection_generation: stage.generation,
+                            stage: authority_delivery_stage_rank(stage.stage),
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(snapshot_invalid(
+                        "authority_log.retained.peer_stages",
+                        "delivery peer stages must be unique",
+                    ));
+                }
+            }
+            if peer_stages.len() != restored.peer_bindings.len()
+                || peer_stages.keys().ne(restored.peer_bindings.keys())
+            {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.peer_stages",
+                    "every configured peer must retain exactly one delivery stage",
+                ));
+            }
+            let all_admitted = !peer_stages.is_empty()
+                && peer_stages
+                    .values()
+                    .all(|peer| peer.stage >= STAGE_ADMITTED);
+            if !peer_stages.is_empty() && lease_snapshot.subsumption_done != all_admitted {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.subsumption_done",
+                    "subsumption completion must equal the all-peers-admitted frontier",
+                ));
+            }
+            if !lease_snapshot.stopped && lease_snapshot.timer_id.is_none() {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.timer_id",
+                    "a live delivery lease must retain its scheduler timer",
+                ));
+            }
+            if lease_snapshot.next_delay_ms < restored.delivery_backoff.initial_ms
+                || lease_snapshot.next_delay_ms > restored.delivery_backoff.maximum_ms
+            {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.next_delay_ms",
+                    "delivery delay must remain within the configured backoff bounds",
+                ));
+            }
+            if let Some(timer_id) = lease_snapshot.timer_id
+                && !timer_ids.insert(timer_id)
+            {
+                return Err(snapshot_invalid(
+                    "authority_log.retained.timer_id",
+                    "delivery timer IDs must be unique",
+                ));
+            }
+
+            restored.retained.insert(
+                revision,
+                DeliveryLease {
+                    entry,
+                    owner: lease_snapshot.owner,
+                    peer_stages,
+                    timer_id: lease_snapshot.timer_id,
+                    attempts: lease_snapshot.attempts.as_u64(),
+                    next_delay_ms: lease_snapshot.next_delay_ms,
+                    stopped: lease_snapshot.stopped,
+                    subsumption_done: lease_snapshot.subsumption_done,
+                },
+            );
+        }
+
+        cross_check_authority_timers(&restored, scheduler)?;
+        Ok(restored)
+    }
+}
+
+fn snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn snapshot_canonical(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn authority_entry_snapshot(
+    entry: &AuthorityEntry,
+    path: &str,
+) -> Result<OpaqueAuthorityEntrySnapshotV2, SnapshotError> {
+    let canonical_bytes = er_canonical::canonical_bytes(entry)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    let snapshot = OpaqueAuthorityEntrySnapshotV2 {
+        identity: AuthorityEntryIdentitySnapshotV2 {
+            revision: entry.revision,
+            context: entry.context.clone(),
+            operation_id: entry.operation_id.clone(),
+            kind: entry.kind,
+            material_digest: entry.material.digest.clone(),
+            next_control_id: control_id_of(&entry.next_control),
+            subsumes: entry.subsumes.clone(),
+        },
+        canonical_entry_bytes: CanonicalHexBytes::from_bytes(&canonical_bytes),
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+fn authority_entry_from_snapshot(
+    snapshot: &OpaqueAuthorityEntrySnapshotV2,
+    path: &str,
+) -> Result<AuthorityEntry, SnapshotError> {
+    let encoded = snapshot.canonical_entry_bytes.as_str().as_bytes();
+    if encoded.is_empty() || !encoded.len().is_multiple_of(2) {
+        return Err(snapshot_canonical(
+            path,
+            "canonical entry bytes must be non-empty, even-length lowercase hex",
+        ));
+    }
+    let mut bytes = Vec::with_capacity(encoded.len() / 2);
+    for pair in encoded.chunks_exact(2) {
+        let high = snapshot_hex_value(pair[0]).ok_or_else(|| {
+            snapshot_canonical(path, "canonical entry bytes contain invalid hex")
+        })?;
+        let low = snapshot_hex_value(pair[1]).ok_or_else(|| {
+            snapshot_canonical(path, "canonical entry bytes contain invalid hex")
+        })?;
+        bytes.push((high << 4) | low);
+    }
+    let entry = serde_json::from_slice::<AuthorityEntry>(&bytes)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    let canonical_bytes = er_canonical::canonical_bytes(&entry)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    if canonical_bytes != bytes {
+        return Err(snapshot_canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
+    }
+    if entry.revision != snapshot.identity.revision
+        || entry.context != snapshot.identity.context
+        || entry.operation_id != snapshot.identity.operation_id
+        || entry.kind != snapshot.identity.kind
+        || entry.material.digest != snapshot.identity.material_digest
+        || entry.subsumes != snapshot.identity.subsumes
+        || control_id_of(&entry.next_control) != snapshot.identity.next_control_id
+    {
+        return Err(snapshot_invalid(
+            path,
+            "decoded AuthorityEntry identity differs from adjacent identity",
+        ));
+    }
+    Ok(entry)
+}
+
+fn snapshot_hex_value(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
+fn delivery_timer_owner(owner_id: &str, revision: Revision) -> Result<TimerOwner, SnapshotError> {
+    TimerOwner::new(
+        format!("{owner_id}:delivery:{revision}"),
+        format!("authority-log/delivery/{revision}"),
+        format!("redeliver revision {revision} until mechanical quorum"),
+    )
+    .map_err(|error| snapshot_invalid("authority_log.retained.owner", error.to_string()))
+}
+
+fn authority_delivery_stage(stage: i8) -> AuthorityDeliveryStageV2 {
+    match stage {
+        STAGE_NONE => AuthorityDeliveryStageV2::None,
+        STAGE_ADMITTED => AuthorityDeliveryStageV2::Admitted,
+        STAGE_MATERIAL_APPLIED => AuthorityDeliveryStageV2::MaterialApplied,
+        STAGE_CONTROL_INSTALLED => AuthorityDeliveryStageV2::ControlInstalled,
+        STAGE_PRESENTATION_SETTLED => AuthorityDeliveryStageV2::PresentationSettled,
+        _ => AuthorityDeliveryStageV2::None,
+    }
+}
+
+fn authority_delivery_stage_rank(stage: AuthorityDeliveryStageV2) -> i8 {
+    match stage {
+        AuthorityDeliveryStageV2::None => STAGE_NONE,
+        AuthorityDeliveryStageV2::Admitted => STAGE_ADMITTED,
+        AuthorityDeliveryStageV2::MaterialApplied => STAGE_MATERIAL_APPLIED,
+        AuthorityDeliveryStageV2::ControlInstalled => STAGE_CONTROL_INSTALLED,
+        AuthorityDeliveryStageV2::PresentationSettled => STAGE_PRESENTATION_SETTLED,
+    }
+}
+
+fn cross_check_authority_timers(
+    authority: &AuthorityLog,
+    scheduler: &KernelScheduler,
+) -> Result<(), SnapshotError> {
+    let mut expected_owners = BTreeMap::new();
+    for lease in authority.retained.values() {
+        let Some(timer_id) = lease.timer_id else {
+            continue;
+        };
+        let Some(timer) = scheduler.timer(timer_id) else {
+            return Err(snapshot_invalid(
+                "authority_log.retained.timer_id",
+                format!("delivery timer {timer_id} is absent from the restored scheduler"),
+            ));
+        };
+        if timer.endpoint != authority.local_context.sender_seat_id
+            || timer.owner != lease.owner
+            || timer.delay_ms != lease.next_delay_ms
+            || timer.time_class != authority.delivery_time_class
+        {
+            return Err(snapshot_invalid(
+                "authority_log.retained.timer_id",
+                format!("delivery timer {timer_id} does not match its restored lease"),
+            ));
+        }
+        if expected_owners.insert(lease.owner.clone(), timer_id).is_some() {
+            return Err(snapshot_invalid(
+                "authority_log.retained.owner",
+                "delivery timer owners must identify one retained lease each",
+            ));
+        }
+    }
+
+    // Reject orphaned timers carrying the authority delivery owner namespace;
+    // a scheduler containing unrelated owners remains usable by other kernel
+    // subsystems and is intentionally left untouched.
+    let owner_prefix = format!("{}:delivery:", authority.owner_id);
+    for timer in scheduler.live_timers() {
+        if !timer.owner.owner_id.starts_with(&owner_prefix) {
+            continue;
+        }
+        let Some(expected_timer_id) = expected_owners.get(&timer.owner) else {
+            return Err(snapshot_invalid(
+                "scheduler.timers",
+                format!("orphaned authority delivery timer {}", timer.timer_id),
+            ));
+        };
+        if *expected_timer_id != timer.timer_id {
+            return Err(snapshot_invalid(
+                "scheduler.timers",
+                "authority delivery owner is bound to the wrong timer ID",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_config(

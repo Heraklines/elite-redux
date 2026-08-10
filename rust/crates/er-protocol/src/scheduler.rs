@@ -47,6 +47,37 @@ pub enum SchedulerCommand {
     },
 }
 
+/// The scheduler's neutral, non-wire restoration projection.
+///
+/// This intentionally contains only public value types.  `er-kernel` converts
+/// it to and from `KernelSchedulerSnapshotV2` without depending on this
+/// module's private maps or introducing a protocol-to-kernel cycle.
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KernelSchedulerRestorableState {
+    pub next_timer_id: Option<SafeU53>,
+    pub timers: Vec<ScheduledTimer>,
+    pub pauses: Vec<KernelSchedulerPauseState>,
+    pub disposed: bool,
+}
+
+/// One exact scheduler pause-reason set in the neutral restoration projection.
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KernelSchedulerPauseState {
+    pub endpoint: SeatId,
+    pub time_class: TimeClass,
+    pub reasons: Vec<String>,
+}
+
+/// Failure while importing a neutral scheduler restoration projection.
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum SchedulerRestoreError {
+    #[error("scheduler restorable state field {path} is invalid: {reason}")]
+    Invalid { path: String, reason: String },
+}
+
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum SchedulerError {
     #[error("scheduler is disposed")]
@@ -287,6 +318,68 @@ impl KernelScheduler {
         self.timers.values().cloned().collect()
     }
 
+    /// Export every private scheduler field through the kernel-neutral seam.
+    #[doc(hidden)]
+    pub fn export_restorable_state(&self) -> KernelSchedulerRestorableState {
+        let mut timers = self.timers.values().cloned().collect::<Vec<_>>();
+        timers.sort_by_key(|timer| (timer.endpoint, timer.timer_id));
+        let pauses = self
+            .pause_reasons
+            .iter()
+            .map(|((endpoint, time_class), reasons)| KernelSchedulerPauseState {
+                endpoint: *endpoint,
+                time_class: *time_class,
+                reasons: reasons.iter().cloned().collect(),
+            })
+            .collect();
+        KernelSchedulerRestorableState {
+            next_timer_id: self.next_timer_id,
+            timers,
+            pauses,
+            disposed: self.disposed,
+        }
+    }
+
+    /// Import a neutral scheduler projection without replaying public schedule
+    /// or pause calls, allocating IDs, or emitting commands.
+    #[doc(hidden)]
+    pub fn import_restorable_state(
+        state: KernelSchedulerRestorableState,
+    ) -> Result<Self, SchedulerRestoreError> {
+        validate_restorable_state(&state)?;
+
+        let timers = state
+            .timers
+            .into_iter()
+            .map(|timer| (timer.timer_id, timer))
+            .collect::<BTreeMap<_, _>>();
+        let pause_reasons = state
+            .pauses
+            .into_iter()
+            .map(|pause| {
+                (
+                    (pause.endpoint, pause.time_class),
+                    pause.reasons.into_iter().collect::<BTreeSet<_>>(),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        Ok(Self {
+            timers,
+            pause_reasons,
+            next_timer_id: state.next_timer_id,
+            disposed: state.disposed,
+        })
+    }
+
+    /// Alias retained for integration code that names the constructor after
+    /// the restoration state rather than the transport-neutral seam.
+    #[doc(hidden)]
+    pub fn from_restorable_state(
+        state: KernelSchedulerRestorableState,
+    ) -> Result<Self, SchedulerRestoreError> {
+        Self::import_restorable_state(state)
+    }
+
     pub fn pending_timer_count(&self) -> SafeU53 {
         match SafeU53::new(self.timers.len() as u64) {
             Ok(count) => count,
@@ -306,15 +399,18 @@ impl KernelScheduler {
 
     pub fn dispose(&mut self) -> Vec<SchedulerCommand> {
         if self.disposed {
+            self.pause_reasons.clear();
             return Vec::new();
         }
 
         self.disposed = true;
         let timer_ids = self.timers.keys().copied().collect::<Vec<_>>();
-        timer_ids
+        let commands = timer_ids
             .into_iter()
             .filter_map(|timer_id| self.cancel(timer_id))
-            .collect()
+            .collect();
+        self.pause_reasons.clear();
+        commands
     }
 
     fn available_timer_ids(&self) -> u64 {
@@ -332,6 +428,91 @@ impl KernelScheduler {
         }
         Ok(())
     }
+}
+
+fn validate_restorable_state(
+    state: &KernelSchedulerRestorableState,
+) -> Result<(), SchedulerRestoreError> {
+    let invalid = |path: &str, reason: &str| SchedulerRestoreError::Invalid {
+        path: path.to_owned(),
+        reason: reason.to_owned(),
+    };
+
+    let timer_keys = state
+        .timers
+        .iter()
+        .map(|timer| (timer.endpoint, timer.timer_id))
+        .collect::<Vec<_>>();
+    if timer_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(invalid(
+            "timers",
+            "timers must be sorted by endpoint and timer ID without duplicates",
+        ));
+    }
+    let mut timer_ids = BTreeSet::new();
+    for timer in &state.timers {
+        if !timer_ids.insert(timer.timer_id) {
+            return Err(invalid(
+                "timers.timer_id",
+                "timer IDs must be unique across endpoints",
+            ));
+        }
+        if TimerOwner::new(
+            timer.owner.owner_id.clone(),
+            timer.owner.address.clone(),
+            timer.owner.reason.clone(),
+        )
+        .is_err()
+        {
+            return Err(invalid(
+                "timers.owner",
+                "timer owner ID, address, and reason must all be non-empty",
+            ));
+        }
+        if let Some(next_timer_id) = state.next_timer_id
+            && timer.timer_id.get() >= next_timer_id
+        {
+            return Err(invalid(
+                "next_timer_id",
+                "allocator cursor must be above every live timer ID",
+            ));
+        }
+    }
+
+    let pause_keys = state
+        .pauses
+        .iter()
+        .map(|pause| (pause.endpoint, pause.time_class))
+        .collect::<Vec<_>>();
+    if pause_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(invalid(
+            "pauses",
+            "pause keys must be sorted by endpoint and time class without duplicates",
+        ));
+    }
+    for pause in &state.pauses {
+        if pause.time_class == TimeClass::Absolute || pause.reasons.is_empty() {
+            return Err(invalid(
+                "pauses",
+                "absolute time cannot be paused and every pause key needs a reason",
+            ));
+        }
+        if pause.reasons.iter().any(String::is_empty)
+            || pause.reasons.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(invalid(
+                "pauses.reasons",
+                "pause reasons must be non-empty, lexical, and duplicate-free",
+            ));
+        }
+    }
+    if state.disposed && (!state.timers.is_empty() || !state.pauses.is_empty()) {
+        return Err(invalid(
+            "disposed",
+            "a disposed scheduler cannot retain timers or pause reasons",
+        ));
+    }
+    Ok(())
 }
 
 const DISCONNECTED_REASON: &str = "disconnected";
