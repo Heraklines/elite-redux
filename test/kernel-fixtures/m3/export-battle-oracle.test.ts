@@ -2995,10 +2995,7 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
   }
 }
 
-async function admitEnemyCommands(game: GameManager, id: string): Promise<void> {
-  if (id === "victory") {
-    return;
-  }
+async function admitEnemyCommands(game: GameManager): Promise<void> {
   const enemy = game.scene.getEnemyField(false);
   const targets = game.scene.getPlayerField(false);
   for (let index = 0; index < enemy.length; index++) {
@@ -3077,7 +3074,7 @@ async function exportCase(id: string, contentHash: string, sharedProvenance: Any
   if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
     registerReplacementPrompt(game);
   }
-  await admitEnemyCommands(game, id);
+  await admitEnemyCommands(game);
   const rawCommitted = JSON.parse(JSON.stringify(game.scene.currentBattle.turnCommands)) as AnyRecord;
   const admitted = committedCommands(game, rawCommitted, trace);
   const settledBoundary = await game.phaseInterceptor.toFirst([
