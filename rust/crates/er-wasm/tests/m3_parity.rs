@@ -5,7 +5,8 @@ use er_kernel::KernelInput;
 use er_wasm::m3_parity;
 use er_wasm::m3_parity::{
     M3_PARITY_FIXTURE_SCHEMA_VERSION, M3_PARITY_TRACE_ID, M3ParityError,
-    final_evidence_fixture, final_evidence_report_json, replay_eventwise,
+    final_evidence_fixture, final_evidence_report_json, final_evidence_trace_json,
+    parse_serialized_trace, replay_eventwise, replay_serialized_trace_json,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -22,18 +23,39 @@ fn assert_eventwise_contract() -> TestResult {
             .all(|event| matches!(&event.input, KernelInput::RawInput { .. })),
         "M3 parity fixture must cross the raw physical-input boundary for every event"
     );
+    assert_eq!(fixture.snapshot_boundary_after.get().get(), 3);
+    let serialized_trace = final_evidence_trace_json()?;
+    let parsed = parse_serialized_trace(&serialized_trace)?;
+    assert_eq!(parsed, fixture);
     let report = replay_eventwise(&fixture)?;
 
     assert_eq!(report.schema_version, M3_PARITY_FIXTURE_SCHEMA_VERSION);
     assert_eq!(report.trace_id, M3_PARITY_TRACE_ID);
     assert_eq!(report.seed, fixture.seed);
-    assert_eq!(report.observations.len(), fixture.events.len());
+    assert_eq!(
+        report.coverage.raw_event_count.get().get(),
+        fixture.events.len() as u64
+    );
+    assert!(report.coverage.presentation_settlement_count.get().get() > 0);
+    assert!(report.coverage.continuation_input_count.get().get() > 0);
+    assert_eq!(report.snapshot_boundary.after_raw_event.get().get(), 3);
+    assert_eq!(report.snapshot_boundary.snapshot_schema_version, 2);
+    assert!(report.snapshot_boundary.pending_presentation_count.get().get() > 0);
+    assert_eq!(
+        report.snapshot_boundary.snapshot_digest,
+        report.snapshot_boundary.restored_snapshot_digest
+    );
+    assert!(report
+        .observations
+        .iter()
+        .any(|observation| observation.input_kind == "BATTLE_PRESENTATION_OUTCOME"));
+    assert!(report
+        .observations
+        .iter()
+        .any(|observation| observation.battle_turn.get().get() > 1));
     for (index, observation) in report.observations.iter().enumerate() {
-        assert_eq!(observation.sequence.get(), (index + 1) as u64);
-        assert_eq!(
-            observation.virtual_time_ms,
-            fixture.events[index].virtual_time_ms
-        );
+        assert_eq!(observation.sequence.get().get(), (index + 1) as u64);
+        assert!(observation.virtual_time_ms <= fixture.events.last().unwrap().virtual_time_ms);
         assert!(!observation.effect_digest.is_empty());
         assert!(!observation.state_digest.is_empty());
         assert!(!observation.snapshot_digest.is_empty());
@@ -52,7 +74,7 @@ fn assert_eventwise_contract() -> TestResult {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn native_eventwise_m3_battle_trace_matches_an_independent_kernel() -> TestResult {
+fn native_m3_replays_the_serialized_production_trace() -> TestResult {
     assert_eventwise_contract()
 }
 
@@ -89,7 +111,8 @@ fn m3_eventwise_trace_is_registered_by_the_snapshot_coverage_contract() {
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn native_m3_eventwise_report_is_canonical_and_reproducible() -> TestResult {
-    let first = final_evidence_report_json()?;
+    let trace = final_evidence_trace_json()?;
+    let first = replay_serialized_trace_json(&trace)?;
     let second = final_evidence_report_json()?;
     assert_eq!(first, second);
     let value: serde_json::Value = serde_json::from_str(&first)?;
@@ -97,9 +120,23 @@ fn native_m3_eventwise_report_is_canonical_and_reproducible() -> TestResult {
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn native_m3_serialized_trace_emits_hosted_report_artifact() -> TestResult {
+    let trace = final_evidence_trace_json()?;
+    let report = replay_serialized_trace_json(&trace)?;
+    if let Some(directory) = std::env::var_os("M3_PARITY_ARTIFACT_DIR") {
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory)?;
+        std::fs::write(directory.join("trace.json"), trace.as_bytes())?;
+        std::fs::write(directory.join("native-report.json"), report.as_bytes())?;
+    }
+    Ok(())
+}
+
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
-fn wasm32_node_eventwise_m3_battle_trace_matches_the_native_trace_definition() -> TestResult {
+fn wasm32_node_replays_the_serialized_m3_production_trace() -> TestResult {
     assert_eventwise_contract()
 }
 
@@ -107,9 +144,11 @@ fn wasm32_node_eventwise_m3_battle_trace_matches_the_native_trace_definition() -
 #[wasm_bindgen_test::wasm_bindgen_test]
 fn wasm32_export_emits_the_shared_canonical_eventwise_report(
 ) -> Result<(), wasm_bindgen::JsValue> {
-    let direct = final_evidence_report_json()
+    let trace = final_evidence_trace_json()
         .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
-    let exported = m3_parity::final_evidence_report_json_wasm()?;
+    let direct = replay_serialized_trace_json(&trace)
+        .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
+    let exported = m3_parity::final_evidence_report_json_wasm(&trace)?;
     assert_eq!(exported, direct);
     Ok(())
 }

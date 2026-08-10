@@ -2933,6 +2933,19 @@ jobs:
           set -e
           exit "$install_status"
 
+      - name: Emit hosted native M3 report from the serialized trace
+        if: steps.contract.outputs.ready == 'true'
+        env:
+          M3_PARITY_ARTIFACT_DIR: ${{ github.workspace }}/m3-native-wasm-artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$M3_PARITY_ARTIFACT_DIR" rust-ci-summary
+          cargo test --manifest-path rust/Cargo.toml -p er-wasm --test m3_parity \
+            native_m3_serialized_trace_emits_hosted_report_artifact --exact --nocapture \
+            2>&1 | tee rust-ci-summary/native-report.log
+          test -s "$M3_PARITY_ARTIFACT_DIR/trace.json"
+          test -s "$M3_PARITY_ARTIFACT_DIR/native-report.json"
+
       - name: Run wasm32 er-wasm tests through Node
         if: steps.contract.outputs.ready == 'true'
         env:
@@ -2948,7 +2961,175 @@ jobs:
           set -e
           exit "$wasm_status"
 
-      - name: Write compact job summary and schema hash
+      - name: Build the wasm32/Node report runner
+        if: steps.contract.outputs.ready == 'true'
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: |
+          set -euo pipefail
+          wasm-pack build --release --target nodejs \
+            --out-dir "$RUNNER_TEMP/m3-er-wasm" \
+            "${{ steps.er-wasm.outputs.directory }}" \
+            2>&1 | tee rust-ci-summary/wasm-build.log
+
+      - name: Emit wasm32/Node report from the native serialized trace
+        if: steps.contract.outputs.ready == 'true'
+        env:
+          M3_TRACE_PATH: ${{ github.workspace }}/m3-native-wasm-artifacts/trace.json
+          M3_WASM_PACKAGE: ${{ runner.temp }}/m3-er-wasm
+          M3_WASM_REPORT_PATH: ${{ github.workspace }}/m3-native-wasm-artifacts/wasm-report.json
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const trace = fs.readFileSync(process.env.M3_TRACE_PATH, "utf8");
+          const wasm = require(path.resolve(process.env.M3_WASM_PACKAGE));
+          const report = wasm.replayM3FinalEvidence(trace);
+          if (typeof report !== "string" || report.length === 0) {
+            throw new Error("wasm32/Node M3 export returned no canonical report");
+          }
+          fs.writeFileSync(process.env.M3_WASM_REPORT_PATH, report, "utf8");
+          NODE
+          test -s "$M3_WASM_REPORT_PATH"
+
+      - name: Compare native and wasm M3 report bytes and digests
+        if: steps.contract.outputs.ready == 'true'
+        env:
+          M3_TRACE_PATH: ${{ github.workspace }}/m3-native-wasm-artifacts/trace.json
+          M3_NATIVE_REPORT_PATH: ${{ github.workspace }}/m3-native-wasm-artifacts/native-report.json
+          M3_WASM_REPORT_PATH: ${{ github.workspace }}/m3-native-wasm-artifacts/wasm-report.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          trace_path = Path(os.environ["M3_TRACE_PATH"])
+          native_path = Path(os.environ["M3_NATIVE_REPORT_PATH"])
+          wasm_path = Path(os.environ["M3_WASM_REPORT_PATH"])
+          summary_path = Path("rust-ci-summary/m3-parity-summary.txt")
+          divergence_path = Path("rust-ci-summary/m3-cross-target-divergence.txt")
+
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          trace_digest = digest(trace_path)
+          native_digest = digest(native_path)
+          wasm_digest = digest(wasm_path)
+          native_bytes = native_path.read_bytes()
+          wasm_bytes = wasm_path.read_bytes()
+
+          try:
+              native = json.loads(native_bytes)
+              wasm = json.loads(wasm_bytes)
+          except Exception as error:
+              divergence_path.write_text(
+                  f"report JSON could not be decoded: {error}\n",
+                  encoding="utf-8",
+              )
+              raise
+
+          if trace_digest != native.get("trace_digest") or trace_digest != wasm.get("trace_digest"):
+              divergence_path.write_text(
+                  "trace digest mismatch\n"
+                  f"artifact_sha256={trace_digest}\n"
+                  f"native_report_trace_digest={native.get('trace_digest')}\n"
+                  f"wasm_report_trace_digest={wasm.get('trace_digest')}\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit("M3 native/wasm trace digest mismatch")
+
+          if native_bytes != wasm_bytes:
+              native_observations = native.get("observations", [])
+              wasm_observations = wasm.get("observations", [])
+              divergence = None
+              if len(native_observations) != len(wasm_observations):
+                  divergence = (
+                      "observation_count",
+                      str(len(native_observations)),
+                      str(len(wasm_observations)),
+                      None,
+                  )
+              else:
+                  fields = (
+                      "sequence",
+                      "virtual_time_ms",
+                      "input_kind",
+                      "battle_turn",
+                      "effect_digest",
+                      "state_digest",
+                      "snapshot_digest",
+                      "ui_projection_digest",
+                      "live_resources",
+                      "live_resources_digest",
+                  )
+                  for index, (left, right) in enumerate(zip(native_observations, wasm_observations)):
+                      for field in fields:
+                          if left.get(field) != right.get(field):
+                              divergence = (
+                                  field,
+                                  json.dumps(left.get(field), sort_keys=True),
+                                  json.dumps(right.get(field), sort_keys=True),
+                                  index,
+                              )
+                              break
+                      if divergence is not None:
+                          break
+                  if divergence is None:
+                      divergence = (
+                          "report_metadata" if native != wasm else "report_bytes",
+                          json.dumps(native, sort_keys=True),
+                          json.dumps(wasm, sort_keys=True),
+                          None,
+                      )
+
+              field, left, right, index = divergence
+              if index is None:
+                  detail = f"field={field} left={left} right={right}"
+              else:
+                  observation = native_observations[index]
+                  detail = (
+                      f"sequence={observation.get('sequence')} "
+                      f"virtual_time_ms={observation.get('virtual_time_ms')} "
+                      f"field={field} left={left} right={right}"
+                  )
+              divergence_path.write_text(
+                  "first cross-target divergence\n"
+                  f"{detail}\n"
+                  f"native_sha256={native_digest}\n"
+                  f"wasm_sha256={wasm_digest}\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit(f"M3 native/wasm report divergence: {detail}")
+
+          coverage = native.get("coverage", {})
+          boundary = native.get("snapshot_boundary", {})
+          summary_path.write_text(
+              "\n".join(
+                  (
+                      "status=passed",
+                      f"trace_sha256={trace_digest}",
+                      f"native_report_sha256={native_digest}",
+                      f"wasm_report_sha256={wasm_digest}",
+                      f"observations={len(native.get('observations', []))}",
+                      f"raw_events={coverage.get('raw_event_count')}",
+                      f"presentation_settlements={coverage.get('presentation_settlement_count')}",
+                      f"continuation_inputs={coverage.get('continuation_input_count')}",
+                      f"snapshot_boundary_after_raw_event={boundary.get('after_raw_event')}",
+                      f"pending_presentation_count={boundary.get('pending_presentation_count')}",
+                  )
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          print(summary_path.read_text(encoding="utf-8"), end="")
+          PY
+
+      - name: Write compact job summary and report digests
         if: always()
         shell: bash
         env:
@@ -2963,13 +3144,12 @@ jobs:
             echo "contract_status=${CONTRACT_STATUS:-unknown}"
             echo "status=${JOB_STATUS:-unknown}"
           } > rust-ci-summary/summary.txt
-          schema_file="$(find schemas/kernel -type f -print -quit 2>/dev/null || true)"
-          if [[ -n "$schema_file" ]]; then
-            find schemas/kernel -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 > rust-ci-summary/schema-hash.txt
-          else
-            echo "pre-contract: schemas/kernel is absent" > rust-ci-summary/schema-hash.txt
+          if [[ -f m3-native-wasm-artifacts/native-report.json && -f m3-native-wasm-artifacts/wasm-report.json ]]; then
+            sha256sum m3-native-wasm-artifacts/trace.json \
+              m3-native-wasm-artifacts/native-report.json \
+              m3-native-wasm-artifacts/wasm-report.json \
+              > rust-ci-summary/report-artifact-sha256.txt
           fi
-          find . -type f -iname '*benchmark*.json' -not -path './.git/*' -not -path './node_modules/*' -print | sort > rust-ci-summary/benchmark-json-files.txt
 
       - name: Upload compact success evidence
         if: success()
@@ -2977,9 +3157,12 @@ jobs:
         with:
           name: rust-kernel-${{ github.job }}-success
           path: |
-            rust-ci-summary/**
-            rust-ci-benchmarks/**/*.json
-            **/*benchmark*.json
+            rust-ci-summary/summary.txt
+            rust-ci-summary/m3-parity-summary.txt
+            rust-ci-summary/report-artifact-sha256.txt
+            m3-native-wasm-artifacts/trace.json
+            m3-native-wasm-artifacts/native-report.json
+            m3-native-wasm-artifacts/wasm-report.json
           retention-days: 7
           if-no-files-found: warn
 
@@ -2990,24 +3173,7 @@ jobs:
           name: rust-kernel-${{ github.job }}-failure
           path: |
             rust-ci-summary/**
-            rust-ci-benchmarks/**/*.json
-            **/*trace*
-            **/*seed*
-            **/*divergence*
-            **/*digest*
-            **/*live-resource*
-            **/*live_resource*
-            **/trace/**
-            **/traces/**
-            **/seed/**
-            **/seeds/**
-            **/divergence/**
-            **/divergences/**
-            **/digest/**
-            **/digests/**
-            **/live-resources/**
-            **/live_resources/**
-            **/resources/**
+            m3-native-wasm-artifacts/**
           retention-days: 14
           if-no-files-found: warn
 

@@ -2,22 +2,23 @@
 //!
 //! This adapter deliberately owns no battle mechanics.  It constructs the
 //! same `GameKernel::new_battle` boundary used by the native and wasm32
-//! targets, feeds only raw physical events, and compares the observations
-//! published after each drained external event.  A second kernel in the same
-//! target is the deterministic control run; the wasm32 test invokes this
-//! exact module through wasm-bindgen so the two targets consume one trace
-//! definition rather than two hand-written drivers.
+//! targets, feeds one canonical serialized raw-input trace, and records the
+//! observations published after each drained external event.  The report also
+//! crosses a real V2 snapshot/destroy/restore boundary and settles the
+//! presentation events emitted by the production kernel.  Hosted CI compares
+//! the native artifact with the wasm32/Node artifact from that same trace.
 
 use std::fmt;
 use std::sync::Arc;
 
-use er_canonical::{canonicalize_value, content_digest};
+use er_canonical::{canonicalize_value, content_digest, fixture_digest};
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
 };
+use er_kernel::snapshot::RestorableKernelSnapshotV2;
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::format::BattleFormat;
@@ -37,13 +38,13 @@ use er_types::{
     ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
     RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
-use serde_json::json;
+use serde_json::{Value, json};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-pub const M3_PARITY_FIXTURE_SCHEMA_VERSION: u32 = 1;
-pub const M3_PARITY_TRACE_ID: &str = "m3-local-battle-raw-eventwise-v1";
+pub const M3_PARITY_FIXTURE_SCHEMA_VERSION: u32 = 2;
+pub const M3_PARITY_TRACE_ID: &str = "m3-local-battle-native-wasm-v2";
 pub const M3_PARITY_SEED: &str = "1469598103934665603";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -57,6 +58,7 @@ pub struct M3ParityFixture {
     pub schema_version: u32,
     pub trace_id: String,
     pub seed: String,
+    pub snapshot_boundary_after: SafeU53,
     pub events: Vec<M3ParityEvent>,
 }
 
@@ -64,6 +66,8 @@ pub struct M3ParityFixture {
 pub struct M3ParityObservation {
     pub sequence: SafeU53,
     pub virtual_time_ms: SafeU53,
+    pub input_kind: String,
+    pub battle_turn: TurnIndex,
     pub effect_digest: String,
     pub state_digest: String,
     pub snapshot_digest: String,
@@ -73,20 +77,32 @@ pub struct M3ParityObservation {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct M3ParityCoverage {
+    pub raw_event_count: SafeU53,
+    pub presentation_settlement_count: SafeU53,
+    pub continuation_input_count: SafeU53,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct M3ParitySnapshotBoundary {
+    pub after_raw_event: SafeU53,
+    pub virtual_time_ms: SafeU53,
+    pub snapshot_schema_version: u32,
+    pub snapshot_digest: String,
+    pub snapshot_bytes_digest: String,
+    pub restored_snapshot_digest: String,
+    pub pending_presentation_count: SafeU53,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct M3ParityReport {
     pub schema_version: u32,
     pub trace_id: String,
     pub seed: String,
+    pub trace_digest: String,
+    pub coverage: M3ParityCoverage,
+    pub snapshot_boundary: M3ParitySnapshotBoundary,
     pub observations: Vec<M3ParityObservation>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct M3ParityDivergence {
-    pub sequence: SafeU53,
-    pub virtual_time_ms: SafeU53,
-    pub field: &'static str,
-    pub left: String,
-    pub right: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -98,11 +114,14 @@ pub enum M3ParityError {
         side: &'static str,
         reason: String,
     },
+    Snapshot {
+        stage: &'static str,
+        reason: String,
+    },
     Canonical {
         field: &'static str,
         reason: String,
     },
-    Divergence(M3ParityDivergence),
 }
 
 impl fmt::Display for M3ParityError {
@@ -122,18 +141,12 @@ impl fmt::Display for M3ParityError {
                 formatter,
                 "M3 {side} kernel rejected event {sequence}: {reason}"
             ),
+            Self::Snapshot { stage, reason } => {
+                write!(formatter, "M3 snapshot {stage} failed: {reason}")
+            }
             Self::Canonical { field, reason } => {
                 write!(formatter, "could not canonicalize M3 parity {field}: {reason}")
             }
-            Self::Divergence(divergence) => write!(
-                formatter,
-                "M3 eventwise divergence at sequence {} virtual_time_ms {} in {}: left={} right={}",
-                divergence.sequence,
-                divergence.virtual_time_ms,
-                divergence.field,
-                divergence.left,
-                divergence.right,
-            ),
         }
     }
 }
@@ -317,12 +330,23 @@ fn protocol_config() -> Result<BattleProtocolConfig, M3ParityError> {
     })
 }
 
-pub fn new_battle_kernel(seed: &str) -> Result<GameKernel, M3ParityError> {
-    let content = selected_content_pack()
-        .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
-    let config = battle_config(seed, &content)?;
-    GameKernel::new_battle(config, protocol_config()?, Arc::new(content))
+fn selected_content() -> Result<Arc<ContentPack>, M3ParityError> {
+    selected_content_pack()
+        .map(Arc::new)
         .map_err(|error| M3ParityError::Configuration(error.to_string()))
+}
+
+fn new_battle_kernel_with_content(
+    seed: &str,
+    content: Arc<ContentPack>,
+) -> Result<GameKernel, M3ParityError> {
+    let config = battle_config(seed, content.as_ref())?;
+    GameKernel::new_battle(config, protocol_config()?, content)
+        .map_err(|error| M3ParityError::Configuration(error.to_string()))
+}
+
+pub fn new_battle_kernel(seed: &str) -> Result<GameKernel, M3ParityError> {
+    new_battle_kernel_with_content(seed, selected_content()?)
 }
 
 fn key_down(code: PhysicalKey) -> RawInputEvent {
@@ -348,24 +372,22 @@ fn raw_event(virtual_time_ms: u64, event: RawInputEvent) -> M3ParityEvent {
     }
 }
 
-/// The final-evidence trace is intentionally raw-key-only and ends at a
-/// quiescent menu boundary.  It exercises the command root, Fight menu,
-/// cancellation, and deterministic navigation without inventing oracle
-/// mechanics or a fabricated expected digest.
+/// The final-evidence trace is intentionally raw-key-only.  It crosses the
+/// command root, selects a real move, resolves a real turn, and then continues
+/// the held physical input after the serialized snapshot boundary. Presentation
+/// settlement is derived only from the production kernel's emitted event IDs;
+/// no command or mechanics oracle is embedded in this adapter.
 pub fn final_evidence_fixture() -> M3ParityFixture {
     M3ParityFixture {
         schema_version: M3_PARITY_FIXTURE_SCHEMA_VERSION,
         trace_id: M3_PARITY_TRACE_ID.to_owned(),
         seed: M3_PARITY_SEED.to_owned(),
+        snapshot_boundary_after: safe(3),
         events: vec![
             raw_event(0, key_down(PhysicalKey::Enter)),
             raw_event(1, key_up(PhysicalKey::Enter)),
-            raw_event(2, key_down(PhysicalKey::Backspace)),
-            raw_event(3, key_up(PhysicalKey::Backspace)),
-            raw_event(4, key_down(PhysicalKey::ArrowDown)),
-            raw_event(5, key_up(PhysicalKey::ArrowDown)),
-            raw_event(6, key_down(PhysicalKey::ArrowUp)),
-            raw_event(7, key_up(PhysicalKey::ArrowUp)),
+            raw_event(2, key_down(PhysicalKey::Enter)),
+            raw_event(3, key_up(PhysicalKey::Enter)),
         ],
     }
 }
@@ -381,6 +403,7 @@ fn observe(
     kernel: &GameKernel,
     sequence: SafeU53,
     virtual_time_ms: SafeU53,
+    input_kind: &str,
     effects: &[KernelEffect],
 ) -> Result<M3ParityObservation, M3ParityError> {
     let projection = kernel
@@ -399,6 +422,8 @@ fn observe(
     Ok(M3ParityObservation {
         sequence,
         virtual_time_ms,
+        input_kind: input_kind.to_owned(),
+        battle_turn: projection.turn,
         effect_digest,
         state_digest: kernel.state_digest(),
         snapshot_digest,
@@ -412,62 +437,21 @@ fn step_observation(
     kernel: &mut GameKernel,
     event: &M3ParityEvent,
     sequence: SafeU53,
-    side: &'static str,
 ) -> Result<M3ParityObservation, M3ParityError> {
     let effects = kernel
         .step(event.input.clone())
         .map_err(|error| M3ParityError::Kernel {
             sequence,
-            side,
+            side: "trace",
             reason: error.to_string(),
         })?;
-    observe(kernel, sequence, event.virtual_time_ms, &effects)
-}
-
-fn first_divergence(
-    left: &M3ParityObservation,
-    right: &M3ParityObservation,
-) -> Option<M3ParityDivergence> {
-    let fields = [
-        ("effect_digest", &left.effect_digest, &right.effect_digest),
-        ("state_digest", &left.state_digest, &right.state_digest),
-        (
-            "snapshot_digest",
-            &left.snapshot_digest,
-            &right.snapshot_digest,
-        ),
-        (
-            "ui_projection_digest",
-            &left.ui_projection_digest,
-            &right.ui_projection_digest,
-        ),
-        (
-            "live_resources_digest",
-            &left.live_resources_digest,
-            &right.live_resources_digest,
-        ),
-    ];
-    for (field, left_value, right_value) in fields {
-        if left_value != right_value {
-            return Some(M3ParityDivergence {
-                sequence: left.sequence,
-                virtual_time_ms: left.virtual_time_ms,
-                field,
-                left: left_value.clone(),
-                right: right_value.clone(),
-            });
-        }
-    }
-    if left.live_resources != right.live_resources {
-        return Some(M3ParityDivergence {
-            sequence: left.sequence,
-            virtual_time_ms: left.virtual_time_ms,
-            field: "live_resources",
-            left: format!("{:?}", left.live_resources),
-            right: format!("{:?}", right.live_resources),
-        });
-    }
-    None
+    observe(
+        kernel,
+        sequence,
+        event.virtual_time_ms,
+        "RAW_INPUT",
+        &effects,
+    )
 }
 
 fn validate_fixture(fixture: &M3ParityFixture) -> Result<(), M3ParityError> {
@@ -498,6 +482,13 @@ fn validate_fixture(fixture: &M3ParityFixture) -> Result<(), M3ParityError> {
             "eventwise trace must not be empty".to_owned(),
         ));
     }
+    let boundary = fixture.snapshot_boundary_after.get().get() as usize;
+    if boundary == 0 || boundary >= fixture.events.len() {
+        return Err(M3ParityError::InvalidFixture(format!(
+            "snapshot boundary {} must be before the final event",
+            fixture.snapshot_boundary_after
+        )));
+    }
     let mut previous_time = SafeU53::ZERO;
     for (index, event) in fixture.events.iter().enumerate() {
         if !matches!(&event.input, KernelInput::RawInput { .. }) {
@@ -515,66 +506,378 @@ fn validate_fixture(fixture: &M3ParityFixture) -> Result<(), M3ParityError> {
     Ok(())
 }
 
-/// Replay the same raw-input trace through two independent production Battle
-/// kernels and retain every post-event observation.  No expected digest is
-/// checked into source: hosted/native and wasm32 runs establish equality from
-/// the same deterministic trace and report the first field-level divergence.
+fn fixture_value(fixture: &M3ParityFixture) -> Value {
+    json!({
+        "schema_version": fixture.schema_version,
+        "trace_id": fixture.trace_id,
+        "seed": fixture.seed,
+        "snapshot_boundary_after": fixture.snapshot_boundary_after,
+        "events": fixture
+            .events
+            .iter()
+            .map(|event| {
+                json!({
+                    "virtual_time_ms": event.virtual_time_ms,
+                    "input": event.input,
+                })
+            })
+            .collect::<Vec<_>>(),
+    })
+}
+
+fn canonical_fixture_json(fixture: &M3ParityFixture) -> Result<String, M3ParityError> {
+    let value = fixture_value(fixture);
+    canonicalize_value(&value).map_err(|error| canonical_error("serialized_trace", error))
+}
+
+/// Serialize the one deterministic production input trace consumed by both
+/// hosted native and wasm32/Node evidence runs.
+pub fn final_evidence_trace_json() -> Result<String, M3ParityError> {
+    canonical_fixture_json(&final_evidence_fixture())
+}
+
+/// Parse the exact serialized trace artifact before any kernel is constructed.
+pub fn parse_serialized_trace(input: &str) -> Result<M3ParityFixture, M3ParityError> {
+    let value: Value = serde_json::from_str(input)
+        .map_err(|error| M3ParityError::InvalidFixture(format!("trace JSON is invalid: {error}")))?;
+    let object = value.as_object().ok_or_else(|| {
+        M3ParityError::InvalidFixture("serialized trace root must be an object".to_owned())
+    })?;
+    let schema_version = object
+        .get("schema_version")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| {
+            M3ParityError::InvalidFixture("trace schema_version must be a u32".to_owned())
+        })?;
+    let trace_id = object
+        .get("trace_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            M3ParityError::InvalidFixture("trace trace_id must be a string".to_owned())
+        })?
+        .to_owned();
+    let seed = object
+        .get("seed")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            M3ParityError::InvalidFixture("trace seed must be a string".to_owned())
+        })?
+        .to_owned();
+    let snapshot_boundary_after: SafeU53 = serde_json::from_value(
+        object
+            .get("snapshot_boundary_after")
+            .cloned()
+            .ok_or_else(|| {
+                M3ParityError::InvalidFixture(
+                    "trace snapshot_boundary_after is missing".to_owned(),
+                )
+            })?,
+    )
+    .map_err(|error| {
+        M3ParityError::InvalidFixture(format!(
+            "trace snapshot_boundary_after is invalid: {error}"
+        ))
+    })?;
+    let events = object
+        .get("events")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            M3ParityError::InvalidFixture("trace events must be an array".to_owned())
+        })?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let event = value.as_object().ok_or_else(|| {
+                M3ParityError::InvalidFixture(format!("trace event {index} must be an object"))
+            })?;
+            let virtual_time_ms: SafeU53 = serde_json::from_value(
+                event
+                    .get("virtual_time_ms")
+                    .cloned()
+                    .ok_or_else(|| {
+                        M3ParityError::InvalidFixture(format!(
+                            "trace event {index} is missing virtual_time_ms"
+                        ))
+                    })?,
+            )
+            .map_err(|error| {
+                M3ParityError::InvalidFixture(format!(
+                    "trace event {index} virtual_time_ms is invalid: {error}"
+                ))
+            })?;
+            let input: KernelInput = serde_json::from_value(
+                event.get("input").cloned().ok_or_else(|| {
+                    M3ParityError::InvalidFixture(format!(
+                        "trace event {index} is missing input"
+                    ))
+                })?,
+            )
+            .map_err(|error| {
+                M3ParityError::InvalidFixture(format!(
+                    "trace event {index} input is invalid: {error}"
+                ))
+            })?;
+            Ok(M3ParityEvent {
+                virtual_time_ms,
+                input,
+            })
+        })
+        .collect::<Result<Vec<_>, M3ParityError>>()?;
+    let fixture = M3ParityFixture {
+        schema_version,
+        trace_id,
+        seed,
+        snapshot_boundary_after,
+        events,
+    };
+    validate_fixture(&fixture)?;
+    let canonical = canonical_fixture_json(&fixture)?;
+    let input_without_final_newline = input.strip_suffix('\n').unwrap_or(input);
+    if input_without_final_newline != canonical {
+        return Err(M3ParityError::InvalidFixture(
+            "serialized trace is not canonical".to_owned(),
+        ));
+    }
+    Ok(fixture)
+}
+
+fn snapshot_error(stage: &'static str, error: impl fmt::Display) -> M3ParityError {
+    M3ParityError::Snapshot {
+        stage,
+        reason: error.to_string(),
+    }
+}
+
+fn restore_from_v2_snapshot(
+    kernel: GameKernel,
+    content: &Arc<ContentPack>,
+    after_raw_event: SafeU53,
+    virtual_time_ms: SafeU53,
+) -> Result<(GameKernel, M3ParitySnapshotBoundary), M3ParityError> {
+    let snapshot = kernel
+        .snapshot_v2()
+        .map_err(|error| snapshot_error("capture", error))?;
+    let pending_presentation_count = snapshot.pending_presentations.pending_barrier_ids.len();
+    if pending_presentation_count == 0 {
+        return Err(M3ParityError::InvalidFixture(
+            "snapshot boundary did not retain a presentation continuation".to_owned(),
+        ));
+    }
+    let snapshot_digest = content_digest(&snapshot).map_err(|error| snapshot_error("digest", error))?;
+    let snapshot_bytes_digest =
+        fixture_digest(&snapshot).map_err(|error| snapshot_error("bytes digest", error))?;
+    let snapshot_value = serde_json::to_value(&snapshot)
+        .map_err(|error| snapshot_error("serialize", error))?;
+    let snapshot_wire = canonicalize_value(&snapshot_value)
+        .map_err(|error| snapshot_error("canonicalize", error))?;
+    let decoded: RestorableKernelSnapshotV2 = serde_json::from_str(&snapshot_wire)
+        .map_err(|error| snapshot_error("deserialize", error))?;
+
+    // This explicit drop is the production ownership boundary: continuation
+    // must come from the V2 wire snapshot, never from a cloned live kernel.
+    drop(kernel);
+    let restored = GameKernel::from_snapshot(decoded, Arc::clone(content))
+        .map_err(|error| snapshot_error("restore", error))?;
+    let restored_snapshot = restored
+        .snapshot_v2()
+        .map_err(|error| snapshot_error("restored capture", error))?;
+    if restored_snapshot != snapshot {
+        return Err(M3ParityError::Snapshot {
+            stage: "restore",
+            reason: "restored V2 snapshot differs before continuation".to_owned(),
+        });
+    }
+    let restored_snapshot_digest = content_digest(&restored_snapshot)
+        .map_err(|error| snapshot_error("restored digest", error))?;
+    let pending_presentation_count = u64::try_from(pending_presentation_count)
+        .map_err(|error| snapshot_error("pending presentation count", error))?;
+    Ok((
+        restored,
+        M3ParitySnapshotBoundary {
+            after_raw_event,
+            virtual_time_ms,
+            snapshot_schema_version: snapshot.schema_version,
+            snapshot_digest,
+            snapshot_bytes_digest,
+            restored_snapshot_digest,
+            pending_presentation_count: safe(pending_presentation_count),
+        },
+    ))
+}
+
+fn settle_pending_presentations(
+    kernel: &mut GameKernel,
+    virtual_time_ms: SafeU53,
+    next_sequence: &mut u64,
+    observations: &mut Vec<M3ParityObservation>,
+    settlement_count: &mut u64,
+    continuation_input_count: &mut u64,
+) -> Result<(), M3ParityError> {
+    loop {
+        let pending = kernel
+            .snapshot_v2()
+            .map_err(|error| snapshot_error("presentation capture", error))?
+            .pending_presentations
+            .pending_barrier_ids;
+        if pending.is_empty() {
+            return Ok(());
+        }
+        for event_id in pending {
+            let sequence = safe(*next_sequence);
+            *next_sequence = (*next_sequence).saturating_add(1);
+            let effects = kernel
+                .step(KernelInput::BattlePresentationOutcome {
+                    endpoint: seat(1),
+                    event_id,
+                    outcome: er_types::battle_ui::PresentationSettlementOutcome::Settled,
+                })
+                .map_err(|error| M3ParityError::Kernel {
+                    sequence,
+                    side: "presentation",
+                    reason: error.to_string(),
+                })?;
+            observations.push(observe(
+                kernel,
+                sequence,
+                virtual_time_ms,
+                "BATTLE_PRESENTATION_OUTCOME",
+                &effects,
+            )?);
+            *settlement_count = (*settlement_count).saturating_add(1);
+            *continuation_input_count = (*continuation_input_count).saturating_add(1);
+        }
+    }
+}
+
+/// Replay one serialized raw-input trace through one production Battle kernel.
+/// The report contains the real kernel observations, presentation outcomes,
+/// and an explicit V2 snapshot destroy/restore continuation boundary.  Native
+/// and wasm32/Node runs emit this same canonical report shape; CI compares the
+/// two independent target artifacts.
 pub fn replay_eventwise(
     fixture: &M3ParityFixture,
 ) -> Result<M3ParityReport, M3ParityError> {
     validate_fixture(fixture)?;
-    let mut left = new_battle_kernel(&fixture.seed)?;
-    let mut right = new_battle_kernel(&fixture.seed)?;
-    let mut observations = Vec::with_capacity(fixture.events.len());
+    let content = selected_content()?;
+    let mut kernel = new_battle_kernel_with_content(&fixture.seed, Arc::clone(&content))?;
+    let mut observations = Vec::with_capacity(fixture.events.len() + 4);
+    let mut next_sequence = 1_u64;
+    let mut settlement_count = 0_u64;
+    let mut continuation_input_count = 0_u64;
+    let mut boundary = None;
     for (index, event) in fixture.events.iter().enumerate() {
-        let sequence = safe((index + 1) as u64);
-        let left_observation = step_observation(&mut left, event, sequence, "left")?;
-        let right_observation = step_observation(&mut right, event, sequence, "right")?;
-        if let Some(divergence) = first_divergence(&left_observation, &right_observation) {
-            return Err(M3ParityError::Divergence(divergence));
+        let sequence = safe(next_sequence);
+        next_sequence = next_sequence.saturating_add(1);
+        let observation = step_observation(&mut kernel, event, sequence)?;
+        if index + 1 == fixture.snapshot_boundary_after.get().get() as usize {
+            let (restored, snapshot_boundary) = restore_from_v2_snapshot(
+                kernel,
+                &content,
+                safe((index + 1) as u64),
+                event.virtual_time_ms,
+            )?;
+            kernel = restored;
+            boundary = Some(snapshot_boundary);
         }
-        observations.push(left_observation);
+        if index + 1 > fixture.snapshot_boundary_after.get().get() as usize {
+            continuation_input_count = continuation_input_count.saturating_add(1);
+        }
+        observations.push(observation);
+        settle_pending_presentations(
+            &mut kernel,
+            event.virtual_time_ms,
+            &mut next_sequence,
+            &mut observations,
+            &mut settlement_count,
+            &mut continuation_input_count,
+        )?;
     }
+
+    if settlement_count == 0 {
+        return Err(M3ParityError::InvalidFixture(
+            "trace did not produce a presentation continuation".to_owned(),
+        ));
+    }
+    let snapshot_boundary = boundary.ok_or_else(|| {
+        M3ParityError::InvalidFixture("trace did not execute its snapshot boundary".to_owned())
+    })?;
     Ok(M3ParityReport {
         schema_version: fixture.schema_version,
         trace_id: fixture.trace_id.clone(),
         seed: fixture.seed.clone(),
+        trace_digest: fixture_digest(&fixture_value(fixture))
+            .map_err(|error| canonical_error("trace_digest", error))?,
+        coverage: M3ParityCoverage {
+            raw_event_count: safe(fixture.events.len() as u64),
+            presentation_settlement_count: safe(settlement_count),
+            continuation_input_count: safe(continuation_input_count),
+        },
+        snapshot_boundary,
         observations,
     })
 }
 
-/// Canonical byte artifact consumed by the hosted native/wasm32 comparison.
-/// Digests are produced by the kernel at runtime and are never frozen into a
-/// source fixture as invented evidence.
-pub fn final_evidence_report_json() -> Result<String, M3ParityError> {
-    let report = replay_eventwise(&final_evidence_fixture())?;
-    let observations = report
-        .observations
-        .iter()
-        .map(|observation| {
-            json!({
-                "sequence": observation.sequence,
-                "virtual_time_ms": observation.virtual_time_ms,
-                "effect_digest": observation.effect_digest,
-                "state_digest": observation.state_digest,
-                "snapshot_digest": observation.snapshot_digest,
-                "ui_projection_digest": observation.ui_projection_digest,
-                "live_resources": observation.live_resources,
-                "live_resources_digest": observation.live_resources_digest,
-            })
-        })
-        .collect::<Vec<_>>();
-    let value = json!({
+fn observation_value(observation: &M3ParityObservation) -> Value {
+    json!({
+        "sequence": observation.sequence,
+        "virtual_time_ms": observation.virtual_time_ms,
+        "input_kind": observation.input_kind,
+        "battle_turn": observation.battle_turn,
+        "effect_digest": observation.effect_digest,
+        "state_digest": observation.state_digest,
+        "snapshot_digest": observation.snapshot_digest,
+        "ui_projection_digest": observation.ui_projection_digest,
+        "live_resources": observation.live_resources,
+        "live_resources_digest": observation.live_resources_digest,
+    })
+}
+
+fn report_value(report: &M3ParityReport) -> Value {
+    json!({
         "schema_version": report.schema_version,
         "trace_id": report.trace_id,
         "seed": report.seed,
-        "observations": observations,
-    });
+        "trace_digest": report.trace_digest,
+        "coverage": {
+            "raw_event_count": report.coverage.raw_event_count,
+            "presentation_settlement_count": report.coverage.presentation_settlement_count,
+            "continuation_input_count": report.coverage.continuation_input_count,
+        },
+        "snapshot_boundary": {
+            "after_raw_event": report.snapshot_boundary.after_raw_event,
+            "virtual_time_ms": report.snapshot_boundary.virtual_time_ms,
+            "snapshot_schema_version": report.snapshot_boundary.snapshot_schema_version,
+            "snapshot_digest": report.snapshot_boundary.snapshot_digest,
+            "snapshot_bytes_digest": report.snapshot_boundary.snapshot_bytes_digest,
+            "restored_snapshot_digest": report.snapshot_boundary.restored_snapshot_digest,
+            "pending_presentation_count": report.snapshot_boundary.pending_presentation_count,
+        },
+        "observations": report
+            .observations
+            .iter()
+            .map(observation_value)
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// Replay a canonical serialized trace and return the canonical hosted report.
+pub fn replay_serialized_trace_json(input: &str) -> Result<String, M3ParityError> {
+    let fixture = parse_serialized_trace(input)?;
+    let report = replay_eventwise(&fixture)?;
+    let value = report_value(&report);
     canonicalize_value(&value).map_err(|error| canonical_error("report", error))
+}
+
+/// Generate the hosted/native report from the same serialized trace that the
+/// wasm32/Node export receives.
+pub fn final_evidence_report_json() -> Result<String, M3ParityError> {
+    replay_serialized_trace_json(&final_evidence_trace_json()?)
 }
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(js_name = replayM3FinalEvidence)]
-pub fn final_evidence_report_json_wasm() -> Result<String, JsValue> {
-    final_evidence_report_json().map_err(|error| JsValue::from_str(&error.to_string()))
+pub fn final_evidence_report_json_wasm(serialized_trace: &str) -> Result<String, JsValue> {
+    replay_serialized_trace_json(serialized_trace)
+        .map_err(|error| JsValue::from_str(&error.to_string()))
 }
