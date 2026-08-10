@@ -143,6 +143,8 @@ name = "er-kernel"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-content",
+ "er-game",
  "er-protocol",
  "er-types",
  "serde_json",

@@ -10,6 +10,10 @@ use crate::{
     ConnectionGeneration, GameButton, MembershipRevision, OperationId, PresentationEventId,
     RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId, TimerId, UiState, UiViewModel,
 };
+use crate::battle_ids::BattlePresentationEventId;
+use crate::battle_ui::{
+    BattlePresentationEvent, BattleUiProjection, PresentationSettlementOutcome,
+};
 
 pub const PROTOCOL_VERSION: &str = "er-coop-47";
 pub const FRAME_PROTOCOL_VERSION: u32 = 2;
@@ -696,6 +700,11 @@ pub enum KernelInput {
         event_id: PresentationEventId,
         outcome: PresentationOutcome,
     },
+    BattlePresentationOutcome {
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
+    },
     TransportChanged {
         endpoint: SeatId,
         state: TransportState,
@@ -749,6 +758,10 @@ pub enum KernelEffect {
         endpoint: SeatId,
         view: UiViewModel,
     },
+    BattleUiChanged {
+        endpoint: SeatId,
+        projection: BattleUiProjection,
+    },
     UiIntent {
         endpoint: SeatId,
         intent: crate::UiIntent,
@@ -756,6 +769,10 @@ pub enum KernelEffect {
     Present {
         endpoint: SeatId,
         event: PresentationEvent,
+    },
+    PresentBattle {
+        endpoint: SeatId,
+        event: BattlePresentationEvent,
     },
     Persist {
         endpoint: SeatId,
