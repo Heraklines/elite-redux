@@ -36,6 +36,20 @@ The M3 oracle exporter reads this value directly from
 after canonical battle state carries the field, and the full live-state
 fingerprint observes it.
 
+Fresh Rust battle construction therefore carries the same value explicitly at
+the game boundary:
+
+```rust
+pub struct BattleGameConfig {
+    pub run_state: GameState,
+    pub wave_seed: String,
+    // remaining frozen fields unchanged
+}
+```
+
+`GameKernel::new_battle` rejects an empty value. Mid-battle restoration reads
+the already-canonical `BattleState.wave_seed`; neither path reconstructs it.
+
 M3B action ordering reads `before.battle.wave_seed` when opening the exact
 speed-tie seed-offset transaction. The field remains unchanged through a
 battle transition. `BattleRngState` remains the battle-cache owner and does

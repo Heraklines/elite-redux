@@ -1619,6 +1619,7 @@ Battle configuration is explicit:
 ```rust
 pub struct BattleGameConfig {
     pub run_state: GameState,
+    pub wave_seed: String,
     pub start: BattleStartV1,
     pub local_seat: SeatId,
     pub scripted_enemy_policy: ScriptedEnemyPolicyV1,
@@ -1663,7 +1664,11 @@ then swaps and emits effects. The exact queue/budget is
 `m3-atomic-transition.md`; typed outcomes are `m3-error-policy.md`.
 
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
-and a valid unconsumed `next_battle_id`. It assigns that ID itself, checked-
+an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed
+`next_battle_id`. The wave seed is supplied explicitly because CR-0017 proves
+that it cannot be reconstructed from the persisted run RNG or battle seed; no
+adapter may derive, substitute, or default it. `new_battle` assigns the battle
+ID itself, checked-
 increments the run allocator, derives battle RNG from the run RNG/wave through
 the frozen `er-rng` constructor, creates public turn one, and builds neutral
 weather/terrain/conditions, empty command/faint state, and `Ongoing` outcome.
