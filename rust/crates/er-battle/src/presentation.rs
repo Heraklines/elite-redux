@@ -46,7 +46,6 @@ pub enum PresentationCausalEvent {
         targets: Vec<FieldSlot>,
     },
     AbilityActivated {
-        action_sequence: SafeU53,
         pokemon: PokemonId,
         ability_id: AbilityId,
     },
@@ -68,13 +67,8 @@ impl PresentationCausalEvent {
         }
     }
 
-    pub const fn ability_activated(
-        action_sequence: SafeU53,
-        pokemon: PokemonId,
-        ability_id: AbilityId,
-    ) -> Self {
+    pub const fn ability_activated(pokemon: PokemonId, ability_id: AbilityId) -> Self {
         Self::AbilityActivated {
-            action_sequence,
             pokemon,
             ability_id,
         }

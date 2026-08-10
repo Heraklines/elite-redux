@@ -215,7 +215,7 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
             before: Some(player),
             after: Some(incoming),
         }),
-        PresentationCausalEvent::ability_activated(safe(1)?, incoming, ability_id),
+        PresentationCausalEvent::ability_activated(incoming, ability_id),
         PresentationCausalEvent::mutation(BattleMutation::StatStageChanged {
             pokemon: enemy,
             stat: BattleStat::Attack,
@@ -228,7 +228,7 @@ fn turn_plan_orders_closed_events_and_filters_cancelled_moves_and_noops() -> Tes
             before: Some(enemy),
             after: None,
         }),
-        PresentationCausalEvent::ability_activated(safe(0)?, player, AbilityId::ZERO),
+        PresentationCausalEvent::ability_activated(player, AbilityId::ZERO),
         PresentationCausalEvent::move_used(safe(2)?, enemy, move_id, vec![player_slot]),
         PresentationCausalEvent::move_used(safe(3)?, enemy, move_id, vec![]),
         PresentationCausalEvent::mutation(BattleMutation::OutcomeChanged {
@@ -326,7 +326,7 @@ fn replacement_plan_preserves_switch_ability_stage_terminal_causality() -> TestR
             before: None,
             after: Some(incoming),
         }),
-        PresentationCausalEvent::ability_activated(safe(0)?, incoming, ability_id),
+        PresentationCausalEvent::ability_activated(incoming, ability_id),
         PresentationCausalEvent::mutation(BattleMutation::StatStageChanged {
             pokemon: incoming,
             stat: BattleStat::Attack,
@@ -482,7 +482,7 @@ fn empty_and_non_presentational_mutations_produce_no_events() -> TestResult {
             before: BattleOutcome::Ongoing,
             after: BattleOutcome::Ongoing,
         }),
-        PresentationCausalEvent::ability_activated(safe(0)?, actor, AbilityId::ZERO),
+        PresentationCausalEvent::ability_activated(actor, AbilityId::ZERO),
     ];
 
     let noop_plan = build_replacement_presentation_plan(ReplacementPresentationInput::new(
