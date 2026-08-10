@@ -36,6 +36,9 @@ import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-it
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
+import { endMoodyFormationBattle } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeBattleEnd } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorBattleEnd } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
@@ -172,6 +175,8 @@ export class BattleEndPhase extends BattlePhase {
 
   start() {
     super.start();
+    notifyMoodyCoordinatorBattleEnd(this.isVictory);
+    notifyMoodyRuntimeBattleEnd(this.isVictory);
 
     // The party-count trays are encounter-intro / switch presentation only.
     // Ensure a delayed or interrupted summon animation cannot leave either tray
@@ -227,6 +232,7 @@ export class BattleEndPhase extends BattlePhase {
     this.applyLegacyCoopWaveEndProgression();
 
     snapshotBattleMoneyGainMultiplier();
+    endMoodyFormationBattle();
     this.recordLocalBattleStats();
 
     if (this.isVictory) {

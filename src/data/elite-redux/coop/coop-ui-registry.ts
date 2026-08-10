@@ -234,6 +234,11 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // partner-owned interaction unmirrored. The LEDGER is a read-only per-client view of run state.
   [UiMode.MOODY_BOON_SELECT]: "local-only",
   [UiMode.MOODY_LEDGER]: "local-only",
+  [UiMode.MOODY_CURSE_SELECT]: "local-only",
+  [UiMode.MOODY_TARGET_PICKER]: "local-only",
+  [UiMode.MOODY_CHOICE]: "local-only",
+  [UiMode.MOODY_ENEMY_PANEL]: "local-only",
+  [UiMode.MOODY_SECTION_REPORT]: "local-only",
 };
 
 /**

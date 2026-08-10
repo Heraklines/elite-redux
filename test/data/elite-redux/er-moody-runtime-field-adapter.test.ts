@@ -1,23 +1,26 @@
 import {
+  createMoodyRuntimeFieldState,
+  type MoodyRuntimeCommand,
+  type MoodyRuntimeFieldResult,
+} from "#data/elite-redux/moody/moody-runtime-field";
+import {
+  attachMoodyRuntimeFieldSave,
+  consumeMoodyRuntimeActionTriggerIds,
+  deserializeMoodyRuntimeFieldState,
+  didMoodyDamageCrossHpFraction,
+  extractMoodyRuntimeFieldSave,
   MOODY_RUNTIME_COMMAND_KINDS,
   MOODY_RUNTIME_FIELD_HOOK_SITES,
+  type MoodyLiveBattleSnapshot,
+  type MoodyLivePokemonReader,
   MoodyRuntimeFieldEventAdapter,
-  attachMoodyRuntimeFieldSave,
-  deserializeMoodyRuntimeFieldState,
-  extractMoodyRuntimeFieldSave,
+  recordMoodyRuntimeActionTriggerIds,
   resetMoodyRuntimeFieldState,
   serializeMoodyRuntimeFieldState,
   snapshotMoodyRuntimePokemon,
   translateMoodyRuntimeCommand,
   translateMoodyRuntimeResult,
-  type MoodyLiveBattleSnapshot,
-  type MoodyLivePokemonReader,
 } from "#data/elite-redux/moody/moody-runtime-field-adapter";
-import {
-  createMoodyRuntimeFieldState,
-  type MoodyRuntimeCommand,
-  type MoodyRuntimeFieldResult,
-} from "#data/elite-redux/moody/moody-runtime-field";
 import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
 import { describe, expect, it } from "vitest";
 
@@ -51,37 +54,36 @@ const player: LivePokemon = {
   types: ["fire"],
 };
 
+const { status: _playerStatus, ...playerWithoutStatus } = player;
 const ally: LivePokemon = {
-  ...player,
+  ...playerWithoutStatus,
   id: 102,
   slot: 1,
   hp: 30,
-  status: undefined,
 };
 const enemy: LivePokemon = {
-  ...player,
+  ...playerWithoutStatus,
   id: 201,
   player: false,
   moves: ["surf", "toxic"],
   eligibleMoves: ["surf"],
   abilities: ["torrent"],
   types: ["water"],
-  status: undefined,
 };
 
 const reader: MoodyLivePokemonReader<LivePokemon> = {
-  id: (pokemon) => pokemon.id,
-  side: (pokemon) => (pokemon.player ? "player" : "enemy"),
-  partySlot: (pokemon) => pokemon.slot,
-  currentHp: (pokemon) => pokemon.hp,
-  maxHp: (pokemon) => pokemon.maxHp,
-  fainted: (pokemon) => pokemon.fainted,
-  status: (pokemon) => pokemon.status,
-  grounded: (pokemon) => pokemon.grounded,
-  moveIds: (pokemon) => pokemon.moves,
-  eligibleMoveIds: (pokemon) => pokemon.eligibleMoves,
-  compatibleAbilityIds: (pokemon) => pokemon.abilities,
-  types: (pokemon) => pokemon.types,
+  id: pokemon => pokemon.id,
+  side: pokemon => (pokemon.player ? "player" : "enemy"),
+  partySlot: pokemon => pokemon.slot,
+  currentHp: pokemon => pokemon.hp,
+  maxHp: pokemon => pokemon.maxHp,
+  fainted: pokemon => pokemon.fainted,
+  status: pokemon => pokemon.status,
+  grounded: pokemon => pokemon.grounded,
+  moveIds: pokemon => pokemon.moves,
+  eligibleMoveIds: pokemon => pokemon.eligibleMoves,
+  compatibleAbilityIds: pokemon => pokemon.abilities,
+  types: pokemon => pokemon.types,
 };
 
 const battle: MoodyLiveBattleSnapshot<LivePokemon> = {
@@ -164,6 +166,7 @@ describe("Moody live snapshot adapter", () => {
         direct: true,
         barrierAbsorbed: 5,
         hpAfter: 50,
+        crossedQuarterHp: false,
       }),
       fieldAdapter.heal({
         target: player,
@@ -213,7 +216,7 @@ describe("Moody live snapshot adapter", () => {
       fieldAdapter.boonDraft(["offer:a", "offer:b", "offer:c"]),
     ];
 
-    expect(events.map((event) => event.kind)).toEqual([
+    expect(events.map(event => event.kind)).toEqual([
       "battle-start",
       "battle-end",
       "entry",
@@ -241,18 +244,92 @@ describe("Moody live snapshot adapter", () => {
       "encounter-generate",
       "boon-draft",
     ]);
+    expect(events.every(event => event.battleId === battle.battleId && event.seed === battle.seed)).toBe(true);
+  });
+
+  it("emits entry facts for every battler already active at battle opening", () => {
+    const entries = adapter().initialEntries({
+      weatherOptions: ["clear", "rain"],
+      terrainOptions: ["none", "grassy"],
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries).toEqual([
+      expect.objectContaining({
+        kind: "entry",
+        pokemon: expect.objectContaining({ id: player.id, side: "player" }),
+        activePokemonIds: [player.id],
+        isReentry: false,
+        weatherOptions: ["clear", "rain"],
+        terrainOptions: ["none", "grassy"],
+      }),
+      expect.objectContaining({
+        kind: "entry",
+        pokemon: expect.objectContaining({ id: enemy.id, side: "enemy" }),
+        activePokemonIds: [enemy.id],
+        isReentry: false,
+      }),
+    ]);
+  });
+
+  it("preserves the derived field facts required by Emergency Shell, Offensive Guard, and Lucid Dreamer", () => {
+    const fieldAdapter = adapter();
+    const move = {
+      user: player,
+      target: enemy,
+      moveId: "dream-eater",
+      moveType: "psychic",
+      category: "special" as const,
+      damaging: true,
+      raisesStats: true,
+      actionId: "action:traits",
+    };
+
+    expect(fieldAdapter.beforeMove({ ...move, asleep: true, dreamTagged: true })).toEqual(
+      expect.objectContaining({ raisesStats: true, asleep: true, dreamTagged: true }),
+    );
     expect(
-      events.every(
-        (event) =>
-          event.battleId === battle.battleId && event.seed === battle.seed,
-      ),
-    ).toBe(true);
+      fieldAdapter.afterDamage({
+        source: enemy,
+        target: player,
+        amount: 60,
+        direct: true,
+        barrierAbsorbed: 0,
+        hpAfter: 20,
+        crossedQuarterHp: true,
+      }),
+    ).toEqual(expect.objectContaining({ crossedQuarterHp: true }));
+  });
+});
+
+describe("Moody live field fact derivation", () => {
+  it("fires the quarter-HP crossing only when damage moves from at-or-above 25% to below it", () => {
+    expect(didMoodyDamageCrossHpFraction({ hpBefore: 26, hpAfter: 24, maxHp: 100 })).toBe(true);
+    expect(didMoodyDamageCrossHpFraction({ hpBefore: 25, hpAfter: 24, maxHp: 100 })).toBe(true);
+    expect(didMoodyDamageCrossHpFraction({ hpBefore: 26, hpAfter: 25, maxHp: 100 })).toBe(false);
+    expect(didMoodyDamageCrossHpFraction({ hpBefore: 24, hpAfter: 10, maxHp: 100 })).toBe(false);
+  });
+
+  it("aggregates unique boon triggers across lanes without resolving any effect twice", () => {
+    const field = recordMoodyRuntimeActionTriggerIds(createMoodyRuntimeFieldState(), battle.battleId, player.id, [
+      "prismatic-opening",
+      "elemental-dividend",
+    ]);
+    const withPassiveAndFormation = recordMoodyRuntimeActionTriggerIds(field, battle.battleId, player.id, [
+      "prismatic-opening",
+      "tag-combo",
+    ]);
+    const consumed = consumeMoodyRuntimeActionTriggerIds(withPassiveAndFormation, battle.battleId, player.id);
+
+    expect(consumed.effectIds).toEqual(["prismatic-opening", "elemental-dividend", "tag-combo"]);
+    expect(consumed.state.lists).toEqual({});
+    expect(consumeMoodyRuntimeActionTriggerIds(consumed.state, battle.battleId, player.id).effectIds).toEqual([]);
   });
 });
 
 describe("Moody executable operation translation", () => {
   it("translates the machine-listed command union exhaustively", () => {
-    const operations = MOODY_RUNTIME_COMMAND_KINDS.map((kind) =>
+    const operations = MOODY_RUNTIME_COMMAND_KINDS.map(kind =>
       translateMoodyRuntimeCommand({
         kind,
         effectId: "prismatic-opening",
@@ -260,12 +337,10 @@ describe("Moody executable operation translation", () => {
       }),
     );
     expect(operations).toHaveLength(MOODY_RUNTIME_COMMAND_KINDS.length);
-    expect(
-      operations.every((operation) => operation.kind !== "persist-state"),
-    ).toBe(true);
-    expect(
-      new Set(operations.map((operation) => operation.command.kind)),
-    ).toEqual(new Set(MOODY_RUNTIME_COMMAND_KINDS));
+    expect(operations.every(operation => operation.kind !== "persist-state")).toBe(true);
+    expect(new Set(operations.flatMap(operation => ("command" in operation ? [operation.command.kind] : [])))).toEqual(
+      new Set(MOODY_RUNTIME_COMMAND_KINDS),
+    );
   });
 
   it("appends one atomic persistence operation after translated commands", () => {
@@ -282,10 +357,7 @@ describe("Moody executable operation translation", () => {
       triggeredEffectIds: ["eye-of-the-storm"],
     };
     const operations = translateMoodyRuntimeResult(result);
-    expect(operations.map((operation) => operation.kind)).toEqual([
-      "vital",
-      "persist-state",
-    ]);
+    expect(operations.map(operation => operation.kind)).toEqual(["vital", "persist-state"]);
     expect(operations[1]).toEqual(
       expect.objectContaining({
         kind: "persist-state",
@@ -324,10 +396,7 @@ describe("Moody runtime save contract", () => {
     const attached = attachMoodyRuntimeFieldSave(moodSave, saved);
     const extracted = extractMoodyRuntimeFieldSave(attached);
 
-    expect(extracted?.numbers.map(([key]) => key)).toEqual([
-      "battle:100:4:a",
-      "persistent:z",
-    ]);
+    expect(extracted?.numbers.map(([key]) => key)).toEqual(["battle:100:4:a", "persistent:z"]);
     expect(deserializeMoodyRuntimeFieldState(extracted)).toEqual(runtimeState);
     expect(moodSave).not.toHaveProperty("fieldRuntime");
   });
@@ -367,33 +436,21 @@ describe("Moody runtime save contract", () => {
       segmentIndex: 10,
       biomeEpoch: 3,
     });
-    expect(Object.keys(segmentReset.numbers)).toEqual([
-      "segment:10:used",
-      "biome:3:used",
-      "persistent:debt",
-    ]);
+    expect(Object.keys(segmentReset.numbers)).toEqual(["segment:10:used", "biome:3:used", "persistent:debt"]);
 
     const biomeReset = resetMoodyRuntimeFieldState(runtimeState, {
       kind: "biome-transition",
       biomeEpoch: 3,
       segmentIndex: 10,
     });
-    expect(Object.keys(biomeReset.numbers)).toEqual([
-      "segment:10:used",
-      "biome:3:used",
-      "persistent:debt",
-    ]);
-    expect(
-      resetMoodyRuntimeFieldState(runtimeState, { kind: "run-end" }),
-    ).toEqual(createMoodyRuntimeFieldState());
+    expect(Object.keys(biomeReset.numbers)).toEqual(["segment:10:used", "biome:3:used", "persistent:debt"]);
+    expect(resetMoodyRuntimeFieldState(runtimeState, { kind: "run-end" })).toEqual(createMoodyRuntimeFieldState());
   });
 });
 
 describe("Moody parent hook manifest", () => {
   it("names every reducer event exactly once or more through concrete existing symbols", () => {
-    const hookedKinds = new Set(
-      MOODY_RUNTIME_FIELD_HOOK_SITES.flatMap((site) => site.events),
-    );
+    const hookedKinds = new Set(MOODY_RUNTIME_FIELD_HOOK_SITES.flatMap(site => site.events));
     expect(hookedKinds).toEqual(
       new Set([
         "battle-start",
@@ -424,10 +481,8 @@ describe("Moody parent hook manifest", () => {
         "boon-draft",
       ]),
     );
-    expect(
-      MOODY_RUNTIME_FIELD_HOOK_SITES.every(
-        (site) => site.path.startsWith("src/") && site.anchor.length > 0,
-      ),
-    ).toBe(true);
+    expect(MOODY_RUNTIME_FIELD_HOOK_SITES.every(site => site.path.startsWith("src/") && site.anchor.length > 0)).toBe(
+      true,
+    );
   });
 });

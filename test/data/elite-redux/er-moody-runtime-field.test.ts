@@ -93,7 +93,7 @@ function boon(boonId: MoodyRuntimeFieldBoonId, rank: 1 | 2 | 3 = 1, evolutionId?
     instanceId: `${boonId}:test`,
     boonId,
     rank,
-    evolutionId,
+    ...(evolutionId == null ? {} : { evolutionId }),
     acquiredAtWave: 10,
     target: {
       pokemonIds: [player.id],
@@ -106,7 +106,7 @@ function curse(curseId: MoodyRuntimeFieldCurseId): MoodyCurseInstance {
   return {
     curseId,
     acquiredAtWave: 10,
-    target: curseId === "oathbound" ? { pokemonIds: [player.id] } : undefined,
+    ...(curseId === "oathbound" ? { target: { pokemonIds: [player.id] } } : {}),
   };
 }
 
@@ -454,10 +454,9 @@ function curseEvent(id: MoodyRuntimeFieldCurseId): {
       };
     case "no-retreat":
     case "withering-pp":
-      return {
-        event: moveResolved,
-        state: id === "withering-pp" ? state({ numbers: { [`${base.battleId}:withering-pp:uses`]: 3 } }) : undefined,
-      };
+      return id === "withering-pp"
+        ? { event: moveResolved, state: state({ numbers: { [`${base.battleId}:withering-pp:uses`]: 3 } }) }
+        : { event: moveResolved };
     case "fog-of-war":
     case "public-enemy":
     case "nemesis-protocol":

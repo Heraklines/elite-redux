@@ -1,5 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import {
+  absorbMoodyCoordinatorBarrier,
+  consumeMoodyCoordinatorMovePower,
+  getMoodyCoordinatorSpectralPower,
+} from "#data/elite-redux/moody/moody-coordinator-combat-state";
+import {
   type MoodyPassiveEffectResult,
   type MoodyPassiveFlags,
   type MoodyPassivePartyContext,
@@ -9,7 +14,38 @@ import {
   queryMoodyPassiveEffects,
 } from "#data/elite-redux/moody/moody-effects";
 import { getMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
-import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
+import {
+  applyMoodyFormationDamage,
+  getMoodyFormationAction,
+  getMoodyFormationExperienceMultiplier,
+  getMoodyFormationLearnedResistanceTypes,
+  getMoodyFormationMaxHpMultiplier,
+  getMoodyFormationSpeedMultiplier,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import type { MoodyRuntimeFieldState } from "#data/elite-redux/moody/moody-runtime-field";
+import {
+  deserializeMoodyRuntimeFieldState,
+  serializeMoodyRuntimeFieldState,
+} from "#data/elite-redux/moody/moody-runtime-field-adapter";
+import {
+  applyMoodyRuntimeBeforeDamage,
+  canMoodyRuntimeActWhileAsleep,
+  getMoodyRuntimeEnemyStatMultiplier,
+  getMoodyRuntimePriorityDelta,
+  getMoodyRuntimeSpeedMultiplier,
+  prepareMoodyRuntimeMoveResolution,
+  recordMoodyRuntimeActionTriggers,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  getMoodyCoordinatorEnemyStatMultiplier,
+  getMoodyCoordinatorNegativeSpaceModifiers,
+  getMoodyCoordinatorPairDamageMultiplier,
+  getMoodyCoordinatorPartyModifiers,
+  getMoodyCoordinatorPhaseShiftDamageMultiplier,
+  getMoodyCoordinatorPocketPriorityDelta,
+  getMoodyCoordinatorTemporaryDamageMultiplier,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { getMoodyModeState, setMoodyRuntimeFieldSaveData } from "#data/elite-redux/moody/moody-state";
 import type { MoodyBoonInstance } from "#data/elite-redux/moody/moody-types";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -176,6 +212,9 @@ export function queryMoodySceneEffects(options: MoodySceneQueryOptions): MoodyPa
       waveIndex: globalScene.currentBattle.waveIndex,
       turn: globalScene.currentBattle.turn,
       isBoss: globalScene.getEnemyParty().some(pokemon => pokemon.isBoss()),
+      learnedResistanceTypes: getMoodyFormationLearnedResistanceTypes()
+        .map(value => Number(value))
+        .filter((value): value is PokemonType => Number.isSafeInteger(value)),
       ...(options.sameSequenceHitIndex == null ? {} : { sameSequenceHitIndex: options.sameSequenceHitIndex }),
     },
   };
@@ -185,12 +224,42 @@ export function queryMoodySceneEffects(options: MoodySceneQueryOptions): MoodyPa
   ]);
 }
 
-interface DeferredDamageDebt {
-  amount: number;
-  dueTurn: number;
+const deferredDebtKey = (pokemonId: number): string => `persistent:deferred-pain:pokemon:${pokemonId}:debt`;
+const deferredDueKey = (pokemonId: number): string => `persistent:deferred-pain:pokemon:${pokemonId}:due`;
+
+function readMoodyFieldState(): MoodyRuntimeFieldState | null {
+  const save = getMoodyModeState()?.fieldRuntime;
+  return save == null ? null : deserializeMoodyRuntimeFieldState(save);
 }
 
-const deferredDamageByPokemon = new Map<number, DeferredDamageDebt>();
+function writeMoodyFieldState(state: MoodyRuntimeFieldState): void {
+  const modeState = getMoodyModeState();
+  if (modeState == null) {
+    return;
+  }
+  const previous = modeState.fieldRuntime;
+  const battle = globalScene.currentBattle;
+  setMoodyRuntimeFieldSaveData(
+    serializeMoodyRuntimeFieldState(state, {
+      battleId: previous?.cursor.battleId ?? String(battle?.battleSeed ?? ""),
+      waveIndex: battle?.waveIndex ?? previous?.cursor.waveIndex ?? 0,
+      turn: battle?.turn ?? previous?.cursor.turn ?? 0,
+      segmentIndex: Math.floor((battle?.waveIndex ?? previous?.cursor.waveIndex ?? 0) / 10),
+      biomeId: globalScene.arena?.biomeId ?? previous?.cursor.biomeId ?? -1,
+      biomeEpoch: previous?.cursor.biomeEpoch ?? 0,
+    }),
+  );
+}
+
+function withMoodyFieldNumbers(update: (numbers: Record<string, number>) => void): void {
+  const state = readMoodyFieldState();
+  if (state == null) {
+    return;
+  }
+  const numbers = { ...state.numbers };
+  update(numbers);
+  writeMoodyFieldState({ ...state, numbers });
+}
 
 export function applyMoodyDamageCalculation(
   source: Pokemon,
@@ -211,91 +280,171 @@ export function applyMoodyDamageCalculation(
     },
     sameSequenceHitIndex: Math.max(1, source.turnData.hitCount - source.turnData.hitsLeft + 1),
   });
+  const formationDamage = applyMoodyFormationDamage(source, target, move, damage, simulated);
   if (effects == null) {
-    return damage;
+    return applyMoodyRuntimeBeforeDamage(source, target, move, formationDamage, simulated);
   }
-  let resolved = Math.max(1, Math.floor(damage * effects.outgoingDamageMultiplier * effects.incomingDamageMultiplier));
+  let resolved = Math.max(
+    1,
+    Math.floor(
+      formationDamage
+        * effects.outgoingDamageMultiplier
+        * effects.incomingDamageMultiplier
+        * getMoodyCoordinatorTemporaryDamageMultiplier(source)
+        * getMoodyCoordinatorPairDamageMultiplier(source, simulated)
+        * getMoodyCoordinatorPartyModifiers(source, move.type).outgoingDamageMultiplier
+        * getMoodyCoordinatorPartyModifiers(target, move.type, true).incomingDamageMultiplier
+        * getMoodyCoordinatorSpectralPower(source.id)
+        * consumeMoodyCoordinatorMovePower(source.id, simulated)
+        * getMoodyCoordinatorNegativeSpaceModifiers(source, move.id).outgoingDamageMultiplier
+        * getMoodyCoordinatorNegativeSpaceModifiers(target).incomingDamageMultiplier
+        * getMoodyCoordinatorPhaseShiftDamageMultiplier(target, simulated),
+    ),
+  );
   if (effects.incomingDamageCapMaxHpFraction != null) {
     resolved = Math.min(resolved, Math.max(1, Math.floor(rawMaxHp(target) * effects.incomingDamageCapMaxHpFraction)));
   }
-  if (effects.deferredDamageFraction > 0) {
-    const deferred = Math.max(0, Math.floor(resolved * effects.deferredDamageFraction));
-    resolved = Math.max(1, resolved - deferred);
-    if (!simulated && deferred > 0) {
-      const previous = deferredDamageByPokemon.get(target.id);
-      deferredDamageByPokemon.set(target.id, {
-        amount: Math.min(Math.floor(rawMaxHp(target) * 0.5), (previous?.amount ?? 0) + deferred),
-        dueTurn: Math.max(previous?.dueTurn ?? 0, globalScene.currentBattle.turn + 1),
-      });
-    }
+  if (!simulated) {
+    const activeBoonIds = new Set(getMoodyModeState()?.boons.map(boon => boon.boonId) ?? []);
+    recordMoodyRuntimeActionTriggers(source.id, [
+      ...new Set(
+        effects.applications.map(application => application.effectId).filter(effectId => activeBoonIds.has(effectId)),
+      ),
+    ]);
   }
-  return resolved;
+  // Field-runtime commands own Deferred Pain's split/debt state. The passive
+  // adapter still reports it for coverage/UI, but applying it here as well
+  // would split the same hit twice.
+  return absorbMoodyCoordinatorBarrier(
+    target.id,
+    applyMoodyRuntimeBeforeDamage(source, target, move, resolved, simulated),
+    simulated,
+  );
 }
 
 export function consumeMoodyDeferredDamage(pokemon: Pokemon): number {
-  const debt = deferredDamageByPokemon.get(pokemon.id);
-  if (debt == null || debt.dueTurn > globalScene.currentBattle.turn) {
+  const state = readMoodyFieldState();
+  if (state == null) {
     return 0;
   }
-  deferredDamageByPokemon.delete(pokemon.id);
-  return debt.amount;
+  const amount = state.numbers[deferredDebtKey(pokemon.id)] ?? 0;
+  const dueTurn = state.numbers[deferredDueKey(pokemon.id)] ?? Number.MAX_SAFE_INTEGER;
+  if (amount <= 0 || dueTurn > globalScene.currentBattle.turn) {
+    return 0;
+  }
+  withMoodyFieldNumbers(numbers => {
+    numbers[deferredDebtKey(pokemon.id)] = 0;
+    numbers[deferredDueKey(pokemon.id)] = 0;
+  });
+  return amount;
 }
 
 export function reduceMoodyDeferredDamage(pokemon: Pokemon, healed: number): void {
-  const debt = deferredDamageByPokemon.get(pokemon.id);
-  if (debt == null || healed <= 0) {
+  if (healed <= 0) {
     return;
   }
-  debt.amount = Math.max(0, debt.amount - healed);
-  if (debt.amount === 0) {
-    deferredDamageByPokemon.delete(pokemon.id);
-  }
+  withMoodyFieldNumbers(numbers => {
+    const debtKey = deferredDebtKey(pokemon.id);
+    numbers[debtKey] = Math.max(0, (numbers[debtKey] ?? 0) - healed);
+  });
 }
 
 export function clearMoodyDeferredDamage(): void {
-  deferredDamageByPokemon.clear();
+  withMoodyFieldNumbers(numbers => {
+    for (const key of Object.keys(numbers)) {
+      if (key.startsWith("persistent:deferred-pain:pokemon:")) {
+        delete numbers[key];
+      }
+    }
+  });
 }
 
 export function getMoodyStatMultiplier(pokemon: Pokemon, stat: Stat): number {
   const effects = queryMoodySceneEffects({ actor: pokemon, target: pokemon });
+  const formationMultiplier =
+    stat === Stat.HP
+      ? getMoodyFormationMaxHpMultiplier(pokemon)
+      : stat === Stat.SPD
+        ? getMoodyFormationSpeedMultiplier(pokemon)
+        : 1;
+  const fieldEnemyMultiplier = getMoodyRuntimeEnemyStatMultiplier(pokemon);
+  const enemyMultiplier =
+    pokemon.isEnemy() && fieldEnemyMultiplier === 1 ? getMoodyCoordinatorEnemyStatMultiplier() : fieldEnemyMultiplier;
+  const runtimeMultiplier = enemyMultiplier * (stat === Stat.SPD ? getMoodyRuntimeSpeedMultiplier(pokemon) : 1);
+  const coordinatorSpeedMultiplier = stat === Stat.SPD ? getMoodyCoordinatorPartyModifiers(pokemon).speedMultiplier : 1;
   if (effects == null) {
-    return 1;
+    return formationMultiplier * runtimeMultiplier * coordinatorSpeedMultiplier;
   }
   if (stat === Stat.HP) {
-    return effects.maxHpMultiplier;
+    return effects.maxHpMultiplier * formationMultiplier * runtimeMultiplier;
   }
-  return effects.nonHpStatMultiplier * (stat === Stat.SPD ? effects.speedMultiplier : 1);
+  return (
+    effects.nonHpStatMultiplier
+    * (stat === Stat.SPD ? effects.speedMultiplier * getMoodyRuntimeSpeedMultiplier(pokemon) : 1)
+    * formationMultiplier
+    * enemyMultiplier
+    * coordinatorSpeedMultiplier
+  );
 }
 
 export function getMoodyMovePriorityDelta(user: Pokemon, move: Move): number {
-  return queryMoodySceneEffects({ actor: user, target: user, move })?.priorityDelta ?? 0;
+  prepareMoodyRuntimeMoveResolution(user);
+  return (
+    (queryMoodySceneEffects({ actor: user, target: user, move })?.priorityDelta ?? 0)
+    + getMoodyRuntimePriorityDelta(user)
+    + getMoodyFormationAction(user.id).reduce((value, command) => value + (command.priorityDelta ?? 0), 0)
+    + getMoodyCoordinatorPocketPriorityDelta(user)
+    + getMoodyCoordinatorNegativeSpaceModifiers(user, move.id).priorityDelta
+    + getMoodyCoordinatorPartyModifiers(user, move.type).priorityDelta
+  );
 }
 
 export function getMoodyPpCost(user: Pokemon, move: PokemonMove, baseCost: number): number {
   const effects = queryMoodySceneEffects({ actor: user, target: user, move: move.getMove() });
-  return effects == null
-    ? baseCost
-    : Math.max(0, Math.floor(baseCost * effects.ppCostMultiplier + effects.ppCostFlatDelta));
+  const passiveCost =
+    effects == null ? baseCost : Math.max(0, Math.floor(baseCost * effects.ppCostMultiplier + effects.ppCostFlatDelta));
+  return getMoodyFormationAction(user.id).reduce(
+    (value, command) => (command.ppCost == null ? value : Math.max(0, command.ppCost)),
+    passiveCost,
+  );
 }
 
 export function getMoodyHealingMultiplier(pokemon: Pokemon): number {
   return queryMoodySceneEffects({ actor: pokemon, target: pokemon })?.healingMultiplier ?? 1;
 }
 
+export function grantMoodyItemSetHealingBarrier(_pokemon: Pokemon, _healed: number): number {
+  return 0;
+}
+
+export function getMoodySelfStatusDamageMultiplier(_pokemon: Pokemon): number {
+  return 1;
+}
+
 export function getMoodyAccuracyMultiplier(user: Pokemon, target: Pokemon, move: Move): number {
   const effects = queryMoodySceneEffects({ actor: user, target, move });
-  if (effects == null) {
-    return 1;
+  const actions = getMoodyFormationAction(user.id);
+  if (effects?.alwaysHits || actions.some(command => command.alwaysHits)) {
+    return Number.MAX_SAFE_INTEGER;
   }
-  return effects.alwaysHits ? Number.MAX_SAFE_INTEGER : effects.accuracyMultiplier;
+  return (
+    (effects?.accuracyMultiplier ?? 1)
+    * actions.reduce((value, command) => value * (command.accuracyMultiplier ?? 1), 1)
+  );
 }
 
 export function canMoodyActWhileAsleep(user: Pokemon, move: Move): boolean {
-  return queryMoodySceneEffects({ actor: user, target: user, move })?.canActWhileAsleep === true;
+  return (
+    queryMoodySceneEffects({ actor: user, target: user, move })?.canActWhileAsleep === true
+    || canMoodyRuntimeActWhileAsleep(user)
+  );
 }
 
 export function getMoodyExperienceMultiplier(pokemon: Pokemon): number {
-  return queryMoodySceneEffects({ actor: pokemon, target: pokemon })?.experienceMultiplier ?? 1;
+  return (
+    (queryMoodySceneEffects({ actor: pokemon, target: pokemon })?.experienceMultiplier ?? 1)
+    * getMoodyFormationExperienceMultiplier(pokemon)
+  );
 }
 
 export function getMoodyBossMoneyGainMultiplier(): number {

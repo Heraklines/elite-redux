@@ -1,4 +1,9 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import {
+  hydrateMoodyFormationRuntimeSession,
+  type MoodyFormationRuntimeSaveDataV1,
+  serializeMoodyFormationRuntimeSession,
+} from "#data/elite-redux/moody/moody-runtime-formation-adapter";
 import type {
   MoodyBoonDefinition,
   MoodyBoonInstance,
@@ -7,8 +12,10 @@ import type {
   MoodyBoonTarget,
   MoodyCurseInstance,
   MoodyCurseOffer,
+  MoodyFormationEngineSaveData,
   MoodyModeSaveData,
   MoodyRarity,
+  MoodyRuntimeFieldSaveData,
 } from "#data/elite-redux/moody/moody-types";
 
 const MOODY_STATE_VERSION = 1 as const;
@@ -27,7 +34,13 @@ const RARITY_WEIGHTS: Readonly<Record<MoodyRarity, number>> = {
 };
 
 export const MOODY_BOON_BY_ID = new Map<string, MoodyBoonDefinition>(
-  MOODY_BOONS.map(boon => [boon.id, boon as MoodyBoonDefinition]),
+  MOODY_BOONS.map(boon => [
+    boon.id,
+    {
+      ...boon,
+      ...(boon.id === "set-collector" ? { implementationStatus: "blocked" as const } : {}),
+    } as MoodyBoonDefinition,
+  ]),
 );
 export const MOODY_CURSE_BY_ID = new Map<string, (typeof MOODY_CURSES)[number]>(
   MOODY_CURSES.map(curse => [curse.id, curse]),
@@ -65,6 +78,23 @@ function cloneState(state: MoodyModeSaveData): MoodyModeSaveData {
   return structuredClone(state);
 }
 
+function emptyFieldRuntime(): MoodyRuntimeFieldSaveData {
+  return {
+    version: 1,
+    cursor: {
+      battleId: "",
+      waveIndex: 0,
+      turn: 0,
+      segmentIndex: 0,
+      biomeId: -1,
+      biomeEpoch: 0,
+    },
+    numbers: [],
+    values: [],
+    lists: [],
+  };
+}
+
 export function createMoodyModeState(seed: string | number): MoodyModeSaveData {
   return {
     version: MOODY_STATE_VERSION,
@@ -74,6 +104,7 @@ export function createMoodyModeState(seed: string | number): MoodyModeSaveData {
     boons: [],
     curses: [],
     recentThreat: [],
+    fieldRuntime: emptyFieldRuntime(),
   };
 }
 
@@ -97,6 +128,48 @@ export function getMoodyModeState(): Readonly<MoodyModeSaveData> | null {
 
 export function getMoodyModeSaveData(): MoodyModeSaveData | undefined {
   return currentState == null ? undefined : cloneState(currentState);
+}
+
+export function setMoodyFormationRuntimeSaveData(runtime: MoodyFormationRuntimeSaveDataV1): void {
+  if (currentState == null) {
+    return;
+  }
+  currentState.formationRuntime = serializeMoodyFormationRuntimeSession(runtime);
+}
+
+export function setMoodyFormationEngineSaveData(engine: MoodyFormationEngineSaveData): void {
+  if (currentState != null) {
+    currentState.formationEngine = structuredClone(engine);
+  }
+}
+
+export function setMoodyRuntimeFieldSaveData(fieldRuntime: MoodyRuntimeFieldSaveData): boolean {
+  if (currentState == null) {
+    return false;
+  }
+  currentState.fieldRuntime = sanitizeFieldRuntime(fieldRuntime);
+  return true;
+}
+
+export function setMoodyBoonDormancy(instanceIds: readonly string[], dormant: boolean): void {
+  if (currentState == null || instanceIds.length === 0) {
+    return;
+  }
+  const selected = new Set(instanceIds);
+  for (const boon of currentState.boons) {
+    if (selected.has(boon.instanceId)) {
+      boon.dormant = dormant;
+    }
+  }
+}
+
+export function concealPendingMoodyBoonOffer(offerId: string): boolean {
+  const index = pendingOffers?.findIndex(offer => offer.offerId === offerId) ?? -1;
+  if (pendingOffers == null || index < 0) {
+    return false;
+  }
+  pendingOffers[index] = { ...pendingOffers[index], hidden: true };
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,6 +228,46 @@ function sanitizeProgress(value: unknown): MoodyBoonProgress | undefined {
   return progress;
 }
 
+function sanitizeFieldRuntime(value: unknown): MoodyRuntimeFieldSaveData {
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.cursor)) {
+    return emptyFieldRuntime();
+  }
+  const tupleRecord = <T>(input: unknown, validValue: (candidate: unknown) => candidate is T): [string, T][] => {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+    return input
+      .filter(
+        (entry): entry is [string, T] =>
+          Array.isArray(entry) && entry.length === 2 && typeof entry[0] === "string" && validValue(entry[1]),
+      )
+      .map(([key, entryValue]) => [key, structuredClone(entryValue)]);
+  };
+  const cursor = value.cursor;
+  return {
+    version: 1,
+    cursor: {
+      battleId: typeof cursor.battleId === "string" ? cursor.battleId : "",
+      waveIndex: Number.isSafeInteger(cursor.waveIndex) ? Math.max(0, Number(cursor.waveIndex)) : 0,
+      turn: Number.isSafeInteger(cursor.turn) ? Math.max(0, Number(cursor.turn)) : 0,
+      segmentIndex: Number.isSafeInteger(cursor.segmentIndex) ? Math.max(0, Number(cursor.segmentIndex)) : 0,
+      biomeId: Number.isSafeInteger(cursor.biomeId) ? Number(cursor.biomeId) : -1,
+      biomeEpoch: Number.isSafeInteger(cursor.biomeEpoch) ? Math.max(0, Number(cursor.biomeEpoch)) : 0,
+    },
+    numbers: tupleRecord(value.numbers, (candidate): candidate is number => Number.isFinite(candidate)),
+    values: tupleRecord(
+      value.values,
+      (candidate): candidate is string | number | boolean =>
+        typeof candidate === "string" || typeof candidate === "boolean" || Number.isFinite(candidate),
+    ),
+    lists: tupleRecord(
+      value.lists,
+      (candidate): candidate is string[] =>
+        Array.isArray(candidate) && candidate.every(item => typeof item === "string"),
+    ),
+  };
+}
+
 function sanitizeBoon(value: unknown): MoodyBoonInstance | null {
   if (!isRecord(value) || typeof value.boonId !== "string" || !MOODY_BOON_BY_ID.has(value.boonId)) {
     return null;
@@ -197,6 +310,29 @@ function sanitizeCurse(value: unknown): MoodyCurseInstance | null {
   };
 }
 
+function sanitizeFormationRuntime(value: unknown): MoodyFormationRuntimeSaveDataV1 | undefined {
+  if (!isRecord(value)) {
+    return;
+  }
+  try {
+    return hydrateMoodyFormationRuntimeSession(value as unknown as MoodyFormationRuntimeSaveDataV1);
+  } catch {
+    return;
+  }
+}
+
+function sanitizeFormationEngine(value: unknown): MoodyFormationEngineSaveData | undefined {
+  if (!isRecord(value) || value.version !== 1 || typeof value.stateJson !== "string") {
+    return;
+  }
+  try {
+    JSON.parse(value.stateJson);
+    return { version: 1, stateJson: value.stateJson };
+  } catch {
+    return;
+  }
+}
+
 export function restoreMoodyModeState(value: unknown): boolean {
   if (!isRecord(value) || value.version !== MOODY_STATE_VERSION || !Number.isSafeInteger(value.seed)) {
     resetMoodyModeState();
@@ -204,6 +340,8 @@ export function restoreMoodyModeState(value: unknown): boolean {
   }
   const boons = Array.isArray(value.boons) ? value.boons.map(sanitizeBoon).filter(boon => boon != null) : [];
   const curses = Array.isArray(value.curses) ? value.curses.map(sanitizeCurse).filter(curse => curse != null) : [];
+  const formationRuntime = sanitizeFormationRuntime(value.formationRuntime);
+  const formationEngine = sanitizeFormationEngine(value.formationEngine);
   currentState = {
     version: MOODY_STATE_VERSION,
     seed: Number(value.seed) >>> 0,
@@ -212,6 +350,9 @@ export function restoreMoodyModeState(value: unknown): boolean {
     boons,
     curses,
     recentThreat: Array.isArray(value.recentThreat) ? structuredClone(value.recentThreat).slice(0, 6) : [],
+    ...(formationRuntime == null ? {} : { formationRuntime }),
+    ...(formationEngine == null ? {} : { formationEngine }),
+    fieldRuntime: sanitizeFieldRuntime(value.fieldRuntime),
   };
   pendingOffers = null;
   pendingOfferWave = -1;
@@ -274,7 +415,7 @@ export function rollMoodyBoonDefinition(
   salt: number,
   excluded: ReadonlySet<string> = new Set(),
 ): MoodyBoonDefinition | null {
-  const catalog: readonly MoodyBoonDefinition[] = MOODY_BOONS;
+  const catalog: readonly MoodyBoonDefinition[] = [...MOODY_BOON_BY_ID.values()];
   const eligible = catalog.filter(boon => boon.implementationStatus !== "blocked" && !excluded.has(boon.id));
   if (eligible.length === 0) {
     return null;

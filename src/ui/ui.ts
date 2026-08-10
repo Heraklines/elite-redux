@@ -36,6 +36,7 @@ import {
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -84,6 +85,27 @@ import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
 import { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
+import type { MoodyBattleHudModel } from "#ui/moody/moody-battle-hud";
+import { MoodyChoiceUiHandler } from "#ui/moody/moody-choice-ui-handler";
+import { MoodyCurseSelectUiHandler } from "#ui/moody/moody-curse-select-ui-handler";
+import { MoodyEnemyPanelUiHandler } from "#ui/moody/moody-enemy-panel-ui-handler";
+import {
+  buildMoodyDetailedRecapSections,
+  getMoodyLivePresentationSnapshot,
+  type MoodyLivePresentationSnapshot,
+  setMoodyLivePresentationSnapshot,
+} from "#ui/moody/moody-live-presentation";
+import type { MoodyOperationModel, MoodyOperationResult } from "#ui/moody/moody-operation";
+import {
+  buildMoodyRecapRows,
+  type MoodyChoicePanelModel,
+  type MoodyTargetPickerModel,
+  type MoodyTransitionSection,
+} from "#ui/moody/moody-presentation";
+import { MoodyRuntimeUi } from "#ui/moody/moody-runtime-ui";
+import type { MoodySectionReportConfig } from "#ui/moody/moody-section-report-ui-handler";
+import { MoodySectionReportUiHandler } from "#ui/moody/moody-section-report-ui-handler";
+import { MoodyTargetPickerUiHandler } from "#ui/moody/moody-target-picker-ui-handler";
 import { MoodyBoonSelectUiHandler } from "#ui/moody-boon-select-ui-handler";
 import { MoodyLedgerUiHandler } from "#ui/moody-ledger-ui-handler";
 import { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
@@ -145,6 +167,9 @@ const transitionModes = [
   // other full-screen transition modes.
   UiMode.MOODY_BOON_SELECT,
   UiMode.MOODY_LEDGER,
+  UiMode.MOODY_CURSE_SELECT,
+  UiMode.MOODY_ENEMY_PANEL,
+  UiMode.MOODY_SECTION_REPORT,
 ];
 
 const noTransitionModes = [
@@ -212,6 +237,13 @@ export class UI extends Phaser.GameObjects.Container {
   public achvBar: AchvBar;
   public bgmBar: BgmBar;
   public savingIcon: SavingIconContainer;
+  private moodyRuntimeUi: MoodyRuntimeUi | null = null;
+  private readonly refreshMoodyRuntime = () => this.moodyRuntimeUi?.refresh(this.mode);
+  private readonly moodyChoiceQueue: {
+    model: MoodyChoicePanelModel;
+    resolve: (optionId: string | null) => void;
+  }[] = [];
+  private moodyChoiceOpen = false;
 
   private tooltipContainer: Phaser.GameObjects.Container;
   private tooltipBg: Phaser.GameObjects.NineSlice;
@@ -308,6 +340,11 @@ export class UI extends Phaser.GameObjects.Container {
       new FunAbilityReviewUiHandler(),
       new MoodyBoonSelectUiHandler(),
       new MoodyLedgerUiHandler(),
+      new MoodyCurseSelectUiHandler(),
+      new MoodyTargetPickerUiHandler(),
+      new MoodyChoiceUiHandler(),
+      new MoodyEnemyPanelUiHandler(),
+      new MoodySectionReportUiHandler(),
     ];
   }
 
@@ -332,6 +369,123 @@ export class UI extends Phaser.GameObjects.Container {
     this.savingIcon.setup();
 
     globalScene.uiContainer.add(this.savingIcon);
+
+    this.moodyRuntimeUi = new MoodyRuntimeUi();
+    globalScene.events.on(Phaser.Scenes.Events.UPDATE, this.refreshMoodyRuntime);
+  }
+
+  /** Push one ordered, non-modal Moody activation row into the live battle feed. */
+  public pushMoodyTrigger(label: string): void {
+    this.moodyRuntimeUi?.pushTrigger(label);
+  }
+
+  /** Keyboard/controller/mobile callers share the same expansion state as tapping the feed. */
+  public toggleMoodyTriggerFeed(): void {
+    this.moodyRuntimeUi?.toggleTriggerFeed();
+  }
+
+  /** Mechanics-owned decisions may provide exact rule/tracker/HP state here. */
+  public setMoodyBattleHudModel(model: MoodyBattleHudModel | null): void {
+    this.moodyRuntimeUi?.setModel(model);
+    this.moodyRuntimeUi?.refresh(this.mode);
+  }
+
+  /** Replace the mechanics-owned presentation projection consumed by all Moody UI surfaces. */
+  public setMoodyLivePresentation(snapshot: MoodyLivePresentationSnapshot | null): void {
+    setMoodyLivePresentationSnapshot(snapshot);
+    this.moodyRuntimeUi?.refresh(this.mode);
+  }
+
+  /**
+   * Queue a mechanics-owned contextual decision. Only one modal is opened at a
+   * time; the next decision is presented after the prior handler has reverted.
+   */
+  public requestMoodyChoice(model: MoodyChoicePanelModel): Promise<string | null> {
+    return new Promise(resolve => {
+      this.moodyChoiceQueue.push({ model, resolve });
+      this.openNextMoodyChoice();
+    });
+  }
+
+  private openNextMoodyChoice(): void {
+    if (this.moodyChoiceOpen) {
+      return;
+    }
+    const request = this.moodyChoiceQueue.shift();
+    if (request == null) {
+      return;
+    }
+    this.moodyChoiceOpen = true;
+    void this.setOverlayMode(UiMode.MOODY_CHOICE, request.model, (optionId: string | null) => {
+      this.moodyChoiceOpen = false;
+      request.resolve(optionId);
+      this.openNextMoodyChoice();
+    });
+  }
+
+  /** Open the reusable binding picker against live mechanics-supplied targets. */
+  public requestMoodyTarget(model: MoodyTargetPickerModel): Promise<number | string | null> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_TARGET_PICKER, model, resolve);
+    });
+  }
+
+  /** Production entry point for interactive Moody reward, contract, market, inheritance, and planning flows. */
+  public requestMoodyOperation(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_CHOICE, model, resolve);
+    });
+  }
+
+  public requestMoodyRecycler(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "recycler" });
+  }
+
+  public requestMoodyLegacySlot(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "legacy" });
+  }
+
+  public requestMoodyBloodMarket(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "blood-market" });
+  }
+
+  public requestMoodyPressureValve(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "pressure-valve" });
+  }
+
+  public requestMoodyItemStackAttachment(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "item-stack" });
+  }
+
+  /** Open a paged report and resolve after the player confirms or closes it. */
+  public showMoodyReport(config: Omit<MoodySectionReportConfig, "onAction">): Promise<"confirm" | "cancel"> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_SECTION_REPORT, { ...config, onAction: resolve });
+    });
+  }
+
+  public showMoodyBorrowedFuture(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "borrowed-future", reorderable: true });
+  }
+
+  public showMoodyBountyBoard(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "bounty" });
+  }
+
+  public showMoodyBiomeReport(sections: readonly MoodyTransitionSection[]): Promise<"confirm" | "cancel"> {
+    return this.showMoodyReport({ title: "BIOME REPORT", sections });
+  }
+
+  /** End-run entry point; mechanics provides the final seed label at GameOver. */
+  public showMoodyRunRecap(seedLabel: string): Promise<"confirm" | "cancel"> {
+    const state = getMoodyModeState();
+    const rows = state == null ? [] : buildMoodyRecapRows(state, seedLabel);
+    const baseSections: MoodyTransitionSection[] = [{ title: "Final build", lines: rows.map(row => row.label) }];
+    return this.showMoodyReport({
+      title: "MOODY RUN RECAP",
+      sections: buildMoodyDetailedRecapSections(baseSections, getMoodyLivePresentationSnapshot()?.recap),
+      footer: "UP DOWN page   A continue",
+    });
   }
 
   private setupTooltip() {
@@ -385,6 +539,7 @@ export class UI extends Phaser.GameObjects.Container {
    * @returns true if the input attempt succeeds
    */
   processInput(button: Button): boolean {
+    this.moodyRuntimeUi?.refresh(this.mode);
     // #player-telemetry: emit the raw input as a compact code + surface context. No listener unless a
     // telemetry build subscribed, so this is behavior-preserving.
     this.emit("er-telemetry-input", button, this.mode);
@@ -1343,6 +1498,11 @@ export class UI extends Phaser.GameObjects.Container {
    * and clears menus from {@linkcode NavigationManager} to prepare for reset
    */
   public freeUIData(): void {
+    globalScene.events.off(Phaser.Scenes.Events.UPDATE, this.refreshMoodyRuntime);
+    this.moodyRuntimeUi?.destroy();
+    this.moodyRuntimeUi = null;
+    this.moodyChoiceQueue.splice(0);
+    this.moodyChoiceOpen = false;
     this.handlers.forEach(h => h.destroy());
     this.handlers = [];
     NavigationManager.getInstance().clearNavigationMenus();

@@ -24,7 +24,9 @@ import {
   setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
+import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import { recordTelemetryRunOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -62,6 +64,7 @@ export class GameOverPhase extends BattlePhase {
 
   private isVictory: boolean;
   private readonly firstRibbons: PokemonSpecies[] = [];
+  private moodyRecapShown = false;
 
   constructor(isVictory = false) {
     super();
@@ -231,6 +234,16 @@ export class GameOverPhase extends BattlePhase {
   }
 
   handleGameOver(): void {
+    if (
+      !this.moodyRecapShown
+      && globalScene.gameMode.isFun
+      && getFunModeConfig().moodyMode
+      && getMoodyModeState() != null
+    ) {
+      this.moodyRecapShown = true;
+      void globalScene.ui.showMoodyRunRecap(globalScene.seed).then(() => this.handleGameOver());
+      return;
+    }
     const doGameOver = (newClear: boolean) => {
       globalScene.disableMenu = true;
       globalScene.time.delayedCall(1000, () => {

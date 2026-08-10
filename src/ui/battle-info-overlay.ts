@@ -29,6 +29,7 @@ import {
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
 import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
+import { shouldHideMoodyEnemyInformation } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -634,6 +635,14 @@ export class BattleInfoOverlay {
   }
 
   private renderAbilitiesInner(c: Phaser.GameObjects.Container, mon: Pokemon): void {
+    if (mon.isEnemy() && shouldHideMoodyEnemyInformation("abilities") && !mon.waveData.abilityRevealed) {
+      const hidden = addTextObject(68, ROW4_BOXES[0][1] + 6, "Abilities are concealed.", TextStyle.WINDOW_ALT, {
+        fontSize: "44px",
+      });
+      hidden.setOrigin(0, 0);
+      c.add(hidden);
+      return;
+    }
     const rows: { label: string; abilityId: number; locked: boolean; gift?: boolean }[] = [];
     // ER Giratina's Bargain - Curiosity (#544): slots the player sealed for this run.
     // The ER slot index is 0 (active ability) or `innateSlot + 1` (innate), matching
@@ -794,7 +803,24 @@ export class BattleInfoOverlay {
   private renderMoves(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     // ER (#380): up to 8 rows - the finale boss fields the full 7-move
     // Angel's Wrath kit, rendered in the compressed band.
-    const moves = mon.getMoveset().filter(Boolean).slice(0, 8);
+    const moves = mon
+      .getMoveset()
+      .filter(
+        move =>
+          move != null
+          && (!mon.isEnemy()
+            || !shouldHideMoodyEnemyInformation("moves")
+            || mon.waveData.revealedMoveIds.has(move.moveId)),
+      )
+      .slice(0, 8);
+    if (moves.length === 0 && mon.isEnemy() && shouldHideMoodyEnemyInformation("moves")) {
+      const hidden = addTextObject(68, ROW4_BOXES[0][1] + 6, "No moves have been revealed.", TextStyle.WINDOW_ALT, {
+        fontSize: "44px",
+      });
+      hidden.setOrigin(0, 0);
+      c.add(hidden);
+      return;
+    }
     const compact = moves.length > 5;
     moveRowBoxes(moves.length).forEach(([, by], i) => {
       const mv = moves[i];

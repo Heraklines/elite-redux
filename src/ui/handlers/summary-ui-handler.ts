@@ -21,6 +21,7 @@ import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
+import { getMoodyModeState, MOODY_BOON_BY_ID, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -53,6 +54,16 @@ import {
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
+import {
+  buildMoodyMarkerSummaryRows,
+  buildMoodyMoveStateLabels,
+  buildMoodyMoveTileSuffix,
+  buildMoodyRuntimeSummaryRows,
+  getMoodyLivePresentationSnapshot,
+  getMoodyMovePresentation,
+  getMoodyPokemonPresentation,
+} from "#ui/moody/moody-live-presentation";
+import { buildMoodyBadge, moodyAttachmentClass, moodyTargetSummary } from "#ui/moody/moody-presentation";
 import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
 import {
   currentEvolutionIndex,
@@ -76,6 +87,8 @@ enum Page {
   ABILITIES,
   STATS,
   MOVES,
+  /** Moody Mode: bindings, counters, attachments, and derived sources. */
+  MOOD,
 }
 
 export enum SummaryUiMode {
@@ -129,6 +142,11 @@ export class SummaryUiHandler extends UiHandler {
   private giftCycleBadge: Phaser.GameObjects.Sprite | null = null;
   /** Full-screen ability-detail overlay (long description); null when closed. */
   private abilitiesDetailContainer: Phaser.GameObjects.Container | null = null;
+  private moodyInspectMode = false;
+  private moodyCursor = 0;
+  private moodyVisibleStart = 0;
+  private moodyRowCount = 0;
+  private moodyRows: { label: string; detail: string; tint: number }[] = [];
   private shinyOverlay: Phaser.GameObjects.Image;
   private numberText: Phaser.GameObjects.Text;
   private pokemonSprite: Phaser.GameObjects.Sprite;
@@ -465,7 +483,7 @@ export class SummaryUiHandler extends UiHandler {
     // Elite Redux ABILITIES page has no dedicated background asset — reuse the
     // profile frame (it's just borders/dividers; the section titles are
     // separate overlays we control in populate()).
-    if (page === Page.ABILITIES) {
+    if (page === Page.ABILITIES || page === Page.MOOD) {
       return "summary_profile";
     }
     return `summary_${Page[page].toLowerCase()}`;
@@ -907,6 +925,13 @@ export class SummaryUiHandler extends UiHandler {
       } else {
         error = true;
       }
+    } else if (this.cursor === Page.MOOD && this.moodyInspectMode && (button === Button.UP || button === Button.DOWN)) {
+      if (this.moodyRowCount > 0) {
+        const delta = button === Button.DOWN ? 1 : -1;
+        this.moodyCursor = (this.moodyCursor + delta + this.moodyRowCount) % this.moodyRowCount;
+        this.populatePageContainer(this.summaryPageContainer);
+        success = true;
+      }
     } else if (button === Button.ACTION) {
       if (this.cursor === Page.ABILITIES) {
         if (this.abilitiesDetailContainer) {
@@ -939,9 +964,17 @@ export class SummaryUiHandler extends UiHandler {
         //Show IVs
         this.permStatsContainer.setVisible(!this.permStatsContainer.visible);
         this.ivContainer.setVisible(!this.ivContainer.visible);
+      } else if (this.cursor === Page.MOOD) {
+        this.moodyInspectMode = !this.moodyInspectMode;
+        this.populatePageContainer(this.summaryPageContainer);
+        success = true;
       }
     } else if (button === Button.CANCEL) {
-      if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
+      if (this.cursor === Page.MOOD && this.moodyInspectMode) {
+        this.moodyInspectMode = false;
+        this.populatePageContainer(this.summaryPageContainer);
+        success = true;
+      } else if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
         // Close the detail overlay rather than leaving the summary.
         this.closeAbilityDetail();
         success = true;
@@ -966,7 +999,9 @@ export class SummaryUiHandler extends UiHandler {
       }
       success = true;
     } else {
-      const pages = getEnumValues(Page);
+      const pages = getEnumValues(Page).filter(
+        page => page !== Page.MOOD || (globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode),
+      );
       switch (button) {
         case Button.UP:
         case Button.DOWN: {
@@ -1100,6 +1135,9 @@ export class SummaryUiHandler extends UiHandler {
     } else {
       changed = this.cursor !== cursor;
       if (changed) {
+        if (this.cursor === Page.MOOD && cursor !== Page.MOOD) {
+          this.moodyInspectMode = false;
+        }
         // Leaving the ABILITIES page → tear down its detail overlay.
         if (this.cursor === Page.ABILITIES && cursor !== Page.ABILITIES) {
           this.closeAbilityDetail();
@@ -1116,8 +1154,9 @@ export class SummaryUiHandler extends UiHandler {
         // Tab visual mapping. The 3 vanilla pages use baked tab sprites
         // (1=STATUS, 2=STATS, 3=MOVES). ER's ABILITIES page has no baked
         // asset, so we hide the tab sprite and show a text label instead.
-        if ((this.cursor as Page) === Page.ABILITIES) {
+        if ((this.cursor as Page) === Page.ABILITIES || (this.cursor as Page) === Page.MOOD) {
           this.tabSprite.setVisible(false);
+          this.abilitiesTabText.setText(this.cursor === Page.MOOD ? "MOOD" : i18next.t("pokemonSummary:abilities"));
           this.abilitiesTabText.setVisible(true);
         } else {
           this.abilitiesTabText.setVisible(false);
@@ -1585,6 +1624,15 @@ export class SummaryUiHandler extends UiHandler {
         // header, so the moves panel keeps its full layout.
         const movesViewEntry = this.getOmniformViewEntry();
         const movesViewSet = movesViewEntry ? getEvolutionMoveset(this.pokemon!, movesViewEntry, 5) : null;
+        const maxMoveRows = Math.min(
+          8,
+          Math.max(
+            this.pokemon?.getMaxMoveCount() ?? 4,
+            movesViewSet?.moveIds.length ?? this.pokemon?.moveset.length ?? 0,
+          ),
+        );
+        const moveRowStep = maxMoveRows > 5 ? 11 : 16;
+        const descriptionY = maxMoveRows > 5 ? 98 : 84;
         this.movesContainer = globalScene.add.container(5, -pageBg.height + 26);
         pageContainer.add(this.movesContainer);
 
@@ -1598,7 +1646,7 @@ export class SummaryUiHandler extends UiHandler {
 
         this.movesContainerDescriptionsTitle = globalScene.add.image(
           2,
-          78,
+          descriptionY - 6,
           getLocalizedSpriteKey("summary_moves_descriptions_title"),
         ); // Pixel text 'DESCRIPTIONS'
         this.movesContainerDescriptionsTitle.setOrigin(0, 0.5);
@@ -1606,8 +1654,7 @@ export class SummaryUiHandler extends UiHandler {
 
         // The "new move" row sits just below the existing move rows (16px each),
         // so its Y depends on the move cap: 64 for 4 moves, 80 with ER's 5th slot.
-        const maxMoveRows = this.pokemon?.getMaxMoveCount() ?? 4;
-        this.extraMoveRowContainer = globalScene.add.container(0, 16 * maxMoveRows);
+        this.extraMoveRowContainer = globalScene.add.container(0, moveRowStep * maxMoveRows);
         this.extraMoveRowContainer.setVisible(false);
         this.movesContainer.add(this.extraMoveRowContainer);
 
@@ -1650,7 +1697,7 @@ export class SummaryUiHandler extends UiHandler {
         this.movesContainer.add(this.moveRowsContainer);
 
         for (let m = 0; m < maxMoveRows; m++) {
-          const moveRowContainer = globalScene.add.container(0, 16 * m);
+          const moveRowContainer = globalScene.add.container(0, moveRowStep * m);
           this.moveRowsContainer.add(moveRowContainer);
 
           // Resolve this row's move + type + PP text. In preview mode the move is
@@ -1669,7 +1716,9 @@ export class SummaryUiHandler extends UiHandler {
           } else {
             const move = this.pokemon && this.pokemon.moveset.length > m ? this.pokemon.moveset[m] : null;
             if (move && this.pokemon) {
-              moveName = move.getName();
+              moveName = `${move.getName()}${buildMoodyMoveTileSuffix(
+                getMoodyMovePresentation(this.pokemon.id, move.moveId),
+              )}`;
               moveType = this.pokemon.getMoveType(move.getMove());
               const maxPP = move.getMovePp();
               ppLabel = `${padInt(maxPP - move.ppUsed, 2, "  ")}/${padInt(maxPP, 2, "  ")}`;
@@ -1696,7 +1745,9 @@ export class SummaryUiHandler extends UiHandler {
           moveRowContainer.add(ppText);
         }
 
-        this.moveDescriptionText = addTextObject(2, 84, "", TextStyle.WINDOW_ALT, { wordWrap: { width: 1212 } });
+        this.moveDescriptionText = addTextObject(2, descriptionY, "", TextStyle.WINDOW_ALT, {
+          wordWrap: { width: 1212 },
+        });
         this.movesContainer.add(this.moveDescriptionText);
 
         // ER Omniform preview: label the previewed moveset. The fallback set (no
@@ -1719,14 +1770,14 @@ export class SummaryUiHandler extends UiHandler {
         // ER: second column for the property pages. Fixed x so the right column
         // lines up cleanly (the pixel font is variable-width, so space-padding the
         // left column can't align it). Hidden for the description page.
-        this.moveDetailCol2Text = addTextObject(116, 84, "", TextStyle.WINDOW_ALT).setVisible(false);
+        this.moveDetailCol2Text = addTextObject(116, descriptionY, "", TextStyle.WINDOW_ALT).setVisible(false);
         this.movesContainer.add(this.moveDetailCol2Text);
 
         // ER: prominent dynamic header for the cyclable move-detail, placed where
         // the static "DESCRIPTIONS" banner is (which we hide while this shows), so
         // the player clearly sees the current page + that the info (C) button
         // cycles, e.g. "[C] ▶ Mechanics  2/4".
-        this.moveDetailPageLabel = addTextObject(2, 79, "", TextStyle.MOVE_INFO_CONTENT)
+        this.moveDetailPageLabel = addTextObject(2, descriptionY - 5, "", TextStyle.MOVE_INFO_CONTENT)
           .setOrigin(0, 0.5)
           .setVisible(false);
         this.movesContainer.add(this.moveDetailPageLabel);
@@ -1735,7 +1786,12 @@ export class SummaryUiHandler extends UiHandler {
         moveDescriptionTextMaskRect.setScale(6);
         moveDescriptionTextMaskRect.fillStyle(0xffffff);
         moveDescriptionTextMaskRect.beginPath();
-        moveDescriptionTextMaskRect.fillRect(112, 130, 202, 46);
+        moveDescriptionTextMaskRect.fillRect(
+          112,
+          130 + (descriptionY - 84),
+          202,
+          Math.max(24, 46 - (descriptionY - 84)),
+        );
 
         const moveDescriptionTextMask = moveDescriptionTextMaskRect.createGeometryMask();
 
@@ -1743,6 +1799,120 @@ export class SummaryUiHandler extends UiHandler {
         this.moveDetailCol2Text?.setMask(moveDescriptionTextMask);
         break;
       }
+      case Page.MOOD: {
+        this.populateMoodyPage(pageContainer, pageBg);
+        break;
+      }
+    }
+  }
+
+  private populateMoodyPage(pageContainer: Phaser.GameObjects.Container, pageBg: Phaser.GameObjects.Sprite): void {
+    const state = getMoodyModeState();
+    const pokemon = this.pokemon;
+    const partySlot = pokemon == null ? -1 : globalScene.getPlayerParty().indexOf(pokemon);
+    const rows: { label: string; detail: string; tint: number }[] = [];
+
+    if (state != null && pokemon != null) {
+      for (const curse of state.curses) {
+        const definition = MOODY_CURSE_BY_ID.get(curse.curseId);
+        const targetsPokemon = curse.target?.pokemonIds?.includes(pokemon.id) === true;
+        if (curse.target == null || targetsPokemon) {
+          rows.push({
+            label: `CURSE / ${definition?.name ?? curse.curseId}`,
+            detail: definition?.description ?? "",
+            tint: 0xb06ac0,
+          });
+        }
+      }
+      for (const boon of state.boons) {
+        const definition = MOODY_BOON_BY_ID.get(boon.boonId);
+        if (definition == null) {
+          continue;
+        }
+        const target = boon.target;
+        const applies =
+          target == null
+          || target.pokemonIds?.includes(pokemon.id) === true
+          || (partySlot >= 0 && target.partySlots?.includes(partySlot) === true);
+        if (!applies) {
+          continue;
+        }
+        const badge = buildMoodyBadge(boon);
+        rows.push({
+          label: `${moodyAttachmentClass(definition).toUpperCase()} / ${badge.name} ${badge.rankLabel}`,
+          detail: `${badge.stateLabel} / ${moodyTargetSummary(target)}\n${badge.detail}`,
+          tint: badge.tint,
+        });
+      }
+    }
+
+    if (pokemon != null) {
+      rows.push(...buildMoodyRuntimeSummaryRows(getMoodyPokemonPresentation(pokemon.id)));
+      rows.push(...buildMoodyMarkerSummaryRows(getMoodyLivePresentationSnapshot(), pokemon.id));
+    }
+
+    this.moodyRows = rows;
+    this.moodyRowCount = rows.length;
+    this.moodyCursor = Math.max(0, Math.min(this.moodyCursor, Math.max(0, rows.length - 1)));
+    if (this.moodyCursor < this.moodyVisibleStart) {
+      this.moodyVisibleStart = this.moodyCursor;
+    } else if (this.moodyCursor >= this.moodyVisibleStart + 7) {
+      this.moodyVisibleStart = this.moodyCursor - 6;
+    }
+
+    const mood = globalScene.add.container(0, -pageBg.height);
+    pageContainer.add(mood);
+    const title = addTextObject(7, 4, "MOODY ATTACHMENTS", TextStyle.SUMMARY_HEADER).setOrigin(0, 0);
+    const hint = addTextObject(207, 5, this.moodyInspectMode ? "A inspect / B back" : "A focus", TextStyle.SUMMARY)
+      .setOrigin(1, 0)
+      .setAlpha(0.75);
+    mood.add([title, hint]);
+
+    if (rows.length === 0) {
+      mood.add(
+        addTextObject(107, 72, "No Moody effects affect this Pokemon.", TextStyle.WINDOW_ALT, {
+          align: "center",
+          wordWrap: { width: 190 * 6, useAdvancedWrap: true },
+        }).setOrigin(0.5),
+      );
+      return;
+    }
+
+    for (let visible = 0; visible < 7; visible++) {
+      const index = this.moodyVisibleStart + visible;
+      const row = rows[index];
+      if (row == null) {
+        continue;
+      }
+      const text = addTextObject(10, 22 + visible * 16, row.label, TextStyle.SUMMARY, {
+        fixedWidth: 118 * 6,
+        maxLines: 1,
+      })
+        .setOrigin(0, 0)
+        .setColor(Phaser.Display.Color.IntegerToColor(row.tint).rgba)
+        .setAlpha(this.moodyInspectMode && index !== this.moodyCursor ? 0.55 : 1);
+      mood.add(text);
+      if (this.moodyInspectMode && index === this.moodyCursor) {
+        mood.add(
+          globalScene.add
+            .nineslice(6, 19 + visible * 16, "summary_moves_cursor", undefined, 123, 15, 1, 1, 1, 1)
+            .setOrigin(0),
+        );
+      }
+    }
+    const selected = rows[this.moodyCursor];
+    const detail = addTextObject(136, 22, selected?.detail ?? "", TextStyle.WINDOW_ALT, {
+      fontSize: "30px",
+      fixedWidth: 70 * 6,
+      maxLines: 12,
+      wordWrap: { width: 70 * 6, useAdvancedWrap: true },
+    }).setOrigin(0, 0);
+    mood.add(detail);
+    if (this.moodyVisibleStart > 0) {
+      mood.add(addTextObject(124, 18, "UP", TextStyle.SUMMARY).setOrigin(1, 0).setAlpha(0.7));
+    }
+    if (this.moodyVisibleStart + 7 < rows.length) {
+      mood.add(addTextObject(124, 140, "DOWN", TextStyle.SUMMARY).setOrigin(1, 0).setAlpha(0.7));
     }
   }
 
@@ -1778,7 +1948,7 @@ export class SummaryUiHandler extends UiHandler {
    * Pokémon's move cap — 4 normally, 5 if it has ER's extra move slot.
    */
   private getNewMoveRowIndex(): number {
-    return this.pokemon?.getMaxMoveCount() ?? 4;
+    return Math.min(8, Math.max(this.pokemon?.getMaxMoveCount() ?? 4, this.pokemon?.moveset.length ?? 0));
   }
 
   getSelectedMove(): Move | null {
@@ -1826,16 +1996,23 @@ export class SummaryUiHandler extends UiHandler {
     this.movesContainerDescriptionsTitle?.setVisible(false);
     this.moveDetailPageLabel?.setText(`[C] ▶ ${page.title}  ${pageIndex + 1}/${pages.length}`).setVisible(true);
 
+    const moodyLines = buildMoodyMoveStateLabels(
+      this.pokemon == null ? null : getMoodyMovePresentation(this.pokemon.id, move.id),
+    );
+
     if (page.description === undefined) {
       // Two columns so all four property rows are visible at a glance (no scroll).
       // Left column = rows 0/2, right column = rows 1/3, each in its own fixed-x
       // text object so they align despite the variable-width pixel font.
       const rows = page.rows ?? [];
       const cell = (r?: MoveDetailRow): string => (r ? `${r.label}: ${r.value}` : "");
-      this.moveDescriptionText.setText(`${cell(rows[0])}\n${cell(rows[2])}`.trimEnd());
+      const left = `${cell(rows[0])}\n${cell(rows[2])}`.trimEnd();
+      this.moveDescriptionText.setText(`${left}${moodyLines.length === 0 ? "" : `\n${moodyLines.join(" / ")}`}`);
       this.moveDetailCol2Text?.setText(`${cell(rows[1])}\n${cell(rows[3])}`.trimEnd()).setVisible(true);
     } else {
-      this.moveDescriptionText.setText(page.description || "");
+      this.moveDescriptionText.setText(
+        `${page.description || ""}${moodyLines.length === 0 ? "" : `\n\n${moodyLines.join("\n")}`}`,
+      );
       this.moveDetailCol2Text?.setVisible(false);
     }
   }
@@ -1980,6 +2157,7 @@ export class SummaryUiHandler extends UiHandler {
       /** ER Black Shiny gift row — distinct styling, never locked. */
       gift?: boolean;
       avalanche?: boolean;
+      temporary?: boolean;
     }
     const rows: Row[] = [];
 
@@ -2012,6 +2190,15 @@ export class SummaryUiHandler extends UiHandler {
         const ability = innateAbilities[3 + index];
         if (ability && ability.id !== AbilityId.NONE) {
           rows.push({ label: `Ability ${index + 5}`, ability, avalanche: true });
+        }
+      }
+    }
+
+    if (!viewOnly) {
+      for (const temporary of getMoodyPokemonPresentation(mon.id)?.temporaryAbilities ?? []) {
+        const ability = allAbilities[temporary.abilityId];
+        if (ability != null && !rows.some(row => row.ability.id === ability.id)) {
+          rows.push({ label: temporary.carousel ? "Ability 5" : "Temporary", ability, temporary: true });
         }
       }
     }
@@ -2078,7 +2265,12 @@ export class SummaryUiHandler extends UiHandler {
       // candy/level/seal lock chrome applies (it is the live mon's state).
       if (viewOnly) {
         // no lock — fall through to the neutral render below
-      } else if (!row.gift && !row.avalanche && runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
+      } else if (
+        !row.gift
+        && !row.avalanche
+        && !row.temporary
+        && runLocked(row.slot === undefined ? 0 : row.slot + 1)
+      ) {
         locked = true;
         lockIconKey = "icon_lock";
         reason = i18next.t("pokemonSummary:abilitySealedRun");

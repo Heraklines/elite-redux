@@ -17,6 +17,7 @@ import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
+import { isMoodyCoordinatorReviveAllowed } from "#data/elite-redux/moody/moody-coordinator-combat-state";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
@@ -1995,6 +1996,9 @@ export class PokemonInstantReviveModifier extends PokemonHeldItemModifier {
    * @returns always `true`
    */
   override apply(pokemon: Pokemon): boolean {
+    if (!isMoodyCoordinatorReviveAllowed(pokemon.id)) {
+      return false;
+    }
     // Restore the Pokemon to half HP
     globalScene.phaseManager.unshiftNew(
       "PokemonHealPhase",
@@ -2193,7 +2197,11 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
    * @returns `true` if the {@linkcode PokemonHpRestoreModifier} should be applied
    */
   override shouldApply(playerPokemon?: PlayerPokemon, multiplier?: number): boolean {
-    return super.shouldApply(playerPokemon) && (this.fainted || (multiplier != null && typeof multiplier === "number"));
+    return (
+      super.shouldApply(playerPokemon)
+      && (!this.fainted || playerPokemon == null || isMoodyCoordinatorReviveAllowed(playerPokemon.id))
+      && (this.fainted || (multiplier != null && typeof multiplier === "number"))
+    );
   }
 
   /**
@@ -2203,6 +2211,9 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
    * @returns `true` if hp was restored
    */
   override apply(pokemon: Pokemon, multiplier: number): boolean {
+    if (this.fainted && !isMoodyCoordinatorReviveAllowed(pokemon.id)) {
+      return false;
+    }
     if (!pokemon.hp === this.fainted) {
       let restorePoints = this.restorePoints;
       if (!this.fainted) {

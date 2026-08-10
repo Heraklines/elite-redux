@@ -1,6 +1,7 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
 import {
   addMoodyCurse,
+  commitMoodyBoonOffer,
   commitMoodyCurseOffer,
   createMoodyModeState,
   getMoodyBoonBudget,
@@ -13,6 +14,8 @@ import {
   restoreMoodyModeState,
   rollMoodyBoonDefinition,
 } from "#data/elite-redux/moody/moody-state";
+import type { MoodyBoonOffer } from "#data/elite-redux/moody/moody-types";
+import { buildPressureValveBoonTarget } from "#ui/moody/moody-operation";
 import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(() => resetMoodyModeState());
@@ -25,7 +28,11 @@ describe("Moody Mode catalog", () => {
     expect(new Set(MOODY_CURSES.map(curse => curse.id)).size).toBe(30);
     expect(MOODY_BOONS.every(boon => boon.base.length > 0 && boon.rankTwo.length > 0)).toBe(true);
     expect(MOODY_BOONS.every(boon => boon.evolutions.length === 2)).toBe(true);
-    expect(MOODY_BOONS.find(boon => boon.id === "set-collector")?.implementationStatus).not.toBe("blocked");
+    const setCollector = MOODY_BOONS.find(boon => boon.id === "set-collector");
+    expect(
+      setCollector != null
+        && (!("implementationStatus" in setCollector) || setCollector.implementationStatus !== "blocked"),
+    ).toBe(true);
   });
 
   it("preserves the authored Unicode text instead of mojibake", () => {
@@ -62,6 +69,24 @@ describe("Moody Mode run state", () => {
 
     initializeMoodyModeState("stable-seed");
     expect(getMoodyBoonOffers(10)).toEqual(first);
+  });
+
+  it("commits and restores the selected Pressure Valve target and conversion", () => {
+    let offer: MoodyBoonOffer | undefined;
+    for (let seed = 0; seed < 10_000 && offer == null; seed++) {
+      initializeMoodyModeState(seed);
+      offer = getMoodyBoonOffers(10).find(candidate => candidate.boonId === "pressure-valve");
+    }
+    expect(offer).toBeDefined();
+    const target = buildPressureValveBoonTarget(87, 4, ["pp"]);
+    expect(target).not.toBeNull();
+    const committed = commitMoodyBoonOffer(offer!, 10, target!);
+    expect(committed.target).toEqual({ pokemonIds: [87], partySlots: [4], option: "pp" });
+
+    const saved = getMoodyModeSaveData();
+    resetMoodyModeState();
+    expect(restoreMoodyModeState(saved)).toBe(true);
+    expect(getMoodyModeSaveData()?.boons).toContainEqual(committed);
   });
 
   it("generates and commits exactly one deterministic opening curse", () => {

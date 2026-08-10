@@ -45,6 +45,8 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { buildPressureValveBoonTarget, buildPressureValveOperation } from "#ui/moody/moody-operation";
+import { inferMoodyCadence, MOODY_CADENCE_LABEL, MOODY_SCOPE_GLYPH } from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -91,18 +93,22 @@ enum TargetStep {
   REPLACE,
 }
 
-const CARD_X = [5, 109, 213] as const;
-const CARD_Y = 18;
-const CARD_W = 102;
-const CARD_H = 138;
+const CARD_X = [4, 82, 160] as const;
+const CARD_Y = 24;
+const CARD_W = 76;
+const CARD_H = 132;
 /** Effect text page geometry inside each card (stable - the box never resizes). */
 const DESC_Y = CARD_Y + 52;
-const DESC_VISIBLE_H = CARD_H - (DESC_Y - CARD_Y) - 6;
+/** Whole-line page height that leaves a dedicated gutter for the bottom-right pager. */
+const DESC_VISIBLE_H = 60;
 const VISIBLE_ROWS = 6;
 const ROW_STEP = 16;
 
 export class MoodyBoonSelectUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
+  /** "Current build: n / 12 lines · ranks r · next draft" under the header. */
+  private buildStatsText: Phaser.GameObjects.Text;
+  private buildSidebarText: Phaser.GameObjects.Text;
 
   // --- Card-select layer ---
   private cardLayer: Phaser.GameObjects.Container;
@@ -140,6 +146,8 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
   private targetScrollTop = 0;
   /** Committed (so double-confirm can never fire onComplete twice). */
   private committed = false;
+  /** A mandatory nested picker is open; ignore input until it resolves. */
+  private operationPending = false;
 
   // Targeting accumulators.
   private pickedPartyIndex = -1;
@@ -165,9 +173,21 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
 
     const bg = globalScene.add.rectangle(0, 0, w, h, 0x14101c, 1).setOrigin(0);
     this.container.add(bg);
-    const header = addTextObject(w / 2, 4, "MOODY DRAFT", TextStyle.HEADER_LABEL);
+    const header = addTextObject(w / 2, 3, "MOODY DRAFT", TextStyle.HEADER_LABEL, { fontSize: "42px" });
     header.setOrigin(0.5, 0);
     this.container.add(header);
+    this.buildStatsText = addTextObject(w / 2, 13, "", TextStyle.SETTINGS_LABEL, { fontSize: "22px" });
+    this.buildStatsText.setOrigin(0.5, 0).setAlpha(0.85);
+    this.container.add(this.buildStatsText);
+    const sidebar = addWindow(238, CARD_Y, 78, CARD_H);
+    this.container.add(sidebar);
+    this.buildSidebarText = addTextObject(243, CARD_Y + 5, "", TextStyle.SETTINGS_LABEL, {
+      fontSize: "26px",
+      fixedWidth: 68 * 6,
+      maxLines: 13,
+      wordWrap: { width: 68 * 6, useAdvancedWrap: true },
+    }).setOrigin(0, 0);
+    this.container.add(this.buildSidebarText);
     const footer = addTextObject(
       w / 2,
       h - 9,
@@ -219,6 +239,7 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
         fontSize: "30px",
       });
       pageLabel.setOrigin(1, 0).setAlpha(0.8);
+      this.cardLayer.add([name, kind, rarity, scope, desc, pageLabel]);
 
       // Click/touch target covering the whole card.
       const hit = globalScene.add.zone(x, CARD_Y, CARD_W, CARD_H).setOrigin(0);
@@ -369,6 +390,7 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
     this.waveIndex = args[0] as number;
     this.onComplete = args[1] as () => void;
     this.committed = false;
+    this.operationPending = false;
     this.step = TargetStep.CARDS;
     this.targetCursorIndex = 0;
     this.targetScrollTop = 0;
@@ -377,6 +399,31 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
     this.party = globalScene.getPlayerParty();
     this.offers = [...getMoodyBoonOffers(this.waveIndex)];
     this.cardPages = [0, 0, 0];
+
+    // Build summary: current lines / cap, total ranks, and evolution proximity so
+    // the draft choice is informed without mentally reconstructing the build.
+    const state = getMoodyModeState();
+    if (state == null) {
+      this.buildStatsText.setText("");
+      this.buildSidebarText.setText("CURRENT BUILD\nNo acquired lines.");
+    } else {
+      const totalRanks = state.boons.reduce((sum, boon) => sum + boon.rank, 0);
+      const evolvingSoon = state.boons.filter(boon => boon.rank === 2).length;
+      this.buildStatsText.setText(
+        `WAVE ${this.waveIndex}  ·  build ${state.boons.length}/12  ·  ranks ${totalRanks}  ·  ${evolvingSoon} line${evolvingSoon === 1 ? "" : "s"} can evolve`,
+      );
+      this.buildSidebarText.setText(
+        [
+          "CURRENT BUILD",
+          ...state.boons.map(boon => {
+            const definition = MOODY_BOON_BY_ID.get(boon.boonId);
+            const evolution = definition?.evolutions.find(branch => branch.id === boon.evolutionId);
+            const rank = boon.rank === 1 ? "I" : boon.rank === 2 ? "II" : (evolution?.name ?? "III");
+            return `${definition?.name ?? boon.boonId} ${rank} (W${boon.acquiredAtWave})`;
+          }),
+        ].join("\n"),
+      );
+    }
 
     this.refreshCards();
     this.cardLayer.setVisible(true);
@@ -401,16 +448,18 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
   private cardDescription(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string {
     switch (offer.kind) {
       case "rank-up":
-        return `Rank II: ${definition.rankTwo}`;
+        return `CURRENT - Rank I: ${definition.base}\n\nAFTER - Rank II: ${definition.rankTwo}`;
       case "evolution":
-        return `Evolve: ${definition.evolutions[0].name} or ${definition.evolutions[1].name}.\n\n${definition.base}`;
+        return `CURRENT - Rank II: ${definition.rankTwo}\n\nAFTER A - ${definition.evolutions[0].name}: ${definition.evolutions[0].description}\n\nAFTER B - ${definition.evolutions[1].name}: ${definition.evolutions[1].description}`;
+      case "replace":
+        return `GAIN: ${definition.base}\n\nCONSEQUENCE: choose one current boon line to discard before this is committed.`;
       default:
         return definition.base;
     }
   }
 
   private scopeLine(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string {
-    const scope = definition.scope;
+    const scope = `${MOODY_SCOPE_GLYPH[definition.targetKind]} ${definition.scope} · ${MOODY_CADENCE_LABEL[inferMoodyCadence(definition)]}`;
     if (offer.kind === "rank-up" || offer.kind === "evolution") {
       return `${scope}  ·  owned`;
     }
@@ -479,6 +528,11 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
       // target it like a visible one.
     }
     const definition = this.definitionOf(offer);
+    if (offer.kind === "rank-up") {
+      // Rank-ups retain the instance's original binding and acquisition choice.
+      this.commitOffer(offer, {});
+      return;
+    }
     if (offer.kind === "evolution") {
       this.openStep(TargetStep.EVOLVE);
       return;
@@ -498,6 +552,11 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
   }
 
   private beginDefinitionTargeting(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): void {
+    if (definition.id === "apex-plunder") {
+      // Apex Plunder binds only after an eligible segmented boss is defeated.
+      this.commitOffer(offer, {});
+      return;
+    }
     switch (definition.targetKind) {
       case "slot":
       case "pokemon":
@@ -818,6 +877,10 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
           this.openStep(TargetStep.PARTY_SECOND);
           return;
         }
+        if (definition?.id === "pressure-valve") {
+          this.requestPressureValve(offer, i);
+          return;
+        }
         // slot / pokemon commit with the single pick.
         const pokemon = this.party[i];
         this.commitOffer(offer, {
@@ -911,6 +974,36 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
     }
   }
 
+  private requestPressureValve(offer: MoodyBoonOffer, partyIndex: number): void {
+    const pokemon = this.party[partyIndex];
+    if (pokemon == null || this.operationPending) {
+      return;
+    }
+    this.operationPending = true;
+    void globalScene.ui
+      .requestMoodyPressureValve(
+        buildPressureValveOperation({
+          healing: "Heal 6% maximum HP for each excess stat stage.",
+          barrier: "Gain an 8% maximum-HP barrier for each excess stat stage.",
+          pp: "Restore 1 PP to the most depleted move for each excess stat stage.",
+        }),
+      )
+      .then(result => {
+        this.operationPending = false;
+        const target =
+          result.action === "confirm" ? buildPressureValveBoonTarget(pokemon.id, partyIndex, result.selectedIds) : null;
+        if (target == null) {
+          this.getUi().playError();
+          return;
+        }
+        this.commitOffer(offer, target);
+      })
+      .catch(() => {
+        this.operationPending = false;
+        this.getUi().playError();
+      });
+  }
+
   // ---------------------------------------------------------------------------
   // Commit
   // ---------------------------------------------------------------------------
@@ -950,7 +1043,7 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
   // ---------------------------------------------------------------------------
 
   processInput(button: Button): boolean {
-    if (!this.active || this.committed) {
+    if (!this.active || this.committed || this.operationPending) {
       return false;
     }
 

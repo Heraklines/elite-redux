@@ -3521,7 +3521,7 @@ export function getDailyRunStarterModifiers(party: PlayerPokemon[]): PokemonHeld
  * @param retryCount Max allowed tries before the next tier down is checked for a valid ModifierType
  * @param allowLuckUpgrades Default true. If false, will not allow ModifierType to randomly upgrade to next tier
  */
-function getNewModifierTypeOption(
+export function getNewModifierTypeOption(
   party: Pokemon[],
   poolType: ModifierPoolType,
   tier?: ModifierTier,

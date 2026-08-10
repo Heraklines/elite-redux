@@ -413,7 +413,9 @@ export const MOODY_RUNTIME_FIELD_VARIANTS = Object.freeze(
       },
     ]),
   ),
-) as Readonly<Record<MoodyRuntimeFieldBoonId, { base: true; rankTwo: true; evolutionIds: readonly [string, string] }>>;
+) as unknown as Readonly<
+  Record<MoodyRuntimeFieldBoonId, { base: true; rankTwo: true; evolutionIds: readonly [string, string] }>
+>;
 
 export const MOODY_RUNTIME_FIELD_COVERAGE = Object.freeze({
   boonNumbers: Object.freeze(Array.from({ length: 34 }, (_, index) => index + 38)),
@@ -447,7 +449,7 @@ function appliesToPokemon(boon: MoodyBoonInstance, pokemon: MoodyRuntimePokemonS
     return pokemon.side === "player";
   }
   const ids = boon.target?.pokemonIds;
-  return ids?.length === 0 || ids.includes(pokemon.id);
+  return ids == null || ids.length === 0 || ids.includes(pokemon.id);
 }
 
 function appliesToSlot(boon: MoodyBoonInstance, pokemon: MoodyRuntimePokemonSnapshot, doctrineId?: string): boolean {
@@ -458,7 +460,7 @@ function appliesToSlot(boon: MoodyBoonInstance, pokemon: MoodyRuntimePokemonSnap
     return pokemon.side === "player";
   }
   const slots = boon.target?.partySlots;
-  return slots?.length === 0 || slots.includes(pokemon.partySlot);
+  return slots == null || slots.length === 0 || slots.includes(pokemon.partySlot);
 }
 
 function rankTwo(boon: MoodyBoonInstance): boolean {
@@ -1508,12 +1510,14 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         break;
       }
       case "last-rites": {
+        const eligibleMoveIds = event.kind === "faint" ? event.pokemon.eligibleMoveIds : undefined;
         if (
           event.kind === "faint"
           && event.pokemon.side === input.ownerSide
-          && event.pokemon.eligibleMoveIds?.length > 0
+          && eligibleMoveIds != null
+          && eligibleMoveIds.length > 0
         ) {
-          setList(battleKey(id, "fallen-moves"), event.pokemon.eligibleMoveIds);
+          setList(battleKey(id, "fallen-moves"), eligibleMoveIds);
           setList(battleKey(id, "fallen-abilities"), event.pokemon.compatibleAbilityIds ?? []);
           baseCommand("mark-trigger", {
             subjectId: event.pokemon.id,
@@ -1993,7 +1997,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         if (event.kind === "encounter-generate") {
           curseCommand("set-counter-weight", {
             multiplier: event.isBoss ? 2 : 1.5,
-            subjectId: event.playerThreatPokemonId,
+            ...(event.playerThreatPokemonId == null ? {} : { subjectId: event.playerThreatPokemonId }),
           });
         }
         break;
@@ -2023,7 +2027,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
           });
         }
         if (event.kind === "battle-won") {
-          const reset = event.alliedFaints > input.event.party.length / 2;
+          const reset = event.alliedFaints > event.party.length / 2;
           setNumber(`persistent:${id}:streak`, reset ? 0 : numberAt(currentState(), `persistent:${id}:streak`) + 1);
           curseCommand("mark-trigger", {
             value: reset ? "streak-reset" : "streak-increased",
@@ -2041,10 +2045,11 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         if (event.kind === "biome-transition") {
           for (const pokemon of event.party) {
             const candidates = event.replacementMoveCandidates[pokemon.id] ?? [];
-            if (candidates.length === 0 || pokemon.moveIds?.length === 0) {
+            const moveIds = pokemon.moveIds;
+            if (candidates.length === 0 || moveIds == null || moveIds.length === 0) {
               continue;
             }
-            const moveIndex = deterministicIndex(event.seed, `${id}:move:${pokemon.id}`, pokemon.moveIds.length);
+            const moveIndex = deterministicIndex(event.seed, `${id}:move:${pokemon.id}`, moveIds.length);
             const replacementIndex = deterministicIndex(
               event.seed,
               `${id}:replacement:${pokemon.id}`,
@@ -2052,7 +2057,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
             );
             curseCommand("replace-move-temporarily", {
               subjectId: pokemon.id,
-              value: pokemon.moveIds[moveIndex],
+              value: moveIds[moveIndex],
               data: {
                 replacementMoveId: candidates[replacementIndex],
                 untilNextBiome: true,

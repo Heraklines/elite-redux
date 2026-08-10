@@ -633,6 +633,14 @@ export class Battle {
     return ret;
   }
 
+  public captureDeterministicRngState(): string | null {
+    return this.battleSeedState;
+  }
+
+  public restoreDeterministicRngState(state: string | null): void {
+    this.battleSeedState = state;
+  }
+
   /**
    * Returns if the battle is of type {@linkcode BattleType.MYSTERY_ENCOUNTER}
    */

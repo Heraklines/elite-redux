@@ -239,7 +239,8 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
     [data-ui-mode="SHOWDOWN_TEAM_MENU"],
-    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"],
+    [data-ui-mode="MOODY_LEDGER"]
   )
   #apadCycleForm,
 #touchControls:not(.config-mode):not(
@@ -248,7 +249,8 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
     [data-ui-mode="SHOWDOWN_TEAM_MENU"],
-    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"],
+    [data-ui-mode="MOODY_LEDGER"]
   )
   #apadCycleShiny,
 #touchControls:not(.config-mode):not(

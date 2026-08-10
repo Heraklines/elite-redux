@@ -105,6 +105,14 @@ import {
   resetMoodyEnemyBoonLoadout,
   setMoodyEnemyBoonLoadout,
 } from "#data/elite-redux/moody/moody-enemy";
+import { prepareMoodyFormationItemActivation } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyCoordinatorItemRule,
+  notifyMoodyCoordinatorPokemonPermanentlyRemoved,
+  prepareMoodyCoordinatorEnemyGeneration,
+  prepareMoodyCoordinatorItemActivation,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { notifyMoodyCoordinatorItemInventory } from "#data/elite-redux/moody/moody-runtime-item-adapter";
 import {
   getShowdownBattleFormat,
   getShowdownFieldOpponentManifest,
@@ -283,6 +291,42 @@ export interface InfoToggle {
  * deterministic-per-wave triple decision that does NOT perturb the main wave RNG stream.
  */
 const TRIPLE_ROLL_SEED_OFFSET = 0x74_72_70_6c; // "trpl"
+
+function applyPersistentModifierWithMoody(modifier: PersistentModifier, args: unknown[]): boolean {
+  if (!(modifier instanceof PokemonHeldItemModifier)) {
+    return (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  const pokemon = modifier.getPokemon();
+  if (pokemon == null) {
+    return false;
+  }
+  const plan = prepareMoodyFormationItemActivation(pokemon, modifier.type.id, "bespoke");
+  const coordinatorPlan = pokemon.isPlayer()
+    ? prepareMoodyCoordinatorItemActivation(pokemon, modifier.type.id, "consumed" in modifier)
+    : { preserveStack: false, repeatActivation: false, effectMultiplier: 1 };
+  const holders = args.filter((value): value is NumberHolder => value instanceof NumberHolder);
+  const before = holders.map(holder => holder.value);
+  if (coordinatorPlan.effectMultiplier <= 0) {
+    return false;
+  }
+  const applied = (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  if (!applied) {
+    return false;
+  }
+  holders.forEach((holder, index) => {
+    holder.value = before[index] + (holder.value - before[index]) * plan.multiplier * coordinatorPlan.effectMultiplier;
+  });
+  if (plan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.preserveStack && "consumed" in modifier) {
+    (modifier as PersistentModifier & { consumed: boolean }).consumed = false;
+  }
+  return true;
+}
 
 /**
  * The `BattleScene` is the primary scene for the game.
@@ -3892,7 +3936,28 @@ export class BattleScene extends SceneBase {
     this.validateAchvs(ModifierAchv, modifier);
     const modifiersToRemove: PersistentModifier[] = [];
     if (modifier instanceof PersistentModifier) {
-      if ((modifier as PersistentModifier).add(this.modifiers, !!virtual)) {
+      let added = (modifier as PersistentModifier).add(this.modifiers, !!virtual);
+      if (!added && !virtual && modifier instanceof PokemonHeldItemModifier) {
+        const pokemon = modifier.getPokemon();
+        const matching = this.modifiers.find(
+          candidate =>
+            candidate instanceof PokemonHeldItemModifier
+            && candidate.pokemonId === modifier.pokemonId
+            && candidate.matchType(modifier),
+        ) as PokemonHeldItemModifier | undefined;
+        if (pokemon != null && matching != null) {
+          const rule = getMoodyCoordinatorItemRule(pokemon, modifier.type.id);
+          const extraCapacity = rule.ignoreStackCap ? Math.max(1, rule.extraCap) : rule.extraCap;
+          if (
+            extraCapacity > 0
+            && matching.stackCount + modifier.stackCount <= matching.getMaxStackCount() + extraCapacity
+          ) {
+            matching.stackCount += modifier.stackCount;
+            added = true;
+          }
+        }
+      }
+      if (added) {
         // The modifier was added: report success so purchase flows that gate on
         // the return value (e.g. SelectModifierPhase.applyModifier deducting the
         // cost) charge for it. Previously `success` stayed false for a normal
@@ -3975,6 +4040,9 @@ export class BattleScene extends SceneBase {
           success ||= result;
         }
       }
+    }
+    if (success && modifier instanceof PersistentModifier && !virtual) {
+      notifyMoodyCoordinatorItemInventory(this.modifiers);
     }
     return success;
   }
@@ -4150,6 +4218,7 @@ export class BattleScene extends SceneBase {
   removePartyMemberModifiers(partyMemberIndex: number): Promise<void> {
     return new Promise(resolve => {
       const pokemonId = this.getPlayerParty()[partyMemberIndex].id;
+      notifyMoodyCoordinatorPokemonPermanentlyRemoved(pokemonId);
       const modifiersToRemove = this.modifiers.filter(
         m => m instanceof PokemonHeldItemModifier && (m as PokemonHeldItemModifier).pokemonId === pokemonId,
       );
@@ -4164,6 +4233,7 @@ export class BattleScene extends SceneBase {
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
       if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+        prepareMoodyCoordinatorEnemyGeneration(this.getEnemyParty().some(pokemon => pokemon.isBoss()));
         setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(this.getEnemyParty(), this.currentBattle.waveIndex));
       } else {
         resetMoodyEnemyBoonLoadout();
@@ -4416,6 +4486,9 @@ export class BattleScene extends SceneBase {
           modifier.apply(pokemon, false);
         }
       }
+      if (!enemy) {
+        notifyMoodyCoordinatorItemInventory(this.modifiers);
+      }
       return true;
     }
 
@@ -4510,7 +4583,7 @@ export class BattleScene extends SceneBase {
   ): T[] {
     const appliedModifiers: T[] = [];
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         appliedModifiers.push(modifier);
       }
@@ -4535,7 +4608,7 @@ export class BattleScene extends SceneBase {
       (m): m is T => m instanceof modifierType && m.shouldApply(...args),
     );
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         return modifier;
       }

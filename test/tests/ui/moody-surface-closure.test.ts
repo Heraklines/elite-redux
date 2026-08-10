@@ -1,0 +1,235 @@
+import {
+  buildMoodyDetailedRecapSections,
+  buildMoodyMarkerSummaryRows,
+  buildMoodyMoveStateLabels,
+  buildMoodyMoveTileSuffix,
+  buildMoodyRuntimeSummaryRows,
+  type MoodyLivePresentationSnapshot,
+} from "#ui/moody/moody-live-presentation";
+import {
+  buildPressureValveBoonTarget,
+  buildPressureValveOperation,
+  moodyNegativeSpaceEligibility,
+} from "#ui/moody/moody-operation";
+import { buildMoodyEnemyPanelRows } from "#ui/moody/moody-presentation";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+function source(path: string): string {
+  return readFileSync(resolve(process.cwd(), path), "utf8");
+}
+
+describe("Moody operation contracts", () => {
+  it("Pressure Valve persists exactly one Healing, Barrier, or PP selection", () => {
+    const model = buildPressureValveOperation({ healing: "heal", barrier: "shield", pp: "restore" });
+    expect(model).toMatchObject({ kind: "pressure-valve", minSelections: 1, maxSelections: 1, cancellable: false });
+    expect(model.options.map(option => option.id)).toEqual(["healing", "barrier", "pp"]);
+    expect(buildPressureValveBoonTarget(41, 2, ["barrier"])).toEqual({
+      pokemonIds: [41],
+      partySlots: [2],
+      option: "barrier",
+    });
+    expect(buildPressureValveBoonTarget(41, 2, [])).toBeNull();
+    expect(buildPressureValveBoonTarget(41, 2, ["healing", "pp"])).toBeNull();
+    expect(buildPressureValveBoonTarget(41, 2, ["invalid"])).toBeNull();
+  });
+
+  it("Negative Space rejects structural moves and the last damaging move", () => {
+    expect(
+      moodyNegativeSpaceEligibility({ damaging: false, eligible: true, structural: true, usableDamagingMoveCount: 2 }),
+    ).toEqual({
+      eligible: false,
+      reason: "Structural or otherwise ineligible move.",
+    });
+    expect(
+      moodyNegativeSpaceEligibility({ damaging: true, eligible: true, usableDamagingMoveCount: 1 }).reason,
+    ).toContain("last usable damaging");
+    expect(moodyNegativeSpaceEligibility({ damaging: true, eligible: true, usableDamagingMoveCount: 2 })).toEqual({
+      eligible: true,
+    });
+  });
+
+  it("the shared operation result preserves selected IDs and reorder plans", () => {
+    const handler = source("src/ui/moody/moody-choice-ui-handler.ts");
+    expect(handler).toContain('action: "confirm"');
+    expect(handler).toContain("selectedIds: [...this.operationSelected]");
+    expect(handler).toContain("orderedIds: this.operationOptions.map");
+    expect(handler).toMatch(/case Button\.(ACTION|SUBMIT)/);
+    expect(handler).toMatch(/case Button\.(LEFT|RIGHT)/);
+  });
+});
+
+describe("Moody live move, stack, marker, and recap projection", () => {
+  const snapshot: MoodyLivePresentationSnapshot = {
+    pokemon: [
+      {
+        pokemonId: 7,
+        temporaryAbilities: [
+          {
+            abilityId: 1,
+            name: "Carousel",
+            description: "Temporary fifth ability.",
+            sourceLabel: "Ability Carousel",
+            carousel: true,
+          },
+        ],
+        moves: [
+          {
+            pokemonId: 7,
+            moveId: 33,
+            temporary: true,
+            sealed: true,
+            ppCost: 3,
+            overdraftHpPercent: 10,
+            overdraftPowerPercent: 25,
+            refrainCount: 2,
+            guaranteedSecondary: true,
+            cannotMiss: true,
+            sourceLabel: "Final Draft",
+            originalMoveName: "Tackle",
+          },
+        ],
+        itemStacks: [
+          {
+            stackId: "vitamin",
+            name: "Calcium",
+            count: 8,
+            attachedEffects: ["Heirloom"],
+            setLabel: "Pantry",
+            setProgress: "2/3",
+            amplificationLabel: "+50%",
+            disabled: true,
+            disabledReason: "Cursed Inventory",
+          },
+        ],
+        barrier: 40,
+        damageDebt: 20,
+        debtDueLabel: "due in 1 turn",
+        revivalCharges: 2,
+        revivalLabel: "APEX",
+        modifiers: [{ label: "Damage", value: "+20%", sourceLabel: "Chosen One" }],
+      },
+    ],
+    trackers: [{ id: "cadence", label: "Avalanche", value: "3/5", pokemonId: 7 }],
+    curseMarkers: [
+      { id: "mark", label: "Blood Mark", detail: "Pays the next debt.", pokemonId: 7, urgency: "critical" },
+    ],
+    recap: {
+      selectedCurse: "Fog of War",
+      mostTriggered: ["Chosen One - 18"],
+      completedBounties: ["Type Mosaic"],
+      highestGlory: 12,
+      flawlessLedgerProgress: "7 upgrades",
+      mostUsedPokemon: "Eevee",
+      majorCurseEvents: ["Blood Moon revived the boss"],
+      replayId: "RUN-1",
+    },
+  };
+
+  it("covers every required move state in tiles and details", () => {
+    const move = snapshot.pokemon![0].moves![0];
+    const labels = buildMoodyMoveStateLabels(move);
+    expect(labels.join(" | ")).toContain("TEMP");
+    expect(labels).toContain("SEALED");
+    expect(labels).toContain("PP COST 3");
+    expect(labels.join(" | ")).toContain("OVERDRAFT");
+    expect(labels).toContain("REFRAIN x2");
+    expect(labels).toContain("SECONDARY GUARANTEED");
+    expect(labels).toContain("CANNOT MISS");
+    expect(labels).toContain("REPLACES: Tackle");
+    expect(labels).toContain("SOURCE: Final Draft");
+    expect(buildMoodyMoveTileSuffix(move)).toContain("[T X P3 O R2 S !]");
+  });
+
+  it("projects Carousel, vitamins/items, barriers, debt, APEX, modifiers, cadence, and curse markers", () => {
+    const rows = [...buildMoodyRuntimeSummaryRows(snapshot.pokemon![0]), ...buildMoodyMarkerSummaryRows(snapshot, 7)];
+    const text = rows.map(row => `${row.label}\n${row.detail}`).join("\n");
+    for (const required of [
+      "ABILITY 5",
+      "Calcium x8",
+      "DISABLED",
+      "BARRIER",
+      "DAMAGE DEBT",
+      "APEX",
+      "Chosen One",
+      "Avalanche",
+      "Blood Mark",
+    ]) {
+      expect(text, required).toContain(required);
+    }
+  });
+
+  it("builds the detailed end-run recap without dropping requested fields", () => {
+    const text = buildMoodyDetailedRecapSections([], snapshot.recap)
+      .flatMap(section => section.lines)
+      .join("\n");
+    for (const required of [
+      "Fog of War",
+      "Chosen One - 18",
+      "Type Mosaic",
+      "12",
+      "7 upgrades",
+      "Eevee",
+      "Blood Moon",
+      "RUN-1",
+    ]) {
+      expect(text, required).toContain(required);
+    }
+  });
+});
+
+describe("Moody production reachability and eight-slot limits", () => {
+  it("renders an explicit eight-Pokemon enemy roster without revealing reserves", () => {
+    const rows = buildMoodyEnemyPanelRows([], { rosterSize: 8, hiddenReserves: true });
+    expect(rows.filter(row => row.kind === "slot")).toHaveLength(8);
+    expect(
+      rows
+        .filter(row => row.kind === "slot")
+        .slice(1)
+        .every(row => row.label.includes("Unknown reserve")),
+    ).toBe(true);
+  });
+
+  it("keeps all interactive operations production-callable through the registered choice mode", () => {
+    const ui = source("src/ui/ui.ts");
+    for (const method of [
+      "requestMoodyRecycler",
+      "showMoodyBountyBoard",
+      "requestMoodyLegacySlot",
+      "showMoodyBorrowedFuture",
+      "requestMoodyBloodMarket",
+      "requestMoodyPressureValve",
+      "requestMoodyItemStackAttachment",
+    ]) {
+      expect(ui, method).toContain(method);
+    }
+    expect(ui).toMatch(/UiMode\.MOODY_CHOICE/);
+    expect(source("src/data/elite-redux/coop/coop-ui-registry.ts")).toMatch(/UiMode\.MOODY_CHOICE/);
+    const coordinator = source("src/data/elite-redux/moody/moody-runtime-game-adapter.ts");
+    expect(coordinator).toContain('kind: "bounty"');
+    expect(coordinator).toContain('kind: "legacy"');
+    expect(coordinator).toContain('kind: "borrowed-future"');
+    expect(source("src/phases/biome-shop-phase.ts")).toContain("requestMoodyBloodMarket");
+    expect(source("src/phases/select-modifier-phase.ts")).toContain("requestMoodyRecycler");
+  });
+
+  it("wires real harness scenarios, eight moves, eight party slots, Fog observations, and input parity", () => {
+    const scenarios = source("src/dev-tools/test-suite/scenarios.ts");
+    for (const call of [
+      "showMoodyBountyBoard",
+      "showMoodyBorrowedFuture",
+      "requestMoodyRecycler",
+      "requestMoodyPressureValve",
+    ]) {
+      expect(scenarios, call).toContain(call);
+    }
+    expect(source("src/ui/handlers/fight-ui-handler.ts")).toContain("Math.min(8");
+    expect(source("src/ui/handlers/summary-ui-handler.ts")).toContain("Math.min(8");
+    expect(source("src/ui/handlers/party-ui-handler.ts")).toContain("globalScene.getPlayerParty().length");
+    expect(source("src/ui/handlers/menu-ui-handler.ts")).toContain("observedEnemyBoonInstanceIds");
+    const inputs = source("src/ui-inputs.ts");
+    expect(inputs).toMatch(/Button\.CYCLE_GENDER/);
+    expect(inputs).toContain("toggleMoodyTriggerFeed");
+  });
+});

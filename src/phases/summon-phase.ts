@@ -6,6 +6,7 @@ import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-d
 import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording, isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
+import { notifyMoodyFormationEntry } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
@@ -344,6 +345,7 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   queuePostSummon(): void {
     const pokemon = this.getPokemon();
     pokemon.turnData.summonedThisTurn = true;
+    notifyMoodyFormationEntry(pokemon);
     if (pokemon.isEnemy()) {
       // ER exposes the active ability and every innate for a fielded opponent. Keep the
       // policy visibility model aligned with that entry disclosure, including sources

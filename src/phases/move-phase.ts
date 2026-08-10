@@ -12,6 +12,18 @@ import {
   recordCoopEvent,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  notifyMoodyFormationMoveAttempt,
+  notifyMoodyFormationMoveResolved,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  notifyMoodyRuntimeBeforeMove,
+  notifyMoodyRuntimeMoveResolved,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  getMoodyCoordinatorMoveSelection,
+  notifyMoodyCoordinatorMoveResolved,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { canMoodyActWhileAsleep, getMoodyPpCost } from "#data/elite-redux/moody/moody-scene-adapter";
 import { SpeciesFormChangePreMoveTrigger } from "#data/form-change-triggers";
 import { getStatusEffectActivationText } from "#data/status-effect";
@@ -63,6 +75,7 @@ export class MovePhase extends PokemonPhase {
   protected failed = false;
   /** Whether the current move should fail and retain PP. */
   protected cancelled = false;
+  private moodyCoordinatorReported = false;
 
   /** Flag set to `true` during {@linkcode checkFreeze} that indicates that the pokemon will thaw if it passes the failure conditions */
   private declare thaw?: boolean;
@@ -156,6 +169,10 @@ export class MovePhase extends PokemonPhase {
     if (override) {
       [this.move, this.targets] = override;
     }
+
+    const activeTargets = this.getActiveTargetPokemon();
+    notifyMoodyFormationMoveAttempt(user, activeTargets, this.move.getMove(), this.useMode);
+    notifyMoodyRuntimeBeforeMove(user, activeTargets[0], this.move.getMove());
 
     // For the purposes of payback and kin, the pokemon is considered to have acted
     // if it attempted to move at all.
@@ -483,8 +500,10 @@ export class MovePhase extends PokemonPhase {
       && !usability.value
     ) {
       failedText = i18next.t("battle:moveCannotUseChallenge", { moveName });
-    } else {
+    } else if (getMoodyCoordinatorMoveSelection(this.pokemon, moveId).selectable) {
       return false;
+    } else {
+      failedText = `${moveName} is sealed by Negative Space!`;
     }
 
     this.cancel();
@@ -1078,6 +1097,26 @@ export class MovePhase extends PokemonPhase {
    * Queue a {@linkcode MoveEndPhase} and then end this phase.
    */
   public end(): void {
+    if (this.cancelled || this.failed) {
+      notifyMoodyFormationMoveResolved(this.pokemon, this.move.getMove(), "failed");
+    }
+    notifyMoodyRuntimeMoveResolved(
+      this.pokemon,
+      this.getActiveTargetPokemon()[0],
+      this.move.getMove(),
+      !this.cancelled && !this.failed,
+    );
+    if (!this.moodyCoordinatorReported) {
+      this.moodyCoordinatorReported = true;
+      notifyMoodyCoordinatorMoveResolved(
+        this.pokemon,
+        this.move.moveId,
+        this.getActiveTargetPokemon(),
+        !this.cancelled && !this.failed,
+        this.move.getMove().category !== MoveCategory.STATUS,
+        this.useMode === MoveUseMode.FOLLOW_UP,
+      );
+    }
     globalScene.phaseManager.unshiftNew(
       "MoveEndPhase",
       this.pokemon.getBattlerIndex(),

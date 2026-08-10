@@ -69,6 +69,14 @@ import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
+  enforceMoodyRuntimeLead,
+  prepareMoodyRuntimeEncounter,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorWildEncounter,
+  prepareMoodyCoordinatorTrainerRoster,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
   maybeBeginSinglePlayerReplayRecording,
   maybeCaptureReplayCheckpoint,
 } from "#data/elite-redux/replay-single-recording";
@@ -581,6 +589,7 @@ export class EncounterPhase extends BattlePhase {
 
   start() {
     super.start();
+    enforceMoodyRuntimeLead();
 
     // ReturnPhase is structural and therefore neutralized on the authoritative guest.
     // Its subsequent player SummonPhase never owns ShowTrainerPhase's exit there, so clear
@@ -1216,6 +1225,19 @@ export class EncounterPhase extends BattlePhase {
     // resizing it for a wild override) - that fielded fewer than 3 foes in-game ("3v1"). Pad
     // it to enemyCapacity here, AFTER all prior resizes, so the field always fills. Binary
     // (cap <= 2) is a no-op.
+    const fieldRosterSize = prepareMoodyRuntimeEncounter(battle.enemyLevels?.length ?? 0);
+    const moodyRosterSize = prepareMoodyCoordinatorTrainerRoster(
+      fieldRosterSize,
+      PLAYER_PARTY_MAX_SIZE,
+      battle.battleType === BattleType.TRAINER,
+      battle.trainer?.config.isBoss === true,
+    );
+    if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < moodyRosterSize) {
+      const fill = battle.enemyLevels.at(-1) ?? 1;
+      while (battle.enemyLevels.length < moodyRosterSize) {
+        battle.enemyLevels.push(fill);
+      }
+    }
     const enemyCapacity = battle.arrangement.enemyCapacity;
     if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
       const fill = battle.enemyLevels.at(-1) ?? battle.enemyLevels[0] ?? 1;
@@ -1267,6 +1289,7 @@ export class EncounterPhase extends BattlePhase {
             TrainerSlot.NONE,
             !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
           );
+          applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
             battle.enemyParty[e].ivs.fill(31);
           }

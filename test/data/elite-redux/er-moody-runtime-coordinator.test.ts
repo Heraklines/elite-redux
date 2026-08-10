@@ -9,6 +9,7 @@ import {
   MOODY_COORDINATOR_SAVE_CONTRACT,
   type MoodyCoordinatorCommand,
   type MoodyCoordinatorEvent,
+  type MoodyCoordinatorExecutors,
   type MoodyCoordinatorState,
   persistMoodyCoordinatorState,
   resetMoodyCoordinatorCadence,
@@ -84,6 +85,7 @@ describe("Moody runtime coordinator", () => {
         ],
       },
       { type: "reward-generated", seed: 12, slotCount: 3, offerIds: ["a", "b", "c"] },
+      { overlapMode: "coordinator-owned" },
     );
     expect(result.commands.map(command => command.kind)).toEqual([
       "apply-pre-luck-rarity-uplifts",
@@ -147,10 +149,24 @@ describe("Moody runtime coordinator", () => {
         command => command.kind,
       ),
     ).toEqual(["guarantee-collectible-traits", "set-capture-rate-multiplier"]);
-    expect(MOODY_COORDINATOR_OVERLAP_POLICY.overlappingPaths).toHaveLength(2);
+    expect(MOODY_COORDINATOR_OVERLAP_POLICY.overlappingPaths).toHaveLength(3);
+
+    const cursedDraftState: MoodyCoordinatorState = {
+      effects: [{ effectId: "cursed-draft", stage: "base" }],
+    };
+    const boonDraft: MoodyCoordinatorEvent = {
+      type: "reward-generated",
+      seed: 12,
+      slotCount: 3,
+      offerIds: ["a", "b", "c"],
+    };
+    expect(coordinateMoodyRuntime(cursedDraftState, boonDraft).commands).toEqual([]);
+    expect(
+      coordinateMoodyRuntime(cursedDraftState, boonDraft, { overlapMode: "coordinator-owned" }).commands,
+    ).toHaveLength(1);
   });
 
-  it("routes Set Collector inventory snapshots to a typed progression command", () => {
+  it("does not route blocked Set Collector inventory snapshots", () => {
     const result = coordinateMoodyRuntime(
       { effects: [{ effectId: "set-collector", stage: "rank-two" }] },
       {
@@ -160,26 +176,8 @@ describe("Moody runtime coordinator", () => {
         chosenSetId: "tactician-tools",
       },
     );
-    expect(result.commands).toEqual([
-      {
-        domain: "progression",
-        effectId: "set-collector",
-        kind: "apply-item-set-bonuses",
-        data: {
-          activeSets: [
-            {
-              setId: "tactician-tools",
-              name: "Tactician's Tools",
-              pieceCount: 2,
-              requiredPieceCount: 2,
-              tier: "three",
-              effect: { accuracyMultiplier: 1.1 },
-            },
-          ],
-        },
-      },
-    ]);
-    expect(result.state.effects[0].state?.values?.activeItemSets).toEqual(result.commands[0].data.activeSets);
+    expect(result.commands).toEqual([]);
+    expect(result.state.effects[0].state?.values?.activeItemSets).toBeUndefined();
   });
 
   it("routes biome progression without losing effect-local state", () => {
@@ -205,6 +203,7 @@ describe("Moody runtime coordinator", () => {
         partyMoves: { "101": ["53"] },
         eligibleReplacementsByMove: { "53": ["58"] },
       },
+      { overlapMode: "coordinator-owned" },
     );
     expect(result.commands.map(command => command.kind)).toEqual([
       "grant-money",
@@ -223,11 +222,19 @@ describe("Moody runtime coordinator", () => {
 
   it("executes typed command domains sequentially", async () => {
     const order: string[] = [];
-    const executors = {
-      progression: vi.fn(async (command: MoodyCoordinatorCommand) => order.push(`p:${command.kind}`)),
-      economy: vi.fn(async (command: MoodyCoordinatorCommand) => order.push(`e:${command.kind}`)),
-      reward: vi.fn(async (command: MoodyCoordinatorCommand) => order.push(`r:${command.kind}`)),
-      capture: vi.fn(async (command: MoodyCoordinatorCommand) => order.push(`c:${command.kind}`)),
+    const executors: MoodyCoordinatorExecutors = {
+      progression: vi.fn(async command => {
+        order.push(`p:${command.kind}`);
+      }),
+      economy: vi.fn(async command => {
+        order.push(`e:${command.kind}`);
+      }),
+      reward: vi.fn(async command => {
+        order.push(`r:${command.kind}`);
+      }),
+      capture: vi.fn(async command => {
+        order.push(`c:${command.kind}`);
+      }),
     };
     const commands: MoodyCoordinatorCommand[] = [
       { domain: "economy", effectId: "compound-interest", kind: "grant-money", data: { amount: 50 } },

@@ -75,6 +75,12 @@ import {
   erMerchantsSealRerollMultiplier,
   erScrapMagnetExtraRewards,
 } from "#data/elite-redux/er-relics";
+import {
+  applyMoodyCoordinatorRewardOptions,
+  getMoodyCoordinatorRecyclerSelectionCount,
+  getMoodyCoordinatorRewardReplacementRule,
+  recycleMoodyCoordinatorRewardOptions,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
@@ -800,6 +806,8 @@ export class SelectModifierPhase extends BattlePhase {
               return this.openCheckTeamScreen(modifierSelectCallback);
             case 3:
               return this.toggleRerollLock();
+            case 4:
+              return this.openMoodyRecycler(modifierSelectCallback);
             default:
               return false;
           }
@@ -1021,7 +1029,16 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Reroll rewards
   private rerollModifiers() {
-    const rerollCost = this.getRerollCost(globalScene.lockModifierTiers);
+    const replacementRule = getMoodyCoordinatorRewardReplacementRule(
+      "reroll",
+      this.getRerollCost(globalScene.lockModifierTiers),
+      0,
+    );
+    const rerollCost = replacementRule.cost;
+    if (replacementRule.disabled) {
+      globalScene.ui.playError();
+      return false;
+    }
     if (rerollCost < 0 || globalScene.money < rerollCost) {
       globalScene.ui.playError();
       return false;
@@ -1078,6 +1095,50 @@ export class SelectModifierPhase extends BattlePhase {
     // own reward/skip interaction). No-op unless recording / in co-op.
     recordSinglePlayerInteraction("reroll", COOP_INTERACTION_REROLL);
     globalScene.playSound("se/buy");
+    return true;
+  }
+
+  public recycleMoodyRewards(destroyedIndices: readonly number[]): boolean {
+    const recycled = recycleMoodyCoordinatorRewardOptions(this.typeOptions, destroyedIndices);
+    if (!recycled) {
+      globalScene.ui.playError();
+      return false;
+    }
+    const handler = globalScene.ui.getHandler() as { setModifiers?: (options: ModifierTypeOption[]) => void };
+    handler.setModifiers?.(this.typeOptions);
+    return true;
+  }
+
+  private openMoodyRecycler(modifierSelectCallback: ModifierSelectCallback): boolean {
+    const sacrificeCount = getMoodyCoordinatorRecyclerSelectionCount();
+    if (this.typeOptions.length <= sacrificeCount) {
+      globalScene.ui.playError();
+      return false;
+    }
+    void globalScene.ui
+      .requestMoodyRecycler({
+        kind: "recycler",
+        title: "RECYCLER",
+        prompt: `Destroy ${sacrificeCount === 1 ? "one offer" : `${sacrificeCount} offers`}. The remaining offers receive improved weighting.`,
+        confirmLabel: "destroy and reroll",
+        cancellable: true,
+        minSelections: sacrificeCount,
+        maxSelections: sacrificeCount,
+        options: this.typeOptions.map((option, index) => ({
+          id: String(index),
+          label: option.type.name,
+          description: `Base tier: ${ModifierTier[option.type.tier] ?? option.type.tier}`,
+          consequenceLines: ["This offer is destroyed permanently.", "The other reward offers are improved."],
+        })),
+      })
+      .then(result => {
+        const indices = result.action === "confirm" ? result.selectedIds.map(Number).filter(Number.isSafeInteger) : [];
+        if (indices.length === sacrificeCount) {
+          this.recycleMoodyRewards(indices);
+        }
+        this.resetModifierSelect(modifierSelectCallback);
+      })
+      .catch(() => this.resetModifierSelect(modifierSelectCallback));
     return true;
   }
 
@@ -1925,13 +1986,14 @@ export class SelectModifierPhase extends BattlePhase {
       this.rerollCount,
       this.modifierTiers,
     );
-    return getPlayerModifierTypeOptions(
+    const options = getPlayerModifierTypeOptions(
       modifierCount,
       globalScene.getPlayerParty(),
       rerollTierPolicy.tiers,
       this.customModifierSettings,
       rerollTierPolicy.allowLuckUpgrades,
     );
+    return this.rerollCount === 0 ? applyMoodyCoordinatorRewardOptions(options) : options;
   }
 
   /**

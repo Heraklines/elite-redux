@@ -5,6 +5,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { submitBugReport } from "#data/elite-redux/er-bug-report";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
@@ -15,6 +16,7 @@ import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-s
 import type { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { BgmBar } from "#ui/bgm-bar";
 import { MessageUiHandler } from "#ui/message-ui-handler";
+import { getMoodyLivePresentationSnapshot } from "#ui/moody/moody-live-presentation";
 import { addTextObject, getTextStyleOptions } from "#ui/text";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
 import { fixedInt, sessionIdKey } from "#utils/common";
@@ -35,6 +37,7 @@ enum MenuOptions {
   SAVE_AND_QUIT,
   LOG_OUT,
   MOODY_LEDGER,
+  MOODY_ENEMY,
   // Showdown 1v1 (D4): concede the duel. Appended LAST so excluding it (every non-showdown context)
   // never shifts another option's index, keeping the processInput adjustedCursor mapping intact.
   FORFEIT,
@@ -97,8 +100,9 @@ export class MenuUiHandler extends MessageUiHandler {
       { condition: globalScene.gameMode.isCoop, options: [MenuOptions.SAVE_AND_QUIT] },
       {
         condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
-        options: [MenuOptions.MOODY_LEDGER],
+        options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
       },
+      { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -163,8 +167,9 @@ export class MenuUiHandler extends MessageUiHandler {
       },
       {
         condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
-        options: [MenuOptions.MOODY_LEDGER],
+        options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
       },
+      { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -180,7 +185,9 @@ export class MenuUiHandler extends MessageUiHandler {
             ? i18next.t("menuUiHandler:forfeit", { defaultValue: "Forfeit" })
             : o === MenuOptions.MOODY_LEDGER
               ? "Moody Ledger"
-              : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
+              : o === MenuOptions.MOODY_ENEMY
+                ? "Enemy Mood"
+                : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
         )
         .join("\n"),
       TextStyle.WINDOW,
@@ -665,6 +672,23 @@ export class MenuUiHandler extends MessageUiHandler {
         ui.setOverlayMode(UiMode.MOODY_LEDGER);
         ui.playSelect();
         return true;
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.MOODY_ENEMY) {
+        const loadout = getMoodyEnemyBoonLoadout();
+        if (loadout != null) {
+          const fogOfWar = getMoodyModeState()?.curses.some(curse => curse.curseId === "fog-of-war") === true;
+          ui.setOverlayMode(UiMode.MOODY_ENEMY_PANEL, {
+            boons: loadout.boons,
+            rosterSize: Math.max(1, globalScene.getEnemyParty().length),
+            hiddenReserves: true,
+            fogOfWar,
+            ...(getMoodyLivePresentationSnapshot()?.observedEnemyBoonInstanceIds == null
+              ? {}
+              : { observedInstanceIds: new Set(getMoodyLivePresentationSnapshot()!.observedEnemyBoonInstanceIds) }),
+          });
+          ui.playSelect();
+          return true;
+        }
       }
       let adjustedCursor = this.cursor;
       const excludedMenu = this.excludedMenus().find(e => e.condition);

@@ -11,12 +11,9 @@ import type {
   MoodyRuntimeTerrain,
   MoodyRuntimeWeather,
 } from "#data/elite-redux/moody/moody-runtime-field";
-import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
+import type { MoodyModeSaveData, MoodyRuntimeFieldSaveData } from "#data/elite-redux/moody/moody-types";
 
-type EventOf<K extends MoodyRuntimeFieldEvent["kind"]> = Extract<
-  MoodyRuntimeFieldEvent,
-  { kind: K }
->;
+type EventOf<K extends MoodyRuntimeFieldEvent["kind"]> = Extract<MoodyRuntimeFieldEvent, { kind: K }>;
 
 export interface MoodyLivePokemonReader<TPokemon> {
   readonly id: (pokemon: TPokemon) => number;
@@ -48,27 +45,7 @@ export interface MoodyLiveBattleSnapshot<TPokemon> {
   readonly enemyActive: readonly TPokemon[];
 }
 
-export interface MoodyRuntimeFieldSaveData {
-  readonly version: 1;
-  readonly cursor: {
-    readonly battleId: string;
-    readonly waveIndex: number;
-    readonly turn: number;
-    readonly segmentIndex: number;
-    readonly biomeId: number;
-    readonly biomeEpoch: number;
-  };
-  readonly numbers: readonly (readonly [key: string, value: number])[];
-  readonly values: readonly (readonly [
-    key: string,
-    value: string | number | boolean,
-  ])[];
-  readonly lists: readonly (readonly [key: string, value: readonly string[]])[];
-}
-
-export type MoodyModeSaveDataWithFieldRuntime<
-  TSave extends MoodyModeSaveData = MoodyModeSaveData,
-> = TSave & {
+export type MoodyModeSaveDataWithFieldRuntime<TSave extends MoodyModeSaveData = MoodyModeSaveData> = TSave & {
   readonly fieldRuntime: MoodyRuntimeFieldSaveData;
 };
 
@@ -93,48 +70,39 @@ export type MoodyRuntimeResetBoundary =
   | { readonly kind: "run-end" };
 
 export const MOODY_RUNTIME_FIELD_RESET_CADENCES = Object.freeze({
-  battle:
-    "Keys prefixed by a battle ID live through that battle and are removed before the next battle-start event.",
+  battle: "Keys prefixed by a battle ID live through that battle and are removed before the next battle-start event.",
   boss: "boss:<battleId>: keys live through one boss battle and are removed before any later battle.",
-  segment:
-    "segment:<index>: keys live through one ten-wave segment and are removed when segmentIndex changes.",
-  biome:
-    "biome:<epoch>: keys live through one biome visit and are removed when biomeEpoch changes.",
-  persistent:
-    "persistent: keys survive battles, segments, and biomes and reset only at run end.",
+  segment: "segment:<index>: keys live through one ten-wave segment and are removed when segmentIndex changes.",
+  biome: "biome:<epoch>: keys live through one biome visit and are removed when biomeEpoch changes.",
+  persistent: "persistent: keys survive battles, segments, and biomes and reset only at run end.",
 });
 
 export function serializeMoodyRuntimeFieldState(
   state: MoodyRuntimeFieldState,
   cursor: MoodyRuntimeFieldSaveData["cursor"],
 ): MoodyRuntimeFieldSaveData {
-  const sortedEntries = <T>(
-    record: Readonly<Record<string, T>>,
-  ): readonly (readonly [string, T])[] =>
+  const sortedEntries = <T>(record: Readonly<Record<string, T>>): readonly (readonly [string, T])[] =>
     Object.entries(record).sort(([left], [right]) => left.localeCompare(right));
   return {
     version: 1,
     cursor: { ...cursor },
-    numbers: sortedEntries(state.numbers),
-    values: sortedEntries(state.values),
+    numbers: sortedEntries(state.numbers).map(([key, value]) => [key, value]),
+    values: sortedEntries(state.values).map(([key, value]) => [key, value]),
     lists: sortedEntries(state.lists).map(([key, value]) => [key, [...value]]),
   };
 }
 
-export function deserializeMoodyRuntimeFieldState(
-  save: MoodyRuntimeFieldSaveData | undefined,
-): MoodyRuntimeFieldState {
-  if (!save) return { numbers: {}, values: {}, lists: {} };
-  if (save.version !== 1)
-    throw new Error(
-      `Unsupported Moody field runtime save version: ${String(save.version)}`,
-    );
+export function deserializeMoodyRuntimeFieldState(save: MoodyRuntimeFieldSaveData | undefined): MoodyRuntimeFieldState {
+  if (!save) {
+    return { numbers: {}, values: {}, lists: {} };
+  }
+  if (save.version !== 1) {
+    throw new Error(`Unsupported Moody field runtime save version: ${String(save.version)}`);
+  }
   return {
     numbers: Object.fromEntries(save.numbers),
     values: Object.fromEntries(save.values),
-    lists: Object.fromEntries(
-      save.lists.map(([key, value]) => [key, [...value]]),
-    ),
+    lists: Object.fromEntries(save.lists.map(([key, value]) => [key, [...value]])),
   };
 }
 
@@ -145,38 +113,37 @@ export function attachMoodyRuntimeFieldSave<TSave extends MoodyModeSaveData>(
   return { ...save, fieldRuntime };
 }
 
-export function extractMoodyRuntimeFieldSave(
-  save: MoodyModeSaveData,
-): MoodyRuntimeFieldSaveData | undefined {
-  return (
-    save as MoodyModeSaveData & { fieldRuntime?: MoodyRuntimeFieldSaveData }
-  ).fieldRuntime;
+export function extractMoodyRuntimeFieldSave(save: MoodyModeSaveData): MoodyRuntimeFieldSaveData | undefined {
+  return save.fieldRuntime;
 }
 
 export function resetMoodyRuntimeFieldState(
   state: MoodyRuntimeFieldState,
   boundary: MoodyRuntimeResetBoundary,
 ): MoodyRuntimeFieldState {
-  if (boundary.kind === "run-end")
+  if (boundary.kind === "run-end") {
     return { numbers: {}, values: {}, lists: {} };
+  }
   const keep = (key: string): boolean => {
-    if (key.startsWith("persistent:")) return true;
+    if (key.startsWith("persistent:")) {
+      return true;
+    }
     if (boundary.kind === "battle-start") {
-      if (key.startsWith(`${boundary.battleId}:`)) return true;
-      if (key.startsWith(`segment:${boundary.segmentIndex}:`)) return true;
-      if (key.startsWith(`biome:${boundary.biomeEpoch}:`)) return true;
+      if (key.startsWith(`${boundary.battleId}:`)) {
+        return true;
+      }
+      if (key.startsWith(`segment:${boundary.segmentIndex}:`)) {
+        return true;
+      }
+      if (key.startsWith(`biome:${boundary.biomeEpoch}:`)) {
+        return true;
+      }
       return false;
     }
     if (boundary.kind === "segment-start") {
-      return (
-        key.startsWith(`segment:${boundary.segmentIndex}:`) ||
-        key.startsWith(`biome:${boundary.biomeEpoch}:`)
-      );
+      return key.startsWith(`segment:${boundary.segmentIndex}:`) || key.startsWith(`biome:${boundary.biomeEpoch}:`);
     }
-    return (
-      key.startsWith(`biome:${boundary.biomeEpoch}:`) ||
-      key.startsWith(`segment:${boundary.segmentIndex}:`)
-    );
+    return key.startsWith(`biome:${boundary.biomeEpoch}:`) || key.startsWith(`segment:${boundary.segmentIndex}:`);
   };
   const filter = <T>(record: Readonly<Record<string, T>>): Record<string, T> =>
     Object.fromEntries(Object.entries(record).filter(([key]) => keep(key)));
@@ -198,10 +165,74 @@ interface MoveSignal<TPokemon> {
   readonly actionId: string;
 }
 
+function optionalField<TKey extends PropertyKey, TValue>(
+  key: TKey,
+  value: TValue | undefined,
+): Partial<Record<TKey, TValue>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<TKey, TValue>);
+}
+
+export function didMoodyDamageCrossHpFraction(input: {
+  readonly hpBefore: number;
+  readonly hpAfter: number;
+  readonly maxHp: number;
+  readonly fraction?: number;
+}): boolean {
+  const maxHp = Math.max(1, input.maxHp);
+  const threshold = maxHp * (input.fraction ?? 0.25);
+  return input.hpBefore >= threshold && input.hpAfter < threshold;
+}
+
+const actionTriggerKey = (battleId: string, pokemonId: number): string =>
+  `${battleId}:runtime-action:pokemon:${pokemonId}:boon-triggers`;
+
+export function recordMoodyRuntimeActionTriggerIds(
+  state: MoodyRuntimeFieldState,
+  battleId: string,
+  pokemonId: number,
+  effectIds: readonly string[],
+): MoodyRuntimeFieldState {
+  const key = actionTriggerKey(battleId, pokemonId);
+  const previous = state.lists[key] ?? [];
+  const next = [...new Set([...previous, ...effectIds.filter(Boolean)])];
+  if (next.length === previous.length && next.every((effectId, index) => effectId === previous[index])) {
+    return state;
+  }
+  return {
+    ...state,
+    lists: {
+      ...state.lists,
+      [key]: next,
+    },
+  };
+}
+
+export function consumeMoodyRuntimeActionTriggerIds(
+  state: MoodyRuntimeFieldState,
+  battleId: string,
+  pokemonId: number,
+): {
+  readonly state: MoodyRuntimeFieldState;
+  readonly effectIds: readonly string[];
+} {
+  const key = actionTriggerKey(battleId, pokemonId);
+  const effectIds = state.lists[key] ?? [];
+  if (!(key in state.lists)) {
+    return { state, effectIds };
+  }
+  const lists = { ...state.lists };
+  delete lists[key];
+  return {
+    state: { ...state, lists },
+    effectIds,
+  };
+}
+
 export function snapshotMoodyRuntimePokemon<TPokemon>(
   pokemon: TPokemon,
   reader: MoodyLivePokemonReader<TPokemon>,
 ): MoodyRuntimePokemonSnapshot {
+  const status = reader.status(pokemon);
   return {
     id: reader.id(pokemon),
     side: reader.side(pokemon),
@@ -209,7 +240,7 @@ export function snapshotMoodyRuntimePokemon<TPokemon>(
     currentHp: reader.currentHp(pokemon),
     maxHp: reader.maxHp(pokemon),
     fainted: reader.fainted(pokemon),
-    status: reader.status(pokemon),
+    ...optionalField("status", status),
     grounded: reader.grounded(pokemon),
     moveCount: reader.moveIds(pokemon).length,
     moveIds: [...reader.moveIds(pokemon)],
@@ -239,9 +270,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
   }
 
   public party(side: MoodyRuntimeSide): readonly MoodyRuntimePokemonSnapshot[] {
-    return (
-      side === "player" ? this.battle.playerParty : this.battle.enemyParty
-    ).map((pokemon) => this.pokemon(pokemon));
+    return (side === "player" ? this.battle.playerParty : this.battle.enemyParty).map(pokemon => this.pokemon(pokemon));
   }
 
   public battleStart(
@@ -255,7 +284,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       isTrainer: this.battle.isTrainer,
       activePokemonId: this.reader.id(activePokemon),
       party: [...this.party("player"), ...this.party("enemy")],
-      carriedField,
+      ...optionalField("carriedField", carriedField),
     };
   }
 
@@ -270,7 +299,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       won: input.won,
       party: [...this.party("player"), ...this.party("enemy")],
       enteredPokemonIds: [...input.enteredPokemonIds],
-      field: input.field,
+      ...optionalField("field", input.field),
     };
   }
 
@@ -286,14 +315,26 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "entry",
       pokemon: this.pokemon(input.pokemon),
-      activePokemonIds: input.activePokemon.map((pokemon) =>
-        this.reader.id(pokemon),
-      ),
+      activePokemonIds: input.activePokemon.map(pokemon => this.reader.id(pokemon)),
       isReentry: input.isReentry,
-      afterAllyFaint: input.afterAllyFaint,
-      weatherOptions: input.weatherOptions,
-      terrainOptions: input.terrainOptions,
+      ...optionalField("afterAllyFaint", input.afterAllyFaint),
+      ...optionalField("weatherOptions", input.weatherOptions),
+      ...optionalField("terrainOptions", input.terrainOptions),
     };
+  }
+
+  public initialEntries(
+    input: { weatherOptions?: readonly MoodyRuntimeWeather[]; terrainOptions?: readonly MoodyRuntimeTerrain[] } = {},
+  ): readonly EventOf<"entry">[] {
+    return [...this.battle.playerActive, ...this.battle.enemyActive].map(pokemon =>
+      this.entry({
+        pokemon,
+        activePokemon: this.reader.side(pokemon) === "player" ? this.battle.playerActive : this.battle.enemyActive,
+        isReentry: false,
+        ...optionalField("weatherOptions", input.weatherOptions),
+        ...optionalField("terrainOptions", input.terrainOptions),
+      }),
+    );
   }
 
   public beforeMove(
@@ -309,12 +350,12 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "before-move",
       ...this.moveSnapshot(input),
-      raisesStats: input.raisesStats,
-      asleep: input.asleep,
-      dreamTagged: input.dreamTagged,
-      weatherWeakens: input.weatherWeakens,
-      legalBestType: input.legalBestType,
-      weaknessMultiplier: input.weaknessMultiplier,
+      ...optionalField("raisesStats", input.raisesStats),
+      ...optionalField("asleep", input.asleep),
+      ...optionalField("dreamTagged", input.dreamTagged),
+      ...optionalField("weatherWeakens", input.weatherWeakens),
+      ...optionalField("legalBestType", input.legalBestType),
+      ...optionalField("weaknessMultiplier", input.weaknessMultiplier),
     };
   }
 
@@ -331,14 +372,14 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.moveSnapshot(input),
       landed: input.landed,
       dealtDirectDamage: input.dealtDirectDamage,
-      weaknessMultiplier: input.weaknessMultiplier,
+      ...optionalField("weaknessMultiplier", input.weaknessMultiplier),
     };
   }
 
   private moveSnapshot(input: MoveSignal<TPokemon>) {
     return {
       user: this.pokemon(input.user),
-      target: input.target ? this.pokemon(input.target) : undefined,
+      ...optionalField("target", input.target ? this.pokemon(input.target) : undefined),
       moveId: input.moveId,
       moveType: input.moveType,
       category: input.category,
@@ -361,15 +402,15 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     return {
       ...this.common(),
       kind: "before-damage",
-      source: input.source ? this.pokemon(input.source) : undefined,
+      ...optionalField("source", input.source ? this.pokemon(input.source) : undefined),
       target: this.pokemon(input.target),
       amount: input.amount,
       direct: input.direct,
-      category: input.category,
-      superEffective: input.superEffective,
-      poisonDamage: input.poisonDamage,
-      hitIndex: input.hitIndex,
-      sameOriginatingAction: input.sameOriginatingAction,
+      ...optionalField("category", input.category),
+      ...optionalField("superEffective", input.superEffective),
+      ...optionalField("poisonDamage", input.poisonDamage),
+      ...optionalField("hitIndex", input.hitIndex),
+      ...optionalField("sameOriginatingAction", input.sameOriginatingAction),
     };
   }
 
@@ -380,18 +421,18 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     amount: number;
     barrierAbsorbed: number;
     hpAfter: number;
-    crossedQuarterHp?: boolean;
+    crossedQuarterHp: boolean;
   }): EventOf<"after-damage"> {
     return {
       ...this.common(),
       kind: "after-damage",
-      source: input.source ? this.pokemon(input.source) : undefined,
+      ...optionalField("source", input.source ? this.pokemon(input.source) : undefined),
       target: this.pokemon(input.target),
       direct: input.direct,
       amount: input.amount,
       barrierAbsorbed: input.barrierAbsorbed,
       hpAfter: input.hpAfter,
-      crossedQuarterHp: input.crossedQuarterHp,
+      ...optionalField("crossedQuarterHp", input.crossedQuarterHp),
     };
   }
 
@@ -407,9 +448,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       target: this.pokemon(input.target),
       amount: input.amount,
       effectiveAmount: input.effectiveAmount,
-      benchedAllies: input.benchedAllies.map((pokemon) =>
-        this.pokemon(pokemon),
-      ),
+      benchedAllies: input.benchedAllies.map(pokemon => this.pokemon(pokemon)),
     };
   }
 
@@ -422,17 +461,14 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     return {
       ...this.common(),
       kind: "status-attempt",
-      source: input.source ? this.pokemon(input.source) : undefined,
+      ...optionalField("source", input.source ? this.pokemon(input.source) : undefined),
       target: this.pokemon(input.target),
       status: input.status,
-      legalOnSource: input.legalOnSource,
+      ...optionalField("legalOnSource", input.legalOnSource),
     };
   }
 
-  public statusApplied(
-    target: TPokemon,
-    status: MoodyRuntimeStatus,
-  ): EventOf<"status-applied"> {
+  public statusApplied(target: TPokemon, status: MoodyRuntimeStatus): EventOf<"status-applied"> {
     return {
       ...this.common(),
       kind: "status-applied",
@@ -451,14 +487,11 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       kind: "status-cured",
       target: this.pokemon(target),
       status,
-      adjacentAllies: adjacentAllies.map((pokemon) => this.pokemon(pokemon)),
+      adjacentAllies: adjacentAllies.map(pokemon => this.pokemon(pokemon)),
     };
   }
 
-  public volatileAttempt(
-    target: TPokemon,
-    volatile: string,
-  ): EventOf<"volatile-attempt"> {
+  public volatileAttempt(target: TPokemon, volatile: string): EventOf<"volatile-attempt"> {
     return {
       ...this.common(),
       kind: "volatile-attempt",
@@ -467,10 +500,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     };
   }
 
-  public volatileApplied(
-    target: TPokemon,
-    volatile: string,
-  ): EventOf<"volatile-applied"> {
+  public volatileApplied(target: TPokemon, volatile: string): EventOf<"volatile-applied"> {
     return {
       ...this.common(),
       kind: "volatile-applied",
@@ -493,23 +523,20 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       next: input.next,
       naturalOrReplacement: input.naturalOrReplacement,
       activePokemon: this.pokemon(input.activePokemon),
-      lowestHpBenchedAlly: input.lowestHpBenchedAlly
-        ? this.pokemon(input.lowestHpBenchedAlly)
-        : undefined,
+      ...optionalField(
+        "lowestHpBenchedAlly",
+        input.lowestHpBenchedAlly ? this.pokemon(input.lowestHpBenchedAlly) : undefined,
+      ),
     };
   }
 
-  public barrierEnded(
-    target: TPokemon,
-    broke: boolean,
-    barrierTag?: string,
-  ): EventOf<"barrier-ended"> {
+  public barrierEnded(target: TPokemon, broke: boolean, barrierTag?: string): EventOf<"barrier-ended"> {
     return {
       ...this.common(),
       kind: "barrier-ended",
       target: this.pokemon(target),
       broke,
-      barrierTag,
+      ...optionalField("barrierTag", barrierTag),
     };
   }
 
@@ -517,7 +544,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     return {
       ...this.common(),
       kind: "turn-start",
-      activePokemonIds: activePokemon.map((pokemon) => this.reader.id(pokemon)),
+      activePokemonIds: activePokemon.map(pokemon => this.reader.id(pokemon)),
     };
   }
 
@@ -525,7 +552,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     return {
       ...this.common(),
       kind: "turn-end",
-      activePokemonIds: activePokemon.map((pokemon) => this.reader.id(pokemon)),
+      activePokemonIds: activePokemon.map(pokemon => this.reader.id(pokemon)),
     };
   }
 
@@ -540,7 +567,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "action-resolved",
       actor: this.pokemon(input.actor),
-      target: input.target ? this.pokemon(input.target) : undefined,
+      ...optionalField("target", input.target ? this.pokemon(input.target) : undefined),
       actionId: input.actionId,
       boonTriggerCount: input.boonTriggerCount,
       removableNegativeCount: input.removableNegativeCount,
@@ -562,37 +589,24 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "faint",
       pokemon: this.pokemon(input.pokemon),
-      committedMove: input.committedMove,
-      otherConsciousAllies: input.otherConsciousAllies.map((pokemon) =>
-        this.pokemon(pokemon),
-      ),
-      activeEnemy: input.activeEnemy
-        ? this.pokemon(input.activeEnemy)
-        : undefined,
-      finalEnemyPokemon: input.finalEnemyPokemon,
+      ...optionalField("committedMove", input.committedMove),
+      otherConsciousAllies: input.otherConsciousAllies.map(pokemon => this.pokemon(pokemon)),
+      ...optionalField("activeEnemy", input.activeEnemy ? this.pokemon(input.activeEnemy) : undefined),
+      ...optionalField("finalEnemyPokemon", input.finalEnemyPokemon),
     };
   }
 
-  public ko(
-    actor: TPokemon,
-    defeated: TPokemon,
-    replacementEnemy?: TPokemon,
-  ): EventOf<"ko"> {
+  public ko(actor: TPokemon, defeated: TPokemon, replacementEnemy?: TPokemon): EventOf<"ko"> {
     return {
       ...this.common(),
       kind: "ko",
       actor: this.pokemon(actor),
       defeated: this.pokemon(defeated),
-      replacementEnemy: replacementEnemy
-        ? this.pokemon(replacementEnemy)
-        : undefined,
+      ...optionalField("replacementEnemy", replacementEnemy ? this.pokemon(replacementEnemy) : undefined),
     };
   }
 
-  public switchAttempt(
-    pokemon: TPokemon,
-    voluntary: boolean,
-  ): EventOf<"switch-attempt"> {
+  public switchAttempt(pokemon: TPokemon, voluntary: boolean): EventOf<"switch-attempt"> {
     return {
       ...this.common(),
       kind: "switch-attempt",
@@ -618,7 +632,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "battle-won",
       party: this.party(input.side),
-      selectedReviveIds: input.selectedReviveIds,
+      ...optionalField("selectedReviveIds", input.selectedReviveIds),
       alliedFaints: input.alliedFaints,
     };
   }
@@ -644,7 +658,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       kind: "encounter-generate",
       isBoss: this.battle.isBoss,
       baseRosterSize: input.baseRosterSize,
-      playerThreatPokemonId: input.playerThreatPokemonId,
+      ...optionalField("playerThreatPokemonId", input.playerThreatPokemonId),
       noFaintWinStreak: input.noFaintWinStreak,
     };
   }
@@ -663,8 +677,7 @@ export type MoodyExecutableOperation =
     }
   | {
       readonly kind: "vital";
-      readonly timing:
-        "before-resolution" | "after-resolution" | "phase-boundary";
+      readonly timing: "before-resolution" | "after-resolution" | "phase-boundary";
       readonly action: string;
       readonly command: MoodyRuntimeCommand;
     }
@@ -683,8 +696,7 @@ export type MoodyExecutableOperation =
   | {
       readonly kind: "temporary-loadout";
       readonly timing: "phase-boundary";
-      readonly action:
-        "grant-move" | "choose-move" | "grant-ability" | "replace-move";
+      readonly action: "grant-move" | "choose-move" | "grant-ability" | "replace-move";
       readonly command: MoodyRuntimeCommand;
     }
   | {
@@ -770,25 +782,17 @@ export const MOODY_RUNTIME_COMMAND_KINDS = [
   "mark-trigger",
 ] as const satisfies readonly MoodyRuntimeCommandKind[];
 
-type MissingRuntimeCommandKind = Exclude<
-  MoodyRuntimeCommandKind,
-  (typeof MOODY_RUNTIME_COMMAND_KINDS)[number]
->;
-type UnexpectedRuntimeCommandKind = Exclude<
-  (typeof MOODY_RUNTIME_COMMAND_KINDS)[number],
-  MoodyRuntimeCommandKind
->;
-const MOODY_RUNTIME_COMMAND_KINDS_ARE_EXACT: [
-  MissingRuntimeCommandKind,
-  UnexpectedRuntimeCommandKind,
-] extends [never, never]
+type MissingRuntimeCommandKind = Exclude<MoodyRuntimeCommandKind, (typeof MOODY_RUNTIME_COMMAND_KINDS)[number]>;
+type UnexpectedRuntimeCommandKind = Exclude<(typeof MOODY_RUNTIME_COMMAND_KINDS)[number], MoodyRuntimeCommandKind>;
+const MOODY_RUNTIME_COMMAND_KINDS_ARE_EXACT: [MissingRuntimeCommandKind, UnexpectedRuntimeCommandKind] extends [
+  never,
+  never,
+]
   ? true
   : false = true;
 void MOODY_RUNTIME_COMMAND_KINDS_ARE_EXACT;
 
-export function translateMoodyRuntimeCommand(
-  command: MoodyRuntimeCommand,
-): MoodyExecutableOperation {
+export function translateMoodyRuntimeCommand(command: MoodyRuntimeCommand): MoodyExecutableOperation {
   switch (command.kind) {
     case "modify-damage":
     case "cap-damage":
@@ -926,8 +930,7 @@ export function translateMoodyRuntimeCommand(
       return {
         kind: "encounter",
         timing:
-          command.kind === "set-enemy-roster-size" ||
-          command.kind === "set-counter-weight"
+          command.kind === "set-enemy-roster-size" || command.kind === "set-counter-weight"
             ? "generation"
             : "phase-boundary",
         action: command.kind,
@@ -944,11 +947,9 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled Moody runtime command: ${String(value)}`);
 }
 
-export function translateMoodyRuntimeResult(
-  result: MoodyRuntimeFieldResult,
-): readonly MoodyExecutableOperation[] {
+export function translateMoodyRuntimeResult(result: MoodyRuntimeFieldResult): readonly MoodyExecutableOperation[] {
   const operations = result.commands.map(translateMoodyRuntimeCommand);
-  if (result.deltas.length) {
+  if (result.deltas.length > 0) {
     operations.push({
       kind: "persist-state",
       timing: "after-resolution",
@@ -969,8 +970,7 @@ export const MOODY_RUNTIME_FIELD_HOOK_SITES = [
   {
     path: "src/battle-scene.ts",
     symbol: "BattleScene.generateEnemyModifiers",
-    anchor:
-      "generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void>",
+    anchor: "generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void>",
     events: ["encounter-generate"] as const,
   },
   {
@@ -995,19 +995,12 @@ export const MOODY_RUNTIME_FIELD_HOOK_SITES = [
     path: "src/field/pokemon.ts",
     symbol: "Pokemon.trySetStatus / Pokemon.doSetStatus",
     anchor: "public trySetStatus(",
-    events: [
-      "status-attempt",
-      "status-applied",
-      "status-cured",
-      "volatile-attempt",
-      "volatile-applied",
-    ] as const,
+    events: ["status-attempt", "status-applied", "status-cured", "volatile-attempt", "volatile-applied"] as const,
   },
   {
     path: "src/field/arena.ts",
     symbol: "Arena.trySetWeather / Arena.trySetTerrain",
-    anchor:
-      "public trySetWeather(weather: WeatherType, user?: Pokemon, turnsOverride?: number): boolean",
+    anchor: "public trySetWeather(weather: WeatherType, user?: Pokemon, turnsOverride?: number): boolean",
     events: ["weather-transition"] as const,
   },
   {

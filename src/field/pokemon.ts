@@ -193,11 +193,36 @@ import {
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
 import {
+  absorbMoodyFormationBarrier,
+  applyMoodyFormationLethalClamp,
+  notifyMoodyFormationStatusEffectCured,
+  shouldMoodyFormationPreventStatusEffect,
+  shouldMoodyFormationPreventVolatile,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyRuntimeMoveTypeOverride,
+  notifyMoodyRuntimeDamageApplied,
+  notifyMoodyRuntimeHeal,
+  notifyMoodyRuntimeStatusApplied,
+  notifyMoodyRuntimeStatusCured,
+  notifyMoodyRuntimeVolatileApplied,
+  shouldMoodyRuntimePreventStatus,
+  shouldMoodyRuntimePreventVolatile,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorTypeEffectiveness,
+  getMoodyCoordinatorExtraAbilityIds,
+  getMoodyCoordinatorHpDebt,
+  getMoodyCoordinatorMaxHpMultiplier,
+  notifyMoodyCoordinatorBossSegmentBroken,
+  notifyMoodyCoordinatorHealingUsed,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
   applyMoodyDamageCalculation,
   getMoodyAccuracyMultiplier,
   getMoodyHealingMultiplier,
   getMoodyStatMultiplier,
-  reduceMoodyDeferredDamage,
+  grantMoodyItemSetHealingBarrier,
 } from "#data/elite-redux/moody/moody-scene-adapter";
 import { getLevelTotalExp } from "#data/exp";
 import {
@@ -2282,7 +2307,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   // TODO: Convert this into a getter
   getMaxHp(): number {
-    return this.getStat(Stat.HP);
+    return Math.max(
+      1,
+      Math.floor(this.getStat(Stat.HP) * getMoodyCoordinatorMaxHpMultiplier(this)) - getMoodyCoordinatorHpDebt(this.id),
+    );
   }
 
   /** Returns the amount of hp currently missing from this {@linkcode Pokemon} (max - current) */
@@ -2895,6 +2923,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    const legacyTemporaryPassiveId = this.summonData.passiveAbility;
+    if (legacyTemporaryPassiveId != null) {
+      const temporary = allAbilities[legacyTemporaryPassiveId];
+      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
+        slots.push(temporary);
+      }
+    }
+    for (const abilityId of getMoodyCoordinatorExtraAbilityIds(this.id)) {
+      const temporary = allAbilities[abilityId];
+      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
+        slots.push(temporary);
+      }
+    }
     if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
       const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
       for (const avalancheId of getFunAbilityAvalancheIds(
@@ -3775,7 +3816,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && (move.id === MoveId.TERA_BLAST
         || (move.id === MoveId.TERA_STARSTORM && moveTypeHolder.value === PokemonType.STELLAR))
     ) {
-      return moveTypeHolder.value as PokemonType;
+      return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
     }
 
     globalScene.arena.applyTags(ArenaTagType.ION_DELUGE, moveTypeHolder);
@@ -3792,7 +3833,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       moveTypeHolder.value = primedType;
     }
 
-    return moveTypeHolder.value as PokemonType;
+    return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
   }
 
   /**
@@ -4120,7 +4161,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ) {
       multi.value = 1;
     }
-    return multi.value as TypeDamageMultiplier;
+    return applyMoodyCoordinatorTypeEffectiveness(source, this, multi.value, simulated) as TypeDamageMultiplier;
   }
 
   /**
@@ -6241,6 +6282,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!isIndirectDamage && source && damage > 0) {
       damage -= erApplySoulmateRedirect(this, damage);
     }
+    damage = absorbMoodyFormationBarrier(this, damage);
+    damage = applyMoodyFormationLethalClamp(this, damage, !isIndirectDamage && source != null);
     // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
     // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
     // carries the ability — and the attacker is Drenched. Direct hits only
@@ -6255,6 +6298,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase, result, isCritical);
+    notifyMoodyRuntimeDamageApplied(source, this, damage, !isIndirectDamage);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
     damagePhase.updateAmount(damage);
@@ -6274,10 +6318,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The true amount of HP restored; may be less than `amount` if `amount` would overheal
    */
   public heal(amount: number): number {
+    const requestedAmount = amount;
     amount = Math.floor(amount * getMoodyHealingMultiplier(this));
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
-    reduceMoodyDeferredDamage(this, healAmount);
+    notifyMoodyRuntimeHeal(this, requestedAmount, healAmount);
+    notifyMoodyCoordinatorHealingUsed(this, healAmount);
+    grantMoodyItemSetHealingBarrier(this, healAmount);
     // Healing is an HP presentation boundary just like damage. Record the authoritative post-heal
     // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
     // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
@@ -6465,6 +6512,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventVolatile(this, tagType)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventVolatile(this, tagType)) {
+      return false;
+    }
+
     // ER Ward Stones (#358): block external CC tags (flinch / confusion /
     // infatuation / the ER statuses) before they attach, one charge per block.
     if (
@@ -6500,6 +6554,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (newTag.canAdd(this)) {
       this.summonData.tags.push(newTag);
       newTag.onAdd(this);
+      notifyMoodyRuntimeVolatileApplied(this, tagType);
       if (
         (tagType === BattlerTagType.CONFUSED || tagType === BattlerTagType.ER_ENRAGE)
         && this.hasAbility(AbilityId.BERSERK)
@@ -7377,6 +7432,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventStatus(this, effect, sourcePokemon)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventStatusEffect(this, effect)) {
+      return false;
+    }
+
     // ER: the vanilla FREEZE status does not exist — it is replaced by Frostbite
     // (an ER battler tag). Any attempt to freeze a Pokemon (vanilla Ice moves,
     // abilities, etc.) instead inflicts ER_FROSTBITE, which carries its own
@@ -7528,6 +7590,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
+    notifyMoodyRuntimeStatusApplied(this, effect);
     if (effect !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -7588,6 +7651,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public clearStatus(confusion: boolean, reloadAssets: boolean) {
     const lastStatus = this.status?.effect;
     this.status = null;
+    if (lastStatus != null) {
+      notifyMoodyRuntimeStatusCured(this, lastStatus);
+      notifyMoodyFormationStatusEffectCured(this, lastStatus);
+    }
     if (lastStatus != null && lastStatus !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -10153,6 +10220,10 @@ export class EnemyPokemon extends Pokemon {
     // TODO: Rewrite this bespoke logic to improve clarity
     while (this.bossSegmentIndex > 0 && segmentIndex - 1 < this.bossSegmentIndex) {
       this.bossSegmentIndex--;
+      const breaker = globalScene.getPlayerField()[globalScene.currentBattle.lastPlayerInvolved];
+      if (breaker != null) {
+        notifyMoodyCoordinatorBossSegmentBroken(breaker, this);
+      }
 
       // Continue, _not_ break here, to ensure that each segment is still broken
       if (!doStatBoost) {

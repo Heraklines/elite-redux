@@ -55,79 +55,6 @@ export interface MoodyRuntimeEffectMeta {
   readonly events: readonly MoodyRuntimeEventContract[];
 }
 
-export interface MoodyAuthoredItemSetEffect {
-  readonly outgoingDamageMultiplier?: number;
-  readonly incomingDamageMultiplier?: number;
-  readonly directHealingMultiplier?: number;
-  readonly firstHealBarrierFraction?: number;
-  readonly accuracyMultiplier?: number;
-  readonly firstMovePowerMultiplier?: number;
-  readonly firstMovePriorityDelta?: number;
-  readonly selfStatusDamageMultiplier?: number;
-  readonly statMultipliers?: Readonly<Record<string, number>>;
-}
-
-export interface MoodyAuthoredItemSet {
-  readonly id: string;
-  readonly name: string;
-  readonly pieceIds: readonly string[];
-  readonly threePiece: MoodyAuthoredItemSetEffect;
-  readonly fivePiece: MoodyAuthoredItemSetEffect;
-  readonly completeCollection: MoodyAuthoredItemSetEffect;
-}
-
-/**
- * Canonical set pieces use modifierTypeInitObj keys. Base-stat boosters append
- * the audited BaseStatBoosterModifierTypeGenerator variant key after a colon.
- */
-export const MOODY_AUTHORED_ITEM_SETS: readonly MoodyAuthoredItemSet[] = [
-  {
-    id: "complete-nutrition",
-    name: "Complete Nutrition",
-    pieceIds: [
-      "BASE_STAT_BOOSTER:hp_up",
-      "BASE_STAT_BOOSTER:protein",
-      "BASE_STAT_BOOSTER:iron",
-      "BASE_STAT_BOOSTER:calcium",
-      "BASE_STAT_BOOSTER:zinc",
-      "BASE_STAT_BOOSTER:carbos",
-    ],
-    threePiece: { statMultipliers: { hp: 1.05, atk: 1.05, def: 1.05, spatk: 1.05, spdef: 1.05, spd: 1.05 } },
-    fivePiece: { statMultipliers: { hp: 1.1, atk: 1.1, def: 1.1, spatk: 1.1, spdef: 1.1, spd: 1.1 } },
-    completeCollection: {
-      statMultipliers: { hp: 1.15, atk: 1.15, def: 1.15, spatk: 1.15, spdef: 1.15, spd: 1.15 },
-    },
-  },
-  {
-    id: "restoration-kit",
-    name: "Restoration Kit",
-    pieceIds: ["LEFTOVERS", "SHELL_BELL", "HEALING_CHARM", "BERRY_POUCH", "REVIVER_SEED"],
-    threePiece: { directHealingMultiplier: 1.15 },
-    fivePiece: { directHealingMultiplier: 1.25, firstHealBarrierFraction: 0.1 },
-    completeCollection: { directHealingMultiplier: 1.35, firstHealBarrierFraction: 0.15 },
-  },
-  {
-    id: "tactician-tools",
-    name: "Tactician's Tools",
-    pieceIds: ["QUICK_CLAW", "KINGS_ROCK", "WIDE_LENS", "GRIP_CLAW", "BATON"],
-    threePiece: { accuracyMultiplier: 1.1 },
-    fivePiece: { accuracyMultiplier: 1.1, firstMovePowerMultiplier: 1.1, firstMovePriorityDelta: 1 },
-    completeCollection: { accuracyMultiplier: 1.15, firstMovePowerMultiplier: 1.25, firstMovePriorityDelta: 1 },
-  },
-  {
-    id: "volatile-core",
-    name: "Volatile Core",
-    pieceIds: ["TOXIC_ORB", "FLAME_ORB", "FROSTBITE_ORB", "FOCUS_BAND", "WHITE_HERB"],
-    threePiece: { outgoingDamageMultiplier: 1.08 },
-    fivePiece: { outgoingDamageMultiplier: 1.15, selfStatusDamageMultiplier: 0.5 },
-    completeCollection: { outgoingDamageMultiplier: 1.25, selfStatusDamageMultiplier: 0.25 },
-  },
-] as const;
-
-export function canonicalMoodyItemSetPieceId(typeId: string, variantId?: string): string {
-  return typeId === "BASE_STAT_BOOSTER" && variantId != null ? `${typeId}:${variantId}` : typeId;
-}
-
 export const MOODY_RUNTIME_BOON_IDS = [
   "compound-interest",
   "warranty",
@@ -188,7 +115,9 @@ export const MOODY_RUNTIME_CURSE_IDS = [
   ...MOODY_RUNTIME_PROGRESSION_CURSE_IDS,
 ] as const;
 
-export const MOODY_RUNTIME_BLOCKED_IDS = [] as const;
+export const MOODY_RUNTIME_BLOCKED_IDS = ["set-collector"] as const;
+
+const MOODY_RUNTIME_BLOCKED_ID_SET = new Set<string>(MOODY_RUNTIME_BLOCKED_IDS);
 
 const EVENT_CONTRACTS: Readonly<Record<string, readonly MoodyRuntimeEventContract[]>> = {
   "compound-interest": [
@@ -210,6 +139,8 @@ const EVENT_CONTRACTS: Readonly<Record<string, readonly MoodyRuntimeEventContrac
   "bounty-board": [
     { kind: "contract-draft", requiredInputs: ["feasibleContractIds"] },
     { kind: "contract-completed", requiredInputs: ["contractId"] },
+    { kind: "contract-declined", requiredInputs: [] },
+    { kind: "contract-failed", requiredInputs: [] },
   ],
   "recruiter-s-eye": [{ kind: "wild-encounter-generated", requiredInputs: ["missingTraits", "traitRarity"] }],
   "contraband-slot": [{ kind: "item-rule-query", requiredInputs: ["itemStackId", "isSelectedStack"] }],
@@ -257,7 +188,9 @@ const EVENT_CONTRACTS: Readonly<Record<string, readonly MoodyRuntimeEventContrac
     { kind: "academy-graduated", requiredInputs: [] },
   ],
   bossbreaker: [{ kind: "boss-segment-broken", requiredInputs: ["pokemonId"] }],
-  "legacy-slot": [{ kind: "pokemon-permanently-removed", requiredInputs: ["eligibleImprints"] }],
+  "legacy-slot": [
+    { kind: "pokemon-permanently-removed", requiredInputs: ["eligibleImprints", "partySlot", "boundPartySlot"] },
+  ],
   "time-loop": [
     {
       kind: "lethal-result-preview",
@@ -347,7 +280,7 @@ export const MOODY_RUNTIME_EFFECTS: readonly MoodyRuntimeEffectMeta[] = [
       id,
       number: definition.number,
       source: "boon" as const,
-      status: "ready" as const,
+      status: MOODY_RUNTIME_BLOCKED_ID_SET.has(id) ? ("blocked" as const) : ("ready" as const),
       base: definition.base,
       rankTwo: definition.rankTwo,
       evolutions: definition.evolutions.map(evolution => ({ id: evolution.id, description: evolution.description })),
@@ -434,6 +367,53 @@ function choose(seed: number, values: readonly string[], salt = 0): string | und
   return values[(mixed >>> 0) % values.length];
 }
 
+function seededFraction(seed: number, salt: number): number {
+  let mixed = (seed ^ Math.imul(salt + 1, 0x9e3779b1)) >>> 0;
+  mixed ^= mixed >>> 16;
+  mixed = Math.imul(mixed, 0x7feb352d);
+  mixed ^= mixed >>> 15;
+  mixed = Math.imul(mixed, 0x846ca68b);
+  mixed ^= mixed >>> 16;
+  return (mixed >>> 0) / 0x1_0000_0000;
+}
+
+function masterContractModifier(contractId: string): Readonly<Record<string, MoodyRuntimeValue>> {
+  switch (contractId) {
+    case "five-elemental-types":
+      return { requiredCount: 8 };
+    case "every-member-acts":
+      return { minimumActionsPerMember: 2 };
+    case "lowest-level-ko":
+      return { requiredKoCount: 2 };
+    case "break-boss-segment":
+      return { requiredSegmentCount: 2 };
+    case "distinct-statuses":
+      return { requiredCount: 5 };
+    case "three-switches":
+      return { requiredCount: 6 };
+    case "marked-above-threshold":
+      return { minimumHpFraction: 0.8 };
+    case "boss-turn-limit":
+      return { maximumTurns: 6 };
+    case "win-under-weather":
+      return { maximumTurns: 8 };
+    case "no-allied-faint":
+      return { additionalConstraint: "no-healing" };
+    case "no-healing":
+      return { additionalConstraint: "no-allied-faint" };
+    case "no-consecutive-repeat":
+      return { additionalConstraint: "use-eight-elemental-types" };
+    case "no-super-effective":
+      return { additionalConstraint: "no-consumables" };
+    case "no-consumables":
+      return { additionalConstraint: "no-healing" };
+    case "one-ko-each":
+      return { additionalConstraint: "no-allied-faint" };
+    default:
+      return { thresholdMultiplier: 2 };
+  }
+}
+
 function rank(stage: MoodyRuntimeStage): 1 | 2 | 3 {
   return stage === "base" ? 1 : stage === "rank-two" ? 2 : 3;
 }
@@ -498,6 +478,17 @@ function resolveBoon(
       }
       const destroyed = event.data.destroyedIndices;
       const upcycle = evolution === "upcycler";
+      const destroyedIndices = Array.isArray(destroyed)
+        ? destroyed.filter((value): value is number => typeof value === "number")
+        : [];
+      const originalRarities = Array.isArray(event.data.originalRarities) ? event.data.originalRarities : [];
+      const minimumOutputTier = Math.max(
+        0,
+        ...destroyedIndices.map(index => {
+          const tier = originalRarities[index];
+          return typeof tier === "number" ? tier + 1 : 0;
+        }),
+      );
       return result(
         [
           command(upcycle ? "generate-upcycled-reward" : "reroll-reward-options", {
@@ -507,70 +498,15 @@ function resolveBoon(
             minimumOriginalRarity: currentRank >= 2,
             excludedCategory: evolution === "closed-loop" ? (event.data.destroyedCategory ?? null) : null,
             minimumTierIncrease: upcycle ? 1 : 0,
+            minimumOutputTier: upcycle ? minimumOutputTier : 0,
             applyLuckAfterward: true,
           }),
         ],
         [set("flags.recyclerUsedThisScreen", true)],
       );
     }
-    case "set-collector": {
-      if (event.kind !== "item-set-query") {
-        return result();
-      }
-      const owned = new Set(stringArray(event, "ownedDistinctItemIds"));
-      const chosenSetId = typeof event.data.chosenSetId === "string" ? event.data.chosenSetId : undefined;
-      const evaluated = MOODY_AUTHORED_ITEM_SETS.map((itemSet, authoredIndex) => {
-        const pieceCount = itemSet.pieceIds.filter(pieceId => owned.has(pieceId)).length;
-        const receivesRankDiscount = currentRank >= 2 && chosenSetId === itemSet.id;
-        const threePieceRequirement = receivesRankDiscount ? 2 : 3;
-        const fivePieceRequirement = receivesRankDiscount ? 4 : 5;
-        const tier =
-          pieceCount >= fivePieceRequirement
-            ? evolution === "complete-collection" && chosenSetId === itemSet.id
-              ? "complete"
-              : "five"
-            : pieceCount >= threePieceRequirement
-              ? "three"
-              : null;
-        return {
-          itemSet,
-          authoredIndex,
-          pieceCount,
-          threePieceRequirement,
-          fivePieceRequirement,
-          tier,
-        } as const;
-      });
-      const tierWeight = { three: 1, five: 2, complete: 3 } as const;
-      const active = evaluated
-        .filter(entry => entry.tier != null)
-        .sort((left, right) => {
-          const chosenDifference = Number(right.itemSet.id === chosenSetId) - Number(left.itemSet.id === chosenSetId);
-          if (chosenDifference !== 0) {
-            return chosenDifference;
-          }
-          const tierDifference = tierWeight[right.tier!] - tierWeight[left.tier!];
-          return tierDifference || right.pieceCount - left.pieceCount || left.authoredIndex - right.authoredIndex;
-        })
-        .slice(0, evolution === "curator" ? 2 : 1)
-        .map(entry => ({
-          setId: entry.itemSet.id,
-          name: entry.itemSet.name,
-          pieceCount: entry.pieceCount,
-          requiredPieceCount: entry.tier === "three" ? entry.threePieceRequirement : entry.fivePieceRequirement,
-          tier: entry.tier!,
-          effect:
-            entry.tier === "complete"
-              ? entry.itemSet.completeCollection
-              : entry.tier === "five"
-                ? entry.itemSet.fivePiece
-                : entry.itemSet.threePiece,
-        }));
-      return result(
-        [command("apply-item-set-bonuses", { activeSets: active })],
-        [set("values.activeItemSets", active)],
-      );
-    }
+    case "set-collector":
+      return result();
     case "blood-market": {
       if (event.kind !== "blood-market-purchase") {
         return result();
@@ -611,30 +547,55 @@ function resolveBoon(
             offered.push(selected);
           }
         }
+        const contractIds =
+          evolution === "master-contract" ? offered.map(contractId => `master:${contractId}`) : offered;
         return result([
           command("offer-feasible-contracts", {
-            contractIds: [...new Set(offered)],
+            contractIds: [...new Set(contractIds)],
+            optional: true,
+            autoAccept: false,
             masterDifficulty: evolution === "master-contract",
+            objectiveDifficulty: evolution === "master-contract" ? "master" : "standard",
+            objectiveModifiers:
+              evolution === "master-contract"
+                ? offered.map(contractId => ({
+                    contractId: `master:${contractId}`,
+                    ...masterContractModifier(contractId),
+                  }))
+                : [],
             chainLength: evolution === "relic-hunter" ? 2 : 1,
           }),
         ]);
       }
+      if (event.kind === "contract-declined" || event.kind === "contract-failed") {
+        return result([], [set("counters.contractChain", 0), set("values.activeContract", null)]);
+      }
       if (event.kind === "contract-completed") {
+        const priorChain = evolution === "relic-hunter" ? counter(state, "contractChain") : 0;
+        const completedChain = priorChain + 1;
+        const guaranteedRelic = evolution === "relic-hunter" && completedChain >= 2;
+        const relicChance = currentRank >= 2 ? 0.25 : 0.15;
+        const rolledRelic = evolution !== "relic-hunter" && seededFraction(event.seed, 0x52454c49) < relicChance;
         return result(
           [
             command("grant-contract-reward", {
               contractId: stringValue(event, "contractId"),
               tier: evolution === "master-contract" ? "master" : currentRank >= 2 ? "rogue" : "ultra",
-              relicChoice: evolution === "relic-hunter" && counter(state, "contractChain") + 1 >= 2,
+              relicChance,
+              relicChoice: guaranteedRelic || rolledRelic,
+              relicGuaranteedByChain: guaranteedRelic,
             }),
           ],
-          [increment("counters.contractChain", 1)],
+          [
+            set("counters.contractChain", evolution === "relic-hunter" && !guaranteedRelic ? completedChain : 0),
+            set("values.activeContract", null),
+          ],
         );
       }
       return result();
     }
     case "recruiter-s-eye": {
-      if (event.kind !== "wild-encounter-generated") {
+      if (event.kind !== "wild-encounter-generated" || flag(state, "recruiterUsedThisBiome")) {
         return result();
       }
       const missing = stringArray(event, "missingTraits");
@@ -816,7 +777,8 @@ function resolveBoon(
       if (event.kind !== "typed-enemy-defeated" || !booleanValue(event, "matchesMarkedType")) {
         return result();
       }
-      const gain = 1 + (evolution === "apex-hunter" ? numberValue(event, "bossSegments") * 3 : 0);
+      const bossSegments = Math.max(0, numberValue(event, "bossSegments"));
+      const gain = evolution === "apex-hunter" && bossSegments > 0 ? bossSegments * 3 : 1;
       const threshold = currentRank >= 2 ? 8 : 10;
       const total = counter(state, "hunterProgress") + gain;
       return result(
@@ -905,6 +867,9 @@ function resolveBoon(
     }
     case "legacy-slot": {
       if (event.kind !== "pokemon-permanently-removed") {
+        return result();
+      }
+      if (numberValue(event, "partySlot", -1) !== numberValue(event, "boundPartySlot", -2)) {
         return result();
       }
       const eligible = stringArray(event, "eligibleImprints");
@@ -1063,15 +1028,24 @@ function resolveBoon(
     case "apex-plunder": {
       const pokemonId = stringValue(event, "pokemonId");
       if (event.kind === "segmented-boss-defeated") {
+        const existing = Array.isArray(state.values?.apexSegments)
+          ? state.values.apexSegments.filter((value): value is number => typeof value === "number" && value > 0)
+          : [];
+        const capacity = evolution === "segment-hoard" ? 2 : 1;
+        if (existing.length >= capacity) {
+          return result();
+        }
+        const fraction = evolution === "segment-hoard" ? 0.25 : currentRank >= 2 ? 0.5 : 0.25;
+        const stored = [...existing, fraction].slice(0, capacity);
         return result(
           [
             command("store-apex-segment", {
               pokemonId,
-              segments: evolution === "segment-hoard" ? 2 : 1,
-              hpFractions: evolution === "segment-hoard" ? [0.25, 0.25] : [currentRank >= 2 ? 0.5 : 0.25],
+              segments: stored.length,
+              hpFractions: stored,
             }),
           ],
-          [set("values.apexSegments", evolution === "segment-hoard" ? [0.25, 0.25] : [currentRank >= 2 ? 0.5 : 0.25])],
+          [set("values.apexSegments", stored)],
         );
       }
       if (
@@ -1138,6 +1112,10 @@ function resolveBoon(
         return result();
       }
       const overflow = Math.max(0, numberValue(event, "overflowStages"));
+      const priorOverflow = counter(state, "overflowStages");
+      const totalOverflow = priorOverflow + overflow;
+      const overpressureCharges = Math.floor(totalOverflow / 3);
+      const overflowRemainder = totalOverflow % 3;
       const selected =
         evolution === "multi-valve" ? stringValue(event, "mostUsefulValve") : stringValue(event, "selectedValve");
       const amount =
@@ -1149,11 +1127,11 @@ function resolveBoon(
       return result(
         [
           command("convert-stat-overflow", { pokemonId: stringValue(event, "pokemonId"), valve: selected, amount }),
-          ...(evolution === "overpressure" && overflow >= 3
-            ? [command("queue-next-move-power", { multiplier: 1.5, charges: Math.floor(overflow / 3) })]
+          ...(evolution === "overpressure" && overpressureCharges > 0
+            ? [command("queue-next-move-power", { multiplier: 1.5, charges: overpressureCharges })]
             : []),
         ],
-        [increment("counters.overflowStages", overflow)],
+        [set("counters.overflowStages", overflowRemainder)],
       );
     }
     case "negative-space": {

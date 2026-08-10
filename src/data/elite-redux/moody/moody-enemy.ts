@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+import { getMoodyRuntimeCounterWeight } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { getMoodyCoordinatorCounterWeight } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { getMoodyBoonBudget, getMoodyModeState, rollMoodyBoonDefinition } from "#data/elite-redux/moody/moody-state";
 import type {
   MoodyBoonDefinition,
@@ -192,8 +194,17 @@ export function generateMoodyEnemyBoonLoadout(party: readonly Pokemon[], waveInd
   }
   const boons: MoodyBoonInstance[] = [];
   const seed = mix32(state.seed ^ Math.imul(waveIndex + 1, 0x85ebca6b));
+  const fieldCounterWeight = getMoodyRuntimeCounterWeight();
+  const counterCandidates = Math.max(
+    1,
+    Math.ceil(fieldCounterWeight === 1 ? getMoodyCoordinatorCounterWeight() : fieldCounterWeight),
+  );
   for (let roll = 0; roll < budget; roll++) {
-    const definition = rollMoodyBoonDefinition(seed, roll)!;
+    const definition = Array.from({ length: counterCandidates }, (_, candidate) =>
+      rollMoodyBoonDefinition(seed, roll * counterCandidates + candidate),
+    )
+      .filter((candidate): candidate is MoodyBoonDefinition => candidate != null)
+      .toSorted((left, right) => counterScore(right) - counterScore(left))[0]!;
     const existing = boons.find(boon => boon.boonId === definition.id);
     if (existing == null) {
       const target = assignTarget(definition, party);

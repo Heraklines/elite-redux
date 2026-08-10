@@ -494,17 +494,16 @@ describe("Moody formation state transitions and command contracts", () => {
       value: 1.02,
     });
 
-    const cures = run(
-      Array.from({ length: 6 }, () => ({ type: "status-cured", pokemon: lead, status: "burn" }) as const).concat([
-        {
-          type: "evaluate",
-          pokemon: { ...lead, majorStatus: "burn" },
-          party,
-          turn: 1,
-        } as const,
-      ]),
-      effect("mithridatism", "evolution-a"),
-    );
+    const cureEvents: MoodyFormationEvent[] = [
+      ...Array.from({ length: 6 }, () => ({ type: "status-cured", pokemon: lead, status: "burn" }) as const),
+      {
+        type: "evaluate",
+        pokemon: { ...lead, majorStatus: "burn" },
+        party,
+        turn: 1,
+      },
+    ];
+    const cures = run(cureEvents, effect("mithridatism", "evolution-a"));
     expect(cures.state.counters["cures.burn"]).toBe(6);
     expect(cures.commands).toContainEqual({
       kind: "status-resistance",
@@ -647,7 +646,8 @@ describe("Moody formation state transitions and command contracts", () => {
       incomingDamageMultiplier: 0.8,
     });
 
-    const choice = run([moveAttempt({ finalDraftEndings: undefined })], effect("final-draft", "evolution-a"));
+    const { finalDraftEndings: _resolvedEndings, ...unresolvedAttempt } = moveAttempt();
+    const choice = run([unresolvedAttempt], effect("final-draft", "evolution-a"));
     expect(choice.commands).toContainEqual({
       kind: "choice-required",
       source: "final-draft",
@@ -724,5 +724,37 @@ describe("Moody formation state transitions and command contracts", () => {
       reward: "barrier",
       magnitudeMultiplier: 1.25,
     });
+  });
+
+  it("reaches Revenge Entry and Shared Inspiration through their production payload fields", () => {
+    const revenge = run(
+      [
+        {
+          type: "entry",
+          pokemon: lead,
+          firstEntryThisBattle: false,
+          afterAllyFainted: true,
+          allyDamagedEarlierThisTurn: false,
+        },
+      ],
+      effect("revenge-entry", "rank-two"),
+    );
+    expect(revenge.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "stat-stage", pokemonId: lead.pokemonId, stat: "speed", stages: 1 }),
+        expect.objectContaining({ kind: "stat-stage", pokemonId: lead.pokemonId, stat: "attack", stages: 1 }),
+      ]),
+    );
+
+    const inspiration = run(
+      [{ type: "enemy-stat-increase", stat: "specialAttack", stages: 2, selectedAdjacentPokemonId: partner.pokemonId }],
+      effect("copycat-heart", "evolution-b"),
+    );
+    expect(inspiration.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "stat-stage", pokemonId: lead.pokemonId, stat: "specialAttack", stages: 2 }),
+        expect.objectContaining({ kind: "stat-stage", pokemonId: partner.pokemonId, stat: "specialAttack", stages: 2 }),
+      ]),
+    );
   });
 });

@@ -1,3 +1,4 @@
+import type { MoodyFormationRuntimeSaveDataV1 } from "#data/elite-redux/moody/moody-runtime-formation-adapter";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 
@@ -102,6 +103,26 @@ export interface MoodyThreatRecord {
   weatherDependence: number;
 }
 
+export interface MoodyRuntimeFieldSaveData {
+  version: 1;
+  cursor: {
+    battleId: string;
+    waveIndex: number;
+    turn: number;
+    segmentIndex: number;
+    biomeId: number;
+    biomeEpoch: number;
+  };
+  numbers: [key: string, value: number][];
+  values: [key: string, value: string | number | boolean][];
+  lists: [key: string, value: string[]][];
+}
+
+export interface MoodyFormationEngineSaveData {
+  version: 1;
+  stateJson: string;
+}
+
 export interface MoodyModeSaveData {
   version: 1;
   seed: number;
@@ -110,6 +131,10 @@ export interface MoodyModeSaveData {
   boons: MoodyBoonInstance[];
   curses: MoodyCurseInstance[];
   recentThreat: MoodyThreatRecord[];
+  formationRuntime?: MoodyFormationRuntimeSaveDataV1;
+  formationEngine?: MoodyFormationEngineSaveData;
+  /** Deterministic combat/runtime state. Optional only for pre-runtime saves. */
+  fieldRuntime?: MoodyRuntimeFieldSaveData;
 }
 
 export type MoodyOfferKind = "new" | "rank-up" | "evolution" | "replace";

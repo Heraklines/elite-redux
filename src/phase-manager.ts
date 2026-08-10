@@ -108,6 +108,16 @@ import { LoginPhase } from "#phases/login-phase";
 import { MessagePhase } from "#phases/message-phase";
 import { ModifierRewardPhase } from "#phases/modifier-reward-phase";
 import { MoneyRewardPhase } from "#phases/money-reward-phase";
+import {
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+} from "#phases/moody-coordinator-choice-phase";
+import { MoodyCoordinatorEchoCleanupPhase, MoodyCoordinatorEchoPhase } from "#phases/moody-coordinator-echo-phase";
+import { MoodyFormationChoicePhase } from "#phases/moody-formation-choice-phase";
+import { MoodyRuntimeChoicePhase } from "#phases/moody-runtime-choice-phase";
+import { MoodySectionReportPhase } from "#phases/moody-section-report-phase";
 import { MoveAnimPhase } from "#phases/move-anim-phase";
 import { MoveChargePhase } from "#phases/move-charge-phase";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
@@ -277,6 +287,14 @@ const PHASES = Object.freeze({
   LoadMoveAnimPhase,
   LoginPhase,
   MessagePhase,
+  MoodyFormationChoicePhase,
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+  MoodyCoordinatorEchoCleanupPhase,
+  MoodyCoordinatorEchoPhase,
+  MoodySectionReportPhase,
   ModifierRewardPhase,
   MoneyRewardPhase,
   MoveAnimPhase,
@@ -318,6 +336,7 @@ const PHASES = Object.freeze({
   SelectGenderPhase,
   SelectModifierPhase,
   SelectMoodyBoonPhase,
+  MoodyRuntimeChoicePhase,
   SelectStarterPhase,
   SelectTargetPhase,
   ShiftSummonPhase,

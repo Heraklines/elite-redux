@@ -64,7 +64,7 @@ function recordingPort(options: { failAt?: number } = {}): {
   const executed: MoodyFormationCommand[] = [];
   const handlers = Object.fromEntries(
     COMMAND_KINDS.map(kind => [kind, (command: MoodyFormationCommand) => executed.push(command)]),
-  ) as MoodyFormationCommandHandlers;
+  ) as unknown as MoodyFormationCommandHandlers;
   return {
     preflighted,
     executed,

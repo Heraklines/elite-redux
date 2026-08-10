@@ -23,7 +23,7 @@ import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tra
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
-import { getMoodyBoonsForPokemon, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
+import { getMoodyBoonsForPokemon, getMoodyModeState, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
 import type { MoodyBoonInstance, MoodyRarity } from "#data/elite-redux/moody/moody-types";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -48,6 +48,8 @@ import { getVariantTint } from "#sprites/variant";
 import type { TurnMove } from "#types/turn-move";
 import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
 import { MessageUiHandler } from "#ui/message-ui-handler";
+import { getMoodyLivePresentationSnapshot, getMoodyPokemonPresentation } from "#ui/moody/moody-live-presentation";
+import { type MoodyAttachmentClass, moodyAttachmentClass } from "#ui/moody/moody-presentation";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { addBBCodeTextObject, addTextObject, getTextColor } from "#ui/text";
@@ -71,39 +73,41 @@ export function resolveItemManageVerticalCursor(
   battlerCount: number,
   direction: Button.UP | Button.DOWN,
 ): number {
+  const cancelCursor = Math.max(6, slotCount);
+  const discardCursor = cancelCursor + 1;
   const activeCount = Math.min(slotCount, Math.max(1, battlerCount));
   const lastActive = activeCount - 1;
   const hasBench = slotCount > activeCount;
 
   if (direction === Button.UP) {
-    if (cursor === 6) {
-      return hasBench ? slotCount - 1 : 7;
+    if (cursor === cancelCursor) {
+      return hasBench ? slotCount - 1 : discardCursor;
     }
-    if (cursor === 7) {
+    if (cursor === discardCursor) {
       return lastActive;
     }
     if (hasBench && cursor === activeCount) {
-      return 7;
+      return discardCursor;
     }
-    if (cursor > 0 && cursor < 6) {
+    if (cursor > 0 && cursor < slotCount) {
       return cursor - 1;
     }
-    return 6;
+    return cancelCursor;
   }
 
-  if (cursor === 6) {
+  if (cursor === cancelCursor) {
     return 0;
   }
-  if (cursor === 7) {
-    return hasBench ? activeCount : 6;
+  if (cursor === discardCursor) {
+    return hasBench ? activeCount : cancelCursor;
   }
   if (cursor === lastActive) {
-    return 7;
+    return discardCursor;
   }
   if (cursor < slotCount - 1) {
     return cursor + 1;
   }
-  return 6;
+  return cancelCursor;
 }
 
 const defaultMessage = i18next.t("partyUiHandler:choosePokemon");
@@ -125,6 +129,9 @@ const MOODY_RARITY_PRIORITY: Readonly<Record<MoodyRarity, number>> = {
 export interface MoodyPartySlotIndicator {
   rarity: MoodyRarity;
   color: number;
+  attachment: MoodyAttachmentClass;
+  emblem: string;
+  dormant: boolean;
 }
 
 export interface MoodyPartySlotPresentation {
@@ -156,23 +163,34 @@ export function buildMoodyPartySlotPresentation(
     .toSorted(
       (left, right) =>
         MOODY_RARITY_PRIORITY[right.definition.rarity] - MOODY_RARITY_PRIORITY[left.definition.rarity]
-        || left.boon.acquiredAtWave - right.boon.acquiredAtWave,
+        || left.boon.acquiredAtWave - right.boon.acquiredAtWave
+        || left.boon.instanceId.localeCompare(right.boon.instanceId),
     );
 
   if (entries.length === 0) {
     return null;
   }
 
-  const visibleCount = entries.length > 3 ? 2 : entries.length;
-  const indicators = entries.slice(0, visibleCount).map(({ definition }) => ({
+  const visibleCount = Math.min(3, entries.length);
+  const indicators = entries.slice(0, visibleCount).map(({ boon, definition }) => ({
     rarity: definition.rarity,
     color: MOODY_RARITY_COLORS[definition.rarity],
+    attachment: moodyAttachmentClass(definition),
+    dormant: boon.dormant === true,
+    emblem:
+      moodyAttachmentClass(definition) === "slot"
+        ? "S"
+        : moodyAttachmentClass(definition) === "pair"
+          ? "P"
+          : moodyAttachmentClass(definition) === "pokemon"
+            ? "M"
+            : "",
   }));
   const overflow = entries.length - visibleCount;
 
   const summaryParts: string[] = [];
   for (const entry of entries) {
-    const candidate = truncateMoodyLabel(entry.label, 26);
+    const candidate = truncateMoodyLabel(`${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`, 26);
     const withCandidate = `Boons: ${[...summaryParts, candidate].join(", ")}`;
     if (withCandidate.length > 40 && summaryParts.length > 0) {
       break;
@@ -193,7 +211,14 @@ export function getMoodyPartySlotPresentation(
   partySlot: number,
   enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode,
 ): MoodyPartySlotPresentation | null {
-  return enabled ? buildMoodyPartySlotPresentation(getMoodyBoonsForPokemon(pokemonId, partySlot)) : null;
+  if (!enabled) {
+    return null;
+  }
+  const boons =
+    getMoodyModeState()?.boons.filter(
+      boon => boon.target?.pokemonIds?.includes(pokemonId) || boon.target?.partySlots?.includes(partySlot),
+    ) ?? getMoodyBoonsForPokemon(pokemonId, partySlot);
+  return buildMoodyPartySlotPresentation(boons);
 }
 
 /**
@@ -386,6 +411,7 @@ export class PartyUiHandler extends MessageUiHandler {
   private partyDiscardModeButton: PartyDiscardModeButton;
   private partyMessageBox: Phaser.GameObjects.NineSlice;
   private moveInfoOverlay: MoveInfoOverlay;
+  private moodyTeamText: Phaser.GameObjects.Text;
 
   private optionsMode: boolean;
   private optionsScroll: boolean;
@@ -507,6 +533,15 @@ export class PartyUiHandler extends MessageUiHandler {
 
     this.partyBg.setOrigin(0, 1);
 
+    this.moodyTeamText = addTextObject(7, -178, "", TextStyle.PARTY, {
+      fontSize: "26px",
+      fixedWidth: 250 * 6,
+      maxLines: 1,
+    })
+      .setOrigin(0, 0)
+      .setVisible(false);
+    partyContainer.add(this.moodyTeamText);
+
     const partySlotsContainer = globalScene.add.container(0, 0);
     partySlotsContainer.setName("party-slots");
     partyContainer.add(partySlotsContainer);
@@ -604,6 +639,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     this.populatePartySlots();
+    this.refreshMoodyTeamStrip();
     // If we are currently transferring items, set the icon to its proper state and reveal the button.
     if (this.isItemManageMode()) {
       this.partyDiscardModeButton.toggleIcon(this.partyUiMode as PartyUiMode.MODIFIER_TRANSFER | PartyUiMode.DISCARD);
@@ -612,6 +648,27 @@ export class PartyUiHandler extends MessageUiHandler {
     this.setCursor(0);
 
     return true;
+  }
+
+  private refreshMoodyTeamStrip(): void {
+    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
+    const state = enabled ? getMoodyModeState() : null;
+    const teamBoons =
+      state?.boons.filter(boon => {
+        const definition = MOODY_BOON_BY_ID.get(boon.boonId);
+        return definition != null && moodyAttachmentClass(definition) === "team";
+      }) ?? [];
+    if (teamBoons.length === 0) {
+      this.moodyTeamText.setVisible(false);
+      return;
+    }
+    const names = teamBoons
+      .slice(0, 3)
+      .map(boon => `${boon.dormant ? "[Dormant] " : ""}${MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId}`)
+      .join(" / ");
+    this.moodyTeamText
+      .setText(`TEAM MOOD: ${names}${teamBoons.length > 3 ? ` +${teamBoons.length - 3}` : ""}`)
+      .setVisible(true);
   }
 
   private processSummaryOption(pokemon: Pokemon): boolean {
@@ -1458,19 +1515,25 @@ export class PartyUiHandler extends MessageUiHandler {
     return this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER || this.partyUiMode === PartyUiMode.DISCARD;
   }
 
+  private getPartyActionCursors(): { cancel: number; discard: number } {
+    const cancel = Math.max(6, this.partySlots.length, globalScene.getPlayerParty().length);
+    return { cancel, discard: cancel + 1 };
+  }
+
   private processPartyActionInput(): boolean {
     const ui = this.getUi();
+    const actionCursors = this.getPartyActionCursors();
 
     // ER (#560): with the fusion preview up, A fuses the SHOWN combo directly.
     if (this.fusionPreviewActive) {
-      if (this.cursor === 6) {
+      if (this.cursor === actionCursors.cancel) {
         return this.processPartyCancelInput(); // A on Cancel backs out the base lock
       }
       this.confirmFusionPreview();
       return true;
     }
 
-    if (this.cursor < 6) {
+    if (this.cursor < this.partySlots.length) {
       if (
         (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER && !this.transferMode)
         || this.partyUiMode === PartyUiMode.DISCARD
@@ -1491,7 +1554,7 @@ export class PartyUiHandler extends MessageUiHandler {
 
     // Toggle item transfer mode to discard items or vice versa
     // Prevent changing mode, when currently transfering an item
-    if (this.cursor === 7 && !this.transferMode) {
+    if (this.cursor === actionCursors.discard && !this.transferMode) {
       switch (this.partyUiMode) {
         case PartyUiMode.DISCARD:
           this.partyUiMode = PartyUiMode.MODIFIER_TRANSFER;
@@ -1509,7 +1572,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     // Pressing return button
-    if (this.cursor === 6) {
+    if (this.cursor === actionCursors.cancel) {
       if (this.allowCancel()) {
         return this.processInput(Button.CANCEL);
       }
@@ -1547,11 +1610,12 @@ export class PartyUiHandler extends MessageUiHandler {
     const ui = this.getUi();
     const slotCount = this.partySlots.length;
     const battlerCount = globalScene.currentBattle.getBattlerCount();
+    const { cancel, discard } = this.getPartyActionCursors();
 
     if (this.lastCursor < battlerCount) {
       this.lastLeftPokemonCursor = this.lastCursor;
     }
-    if (this.lastCursor >= battlerCount && this.lastCursor < 6) {
+    if (this.lastCursor >= battlerCount && this.lastCursor < slotCount) {
       this.lastRightPokemonCursor = this.lastCursor;
     }
 
@@ -1565,27 +1629,29 @@ export class PartyUiHandler extends MessageUiHandler {
           success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
           break;
         }
-        success = this.setCursor(this.cursor ? (this.cursor < 6 ? this.cursor - 1 : slotCount - 1) : 6);
+        success = this.setCursor(this.cursor ? (this.cursor < slotCount ? this.cursor - 1 : slotCount - 1) : cancel);
         break;
       case Button.DOWN:
         if (this.isItemManageMode()) {
           success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
           break;
         }
-        success = this.setCursor(this.cursor < 6 ? (this.cursor < slotCount - 1 ? this.cursor + 1 : 6) : 0);
+        success = this.setCursor(
+          this.cursor < slotCount ? (this.cursor < slotCount - 1 ? this.cursor + 1 : cancel) : 0,
+        );
         break;
       case Button.LEFT:
-        if (this.cursor === 6) {
-          success = this.setCursor(this.isItemManageMode() ? 7 : this.lastLeftPokemonCursor);
+        if (this.cursor === cancel) {
+          success = this.setCursor(this.isItemManageMode() ? discard : this.lastLeftPokemonCursor);
         }
-        if (this.cursor >= battlerCount && this.cursor < 6) {
+        if (this.cursor >= battlerCount && this.cursor < slotCount) {
           success = this.setCursor(this.lastLeftPokemonCursor);
         }
         break;
       case Button.RIGHT:
         // Scrolling right from item transfer button or with no backup party members goes to cancel
-        if (this.cursor === 7 || slotCount <= battlerCount) {
-          success = this.setCursor(6);
+        if (this.cursor === discard || slotCount <= battlerCount) {
+          success = this.setCursor(cancel);
           break;
         }
         if (this.cursor < battlerCount) {
@@ -1610,13 +1676,14 @@ export class PartyUiHandler extends MessageUiHandler {
     this.clearPartySlots();
 
     const party = globalScene.getPlayerParty();
+    const cancelCursor = Math.max(6, party.length);
 
-    if (this.cursor < 6 && this.cursor >= party.length) {
+    if (this.cursor < cancelCursor && this.cursor >= party.length) {
       this.cursor = party.length - 1;
-    } else if (this.cursor === 6) {
+    } else if (this.cursor === cancelCursor) {
       this.partyCancelButton.select();
     }
-    if (this.lastCursor < 6 && this.lastCursor >= party.length) {
+    if (this.lastCursor < cancelCursor && this.lastCursor >= party.length) {
       this.lastCursor = party.length - 1;
     }
 
@@ -1638,20 +1705,21 @@ export class PartyUiHandler extends MessageUiHandler {
     }
     const changed = this.cursor !== cursor;
     if (changed) {
+      const { cancel, discard } = this.getPartyActionCursors();
       this.lastCursor = this.cursor;
       this.cursor = cursor;
-      if (this.lastCursor < 6) {
-        this.partySlots[this.lastCursor].deselect();
-      } else if (this.lastCursor === 6) {
+      if (this.lastCursor < this.partySlots.length) {
+        this.partySlots[this.lastCursor]?.deselect();
+      } else if (this.lastCursor === cancel) {
         this.partyCancelButton.deselect();
-      } else if (this.lastCursor === 7) {
+      } else if (this.lastCursor === discard) {
         this.partyDiscardModeButton.deselect();
       }
-      if (cursor < 6) {
-        this.partySlots[cursor].select();
-      } else if (cursor === 6) {
+      if (cursor < this.partySlots.length) {
+        this.partySlots[cursor]?.select();
+      } else if (cursor === cancel) {
         this.partyCancelButton.select();
-      } else if (cursor === 7) {
+      } else if (cursor === discard) {
         this.partyDiscardModeButton.select();
       }
       // ER (#560): refresh the live fusion preview for (locked base, hovered).
@@ -1735,7 +1803,7 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   showOptions() {
-    if (this.cursor === 6) {
+    if (this.cursor === this.getPartyActionCursors().cancel) {
       return;
     }
 
@@ -1782,8 +1850,36 @@ export class PartyUiHandler extends MessageUiHandler {
     const focusedPokemon =
       this.cursor >= 0 && this.cursor < this.partySlots.length ? this.partySlots[this.cursor].getPokemon() : null;
     const presentation = focusedPokemon == null ? null : getMoodyPartySlotPresentation(focusedPokemon.id, this.cursor);
+    const runtime = focusedPokemon == null ? null : getMoodyPokemonPresentation(focusedPokemon.id);
+    const liveSnapshot = getMoodyLivePresentationSnapshot();
+    const runtimeLines =
+      runtime == null
+        ? []
+        : [
+            ...(runtime.itemStacks ?? []).map(stack => {
+              const attachments = stack.attachedEffects ?? [];
+              return `${stack.disabled ? "[DISABLED] " : ""}${stack.name} x${stack.count}${
+                attachments.length > 0 ? ` (${attachments.join(", ")})` : ""
+              }`;
+            }),
+            ...(runtime.temporaryAbilities ?? []).map(
+              ability => `${ability.carousel ? "Ability 5" : "Temp"}: ${ability.name}`,
+            ),
+            (runtime.barrier ?? 0) > 0 ? `Barrier ${runtime.barrier}` : "",
+            (runtime.damageDebt ?? 0) > 0
+              ? `Debt ${runtime.damageDebt}${runtime.debtDueLabel == null ? "" : ` (${runtime.debtDueLabel})`}`
+              : "",
+            (runtime.revivalCharges ?? 0) > 0 ? `${runtime.revivalLabel ?? "Revival"} x${runtime.revivalCharges}` : "",
+            ...(liveSnapshot?.trackers ?? [])
+              .filter(tracker => tracker.pokemonId === focusedPokemon?.id)
+              .map(tracker => `${tracker.label}: ${tracker.value}`),
+            ...(liveSnapshot?.curseMarkers ?? [])
+              .filter(marker => marker.pokemonId === focusedPokemon?.id)
+              .map(marker => `[CURSE] ${marker.label}: ${marker.detail}`),
+          ].filter(Boolean);
 
-    if (presentation == null) {
+    if (presentation == null && runtimeLines.length === 0) {
+      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px");
       switch (this.partyUiMode) {
         case PartyUiMode.MODIFIER_TRANSFER:
           this.showText(i18next.t("partyUiHandler:partyTransfer"));
@@ -1807,9 +1903,13 @@ export class PartyUiHandler extends MessageUiHandler {
         break;
     }
 
-    text = text.length > 0 ? `${text}\n${presentation.summary}` : presentation.summary;
+    const moodSummary = [presentation?.summary ?? "", ...runtimeLines].filter(Boolean).join(" / ");
+    text = text.length > 0 ? `${text}\n${moodSummary}` : moodSummary;
 
+    const messageWidth = 248 * 6;
+    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("48px");
     this.showText(text, 0);
+    this.partyMessageBox.setSize(262, 42);
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -2250,7 +2350,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
     const party = globalScene.getPlayerParty();
     const base = party[this.transferCursor];
-    const partner = this.cursor < 6 ? party[this.cursor] : undefined;
+    const partner = this.cursor < party.length ? party[this.cursor] : undefined;
     if (base && partner && this.cursor !== this.transferCursor) {
       this.fusionPreviewPanel.show(base, partner);
     } else {
@@ -2265,7 +2365,8 @@ export class PartyUiHandler extends MessageUiHandler {
       return;
     }
     const ui = this.getUi();
-    if (this.cursor < 6 && this.cursor !== this.transferCursor && this.selectCallback) {
+    const party = globalScene.getPlayerParty();
+    if (this.cursor < party.length && this.cursor !== this.transferCursor && this.selectCallback) {
       (this.selectCallback as PartyModifierSpliceSelectCallback)(this.transferCursor, this.cursor);
       this.clearTransfer();
       ui.playSelect();
@@ -2538,8 +2639,10 @@ class PartySlot extends Phaser.GameObjects.Container {
 
     let slotPositionY: number;
     if (isBenched) {
-      slotPositionY = -196 + (isDoubleBattle || isTripleField ? -40 : 0);
-      slotPositionY += (28 + (isDoubleBattle || isTripleField ? 8 : 0)) * slotIndex;
+      const benchIndex = slotIndex - onFieldCount;
+      const benchCount = Math.max(1, globalScene.getPlayerParty().length - onFieldCount);
+      const benchStep = Math.min(isDoubleBattle || isTripleField ? 36 : 28, Math.floor(144 / benchCount));
+      slotPositionY = -196 + benchIndex * benchStep;
     } else if (isTripleField) {
       slotPositionY = -160 + (isItemManageMode ? -12 : 0);
       slotPositionY += (isItemManageMode ? 38 : 44) * slotIndex;
@@ -2760,12 +2863,22 @@ class PartySlot extends Phaser.GameObjects.Container {
         indicatorRight -= overflowText.displayWidth + 2;
       }
       for (const indicator of moodyPresentation.indicators) {
+        const markerWidth = indicator.attachment === "slot" ? 2 : indicator.attachment === "team" ? 7 : 4;
+        const markerHeight = indicator.attachment === "slot" ? 6 : indicator.attachment === "pair" ? 4 : 3;
         const marker = globalScene.add
-          .rectangle(indicatorRight, 1, 4, 3, indicator.color)
+          .rectangle(indicatorRight, 1, markerWidth, markerHeight, indicator.color)
           .setOrigin(1, 0)
+          .setAlpha(indicator.dormant ? 0.4 : 1)
           .setStrokeStyle(1, 0x202028);
         slotInfoContainer.add(marker);
-        indicatorRight -= 5;
+        if (indicator.emblem.length > 0) {
+          const emblem = addTextObject(indicatorRight - markerWidth / 2, 0, indicator.emblem, TextStyle.PARTY)
+            .setOrigin(0.5, 0)
+            .setScale(0.45)
+            .setAlpha(indicator.dormant ? 0.4 : 1);
+          slotInfoContainer.add(emblem);
+        }
+        indicatorRight -= markerWidth + 2;
       }
     }
 

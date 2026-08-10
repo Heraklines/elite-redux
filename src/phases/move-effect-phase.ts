@@ -46,6 +46,8 @@ import {
   erPopAirBalloonOnHit,
   erTransferStickyBarbOnHit,
 } from "#data/elite-redux/er-tactical-items";
+import { getMoodyCoordinatorSpectralPower } from "#data/elite-redux/moody/moody-coordinator-combat-state";
+import { notifyMoodyFormationMoveResolved } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
@@ -151,6 +153,10 @@ export class MoveEffectPhase extends PokemonPhase {
    */
   private erStartedPrimed = false;
 
+  private isMoodyCoordinatorSpectral(user = this.getUserPokemon()): boolean {
+    return this.useMode === MoveUseMode.FOLLOW_UP && getMoodyCoordinatorSpectralPower(user.id) !== 1;
+  }
+
   /**
    * @param useMode - The {@linkcode MoveUseMode} corresponding to how this move was used.
    */
@@ -234,10 +240,14 @@ export class MoveEffectPhase extends PokemonPhase {
         && !move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_ABILITIES, user, target: opponent })
         && suppressesOpponentDamageBoosts(opponent);
       // Assume single target for multi hit
-      applyMoveAttrs("MultiHitAttr", user, opponent ?? null, move, hitCount, suppressesMultiHitAbilities);
+      if (!this.isMoodyCoordinatorSpectral(user)) {
+        applyMoveAttrs("MultiHitAttr", user, opponent ?? null, move, hitCount, suppressesMultiHitAbilities);
+      }
       // If Parental Bond is applicable, add another hit
       const addStrikeParams = { pokemon: user, move, hitCount, opponent };
-      if (suppressesMultiHitAbilities) {
+      if (this.isMoodyCoordinatorSpectral(user)) {
+        hitCount.value = 1;
+      } else if (suppressesMultiHitAbilities) {
         applyFilteredAbAttrs("AddSecondStrikeAbAttr", addStrikeParams, bypassesOpponentMultiHitSuppression);
       } else {
         applyAbAttrs("AddSecondStrikeAbAttr", addStrikeParams);
@@ -431,7 +441,7 @@ export class MoveEffectPhase extends PokemonPhase {
    */
   private postAnimCallback(user: Pokemon, targets: Pokemon[]) {
     // Add to the move history entry
-    if (this.firstHit && this.useMode !== MoveUseMode.DELAYED_ATTACK) {
+    if (this.firstHit && this.useMode !== MoveUseMode.DELAYED_ATTACK && !this.isMoodyCoordinatorSpectral(user)) {
       user.pushMoveHistory(this.moveHistoryEntry);
       if (!isVirtual(this.useMode)) {
         recordSignatureExecutedMove(user, this.move);
@@ -452,8 +462,17 @@ export class MoveEffectPhase extends PokemonPhase {
       user.stellarTypesBoosted.push(moveType);
     }
 
-    if (this.lastHit) {
+    if (this.lastHit && !this.isMoodyCoordinatorSpectral(user)) {
       this.triggerMoveEffects(MoveEffectTrigger.POST_TARGET, user, null);
+      const outcome =
+        this.moveHistoryEntry.result === MoveResult.SUCCESS
+          ? "hit"
+          : this.moveHistoryEntry.result === MoveResult.MISS
+            ? "miss"
+            : this.moveHistoryEntry.result === MoveResult.FAIL
+              ? "failed"
+              : "immune";
+      notifyMoodyFormationMoveResolved(user, this.move, outcome);
     }
 
     this.updateSubstitutes();
@@ -795,6 +814,11 @@ export class MoveEffectPhase extends PokemonPhase {
   protected applyMoveEffects(target: Pokemon, effectiveness: TypeDamageMultiplier, firstTarget: boolean): void {
     const user = this.getUserPokemon();
 
+    if (this.isMoodyCoordinatorSpectral(user)) {
+      this.applyMove(user, target, effectiveness);
+      return;
+    }
+
     this.triggerMoveEffects(MoveEffectTrigger.PRE_APPLY, user, target);
 
     const result = this.applyMove(user, target, effectiveness);
@@ -860,7 +884,9 @@ export class MoveEffectPhase extends PokemonPhase {
      * Apply stat changes from {@linkcode move} and gives it to {@linkcode source}
      * before damage calculation
      */
-    applyMoveAttrs("StatChangeBeforeDmgCalcAttr", user, target, this.move);
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      applyMoveAttrs("StatChangeBeforeDmgCalcAttr", user, target, this.move);
+    }
 
     // Mold Breaker & co. also ignore the target's damage-MODIFYING abilities
     // (Multiscale, Thick Fat, Filter/Solid Rock, Fluffy, Heatproof, Ice Scales,
@@ -882,7 +908,7 @@ export class MoveEffectPhase extends PokemonPhase {
     const typeBoost = user.findTag(
       (t): t is TypeBoostTag => t instanceof TypeBoostTag && t.boostedType === user.getMoveType(this.move),
     );
-    if (typeBoost?.oneUse) {
+    if (typeBoost?.oneUse && !this.isMoodyCoordinatorSpectral(user)) {
       user.removeTag(typeBoost.tagType);
     }
 
@@ -945,10 +971,12 @@ export class MoveEffectPhase extends PokemonPhase {
     // ER Sheer Force (125): moves it power-boosts (those with a secondary effect,
     // move.chance >= 1) do NOT incur Life Orb recoil.
     const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
-    if (!sheerForceSuppressesRecoil) {
+    if (!sheerForceSuppressesRecoil && !this.isMoodyCoordinatorSpectral(user)) {
       applyErLifeOrbRecoil(user, finalDmg);
     }
-    applyErRockyHelmet(user, target, this.move, finalDmg);
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      applyErRockyHelmet(user, target, this.move, finalDmg);
+    }
 
     target.turnData.attacksReceived.unshift({
       move: this.move.id,
@@ -959,20 +987,22 @@ export class MoveEffectPhase extends PokemonPhase {
       sourceBattlerIndex: user.getBattlerIndex(),
     });
 
-    if (user.isPlayer() && target.isEnemy()) {
+    if (user.isPlayer() && target.isEnemy() && !this.isMoodyCoordinatorSpectral(user)) {
       globalScene.applyModifiers(DamageMoneyRewardModifier, true, user, new NumberHolder(finalDmg));
     }
 
-    erRecordAchievementMoveDamage(
-      user,
-      target,
-      this.move,
-      this.useMode,
-      finalDmg,
-      isCritical,
-      targetHpBefore,
-      result === HitResult.SUPER_EFFECTIVE,
-    );
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      erRecordAchievementMoveDamage(
+        user,
+        target,
+        this.move,
+        this.useMode,
+        finalDmg,
+        isCritical,
+        targetHpBefore,
+        result === HitResult.SUPER_EFFECTIVE,
+      );
+    }
 
     return [result, finalDmg, isCritical];
   }

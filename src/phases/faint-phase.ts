@@ -19,6 +19,15 @@ import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { erMomentumEngineOnEnemyKo, erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
+import { notifyMoodyFormationFaint } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  observeMoodyRuntimeFaint,
+  resolveMoodyFaintLaneOrder,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  notifyMoodyCoordinatorFaint,
+  notifyMoodyCoordinatorFinalizedFaint,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -64,6 +73,16 @@ export class FaintPhase extends PokemonPhase {
     super.start();
 
     const faintPokemon = this.getPokemon();
+    const moodyFieldObservation = observeMoodyRuntimeFaint(faintPokemon, this.source);
+    const moodyIntervention = resolveMoodyFaintLaneOrder({
+      field: () => moodyFieldObservation,
+      formation: () => undefined,
+      coordinator: () => notifyMoodyCoordinatorFaint(faintPokemon, this.source),
+    });
+    if (moodyIntervention != null) {
+      this.end();
+      return;
+    }
     const recordedFaintAddress = consumeCoopRecordedFaintAddress(this.battlerIndex);
     this.faintSourceAddress = {
       wave: globalScene.currentBattle.waveIndex,
@@ -92,6 +111,10 @@ export class FaintPhase extends PokemonPhase {
         return;
       }
     }
+
+    moodyFieldObservation.finalize();
+    notifyMoodyFormationFaint(faintPokemon, this.source);
+    notifyMoodyCoordinatorFinalizedFaint(faintPokemon, this.source);
 
     /**
      * In case the current pokemon was just switched in, make sure it is counted as participating in the combat.

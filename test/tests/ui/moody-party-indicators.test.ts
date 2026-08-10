@@ -26,10 +26,18 @@ describe("Moody party-card indicators", () => {
       boon("relay-seat", 50),
     ]);
 
-    expect(presentation?.indicators.map(indicator => indicator.rarity)).toEqual(["master", "ultra"]);
-    expect(presentation?.overflow).toBe(3);
+    expect(presentation?.indicators.map(indicator => indicator.rarity)).toEqual(["master", "ultra", "great"]);
+    expect(presentation?.overflow).toBe(2);
     expect(presentation?.summary).toContain("Sanctuary Seat");
     expect(presentation?.summary).toContain("+3");
+  });
+
+  it("keeps dormant effects visible and marks their compact presentation", () => {
+    const dormant = { ...boon("crowned-vanguard", 10), dormant: true };
+    const presentation = buildMoodyPartySlotPresentation([dormant]);
+
+    expect(presentation?.indicators[0]).toMatchObject({ dormant: true });
+    expect(presentation?.summary).toContain("[Dormant]");
   });
 
   it("uses rank and evolution labels from the catalog", () => {

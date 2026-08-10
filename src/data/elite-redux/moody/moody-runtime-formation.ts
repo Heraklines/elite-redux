@@ -288,15 +288,18 @@ export type MoodyFormationEvent =
       turn: number;
     };
 
-export type MoodyFormationRepertoireReward =
-  | "barrier"
-  | "heal"
-  | "restore-pp"
-  | "cleanse"
-  | "random-stat"
-  | "next-priority"
-  | "next-secondary"
-  | "type-resistance";
+export const MOODY_FORMATION_REPERTOIRE_REWARDS = [
+  "barrier",
+  "heal",
+  "restore-pp",
+  "cleanse",
+  "random-stat",
+  "next-priority",
+  "next-secondary",
+  "type-resistance",
+] as const;
+
+export type MoodyFormationRepertoireReward = (typeof MOODY_FORMATION_REPERTOIRE_REWARDS)[number];
 
 export type MoodyFormationCommand =
   | {
@@ -1043,7 +1046,7 @@ export function resolveMoodyFormationEffect(
             kind: "restore-pp",
             source: effect.boonId,
             pokemonId: occupant.pokemonId,
-            moveId: occupant.mostDepletedMoveId,
+            ...(occupant.mostDepletedMoveId == null ? {} : { moveId: occupant.mostDepletedMoveId }),
             amount: Math.max(1, Math.ceil(tokens * (1 - redirect))),
           });
           if (ally && redirect > 0) {
@@ -1057,7 +1060,7 @@ export function resolveMoodyFormationEffect(
               kind: "restore-pp",
               source: effect.boonId,
               pokemonId: ally.pokemonId,
-              moveId: ally.mostDepletedMoveId,
+              ...(ally.mostDepletedMoveId == null ? {} : { moveId: ally.mostDepletedMoveId }),
               amount: Math.max(1, Math.floor(tokens * redirect)),
             });
           }
@@ -2110,7 +2113,7 @@ export function resolveMoodyFormationEffect(
             kind: "max-pp",
             source: effect.boonId,
             pokemonId,
-            moveId: effect.target.moveIds?.[0],
+            ...(effect.target.moveIds?.[0] == null ? {} : { moveId: effect.target.moveIds[0] }),
             flatDelta: isEvolution(effect, "deep-wells") ? 2 : effect.rank >= 2 ? 5 : 3,
             allMoves: isEvolution(effect, "deep-wells"),
           });

@@ -1,5 +1,6 @@
 import {
   applyMoodyRuntimeStateDeltas,
+  MOODY_RUNTIME_EFFECT_BY_ID,
   type MoodyRuntimeCommand,
   type MoodyRuntimeEvent,
   type MoodyRuntimeStage,
@@ -70,6 +71,13 @@ export const MOODY_COORDINATOR_OVERLAP_POLICY = {
       legacyOwner: "src/data/elite-redux/moody/moody-scene-adapter.ts:getMoodyCaptureMultiplier",
       defaultResolution: "legacy-scene-owned; coordinator still applies collectible-trait assignment only",
     },
+    {
+      effectId: "field-runtime curse lane",
+      coordinatorEvent: "multiple",
+      coordinatorCommand: "multiple",
+      legacyOwner: "src/data/elite-redux/moody/moody-runtime-field-engine.ts",
+      defaultResolution: "field-runtime-owned; coordinator skips the overlapping effect entirely",
+    },
   ],
   scenePassiveOutputs: [
     "damage",
@@ -84,6 +92,17 @@ export const MOODY_COORDINATOR_OVERLAP_POLICY = {
   coordinatorOwnedRequirement:
     "Use coordinator-owned only after the parent disconnects the matching legacy scene hook for the same event.",
 } as const;
+
+export const MOODY_COORDINATOR_LEGACY_FIELD_OWNED_EFFECT_IDS = new Set([
+  "public-enemy",
+  "mood-swing",
+  "nemesis-protocol",
+  "blood-moon",
+  "reverse-snowball",
+  "cursed-draft",
+  "entropy",
+  "feedback-loop",
+]);
 
 export type MoodyCoordinatorCommand =
   | {
@@ -157,6 +176,11 @@ export const MOODY_COORDINATOR_RESET_RULES: readonly MoodyCoordinatorResetRule[]
   },
   { effectId: "recycler", cadence: "reward-screen", paths: ["flags.recyclerUsedThisScreen"] },
   { effectId: "recruiter-s-eye", cadence: "biome", paths: ["flags.recruiterUsedThisBiome"] },
+  {
+    effectId: "blood-market",
+    cadence: "biome",
+    paths: ["flags.bloodMarketUsedThisBiome", "values.bloodDebts"],
+  },
   { effectId: "flawless-ledger", cadence: "biome", paths: ["flags.ledgerFailureShieldUsed"] },
   { effectId: "time-loop", cadence: "ten-wave-segment", paths: ["counters.segmentUses"] },
   { effectId: "mirror-theft", cadence: "battle", paths: ["counters.mirrorUses"] },
@@ -225,6 +249,7 @@ export type MoodyCoordinatorEvent =
       readonly type: "market-purchase";
       readonly seed: number;
       readonly itemTier: number;
+      readonly payment: "money" | "blood";
       readonly debtRate: number;
       readonly usageRanking: readonly string[];
       readonly maxHpByPokemon: NumberMap;
@@ -293,6 +318,8 @@ export type MoodyCoordinatorEvent =
       readonly type: "pokemon-permanently-removed";
       readonly seed: number;
       readonly eligibleImprints: readonly string[];
+      readonly partySlot: number;
+      readonly boundPartySlot: number;
     }
   | {
       readonly type: "segmented-boss-defeated";
@@ -469,11 +496,13 @@ function progressWithState(progress: MoodyBoonProgress | undefined, state: Moody
 export function hydrateMoodyCoordinatorState(save: MoodyModeSaveData): MoodyCoordinatorState {
   return {
     effects: [
-      ...save.boons.map(boon => ({
-        effectId: boon.boonId,
-        stage: boon.rank === 1 ? "base" : boon.rank === 2 ? "rank-two" : (boon.evolutionId ?? "rank-two"),
-        state: stateFromProgress(boon.progress),
-      })),
+      ...save.boons
+        .filter(boon => !boon.dormant)
+        .map(boon => ({
+          effectId: boon.boonId,
+          stage: boon.rank === 1 ? "base" : boon.rank === 2 ? "rank-two" : (boon.evolutionId ?? "rank-two"),
+          state: stateFromProgress(boon.progress),
+        })),
       ...save.curses.map(curse => ({
         effectId: curse.curseId,
         stage: "base",
@@ -579,10 +608,17 @@ export function decodeMoodyCoordinatorCommand(effectId: string, source: MoodyRun
   throw new Error(`Moody coordinator has no typed executor contract for ${effectId}:${source.kind}`);
 }
 
-function runtimeEvent(effectId: string, event: MoodyCoordinatorEvent): MoodyRuntimeEvent | null {
+function runtimeEvent(
+  effectId: string,
+  event: MoodyCoordinatorEvent,
+  effectState: MoodyRuntimeState | undefined,
+): MoodyRuntimeEvent | null {
   const seed = event.seed;
   switch (event.type) {
     case "wave-completed": {
+      if (effectId === "bounty-board" && (!event.victory || event.alliedFaintCount > 0)) {
+        return { kind: "contract-failed", seed, data: {} };
+      }
       if (effectId === "compound-interest" && event.victory && event.isBoss) {
         return {
           kind: "boss-defeated",
@@ -682,7 +718,11 @@ function runtimeEvent(effectId: string, event: MoodyCoordinatorEvent): MoodyRunt
       return null;
     }
     case "market-purchase": {
-      if (effectId === "blood-market") {
+      if (
+        effectId === "blood-market"
+        && event.payment === "blood"
+        && effectState?.flags?.bloodMarketUsedThisBiome !== true
+      ) {
         return {
           kind: "blood-market-purchase",
           seed,
@@ -779,7 +819,15 @@ function runtimeEvent(effectId: string, event: MoodyCoordinatorEvent): MoodyRunt
       return effectId === "bench-academy" ? { kind: "academy-graduated", seed, data: {} } : null;
     case "pokemon-permanently-removed":
       return effectId === "legacy-slot"
-        ? { kind: "pokemon-permanently-removed", seed, data: { eligibleImprints: event.eligibleImprints } }
+        ? {
+            kind: "pokemon-permanently-removed",
+            seed,
+            data: {
+              eligibleImprints: event.eligibleImprints,
+              partySlot: event.partySlot,
+              boundPartySlot: event.boundPartySlot,
+            },
+          }
         : null;
     case "segmented-boss-defeated":
       return effectId === "apex-plunder"
@@ -830,6 +878,15 @@ export function coordinateMoodyRuntime(
   let routedEvent = event;
   const overlapMode = options.overlapMode ?? MOODY_COORDINATOR_OVERLAP_POLICY.defaultMode;
   const effects = inputState.effects.map(effect => {
+    if (MOODY_RUNTIME_EFFECT_BY_ID.get(effect.effectId)?.status === "blocked") {
+      return effect;
+    }
+    if (
+      overlapMode === "legacy-scene-compatible"
+      && MOODY_COORDINATOR_LEGACY_FIELD_OWNED_EFFECT_IDS.has(effect.effectId)
+    ) {
+      return effect;
+    }
     if (
       overlapMode === "legacy-scene-compatible"
       && effect.effectId === "compound-interest"
@@ -839,7 +896,7 @@ export function coordinateMoodyRuntime(
     ) {
       return effect;
     }
-    const routed = runtimeEvent(effect.effectId, routedEvent);
+    const routed = runtimeEvent(effect.effectId, routedEvent, effect.state);
     if (routed == null) {
       return effect;
     }
@@ -859,7 +916,17 @@ export function coordinateMoodyRuntime(
         routedEvent = { ...routedEvent, price: nextPrice };
       }
     }
-    return { ...effect, state: applyMoodyRuntimeStateDeltas(effect.state ?? {}, resolution.stateDeltas) };
+    const nextState = applyMoodyRuntimeStateDeltas(effect.state ?? {}, resolution.stateDeltas);
+    if (effect.effectId === "blood-market" && event.type === "market-purchase" && event.payment === "blood") {
+      return {
+        ...effect,
+        state: {
+          ...nextState,
+          flags: { ...nextState.flags, bloodMarketUsedThisBiome: true },
+        },
+      };
+    }
+    return { ...effect, state: nextState };
   });
   return { state: { effects }, commands };
 }

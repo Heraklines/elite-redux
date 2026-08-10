@@ -94,6 +94,16 @@ export enum UiMode {
   FUN_ABILITY_REVIEW,
   /** Fun Mode "Moody Mode": the post-boss 3-boon draft (pick one, target it, commit). */
   MOODY_BOON_SELECT,
-  /** Fun Mode "Moody Mode": the read-only ledger of the run's acquired boons and curses. */
+  /** Fun Mode "Moody Mode": the five-tab ledger of the run's acquired boons and curses. */
   MOODY_LEDGER,
+  /** Fun Mode "Moody Mode": the run-setup curse draft after party selection. */
+  MOODY_CURSE_SELECT,
+  /** Fun Mode "Moody Mode": the generic typed target/binding picker shell. */
+  MOODY_TARGET_PICKER,
+  /** Fun Mode "Moody Mode": the contextual post-acquisition choice panel. */
+  MOODY_CHOICE,
+  /** Fun Mode "Moody Mode": the current-encounter enemy boon panel (fog-safe). */
+  MOODY_ENEMY_PANEL,
+  /** Fun Mode "Moody Mode": shared section report (biome transition / bounty / borrowed future / recap). */
+  MOODY_SECTION_REPORT,
 }

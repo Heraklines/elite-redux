@@ -7,7 +7,6 @@ import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
-import type { CoopAuthorityRole } from "#data/elite-redux/coop/coop-session-binding";
 import {
   failCoopSharedSession,
   getCoopController,
@@ -16,8 +15,10 @@ import {
   runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopAuthorityRole } from "#data/elite-redux/coop/coop-session-binding";
 import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
 import { playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { notifyMoodyCoordinatorPokemonEvolved } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { LearnMoveType } from "#enums/learn-move-type";
@@ -84,13 +85,11 @@ export class EvolutionPhase extends Phase {
   private readonly coopOwningRuntime = getCoopRuntime();
   private readonly coopRewardSourceWave: number;
   private readonly coopRewardSourceTurn: number;
-  private coopRewardTerminalSettlement:
-    | {
-        readonly operationId: string;
-        readonly successor: Extract<CoopNextControl, { readonly kind: "AWAIT_SUCCESSOR" }>;
-        readonly settle: () => boolean;
-      }
-    | null = null;
+  private coopRewardTerminalSettlement: {
+    readonly operationId: string;
+    readonly successor: Extract<CoopNextControl, { readonly kind: "AWAIT_SUCCESSOR" }>;
+    readonly settle: () => boolean;
+  } | null = null;
   private fusionSpeciesEvolved: boolean; // Whether the evolution is of the fused species
   private evolutionBgm: AnySound | null;
   private evolutionHandler: EvolutionSceneUiHandler;
@@ -635,6 +634,7 @@ export class EvolutionPhase extends Phase {
   private onEvolutionComplete(evolvedPokemon: Pokemon) {
     // ER achievements: `this.pokemon` is now the evolved species (Incompatible Hardware: Porygon-Z).
     erRecordAchievementEvolution(this.pokemon);
+    notifyMoodyCoordinatorPokemonEvolved(this.pokemon);
     fadeOutSoundIfActive(globalScene, this.evolutionBgm);
     globalScene.time.delayedCall(250, () => {
       this.pokemon.cry();
@@ -758,10 +758,7 @@ export class EvolutionPhase extends Phase {
           const finishEvolution = (): void => {
             recordCoopWaveProgressionPresentation(presentation, this.coopOwningRuntime);
             if (this.coopSettleRewardEvolution != null) {
-              const committed = this.coopSettleRewardEvolution(
-                presentation,
-                this.evolutionRequiresLearnMoveDecision(),
-              );
+              const committed = this.coopSettleRewardEvolution(presentation, this.evolutionRequiresLearnMoveDecision());
               if (!committed || !this.proveCoopRewardEvolutionSettlement()) {
                 failCoopSharedSession(`Evolution reward ${this.coopRewardOperationId ?? "unknown"} could not settle`);
                 return;
