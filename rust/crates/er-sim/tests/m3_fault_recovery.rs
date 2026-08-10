@@ -1,9 +1,8 @@
 //! Closed fault/recovery snapshot boundary coverage.
 //!
 //! The malformed/duplicate cases below are necessary rejection evidence only.
-//! M3C-11 acceptance also requires a live production Battle `SimulatedPair`
-//! round-trip remains integration-owned until the private owner bridges are
-//! exposed; these fault DTO checks are not a substitute for that test.
+//! The live production Battle `SimulatedPair` campaign below proves that the
+//! same fault state is restorable at the owner boundary, not only in DTOs.
 
 use std::error::Error;
 
@@ -95,7 +94,9 @@ fn fault_script_round_trips_duplicate_delay_and_all_corruption_variants() -> Tes
             FaultOperationV2::Corrupt {
                 packet_id: safe(1),
                 corruption: FrameCorruptionV2::Replace {
-                    body: CanonicalHexBytes::from_bytes(br#"{"kind":"TURN"}"#),
+                    body: CanonicalHexBytes::from_bytes(
+                        br#"{"kind":"JSON_VALUE","value":{"kind":"TURN"}}"#,
+                    ),
                 },
             },
             FaultOperationV2::Corrupt {
@@ -196,12 +197,21 @@ fn storage_identity_is_endpoint_qualified_and_nullable_fields_are_required() -> 
     Ok(())
 }
 
-// The fault campaign uses the same production doubles builder as the raw-key
-// co-op campaign.  The pump remains an external transport/proposal boundary;
-// it does not call a reducer, command collector, or material applier directly.
+// The legacy replica test retains the same external transport/proposal pump as
+// the raw-key co-op campaign. The live Battle test below uses SimulatedPair's
+// production environment owner and never bypasses the public pair boundary.
 mod live_replica_recovery {
     include!("m3_raw_key_coop.rs");
 
+    use std::collections::BTreeMap;
+
+    use er_sim::snapshot::{
+        QueuedPacketSnapshotV2, RestorablePairSnapshotV2, RestorablePacketKindV2,
+    };
+    use er_sim::{
+        FaultOperation, FrameCorruption, PairEndpoint, PairOperation, SimulatedBattlePairConfig,
+        SimulatedPair,
+    };
     use er_content::pack::ContentPack;
     use er_kernel::snapshot::{
         KernelDeterminismDigest, RestorableKernelSnapshotV2,
@@ -210,6 +220,7 @@ mod live_replica_recovery {
         CorrelatedResponseSnapshotV2, PendingRecoverySnapshotV2, ProposalTimerKindV2,
     };
     use er_types::battle_ids::{CanonicalHexBytes, ContentPackHash};
+    use er_types::{LiveResourceSnapshot, RecoveryFenceState};
 
     fn content_pack() -> TestResult<Arc<ContentPack>> {
         let wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
@@ -329,6 +340,255 @@ mod live_replica_recovery {
             "failed {label} restore mutated the live owner",
         );
         Ok(())
+    }
+
+    fn simulated_battle_pair() -> TestResult<(SimulatedPair, Arc<ContentPack>)> {
+        let mut host_game = forced_doubles_config()?;
+        host_game.local_seat = seat(1);
+        let mut guest_game = host_game.clone();
+        guest_game.local_seat = seat(2);
+        let host_seat = seat(1);
+        let guest_seat = seat(2);
+        let content = content_pack()?;
+        let pair = SimulatedPair::new_battle(SimulatedBattlePairConfig {
+            host_game,
+            host_protocol: authority_protocol(host_seat, guest_seat, generation(1))?,
+            guest_game,
+            guest_protocol: replica_protocol(host_seat, guest_seat, generation(1))?,
+            content: Arc::clone(&content),
+            replay_seed: 0x4c554e41,
+            initial_storage: BTreeMap::new(),
+        })?;
+        Ok((pair, content))
+    }
+
+    fn prime_simulated_battle(pair: &mut SimulatedPair) -> TestResult {
+        // `new_battle` starts with the production protocol generation while
+        // the fault network starts at zero. Reconnect once to synchronize the
+        // live transport owner without starting a recovery transaction.
+        pair.apply(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        })?;
+        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            for _ in 0..3 {
+                pair.press(endpoint, PhysicalKey::Enter)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn first_packet(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        packet_generation: ConnectionGeneration,
+    ) -> TestResult<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .find(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && packet.source_generation == packet_generation
+                    && packet.destination_generation == packet_generation
+            })
+            .cloned()
+            .ok_or_else(|| {
+                invalid(format!(
+                    "missing {kind:?} packet from {source:?} to {destination:?} at generation {}",
+                    packet_generation.get().get()
+                ))
+            })
+    }
+
+    fn last_packet(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        packet_generation: ConnectionGeneration,
+    ) -> TestResult<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .rev()
+            .find(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && packet.source_generation == packet_generation
+                    && packet.destination_generation == packet_generation
+            })
+            .cloned()
+            .ok_or_else(|| {
+                invalid(format!(
+                    "missing trailing {kind:?} packet from {source:?} to {destination:?} at generation {}",
+                    packet_generation.get().get()
+                ))
+            })
+    }
+
+    fn packets_with_body(
+        snapshot: &RestorablePairSnapshotV2,
+        kind: RestorablePacketKindV2,
+        source: PairEndpoint,
+        destination: PairEndpoint,
+        body: &CanonicalHexBytes,
+    ) -> Vec<QueuedPacketSnapshotV2> {
+        snapshot
+            .network
+            .packets
+            .iter()
+            .filter(|packet| {
+                packet.kind == kind
+                    && packet.source == source
+                    && packet.destination == destination
+                    && &packet.body == body
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn settle_pending_battle_presentations(pair: &mut SimulatedPair) -> TestResult {
+        for _ in 0..64 {
+            let snapshot = pair.snapshot_v2()?;
+            let mut pending = Vec::new();
+            pending.extend(
+                snapshot
+                    .host
+                    .pending_presentations
+                    .pending_barrier_ids
+                    .iter()
+                    .cloned()
+                    .map(|event_id| (PairEndpoint::Host, event_id)),
+            );
+            pending.extend(
+                snapshot
+                    .guest
+                    .pending_presentations
+                    .pending_barrier_ids
+                    .iter()
+                    .cloned()
+                    .map(|event_id| (PairEndpoint::Guest, event_id)),
+            );
+            if pending.is_empty() {
+                return Ok(());
+            }
+            for (endpoint, event_id) in pending {
+                pair.apply(PairOperation::BattlePresentationOutcome {
+                    endpoint,
+                    event_id,
+                    outcome: PresentationSettlementOutcome::Settled,
+                })?;
+            }
+        }
+        Err(invalid(
+            "Battle presentation barriers did not settle within the fixture bound",
+        ))
+    }
+
+    fn assert_guest_recovery_fence_held(
+        snapshot: &RestorablePairSnapshotV2,
+    ) -> TestResult {
+        let recovery = snapshot
+            .guest
+            .protocol
+            .recovery
+            .as_ref()
+            .ok_or_else(|| invalid("replica snapshot omitted its recovery owner"))?;
+        assert_eq!(recovery.fence.state, RecoveryFenceState::Held);
+        assert!(recovery.phase.is_some());
+        assert!(recovery.request_id.is_some());
+        Ok(())
+    }
+
+    fn assert_pair_snapshot_equal(
+        left: &RestorablePairSnapshotV2,
+        right: &RestorablePairSnapshotV2,
+        label: &str,
+    ) -> TestResult {
+        assert_eq!(
+            serde_json::to_vec(left)?,
+            serde_json::to_vec(right)?,
+            "restorable pair snapshot bytes diverged after {label}",
+        );
+        assert_eq!(
+            left.network.packets, right.network.packets,
+            "packet queue/order diverged after {label}",
+        );
+        assert_eq!(
+            left.host.mechanical_digest, right.host.mechanical_digest,
+            "host mechanical digest diverged after {label}",
+        );
+        assert_eq!(
+            left.guest.mechanical_digest, right.guest.mechanical_digest,
+            "guest mechanical digest diverged after {label}",
+        );
+        assert_eq!(
+            left.host.kernel_determinism_digest, right.host.kernel_determinism_digest,
+            "host kernel digest diverged after {label}",
+        );
+        assert_eq!(
+            left.guest.kernel_determinism_digest, right.guest.kernel_determinism_digest,
+            "guest kernel digest diverged after {label}",
+        );
+        Ok(())
+    }
+
+    fn apply_same_pair_operation(
+        uninterrupted: &mut SimulatedPair,
+        restored: &mut SimulatedPair,
+        operation: PairOperation,
+        label: &str,
+    ) -> TestResult {
+        let uninterrupted_step = uninterrupted.apply(operation.clone())?;
+        let restored_step = restored.apply(operation)?;
+        assert_eq!(
+            uninterrupted_step.sequence, restored_step.sequence,
+            "pair sequence diverged after {label}",
+        );
+        assert_eq!(
+            uninterrupted_step.operation, restored_step.operation,
+            "operation identity diverged after {label}",
+        );
+        assert_eq!(
+            serde_json::to_vec(&uninterrupted_step.generated_effects)?,
+            serde_json::to_vec(&restored_step.generated_effects)?,
+            "ordered effects diverged after {label}",
+        );
+        assert_eq!(
+            uninterrupted_step.effects_digest, restored_step.effects_digest,
+            "effect digest diverged after {label}",
+        );
+        let uninterrupted_snapshot = uninterrupted.snapshot_v2()?;
+        let restored_snapshot = restored.snapshot_v2()?;
+        assert_pair_snapshot_equal(&uninterrupted_snapshot, &restored_snapshot, label)
+    }
+
+    fn assert_zero_pair_resources(snapshot: &er_sim::PairSnapshot) {
+        assert_eq!(
+            snapshot.host.live_resources,
+            LiveResourceSnapshot::default()
+        );
+        assert_eq!(
+            snapshot.guest.live_resources,
+            LiveResourceSnapshot::default()
+        );
+        assert!(snapshot.clock_timers.is_empty());
+        assert!(snapshot.network.queued_packet_ids.is_empty());
+        assert!(snapshot.network.disconnected_endpoints.is_empty());
+        assert!(snapshot.network.suspended_endpoints.is_empty());
+        assert!(snapshot.network.disposed);
+        assert!(snapshot.presenter.pending_event_ids.is_empty());
+        assert!(snapshot.presenter.settled_event_ids.is_empty());
+        assert!(snapshot.presenter.disposed);
+        assert!(snapshot.storage.keys.is_empty());
+        assert!(snapshot.storage.pending_request_ids.is_empty());
+        assert!(snapshot.storage.disposed);
     }
 
     #[test]
@@ -470,6 +730,267 @@ mod live_replica_recovery {
             Arc::clone(&content),
             "recovery correlation",
         )?;
+        Ok(())
+    }
+
+    #[test]
+    fn live_battle_pair_fault_queue_round_trip_is_atomic_and_deterministic() -> TestResult {
+        let (mut pair, content) = simulated_battle_pair()?;
+        prime_simulated_battle(&mut pair)?;
+
+        let generation_one = generation(1);
+        let initial = pair.snapshot_v2()?;
+        let proposal = first_packet(
+            &initial,
+            RestorablePacketKindV2::CommandProposal,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            generation_one,
+        )?;
+
+        // A frame-only fault against an opaque proposal must fail atomically:
+        // no queue, RNG, sequence, or fault-script cursor mutation may leak.
+        let before_failed_fault = serde_json::to_vec(&pair.snapshot_v2()?)?;
+        let rejected_fault = pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Corrupt {
+                packet_id: proposal.packet_id,
+                corruption: FrameCorruption::DeleteField {
+                    json_pointer: "/ctx/connectionGeneration".to_owned(),
+                },
+            },
+        });
+        assert!(rejected_fault.is_err());
+        assert_eq!(
+            serde_json::to_vec(&pair.snapshot_v2()?)?,
+            before_failed_fault,
+            "failed fault crossed the SimulatedPair atomic boundary",
+        );
+
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Deliver {
+                packet_id: proposal.packet_id,
+            },
+        })?;
+        let turn = first_packet(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::AuthorityFrame,
+            PairEndpoint::Host,
+            PairEndpoint::Guest,
+            generation_one,
+        )?;
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Delay {
+                packet_id: turn.packet_id,
+                additional_ms: safe(100),
+            },
+        })?;
+        let delayed_turn = first_packet(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::AuthorityFrame,
+            PairEndpoint::Host,
+            PairEndpoint::Guest,
+            generation_one,
+        )?;
+        assert_eq!(delayed_turn.disposition, PacketDispositionV2::Delayed);
+        assert!(delayed_turn.delivery_deadline_ms > delayed_turn.enqueued_at_ms);
+
+        // Delivering the delayed TURN explicitly leaves the generated Battle
+        // effects and the logical-control receipt in the production pump.
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Deliver {
+                packet_id: turn.packet_id,
+            },
+        })?;
+        let after_turn = pair.snapshot_v2()?;
+        if !after_turn.network.packets.iter().any(|packet| {
+            packet.kind == RestorablePacketKindV2::ControlReceipt
+                && packet.source == PairEndpoint::Guest
+                && packet.destination == PairEndpoint::Host
+        }) {
+            // FaultControlled presenters intentionally retain their own live
+            // barrier state. Settle it through the public pair operation if
+            // this Battle path emitted the receipt only after presentation.
+            settle_pending_battle_presentations(&mut pair)?;
+        }
+        // Replica admission emits ordered admitted/material/control receipts;
+        // the trailing receipt is the logical-control (`controlInstalled`)
+        // acknowledgement, before any optional presentation settlement.
+        let receipt = last_packet(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::ControlReceipt,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            generation_one,
+        )?;
+        let receipt_body_before_corruption = receipt.body.clone();
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Delay {
+                packet_id: receipt.packet_id,
+                additional_ms: safe(100),
+            },
+        })?;
+        let delayed_receipt = first_packet(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::ControlReceipt,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            generation_one,
+        )?;
+        assert_eq!(delayed_receipt.disposition, PacketDispositionV2::Delayed);
+
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Corrupt {
+                packet_id: receipt.packet_id,
+                corruption: FrameCorruption::DeleteField {
+                    json_pointer: "/ctx/connectionGeneration".to_owned(),
+                },
+            },
+        })?;
+        let corrupted_receipt = first_packet(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::ControlReceipt,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            generation_one,
+        )?;
+        assert_ne!(
+            corrupted_receipt.body, receipt_body_before_corruption,
+            "production frame corruption did not change the queued receipt bytes",
+        );
+        let corrupted_receipt_body = corrupted_receipt.body.clone();
+
+        // Keep both copies in the queue so the final checkpoint contains a
+        // literal duplicate pair, rather than only a historical duplicate
+        // counter that the closed V2 schema intentionally does not expose.
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Duplicate {
+                packet_id: receipt.packet_id,
+            },
+        })?;
+        let duplicated = packets_with_body(
+            &pair.snapshot_v2()?,
+            RestorablePacketKindV2::ControlReceipt,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            &corrupted_receipt_body,
+        );
+        assert_eq!(duplicated.len(), 2);
+
+        // A new generation fences the delayed/corrupted receipt copies while
+        // the replica recovery transaction is visibly held.
+        pair.apply(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Guest,
+        })?;
+        let checkpoint = pair.snapshot_v2()?;
+        assert_guest_recovery_fence_held(&checkpoint)?;
+        let current_generation = checkpoint
+            .network
+            .links
+            .iter()
+            .find(|link| link.endpoint == PairEndpoint::Guest)
+            .map(|link| link.generation)
+            .ok_or_else(|| invalid("pair snapshot omitted the guest network link"))?;
+        assert_eq!(current_generation, generation(2));
+        let stale_receipts = duplicated
+            .iter()
+            .map(|packet| packet.packet_id)
+            .collect::<Vec<_>>();
+        assert!(stale_receipts.iter().all(|packet_id| {
+            checkpoint.network.packets.iter().any(|packet| {
+                packet.packet_id == *packet_id
+                    && packet.source_generation != current_generation
+                    && packet.destination_generation != current_generation
+            })
+        }));
+        let queued_corrupted_delayed = packets_with_body(
+            &checkpoint,
+            RestorablePacketKindV2::ControlReceipt,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            &corrupted_receipt_body,
+        );
+        assert_eq!(queued_corrupted_delayed.len(), 2);
+        assert!(queued_corrupted_delayed
+            .iter()
+            .all(|packet| packet.disposition == PacketDispositionV2::Delayed));
+
+        let wire = serde_json::to_string(&checkpoint)?;
+        let decoded: RestorablePairSnapshotV2 = serde_json::from_str(&wire)?;
+        assert_eq!(
+            serde_json::to_vec(&checkpoint)?,
+            serde_json::to_vec(&decoded)?,
+            "live pair JSON round trip changed canonical snapshot bytes",
+        );
+        let mut uninterrupted = pair;
+        let mut restored = SimulatedPair::from_snapshot(decoded, Arc::clone(&content))?;
+        let uninterrupted_checkpoint = uninterrupted.snapshot_v2()?;
+        let restored_checkpoint = restored.snapshot_v2()?;
+        assert_pair_snapshot_equal(
+            &uninterrupted_checkpoint,
+            &restored_checkpoint,
+            "live Battle restore",
+        )?;
+
+        // First reap both stale copies through the same fault boundary. Then
+        // continue the held recovery request and bundle; every ordered effect,
+        // queued packet body/order, and endpoint digest must remain identical.
+        for packet_id in stale_receipts {
+            apply_same_pair_operation(
+                &mut uninterrupted,
+                &mut restored,
+                PairOperation::Fault {
+                    operation: FaultOperation::Deliver { packet_id },
+                },
+                "stale-generation receipt reap",
+            )?;
+        }
+        let recovery_request = first_packet(
+            &uninterrupted.snapshot_v2()?,
+            RestorablePacketKindV2::AuthorityFrame,
+            PairEndpoint::Guest,
+            PairEndpoint::Host,
+            current_generation,
+        )?;
+        apply_same_pair_operation(
+            &mut uninterrupted,
+            &mut restored,
+            PairOperation::Fault {
+                operation: FaultOperation::Deliver {
+                    packet_id: recovery_request.packet_id,
+                },
+            },
+            "recovery request",
+        )?;
+        let recovery_bundle = first_packet(
+            &uninterrupted.snapshot_v2()?,
+            RestorablePacketKindV2::AuthorityFrame,
+            PairEndpoint::Host,
+            PairEndpoint::Guest,
+            current_generation,
+        )?;
+        apply_same_pair_operation(
+            &mut uninterrupted,
+            &mut restored,
+            PairOperation::Fault {
+                operation: FaultOperation::Deliver {
+                    packet_id: recovery_bundle.packet_id,
+                },
+            },
+            "recovery bundle",
+        )?;
+
+        let uninterrupted_cleanup = uninterrupted.teardown("live Battle fault recovery test")?;
+        let restored_cleanup = restored.teardown("live Battle fault recovery test")?;
+        assert_zero_pair_resources(&uninterrupted_cleanup);
+        assert_zero_pair_resources(&restored_cleanup);
+        assert_eq!(
+            uninterrupted_cleanup.host.live_resources,
+            restored_cleanup.host.live_resources
+        );
+        assert_eq!(
+            uninterrupted_cleanup.guest.live_resources,
+            restored_cleanup.guest.live_resources
+        );
         Ok(())
     }
 }
