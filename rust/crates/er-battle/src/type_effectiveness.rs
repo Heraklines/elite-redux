@@ -262,11 +262,13 @@ pub fn resolve_type_effectiveness(
     }
 
     let primary = chart.multiplier(attack_type, defender_typing.primary);
-    let combined = compose_type_multipliers(primary, defender_typing.secondary).ok_or(
+    let secondary = defender_typing
+        .secondary
+        .map(|defender_type| chart.multiplier(attack_type, defender_type));
+    let combined = compose_type_multipliers(primary, secondary).ok_or(
         TypeEffectivenessError::CompositionOutOfRange {
             left: EffectivenessMultiplier::from_single_type(primary),
-            right: defender_typing
-                .secondary
+            right: secondary
                 .map_or(EffectivenessMultiplier::One, EffectivenessMultiplier::from_single_type),
         },
     )?;
