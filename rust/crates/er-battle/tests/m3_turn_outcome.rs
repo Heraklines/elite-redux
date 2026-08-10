@@ -733,10 +733,12 @@ fn player_faint_stays_pending_until_replacement_material_resolves_it() -> TestRe
         if with_reserve {
             assert_eq!(after_battle.player_party[1].id, reserve_id);
         } else {
-            assert!(!transition.presentation.iter().any(|event| matches!(
-                &event.kind,
-                BattlePresentationKind::BattleLost
-            )));
+            assert!(
+                !transition
+                    .presentation
+                    .iter()
+                    .any(|event| matches!(&event.kind, BattlePresentationKind::BattleLost))
+            );
             let occurrence = *occurrence;
             let before_replacement = transition.after_state.clone();
             let before_replacement_battle = battle(&before_replacement)?;

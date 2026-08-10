@@ -474,8 +474,8 @@ fn faint_queue_preserves_allocator_causality_and_stored_replacement_truth()
 }
 
 #[test]
-fn pending_last_player_faint_defers_defeat_until_replacement_applies()
--> Result<(), Box<dyn Error>> {
+fn pending_last_player_faint_defers_defeat_until_replacement_applies() -> Result<(), Box<dyn Error>>
+{
     let mut state = valid_game()?;
     let battle = state.battle.as_mut().ok_or("missing battle")?;
     battle.player_party[0] = pokemon(17, Some(seat(1)), true)?;
