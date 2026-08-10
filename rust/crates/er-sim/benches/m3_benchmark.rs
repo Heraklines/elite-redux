@@ -703,21 +703,54 @@ fn record_pair_turn_evidence(step: &PairStep, evidence: &mut TurnEvidence) -> Te
     Ok(())
 }
 
+fn state_game<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
+    let mode = state
+        .get("mode")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid(format!("{label}.mode is not a string")))?;
+    if mode != "BATTLE" {
+        return Err(invalid(format!(
+            "{label}.mode is {mode}, expected BATTLE"
+        )));
+    }
+    let game = state
+        .get("game")
+        .ok_or_else(|| invalid(format!("{label} has no canonical game state")))?;
+    if !game.is_object() {
+        return Err(invalid(format!("{label}.game is not an object")));
+    }
+    Ok(game)
+}
+
 fn state_battle<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
-    let battle = state
+    let battle = state_game(state, label)?
         .get("battle")
-        .ok_or_else(|| invalid(format!("{label} has no battle state")))?;
+        .ok_or_else(|| invalid(format!("{label}.game has no battle state")))?;
     if !battle.is_object() {
-        return Err(invalid(format!("{label}.battle is not an object")));
+        return Err(invalid(format!("{label}.game.battle is not an object")));
     }
     Ok(battle)
+}
+
+fn state_control<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
+    let control = state
+        .get("control")
+        .ok_or_else(|| invalid(format!("{label} has no battle control plan")))?;
+    if !control.is_object() {
+        return Err(invalid(format!("{label}.control is not an object")));
+    }
+    Ok(control)
 }
 
 fn state_turn(state: &Value, label: &str) -> TestResult<u64> {
     state_battle(state, label)?
         .get("turn")
         .and_then(Value::as_u64)
-        .ok_or_else(|| invalid(format!("{label}.battle.turn is not a non-negative integer")))
+        .ok_or_else(|| {
+            invalid(format!(
+                "{label}.game.battle.turn is not a non-negative integer"
+            ))
+        })
 }
 
 fn assert_local_victory_terminal(kernel: &GameKernel, label: &str) -> TestResult {
@@ -725,10 +758,10 @@ fn assert_local_victory_terminal(kernel: &GameKernel, label: &str) -> TestResult
     let outcome = state_battle(&snapshot.state, label)?
         .get("outcome")
         .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{label}.battle.outcome is not a string")))?;
+        .ok_or_else(|| invalid(format!("{label}.game.battle.outcome is not a string")))?;
     if outcome != "VICTORY" {
         return Err(invalid(format!(
-            "{label}.battle.outcome is {outcome}, expected VICTORY"
+            "{label}.game.battle.outcome is {outcome}, expected VICTORY"
         )));
     }
     let projection = kernel
@@ -760,14 +793,18 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
     let command_state = battle
         .get("command_state")
         .and_then(Value::as_object)
-        .ok_or_else(|| invalid(format!("{label}.battle.command_state is invalid")))?;
+        .ok_or_else(|| invalid(format!("{label}.game.battle.command_state is invalid")))?;
     let frontier = command_state
         .get("frontier")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid(format!("{label}.battle.command_state.frontier is invalid")))?;
+        .ok_or_else(|| {
+            invalid(format!(
+                "{label}.game.battle.command_state.frontier is invalid"
+            ))
+        })?;
     if frontier.is_empty() {
         return Err(invalid(format!(
-            "{label}.battle.command_state.frontier is empty"
+            "{label}.game.battle.command_state.frontier is empty"
         )));
     }
     let expected_fragment = format!("/turn/{expected_turn}/");
@@ -796,10 +833,10 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
     let outcome = battle
         .get("outcome")
         .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{label}.battle.outcome is invalid")))?;
+        .ok_or_else(|| invalid(format!("{label}.game.battle.outcome is invalid")))?;
     if outcome != "ONGOING" {
         return Err(invalid(format!(
-            "{label}.battle.outcome is {outcome}, expected ONGOING"
+            "{label}.game.battle.outcome is {outcome}, expected ONGOING"
         )));
     }
     Ok(())
@@ -825,23 +862,23 @@ fn assert_supported_turn_transition(
     Ok(())
 }
 
-fn mechanical_state(state: &Value, label: &str) -> TestResult<Value> {
-    let mut mechanical = state.clone();
-    let object = mechanical
-        .as_object_mut()
-        .ok_or_else(|| invalid(format!("{label} is not an object")))?;
-    for field_name in ["terminal", "liveResources", "disposed"] {
-        object.remove(field_name);
+fn assert_pair_mechanical_convergence(snapshot: &er_sim::PairSnapshot) -> TestResult {
+    let host_game = state_game(&snapshot.host.kernel.state, "two-client host state")?;
+    let guest_game = state_game(&snapshot.guest.kernel.state, "two-client guest state")?;
+    if host_game != guest_game {
+        return Err(invalid(
+            "two-client supported turn host/guest canonical game state does not converge",
+        ));
     }
-    Ok(mechanical)
+    Ok(())
 }
 
 fn assert_pair_control_convergence(snapshot: &er_sim::PairSnapshot) -> TestResult {
-    if mechanical_state(&snapshot.host.kernel.state, "two-client host state")?
-        != mechanical_state(&snapshot.guest.kernel.state, "two-client guest state")?
-    {
+    let host_control = state_control(&snapshot.host.kernel.state, "two-client host state")?;
+    let guest_control = state_control(&snapshot.guest.kernel.state, "two-client guest state")?;
+    if host_control != guest_control {
         return Err(invalid(
-            "two-client supported turn host/guest mechanical state does not converge",
+            "two-client supported turn host/guest battle control plan does not converge",
         ));
     }
     let mut host_ui = snapshot.host.ui.clone();
@@ -883,6 +920,7 @@ fn assert_two_client_supported_turn(
             "two-client supported turn reached terminal state instead of a supported next control",
         ));
     }
+    assert_pair_mechanical_convergence(after)?;
     assert_pair_control_convergence(after)?;
     if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
