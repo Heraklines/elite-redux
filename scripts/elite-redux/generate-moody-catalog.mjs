@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -95,9 +96,6 @@ const boons = boonMatches.map((match, index) => {
     rankTwo,
     evolutions,
     fullDescription,
-    ...(match[2] === "Set Collector"
-      ? { implementationStatus: "blocked", implementationNote: "Requires an authored item-and-vitamin set audit." }
-      : {}),
   };
 });
 
@@ -132,4 +130,11 @@ const generated = `/* This file is generated from docs/moody-mode-spec.md. Do no
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, generated, "utf8");
+const biomeCli = path.join(root, "node_modules", "@biomejs", "biome", "bin", "biome");
+if (!fs.existsSync(biomeCli)) {
+  throw new Error(`Biome CLI not found at ${biomeCli}; install workspace dependencies before generating.`);
+}
+execFileSync(process.execPath, [biomeCli, "format", "--write", outputPath], {
+  stdio: "inherit",
+});
 console.log(`Generated ${boons.length} boons and ${curses.length} curses at ${path.relative(root, outputPath)}`);

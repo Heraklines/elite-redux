@@ -25,7 +25,7 @@ describe("Moody Mode catalog", () => {
     expect(new Set(MOODY_CURSES.map(curse => curse.id)).size).toBe(30);
     expect(MOODY_BOONS.every(boon => boon.base.length > 0 && boon.rankTwo.length > 0)).toBe(true);
     expect(MOODY_BOONS.every(boon => boon.evolutions.length === 2)).toBe(true);
-    expect(MOODY_BOONS.find(boon => boon.id === "set-collector")?.implementationStatus).toBe("blocked");
+    expect(MOODY_BOONS.find(boon => boon.id === "set-collector")?.implementationStatus).not.toBe("blocked");
   });
 
   it("preserves the authored Unicode text instead of mojibake", () => {

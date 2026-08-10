@@ -1,5 +1,7 @@
 import {
   applyMoodyRuntimeStateDeltas,
+  canonicalMoodyItemSetPieceId,
+  MOODY_AUTHORED_ITEM_SETS,
   MOODY_RUNTIME_BLOCKED_IDS,
   MOODY_RUNTIME_BOON_IDS,
   MOODY_RUNTIME_CURSE_IDS,
@@ -12,6 +14,8 @@ import {
   type MoodyRuntimeValue,
   resolveMoodyRuntimeEffect,
 } from "#data/elite-redux/moody/moody-runtime-meta";
+import { Stat } from "#enums/stat";
+import { getModifierTypeFuncById, ModifierTypeGenerator } from "#modifiers/modifier-type";
 import { describe, expect, it } from "vitest";
 
 const expectedBoonIds = [
@@ -82,6 +86,8 @@ const samples: Readonly<Record<string, MoodyRuntimeValue>> = {
   remainingIndices: [1, 2],
   originalRarities: [1, 2, 3],
   destroyedCategory: "healing",
+  ownedDistinctItemIds: ["LEFTOVERS", "SHELL_BELL", "HEALING_CHARM"],
+  chosenSetId: "restoration-kit",
   itemTier: 3,
   debtRate: 0.2,
   usageRanking: ["101", "202"],
@@ -206,12 +212,10 @@ describe("Moody runtime meta exact coverage", () => {
     ]);
   });
 
-  it("blocks only Set Collector and gives every other effect an executable event", () => {
-    expect(MOODY_RUNTIME_BLOCKED_IDS).toEqual(["set-collector"]);
-    expect(MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "blocked").map(effect => effect.id)).toEqual([
-      "set-collector",
-    ]);
-    for (const meta of MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "ready")) {
+  it("leaves no requested effect blocked and gives every effect an executable event", () => {
+    expect(MOODY_RUNTIME_BLOCKED_IDS).toEqual([]);
+    expect(MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "blocked")).toEqual([]);
+    for (const meta of MOODY_RUNTIME_EFFECTS) {
       expect(meta.events.length, meta.id).toBeGreaterThan(0);
       expect(
         outputsFor(meta, "base").some(output => output.commands.length + output.stateDeltas.length > 0),
@@ -252,6 +256,131 @@ describe("Moody runtime meta exact coverage", () => {
         data: { money: 100 },
       }),
     ).toThrow("compound-interest:boss-defeated missing inputs: capRemaining");
+  });
+});
+
+describe("Set Collector authored item sets", () => {
+  it("uses audited registry IDs and canonical vitamin variants", () => {
+    expect(MOODY_AUTHORED_ITEM_SETS.map(itemSet => itemSet.id)).toEqual([
+      "complete-nutrition",
+      "restoration-kit",
+      "tactician-tools",
+      "volatile-core",
+    ]);
+    expect(canonicalMoodyItemSetPieceId("BASE_STAT_BOOSTER", "protein")).toBe("BASE_STAT_BOOSTER:protein");
+    expect(canonicalMoodyItemSetPieceId("LEFTOVERS")).toBe("LEFTOVERS");
+    expect(MOODY_AUTHORED_ITEM_SETS.every(itemSet => new Set(itemSet.pieceIds).size === itemSet.pieceIds.length)).toBe(
+      true,
+    );
+
+    const vitaminStats = {
+      hp_up: Stat.HP,
+      protein: Stat.ATK,
+      iron: Stat.DEF,
+      calcium: Stat.SPATK,
+      zinc: Stat.SPDEF,
+      carbos: Stat.SPD,
+    } as const;
+    for (const pieceId of MOODY_AUTHORED_ITEM_SETS.flatMap(itemSet => itemSet.pieceIds)) {
+      const [typeId, variantId] = pieceId.split(":");
+      const factory = getModifierTypeFuncById(typeId);
+      expect(factory, pieceId).toBeTypeOf("function");
+      const registryType = factory();
+      if (variantId == null) {
+        expect(registryType, pieceId).toBeDefined();
+        continue;
+      }
+      expect(registryType, pieceId).toBeInstanceOf(ModifierTypeGenerator);
+      const stat = vitaminStats[variantId as keyof typeof vitaminStats];
+      expect(stat, pieceId).toBeTypeOf("number");
+      const generatedVariant = (registryType as ModifierTypeGenerator).generateType([], [stat]);
+      expect(generatedVariant?.id, pieceId).toBe(typeId);
+      expect((generatedVariant as { getPregenArgs(): readonly number[] }).getPregenArgs(), pieceId).toEqual([stat]);
+    }
+  });
+
+  it("collapses duplicate stacks and activates the base three-piece effect", () => {
+    const output = resolveMoodyRuntimeEffect("set-collector", "base", {
+      kind: "item-set-query",
+      seed: 1,
+      data: {
+        ownedDistinctItemIds: ["LEFTOVERS", "LEFTOVERS", "SHELL_BELL", "HEALING_CHARM"],
+        chosenSetId: null,
+      },
+    });
+    expect(output.commands[0]).toEqual({
+      kind: "apply-item-set-bonuses",
+      data: {
+        activeSets: [
+          {
+            setId: "restoration-kit",
+            name: "Restoration Kit",
+            pieceCount: 3,
+            requiredPieceCount: 3,
+            tier: "three",
+            effect: { directHealingMultiplier: 1.15 },
+          },
+        ],
+      },
+    });
+  });
+
+  it("discounts only the Rank II chosen set by one piece", () => {
+    const output = resolveMoodyRuntimeEffect("set-collector", "rank-two", {
+      kind: "item-set-query",
+      seed: 1,
+      data: {
+        ownedDistinctItemIds: ["QUICK_CLAW", "WIDE_LENS", "LEFTOVERS", "SHELL_BELL"],
+        chosenSetId: "tactician-tools",
+      },
+    });
+    expect(output.commands[0].data.activeSets).toEqual([
+      {
+        setId: "tactician-tools",
+        name: "Tactician's Tools",
+        pieceCount: 2,
+        requiredPieceCount: 2,
+        tier: "three",
+        effect: { accuracyMultiplier: 1.1 },
+      },
+    ]);
+  });
+
+  it("lets Curator keep two deterministic set bonuses active", () => {
+    const output = resolveMoodyRuntimeEffect("set-collector", "curator", {
+      kind: "item-set-query",
+      seed: 1,
+      data: {
+        ownedDistinctItemIds: ["LEFTOVERS", "SHELL_BELL", "HEALING_CHARM", "QUICK_CLAW", "KINGS_ROCK", "WIDE_LENS"],
+        chosenSetId: "tactician-tools",
+      },
+    });
+    expect((output.commands[0].data.activeSets as readonly { setId: string }[]).map(entry => entry.setId)).toEqual([
+      "tactician-tools",
+      "restoration-kit",
+    ]);
+  });
+
+  it("emits the stronger Complete Collection five-piece effect", () => {
+    const output = resolveMoodyRuntimeEffect("set-collector", "complete-collection", {
+      kind: "item-set-query",
+      seed: 1,
+      data: {
+        ownedDistinctItemIds: ["TOXIC_ORB", "FLAME_ORB", "FROSTBITE_ORB", "FOCUS_BAND", "WHITE_HERB"],
+        chosenSetId: "volatile-core",
+      },
+    });
+    expect(output.commands[0].data.activeSets).toEqual([
+      {
+        setId: "volatile-core",
+        name: "Volatile Core",
+        pieceCount: 5,
+        requiredPieceCount: 4,
+        tier: "complete",
+        effect: { outgoingDamageMultiplier: 1.25, selfStatusDamageMultiplier: 0.25 },
+      },
+    ]);
+    expect(output.stateDeltas[0].path).toBe("values.activeItemSets");
   });
 });
 

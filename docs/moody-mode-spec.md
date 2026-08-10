@@ -1087,17 +1087,15 @@ This remains deliberately rare.
 
 ---
 
-### 75. Set Collector — **Ultra; item sets; provisionally blocked**
+### 75. Set Collector — **Ultra; authored item and vitamin sets**
 
-**Base framework:** Three distinct item IDs from the same deliberately authored set activate that set’s first bonus. Five distinct IDs activate its evolved bonus. Additional stacks of one item do not count as additional set pieces.
+**Base:** Three distinct IDs from an authored set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.
 
 **Rank II:** One chosen set requires one fewer distinct item.
 
 **Evolution — Curator:** Two different set bonuses can be active simultaneously without conflict.
 
-**Evolution — Complete Collection:** The five-piece effect of one set becomes stronger.
-
-The actual sets and their effects must not be invented generically. This line remains content-blocked until the complete item and vitamin catalogue is audited and sensible sets are authored.
+**Evolution — Complete Collection:** One chosen five-piece becomes stronger: Complete Nutrition +15% all stats; Restoration Kit +35% healing and a 15% barrier; Tactician's Tools +15% accuracy, +1 first-move priority, and +25% first-move power; Volatile Core +25% damage and 25% self-inflicted status damage.
 
 ---
 

@@ -55,6 +55,79 @@ export interface MoodyRuntimeEffectMeta {
   readonly events: readonly MoodyRuntimeEventContract[];
 }
 
+export interface MoodyAuthoredItemSetEffect {
+  readonly outgoingDamageMultiplier?: number;
+  readonly incomingDamageMultiplier?: number;
+  readonly directHealingMultiplier?: number;
+  readonly firstHealBarrierFraction?: number;
+  readonly accuracyMultiplier?: number;
+  readonly firstMovePowerMultiplier?: number;
+  readonly firstMovePriorityDelta?: number;
+  readonly selfStatusDamageMultiplier?: number;
+  readonly statMultipliers?: Readonly<Record<string, number>>;
+}
+
+export interface MoodyAuthoredItemSet {
+  readonly id: string;
+  readonly name: string;
+  readonly pieceIds: readonly string[];
+  readonly threePiece: MoodyAuthoredItemSetEffect;
+  readonly fivePiece: MoodyAuthoredItemSetEffect;
+  readonly completeCollection: MoodyAuthoredItemSetEffect;
+}
+
+/**
+ * Canonical set pieces use modifierTypeInitObj keys. Base-stat boosters append
+ * the audited BaseStatBoosterModifierTypeGenerator variant key after a colon.
+ */
+export const MOODY_AUTHORED_ITEM_SETS: readonly MoodyAuthoredItemSet[] = [
+  {
+    id: "complete-nutrition",
+    name: "Complete Nutrition",
+    pieceIds: [
+      "BASE_STAT_BOOSTER:hp_up",
+      "BASE_STAT_BOOSTER:protein",
+      "BASE_STAT_BOOSTER:iron",
+      "BASE_STAT_BOOSTER:calcium",
+      "BASE_STAT_BOOSTER:zinc",
+      "BASE_STAT_BOOSTER:carbos",
+    ],
+    threePiece: { statMultipliers: { hp: 1.05, atk: 1.05, def: 1.05, spatk: 1.05, spdef: 1.05, spd: 1.05 } },
+    fivePiece: { statMultipliers: { hp: 1.1, atk: 1.1, def: 1.1, spatk: 1.1, spdef: 1.1, spd: 1.1 } },
+    completeCollection: {
+      statMultipliers: { hp: 1.15, atk: 1.15, def: 1.15, spatk: 1.15, spdef: 1.15, spd: 1.15 },
+    },
+  },
+  {
+    id: "restoration-kit",
+    name: "Restoration Kit",
+    pieceIds: ["LEFTOVERS", "SHELL_BELL", "HEALING_CHARM", "BERRY_POUCH", "REVIVER_SEED"],
+    threePiece: { directHealingMultiplier: 1.15 },
+    fivePiece: { directHealingMultiplier: 1.25, firstHealBarrierFraction: 0.1 },
+    completeCollection: { directHealingMultiplier: 1.35, firstHealBarrierFraction: 0.15 },
+  },
+  {
+    id: "tactician-tools",
+    name: "Tactician's Tools",
+    pieceIds: ["QUICK_CLAW", "KINGS_ROCK", "WIDE_LENS", "GRIP_CLAW", "BATON"],
+    threePiece: { accuracyMultiplier: 1.1 },
+    fivePiece: { accuracyMultiplier: 1.1, firstMovePowerMultiplier: 1.1, firstMovePriorityDelta: 1 },
+    completeCollection: { accuracyMultiplier: 1.15, firstMovePowerMultiplier: 1.25, firstMovePriorityDelta: 1 },
+  },
+  {
+    id: "volatile-core",
+    name: "Volatile Core",
+    pieceIds: ["TOXIC_ORB", "FLAME_ORB", "FROSTBITE_ORB", "FOCUS_BAND", "WHITE_HERB"],
+    threePiece: { outgoingDamageMultiplier: 1.08 },
+    fivePiece: { outgoingDamageMultiplier: 1.15, selfStatusDamageMultiplier: 0.5 },
+    completeCollection: { outgoingDamageMultiplier: 1.25, selfStatusDamageMultiplier: 0.25 },
+  },
+] as const;
+
+export function canonicalMoodyItemSetPieceId(typeId: string, variantId?: string): string {
+  return typeId === "BASE_STAT_BOOSTER" && variantId != null ? `${typeId}:${variantId}` : typeId;
+}
+
 export const MOODY_RUNTIME_BOON_IDS = [
   "compound-interest",
   "warranty",
@@ -115,7 +188,7 @@ export const MOODY_RUNTIME_CURSE_IDS = [
   ...MOODY_RUNTIME_PROGRESSION_CURSE_IDS,
 ] as const;
 
-export const MOODY_RUNTIME_BLOCKED_IDS = ["set-collector"] as const;
+export const MOODY_RUNTIME_BLOCKED_IDS = [] as const;
 
 const EVENT_CONTRACTS: Readonly<Record<string, readonly MoodyRuntimeEventContract[]>> = {
   "compound-interest": [
@@ -130,7 +203,7 @@ const EVENT_CONTRACTS: Readonly<Record<string, readonly MoodyRuntimeEventContrac
       requiredInputs: ["destroyedIndices", "remainingIndices", "originalRarities", "destroyedCategory"],
     },
   ],
-  "set-collector": [],
+  "set-collector": [{ kind: "item-set-query", requiredInputs: ["ownedDistinctItemIds", "chosenSetId"] }],
   "blood-market": [
     { kind: "blood-market-purchase", requiredInputs: ["itemTier", "debtRate", "usageRanking", "maxHpByPokemon"] },
   ],
@@ -274,7 +347,7 @@ export const MOODY_RUNTIME_EFFECTS: readonly MoodyRuntimeEffectMeta[] = [
       id,
       number: definition.number,
       source: "boon" as const,
-      status: id === "set-collector" ? ("blocked" as const) : ("ready" as const),
+      status: "ready" as const,
       base: definition.base,
       rankTwo: definition.rankTwo,
       evolutions: definition.evolutions.map(evolution => ({ id: evolution.id, description: evolution.description })),
@@ -440,6 +513,64 @@ function resolveBoon(
         [set("flags.recyclerUsedThisScreen", true)],
       );
     }
+    case "set-collector": {
+      if (event.kind !== "item-set-query") {
+        return result();
+      }
+      const owned = new Set(stringArray(event, "ownedDistinctItemIds"));
+      const chosenSetId = typeof event.data.chosenSetId === "string" ? event.data.chosenSetId : undefined;
+      const evaluated = MOODY_AUTHORED_ITEM_SETS.map((itemSet, authoredIndex) => {
+        const pieceCount = itemSet.pieceIds.filter(pieceId => owned.has(pieceId)).length;
+        const receivesRankDiscount = currentRank >= 2 && chosenSetId === itemSet.id;
+        const threePieceRequirement = receivesRankDiscount ? 2 : 3;
+        const fivePieceRequirement = receivesRankDiscount ? 4 : 5;
+        const tier =
+          pieceCount >= fivePieceRequirement
+            ? evolution === "complete-collection" && chosenSetId === itemSet.id
+              ? "complete"
+              : "five"
+            : pieceCount >= threePieceRequirement
+              ? "three"
+              : null;
+        return {
+          itemSet,
+          authoredIndex,
+          pieceCount,
+          threePieceRequirement,
+          fivePieceRequirement,
+          tier,
+        } as const;
+      });
+      const tierWeight = { three: 1, five: 2, complete: 3 } as const;
+      const active = evaluated
+        .filter(entry => entry.tier != null)
+        .sort((left, right) => {
+          const chosenDifference = Number(right.itemSet.id === chosenSetId) - Number(left.itemSet.id === chosenSetId);
+          if (chosenDifference !== 0) {
+            return chosenDifference;
+          }
+          const tierDifference = tierWeight[right.tier!] - tierWeight[left.tier!];
+          return tierDifference || right.pieceCount - left.pieceCount || left.authoredIndex - right.authoredIndex;
+        })
+        .slice(0, evolution === "curator" ? 2 : 1)
+        .map(entry => ({
+          setId: entry.itemSet.id,
+          name: entry.itemSet.name,
+          pieceCount: entry.pieceCount,
+          requiredPieceCount: entry.tier === "three" ? entry.threePieceRequirement : entry.fivePieceRequirement,
+          tier: entry.tier!,
+          effect:
+            entry.tier === "complete"
+              ? entry.itemSet.completeCollection
+              : entry.tier === "five"
+                ? entry.itemSet.fivePiece
+                : entry.itemSet.threePiece,
+        }));
+      return result(
+        [command("apply-item-set-bonuses", { activeSets: active })],
+        [set("values.activeItemSets", active)],
+      );
+    }
     case "blood-market": {
       if (event.kind !== "blood-market-purchase") {
         return result();
@@ -522,9 +653,14 @@ function resolveBoon(
           command("guarantee-collectible-traits", {
             traits: ordered.slice(0, currentRank >= 2 ? 2 : 1),
             revealIvsOnFirstCaptureAttempt: true,
-            catchRateMultiplier:
-              evolution === "completionist" ? numberValue(event, "completionistCatchMultiplier", 1.15) : 1,
           }),
+          ...(evolution === "completionist"
+            ? [
+                command("set-capture-rate-multiplier", {
+                  multiplier: numberValue(event, "completionistCatchMultiplier", 1.15),
+                }),
+              ]
+            : []),
         ],
         [set("flags.recruiterUsedThisBiome", true)],
       );
