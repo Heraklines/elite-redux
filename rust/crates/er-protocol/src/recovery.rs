@@ -1839,6 +1839,8 @@ impl crate::snapshot::RecoveryTransactionSnapshotBridge for RecoveryTransaction 
             ));
         }
 
+        cross_check_recovery_timers(&snapshot.config, &timers, scheduler)?;
+
         Ok(Self {
             config: snapshot.config,
             fence: RecoveryFence {
@@ -1870,6 +1872,42 @@ fn validate_recovery_config(
             "recovery.config",
             "recovery configuration is invalid",
         ));
+    }
+    Ok(())
+}
+
+fn cross_check_recovery_timers(
+    config: &RecoveryTransactionConfig,
+    timers: &BTreeMap<TimerId, RecoveryTimer>,
+    scheduler: &KernelScheduler,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    let mut expected_timer_ids = BTreeMap::<TimerOwner, BTreeSet<TimerId>>::new();
+    for (timer_id, timer) in timers {
+        expected_timer_ids
+            .entry(timer.timer.owner.clone())
+            .or_default()
+            .insert(*timer_id);
+    }
+
+    // Recovery owns one configured scheduler owner namespace.  Any live timer
+    // carrying that owner must be represented by an exact retained timer;
+    // unrelated scheduler owners remain available to their own subsystems.
+    for timer in scheduler.live_timers() {
+        if timer.owner.owner_id != config.timer_owner_id {
+            continue;
+        }
+        let Some(expected_ids) = expected_timer_ids.get(&timer.owner) else {
+            return Err(recovery_snapshot_invalid(
+                "scheduler.timers",
+                format!("orphaned recovery timer {}", timer.timer_id),
+            ));
+        };
+        if !expected_ids.contains(&timer.timer_id) {
+            return Err(recovery_snapshot_invalid(
+                "scheduler.timers",
+                "recovery timer owner is bound to the wrong timer ID",
+            ));
+        }
     }
     Ok(())
 }

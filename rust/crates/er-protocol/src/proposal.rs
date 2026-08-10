@@ -1846,6 +1846,8 @@ impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
             }
         }
 
+        cross_check_proposal_timers(&snapshot.config, &timer_targets, scheduler)?;
+
         Ok(Self {
             config: snapshot.config,
             leases,
@@ -1900,6 +1902,42 @@ fn proposal_timer_owner(
         reason,
     )
     .map_err(|error| proposal_snapshot_invalid("proposal_leases.timer_targets.owner", error.to_string()))
+}
+
+fn cross_check_proposal_timers(
+    config: &ProposalLeaseConfig,
+    timer_targets: &BTreeMap<TimerId, ProposalTimerTarget>,
+    scheduler: &KernelScheduler,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    let mut expected_timer_ids = BTreeMap::<TimerOwner, BTreeSet<TimerId>>::new();
+    for (timer_id, target) in timer_targets {
+        expected_timer_ids
+            .entry(target.owner.clone())
+            .or_default()
+            .insert(*timer_id);
+    }
+
+    // A scheduler containing unrelated owners remains usable by other
+    // subsystems.  Timers in this proposal owner's namespace, however, must
+    // be represented by one exact retained target in the restored manager.
+    for timer in scheduler.live_timers() {
+        if !timer.owner.owner_id.starts_with(&config.owner_prefix) {
+            continue;
+        }
+        let Some(expected_ids) = expected_timer_ids.get(&timer.owner) else {
+            return Err(proposal_snapshot_invalid(
+                "scheduler.timers",
+                format!("orphaned proposal timer {}", timer.timer_id),
+            ));
+        };
+        if !expected_ids.contains(&timer.timer_id) {
+            return Err(proposal_snapshot_invalid(
+                "scheduler.timers",
+                "proposal timer owner is bound to the wrong timer ID",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn opaque_proposal_snapshot(

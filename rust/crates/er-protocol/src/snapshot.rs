@@ -868,6 +868,20 @@ impl ProposalLeaseSnapshotV2 {
                     "a committed operation cannot retain an active lease",
                 ));
             }
+            let (Some(retry_timer), Some(absolute_timer)) =
+                (lease.retry_timer, lease.absolute_timer)
+            else {
+                return Err(invalid(
+                    "proposal_leases.leases",
+                    "an active proposal lease must retain both scheduler timers",
+                ));
+            };
+            if retry_timer == absolute_timer {
+                return Err(invalid(
+                    "proposal_leases.leases",
+                    "proposal retry and absolute timers cannot share an identity",
+                ));
+            }
             for (timer_id, kind, time_class) in [
                 (lease.retry_timer, ProposalTimerKindV2::Retry, TimeClass::Connected),
                 (
