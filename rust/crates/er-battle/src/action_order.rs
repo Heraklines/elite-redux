@@ -6,8 +6,6 @@
 //! separate so a later resolver can consume one [`PendingAction`] at a time
 //! without inventing an actor or field-slot tie-break.
 
-use std::cmp::Ordering;
-
 use er_content::moves::find_move;
 use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
@@ -105,6 +103,11 @@ pub enum ActionOrderError {
     },
     #[error("move {move_id:?} is outside the selected M3 content slice")]
     UnsupportedMove { move_id: MoveId },
+    #[error("status {status:?} for actor {actor:?} is unsupported by effective Speed ordering")]
+    UnsupportedSpeedStatus {
+        actor: PokemonId,
+        status: StatusKind,
+    },
     #[error("speed stage {stage} for actor {actor:?} is outside [{min}, {max}]")]
     InvalidSpeedStage {
         actor: PokemonId,
@@ -206,7 +209,7 @@ impl PendingActionQueue {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.switches.is_empty() && self.moves.is_empty()
     }
 
     /// Current-stage entries before the next dynamic reorder.
@@ -257,8 +260,7 @@ impl PendingActionQueue {
             if actions.is_empty() {
                 None
             } else {
-                let mut first = actions.drain(..1);
-                first.next()
+                actions.drain(..1).next()
             }
         };
         if action.is_none() {
@@ -286,6 +288,13 @@ impl PendingActionQueue {
 /// The current stat is stage-adjusted first.  Paralysis then applies the
 /// oracle's JavaScript right shift, and the final value is clamped to one.
 pub fn effective_speed(pokemon: &PokemonState) -> Result<u32, ActionOrderError> {
+    if matches!(pokemon.status.kind, StatusKind::Toxic | StatusKind::Sleep) {
+        return Err(ActionOrderError::UnsupportedSpeedStatus {
+            actor: pokemon.id,
+            status: pokemon.status.kind,
+        });
+    }
+
     let stage = pokemon.stat_stages.speed;
     if !(MIN_STAT_STAGE..=MAX_STAT_STAGE).contains(&stage) {
         return Err(ActionOrderError::InvalidSpeedStage {
@@ -296,11 +305,7 @@ pub fn effective_speed(pokemon: &PokemonState) -> Result<u32, ActionOrderError> 
         });
     }
 
-    let magnitude = if stage < 0 {
-        u64::from((-stage) as u8)
-    } else {
-        u64::from(stage as u8)
-    };
+    let magnitude = u64::from(stage.unsigned_abs());
     let numerator = if stage >= 0 {
         2_u64
             .checked_add(magnitude)
@@ -319,25 +324,19 @@ pub fn effective_speed(pokemon: &PokemonState) -> Result<u32, ActionOrderError> 
         .checked_mul(numerator)
         .ok_or(ActionOrderError::SpeedOverflow { actor: pokemon.id })?
         / denominator;
-    let mut adjusted =
+    let adjusted =
         u32::try_from(adjusted).map_err(|_| ActionOrderError::SpeedOverflow { actor: pokemon.id })?;
 
-    if pokemon.status.kind == StatusKind::Paralysis {
+    let adjusted = if pokemon.status.kind == StatusKind::Paralysis {
         // `ret >>= 1` is an arithmetic signed-32-bit shift in JavaScript.
         // The selected M3 state keeps effective stats in the exported u32
         // domain, so this conversion is exact for all accepted values.
-        let shifted = (adjusted as i32) >> 1;
-        if shifted < 1 {
-            return Ok(1);
-        }
-        adjusted = shifted as u32;
-    }
-
-    if adjusted < 1 {
-        Ok(1)
+        ((adjusted as i32) >> 1).max(1) as u32
     } else {
-        Ok(adjusted)
-    }
+        adjusted
+    };
+
+    Ok(adjusted.max(1))
 }
 
 /// Build the staged pending-action queue from the canonical normalized set.
@@ -674,8 +673,8 @@ fn reorder_actions(
 
     // Resolve all live values before opening the seed-offset transaction.  A
     // malformed state therefore cannot consume a speed-tie draw.
-    for action in actions.iter() {
-        let _ = effective_speed(find_pokemon(battle, action.actor)?)?;
+    for action in actions.as_slice() {
+        effective_speed(find_pokemon(battle, action.actor)?)?;
     }
 
     let mut groups = consecutive_groups(actions);
@@ -689,14 +688,9 @@ fn reorder_actions(
         action.effective_speed = effective_speed(find_pokemon(battle, action.actor)?)?;
     }
 
-    // Slice::sort_by is stable.  Returning Ordering::Equal for equal speeds
-    // is intentional: the seeded group order remains the only tie input.
-    shuffled.sort_by(|left, right| {
-        right
-            .effective_speed
-            .cmp(&left.effective_speed)
-            .then(Ordering::Equal)
-    });
+    // Slice::sort_by is stable.  Equal speeds compare equal, so the seeded
+    // group order remains the only tie input.
+    shuffled.sort_by(|left, right| right.effective_speed.cmp(&left.effective_speed));
     assign_tie_orders(&mut shuffled)?;
 
     if is_move_queue {
@@ -722,10 +716,8 @@ fn consecutive_groups(actions: &[PendingAction]) -> Vec<Vec<PendingAction>> {
             .last()
             .and_then(|group| group.first())
             .is_some_and(|first| first.actor == action.actor);
-        if same_actor {
-            if let Some(group) = groups.last_mut() {
-                group.push(action.clone());
-            }
+        if same_actor && let Some(group) = groups.last_mut() {
+            group.push(action.clone());
         } else {
             groups.push(vec![action.clone()]);
         }
@@ -753,19 +745,23 @@ fn assign_tie_orders(actions: &mut [PendingAction]) -> Result<(), ActionOrderErr
     Ok(())
 }
 
-fn party_for_side<'a>(battle: &'a BattleState, side: BattleSide) -> &'a [PokemonState] {
+fn party_for_side(battle: &BattleState, side: BattleSide) -> &[PokemonState] {
     match side {
         BattleSide::Player => &battle.player_party,
         BattleSide::Enemy => &battle.enemy_party,
     }
 }
 
-fn find_pokemon<'a>(
-    battle: &'a BattleState,
+fn find_pokemon(
+    battle: &BattleState,
     actor: PokemonId,
-) -> Result<&'a PokemonState, ActionOrderError> {
+) -> Result<&PokemonState, ActionOrderError> {
     let mut found = None;
-    for pokemon in battle.player_party.iter().chain(&battle.enemy_party) {
+    for pokemon in battle
+        .player_party
+        .iter()
+        .chain(battle.enemy_party.iter())
+    {
         if pokemon.id == actor {
             if found.is_some() {
                 return Err(ActionOrderError::UnknownActor { actor });

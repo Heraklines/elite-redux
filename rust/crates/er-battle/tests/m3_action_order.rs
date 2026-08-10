@@ -303,6 +303,7 @@ fn voluntary_switch_is_constructed_before_the_move_stage() -> TestResult {
     let first = ordered.first().ok_or("empty action order")?;
     assert_eq!(first.kind, ResolvedActionKind::Switch);
     assert_eq!(first.actor, pokemon_id(1)?);
+    assert_eq!(first.effective_speed, 180);
     assert_eq!(first.command_operation_id, operation("switch-player-zero")?);
     let remaining = ordered.get(1..).ok_or("missing move stage")?;
     assert!(remaining
@@ -368,6 +369,41 @@ fn paralysis_and_stage_math_are_applied_to_live_speed() -> TestResult {
     let second = queue.pop_next(&live, &mut rng)?.ok_or("missing second action")?;
     assert_eq!(second.actor, pokemon_id(1)?);
     assert_eq!(second.effective_speed, 180);
+    Ok(())
+}
+
+#[test]
+fn toxic_and_sleep_fail_before_the_speed_shuffle() -> TestResult {
+    let content = selected_content_pack()?;
+    let state = single_state(&content, 180, StatusKind::None, 0, &[1], 180, &[1])?;
+    let commands = vec![
+        fight("status-player", 1, BattleSide::Player, 1, BattleSide::Enemy)?,
+        fight("status-enemy", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
+    ];
+    let expected_actor = pokemon_id(1)?;
+
+    for status in [StatusKind::Toxic, StatusKind::Sleep] {
+        let mut queue = build_pending_action_queue_from_commands(&state, &commands, &content)?;
+        let mut live = state.clone();
+        let live_player = live
+            .battle
+            .as_mut()
+            .and_then(|battle| battle.player_party.first_mut())
+            .ok_or("missing live player")?;
+        live_player.status.kind = status;
+        let mut rng = runtime(&live)?;
+
+        let result = queue.pop_next(&live, &mut rng);
+        assert!(matches!(
+            result,
+            Err(ActionOrderError::UnsupportedSpeedStatus {
+                actor,
+                status: actual_status,
+            }) if actor == expected_actor && actual_status == status
+        ));
+        assert_eq!(queue.len(), 2);
+        assert!(rng.audit_entries().is_empty());
+    }
     Ok(())
 }
 
@@ -454,7 +490,7 @@ fn unsupported_ordering_is_rejected_before_rng_consumption() -> TestResult {
         trick_room: true,
         ..ActionOrderOptions::default()
     };
-    let mut rng = runtime(&state)?;
+    let rng = runtime(&state)?;
     let result = er_battle::action_order::build_pending_action_queue_with_options(
         &state,
         &commands,
@@ -484,7 +520,7 @@ fn unsupported_arena_state_is_rejected_before_the_shuffle_boundary() -> TestResu
         fight("arena-player", 1, BattleSide::Player, 1, BattleSide::Enemy)?,
         fight("arena-enemy", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
     ];
-    let mut rng = runtime(&state)?;
+    let rng = runtime(&state)?;
     let result = build_pending_action_queue_from_commands(&state, &commands, &content);
     assert!(matches!(
         result,
@@ -528,7 +564,7 @@ fn selected_content_and_state_constructors_reject_unsupported_move_identity() ->
         },
     ];
     let unknown_move = move_id(999)?;
-    let mut rng = runtime(&state)?;
+    let rng = runtime(&state)?;
     let result = build_pending_action_queue_from_commands(&state, &commands, &content);
     assert!(matches!(
         result,
