@@ -1,18 +1,15 @@
 use std::error::Error;
 
-use er_battle::damage::{
-    DamageError, DamageInput, calculate_damage, to_dmg_value,
-};
+use er_battle::damage::{DamageError, DamageInput, calculate_damage, to_dmg_value};
 use er_battle::js_math::{
-    js_ceil, js_clamp, js_floor, js_max, js_min, js_round, js_trunc,
-    safe_integer_from_f64,
+    js_ceil, js_clamp, js_floor, js_max, js_min, js_round, js_trunc, safe_integer_from_f64,
 };
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason, RngStream};
 use er_rng::battle::{BattleRngState, RngRuntime};
 use er_rng::phaser::{PhaserRdg, RunRngState};
+use er_types::SafeU53;
 use er_types::battle_ids::TurnIndex;
 use er_types::battle_model::MoveCategory;
-use er_types::SafeU53;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -27,8 +24,7 @@ fn runtime() -> TestResult<RngRuntime> {
 fn physical_fixture_input() -> DamageInput {
     // physical-hit / critical-hit / burn-physical-penalty use the selected
     // POUND (move 1) boundary and explicitly exported effective stats.
-    DamageInput::new(100, MoveCategory::Physical, 40.0, 148.0, 83.0)
-        .with_stab_multiplier(1.5)
+    DamageInput::new(100, MoveCategory::Physical, 40.0, 148.0, 83.0).with_stab_multiplier(1.5)
 }
 
 #[test]
@@ -162,8 +158,7 @@ fn burn_halves_physical_damage_but_not_special_damage() -> TestResult {
     expected = expected * burned_result.burn_multiplier;
     assert_eq!(burned_result.pre_field_damage, to_dmg_value(expected)?);
 
-    let special = DamageInput::new(100, MoveCategory::Special, 40.0, 148.0, 83.0)
-        .with_burned(true);
+    let special = DamageInput::new(100, MoveCategory::Special, 40.0, 148.0, 83.0).with_burned(true);
     let unburned_special = special.with_burned(false);
     let mut special_rng = runtime()?;
     let mut unburned_special_rng = special_rng.clone();

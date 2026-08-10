@@ -122,7 +122,9 @@ impl AccuracyContext {
         if let MoveAccuracy::Percent(accuracy) = &self.move_accuracy
             && !(1..=100).contains(accuracy)
         {
-            return Err(AccuracyContextError::InvalidBaseAccuracy { accuracy: *accuracy });
+            return Err(AccuracyContextError::InvalidBaseAccuracy {
+                accuracy: *accuracy,
+            });
         }
         if !(-6..=6).contains(&self.source_accuracy_stage) {
             return Err(AccuracyContextError::InvalidSourceAccuracyStage {
@@ -272,7 +274,11 @@ pub struct AccuracySkipEvidence {
 
 /// Typed accuracy outcome consumed by later move-effect stages.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(tag = "kind", content = "evidence", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "kind",
+    content = "evidence",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum AccuracyDecision {
     Hit(AccuracyRollEvidence),
     Miss(AccuracyRollEvidence),

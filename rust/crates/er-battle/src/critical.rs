@@ -199,7 +199,11 @@ pub struct CriticalRollEvidence {
 
 /// Typed critical outcome consumed by the damage pipeline.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(tag = "kind", content = "evidence", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "kind",
+    content = "evidence",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum CriticalDecision {
     Critical(CriticalRollEvidence),
     NonCritical(CriticalRollEvidence),

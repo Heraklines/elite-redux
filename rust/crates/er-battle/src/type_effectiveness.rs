@@ -257,8 +257,7 @@ pub fn resolve_type_effectiveness(
     chart
         .validate()
         .map_err(TypeEffectivenessError::InvalidChart)?;
-    validate_m3_typing(defender_typing)
-        .map_err(TypeEffectivenessError::InvalidDefenderTyping)?;
+    validate_m3_typing(defender_typing).map_err(TypeEffectivenessError::InvalidDefenderTyping)?;
     if !matches!(
         attack_type,
         PokemonType::Normal
@@ -279,8 +278,10 @@ pub fn resolve_type_effectiveness(
     let combined = compose_type_multipliers(primary, secondary).ok_or(
         TypeEffectivenessError::CompositionOutOfRange {
             left: EffectivenessMultiplier::from_single_type(primary),
-            right: secondary
-                .map_or(EffectivenessMultiplier::One, EffectivenessMultiplier::from_single_type),
+            right: secondary.map_or(
+                EffectivenessMultiplier::One,
+                EffectivenessMultiplier::from_single_type,
+            ),
         },
     )?;
     Ok(TypeEffectiveness::new(combined))

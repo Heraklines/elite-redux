@@ -7,9 +7,7 @@
 use er_rng::audit::{RngCallsiteId, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::RngError;
-use er_types::battle_model::{
-    MoveCategory, PokemonType, PokemonTyping, StatusKind, StatusState,
-};
+use er_types::battle_model::{MoveCategory, PokemonType, PokemonTyping, StatusKind, StatusState};
 use er_types::{SafeU53, SafeU53Error};
 use thiserror::Error;
 
@@ -285,9 +283,7 @@ pub fn check_paralysis(
         StatusKind::None | StatusKind::Burn | StatusKind::Poison => {
             Ok(ParalysisActivationOutcome::NotParalyzed)
         }
-        StatusKind::Toxic | StatusKind::Sleep => {
-            Err(StatusError::UnsupportedStatus { status })
-        }
+        StatusKind::Toxic | StatusKind::Sleep => Err(StatusError::UnsupportedStatus { status }),
         StatusKind::Paralysis => {
             let draw = runtime.pokemon_rand_battle_seed_int(
                 SafeU53::new(4)?,
@@ -326,9 +322,7 @@ pub fn burn_damage_multiplier(
 }
 
 /// Resolve one ordinary Poison or Burn post-turn residual.
-pub fn resolve_residual(
-    input: StatusResidualInput,
-) -> Result<StatusResidualOutcome, StatusError> {
+pub fn resolve_residual(input: StatusResidualInput) -> Result<StatusResidualOutcome, StatusError> {
     validate_status_state(input.status)?;
     if input.max_hp == 0 {
         return Err(StatusError::InvalidMaxHp);
@@ -399,8 +393,7 @@ pub fn status_type_immunity(
 
 /// Return whether the target's typing blocks a powder move.
 pub fn powder_immunity(target_types: PokemonTyping) -> bool {
-    target_types.primary == PokemonType::Grass
-        || target_types.secondary == Some(PokemonType::Grass)
+    target_types.primary == PokemonType::Grass || target_types.secondary == Some(PokemonType::Grass)
 }
 
 const fn type_blocks_status(status: StatusKind, pokemon_type: PokemonType) -> bool {
@@ -424,13 +417,8 @@ fn validate_supported_status(status: StatusKind) -> Result<(), StatusError> {
 
 fn validate_supported_status_or_none(status: StatusKind) -> Result<(), StatusError> {
     match status {
-        StatusKind::None
-        | StatusKind::Burn
-        | StatusKind::Poison
-        | StatusKind::Paralysis => Ok(()),
-        StatusKind::Toxic | StatusKind::Sleep => {
-            Err(StatusError::UnsupportedStatus { status })
-        }
+        StatusKind::None | StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis => Ok(()),
+        StatusKind::Toxic | StatusKind::Sleep => Err(StatusError::UnsupportedStatus { status }),
     }
 }
 
@@ -439,14 +427,18 @@ fn validate_status_state(status: StatusState) -> Result<(), StatusError> {
         StatusKind::None | StatusKind::Paralysis
             if status.toxic_turn_count != 0 || status.sleep_turns_remaining.is_some() =>
         {
-            Err(StatusError::InvalidStatusState { status: status.kind })
+            Err(StatusError::InvalidStatusState {
+                status: status.kind,
+            })
         }
         StatusKind::Burn | StatusKind::Poison if status.sleep_turns_remaining.is_some() => {
-            Err(StatusError::InvalidStatusState { status: status.kind })
+            Err(StatusError::InvalidStatusState {
+                status: status.kind,
+            })
         }
-        StatusKind::Toxic | StatusKind::Sleep => {
-            Err(StatusError::UnsupportedStatus { status: status.kind })
-        }
+        StatusKind::Toxic | StatusKind::Sleep => Err(StatusError::UnsupportedStatus {
+            status: status.kind,
+        }),
         StatusKind::None | StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis => Ok(()),
     }
 }

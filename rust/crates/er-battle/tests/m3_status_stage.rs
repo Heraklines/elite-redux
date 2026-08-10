@@ -14,21 +14,21 @@ use std::error::Error;
 use er_rng::audit::{RngReason, RngStream};
 use er_rng::battle::{BattleRngState, RngRuntime};
 use er_rng::phaser::{PhaserRdgState, RunRngState};
+use er_types::SafeU53;
 use er_types::battle_ids::TurnIndex;
 use er_types::battle_model::{
     BattleStat, BattleStats, MoveCategory, PokemonType, PokemonTyping, StatStages, StatusKind,
     StatusState,
 };
-use er_types::SafeU53;
 use stat_stage::{
     EffectiveStatInput, StagePolicy, apply_stage_delta, effective_battle_stat, effective_speed,
     js_signed_shift_right_one, stage_for_stat, stage_ratio,
 };
 use status::{
     ParalysisActivationOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
-    StatusChanceOutcome, StatusError, StatusRejection, StatusResidualInput,
-    StatusResidualOutcome, apply_status, burn_damage_multiplier, check_paralysis,
-    apply_status_with_chance, resolve_residual, roll_status_chance, status_type_immunity,
+    StatusChanceOutcome, StatusError, StatusRejection, StatusResidualInput, StatusResidualOutcome,
+    apply_status, apply_status_with_chance, burn_damage_multiplier, check_paralysis,
+    resolve_residual, roll_status_chance, status_type_immunity,
 };
 
 fn typing(primary: PokemonType, secondary: Option<PokemonType>) -> PokemonTyping {
@@ -355,7 +355,12 @@ fn unsupported_toxic_sleep_and_status_none_fail_closed() {
         hp: 100,
         max_hp: 100,
     });
-    assert!(matches!(toxic, Err(StatusError::UnsupportedStatus { status: StatusKind::Toxic })));
+    assert!(matches!(
+        toxic,
+        Err(StatusError::UnsupportedStatus {
+            status: StatusKind::Toxic
+        })
+    ));
     assert!(matches!(
         status_type_immunity(StatusKind::Sleep, typing(PokemonType::Fire, None)),
         Err(StatusError::UnsupportedStatus {
@@ -365,8 +370,7 @@ fn unsupported_toxic_sleep_and_status_none_fail_closed() {
 }
 
 #[test]
-fn residuals_increment_turn_count_and_preserve_minimum_one_rounding()
-    -> Result<(), Box<dyn Error>>
+fn residuals_increment_turn_count_and_preserve_minimum_one_rounding() -> Result<(), Box<dyn Error>>
 {
     // Published poison-residual and poison-application cases use max HP/8 and
     // increment the count before the HP mutation.
@@ -574,6 +578,9 @@ fn chance_gate_has_source_no_draw_guarantees_and_strict_failure() -> Result<(), 
     let result = roll_status_chance(&mut runtime, Some(0))?;
     assert!(matches!(result, StatusChanceOutcome::Failed { draw } if draw.get() <= 99));
     assert_eq!(runtime.audit_entries().len(), 1);
-    assert_eq!(runtime.audit_entries()[0].reason, RngReason::SecondaryEffect);
+    assert_eq!(
+        runtime.audit_entries()[0].reason,
+        RngReason::SecondaryEffect
+    );
     Ok(())
 }

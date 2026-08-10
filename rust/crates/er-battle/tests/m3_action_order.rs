@@ -285,7 +285,10 @@ fn runtime(state: &GameState) -> TestResult<RngRuntime> {
 }
 
 fn actor_sequence(actions: &[PendingAction]) -> Vec<u64> {
-    actions.iter().map(|action| u64::from(action.actor)).collect()
+    actions
+        .iter()
+        .map(|action| u64::from(action.actor))
+        .collect()
 }
 
 #[test]
@@ -293,9 +296,27 @@ fn voluntary_switch_is_constructed_before_the_move_stage() -> TestResult {
     let content = selected_content_pack()?;
     let state = double_state(&content)?;
     let commands = vec![
-        fight("move-player-one", 2, BattleSide::Player, 1, BattleSide::Enemy)?,
-        fight("move-enemy-zero", 4, BattleSide::Enemy, 1, BattleSide::Player)?,
-        fight("move-enemy-one", 5, BattleSide::Enemy, 1, BattleSide::Player)?,
+        fight(
+            "move-player-one",
+            2,
+            BattleSide::Player,
+            1,
+            BattleSide::Enemy,
+        )?,
+        fight(
+            "move-enemy-zero",
+            4,
+            BattleSide::Enemy,
+            1,
+            BattleSide::Player,
+        )?,
+        fight(
+            "move-enemy-one",
+            5,
+            BattleSide::Enemy,
+            1,
+            BattleSide::Player,
+        )?,
         switch("switch-player-zero")?,
     ];
     let mut rng = runtime(&state)?;
@@ -306,9 +327,11 @@ fn voluntary_switch_is_constructed_before_the_move_stage() -> TestResult {
     assert_eq!(first.effective_speed, 180);
     assert_eq!(first.command_operation_id, operation("switch-player-zero")?);
     let remaining = ordered.get(1..).ok_or("missing move stage")?;
-    assert!(remaining
-        .iter()
-        .all(|action| action.kind == ResolvedActionKind::Move));
+    assert!(
+        remaining
+            .iter()
+            .all(|action| action.kind == ResolvedActionKind::Move)
+    );
     Ok(())
 }
 
@@ -317,7 +340,13 @@ fn special_hit_priority_beats_a_faster_normal_move() -> TestResult {
     let content = selected_content_pack()?;
     let state = single_state(&content, 80, StatusKind::None, 0, &[351], 200, &[1])?;
     let commands = vec![
-        fight("priority-move", 1, BattleSide::Player, 351, BattleSide::Enemy)?,
+        fight(
+            "priority-move",
+            1,
+            BattleSide::Player,
+            351,
+            BattleSide::Enemy,
+        )?,
         fight("normal-move", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
     ];
     let mut rng = runtime(&state)?;
@@ -366,7 +395,9 @@ fn paralysis_and_stage_math_are_applied_to_live_speed() -> TestResult {
     let first = queue.pop_next(&live, &mut rng)?.ok_or("empty live queue")?;
     assert_eq!(first.actor, pokemon_id(2)?);
     assert_eq!(first.effective_speed, 100);
-    let second = queue.pop_next(&live, &mut rng)?.ok_or("missing second action")?;
+    let second = queue
+        .pop_next(&live, &mut rng)?
+        .ok_or("missing second action")?;
     assert_eq!(second.actor, pokemon_id(1)?);
     assert_eq!(second.effective_speed, 180);
     Ok(())
@@ -416,19 +447,11 @@ fn speed_tie_uses_the_exact_seed_offset_shuffle_and_audit() -> TestResult {
         fight("tie-enemy", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
     ];
     let mut first_rng = runtime(&state)?;
-    let first_order = order_pending_actions_from_commands(
-        &state,
-        &commands,
-        &content,
-        &mut first_rng,
-    )?;
+    let first_order =
+        order_pending_actions_from_commands(&state, &commands, &content, &mut first_rng)?;
     let mut second_rng = runtime(&state)?;
-    let second_order = order_pending_actions_from_commands(
-        &state,
-        &commands,
-        &content,
-        &mut second_rng,
-    )?;
+    let second_order =
+        order_pending_actions_from_commands(&state, &commands, &content, &mut second_rng)?;
     assert_eq!(first_order, second_order);
     assert_eq!(first_rng.audit_entries().len(), 1);
     let draw = first_rng
@@ -483,8 +506,20 @@ fn unsupported_ordering_is_rejected_before_rng_consumption() -> TestResult {
     let content = selected_content_pack()?;
     let state = single_state(&content, 180, StatusKind::None, 0, &[1], 180, &[1])?;
     let commands = vec![
-        fight("unsupported-player", 1, BattleSide::Player, 1, BattleSide::Enemy)?,
-        fight("unsupported-enemy", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
+        fight(
+            "unsupported-player",
+            1,
+            BattleSide::Player,
+            1,
+            BattleSide::Enemy,
+        )?,
+        fight(
+            "unsupported-enemy",
+            2,
+            BattleSide::Enemy,
+            1,
+            BattleSide::Player,
+        )?,
     ];
     let options = ActionOrderOptions {
         trick_room: true,
@@ -492,14 +527,13 @@ fn unsupported_ordering_is_rejected_before_rng_consumption() -> TestResult {
     };
     let rng = runtime(&state)?;
     let result = er_battle::action_order::build_pending_action_queue_with_options(
-        &state,
-        &commands,
-        &content,
-        &options,
+        &state, &commands, &content, &options,
     );
     assert!(matches!(
         result,
-        Err(ActionOrderError::Unsupported(UnsupportedOrdering::TrickRoom))
+        Err(ActionOrderError::Unsupported(
+            UnsupportedOrdering::TrickRoom
+        ))
     ));
     assert!(rng.audit_entries().is_empty());
     Ok(())
@@ -524,7 +558,9 @@ fn unsupported_arena_state_is_rejected_before_the_shuffle_boundary() -> TestResu
     let result = build_pending_action_queue_from_commands(&state, &commands, &content);
     assert!(matches!(
         result,
-        Err(ActionOrderError::Unsupported(UnsupportedOrdering::ArenaCondition))
+        Err(ActionOrderError::Unsupported(
+            UnsupportedOrdering::ArenaCondition
+        ))
     ));
     assert!(rng.audit_entries().is_empty());
     Ok(())
@@ -535,8 +571,20 @@ fn operation_identity_and_tie_order_are_carried_on_pending_entries() -> TestResu
     let content = selected_content_pack()?;
     let state = single_state(&content, 180, StatusKind::None, 0, &[1], 180, &[1])?;
     let commands = vec![
-        fight("identity-player", 1, BattleSide::Player, 1, BattleSide::Enemy)?,
-        fight("identity-enemy", 2, BattleSide::Enemy, 1, BattleSide::Player)?,
+        fight(
+            "identity-player",
+            1,
+            BattleSide::Player,
+            1,
+            BattleSide::Enemy,
+        )?,
+        fight(
+            "identity-enemy",
+            2,
+            BattleSide::Enemy,
+            1,
+            BattleSide::Player,
+        )?,
     ];
     let mut rng = runtime(&state)?;
     let ordered = order_pending_actions_from_commands(&state, &commands, &content, &mut rng)?;

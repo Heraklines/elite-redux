@@ -5,8 +5,8 @@ use er_battle::accuracy::{
     AccuracySkipReason, AccuracyUnsupportedReason,
 };
 use er_battle::critical::{
-    CRITICAL_HIT_MULTIPLIER, CRITICAL_ODDS, CriticalContext, CriticalContextError,
-    CriticalError, CriticalGate, CriticalUnsupportedReason,
+    CRITICAL_HIT_MULTIPLIER, CRITICAL_ODDS, CriticalContext, CriticalContextError, CriticalError,
+    CriticalGate, CriticalUnsupportedReason,
 };
 use er_rng::audit::{RngCallsiteId, RngReason};
 use er_rng::battle::{BattleRngState, RngRuntime};
@@ -21,12 +21,10 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 // These constants mirror only the stream states needed by each seam.
 const ALWAYS_HIT_RUN_STATE: &str =
     "!rnd,1,0.18032378423959017,0.9995999033562839,0.20317641110159457";
-const MISS_RUN_STATE: &str =
-    "!rnd,1,0.2884788236115128,0.2677236401941627,0.32724559400230646";
+const MISS_RUN_STATE: &str = "!rnd,1,0.2884788236115128,0.2677236401941627,0.32724559400230646";
 const MISS_SAVED_SUBSTREAM: &str =
     "!rnd,1859127,0.5025886141229421,0.4581744347233325,0.6846395924221724";
-const CRITICAL_RUN_STATE: &str =
-    "!rnd,1,0.5098650357685983,0.4744028700515628,0.6628262170124799";
+const CRITICAL_RUN_STATE: &str = "!rnd,1,0.5098650357685983,0.4744028700515628,0.6628262170124799";
 const CRITICAL_SAVED_SUBSTREAM: &str =
     "!rnd,2073079,0.9976057731546462,0.32632405031472445,0.4190253959968686";
 
@@ -57,12 +55,8 @@ fn runtime_from_published_states(
 
 #[test]
 fn published_always_hit_skips_accuracy_draw() -> TestResult {
-    let mut runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let context = AccuracyContext::always_hits(0, 6, AccuracyGate::Eligible);
 
     let decision = context.resolve(&mut runtime)?;
@@ -221,12 +215,8 @@ fn critical_zero_is_the_only_hit_and_odds_follow_selected_slice() -> TestResult 
 
 #[test]
 fn guaranteed_selected_odds_record_a_non_consuming_cardinality_one_audit() -> TestResult {
-    let mut runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let context = CriticalContext::new(3, CriticalGate::Eligible);
 
     let decision = context.resolve(&mut runtime)?;
@@ -250,23 +240,15 @@ fn guaranteed_selected_odds_record_a_non_consuming_cardinality_one_audit() -> Te
 
 #[test]
 fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
-    let mut accuracy_runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut accuracy_runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let no_effect_accuracy = AccuracyContext::ordinary(75, 0, 0, AccuracyGate::NoEffect);
     let accuracy_decision = no_effect_accuracy.resolve(&mut accuracy_runtime)?;
     assert!(accuracy_decision.draw().is_none());
     assert!(accuracy_runtime.audit_entries().is_empty());
 
-    let mut critical_runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut critical_runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let no_effect_critical = CriticalContext::new(0, CriticalGate::NoEffect);
     let critical_decision = no_effect_critical.resolve(&mut critical_runtime)?;
     assert!(critical_decision.draw().is_none());
@@ -298,12 +280,8 @@ fn no_effect_and_unsupported_branches_consume_no_draw() -> TestResult {
 
 #[test]
 fn invalid_contexts_fail_closed_before_rng_access() -> TestResult {
-    let mut accuracy_runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut accuracy_runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let invalid_accuracy = AccuracyContext::ordinary(0, 0, 0, AccuracyGate::Eligible);
     assert!(matches!(
         invalid_accuracy.resolve(&mut accuracy_runtime),
@@ -322,18 +300,14 @@ fn invalid_contexts_fail_closed_before_rng_access() -> TestResult {
     ));
     assert!(accuracy_runtime.audit_entries().is_empty());
 
-    let mut critical_runtime = runtime_from_published_states(
-        "7kmfnITLsaH6sVd8",
-        ALWAYS_HIT_RUN_STATE,
-        None,
-        0,
-    )?;
+    let mut critical_runtime =
+        runtime_from_published_states("7kmfnITLsaH6sVd8", ALWAYS_HIT_RUN_STATE, None, 0)?;
     let invalid_critical = CriticalContext::new(4, CriticalGate::Eligible);
     assert!(matches!(
         invalid_critical.resolve(&mut critical_runtime),
-        Err(CriticalError::InvalidContext(CriticalContextError::StageOutOfRange {
-            stage: 4
-        }))
+        Err(CriticalError::InvalidContext(
+            CriticalContextError::StageOutOfRange { stage: 4 }
+        ))
     ));
     assert!(critical_runtime.audit_entries().is_empty());
     Ok(())

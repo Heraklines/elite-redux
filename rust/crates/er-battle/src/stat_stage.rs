@@ -265,9 +265,7 @@ fn base_stat_for_stat(stats: &BattleStats, stat: BattleStat) -> Result<u32, Stat
 fn validate_status(status: StatusKind) -> Result<(), StatStageError> {
     match status {
         StatusKind::None | StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis => Ok(()),
-        StatusKind::Toxic | StatusKind::Sleep => {
-            Err(StatStageError::UnsupportedStatus { status })
-        }
+        StatusKind::Toxic | StatusKind::Sleep => Err(StatStageError::UnsupportedStatus { status }),
     }
 }
 

@@ -231,7 +231,10 @@ impl PendingActionQueue {
         state: &GameState,
         rng: &mut RngRuntime,
     ) -> Result<Option<PendingAction>, ActionOrderError> {
-        let battle = state.battle.as_ref().ok_or(ActionOrderError::MissingBattle)?;
+        let battle = state
+            .battle
+            .as_ref()
+            .ok_or(ActionOrderError::MissingBattle)?;
         validate_supported_ordering(battle, &self.options)?;
 
         if self.stage == PendingStage::Switches && self.switches.is_empty() {
@@ -324,8 +327,8 @@ pub fn effective_speed(pokemon: &PokemonState) -> Result<u32, ActionOrderError> 
         .checked_mul(numerator)
         .ok_or(ActionOrderError::SpeedOverflow { actor: pokemon.id })?
         / denominator;
-    let adjusted =
-        u32::try_from(adjusted).map_err(|_| ActionOrderError::SpeedOverflow { actor: pokemon.id })?;
+    let adjusted = u32::try_from(adjusted)
+        .map_err(|_| ActionOrderError::SpeedOverflow { actor: pokemon.id })?;
 
     let adjusted = if pokemon.status.kind == StatusKind::Paralysis {
         // `ret >>= 1` is an arithmetic signed-32-bit shift in JavaScript.
@@ -377,7 +380,10 @@ pub fn build_pending_action_queue_with_options(
     content: &ContentPack,
     options: &ActionOrderOptions,
 ) -> Result<PendingActionQueue, ActionOrderError> {
-    let battle = state.battle.as_ref().ok_or(ActionOrderError::MissingBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(ActionOrderError::MissingBattle)?;
     validate_supported_ordering(battle, options)?;
     content.validate().map_err(ActionOrderError::Content)?;
     state.validate().map_err(ActionOrderError::State)?;
@@ -582,7 +588,9 @@ fn build_switch_action(
         });
     }
     if destination.fainted {
-        return Err(ActionOrderError::SwitchDestinationFainted { incoming: *incoming });
+        return Err(ActionOrderError::SwitchDestinationFainted {
+            incoming: *incoming,
+        });
     }
     Ok(PendingAction {
         command: command.clone(),
@@ -737,8 +745,8 @@ fn assign_tie_orders(actions: &mut [PendingAction]) -> Result<(), ActionOrderErr
                 .checked_add(1)
                 .ok_or(ActionOrderError::TieOrderOverflow)?;
         }
-        action.tie_order = SafeU53::new(group_position)
-            .map_err(|_| ActionOrderError::TieOrderOverflow)?;
+        action.tie_order =
+            SafeU53::new(group_position).map_err(|_| ActionOrderError::TieOrderOverflow)?;
         previous_speed = Some(action.effective_speed);
         previous_actor = Some(action.actor);
     }
@@ -752,16 +760,9 @@ fn party_for_side(battle: &BattleState, side: BattleSide) -> &[PokemonState] {
     }
 }
 
-fn find_pokemon(
-    battle: &BattleState,
-    actor: PokemonId,
-) -> Result<&PokemonState, ActionOrderError> {
+fn find_pokemon(battle: &BattleState, actor: PokemonId) -> Result<&PokemonState, ActionOrderError> {
     let mut found = None;
-    for pokemon in battle
-        .player_party
-        .iter()
-        .chain(battle.enemy_party.iter())
-    {
+    for pokemon in battle.player_party.iter().chain(battle.enemy_party.iter()) {
         if pokemon.id == actor {
             if found.is_some() {
                 return Err(ActionOrderError::UnknownActor { actor });

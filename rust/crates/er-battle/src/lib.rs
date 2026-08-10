@@ -2,9 +2,9 @@
 
 pub mod accuracy;
 pub mod action_order;
+pub mod command;
 pub mod critical;
 pub mod damage;
-pub mod command;
 pub mod error;
 pub mod js_math;
 pub mod legality;

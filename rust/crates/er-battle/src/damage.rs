@@ -163,14 +163,8 @@ impl DamageInput {
         if !self.defensive_stat.is_finite() || self.defensive_stat <= 0.0 {
             return Err(DamageError::InvalidDefensiveStat);
         }
-        validate_positive_multiplier(
-            self.target_multiplier,
-            DamageModifier::Target,
-        )?;
-        validate_positive_multiplier(
-            self.critical_multiplier,
-            DamageModifier::Critical,
-        )?;
+        validate_positive_multiplier(self.target_multiplier, DamageModifier::Target)?;
+        validate_positive_multiplier(self.critical_multiplier, DamageModifier::Critical)?;
         validate_positive_multiplier(self.stab_multiplier, DamageModifier::Stab)?;
         validate_nonnegative_multiplier(
             self.effectiveness_multiplier,
@@ -270,8 +264,8 @@ pub fn calculate_damage(
     // integer boundary rejects, the caller observes no live draw or audit
     // sequence allocation.
     let mut staged_runtime = runtime.clone();
-    let cardinality = SafeU53::new(DAMAGE_VARIANCE_CARDINALITY)
-        .map_err(|_| DamageError::InvalidVarianceRange)?;
+    let cardinality =
+        SafeU53::new(DAMAGE_VARIANCE_CARDINALITY).map_err(|_| DamageError::InvalidVarianceRange)?;
     let minimum =
         SafeU53::new(DAMAGE_VARIANCE_MINIMUM).map_err(|_| DamageError::InvalidVarianceRange)?;
     let roll = staged_runtime.pokemon_rand_battle_seed_int(
@@ -341,10 +335,7 @@ pub fn resolve_damage(
     calculate_damage(input, runtime)
 }
 
-fn validate_positive_multiplier(
-    value: f64,
-    modifier: DamageModifier,
-) -> Result<(), DamageError> {
+fn validate_positive_multiplier(value: f64, modifier: DamageModifier) -> Result<(), DamageError> {
     if !value.is_finite() || value <= 0.0 {
         return Err(DamageError::InvalidPositiveMultiplier { modifier });
     }

@@ -2,8 +2,8 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use er_battle::type_effectiveness::{
-    EffectivenessClass, EffectivenessMultiplier, TypeEffectivenessError,
-    compose_type_multipliers, resolve_type_effectiveness,
+    EffectivenessClass, EffectivenessMultiplier, TypeEffectivenessError, compose_type_multipliers,
+    resolve_type_effectiveness,
 };
 use er_content::pack::{TypeChartError, selected_type_chart};
 use er_state::pokemon::TypingValidationError;
@@ -169,11 +169,8 @@ fn closed_multiplier_values_cover_neutral_zero_quarter_half_two_and_four() -> Te
     assert!(quarter.is_resistant());
     assert_eq!(quarter.multiplier.exponent(), Some(-2));
 
-    let half = resolve_type_effectiveness(
-        &chart,
-        PokemonType::Fire,
-        &typing(PokemonType::Water, None),
-    )?;
+    let half =
+        resolve_type_effectiveness(&chart, PokemonType::Fire, &typing(PokemonType::Water, None))?;
     assert_eq!(half.multiplier, EffectivenessMultiplier::Half);
     assert!(half.is_resistant());
 
@@ -225,7 +222,10 @@ fn dual_type_composition_is_order_independent_without_intermediate_rounding() ->
         &typing(PokemonType::Poison, Some(PokemonType::Grass)),
     )?;
     assert_eq!(quarter, reversed_quarter);
-    assert_eq!(reversed_quarter.multiplier, EffectivenessMultiplier::Quarter);
+    assert_eq!(
+        reversed_quarter.multiplier,
+        EffectivenessMultiplier::Quarter
+    );
 
     assert_eq!(
         compose_type_multipliers(SingleTypeMultiplier::Half, Some(SingleTypeMultiplier::Half)),
