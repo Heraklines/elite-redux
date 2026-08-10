@@ -108,6 +108,10 @@ pub enum FaintQueueError {
     },
     #[error("faint queue contains duplicate occurrence {id:?}")]
     DuplicateQueueOccurrence { id: FaintOccurrenceId },
+    #[error("faint queue contains duplicate unresolved subject {pokemon:?} in {slot:?}")]
+    DuplicateQueueSubject { slot: FieldSlot, pokemon: PokemonId },
+    #[error("faint authority epoch must be greater than zero")]
+    ZeroAuthorityEpoch,
     #[error("faint queue occurrence {id:?} is not below allocator {next:?}")]
     QueueAllocatorMismatch {
         id: FaintOccurrenceId,
@@ -159,6 +163,9 @@ pub fn queue_faints(
     authority_epoch: AuthorityEpoch,
     first_turn_occurrence: u32,
 ) -> Result<Vec<FaintQueueResult>, FaintQueueError> {
+    if authority_epoch == AuthorityEpoch::ZERO {
+        return Err(FaintQueueError::ZeroAuthorityEpoch);
+    }
     validate_queue_shape(battle)?;
 
     let mut working_queue = battle.faint_queue.clone();
@@ -285,10 +292,22 @@ fn validate_queue_shape(battle: &BattleState) -> Result<(), FaintQueueError> {
         .map_err(|source| FaintQueueError::InvalidField { source })?;
 
     let mut ids = HashSet::with_capacity(battle.faint_queue.len());
+    let mut unresolved_subjects = HashSet::with_capacity(battle.faint_queue.len());
     let mut previous: Option<&FaintOccurrence> = None;
     for occurrence in &battle.faint_queue {
         if !ids.insert(occurrence.id) {
             return Err(FaintQueueError::DuplicateQueueOccurrence { id: occurrence.id });
+        }
+        if occurrence.source.epoch == AuthorityEpoch::ZERO {
+            return Err(FaintQueueError::ZeroAuthorityEpoch);
+        }
+        if occurrence.replacement != ReplacementProgress::Applied
+            && !unresolved_subjects.insert((occurrence.slot, occurrence.pokemon))
+        {
+            return Err(FaintQueueError::DuplicateQueueSubject {
+                slot: occurrence.slot,
+                pokemon: occurrence.pokemon,
+            });
         }
         if occurrence.id >= battle.next_faint_occurrence {
             return Err(FaintQueueError::QueueAllocatorMismatch {

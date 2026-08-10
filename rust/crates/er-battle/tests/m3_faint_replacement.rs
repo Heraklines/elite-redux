@@ -276,6 +276,40 @@ fn candidate_adapter_and_checked_queue_allocation_are_atomic() -> TestResult {
         Err(FaintQueueError::TurnOccurrenceOverflow)
     ));
     assert_eq!(turn_overflow, before_turn_overflow);
+
+    let mut zero_epoch = single_with_reserve()?;
+    let before_zero_epoch = zero_epoch.clone();
+    assert!(matches!(
+        queue_faint(
+            &mut zero_epoch,
+            adapted,
+            AuthorityEpoch::ZERO,
+            7,
+        ),
+        Err(FaintQueueError::ZeroAuthorityEpoch)
+    ));
+    assert_eq!(zero_epoch, before_zero_epoch);
+    Ok(())
+}
+
+#[test]
+fn malformed_duplicate_unresolved_queue_subject_is_rejected_atomically() -> TestResult {
+    let mut battle = single_with_reserve()?;
+    let target = candidate(BattleSide::Player, 0, 1)?;
+    queue_faint(&mut battle, target, epoch(17)?, 7)?;
+
+    let mut duplicate = battle.faint_queue[0];
+    duplicate.id = FaintOccurrenceId::new(safe(1)?);
+    duplicate.source.turn_occurrence = 8;
+    battle.faint_queue.push(duplicate);
+    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(2)?);
+
+    let before = battle.clone();
+    assert!(matches!(
+        queue_faint(&mut battle, target, epoch(17)?, 9),
+        Err(FaintQueueError::DuplicateQueueSubject { .. })
+    ));
+    assert_eq!(battle, before);
     Ok(())
 }
 

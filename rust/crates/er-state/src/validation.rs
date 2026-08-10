@@ -9,7 +9,7 @@ use er_types::battle_command::{
     validate_player_command_operation_id, validate_scripted_enemy_command_operation_id,
 };
 use er_types::battle_ids::{
-    BattleId, BattleSide, ContentPackHash, FieldSlot, PartyIndex, PokemonId,
+    AuthorityEpoch, BattleId, BattleSide, ContentPackHash, FieldSlot, PartyIndex, PokemonId,
 };
 use er_types::{SafeU53, SeatId};
 use thiserror::Error;
@@ -139,6 +139,12 @@ pub enum StateValidationError {
     TerminalCommandFrontier,
     #[error("faint occurrence ID {id:?} appears more than once")]
     DuplicateFaintOccurrence {
+        id: er_types::battle_ids::FaintOccurrenceId,
+    },
+    #[error("unresolved faint subject {pokemon:?} in {slot:?} appears more than once")]
+    DuplicateUnresolvedFaint { slot: FieldSlot, pokemon: PokemonId },
+    #[error("faint occurrence {id:?} has a zero authority epoch")]
+    ZeroFaintAuthorityEpoch {
         id: er_types::battle_ids::FaintOccurrenceId,
     },
     #[error("faint occurrence ID {id:?} is not below allocator {next:?}")]
@@ -698,10 +704,22 @@ fn parse_enemy_cursor(operation: &str) -> Result<SafeU53, StateValidationError> 
 
 fn validate_faint_queue(battle: &BattleState) -> Result<(), StateValidationError> {
     let mut ids = BTreeSet::new();
+    let mut unresolved_subjects = BTreeSet::new();
     let mut previous: Option<&FaintOccurrence> = None;
     for occurrence in &battle.faint_queue {
         if !ids.insert(occurrence.id) {
             return Err(StateValidationError::DuplicateFaintOccurrence { id: occurrence.id });
+        }
+        if occurrence.source.epoch == AuthorityEpoch::ZERO {
+            return Err(StateValidationError::ZeroFaintAuthorityEpoch { id: occurrence.id });
+        }
+        if occurrence.replacement != ReplacementProgress::Applied
+            && !unresolved_subjects.insert((occurrence.slot, occurrence.pokemon))
+        {
+            return Err(StateValidationError::DuplicateUnresolvedFaint {
+                slot: occurrence.slot,
+                pokemon: occurrence.pokemon,
+            });
         }
         if occurrence.id >= battle.next_faint_occurrence {
             return Err(StateValidationError::FaintAllocatorMismatch {
@@ -792,7 +810,12 @@ fn validate_replacement_progress(
         {
             Ok(())
         }
-        ReplacementProgress::NotRequired | ReplacementProgress::Applied => Ok(()),
+        ReplacementProgress::NotRequired
+            if occurrence.slot.side == BattleSide::Enemy && owner.is_none() =>
+        {
+            Ok(())
+        }
+        ReplacementProgress::Applied => Ok(()),
         _ => Err(StateValidationError::InvalidReplacementProgress { id: occurrence.id }),
     }
 }

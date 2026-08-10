@@ -474,6 +474,52 @@ fn faint_queue_preserves_allocator_causality_and_stored_replacement_truth()
 }
 
 #[test]
+fn faint_queue_rejects_noncanonical_authority_and_unresolved_subjects()
+-> Result<(), Box<dyn Error>> {
+    let mut state = valid_game()?;
+    let battle = state.battle.as_mut().ok_or("missing battle")?;
+    battle.player_party[0] = pokemon(17, Some(seat(1)), true)?;
+    battle.player_party.push(pokemon(19, Some(seat(1)), false)?);
+    battle.faint_queue.push(FaintOccurrence {
+        id: FaintOccurrenceId::ZERO,
+        source: FaintSource {
+            epoch: er_types::battle_ids::AuthorityEpoch::ZERO,
+            wave: battle.wave,
+            resolved_turn: battle.turn,
+            turn_occurrence: 0,
+        },
+        slot: slot(BattleSide::Player, 0),
+        pokemon: PokemonId::new(safe(17)),
+        owner_seat: Some(seat(1)),
+        replacement: ReplacementProgress::Pending,
+    });
+    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(1));
+    assert!(matches!(
+        validate_battle_state(battle),
+        Err(StateValidationError::ZeroFaintAuthorityEpoch { .. })
+    ));
+
+    battle.faint_queue[0].source.epoch = er_types::battle_ids::AuthorityEpoch::new(safe(1));
+    battle.faint_queue[0].replacement = ReplacementProgress::NotRequired;
+    assert!(matches!(
+        validate_battle_state(battle),
+        Err(StateValidationError::InvalidReplacementProgress { .. })
+    ));
+
+    battle.faint_queue[0].replacement = ReplacementProgress::Pending;
+    let mut duplicate = battle.faint_queue[0];
+    duplicate.id = FaintOccurrenceId::new(safe(1));
+    duplicate.source.turn_occurrence = 1;
+    battle.faint_queue.push(duplicate);
+    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(2));
+    assert!(matches!(
+        validate_battle_state(battle),
+        Err(StateValidationError::DuplicateUnresolvedFaint { .. })
+    ));
+    Ok(())
+}
+
+#[test]
 fn mechanical_digest_is_strict_domain_separated_and_state_complete() -> Result<(), Box<dyn Error>> {
     let state = valid_game()?;
     let digest = compute_mechanical_state_digest(&state)?;
