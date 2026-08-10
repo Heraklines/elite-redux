@@ -124,6 +124,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-game"
+version = "0.1.0"
+dependencies = [
+ "er-battle",
+ "er-canonical",
+ "er-content",
+ "er-rng",
+ "er-state",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "er-kernel"
 version = "0.1.0"
 dependencies = [
