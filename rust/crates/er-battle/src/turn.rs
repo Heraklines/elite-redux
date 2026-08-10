@@ -56,6 +56,7 @@ use crate::replacement::{
 };
 use crate::resolver::{
     BattleMutation, BattleNextDecision, BattleReplacementTransition, BattleTransition,
+    validate_battle_mutation_evidence,
 };
 use crate::stat_stage::{StatStageError, set_stage};
 use crate::status::{
@@ -173,6 +174,7 @@ pub fn resolve_turn(
         &causal_events,
         outcome,
     ))?;
+    validate_battle_mutation_evidence(before, &after, &mutations)?;
 
     Ok(BattleTransition {
         before_state: before.clone(),
@@ -257,6 +259,7 @@ pub fn resolve_replacement(
         &causal_events,
         outcome,
     ))?;
+    validate_battle_mutation_evidence(before, &after, &mutations)?;
 
     Ok(BattleReplacementTransition {
         before_state: before.clone(),
