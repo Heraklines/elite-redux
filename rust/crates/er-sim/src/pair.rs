@@ -12,6 +12,8 @@ use er_types::{
     PhysicalKey, PresentationEventId, PresentationOutcome, RawFrame, RawInputEvent, SafeU53,
     SeatId, StorageResult, TerminalMenu, TerminalState, TimeClass, TransportState, UiViewModel,
 };
+use er_types::battle_ids::BattlePresentationEventId;
+use er_types::battle_ui::PresentationSettlementOutcome;
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer, de::Error as SerdeDeError,
     ser::Error as SerdeSerError,
@@ -67,6 +69,11 @@ pub enum PairOperation {
         endpoint: PairEndpoint,
         event_id: PresentationEventId,
         outcome: PresentationOutcome,
+    },
+    BattlePresentationOutcome {
+        endpoint: PairEndpoint,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
     },
     StorageResult {
         endpoint: PairEndpoint,
@@ -501,6 +508,18 @@ impl SimulatedPair {
                     .settle(endpoint_seat, event_id, outcome)
                     .map_err(adapter_error)?;
                 self.queue_presentation_completions(endpoint, completions, work);
+            }
+            PairOperation::BattlePresentationOutcome {
+                endpoint,
+                event_id,
+                outcome,
+            } => {
+                let endpoint_seat = self.seat(endpoint);
+                let completions = self
+                    .presenter
+                    .settle_battle(endpoint_seat, event_id, outcome)
+                    .map_err(adapter_error)?;
+                self.queue_battle_presentation_completions(endpoint, completions, work);
             }
             PairOperation::StorageResult {
                 endpoint,
@@ -974,13 +993,27 @@ impl SimulatedPair {
                     .apply(SchedulerCommand::Cancel { endpoint, timer_id })
                     .map_err(clock_error)?;
             }
-            KernelEffect::UiChanged { endpoint, .. } | KernelEffect::UiIntent { endpoint, .. } => {
+            KernelEffect::UiChanged { endpoint, .. }
+            | KernelEffect::BattleUiChanged { endpoint, .. }
+            | KernelEffect::UiIntent { endpoint, .. } => {
                 self.require_seat(endpoint)?;
             }
             KernelEffect::Present { endpoint, event } => {
                 let seat = self.require_seat(endpoint)?;
                 let completions = self.presenter.present(seat, event).map_err(adapter_error)?;
                 self.queue_presentation_completions(
+                    self.endpoint_for_seat(seat)?,
+                    completions,
+                    work,
+                );
+            }
+            KernelEffect::PresentBattle { endpoint, event } => {
+                let seat = self.require_seat(endpoint)?;
+                let completions = self
+                    .presenter
+                    .present_battle(seat, event)
+                    .map_err(adapter_error)?;
+                self.queue_battle_presentation_completions(
                     self.endpoint_for_seat(seat)?,
                     completions,
                     work,
@@ -1177,6 +1210,25 @@ impl SimulatedPair {
             work.push_front(PairWork::Input {
                 endpoint,
                 input: KernelInput::PresentationSettled {
+                    endpoint: seat,
+                    event_id: completion.event_id,
+                    outcome: completion.outcome,
+                },
+            });
+        }
+    }
+
+    fn queue_battle_presentation_completions(
+        &self,
+        endpoint: PairEndpoint,
+        completions: Vec<crate::BattlePresentationCompletion>,
+        work: &mut VecDeque<PairWork>,
+    ) {
+        let seat = self.seat(endpoint);
+        for completion in completions.into_iter().rev() {
+            work.push_front(PairWork::Input {
+                endpoint,
+                input: KernelInput::BattlePresentationOutcome {
                     endpoint: seat,
                     event_id: completion.event_id,
                     outcome: completion.outcome,

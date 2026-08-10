@@ -352,6 +352,9 @@ impl GameKernel {
                 self.sync_live_resources();
                 Ok(effects)
             }
+            KernelInput::BattlePresentationOutcome { .. } => Err(KernelError::Canonical {
+                reason: "battle presentation outcome requires Battle-mode construction".to_owned(),
+            }),
             KernelInput::TransportChanged {
                 endpoint,
                 state,

@@ -4,6 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use er_types::{PresentationEvent, PresentationEventId, PresentationOutcome, SeatId};
+use er_types::battle_ids::BattlePresentationEventId;
+use er_types::battle_ui::{BattlePresentationEvent, PresentationSettlementOutcome};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -19,6 +21,13 @@ pub enum PresenterMode {
 pub struct PresentationCompletion {
     pub event_id: PresentationEventId,
     pub outcome: PresentationOutcome,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BattlePresentationCompletion {
+    pub event_id: BattlePresentationEventId,
+    pub outcome: PresentationSettlementOutcome,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -37,6 +46,16 @@ pub enum PresenterError {
     UnknownEvent { event_id: PresentationEventId },
     #[error("presentation event {event_id} is already settled")]
     AlreadySettled { event_id: PresentationEventId },
+    #[error("battle presentation event {event_id:?} is unknown")]
+    UnknownBattleEvent {
+        event_id: BattlePresentationEventId,
+    },
+    #[error("battle presentation event {event_id:?} is already settled")]
+    BattleAlreadySettled {
+        event_id: BattlePresentationEventId,
+    },
+    #[error("battle presentation settlement outcome is invalid")]
+    InvalidBattleOutcome,
 }
 
 pub trait Presenter: fmt::Debug {
@@ -53,9 +72,32 @@ pub trait Presenter: fmt::Debug {
         outcome: PresentationOutcome,
     ) -> Result<Vec<PresentationCompletion>, PresenterError>;
 
+    fn present_battle(
+        &mut self,
+        endpoint: SeatId,
+        event: BattlePresentationEvent,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError>;
+
+    fn settle_battle(
+        &mut self,
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError>;
+
     fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId>;
 
     fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId>;
+
+    fn pending_battle_event_ids(
+        &self,
+        endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId>;
+
+    fn settled_battle_event_ids(
+        &self,
+        endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId>;
 
     fn diagnostics_for(&self, endpoint: SeatId) -> PresenterDiagnostics {
         PresenterDiagnostics {
@@ -73,6 +115,8 @@ pub trait Presenter: fmt::Debug {
 #[derive(Debug, Default)]
 pub struct InstantPresenter {
     settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
+    battle_settled:
+        BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
     disposed: bool,
 }
 
@@ -121,6 +165,43 @@ impl Presenter for InstantPresenter {
         Err(PresenterError::UnknownEvent { event_id })
     }
 
+    fn present_battle(
+        &mut self,
+        endpoint: SeatId,
+        event: BattlePresentationEvent,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError> {
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        let event_id = event.event_id;
+        let key = (endpoint, event_id.clone());
+        if self.battle_settled.contains_key(&key) {
+            return Err(PresenterError::BattleAlreadySettled { event_id });
+        }
+
+        let outcome = PresentationSettlementOutcome::Settled;
+        self.battle_settled.insert(key, outcome.clone());
+        Ok(vec![BattlePresentationCompletion { event_id, outcome }])
+    }
+
+    fn settle_battle(
+        &mut self,
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        _outcome: PresentationSettlementOutcome,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError> {
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        if self
+            .battle_settled
+            .contains_key(&(endpoint, event_id.clone()))
+        {
+            return Err(PresenterError::BattleAlreadySettled { event_id });
+        }
+        Err(PresenterError::UnknownBattleEvent { event_id })
+    }
+
     fn pending_event_ids(&self, _endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         BTreeSet::new()
     }
@@ -129,6 +210,25 @@ impl Presenter for InstantPresenter {
         self.settled
             .keys()
             .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
+            .collect()
+    }
+
+    fn pending_battle_event_ids(
+        &self,
+        _endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId> {
+        BTreeSet::new()
+    }
+
+    fn settled_battle_event_ids(
+        &self,
+        endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId> {
+        self.battle_settled
+            .keys()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(event_id.clone())
+            })
             .collect()
     }
 
@@ -143,6 +243,7 @@ impl Presenter for InstantPresenter {
     fn dispose(&mut self) {
         self.disposed = true;
         self.settled.clear();
+        self.battle_settled.clear();
     }
 }
 
@@ -150,6 +251,9 @@ impl Presenter for InstantPresenter {
 pub struct FaultPresenter {
     pending: BTreeSet<(SeatId, PresentationEventId)>,
     settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
+    battle_pending: BTreeSet<(SeatId, BattlePresentationEventId)>,
+    battle_settled:
+        BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
     disposed: bool,
 }
 
@@ -215,6 +319,47 @@ impl Presenter for FaultPresenter {
         Ok(vec![PresentationCompletion { event_id, outcome }])
     }
 
+    fn present_battle(
+        &mut self,
+        endpoint: SeatId,
+        event: BattlePresentationEvent,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError> {
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        let event_id = event.event_id;
+        let key = (endpoint, event_id.clone());
+        if self.battle_settled.contains_key(&key) {
+            return Err(PresenterError::BattleAlreadySettled { event_id });
+        }
+        self.battle_pending.insert(key);
+        Ok(Vec::new())
+    }
+
+    fn settle_battle(
+        &mut self,
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
+    ) -> Result<Vec<BattlePresentationCompletion>, PresenterError> {
+        if self.disposed {
+            return Err(PresenterError::Disposed);
+        }
+        outcome
+            .validate()
+            .map_err(|_| PresenterError::InvalidBattleOutcome)?;
+        let key = (endpoint, event_id.clone());
+        if !self.battle_pending.remove(&key) {
+            if self.battle_settled.contains_key(&key) {
+                return Err(PresenterError::BattleAlreadySettled { event_id });
+            }
+            return Err(PresenterError::UnknownBattleEvent { event_id });
+        }
+
+        self.battle_settled.insert(key, outcome.clone());
+        Ok(vec![BattlePresentationCompletion { event_id, outcome }])
+    }
+
     fn pending_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId> {
         self.pending
             .iter()
@@ -226,6 +371,30 @@ impl Presenter for FaultPresenter {
         self.settled
             .keys()
             .filter_map(|(key_endpoint, event_id)| (*key_endpoint == endpoint).then_some(*event_id))
+            .collect()
+    }
+
+    fn pending_battle_event_ids(
+        &self,
+        endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId> {
+        self.battle_pending
+            .iter()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(event_id.clone())
+            })
+            .collect()
+    }
+
+    fn settled_battle_event_ids(
+        &self,
+        endpoint: SeatId,
+    ) -> BTreeSet<BattlePresentationEventId> {
+        self.battle_settled
+            .keys()
+            .filter_map(|(key_endpoint, event_id)| {
+                (*key_endpoint == endpoint).then_some(event_id.clone())
+            })
             .collect()
     }
 
@@ -241,5 +410,7 @@ impl Presenter for FaultPresenter {
         self.disposed = true;
         self.pending.clear();
         self.settled.clear();
+        self.battle_pending.clear();
+        self.battle_settled.clear();
     }
 }
