@@ -2,6 +2,7 @@
 
 mod battle_ui;
 mod battle_replica;
+mod battle_presentation;
 pub mod input_router;
 pub mod kernel;
 pub mod ui_reducer;

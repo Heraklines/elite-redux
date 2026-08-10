@@ -81,7 +81,7 @@ fn plan_identity_and_zero_based_order_are_checked_atomically() -> TestResult {
     let before = state.clone();
     let wrong_operation = operation("battle/1/turn/2/result")?;
     let wrong_event = event(
-        &wrong_operation,
+        &operation_id,
         0,
         PresentationBlockingPolicy::BlocksHumanInput,
         PresentationSkipPolicy::Forbidden,
