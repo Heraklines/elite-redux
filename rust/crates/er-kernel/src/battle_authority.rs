@@ -56,11 +56,11 @@ const REPLACEMENT_MATERIAL_SCHEMA_VERSION: u32 = 1;
 /// owners.  A request never carries a semantic command or a protocol entry;
 /// it carries only typed game proposals and a closed resolver/projection
 /// bundle from `GameRuntime`.  `scripted_policy` is the current cursor used to
-/// admit a still-pending current frontier, if any; it is a validation input
-/// only.  This adapter never writes it into a prepared or published
-/// transaction.  The common GameRuntime material-install method must validate
-/// the fresh admitted scripted frontier and commit that cursor once for both
-/// authority and replica.
+/// admit a still-pending current frontier, if any.  This adapter never
+/// mutates or commits that input cursor; it carries only the separately derived
+/// exact policy-after in the prepared/published stage.  The common GameRuntime
+/// material-install method must validate the fresh admitted scripted frontier
+/// and commit that cursor once for both authority and replica.
 #[derive(Clone)]
 pub(crate) struct AuthorityTransactionInput {
     pub state: GameState,
@@ -129,8 +129,10 @@ pub(crate) enum AuthorityTransactionError {
     MaterialDigest { reason: String },
     #[error("authority control projection is invalid: {reason}")]
     ControlProjection { reason: String },
-    #[error("authority transaction validation failed before publication: {reason}")]
+    #[error("authority transaction enclosing validation failed: {reason}")]
     EnclosingValidation { reason: String },
+    // Kept for the frozen error table; exact replacement duplicates are
+    // handled as read-only admission evidence and never emit this variant.
     #[error("exact authority replacement stage is already admitted: {operation_id}")]
     Duplicate { operation_id: OperationId },
 }
@@ -147,6 +149,7 @@ pub(crate) struct AuthorityPreparedTransaction {
     material_wire: Material,
     operation_id: OperationId,
     kind: AuthorityEntryKind,
+    scripted_policy_after: ScriptedEnemyPolicyV1,
     log: AuthorityLog,
     scheduler: KernelScheduler,
     prepared: PreparedCommit,
@@ -198,6 +201,13 @@ impl AuthorityPreparedTransaction {
         &self.prepared.entry.next_control
     }
 
+    /// The exact scripted cursor that the common material installer must
+    /// commit with this staged state.  The adapter derives this from the
+    /// serialized next frontier but never mutates the runtime-owned cursor.
+    pub(crate) fn scripted_policy_after(&self) -> &ScriptedEnemyPolicyV1 {
+        &self.scripted_policy_after
+    }
+
     /// Publish only after the enclosing integration-owned transaction has
     /// compared every staged subsystem and validated cross-owner identity.
     pub(crate) fn publish_after_validation<V: EnclosingKernelValidation>(
@@ -214,6 +224,7 @@ impl AuthorityPreparedTransaction {
             material_wire: _,
             operation_id,
             kind,
+            scripted_policy_after,
             mut log,
             mut scheduler,
             prepared,
@@ -221,7 +232,7 @@ impl AuthorityPreparedTransaction {
         let commit = log
             .publish_prepared(prepared.token, &mut scheduler)
             .map_err(map_authority_log_error)?;
-        Ok(AuthorityPublishedTransaction {
+        let published = AuthorityPublishedTransaction {
             state,
             control,
             menu_allocators,
@@ -229,22 +240,40 @@ impl AuthorityPreparedTransaction {
             material,
             operation_id,
             kind,
+            scripted_policy_after,
             log,
             scheduler,
             commit,
-        })
+        };
+        validate_published_authority_stage(&published)?;
+        validator.validate_authority_publication(&published)?;
+        Ok(published)
     }
 }
 
 /// The only legal publication hook.  The integration-owned
 /// `KernelTransaction` implements this trait and must validate staged game,
 /// protocol, scheduler, input, UI, presentation barriers, and effects before
-/// this adapter can call `AuthorityLog::publish_prepared`.
+/// this adapter can call `AuthorityLog::publish_prepared`; its publication
+/// hook runs again on the cloned post-publication stage before any commit
+/// actions escape.
 pub(crate) trait EnclosingKernelValidation {
     fn validate_authority_stage(
         &self,
         staged: &AuthorityPreparedTransaction,
     ) -> Result<(), AuthorityTransactionError>;
+
+    /// Validate the cloned log/scheduler publication before the published
+    /// transaction—and therefore its commit/effect actions—can escape to the
+    /// enclosing transaction.  The adapter enforces its baseline publication
+    /// identity and peerless-local checks before calling this hook; the
+    /// default retains compatibility with the current integration owner.
+    fn validate_authority_publication(
+        &self,
+        _published: &AuthorityPublishedTransaction,
+    ) -> Result<(), AuthorityTransactionError> {
+        Ok(())
+    }
 }
 
 pub(crate) struct AuthorityPublishedTransaction {
@@ -255,9 +284,49 @@ pub(crate) struct AuthorityPublishedTransaction {
     pub(crate) material: PreparedMaterial,
     pub(crate) operation_id: OperationId,
     pub(crate) kind: AuthorityEntryKind,
+    pub(crate) scripted_policy_after: ScriptedEnemyPolicyV1,
     pub(crate) log: AuthorityLog,
     pub(crate) scheduler: KernelScheduler,
     pub(crate) commit: CommitOutcome,
+}
+
+fn validate_published_authority_stage(
+    published: &AuthorityPublishedTransaction,
+) -> Result<(), AuthorityTransactionError> {
+    if published.commit.entry.operation_id != published.operation_id
+        || published.commit.entry.kind != published.kind
+    {
+        return Err(AuthorityTransactionError::EnclosingValidation {
+            reason: "published commit identity diverged from the staged authority operation"
+                .to_owned(),
+        });
+    }
+    published
+        .scripted_policy_after
+        .validate()
+        .map_err(|source| {
+            AuthorityTransactionError::Admission(AuthorityCommandError::ScriptedPolicy(source))
+        })?;
+
+    // `AuthorityLog::new_local` intentionally has no remote delivery action.
+    // A local publication is nevertheless complete when the log reports its
+    // empty peer quorum as satisfied; do not manufacture a synthetic peer or
+    // reject a valid peerless commit merely because the action list has no
+    // Deliver entry.
+    let has_peer_delivery = published.commit.actions.iter().any(|action| {
+        matches!(action, er_protocol::AuthorityLogAction::Deliver { .. })
+    });
+    if !has_peer_delivery
+        && !published
+            .log
+            .peer_stage_quorum(&published.operation_id, er_types::AckStage::Admitted)
+    {
+        return Err(AuthorityTransactionError::EnclosingValidation {
+            reason: "authority publication has no peer delivery but its local quorum is not satisfied"
+                .to_owned(),
+        });
+    }
+    Ok(())
 }
 
 /// Prepare a complete authority TURN on the already-cloned transaction.
@@ -321,7 +390,7 @@ pub(crate) fn prepare_authority_turn(
     let completion = complete_command_frontier(&staged_state, content)?;
     let CommandFrontierCompletion::Complete {
         state: complete_state,
-        ..
+        commands: completed_commands,
     } = completion
     else {
         return Err(AuthorityTransactionError::ControlProjection {
@@ -330,12 +399,46 @@ pub(crate) fn prepare_authority_turn(
         });
     };
 
-    let battle = complete_state
+    // Keep the resolver's command evidence tied to the exact completed
+    // frontier.  The completion helper returns a canonical set, while the
+    // completed state carries the authoritative frontier and tombstones; both
+    // must agree before the candidate can become material.
+    completed_commands
+        .validate_canonical_order()
+        .map_err(AuthorityCommandError::Command)
+        .map_err(AuthorityTransactionError::Admission)?;
+    let completed_battle = complete_state
         .battle
         .as_ref()
         .ok_or_else(|| AuthorityTransactionError::ControlProjection {
-            reason: "TURN preparation has no active battle".to_owned(),
+            reason: "completed command frontier has no active battle".to_owned(),
         })?;
+    completed_battle
+        .command_state
+        .validate()
+        .map_err(AuthorityCommandError::Command)
+        .map_err(AuthorityTransactionError::Admission)?;
+    let completed_state_commands = completed_battle
+        .command_state
+        .admitted_command_set()
+        .map_err(AuthorityCommandError::Command)
+        .map_err(AuthorityTransactionError::Admission)?;
+    if completed_state_commands != completed_commands
+        || candidate.accepted_commands != completed_state_commands
+    {
+        return Err(AuthorityTransactionError::CandidateMismatch {
+            field: "accepted_commands",
+        });
+    }
+
+    // The full before-state equality below includes the canonical frontier
+    // and tombstones, not only the mechanical digest.
+    if candidate.before_state != complete_state {
+        return Err(AuthorityTransactionError::CandidateMismatch {
+            field: "before_state",
+        });
+    }
+    let battle = completed_battle;
     let operation_id = er_types::battle_command::turn_result_operation_id(
         battle.battle_id,
         battle.wave,
@@ -343,12 +446,7 @@ pub(crate) fn prepare_authority_turn(
     )
     .map_err(AuthorityCommandError::Command)
     .map_err(AuthorityTransactionError::Admission)?;
-    if candidate.before_state != complete_state {
-        return Err(AuthorityTransactionError::CandidateMismatch {
-            field: "before_state",
-        });
-    }
-    validate_prepared_projection(
+    let scripted_policy_after = validate_prepared_projection(
         &candidate.after_state,
         candidate.next_decision,
         &next_control,
@@ -418,6 +516,7 @@ pub(crate) fn prepare_authority_turn(
         material_wire,
         operation_id,
         kind: AuthorityEntryKind::TurnCommit,
+        scripted_policy_after,
         log,
         scheduler,
         prepared,
@@ -529,7 +628,7 @@ pub(crate) fn prepare_authority_replacement(
             field: "selection",
         });
     }
-    validate_prepared_projection(
+    let scripted_policy_after = validate_prepared_projection(
         &candidate.after_state,
         candidate.next_decision,
         &next_control,
@@ -599,6 +698,7 @@ pub(crate) fn prepare_authority_replacement(
         material_wire,
         operation_id,
         kind: AuthorityEntryKind::ReplacementCommit,
+        scripted_policy_after,
         log,
         scheduler,
         prepared,
@@ -650,14 +750,20 @@ fn admit_scripted_if_pending(
 /// material.  The candidate and control plan are a single GameRuntime-owned
 /// bundle: a command frontier decision is not accepted with an empty or
 /// un-actionable `after_state`, and protocol metadata is not part of this
-/// input.
+/// input.  The returned policy is the exact cursor-after for the serialized
+/// candidate frontier.
 fn validate_prepared_projection(
     after_state: &GameState,
     next_decision: BattleNextDecision,
     control_plan: &BattleControlPlan,
     policy_before: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
-) -> Result<(), AuthorityTransactionError> {
+) -> Result<ScriptedEnemyPolicyV1, AuthorityTransactionError> {
+    policy_before
+        .validate()
+        .map_err(|source| {
+            AuthorityTransactionError::Admission(AuthorityCommandError::ScriptedPolicy(source))
+        })?;
     control_plan
         .validate()
         .map_err(|source| AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source)))?;
@@ -692,8 +798,12 @@ fn validate_prepared_projection(
             validate_command_frontier_projection(battle, control_plan)?;
             // This is validation-only.  The common GameRuntime material
             // installer calls the same role-neutral projector and owns the
-            // policy cursor commit for both authority and replica.
-            project_scripted_policy_for_material(after_state, policy_before, content)?;
+            // policy cursor commit for both authority and replica.  Carrying
+            // this exact clone through the prepared transaction prevents the
+            // adapter from silently dropping the advancement while avoiding a
+            // second mutating admission path.
+            project_scripted_policy_for_material(after_state, policy_before, content)
+                .map_err(AuthorityTransactionError::Admission)
         }
         BattleNextDecision::Replacement { occurrence } => {
             let stored = battle
@@ -720,6 +830,7 @@ fn validate_prepared_projection(
             .map_err(AuthorityCommandError::Command)
             .map_err(AuthorityTransactionError::Admission)?;
             validate_internal_replacement_control(control_plan, stored, &operation_id)?;
+            Ok(policy_before.clone())
         }
         BattleNextDecision::Complete(outcome) => {
             if control_plan.seats.iter().any(|seat| {
@@ -730,9 +841,9 @@ fn validate_prepared_projection(
                     reason: "complete resolver candidate has a non-complete seat control".to_owned(),
                 });
             }
+            Ok(policy_before.clone())
         }
     }
-    Ok(())
 }
 
 fn validate_command_frontier_projection(

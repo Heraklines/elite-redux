@@ -1119,10 +1119,14 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     let publish = source
         .find(".publish_prepared(prepared.token")
         .ok_or("authority log publication seam missing")?;
+    let post_validate = source
+        .find("validator.validate_authority_publication(&published)?")
+        .ok_or("post-publication enclosing validation hook missing")?;
     assert!(prepared < codec);
     assert!(codec < apply);
     assert!(apply < prepare);
     assert!(validate < publish);
+    assert!(publish < post_validate);
     assert!(source.contains("PreparedAuthorityReplacement {"));
     assert!(source.contains("validate_control_allocator_projection(&next_control, &allocators)?"));
     assert!(source.contains("prepared_admission.allocator_before() != allocators.as_slice()"));
@@ -1132,6 +1136,16 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains("admit_command_proposal_with_context"));
     assert!(source.contains("admit_replacement_proposal_with_context"));
     assert!(source.contains("replacement_fingerprints.entries()"));
+    assert!(source.contains("ReplacementAdmissionResult::Duplicate { .. }"));
+    assert!(source.contains("expected read-only"));
+    assert!(!source.contains("return Err(AuthorityTransactionError::Duplicate"));
+    assert!(source.contains("commands: completed_commands"));
+    assert!(source.contains("candidate.accepted_commands != completed_state_commands"));
+    assert!(source.contains("frontier and tombstones"));
+    assert!(source.contains("scripted_policy_after"));
+    assert!(source.contains("validate_published_authority_stage(&published)?"));
+    assert!(source.contains("peer_stage_quorum"));
+    assert!(source.contains("AuthorityLogAction::Deliver"));
     assert!(source.contains("checked_add(1)"));
     assert!(source.contains("if required > allocator.next_menu_instance_id.get()"));
     assert!(!source.contains("resolve_turn("));
@@ -1146,14 +1160,14 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     let prepared_end = source
         .find("pub(crate) enum PreparedMaterial")
         .ok_or("prepared material type missing")?;
-    assert!(!source[prepared_start..prepared_end].contains("scripted_policy"));
+    assert!(source[prepared_start..prepared_end].contains("scripted_policy_after"));
     let published_start = source
         .find("pub(crate) struct AuthorityPublishedTransaction")
         .ok_or("published transaction type missing")?;
     let published_end = source
         .find("/// Prepare a complete authority TURN")
         .ok_or("authority preparation function missing")?;
-    assert!(!source[published_start..published_end].contains("scripted_policy"));
+    assert!(source[published_start..published_end].contains("scripted_policy_after"));
     assert!(source.contains("require_turn_equivalence(&candidate, &decoded, &applied)?"));
     assert!(source.contains("require_replacement_equivalence(&candidate, &decoded, &applied)?"));
     assert!(source.contains("stored.source.turn_occurrence"));
