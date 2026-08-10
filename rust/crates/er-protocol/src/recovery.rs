@@ -1053,7 +1053,12 @@ impl RecoveryTransaction {
                         scheduler,
                     ));
                 }
-                if let Some(reason) = self.staged_live_issue(&live, bundle.frontier) {
+                let exact_already_installed = self.captured_frontier == Some(bundle.frontier)
+                    && self.captured_state == Some(live.frontier)
+                    && self.installed_live_issue(&live, bundle.frontier).is_none();
+                if !exact_already_installed
+                    && let Some(reason) = self.staged_live_issue(&live, bundle.frontier)
+                {
                     return Ok(self.terminalize_with_actions(reason, scheduler));
                 }
                 revision

@@ -507,13 +507,16 @@ impl GameKernel {
             return Vec::new();
         }
 
-        if let Some(mut battle) = self.battle.take() {
+        if let Some(battle) = self.battle.as_mut() {
             let mut effects = battle.dispose(&mut self.scheduler, reason);
             for command in self.scheduler.dispose() {
                 if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
                     effects.push(KernelEffect::CancelTimer { endpoint, timer_id });
                 }
             }
+            // Retain the disposed Battle owner so a terminal/teardown V2
+            // snapshot can still reconstruct the exact mechanical endpoint.
+            // `disposed` remains the absorbing execution guard.
             self.disposed = true;
             self.live_resources = LiveResourceSnapshot::default();
             return effects;
@@ -3140,7 +3143,7 @@ pub(crate) fn tail_request_frame(
     )
 }
 
-fn recovery_request_frame(
+pub(crate) fn recovery_request_frame(
     context: &FrameContext,
     request: RecoveryRequestBody,
 ) -> Result<NetworkFrame, String> {
@@ -3151,7 +3154,7 @@ fn recovery_request_frame(
     )
 }
 
-fn recovery_bundle_frame(
+pub(crate) fn recovery_bundle_frame(
     context: &FrameContext,
     request_id: String,
     membership_revision: er_types::MembershipRevision,
@@ -3184,14 +3187,14 @@ fn recovery_bundle_frame(
     )
 }
 
-fn recovery_material_digest(slice: &AuthorityRecoverySlice) -> String {
+pub(crate) fn recovery_material_digest(slice: &AuthorityRecoverySlice) -> String {
     match slice.required_tail.last() {
         Some(entry) => entry.material.digest.clone(),
         None => "recovery-empty".to_owned(),
     }
 }
 
-fn recovery_applied_frame(
+pub(crate) fn recovery_applied_frame(
     context: &FrameContext,
     proof: RecoveryAppliedProof,
 ) -> Result<NetworkFrame, String> {

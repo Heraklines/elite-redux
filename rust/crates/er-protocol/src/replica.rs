@@ -202,6 +202,18 @@ impl EntryIdentity {
             && self.operation_id == terminal.operation_id
             && self.next_control == terminal.next_control
     }
+
+    fn to_entry(&self) -> AuthorityEntry {
+        AuthorityEntry {
+            context: self.context.clone(),
+            revision: self.revision,
+            operation_id: self.operation_id.clone(),
+            kind: self.kind,
+            material: self.material.clone(),
+            next_control: self.next_control.clone(),
+            subsumes: self.subsumes.clone(),
+        }
+    }
 }
 
 impl InstalledControl {
@@ -390,6 +402,32 @@ impl AuthorityReplica {
         outcome: ControlProjectionOutcome,
     ) -> Result<Vec<ReplicaAction>, AuthorityReplicaError> {
         self.ensure_live()?;
+        if let ControlProjectionOutcome::AlreadyInstalled { control_id } = &outcome
+            && self.pending.is_none()
+        {
+            let installed = self
+                .installed_controls
+                .get(&revision)
+                .ok_or(AuthorityReplicaError::WrongPendingRevision { revision })?;
+            if installed.control_id != *control_id
+                || !self.identity_matches_current_context(&installed.identity)
+                || self.frontier
+                    != (AuthorityFrontier {
+                        received: revision,
+                        material: revision,
+                        control: revision,
+                    })
+            {
+                return Err(invalid_recovery(
+                    "already-installed recovery control proof is not the exact live frontier",
+                ));
+            }
+            let entry = installed.identity.to_entry();
+            return Ok(vec![
+                self.receipt_action(&entry, AckStage::ControlInstalled, Some(control_id.clone())),
+                ReplicaAction::ProbePresentation { entry },
+            ]);
+        }
         let pending = self.pending_for_revision(revision)?;
         match outcome {
             ControlProjectionOutcome::Installed { control_id }
@@ -596,6 +634,24 @@ impl AuthorityReplica {
                 "recovered entry revision must be positive",
             ));
         }
+        let entry_identity = EntryIdentity::from_entry(&entry);
+        if self.frontier
+            == (AuthorityFrontier {
+                received: entry.revision,
+                material: entry.revision,
+                control: entry.revision,
+            })
+            && self.pending.is_none()
+            && self.installed_controls.get(&entry.revision).is_some_and(|installed| {
+                installed.identity == entry_identity
+                    && installed.control_id == control_id_of(&entry.next_control)
+            })
+        {
+            return Ok(vec![ReplicaAction::ProjectControl {
+                entry: entry.clone(),
+                expected_control_id: control_id_of(&entry.next_control),
+            }]);
+        }
         if let Some(pending) = self.pending.as_ref() {
             if !same_entry_identity(&pending.entry, &entry)
                 || pending.stage != PendingStage::MaterialApplied
@@ -612,7 +668,6 @@ impl AuthorityReplica {
                 "recovered entry has no predecessor revision",
             ));
         };
-        let entry_identity = EntryIdentity::from_entry(&entry);
         if let Some(proof) = self.recovery_proof.as_ref() {
             if proof.identity != entry_identity
                 || !self.identity_matches_current_context(&proof.identity)

@@ -267,6 +267,18 @@ impl BattleUiAdapter {
         Ok(routed)
     }
 
+    pub(crate) fn clear_input(
+        &mut self,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleUiOutput, BattleUiAdapterError> {
+        self.ensure_live()?;
+        let routed = self.input.clear(scheduler);
+        Ok(BattleUiOutput {
+            timers: routed.timers,
+            ..BattleUiOutput::default()
+        })
+    }
+
     pub(crate) fn dispose(&mut self, scheduler: &mut KernelScheduler) -> BattleUiOutput {
         if self.disposed {
             return BattleUiOutput::default();

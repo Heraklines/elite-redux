@@ -1006,7 +1006,7 @@ fn collect_control_menu_instances(
     Ok(())
 }
 
-fn protocol_next_control_from_plan(
+pub(crate) fn protocol_next_control_from_plan(
     next_decision: BattleNextDecision,
     control_plan: &BattleControlPlan,
     authority_epoch: AuthorityEpoch,
