@@ -10,6 +10,7 @@ mod battle_ui;
 use std::error::Error;
 
 use battle_ui::BattleUiAdapter;
+use input_router::BattleButtonEvent;
 use er_protocol::KernelScheduler;
 use er_types::battle_control::{
     BattleControl, CommandRootControl, MoveSelectControl, SeatBattleControl,
@@ -361,6 +362,80 @@ fn battle_raw_repeat_duplicate_keyup_blur_and_stale_timer_are_deterministic() ->
     )?;
     assert!(stale_release.intents.is_empty());
     assert_eq!(adapter.input().held_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn battle_input_route_and_one_button_reduction_are_separate_stages() -> TestResult {
+    let projection = command_projection(
+        1,
+        "command/fight",
+        true,
+        vec![MenuNavigationEdge::new(
+            MenuOptionId::new("command/fight")?,
+            NavigationDirection::Down,
+            MenuOptionId::new("command/switch")?,
+        )],
+    )?;
+    let mut adapter = BattleUiAdapter::new(seat(1), projection.clone(), battle_input_map())?;
+    let mut scheduler = KernelScheduler::new();
+
+    let routed = adapter.route_raw_input(
+        seat(1),
+        key_down(PhysicalKey::ArrowDown),
+        &mut scheduler,
+    )?;
+    assert_eq!(routed.events.len(), 1);
+    assert_eq!(routed.timers.len(), 1);
+    assert_eq!(adapter.projection(), &projection);
+    let captured = routed.events[0];
+    assert_eq!(
+        captured,
+        BattleButtonEvent::Pressed {
+            seat: seat(1),
+            button: GameButton::Down,
+            menu_instance_id: MenuInstanceId::new(safe(1)),
+        }
+    );
+
+    let reduction = adapter.reduce_one_button(captured)?;
+    assert!(reduction.changed);
+    assert!(reduction.intents.is_empty());
+    assert_ne!(adapter.projection(), &projection);
+
+    let repeated = adapter.route_timer_fired(
+        seat(1),
+        er_types::TimerId::new(safe(0)),
+        &mut scheduler,
+    )?;
+    assert_eq!(repeated.events.len(), 1);
+    assert_eq!(repeated.timers.len(), 1);
+    assert_eq!(
+        adapter.reduce_one_button(repeated.events[0])?,
+        ui_reducer::BattleUiReduction {
+            changed: false,
+            intents: Vec::new(),
+        }
+    );
+
+    assert_eq!(
+        adapter.reduce_one_button(BattleButtonEvent::Released {
+            seat: seat(1),
+            button: GameButton::Down,
+            menu_instance_id: MenuInstanceId::new(safe(1)),
+        }),
+        Err(BattleUiReject::UnsupportedButton)
+    );
+    let released = adapter.route_raw_input(
+        seat(1),
+        RawInputEvent::KeyUp {
+            code: PhysicalKey::ArrowDown,
+        },
+        &mut scheduler,
+    )?;
+    assert_eq!(released.events.len(), 1);
+    assert_eq!(released.timers.len(), 1);
+    assert!(scheduler.live_timers().is_empty());
     Ok(())
 }
 

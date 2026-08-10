@@ -102,44 +102,61 @@ impl BattleUiAdapter {
         Ok(())
     }
 
+    /// Capture one raw input event as menu-instance-bound button work.
+    ///
+    /// This is the routing half of the battle UI boundary. It deliberately
+    /// stops at [`BattleInputOutput`]; the captured button events are consumed
+    /// by a later FIFO `Button`/`Ui` step through [`Self::reduce_one_button`].
+    /// The ownership and actionability gate stays before physical input state
+    /// changes so rejected presses cannot arm a held key or repeat timer.
+    pub(crate) fn route_raw_input(
+        &mut self,
+        seat: SeatId,
+        event: RawInputEvent,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleUiAdapterError> {
+        self.ensure_live()?;
+        self.validate_raw_input(seat, &event)?;
+        self.route_raw_input_unchecked(seat, event, scheduler)
+    }
+
     pub(crate) fn handle_raw_input(
         &mut self,
         seat: SeatId,
         event: RawInputEvent,
         scheduler: &mut KernelScheduler,
     ) -> Result<BattleUiOutput, BattleUiAdapterError> {
-        self.ensure_live()?;
-        if seat != self.local_seat {
-            return Ok(BattleUiOutput {
-                rejection: Some(BattleUiReject::WrongSeat),
-                ..BattleUiOutput::default()
-            });
-        }
-
-        let is_press = matches!(
-            &event,
-            RawInputEvent::KeyDown { .. } | RawInputEvent::GamepadDown { .. }
-        );
-        let menu_instance_id = self.reducer.current_menu_instance_id();
-        if is_press {
-            if self.reducer.owner_seat() != Some(seat) {
+        let routed = match self.route_raw_input(seat, event, scheduler) {
+            Ok(routed) => routed,
+            Err(BattleUiAdapterError::Ui(rejection)) => {
                 return Ok(BattleUiOutput {
-                    rejection: Some(BattleUiReject::NonActionable),
+                    rejection: Some(rejection),
                     ..BattleUiOutput::default()
                 });
             }
-            if !self.reducer.is_actionable() {
-                return Ok(BattleUiOutput {
-                    rejection: Some(BattleUiReject::NonActionable),
-                    ..BattleUiOutput::default()
-                });
-            }
-        }
-        let menu_instance_id = menu_instance_id.unwrap_or(MenuInstanceId::ZERO);
-        let routed = self
-            .input
-            .handle(seat, menu_instance_id, event, scheduler)?;
+            Err(error) => return Err(error),
+        };
         Ok(self.consume_routed(routed, scheduler))
+    }
+
+    /// Capture one owned repeat timer as menu-instance-bound button work.
+    ///
+    /// Timer routing intentionally does not reject the current menu before
+    /// producing its captured event: the held key belongs to the menu that
+    /// armed it, and the later UI reduction must make the exact stale-instance
+    /// or actionability decision. Any route failure still discards the old
+    /// timer registration and clears its held-key link deterministically.
+    pub(crate) fn route_timer_fired(
+        &mut self,
+        endpoint: SeatId,
+        timer_id: TimerId,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleUiAdapterError> {
+        self.ensure_live()?;
+        if endpoint != self.local_seat {
+            return Err(BattleUiAdapterError::Ui(BattleUiReject::WrongSeat));
+        }
+        self.route_timer_fired_unchecked(endpoint, timer_id, scheduler)
     }
 
     pub(crate) fn timer_fired(
@@ -148,13 +165,89 @@ impl BattleUiAdapter {
         timer_id: TimerId,
         scheduler: &mut KernelScheduler,
     ) -> Result<BattleUiOutput, BattleUiAdapterError> {
-        self.ensure_live()?;
-        if endpoint != self.local_seat {
-            return Ok(BattleUiOutput {
-                rejection: Some(BattleUiReject::WrongSeat),
-                ..BattleUiOutput::default()
-            });
+        let routed = match self.route_timer_fired(endpoint, timer_id, scheduler) {
+            Ok(routed) => routed,
+            Err(BattleUiAdapterError::Ui(rejection)) => {
+                return Ok(BattleUiOutput {
+                    rejection: Some(rejection),
+                    ..BattleUiOutput::default()
+                });
+            }
+            Err(error) => return Err(error),
+        };
+        Ok(self.consume_routed(routed, scheduler))
+    }
+
+    /// Reduce exactly one button event captured by the input router.
+    ///
+    /// This method owns only the `Button -> Ui` boundary. It never creates a
+    /// game intent, queues protocol work, or invokes a downstream reducer.
+    /// Release events are passed through to the UI reducer so they retain its
+    /// exact `UnsupportedButton` rejection; compatibility wrappers skip them
+    /// because key-up remains input cleanup rather than a UI action.
+    pub(crate) fn reduce_one_button(
+        &mut self,
+        event: BattleButtonEvent,
+    ) -> Result<BattleUiReduction, BattleUiReject> {
+        match event {
+            BattleButtonEvent::Pressed {
+                seat,
+                button,
+                menu_instance_id,
+            } => self
+                .reducer
+                .reduce_at(seat, menu_instance_id, ButtonEvent::Pressed(button)),
+            BattleButtonEvent::Released {
+                seat,
+                button,
+                menu_instance_id,
+            } => self
+                .reducer
+                .reduce_at(seat, menu_instance_id, ButtonEvent::Released(button)),
         }
+    }
+
+    fn validate_raw_input(
+        &self,
+        seat: SeatId,
+        event: &RawInputEvent,
+    ) -> Result<(), BattleUiAdapterError> {
+        if seat != self.local_seat {
+            return Err(BattleUiAdapterError::Ui(BattleUiReject::WrongSeat));
+        }
+        let is_press = matches!(
+            event,
+            RawInputEvent::KeyDown { .. } | RawInputEvent::GamepadDown { .. }
+        );
+        if is_press
+            && (self.reducer.owner_seat() != Some(seat) || !self.reducer.is_actionable())
+        {
+            return Err(BattleUiAdapterError::Ui(BattleUiReject::NonActionable));
+        }
+        Ok(())
+    }
+
+    fn route_raw_input_unchecked(
+        &mut self,
+        seat: SeatId,
+        event: RawInputEvent,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleUiAdapterError> {
+        let menu_instance_id = self
+            .reducer
+            .current_menu_instance_id()
+            .unwrap_or(MenuInstanceId::ZERO);
+        Ok(self
+            .input
+            .handle(seat, menu_instance_id, event, scheduler)?)
+    }
+
+    fn route_timer_fired_unchecked(
+        &mut self,
+        endpoint: SeatId,
+        timer_id: TimerId,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<BattleInputOutput, BattleUiAdapterError> {
         let Some(scheduled) = scheduler.timer(timer_id).cloned() else {
             return Err(InputRouteError::UnknownTimer { timer_id }.into());
         };
@@ -171,7 +264,7 @@ impl BattleUiAdapter {
                 return Err(error.into());
             }
         };
-        Ok(self.consume_routed(routed, scheduler))
+        Ok(routed)
     }
 
     pub(crate) fn dispose(&mut self, scheduler: &mut KernelScheduler) -> BattleUiOutput {
@@ -210,17 +303,10 @@ impl BattleUiAdapter {
         };
 
         for event in routed.events {
-            let BattleButtonEvent::Pressed {
-                seat,
-                button,
-                menu_instance_id,
-            } = event
-            else {
+            let BattleButtonEvent::Pressed { .. } = event else {
                 continue;
             };
-            let reduction = self
-                .reducer
-                .reduce_at(seat, menu_instance_id, ButtonEvent::Pressed(button));
+            let reduction = self.reduce_one_button(event);
             match reduction {
                 Ok(BattleUiReduction { changed, intents }) => {
                     output.projection_changed |= changed;
