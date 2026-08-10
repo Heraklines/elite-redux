@@ -1,5 +1,6 @@
 //! Wasm JSON boundary for native/schema/trace parity tests.
 
+pub mod m3_parity;
 pub mod m3_schema;
 
 use er_canonical::{canonicalize, canonicalize_value, fixture_digest};
