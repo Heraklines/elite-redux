@@ -13,15 +13,15 @@ use er_types::{AuthorityEntryKind, Material};
 use thiserror::Error;
 
 /// Shared terminal reason for a material content identity failure.
-pub const M3_CONTENT_HASH_MISMATCH: &str = "M3_CONTENT_HASH_MISMATCH";
+pub(crate) const M3_CONTENT_HASH_MISMATCH: &str = "M3_CONTENT_HASH_MISMATCH";
 /// Shared terminal reason for a malformed material envelope or identity.
-pub const M3_MALFORMED_BATTLE_MATERIAL: &str = "M3_MALFORMED_BATTLE_MATERIAL";
+pub(crate) const M3_MALFORMED_BATTLE_MATERIAL: &str = "M3_MALFORMED_BATTLE_MATERIAL";
 /// Shared terminal reason for invalid authenticated authority material.
-pub const M3_INVALID_AUTHORITY_MATERIAL: &str = "M3_INVALID_AUTHORITY_MATERIAL";
+pub(crate) const M3_INVALID_AUTHORITY_MATERIAL: &str = "M3_INVALID_AUTHORITY_MATERIAL";
 
 /// The narrow protocol-violation classes exposed by material application.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
-pub enum ProtocolViolation {
+pub(crate) enum ProtocolViolation {
     #[error("material content hash does not match the local immutable content pack")]
     ContentHashMismatch,
     #[error("material is malformed or has an unsupported identity/schema")]
@@ -39,7 +39,7 @@ impl ProtocolViolation {
 
 /// Exact replica-side recoverability/terminal classes for material apply.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
-pub enum ReplicaApplyError {
+pub(crate) enum ReplicaApplyError {
     #[error("endpoint-local state or allocator frontier does not match material")]
     BeforeDigestMismatch,
     #[error("material protocol violation: {0}")]
@@ -65,7 +65,7 @@ impl ReplicaApplyError {
 }
 
 /// Apply a canonical TURN payload received from the Authority.
-pub fn apply_turn_material_bytes(
+fn apply_turn_material_bytes(
     current: &BattleMaterialApplyContext,
     bytes: &[u8],
     content: &ContentPack,
@@ -76,7 +76,7 @@ pub fn apply_turn_material_bytes(
 }
 
 /// Apply a canonical REPLACEMENT payload received from the Authority.
-pub fn apply_replacement_material_bytes(
+fn apply_replacement_material_bytes(
     current: &BattleMaterialApplyContext,
     bytes: &[u8],
     content: &ContentPack,
@@ -87,7 +87,7 @@ pub fn apply_replacement_material_bytes(
 }
 
 /// Apply a complete Authority material envelope, checking its declared kind.
-pub fn apply_authority_material(
+pub(crate) fn apply_authority_material(
     current: &BattleMaterialApplyContext,
     kind: AuthorityEntryKind,
     material: &Material,
@@ -137,7 +137,7 @@ pub fn apply_authority_material(
 }
 
 /// Map the common applier's closed error set without broadening recovery.
-pub const fn map_material_apply_error(
+pub(crate) const fn map_material_apply_error(
     error: BattleMaterialApplyError,
 ) -> ReplicaApplyError {
     match error {

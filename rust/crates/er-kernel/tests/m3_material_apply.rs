@@ -1,8 +1,11 @@
+#[path = "../src/battle_replica.rs"]
+mod battle_replica;
+
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, ContentPack,
     apply_turn_material, decode_replacement_material, decode_turn_material,
 };
-use er_kernel::battle_replica::{
+use battle_replica::{
     M3_CONTENT_HASH_MISMATCH, M3_INVALID_AUTHORITY_MATERIAL, M3_MALFORMED_BATTLE_MATERIAL,
     ProtocolViolation, ReplicaApplyError, map_material_apply_error,
 };
