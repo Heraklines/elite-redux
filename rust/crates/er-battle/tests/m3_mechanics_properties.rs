@@ -12,7 +12,7 @@ use er_battle::status::{
     StatusResidualInput, StatusResidualOutcome, apply_status, powder_immunity, resolve_residual,
 };
 use er_battle::type_effectiveness::{
-    EffectivenessClass, EffectivenessMultiplier, compose_type_multipliers,
+    EffectivenessClass, EffectivenessMultiplier, TypeEffectiveness, compose_type_multipliers,
     resolve_type_effectiveness,
 };
 use er_content::pack::selected_type_chart;
@@ -491,7 +491,7 @@ fn type_effectiveness_composition_and_chart_resolution_are_exhaustive() -> Resul
             !multiplier.is_super_effective()
         );
         assert_eq!(
-            multiplier.allows_follow_up_resolution(),
+            TypeEffectiveness::new(multiplier).allows_follow_up_resolution(),
             !multiplier.is_immune()
         );
     }

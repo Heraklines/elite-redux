@@ -49,7 +49,7 @@ pub enum PresentationCausalEvent {
         pokemon: PokemonId,
         ability_id: AbilityId,
     },
-    Mutation(BattleMutation),
+    Mutation(Box<BattleMutation>),
 }
 
 impl PresentationCausalEvent {
@@ -74,8 +74,8 @@ impl PresentationCausalEvent {
         }
     }
 
-    pub const fn mutation(mutation: BattleMutation) -> Self {
-        Self::Mutation(mutation)
+    pub fn mutation(mutation: BattleMutation) -> Self {
+        Self::Mutation(Box::new(mutation))
     }
 }
 
@@ -343,8 +343,10 @@ fn terminal_outcome(
     }
 
     causal_events.iter().rev().find_map(|event| {
-        let PresentationCausalEvent::Mutation(BattleMutation::OutcomeChanged { after, .. }) = event
-        else {
+        let PresentationCausalEvent::Mutation(mutation) = event else {
+            return None;
+        };
+        let BattleMutation::OutcomeChanged { after, .. } = mutation.as_ref() else {
             return None;
         };
         (*after != BattleOutcome::Ongoing).then_some(*after)
