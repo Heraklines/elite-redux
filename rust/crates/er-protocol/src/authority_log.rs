@@ -927,6 +927,7 @@ impl AuthorityLog {
         self.retained.clear();
         self.prepared.clear();
         self.latest_committed = None;
+        self.head_revision = Revision::ZERO;
         self.retired_operation_stages.clear();
         self.retired_operation_order.clear();
         actions

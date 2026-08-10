@@ -251,6 +251,7 @@ pub struct FaultNetwork {
     duplicated_count: SafeU53,
     corrupted_count: SafeU53,
     disposed: bool,
+    last_observed_now_ms: SafeU53,
 }
 
 impl FaultNetwork {
@@ -411,10 +412,11 @@ impl FaultNetwork {
             return Err(FaultNetworkError::Disconnected { endpoint: to });
         }
 
+        let effective_now_ms = now_ms.max(self.last_observed_now_ms);
         let source_generation = self.connection_generation(from);
         let destination_generation = self.connection_generation(to);
         let (kind, payload_corrupted) = classify_payload(&payload);
-        let (deliver_at_ms, next_rng) = self.next_delivery_time(now_ms)?;
+        let (deliver_at_ms, next_rng) = self.next_delivery_time(effective_now_ms)?;
         let (packet_id, queue_order_id, next_packet_id, next_queue_order_id) =
             self.peek_packet_and_queue_ids()?;
         self.queue.push(QueuedPacket {
@@ -427,7 +429,7 @@ impl FaultNetwork {
                 deliver_at_ms,
                 },
             queue_order_id,
-            enqueued_at_ms: now_ms,
+            enqueued_at_ms: effective_now_ms,
             source_generation,
             destination_generation,
             // Retain an explicitly stale send for deterministic drop/reap behavior, but never
@@ -436,7 +438,7 @@ impl FaultNetwork {
                 || connection_generation != destination_generation,
             kind,
             payload_corrupted,
-            disposition: if deliver_at_ms <= now_ms {
+            disposition: if deliver_at_ms <= effective_now_ms {
                 FaultNetworkPacketDisposition::Ready
             } else {
                 FaultNetworkPacketDisposition::Queued
@@ -445,7 +447,7 @@ impl FaultNetwork {
         self.rng = next_rng;
         self.next_packet_id = next_packet_id;
         self.next_queue_order_id = next_queue_order_id;
-        self.observe_now(now_ms);
+        self.observe_now(effective_now_ms);
         Ok(packet_id)
     }
 
@@ -494,6 +496,7 @@ impl FaultNetwork {
     pub fn deliver_due(&mut self, now_ms: SafeU53) -> Result<Vec<NetworkEvent>, FaultNetworkError> {
         self.ensure_live()?;
         self.observe_now(now_ms);
+        let now_ms = self.last_observed_now_ms;
         let mut events = self.reap_stale_packets();
         while let Some(index) = self.next_reordered_due_index(now_ms) {
             let packet_id = self.queue[index].packet.packet_id;
@@ -877,13 +880,19 @@ impl FaultNetwork {
         corruption: FrameCorruption,
     ) -> Result<(), FaultNetworkError> {
         let index = self.packet_index(packet_id)?;
-        let payload = &mut self.queue[index].packet.payload;
-        let NetworkPayload::Frame(raw) = payload else {
-            return Err(FaultNetworkError::PayloadIsNotFrame { packet_id });
-        };
-        corrupt_raw_frame(raw, corruption)
-            .map_err(|reason| FaultNetworkError::InvalidFault { reason })?;
-        self.queue[index].payload_corrupted = true;
+        {
+            let payload = &mut self.queue[index].packet.payload;
+            let NetworkPayload::Frame(raw) = payload else {
+                return Err(FaultNetworkError::PayloadIsNotFrame { packet_id });
+            };
+            corrupt_raw_frame(raw, corruption)
+                .map_err(|reason| FaultNetworkError::InvalidFault { reason })?;
+        }
+        let expected_kind = self.queue[index].kind;
+        self.queue[index].payload_corrupted = classify_payload_strict(
+            &self.queue[index].packet.payload,
+        )
+        .map_or(true, |actual_kind| actual_kind != expected_kind);
         increment_diagnostic_counter(&mut self.corrupted_count);
         Ok(())
     }
@@ -1046,17 +1055,14 @@ impl FaultNetworkState {
                     reason: format!("packet {packet_id} has an inconsistent kind family"),
                 });
             }
-            if !queued.payload_corrupted {
-                let parsed_kind = classify_payload_strict(&queued.packet.payload).map_err(|reason| {
-                    FaultNetworkError::InvalidState {
-                        reason: format!("packet {packet_id} has an unparseable body: {reason}"),
-                    }
-                })?;
-                if parsed_kind != queued.kind {
-                    return Err(FaultNetworkError::InvalidState {
-                        reason: format!("packet {packet_id} kind does not match its body"),
-                    });
-                }
+            let expected_payload_corrupted = classify_payload_strict(&queued.packet.payload)
+                .map_or(true, |parsed_kind| parsed_kind != queued.kind);
+            if queued.payload_corrupted != expected_payload_corrupted {
+                return Err(FaultNetworkError::InvalidState {
+                    reason: format!(
+                        "packet {packet_id} has an inconsistent payload-corruption marker"
+                    ),
+                });
             }
             let due = queued.packet.deliver_at_ms <= self.observed_now_ms;
             if due != (queued.disposition == FaultNetworkPacketDisposition::Ready) {

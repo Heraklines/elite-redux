@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
-use er_canonical::content_digest;
+use er_canonical::{canonical_bytes, content_digest};
 use er_content::pack::ContentPack;
 use er_kernel::snapshot::{
     restore_game_kernel, snapshot_game_kernel, GameKernelSnapshotBridge, KernelDeterminismDigest,
@@ -25,10 +25,12 @@ use er_types::battle_ui::{
     BattlePresentationEvent, PresentationSettlementOutcome,
 };
 use er_types::{
-    ConnectionGeneration, InputFocus, PhysicalKey, RawInputEvent, SafeU53, SeatId, TerminalState,
-    TimeClass, TimerId, TransportState,
+    ConnectionGeneration, InputFocus, PhysicalKey, RawFrame, RawInputEvent, SafeU53, SeatId,
+    TerminalState, TimeClass, TimerId, TransportState,
 };
-use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
+use serde::{
+    Deserialize, Deserializer, Serialize, de::DeserializeOwned, de::Error as _,
+};
 use thiserror::Error;
 
 use crate::PairEndpoint;
@@ -2507,28 +2509,9 @@ fn validate_fault_operation(
         | FaultOperationV2::DeliverNext
         | FaultOperationV2::Drop { .. }
         | FaultOperationV2::Duplicate { .. } => {}
-        FaultOperationV2::Corrupt { corruption, .. } => match corruption {
-            FrameCorruptionV2::Replace { body }
-            | FrameCorruptionV2::MalformedJson { body } => {
-                validate_bytes(body, &format!("{path}.corruption.body"))?;
-            }
-            FrameCorruptionV2::DeleteField { json_pointer }
-            | FrameCorruptionV2::ReplaceField { json_pointer, .. }
-                if !json_pointer.starts_with('/') =>
-            {
-                return Err(invalid(
-                    format!("{path}.corruption.json_pointer"),
-                    "must be a non-root JSON pointer beginning with '/'",
-                ));
-            }
-            FrameCorruptionV2::ReplaceField {
-                canonical_value, ..
-            } => validate_bytes(
-                canonical_value,
-                &format!("{path}.corruption.canonical_value"),
-            )?,
-            _ => {}
-        },
+        FaultOperationV2::Corrupt { corruption, .. } => {
+            validate_fault_corruption(corruption, &format!("{path}.corruption"))?;
+        }
     }
     Ok(())
 }
@@ -2904,6 +2887,86 @@ fn validate_bytes(bytes: &CanonicalHexBytes, path: &str) -> Result<(), SnapshotE
     Ok(())
 }
 
+fn validate_fault_corruption(
+    corruption: &FrameCorruptionV2,
+    path: &str,
+) -> Result<(), SnapshotError> {
+    match corruption {
+        FrameCorruptionV2::Replace { body } => {
+            validate_canonical_json::<RawFrame>(body, &format!("{path}.body"))?;
+        }
+        FrameCorruptionV2::MalformedJson { body } => {
+            validate_bytes(body, &format!("{path}.body"))?;
+        }
+        FrameCorruptionV2::DeleteField { json_pointer } => {
+            validate_json_pointer(json_pointer, &format!("{path}.json_pointer"))?;
+        }
+        FrameCorruptionV2::ReplaceField {
+            json_pointer,
+            canonical_value,
+        } => {
+            validate_json_pointer(json_pointer, &format!("{path}.json_pointer"))?;
+            validate_canonical_json::<serde_json::Value>(
+                canonical_value,
+                &format!("{path}.canonical_value"),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_json_pointer(pointer: &str, path: &str) -> Result<(), SnapshotError> {
+    if !pointer.starts_with('/') {
+        return Err(invalid(
+            path,
+            "must be a non-root JSON pointer beginning with '/'",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_canonical_json<T>(
+    value: &CanonicalHexBytes,
+    path: &str,
+) -> Result<(), SnapshotError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    validate_bytes(value, path)?;
+    let encoded = value.as_str().as_bytes();
+    let mut bytes = Vec::with_capacity(encoded.len() / 2);
+    for pair in encoded.chunks_exact(2) {
+        let high = canonical_hex_value(pair[0])
+            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
+        let low = canonical_hex_value(pair[1])
+            .ok_or_else(|| invalid(path, "canonical payload contains invalid hexadecimal"))?;
+        bytes.push((high << 4) | low);
+    }
+    let decoded = serde_json::from_slice::<T>(&bytes).map_err(|error| SnapshotError::Canonical {
+        path: path.to_owned(),
+        reason: error.to_string(),
+    })?;
+    let recanonical = canonical_bytes(&decoded).map_err(|error| SnapshotError::Canonical {
+        path: path.to_owned(),
+        reason: error.to_string(),
+    })?;
+    if recanonical != bytes {
+        return Err(SnapshotError::Canonical {
+            path: path.to_owned(),
+            reason: "payload is not the exact canonical JSON encoding".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn canonical_hex_value(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
 fn validate_live_resources(resources: &LiveResourceSnapshot) -> Result<(), SnapshotError> {
     validate_kernel_live_resources(resources)
         .map_err(|error| invalid("live_resources", error.to_string()))
@@ -2980,10 +3043,19 @@ fn validate_presenter_endpoint(
             ));
         }
     }
+    let outcomes = presenter
+        .outcomes
+        .iter()
+        .filter(|entry| entry.endpoint == pair_endpoint)
+        .collect::<Vec<_>>();
+    if outcomes.len() != endpoint.pending_presentations.outcomes.len() {
+        return Err(invalid(
+            path,
+            "presenter and endpoint have different settled outcome counts",
+        ));
+    }
     for outcome in &endpoint.pending_presentations.outcomes {
-        if !presenter.outcomes.iter().any(|entry| {
-            entry.endpoint == pair_endpoint && &entry.outcome == outcome
-        }) {
+        if !outcomes.iter().any(|entry| &entry.outcome == outcome) {
             return Err(invalid(
                 path,
                 "presenter is missing an endpoint presentation outcome",
@@ -3271,25 +3343,7 @@ impl FaultScriptSnapshotV2 {
                 strictly_sorted(&sorted, "fault_script.reorder.packet_ids")?;
             }
             if let FaultOperationV2::Corrupt { corruption, .. } = operation {
-                match corruption {
-                    FrameCorruptionV2::Replace { body }
-                    | FrameCorruptionV2::MalformedJson { body } => {
-                        validate_bytes(body, "fault_script.corruption.body")?;
-                    }
-                    FrameCorruptionV2::DeleteField { json_pointer }
-                    | FrameCorruptionV2::ReplaceField { json_pointer, .. }
-                        if !json_pointer.starts_with('/') =>
-                    {
-                        return Err(invalid(
-                            "fault_script.corruption.json_pointer",
-                            "must be a non-root JSON pointer beginning with '/'",
-                        ));
-                    }
-                    FrameCorruptionV2::ReplaceField {
-                        canonical_value, ..
-                    } => validate_bytes(canonical_value, "fault_script.corruption.canonical_value")?,
-                    _ => {}
-                }
+                validate_fault_corruption(corruption, "fault_script.corruption")?;
             }
         }
         Ok(())
@@ -3298,13 +3352,13 @@ impl FaultScriptSnapshotV2 {
 
 impl FaultRngStateV2 {
     pub fn validate(&self) -> Result<(), SnapshotError> {
-        if self.algorithm_version == 0
-            || self.state_bits.is_empty()
+        if self.algorithm_version != crate::network::FAULT_NETWORK_RNG_ALGORITHM_VERSION
+            || self.state_bits.len() != 32
             || !self.state_bits.bytes().all(|bit| matches!(bit, b'0' | b'1'))
         {
             return Err(invalid(
                 "fault_rng_state",
-                "algorithm version and an exact binary state-bit string are required",
+                "the pinned algorithm version and exactly 32 binary state bits are required",
             ));
         }
         Ok(())
@@ -3383,12 +3437,123 @@ impl RestorablePairSnapshotV2 {
         validate_driver_endpoint(&self.guest_driver, &self.guest, "guest_driver")?;
         self.clock.validate()?;
         self.network.validate()?;
+        let host_seat = self.host.runtime_identity.local_seat;
+        let guest_seat = self.guest.runtime_identity.local_seat;
+        let host_link = self
+            .network
+            .links
+            .iter()
+            .find(|link| link.endpoint == PairEndpoint::Host)
+            .ok_or_else(|| invalid("network.links", "host link is absent"))?;
+        let guest_link = self
+            .network
+            .links
+            .iter()
+            .find(|link| link.endpoint == PairEndpoint::Guest)
+            .ok_or_else(|| invalid("network.links", "guest link is absent"))?;
+        if host_link.generation != guest_link.generation {
+            return Err(invalid(
+                "network.links.generation",
+                "the shared pair transport must use one generation at both endpoints",
+            ));
+        }
+        if self.host.protocol.frame_context.context.connection_generation
+            != host_link.generation
+            || self.guest.protocol.frame_context.context.connection_generation
+                != guest_link.generation
+        {
+            return Err(invalid(
+                "network.links.generation",
+                "network link generations must equal each endpoint's local protocol generation",
+            ));
+        }
+        let host_peer = self.host.protocol.connections.as_slice();
+        let guest_peer = self.guest.protocol.connections.as_slice();
+        if host_peer.len() != 1
+            || host_peer[0].peer_seat != guest_seat
+            || host_peer[0].generation != guest_link.generation
+            || guest_peer.len() != 1
+            || guest_peer[0].peer_seat != host_seat
+            || guest_peer[0].generation != host_link.generation
+        {
+            return Err(invalid(
+                "network.links",
+                "network links and endpoint peer bindings must describe the exact same pair topology",
+            ));
+        }
+        let expected_transport = if host_link.connected && guest_link.connected {
+            TransportState::Connected
+        } else {
+            TransportState::Disconnected
+        };
+        if host_peer[0].state != expected_transport
+            || guest_peer[0].state != expected_transport
+        {
+            return Err(invalid(
+                "network.links.connected",
+                "pair link connectivity must equal both endpoint transport projections",
+            ));
+        }
+        for (path, link, endpoint) in [
+            ("network.links.host.suspended", host_link, &self.host),
+            ("network.links.guest.suspended", guest_link, &self.guest),
+        ] {
+            for time_class in [
+                TimeClass::Connected,
+                TimeClass::Recovery,
+                TimeClass::Renderer,
+                TimeClass::HumanInput,
+            ] {
+                let projected = endpoint.scheduler.pauses.iter().any(|pause| {
+                    pause.time_class == time_class
+                        && pause.reasons.iter().any(|reason| reason == "suspended")
+                });
+                if projected != link.suspended {
+                    return Err(invalid(
+                        path,
+                        "network suspension must equal every pausable endpoint scheduler class",
+                    ));
+                }
+            }
+            if endpoint.scheduler.pauses.iter().any(|pause| {
+                pause.time_class == TimeClass::Absolute
+                    && pause.reasons.iter().any(|reason| reason == "suspended")
+            }) {
+                return Err(invalid(
+                    path,
+                    "absolute time cannot carry the pair suspension reason",
+                ));
+            }
+        }
         for packet in &self.network.packets {
+            if packet.enqueued_at_ms > self.virtual_time_ms {
+                return Err(invalid(
+                    "network.packets.enqueued_at_ms",
+                    "queued packet cannot be enqueued after pair virtual time",
+                ));
+            }
             let ready = packet.delivery_deadline_ms <= self.virtual_time_ms;
             if matches!(packet.disposition, PacketDispositionV2::Ready) != ready {
                 return Err(invalid(
                     "network.packets.disposition",
                     "READY must exactly match a deadline at or before pair virtual time",
+                ));
+            }
+            let source_generation = match packet.source {
+                PairEndpoint::Host => host_link.generation,
+                PairEndpoint::Guest => guest_link.generation,
+            };
+            let destination_generation = match packet.destination {
+                PairEndpoint::Host => host_link.generation,
+                PairEndpoint::Guest => guest_link.generation,
+            };
+            if packet.source_generation != packet.destination_generation
+                || packet.source_generation > source_generation
+                || packet.destination_generation > destination_generation
+            {
+                return Err(invalid(
+                    "network.packets.connection_generation",
+                    "queued packet must retain one transport generation no newer than either endpoint link",
                 ));
             }
         }

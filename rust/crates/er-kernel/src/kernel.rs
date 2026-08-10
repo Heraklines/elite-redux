@@ -16,6 +16,7 @@ use er_protocol::{
     ReplicaAdmission, ScheduledTimer, SchedulerCommand, ValidatedFrame, ValidatedFrameBody,
     control_id_of, frame_contexts_compatible,
 };
+use er_state::digest::MechanicalStateDigest;
 use er_types::{
     AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityReceiptBody,
     AuthorityRecoverySlice, ButtonEvent, CancelPolicy, ChoiceListMenu, CommandMenu,
@@ -32,7 +33,12 @@ pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapsh
 use serde_json::{Value, json};
 use thiserror::Error;
 
-use crate::battle_kernel::{BattleInitializationError, BattleMode};
+use crate::battle_kernel::{BattleInitializationError, BattleMode, BattleModeSnapshotParts};
+use crate::snapshot::{
+    GameKernelSnapshotBridge, KERNEL_DETERMINISM_DIGEST_PREFIX, KernelDeterminismDigest,
+    KernelSchedulerSnapshotV2, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION,
+    RestorableKernelSnapshotV2, SnapshotError, restore_game_kernel, snapshot_game_kernel,
+};
 use crate::{InputRouteError, InputRouter, UiReducer};
 
 #[derive(Clone, Debug, Default)]
@@ -475,6 +481,165 @@ impl GameKernel {
         }
     }
 
+    /// Capture the complete, closed production-M3 endpoint owner graph.
+    pub fn snapshot_v2(&self) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
+        snapshot_game_kernel(self)
+    }
+
+    /// Reconstruct a fresh production-M3 endpoint from a validated snapshot.
+    pub fn from_snapshot(
+        snapshot: RestorableKernelSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        restore_game_kernel(snapshot, content)
+    }
+
+    /// Explicit schema-version alias for callers that name the V2 boundary.
+    pub fn from_snapshot_v2(
+        snapshot: RestorableKernelSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        Self::from_snapshot(snapshot, content)
+    }
+
+    fn capture_restorable_snapshot_v2(
+        &self,
+    ) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
+        let battle = self.battle.as_ref().ok_or_else(|| {
+            m3_snapshot_invalid(
+                "battle",
+                "restorable V2 snapshots require production Battle-mode construction",
+            )
+        })?;
+        if self.protocol_config.is_some()
+            || self.protocol.is_some()
+            || self.protocol_init_error.is_some()
+            || !self.repeat_timers.is_empty()
+            || !self.pending_presentations.is_empty()
+        {
+            return Err(m3_snapshot_invalid(
+                "legacy_owners",
+                "production Battle mode cannot retain fixture protocol or presentation owners",
+            ));
+        }
+        let expected_resources = battle.live_resources(&self.scheduler);
+        if self.live_resources != expected_resources {
+            return Err(m3_snapshot_invalid(
+                "live_resources",
+                "root live-resource projection differs from the battle owner graph",
+            ));
+        }
+
+        let parts = battle.snapshot_parts(&self.scheduler, &self.terminal, self.disposed)?;
+        let scheduler = KernelSchedulerSnapshotV2::from_scheduler(&self.scheduler)?;
+        let mechanical_digest = MechanicalStateDigest::compute(&parts.game.state)
+            .map_err(|error| m3_snapshot_invalid("mechanical_digest", error.to_string()))?;
+        let presentation_plan_digest =
+            er_battle::compute_presentation_plan_digest(&parts.pending_presentations.plan_events())
+                .map_err(|error| {
+                    m3_snapshot_canonical("presentation_plan_digest", error.to_string())
+                })?;
+        let content_hash = parts.game.state.content_hash.clone();
+        let mut snapshot = RestorableKernelSnapshotV2 {
+            schema_version: RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION,
+            content_hash,
+            runtime_identity: parts.runtime_identity,
+            input_router: parts.input_router,
+            ui: parts.ui,
+            scheduler,
+            protocol: parts.protocol,
+            game: parts.game,
+            pending_presentations: parts.pending_presentations,
+            terminal: self.terminal.clone(),
+            disposed: self.disposed,
+            prepared_transaction: None,
+            mechanical_digest,
+            kernel_determinism_digest: KernelDeterminismDigest::new(format!(
+                "{KERNEL_DETERMINISM_DIGEST_PREFIX}{}",
+                "0".repeat(64)
+            ))?,
+            presentation_plan_digest,
+        };
+        snapshot.kernel_determinism_digest = KernelDeterminismDigest::compute(&snapshot)?;
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn restore_restorable_snapshot_v2(
+        snapshot: RestorableKernelSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate_for_content(content.as_ref())?;
+        let expected_snapshot = snapshot.clone();
+        let RestorableKernelSnapshotV2 {
+            runtime_identity,
+            input_router,
+            ui,
+            scheduler,
+            protocol,
+            game,
+            pending_presentations,
+            terminal,
+            disposed,
+            ..
+        } = snapshot;
+        let mut scheduler = scheduler.into_scheduler()?;
+        let battle = BattleMode::from_snapshot_parts(
+            BattleModeSnapshotParts {
+                runtime_identity,
+                input_router,
+                ui,
+                protocol,
+                game,
+                pending_presentations,
+            },
+            &mut scheduler,
+            &terminal,
+            disposed,
+            content,
+        )?;
+        let mut kernel = Self::new(KernelConfig::default());
+        kernel.scheduler = scheduler;
+        kernel.terminal = terminal;
+        kernel.disposed = disposed;
+        kernel.live_resources = if disposed {
+            LiveResourceSnapshot::default()
+        } else {
+            battle.live_resources(&kernel.scheduler)
+        };
+        kernel.battle = Some(Box::new(battle));
+        let restored_snapshot = kernel.capture_restorable_snapshot_v2()?;
+        if restored_snapshot.mechanical_digest != expected_snapshot.mechanical_digest {
+            return Err(m3_snapshot_invalid(
+                "mechanical_digest",
+                "restored runtime does not reproduce the captured mechanical digest",
+            ));
+        }
+        if restored_snapshot.presentation_plan_digest
+            != expected_snapshot.presentation_plan_digest
+        {
+            return Err(m3_snapshot_invalid(
+                "presentation_plan_digest",
+                "restored runtime does not reproduce the captured presentation digest",
+            ));
+        }
+        if restored_snapshot.kernel_determinism_digest
+            != expected_snapshot.kernel_determinism_digest
+        {
+            return Err(m3_snapshot_invalid(
+                "kernel_determinism_digest",
+                "restored runtime does not reproduce the captured determinism digest",
+            ));
+        }
+        if restored_snapshot != expected_snapshot {
+            return Err(m3_snapshot_invalid(
+                "snapshot",
+                "restored runtime does not reproduce the complete captured owner graph",
+            ));
+        }
+        Ok(kernel)
+    }
+
     pub fn state_digest(&self) -> String {
         match content_digest(&self.snapshot()) {
             Ok(digest) => digest,
@@ -500,6 +665,29 @@ impl GameKernel {
 
     pub fn is_disposed(&self) -> bool {
         self.disposed
+    }
+
+    fn accept_shared_terminal_root(
+        &mut self,
+        terminal: &TerminalState,
+    ) -> Result<(), SnapshotError> {
+        if self.disposed {
+            return Err(m3_snapshot_invalid(
+                "terminal",
+                "disposed endpoint cannot accept a new shared terminal root",
+            ));
+        }
+        if let Some(existing) = &self.terminal {
+            if existing != terminal {
+                return Err(m3_snapshot_invalid(
+                    "terminal",
+                    "shared terminal differs from the endpoint terminal root",
+                ));
+            }
+            return Ok(());
+        }
+        self.terminal = Some(terminal.clone());
+        Ok(())
     }
 
     pub fn dispose(&mut self, reason: &str) -> Vec<KernelEffect> {
@@ -2897,6 +3085,41 @@ impl GameKernel {
             }
             None => {}
         }
+    }
+}
+
+impl GameKernelSnapshotBridge for GameKernel {
+    fn snapshot_v2(&self) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
+        self.capture_restorable_snapshot_v2()
+    }
+
+    fn accept_shared_terminal_root(
+        &mut self,
+        terminal: &TerminalState,
+    ) -> Result<(), SnapshotError> {
+        GameKernel::accept_shared_terminal_root(self, terminal)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: RestorableKernelSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate_for_content(content.as_ref())?;
+        Self::restore_restorable_snapshot_v2(snapshot, content)
+    }
+}
+
+fn m3_snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn m3_snapshot_canonical(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
     }
 }
 

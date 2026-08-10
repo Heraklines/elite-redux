@@ -56,9 +56,18 @@ pub enum SchedulerCommand {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KernelSchedulerRestorableState {
     pub next_timer_id: Option<SafeU53>,
-    pub timers: Vec<ScheduledTimer>,
+    pub timers: Vec<KernelSchedulerTimerState>,
     pub pauses: Vec<KernelSchedulerPauseState>,
     pub disposed: bool,
+}
+
+/// One exact live timer in the neutral scheduler restoration projection.
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KernelSchedulerTimerState {
+    pub registration: ScheduledTimer,
+    pub original_delay_ms: SafeU53,
+    pub remaining_active_ms: SafeU53,
 }
 
 /// One exact scheduler pause-reason set in the neutral restoration projection.
@@ -93,6 +102,7 @@ pub enum SchedulerError {
 #[derive(Clone, Debug)]
 pub struct KernelScheduler {
     timers: BTreeMap<TimerId, ScheduledTimer>,
+    timer_remaining_active_ms: BTreeMap<TimerId, SafeU53>,
     pause_reasons: BTreeMap<(SeatId, TimeClass), BTreeSet<String>>,
     // `Some(value)` is the next never-used ID in the inclusive
     // `0..=SafeU53::MAX` domain. `None` means the lifetime domain is exhausted;
@@ -105,6 +115,7 @@ impl Default for KernelScheduler {
     fn default() -> Self {
         Self {
             timers: BTreeMap::new(),
+            timer_remaining_active_ms: BTreeMap::new(),
             pause_reasons: BTreeMap::new(),
             next_timer_id: Some(SafeU53::ZERO),
             disposed: false,
@@ -180,6 +191,8 @@ impl KernelScheduler {
             commands.push(SchedulerCommand::Schedule {
                 timer: timer.clone(),
             });
+            self.timer_remaining_active_ms
+                .insert(timer_id, timer.delay_ms);
             self.timers.insert(timer_id, timer);
         }
         self.next_timer_id = next_timer_id;
@@ -188,6 +201,7 @@ impl KernelScheduler {
 
     pub fn cancel(&mut self, timer_id: TimerId) -> Option<SchedulerCommand> {
         let timer = self.timers.remove(&timer_id)?;
+        self.timer_remaining_active_ms.remove(&timer_id);
         Some(SchedulerCommand::Cancel {
             endpoint: timer.endpoint,
             timer_id,
@@ -209,9 +223,12 @@ impl KernelScheduler {
     }
 
     pub fn fired(&mut self, timer_id: TimerId) -> Result<ScheduledTimer, SchedulerError> {
-        self.timers
+        let timer = self
+            .timers
             .remove(&timer_id)
-            .ok_or(SchedulerError::UnknownTimer { timer_id })
+            .ok_or(SchedulerError::UnknownTimer { timer_id })?;
+        self.timer_remaining_active_ms.remove(&timer_id);
+        Ok(timer)
     }
 
     pub fn pause_class(
@@ -321,8 +338,22 @@ impl KernelScheduler {
     /// Export every private scheduler field through the kernel-neutral seam.
     #[doc(hidden)]
     pub fn export_restorable_state(&self) -> KernelSchedulerRestorableState {
-        let mut timers = self.timers.values().cloned().collect::<Vec<_>>();
-        timers.sort_by_key(|timer| (timer.endpoint, timer.timer_id));
+        let mut timers = self
+            .timers
+            .values()
+            .map(|registration| KernelSchedulerTimerState {
+                original_delay_ms: registration.delay_ms,
+                remaining_active_ms: self
+                    .timer_remaining_active_ms
+                    .get(&registration.timer_id)
+                    .copied()
+                    .unwrap_or(registration.delay_ms),
+                registration: registration.clone(),
+            })
+            .collect::<Vec<_>>();
+        timers.sort_by_key(|timer| {
+            (timer.registration.endpoint, timer.registration.timer_id)
+        });
         let pauses = self
             .pause_reasons
             .iter()
@@ -348,13 +379,21 @@ impl KernelScheduler {
     ) -> Result<Self, SchedulerRestoreError> {
         validate_restorable_state(&state)?;
 
-        let timers = state
-            .timers
-            .into_iter()
-            .map(|timer| (timer.timer_id, timer))
+        let KernelSchedulerRestorableState {
+            next_timer_id,
+            timers: timer_states,
+            pauses,
+            disposed,
+        } = state;
+        let timer_remaining_active_ms = timer_states
+            .iter()
+            .map(|timer| (timer.registration.timer_id, timer.remaining_active_ms))
             .collect::<BTreeMap<_, _>>();
-        let pause_reasons = state
-            .pauses
+        let timers = timer_states
+            .into_iter()
+            .map(|timer| (timer.registration.timer_id, timer.registration))
+            .collect::<BTreeMap<_, _>>();
+        let pause_reasons = pauses
             .into_iter()
             .map(|pause| {
                 (
@@ -365,9 +404,10 @@ impl KernelScheduler {
             .collect::<BTreeMap<_, _>>();
         Ok(Self {
             timers,
+            timer_remaining_active_ms,
             pause_reasons,
-            next_timer_id: state.next_timer_id,
-            disposed: state.disposed,
+            next_timer_id,
+            disposed,
         })
     }
 
@@ -441,7 +481,12 @@ fn validate_restorable_state(
     let timer_keys = state
         .timers
         .iter()
-        .map(|timer| (timer.endpoint, timer.timer_id))
+        .map(|timer| {
+            (
+                timer.registration.endpoint,
+                timer.registration.timer_id,
+            )
+        })
         .collect::<Vec<_>>();
     if timer_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
         return Err(invalid(
@@ -451,16 +496,16 @@ fn validate_restorable_state(
     }
     let mut timer_ids = BTreeSet::new();
     for timer in &state.timers {
-        if !timer_ids.insert(timer.timer_id) {
+        if !timer_ids.insert(timer.registration.timer_id) {
             return Err(invalid(
                 "timers.timer_id",
                 "timer IDs must be unique across endpoints",
             ));
         }
         if TimerOwner::new(
-            timer.owner.owner_id.clone(),
-            timer.owner.address.clone(),
-            timer.owner.reason.clone(),
+            timer.registration.owner.owner_id.clone(),
+            timer.registration.owner.address.clone(),
+            timer.registration.owner.reason.clone(),
         )
         .is_err()
         {
@@ -469,8 +514,16 @@ fn validate_restorable_state(
                 "timer owner ID, address, and reason must all be non-empty",
             ));
         }
+        if timer.original_delay_ms != timer.registration.delay_ms
+            || timer.remaining_active_ms > timer.original_delay_ms
+        {
+            return Err(invalid(
+                "timers.remaining_active_ms",
+                "timer durations must preserve the registration delay and remaining active bound",
+            ));
+        }
         if let Some(next_timer_id) = state.next_timer_id
-            && timer.timer_id.get() >= next_timer_id
+            && timer.registration.timer_id.get() >= next_timer_id
         {
             return Err(invalid(
                 "next_timer_id",

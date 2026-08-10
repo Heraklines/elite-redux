@@ -1,33 +1,58 @@
 //! Two-kernel effect-only orchestrator with no semantic-choice bypass API.
 
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::Arc;
 
-use er_canonical::content_digest;
-use er_kernel::{GameKernel, KernelConfig};
+use er_canonical::{canonical_bytes, content_digest};
+use er_content::pack::ContentPack;
+use er_kernel::{BattleGameConfig, BattleProtocolConfig, GameKernel, KernelConfig};
+use er_kernel::snapshot::{
+    GameKernelSnapshotBridge, KernelDeterminismDigest, PresentationOutcomeSnapshotV1,
+    RestorableKernelSnapshotV2,
+};
 use er_protocol::{ScheduledTimer, SchedulerCommand, control_id_of};
-use er_testkit::{DetachedKeyboardDriver, KeyHoldPlan};
+use er_testkit::{
+    DetachedKeyboardDriver, DetachedKeyboardDriverState, DriverHoldState,
+};
 use er_types::{
     ConnectionGeneration, ControlProjectionOutcome, InputFocus, KernelEffect, KernelInput,
     KernelSnapshot, LiveResourceSnapshot, MaterialApplicationOutcome, MenuState, NetworkPayload,
     PhysicalKey, PresentationEventId, PresentationOutcome, RawFrame, RawInputEvent, SafeU53,
     SeatId, StorageResult, TerminalMenu, TerminalState, TimeClass, TransportState, UiViewModel,
 };
-use er_types::battle_ids::BattlePresentationEventId;
+use er_types::battle_ids::{BattlePresentationEventId, CanonicalHexBytes};
 use er_types::battle_ui::PresentationSettlementOutcome;
 use serde::{
-    Deserialize, Deserializer, Serialize, Serializer, de::Error as SerdeDeError,
-    ser::Error as SerdeSerError,
+    Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned,
+    de::Error as SerdeDeError, ser::Error as SerdeSerError,
 };
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    ClockTimerSnapshot, FaultNetwork, FaultNetworkDiagnostics, FaultOperation, InstantPresenter,
-    MemoryStorage, NetworkEvent, Presenter, PresenterDiagnostics, PresenterMode, StorageAdapter,
-    StorageDiagnostics,
+    ClockCounterState, ClockEndpointState, ClockPauseState, ClockTimerSnapshot, ClockTimerState,
+    FaultNetwork, FaultNetworkDiagnostics, FaultNetworkGenerationState,
+    FaultNetworkPacketDisposition, FaultNetworkPacketKind, FaultNetworkPacketState,
+    FaultNetworkRngState, FaultNetworkState, FaultOperation, InstantPresenter, MemoryStorage,
+    MemoryStorageState, NetworkEvent, NetworkPacket, Presenter, PresenterBattleOutcomeState,
+    PresenterBattlePendingState, PresenterDiagnostics, PresenterMode, PresenterState,
+    PresenterTombstoneState, StorageAdapter, StorageDiagnostics, StoragePendingRequestState,
+    StorageValueState, VirtualClockState, restore_presenter,
+};
+use crate::snapshot::{
+    DetachedKeyboardDriverSnapshotV2, DriverHoldSnapshotV2, FaultNetworkSnapshotV2,
+    FaultRngStateV2, FrameCorruptionV2, PacketDispositionV2, PacketReorderStateV2,
+    PairClockTimerSnapshotV2,
+    PairPresenterEventSnapshotV2, PairPresenterOutcomeSnapshotV2,
+    PairPresenterTombstoneSnapshotV2, PresenterSnapshotV2, QueuedPacketSnapshotV2,
+    RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION, RestorablePacketKindV2, RestorablePairSnapshotV2,
+    RestorableStorageRequestV2, SimulatedPairSnapshotBridge, SnapshotError,
+    StorageFaultSnapshotV2, StorageRequestSnapshotV2, StorageSnapshotV2,
+    StorageValueSnapshotV2, VirtualClockSnapshotV2, restore_simulated_pair,
+    snapshot_simulated_pair,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PairEndpoint {
     Host,
@@ -44,6 +69,20 @@ pub struct SimulatedPairConfig {
     pub presenter: PresenterMode,
     pub initial_storage: BTreeMap<String, Value>,
     pub event_budget: SafeU53,
+}
+
+/// Production-M3 pair bootstrap. The event budget and fault-controlled
+/// presenter are fixed because the restorable pair schema intentionally has
+/// no ambient constructor settings.
+#[derive(Clone, Debug)]
+pub struct SimulatedBattlePairConfig {
+    pub host_game: BattleGameConfig,
+    pub host_protocol: BattleProtocolConfig,
+    pub guest_game: BattleGameConfig,
+    pub guest_protocol: BattleProtocolConfig,
+    pub content: Arc<ContentPack>,
+    pub replay_seed: u64,
+    pub initial_storage: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -216,9 +255,28 @@ pub struct SimulatedPair {
     storage: MemoryStorage,
     shared_terminal: Option<TerminalState>,
     terminal_reason: Option<String>,
+    fault_script: crate::snapshot::FaultScriptSnapshotV2,
     // PairStep intentionally exposes effects but not packet-delivery events.
     // This deterministic private value is the narrow witness for cross-domain
     // timer/network ordering without changing the frozen public schema.
+    last_boundary_order: Vec<BoundaryOrderEvent>,
+    disposed: bool,
+}
+
+#[derive(Debug)]
+struct PairRollbackState {
+    host_kernel: GameKernel,
+    guest_kernel: GameKernel,
+    host_keyboard: DetachedKeyboardDriver,
+    guest_keyboard: DetachedKeyboardDriver,
+    sequence: SafeU53,
+    clock: VirtualClockState,
+    network: FaultNetworkState,
+    presenter: PresenterState,
+    storage: MemoryStorageState,
+    shared_terminal: Option<TerminalState>,
+    terminal_reason: Option<String>,
+    fault_script: crate::snapshot::FaultScriptSnapshotV2,
     last_boundary_order: Vec<BoundaryOrderEvent>,
     disposed: bool,
 }
@@ -287,18 +345,304 @@ impl SimulatedPair {
             storage: MemoryStorage::new(config.initial_storage),
             shared_terminal: None,
             terminal_reason: None,
+            fault_script: empty_fault_script(),
             last_boundary_order: Vec::new(),
             disposed: false,
         })
     }
 
+    pub fn new_battle(
+        config: SimulatedBattlePairConfig,
+    ) -> Result<Self, SimulatedPairError> {
+        let host_seat = config.host_game.local_seat;
+        let guest_seat = config.guest_game.local_seat;
+        if host_seat == guest_seat {
+            return Err(SimulatedPairError::InvalidConfig {
+                reason: "host and guest Battle endpoints must use distinct local seats"
+                    .to_owned(),
+            });
+        }
+        let host_kernel = GameKernel::new_battle(
+            config.host_game,
+            config.host_protocol,
+            Arc::clone(&config.content),
+        )
+        .map_err(|error| SimulatedPairError::InvalidConfig {
+            reason: format!("host Battle kernel: {error}"),
+        })?;
+        let guest_kernel = GameKernel::new_battle(
+            config.guest_game,
+            config.guest_protocol,
+            Arc::clone(&config.content),
+        )
+        .map_err(|error| SimulatedPairError::InvalidConfig {
+            reason: format!("guest Battle kernel: {error}"),
+        })?;
+        let host_snapshot = host_kernel
+            .snapshot_v2()
+            .map_err(|error| SimulatedPairError::InvalidConfig {
+                reason: format!("host Battle snapshot: {error}"),
+            })?;
+        let guest_snapshot = guest_kernel
+            .snapshot_v2()
+            .map_err(|error| SimulatedPairError::InvalidConfig {
+                reason: format!("guest Battle snapshot: {error}"),
+            })?;
+        if host_snapshot.game.state != guest_snapshot.game.state
+            || host_snapshot.protocol.role == guest_snapshot.protocol.role
+        {
+            return Err(SimulatedPairError::InvalidConfig {
+                reason: "Battle endpoints must share one mechanical state and opposite protocol roles"
+                    .to_owned(),
+            });
+        }
+
+        Ok(Self {
+            host_kernel,
+            guest_kernel,
+            host_seat,
+            guest_seat,
+            host_keyboard: DetachedKeyboardDriver::new(host_seat),
+            guest_keyboard: DetachedKeyboardDriver::new(guest_seat),
+            sequence: SafeU53::ZERO,
+            seed: config.replay_seed,
+            event_budget: m3_pair_event_budget(),
+            clock: crate::VirtualClock::new(),
+            network: FaultNetwork::new(config.replay_seed, [host_seat, guest_seat]),
+            presenter: Box::new(crate::FaultPresenter::new()),
+            storage: MemoryStorage::new(config.initial_storage),
+            shared_terminal: None,
+            terminal_reason: None,
+            fault_script: empty_fault_script(),
+            last_boundary_order: Vec::new(),
+            disposed: false,
+        })
+    }
+
+    /// Capture the complete production-M3 pair and deterministic environment.
+    pub fn snapshot_v2(&self) -> Result<RestorablePairSnapshotV2, SnapshotError> {
+        snapshot_simulated_pair(self)
+    }
+
+    /// Reconstruct a fresh production-M3 pair from one closed V2 snapshot.
+    pub fn from_snapshot(
+        snapshot: RestorablePairSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        restore_simulated_pair(snapshot, content)
+    }
+
+    pub fn from_snapshot_v2(
+        snapshot: RestorablePairSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        Self::from_snapshot(snapshot, content)
+    }
+
+    fn capture_restorable_pair_snapshot_v2(
+        &self,
+    ) -> Result<RestorablePairSnapshotV2, SnapshotError> {
+        if self.event_budget != m3_pair_event_budget() {
+            return Err(pair_snapshot_invalid(
+                "event_budget",
+                "non-production event budget is not representable by the frozen pair schema",
+            ));
+        }
+        if self.disposed && self.shared_terminal.is_some() {
+            return Err(pair_snapshot_invalid(
+                "disposed",
+                "post-terminal explicit teardown is not distinguishable in the frozen pair schema",
+            ));
+        }
+
+        let clock = freeze_clock(self.clock.export_state())?;
+        let mut host = self.host_kernel.snapshot_v2().map_err(map_kernel_snapshot_error)?;
+        let mut guest = self
+            .guest_kernel
+            .snapshot_v2()
+            .map_err(map_kernel_snapshot_error)?;
+        install_pair_timer_remaining(&mut host, &clock)?;
+        install_pair_timer_remaining(&mut guest, &clock)?;
+
+        if host.terminal != self.shared_terminal || guest.terminal != self.shared_terminal {
+            return Err(pair_snapshot_invalid(
+                "terminal",
+                "pair shared terminal differs from one or both endpoint roots",
+            ));
+        }
+        let manually_disposed = host.disposed && host.terminal.is_none();
+        if host.disposed != guest.disposed
+            || self.disposed != manually_disposed
+            || (self.shared_terminal.is_none() && !self.disposed && host.disposed)
+        {
+            return Err(pair_snapshot_invalid(
+                "disposed",
+                "pair lifecycle differs from its endpoint owner roots",
+            ));
+        }
+        if let Some(terminal) = &self.shared_terminal {
+            if self.terminal_reason.as_deref() != Some(terminal.reason.as_str()) {
+                return Err(pair_snapshot_invalid(
+                    "terminal_reason",
+                    "pair terminal reason differs from the exact shared terminal",
+                ));
+            }
+        } else if !self.disposed && self.terminal_reason.is_some() {
+            return Err(pair_snapshot_invalid(
+                "terminal_reason",
+                "live non-terminal pair cannot retain a teardown reason",
+            ));
+        }
+
+        let network_state = self.network.export_state();
+        if network_state.seed != self.seed || network_state.observed_now_ms != clock.now_ms {
+            return Err(pair_snapshot_invalid(
+                "network",
+                "fault network seed/time differs from the pair root",
+            ));
+        }
+        let fault_rng_state = FaultRngStateV2 {
+            algorithm_version: network_state.rng.algorithm_version,
+            state_bits: network_state.rng.state_bits.clone(),
+        };
+        let snapshot = RestorablePairSnapshotV2 {
+            schema_version: RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
+            sequence: self.sequence,
+            replay_seed: self.seed.to_string(),
+            virtual_time_ms: clock.now_ms,
+            host,
+            guest,
+            host_driver: freeze_driver(self.host_keyboard.export_state()),
+            guest_driver: freeze_driver(self.guest_keyboard.export_state()),
+            clock,
+            network: freeze_network(
+                network_state,
+                self.host_seat,
+                self.guest_seat,
+            )?,
+            presenter: freeze_presenter(
+                self.presenter.export_state().map_err(|error| {
+                    pair_snapshot_invalid("presenter", error.to_string())
+                })?,
+                self.host_seat,
+                self.guest_seat,
+            )?,
+            storage: freeze_storage(self.storage.export_state(), self.host_seat, self.guest_seat)?,
+            fault_script: self.fault_script.clone(),
+            fault_rng_state,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    fn restore_restorable_pair_snapshot_v2(
+        snapshot: RestorablePairSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate()?;
+        if snapshot.host.content_hash != content.hash {
+            return Err(pair_snapshot_invalid(
+                "host.content_hash",
+                "snapshot content identity differs from supplied ContentPack",
+            ));
+        }
+        let expected_snapshot = snapshot.clone();
+        let host_seat = snapshot.host.runtime_identity.local_seat;
+        let guest_seat = snapshot.guest.runtime_identity.local_seat;
+        let replay_seed = parse_canonical_seed(&snapshot.replay_seed)
+            .map_err(|reason| pair_snapshot_invalid("replay_seed", reason))?;
+
+        let clock = thaw_clock(&snapshot, host_seat, guest_seat)?;
+        let network = thaw_network(&snapshot, replay_seed, host_seat, guest_seat)?;
+        let presenter = thaw_presenter(&snapshot.presenter, host_seat, guest_seat)?;
+        let storage = thaw_storage(&snapshot.storage, host_seat, guest_seat)?;
+        let host_keyboard = thaw_driver(&snapshot.host_driver)?;
+        let guest_keyboard = thaw_driver(&snapshot.guest_driver)?;
+        let shared_terminal = snapshot.host.terminal.clone();
+        let disposed = snapshot.host.disposed && shared_terminal.is_none();
+        let terminal_reason = shared_terminal
+            .as_ref()
+            .map(|terminal| terminal.reason.clone());
+        let fault_script = snapshot.fault_script.clone();
+        let host_kernel = GameKernel::from_snapshot(snapshot.host, Arc::clone(&content))
+            .map_err(map_kernel_snapshot_error)?;
+        let guest_kernel = GameKernel::from_snapshot(snapshot.guest, content)
+            .map_err(map_kernel_snapshot_error)?;
+        let pair = Self {
+            host_kernel,
+            guest_kernel,
+            host_seat,
+            guest_seat,
+            host_keyboard,
+            guest_keyboard,
+            sequence: snapshot.sequence,
+            seed: replay_seed,
+            event_budget: m3_pair_event_budget(),
+            clock,
+            network,
+            presenter,
+            storage,
+            shared_terminal,
+            terminal_reason,
+            fault_script,
+            last_boundary_order: Vec::new(),
+            disposed,
+        };
+        let restored_snapshot = pair.capture_restorable_pair_snapshot_v2()?;
+        if restored_snapshot != expected_snapshot {
+            return Err(pair_snapshot_invalid(
+                "snapshot",
+                "restored pair does not reproduce the complete captured owner graph",
+            ));
+        }
+        Ok(pair)
+    }
+
     pub fn apply(&mut self, operation: PairOperation) -> Result<PairStep, SimulatedPairError> {
         self.ensure_live()?;
+        if self.sequence == SafeU53::MAX {
+            return Err(SimulatedPairError::Adapter {
+                reason: "pair sequence exhausted".to_owned(),
+            });
+        }
+        let rollback = self.capture_rollback_state()?;
+        if self.shared_terminal.is_none() {
+            self.sync_driver_operation(&operation);
+        }
+        match self.apply_after_driver_sync(operation) {
+            Ok(step) => Ok(step),
+            Err(error) => {
+                if let Err(rollback_error) = self.restore_rollback_state(rollback) {
+                    return Err(SimulatedPairError::Adapter {
+                        reason: format!(
+                            "pair operation failed ({error}); restoring its atomic boundary failed ({rollback_error})"
+                        ),
+                    });
+                }
+                Err(error)
+            }
+        }
+    }
+
+    fn apply_after_driver_sync(
+        &mut self,
+        operation: PairOperation,
+    ) -> Result<PairStep, SimulatedPairError> {
         let operation_for_step = operation.clone();
         let mut generated_effects = Vec::new();
         let mut work = VecDeque::new();
         let mut generated_events = 0_u64;
         let event_budget = self.event_budget;
+        let fault_script_operation = if self.shared_terminal.is_none() {
+            self.prepare_fault_script_operation(&operation)?
+        } else {
+            None
+        };
+        let storage_completion = if self.shared_terminal.is_none() {
+            self.validate_storage_completion(&operation)?
+        } else {
+            None
+        };
 
         if self.shared_terminal.is_none() {
             self.begin_operation(
@@ -316,6 +660,17 @@ impl SimulatedPair {
             )?;
         }
 
+        if let Some((endpoint, request_id, result)) = storage_completion
+            && self.shared_terminal.is_none()
+        {
+            self.storage
+                .settle_pending_request(endpoint, request_id, result)
+                .map_err(adapter_error)?;
+        }
+        if let Some(operation) = fault_script_operation {
+            self.commit_fault_script_operation(operation)?;
+        }
+
         let effects_digest =
             content_digest(&generated_effects).map_err(|error| SimulatedPairError::Adapter {
                 reason: format!("effects could not be canonicalized: {error}"),
@@ -331,13 +686,192 @@ impl SimulatedPair {
         })
     }
 
+    fn capture_rollback_state(&self) -> Result<PairRollbackState, SimulatedPairError> {
+        Ok(PairRollbackState {
+            host_kernel: self.host_kernel.clone(),
+            guest_kernel: self.guest_kernel.clone(),
+            host_keyboard: self.host_keyboard.clone(),
+            guest_keyboard: self.guest_keyboard.clone(),
+            sequence: self.sequence,
+            clock: self.clock.export_state(),
+            network: self.network.export_state(),
+            presenter: self.presenter.export_state().map_err(adapter_error)?,
+            storage: self.storage.export_state(),
+            shared_terminal: self.shared_terminal.clone(),
+            terminal_reason: self.terminal_reason.clone(),
+            fault_script: self.fault_script.clone(),
+            last_boundary_order: self.last_boundary_order.clone(),
+            disposed: self.disposed,
+        })
+    }
+
+    fn restore_rollback_state(
+        &mut self,
+        state: PairRollbackState,
+    ) -> Result<(), SimulatedPairError> {
+        let PairRollbackState {
+            host_kernel,
+            guest_kernel,
+            host_keyboard,
+            guest_keyboard,
+            sequence,
+            clock,
+            network,
+            presenter,
+            storage,
+            shared_terminal,
+            terminal_reason,
+            fault_script,
+            last_boundary_order,
+            disposed,
+        } = state;
+        let clock = crate::VirtualClock::from_state(clock).map_err(clock_error)?;
+        let network = FaultNetwork::from_state(network).map_err(network_error)?;
+        let presenter = restore_presenter(presenter).map_err(adapter_error)?;
+        let storage = MemoryStorage::from_state(storage).map_err(adapter_error)?;
+
+        self.host_kernel = host_kernel;
+        self.guest_kernel = guest_kernel;
+        self.host_keyboard = host_keyboard;
+        self.guest_keyboard = guest_keyboard;
+        self.sequence = sequence;
+        self.clock = clock;
+        self.network = network;
+        self.presenter = presenter;
+        self.storage = storage;
+        self.shared_terminal = shared_terminal;
+        self.terminal_reason = terminal_reason;
+        self.fault_script = fault_script;
+        self.last_boundary_order = last_boundary_order;
+        self.disposed = disposed;
+        Ok(())
+    }
+
+    fn sync_driver_operation(&mut self, operation: &PairOperation) {
+        let PairOperation::RawInput { endpoint, event } = operation else {
+            return;
+        };
+        match event {
+            RawInputEvent::KeyDown {
+                code,
+                printable,
+                focus,
+                ..
+            } => {
+                if self.keyboard(*endpoint).input_focus() != *focus {
+                    let _ = self.keyboard_mut(*endpoint).focus(*focus);
+                }
+                let _ = self.keyboard(*endpoint).key_down(code.clone(), *printable);
+            }
+            RawInputEvent::KeyUp { code } => {
+                let _ = self.keyboard(*endpoint).key_up(code.clone());
+            }
+            RawInputEvent::FocusChanged(focus) => {
+                let _ = self.keyboard_mut(*endpoint).focus(*focus);
+            }
+            RawInputEvent::WindowBlurred => {
+                let _ = self.keyboard(*endpoint).blur();
+            }
+            RawInputEvent::WindowFocused => {
+                let _ = self.keyboard_mut(*endpoint).focus(InputFocus::Game);
+            }
+            RawInputEvent::GamepadDown { .. } | RawInputEvent::GamepadUp { .. } => {}
+        }
+    }
+
+    fn validate_storage_completion(
+        &self,
+        operation: &PairOperation,
+    ) -> Result<Option<(SeatId, SafeU53, StorageResult)>, SimulatedPairError> {
+        let PairOperation::StorageResult {
+            endpoint,
+            request_id,
+            result,
+        } = operation
+        else {
+            return Ok(None);
+        };
+        let seat = self.seat(*endpoint);
+        self.storage
+            .validate_pending_result(seat, *request_id, result)
+            .map_err(adapter_error)?;
+        Ok(Some((seat, *request_id, result.clone())))
+    }
+
+    fn prepare_fault_script_operation(
+        &self,
+        operation: &PairOperation,
+    ) -> Result<Option<crate::snapshot::FaultOperationV2>, SimulatedPairError> {
+        let PairOperation::Fault { operation } = operation else {
+            return Ok(None);
+        };
+        let frozen = freeze_fault_operation(operation).map_err(|error| {
+            SimulatedPairError::Adapter {
+                reason: format!("fault operation cannot enter the V2 script: {error}"),
+            }
+        })?;
+        if self.fault_script.cursor == SafeU53::MAX {
+            return Err(SimulatedPairError::Adapter {
+                reason: "fault script cursor exhausted".to_owned(),
+            });
+        }
+        let cursor = usize::try_from(self.fault_script.cursor.get()).map_err(|_| {
+            SimulatedPairError::Adapter {
+                reason: "fault script cursor exceeds usize".to_owned(),
+            }
+        })?;
+        if cursor > self.fault_script.operations.len() {
+            return Err(SimulatedPairError::Adapter {
+                reason: "fault script cursor exceeds operation count".to_owned(),
+            });
+        }
+        if let Some(expected) = self.fault_script.operations.get(cursor)
+            && expected != &frozen
+        {
+            return Err(SimulatedPairError::Adapter {
+                reason: "fault operation differs from the restored script cursor".to_owned(),
+            });
+        }
+        Ok(Some(frozen))
+    }
+
+    fn commit_fault_script_operation(
+        &mut self,
+        operation: crate::snapshot::FaultOperationV2,
+    ) -> Result<(), SimulatedPairError> {
+        let cursor = usize::try_from(self.fault_script.cursor.get()).map_err(|_| {
+            SimulatedPairError::Adapter {
+                reason: "fault script cursor exceeds usize".to_owned(),
+            }
+        })?;
+        if cursor == self.fault_script.operations.len() {
+            self.fault_script.operations.push(operation);
+        }
+        let next = self
+            .fault_script
+            .cursor
+            .get()
+            .checked_add(1)
+            .and_then(|value| SafeU53::new(value).ok())
+            .ok_or_else(|| SimulatedPairError::Adapter {
+                reason: "fault script cursor exhausted".to_owned(),
+            })?;
+        self.fault_script.cursor = next;
+        Ok(())
+    }
+
     pub fn key_down(
         &mut self,
         endpoint: PairEndpoint,
         code: PhysicalKey,
         printable: bool,
     ) -> Result<PairStep, SimulatedPairError> {
-        let event = self.keyboard(endpoint).key_down(code, printable);
+        let event = RawInputEvent::KeyDown {
+            code,
+            printable,
+            browser_repeat: false,
+            focus: self.keyboard(endpoint).input_focus(),
+        };
         self.apply(PairOperation::RawInput { endpoint, event })
     }
 
@@ -346,8 +880,10 @@ impl SimulatedPair {
         endpoint: PairEndpoint,
         code: PhysicalKey,
     ) -> Result<PairStep, SimulatedPairError> {
-        let event = self.keyboard(endpoint).key_up(code);
-        self.apply(PairOperation::RawInput { endpoint, event })
+        self.apply(PairOperation::RawInput {
+            endpoint,
+            event: RawInputEvent::KeyUp { code },
+        })
     }
 
     pub fn press(
@@ -355,16 +891,11 @@ impl SimulatedPair {
         endpoint: PairEndpoint,
         code: PhysicalKey,
     ) -> Result<Vec<PairStep>, SimulatedPairError> {
-        let [key_down_event, key_up_event] = self.keyboard(endpoint).press(code);
-        let key_down = self.apply(PairOperation::RawInput {
-            endpoint,
-            event: key_down_event,
-        })?;
-        let key_up = self.apply(PairOperation::RawInput {
-            endpoint,
-            event: key_up_event,
-        })?;
-        Ok(vec![key_down, key_up])
+        self.run_atomic_composite(|pair| {
+            let key_down = pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
+            let key_up = pair.key_up(endpoint, code)?;
+            Ok(vec![key_down, key_up])
+        })
     }
 
     pub fn hold_for(
@@ -373,28 +904,58 @@ impl SimulatedPair {
         code: PhysicalKey,
         duration_ms: SafeU53,
     ) -> Result<Vec<PairStep>, SimulatedPairError> {
-        let KeyHoldPlan {
-            key_down,
-            duration_ms,
-            key_up,
-        } = self.keyboard(endpoint).hold_for(code, duration_ms);
-        let key_down = self.apply(PairOperation::RawInput {
-            endpoint,
-            event: key_down,
-        })?;
-        let advance = self.apply(PairOperation::AdvanceTime {
-            delta_ms: duration_ms,
-        })?;
-        let key_up = self.apply(PairOperation::RawInput {
-            endpoint,
-            event: key_up,
-        })?;
-        Ok(vec![key_down, advance, key_up])
+        self.run_atomic_composite(|pair| {
+            if duration_ms == SafeU53::ZERO {
+                return pair.press(endpoint, code);
+            }
+            if pair.shared_terminal.is_some() {
+                let key_down =
+                    pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
+                let advance = pair.advance_time(duration_ms)?;
+                let key_up = pair.key_up(endpoint, code)?;
+                return Ok(vec![key_down, advance, key_up]);
+            }
+            let key_down_event = pair
+                .keyboard(endpoint)
+                .key_down(code.clone(), is_printable_key(&code));
+            pair.keyboard(endpoint)
+                .set_active_hold(code.clone(), duration_ms)
+                .map_err(adapter_error)?;
+            let key_down = pair.apply(PairOperation::RawInput {
+                endpoint,
+                event: key_down_event,
+            })?;
+            let advance = pair.advance_time(duration_ms)?;
+            let key_up = pair.key_up(endpoint, code)?;
+            Ok(vec![key_down, advance, key_up])
+        })
+    }
+
+    fn run_atomic_composite<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, SimulatedPairError>,
+    ) -> Result<T, SimulatedPairError> {
+        let rollback = self.capture_rollback_state()?;
+        match operation(self) {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                if let Err(rollback_error) = self.restore_rollback_state(rollback) {
+                    return Err(SimulatedPairError::Adapter {
+                        reason: format!(
+                            "pair composite failed ({error}); restoring its atomic boundary failed ({rollback_error})"
+                        ),
+                    });
+                }
+                Err(error)
+            }
+        }
     }
 
     pub fn blur(&mut self, endpoint: PairEndpoint) -> Result<PairStep, SimulatedPairError> {
-        let event = self.keyboard(endpoint).blur();
-        self.apply(PairOperation::RawInput { endpoint, event })
+        self.apply(PairOperation::RawInput {
+            endpoint,
+            event: RawInputEvent::WindowBlurred,
+        })
     }
 
     pub fn focus(
@@ -402,13 +963,10 @@ impl SimulatedPair {
         endpoint: PairEndpoint,
         focus: InputFocus,
     ) -> Result<PairStep, SimulatedPairError> {
-        let mut next_keyboard = self.keyboard(endpoint).clone();
-        let event = next_keyboard.focus(focus);
-        let step = self.apply(PairOperation::RawInput { endpoint, event })?;
-        if self.shared_terminal.is_none() {
-            *self.keyboard_mut(endpoint) = next_keyboard;
-        }
-        Ok(step)
+        self.apply(PairOperation::RawInput {
+            endpoint,
+            event: RawInputEvent::FocusChanged(focus),
+        })
     }
 
     pub fn advance_time(&mut self, delta_ms: SafeU53) -> Result<PairStep, SimulatedPairError> {
@@ -444,6 +1002,8 @@ impl SimulatedPair {
         self.network.dispose();
         self.presenter.dispose();
         self.storage.dispose();
+        let _ = self.host_keyboard.blur();
+        let _ = self.guest_keyboard.blur();
         self.disposed = true;
         if self.terminal_reason.is_none() {
             self.terminal_reason = Some(reason.to_owned());
@@ -476,6 +1036,8 @@ impl SimulatedPair {
                     generated_events,
                     event_budget,
                 )?;
+                self.host_keyboard.advance_active_holds(delta_ms);
+                self.guest_keyboard.advance_active_holds(delta_ms);
             }
             PairOperation::Fault { operation } => {
                 let events = self
@@ -758,7 +1320,7 @@ impl SimulatedPair {
         // complete generation; the old-generation batch is intentionally never
         // delivered during a hot rebind.
         work.push_back(PairWork::InputBatch(
-            self.reconnect_transport_inputs(generation)?,
+            self.reconnect_transport_inputs(generation, link_connected)?,
         ));
         Ok(())
     }
@@ -766,17 +1328,23 @@ impl SimulatedPair {
     fn reconnect_transport_inputs(
         &self,
         generation: ConnectionGeneration,
+        link_connected: bool,
     ) -> Result<Vec<(PairEndpoint, KernelInput)>, SimulatedPairError> {
         let mut inputs = Vec::with_capacity(8);
         for kernel_endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             let local_seat = self.seat(kernel_endpoint);
             let remote_seat = self.peer_seat(local_seat)?;
-            for (observed_endpoint, state) in [
+            let mut transitions = vec![
                 (local_seat, TransportState::Disconnected),
                 (remote_seat, TransportState::Disconnected),
-                (remote_seat, TransportState::Connected),
-                (local_seat, TransportState::Connected),
-            ] {
+            ];
+            if link_connected {
+                transitions.extend([
+                    (remote_seat, TransportState::Connected),
+                    (local_seat, TransportState::Connected),
+                ]);
+            }
+            for (observed_endpoint, state) in transitions {
                 inputs.push((
                     kernel_endpoint,
                     KernelInput::TransportChanged {
@@ -1111,7 +1679,7 @@ impl SimulatedPair {
         // Install the exact shared value while the kernels are still live.
         // GameKernel::replace_menu is inert after disposal, while the pair
         // contract requires both endpoint projections to retain this value.
-        self.project_shared_terminal(&terminal);
+        self.project_shared_terminal(&terminal)?;
 
         // Shared terminal is the absorbing mechanical boundary. Kernel
         // disposal clears every internal timer/protocol owner; disposing the
@@ -1123,11 +1691,16 @@ impl SimulatedPair {
         self.network.dispose();
         self.presenter.dispose();
         self.storage.dispose();
+        let _ = self.host_keyboard.blur();
+        let _ = self.guest_keyboard.blur();
         self.last_boundary_order.clear();
         Ok(())
     }
 
-    fn project_shared_terminal(&mut self, terminal: &TerminalState) {
+    fn project_shared_terminal(
+        &mut self,
+        terminal: &TerminalState,
+    ) -> Result<(), SimulatedPairError> {
         let menu = MenuState::Terminal(TerminalMenu {
             terminal_id: terminal.terminal_id.clone(),
             prompt_key: Some(terminal.reason.clone()),
@@ -1144,6 +1717,14 @@ impl SimulatedPair {
                 kernel.replace_menu(None, false, menu.clone());
             }
         }
+        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            <GameKernel as GameKernelSnapshotBridge>::accept_shared_terminal_root(
+                self.kernel_mut(endpoint),
+                terminal,
+            )
+            .map_err(map_kernel_snapshot_error)?;
+        }
+        Ok(())
     }
 
     fn queue_kernel_disposal(
@@ -1344,6 +1925,944 @@ impl SimulatedPair {
     }
 }
 
+impl SimulatedPairSnapshotBridge for SimulatedPair {
+    fn snapshot_v2(&self) -> Result<RestorablePairSnapshotV2, SnapshotError> {
+        self.capture_restorable_pair_snapshot_v2()
+    }
+
+    fn from_snapshot_v2(
+        snapshot: RestorablePairSnapshotV2,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        Self::restore_restorable_pair_snapshot_v2(snapshot, content)
+    }
+}
+
+fn pair_snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn pair_snapshot_canonical(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn map_kernel_snapshot_error(error: er_kernel::snapshot::SnapshotError) -> SnapshotError {
+    match error {
+        er_kernel::snapshot::SnapshotError::Invalid { path, reason } => {
+            pair_snapshot_invalid(path, reason)
+        }
+        er_kernel::snapshot::SnapshotError::Canonical { path, reason } => {
+            pair_snapshot_canonical(path, reason)
+        }
+    }
+}
+
+fn freeze_driver(state: DetachedKeyboardDriverState) -> DetachedKeyboardDriverSnapshotV2 {
+    DetachedKeyboardDriverSnapshotV2 {
+        seat: state.seat,
+        focus: state.focus,
+        pressed_keys: state.pressed_keys,
+        active_holds: state
+            .active_holds
+            .into_iter()
+            .map(|hold| DriverHoldSnapshotV2 {
+                key: hold.key,
+                remaining_ms: hold.remaining_ms,
+            })
+            .collect(),
+    }
+}
+
+fn thaw_driver(
+    snapshot: &DetachedKeyboardDriverSnapshotV2,
+) -> Result<DetachedKeyboardDriver, SnapshotError> {
+    DetachedKeyboardDriver::from_state(DetachedKeyboardDriverState {
+        seat: snapshot.seat,
+        focus: snapshot.focus,
+        pressed_keys: snapshot.pressed_keys.clone(),
+        active_holds: snapshot
+            .active_holds
+            .iter()
+            .map(|hold| DriverHoldState {
+                key: hold.key.clone(),
+                remaining_ms: hold.remaining_ms,
+            })
+            .collect(),
+    })
+    .map_err(|error| pair_snapshot_invalid("driver", error.to_string()))
+}
+
+fn freeze_clock(state: VirtualClockState) -> Result<VirtualClockSnapshotV2, SnapshotError> {
+    state
+        .validate()
+        .map_err(|error| pair_snapshot_invalid("clock", error.to_string()))?;
+    let snapshot = VirtualClockSnapshotV2 {
+        now_ms: state.now_ms,
+        timers: state
+            .timers
+            .into_iter()
+            .map(|timer| PairClockTimerSnapshotV2 {
+                endpoint: timer.timer.endpoint,
+                timer_id: timer.timer.timer_id,
+                time_class: timer.timer.time_class,
+                remaining_active_ms: timer.remaining_active_ms,
+                paused: timer.paused,
+            })
+            .collect(),
+        disposed: state.disposed,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+fn install_pair_timer_remaining(
+    endpoint: &mut RestorableKernelSnapshotV2,
+    clock: &VirtualClockSnapshotV2,
+) -> Result<(), SnapshotError> {
+    for timer in &mut endpoint.scheduler.timers {
+        let clock_timer = clock
+            .timers
+            .iter()
+            .find(|clock_timer| {
+                clock_timer.endpoint == timer.registration.endpoint
+                    && clock_timer.timer_id == timer.registration.timer_id
+            })
+            .ok_or_else(|| {
+                pair_snapshot_invalid(
+                    "clock.timers",
+                    "endpoint scheduler timer has no exact pair-clock registration",
+                )
+            })?;
+        timer.remaining_active_ms = clock_timer.remaining_active_ms;
+    }
+    endpoint.kernel_determinism_digest =
+        KernelDeterminismDigest::compute(endpoint).map_err(map_kernel_snapshot_error)?;
+    endpoint.validate().map_err(map_kernel_snapshot_error)
+}
+
+fn thaw_clock(
+    snapshot: &RestorablePairSnapshotV2,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<crate::VirtualClock, SnapshotError> {
+    if snapshot.clock.disposed {
+        return crate::VirtualClock::from_state(VirtualClockState {
+            now_ms: snapshot.clock.now_ms,
+            endpoints: Vec::new(),
+            timers: Vec::new(),
+            disposed: true,
+        })
+        .map_err(|error| pair_snapshot_invalid("clock", error.to_string()));
+    }
+
+    let mut endpoints = vec![
+        thaw_clock_endpoint(host_seat, &snapshot.host, snapshot.clock.now_ms),
+        thaw_clock_endpoint(guest_seat, &snapshot.guest, snapshot.clock.now_ms),
+    ];
+    endpoints.sort_by_key(|endpoint| endpoint.endpoint);
+    let mut timers = Vec::with_capacity(snapshot.clock.timers.len());
+    for clock_timer in &snapshot.clock.timers {
+        let endpoint = if clock_timer.endpoint == host_seat {
+            &snapshot.host
+        } else if clock_timer.endpoint == guest_seat {
+            &snapshot.guest
+        } else {
+            return Err(pair_snapshot_invalid(
+                "clock.timers.endpoint",
+                "clock timer names neither pair endpoint",
+            ));
+        };
+        let registration = endpoint
+            .scheduler
+            .timers
+            .iter()
+            .find(|timer| timer.registration.timer_id == clock_timer.timer_id)
+            .map(|timer| timer.registration.clone())
+            .ok_or_else(|| {
+                pair_snapshot_invalid(
+                    "clock.timers.timer_id",
+                    "clock timer has no endpoint scheduler owner",
+                )
+            })?;
+        let active_deadline = add_snapshot_time(
+            snapshot.clock.now_ms,
+            clock_timer.remaining_active_ms,
+            "clock.timers.remaining_active_ms",
+        )?;
+        timers.push(ClockTimerState {
+            timer: registration,
+            remaining_active_ms: clock_timer.remaining_active_ms,
+            deadline_ms: if clock_timer.paused {
+                snapshot.clock.now_ms
+            } else {
+                active_deadline
+            },
+            paused: clock_timer.paused,
+        });
+    }
+    crate::VirtualClock::from_state(VirtualClockState {
+        now_ms: snapshot.clock.now_ms,
+        endpoints,
+        timers,
+        disposed: false,
+    })
+    .map_err(|error| pair_snapshot_invalid("clock", error.to_string()))
+}
+
+fn thaw_clock_endpoint(
+    seat: SeatId,
+    endpoint: &RestorableKernelSnapshotV2,
+    now_ms: SafeU53,
+) -> ClockEndpointState {
+    let counters = [
+        TimeClass::Connected,
+        TimeClass::Recovery,
+        TimeClass::Renderer,
+        TimeClass::HumanInput,
+        TimeClass::Absolute,
+    ]
+    .into_iter()
+    .map(|time_class| ClockCounterState { time_class, now_ms })
+    .collect();
+    let pause_reasons = endpoint
+        .scheduler
+        .pauses
+        .iter()
+        .map(|pause| ClockPauseState {
+            time_class: pause.time_class,
+            reasons: pause.reasons.clone(),
+        })
+        .collect();
+    ClockEndpointState {
+        endpoint: seat,
+        counters,
+        pause_reasons,
+    }
+}
+
+fn add_snapshot_time(left: SafeU53, right: SafeU53, path: &str) -> Result<SafeU53, SnapshotError> {
+    let value = left
+        .get()
+        .checked_add(right.get())
+        .ok_or_else(|| pair_snapshot_invalid(path, "time exceeds SafeU53"))?;
+    SafeU53::new(value).map_err(|_| pair_snapshot_invalid(path, "time exceeds SafeU53"))
+}
+
+fn freeze_network(
+    state: FaultNetworkState,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<FaultNetworkSnapshotV2, SnapshotError> {
+    state
+        .validate()
+        .map_err(|error| pair_snapshot_invalid("network", error.to_string()))?;
+    if state.endpoints != [host_seat, guest_seat] {
+        return Err(pair_snapshot_invalid(
+            "network.links",
+            "fault network endpoint identity/order differs from the pair",
+        ));
+    }
+    let generation = |seat: SeatId| {
+        state
+            .generations
+            .iter()
+            .find(|entry| entry.endpoint == seat)
+            .map(|entry| entry.generation)
+            .ok_or_else(|| {
+                pair_snapshot_invalid("network.links", "endpoint generation is absent")
+            })
+    };
+    let next_packet_id = state.next_packet_id.ok_or_else(|| {
+        pair_snapshot_invalid(
+            "network.next_packet_id",
+            "exhausted packet allocator is not representable by the frozen pair schema",
+        )
+    })?;
+    let next_queue_order_id = state.next_queue_order_id.ok_or_else(|| {
+        pair_snapshot_invalid(
+            "network.next_queue_order_id",
+            "exhausted queue allocator is not representable by the frozen pair schema",
+        )
+    })?;
+    if state.packets.iter().any(|packet| {
+        packet.source_generation != packet.destination_generation
+            || packet.packet.connection_generation != packet.source_generation
+    }) {
+        return Err(pair_snapshot_invalid(
+            "network.packets.connection_generation",
+            "packet generation state is not representable by the frozen pair schema",
+        ));
+    }
+    let packets = state
+        .packets
+        .iter()
+        .map(|packet| {
+            Ok(QueuedPacketSnapshotV2 {
+                packet_id: packet.packet.packet_id,
+                queue_order_id: packet.queue_order_id,
+                kind: freeze_packet_kind(packet.kind),
+                source: pair_endpoint_for_seat(packet.packet.from, host_seat, guest_seat)?,
+                destination: pair_endpoint_for_seat(packet.packet.to, host_seat, guest_seat)?,
+                source_generation: packet.source_generation,
+                destination_generation: packet.destination_generation,
+                body: canonical_value_bytes(&packet.packet.payload, "network.packets.body")?,
+                enqueued_at_ms: packet.enqueued_at_ms,
+                delivery_deadline_ms: packet.packet.deliver_at_ms,
+                reorder_state: packet.reorder_rank.map_or(
+                    PacketReorderStateV2::Stable,
+                    |rank| PacketReorderStateV2::Held { rank },
+                ),
+                disposition: freeze_packet_disposition(packet.disposition),
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    let snapshot = FaultNetworkSnapshotV2 {
+        next_packet_id,
+        next_queue_order_id,
+        packets,
+        links: vec![
+            crate::snapshot::NetworkLinkSnapshotV2 {
+                endpoint: PairEndpoint::Host,
+                generation: generation(host_seat)?,
+                connected: !state.disconnected.contains(&host_seat),
+                suspended: state.suspended.contains(&host_seat),
+            },
+            crate::snapshot::NetworkLinkSnapshotV2 {
+                endpoint: PairEndpoint::Guest,
+                generation: generation(guest_seat)?,
+                connected: !state.disconnected.contains(&guest_seat),
+                suspended: state.suspended.contains(&guest_seat),
+            },
+        ],
+        disposed: state.disposed,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+fn thaw_network(
+    snapshot: &RestorablePairSnapshotV2,
+    replay_seed: u64,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<FaultNetwork, SnapshotError> {
+    let host_link = snapshot
+        .network
+        .links
+        .iter()
+        .find(|link| link.endpoint == PairEndpoint::Host)
+        .ok_or_else(|| pair_snapshot_invalid("network.links", "host link is absent"))?;
+    let guest_link = snapshot
+        .network
+        .links
+        .iter()
+        .find(|link| link.endpoint == PairEndpoint::Guest)
+        .ok_or_else(|| pair_snapshot_invalid("network.links", "guest link is absent"))?;
+    let mut generations = vec![
+        FaultNetworkGenerationState {
+            endpoint: host_seat,
+            generation: host_link.generation,
+        },
+        FaultNetworkGenerationState {
+            endpoint: guest_seat,
+            generation: guest_link.generation,
+        },
+    ];
+    generations.sort_by_key(|entry| entry.endpoint);
+    let mut disconnected = [
+        (!host_link.connected).then_some(host_seat),
+        (!guest_link.connected).then_some(guest_seat),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    disconnected.sort_unstable();
+    let mut suspended = [
+        host_link.suspended.then_some(host_seat),
+        guest_link.suspended.then_some(guest_seat),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    suspended.sort_unstable();
+    let generation_for = |seat: SeatId| {
+        if seat == host_seat {
+            Some(host_link.generation)
+        } else if seat == guest_seat {
+            Some(guest_link.generation)
+        } else {
+            None
+        }
+    };
+    let mut reordered_packet_ids = Vec::new();
+    let mut packets = Vec::with_capacity(snapshot.network.packets.len());
+    for packet in &snapshot.network.packets {
+        if packet.source_generation != packet.destination_generation {
+            return Err(pair_snapshot_invalid(
+                "network.packets.connection_generation",
+                "one transport packet cannot restore unequal source/destination generations",
+            ));
+        }
+        let from = seat_for_pair_endpoint(packet.source, host_seat, guest_seat);
+        let to = seat_for_pair_endpoint(packet.destination, host_seat, guest_seat);
+        let payload = decode_canonical_value::<NetworkPayload>(
+            &packet.body,
+            "network.packets.body",
+        )?;
+        let kind = thaw_packet_kind(packet.kind);
+        let stale = !is_link_connected(from, host_seat, guest_seat, host_link, guest_link)
+            || !is_link_connected(to, host_seat, guest_seat, host_link, guest_link)
+            || generation_for(from) != Some(packet.source_generation)
+            || generation_for(to) != Some(packet.destination_generation);
+        let reorder_rank = match &packet.reorder_state {
+            PacketReorderStateV2::Stable => None,
+            PacketReorderStateV2::Held { rank } => {
+                reordered_packet_ids.push(packet.packet_id);
+                Some(*rank)
+            }
+        };
+        packets.push(FaultNetworkPacketState {
+            packet: NetworkPacket {
+                packet_id: packet.packet_id,
+                from,
+                to,
+                connection_generation: packet.source_generation,
+                payload: payload.clone(),
+                deliver_at_ms: packet.delivery_deadline_ms,
+            },
+            queue_order_id: packet.queue_order_id,
+            enqueued_at_ms: packet.enqueued_at_ms,
+            source_generation: packet.source_generation,
+            destination_generation: packet.destination_generation,
+            stale,
+            kind,
+            payload_corrupted: payload_is_corrupted_for_kind(&payload, kind),
+            disposition: thaw_packet_disposition(packet.disposition),
+            reorder_rank,
+        });
+    }
+    reordered_packet_ids.sort_unstable();
+    FaultNetwork::from_state(FaultNetworkState {
+        seed: replay_seed,
+        rng: FaultNetworkRngState {
+            algorithm_version: snapshot.fault_rng_state.algorithm_version,
+            state_bits: snapshot.fault_rng_state.state_bits.clone(),
+        },
+        observed_now_ms: snapshot.virtual_time_ms,
+        endpoints: [host_seat, guest_seat],
+        generations,
+        packets,
+        reordered_packet_ids,
+        next_packet_id: Some(snapshot.network.next_packet_id),
+        next_queue_order_id: Some(snapshot.network.next_queue_order_id),
+        disconnected,
+        suspended,
+        dropped_count: SafeU53::ZERO,
+        duplicated_count: SafeU53::ZERO,
+        corrupted_count: SafeU53::ZERO,
+        disposed: snapshot.network.disposed,
+    })
+    .map_err(|error| pair_snapshot_invalid("network", error.to_string()))
+}
+
+fn freeze_packet_kind(kind: FaultNetworkPacketKind) -> RestorablePacketKindV2 {
+    match kind {
+        FaultNetworkPacketKind::AuthorityFrame => RestorablePacketKindV2::AuthorityFrame,
+        FaultNetworkPacketKind::CommandProposal => RestorablePacketKindV2::CommandProposal,
+        FaultNetworkPacketKind::ReplacementProposal => RestorablePacketKindV2::ReplacementProposal,
+        FaultNetworkPacketKind::ControlReceipt => RestorablePacketKindV2::ControlReceipt,
+    }
+}
+
+fn thaw_packet_kind(kind: RestorablePacketKindV2) -> FaultNetworkPacketKind {
+    match kind {
+        RestorablePacketKindV2::AuthorityFrame => FaultNetworkPacketKind::AuthorityFrame,
+        RestorablePacketKindV2::CommandProposal => FaultNetworkPacketKind::CommandProposal,
+        RestorablePacketKindV2::ReplacementProposal => FaultNetworkPacketKind::ReplacementProposal,
+        RestorablePacketKindV2::ControlReceipt => FaultNetworkPacketKind::ControlReceipt,
+    }
+}
+
+fn freeze_packet_disposition(
+    disposition: FaultNetworkPacketDisposition,
+) -> PacketDispositionV2 {
+    match disposition {
+        FaultNetworkPacketDisposition::Queued => PacketDispositionV2::Queued,
+        FaultNetworkPacketDisposition::Delayed => PacketDispositionV2::Delayed,
+        FaultNetworkPacketDisposition::Ready => PacketDispositionV2::Ready,
+    }
+}
+
+fn thaw_packet_disposition(disposition: PacketDispositionV2) -> FaultNetworkPacketDisposition {
+    match disposition {
+        PacketDispositionV2::Queued => FaultNetworkPacketDisposition::Queued,
+        PacketDispositionV2::Delayed => FaultNetworkPacketDisposition::Delayed,
+        PacketDispositionV2::Ready => FaultNetworkPacketDisposition::Ready,
+    }
+}
+
+fn is_link_connected(
+    seat: SeatId,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+    host: &crate::snapshot::NetworkLinkSnapshotV2,
+    guest: &crate::snapshot::NetworkLinkSnapshotV2,
+) -> bool {
+    if seat == host_seat {
+        host.connected
+    } else if seat == guest_seat {
+        guest.connected
+    } else {
+        false
+    }
+}
+
+fn payload_is_corrupted_for_kind(
+    payload: &NetworkPayload,
+    expected: FaultNetworkPacketKind,
+) -> bool {
+    let actual = match payload {
+        NetworkPayload::Proposal(proposal) => Some(if proposal.fingerprint.starts_with("brp1-") {
+            FaultNetworkPacketKind::ReplacementProposal
+        } else {
+            FaultNetworkPacketKind::CommandProposal
+        }),
+        NetworkPayload::Frame(raw) => raw_frame_value(raw).map(|value| {
+            if value.get("t").and_then(Value::as_str) == Some("authorityReceipt") {
+                FaultNetworkPacketKind::ControlReceipt
+            } else {
+                FaultNetworkPacketKind::AuthorityFrame
+            }
+        }),
+    };
+    actual != Some(expected)
+}
+
+fn raw_frame_value(raw: &RawFrame) -> Option<Value> {
+    match raw {
+        RawFrame::JsonText(text) => serde_json::from_str(text).ok(),
+        RawFrame::JsonValue(value) => Some(value.clone()),
+    }
+}
+
+fn pair_endpoint_for_seat(
+    seat: SeatId,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<PairEndpoint, SnapshotError> {
+    if seat == host_seat {
+        Ok(PairEndpoint::Host)
+    } else if seat == guest_seat {
+        Ok(PairEndpoint::Guest)
+    } else {
+        Err(pair_snapshot_invalid(
+            "pair.endpoint",
+            "seat names neither pair endpoint",
+        ))
+    }
+}
+
+fn seat_for_pair_endpoint(
+    endpoint: PairEndpoint,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> SeatId {
+    match endpoint {
+        PairEndpoint::Host => host_seat,
+        PairEndpoint::Guest => guest_seat,
+    }
+}
+
+fn freeze_presenter(
+    state: PresenterState,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<PresenterSnapshotV2, SnapshotError> {
+    state
+        .validate()
+        .map_err(|error| pair_snapshot_invalid("presenter", error.to_string()))?;
+    if state.mode != PresenterMode::FaultControlled
+        || !state.pending.is_empty()
+        || !state.outcomes.is_empty()
+    {
+        return Err(pair_snapshot_invalid(
+            "presenter",
+            "production M3 pair requires the fault-controlled battle presenter without legacy events",
+        ));
+    }
+    let mut pending = state
+        .battle_pending
+        .into_iter()
+        .map(|entry| {
+            Ok(PairPresenterEventSnapshotV2 {
+                endpoint: pair_endpoint_for_seat(entry.endpoint, host_seat, guest_seat)?,
+                event: entry.event,
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    pending.sort_by_key(|entry| {
+        (
+            pair_endpoint_rank(entry.endpoint),
+            entry.event.event_id.clone(),
+        )
+    });
+    let mut outcomes = state
+        .battle_outcomes
+        .into_iter()
+        .map(|entry| {
+            Ok(PairPresenterOutcomeSnapshotV2 {
+                endpoint: pair_endpoint_for_seat(entry.endpoint, host_seat, guest_seat)?,
+                outcome: PresentationOutcomeSnapshotV1 {
+                    event_id: entry.event_id,
+                    outcome: entry.outcome,
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    outcomes.sort_by_key(|entry| {
+        (
+            pair_endpoint_rank(entry.endpoint),
+            entry.outcome.event_id.clone(),
+        )
+    });
+    let mut tombstones = state
+        .tombstones
+        .into_iter()
+        .map(|entry| {
+            Ok(PairPresenterTombstoneSnapshotV2 {
+                endpoint: pair_endpoint_for_seat(entry.endpoint, host_seat, guest_seat)?,
+                event_id: entry.event_id,
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    tombstones.sort_by_key(|entry| {
+        (pair_endpoint_rank(entry.endpoint), entry.event_id.clone())
+    });
+    let snapshot = PresenterSnapshotV2 {
+        pending,
+        outcomes,
+        tombstones,
+        disposed: state.disposed,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+fn thaw_presenter(
+    snapshot: &PresenterSnapshotV2,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<Box<dyn Presenter>, SnapshotError> {
+    let mut battle_pending = snapshot
+        .pending
+        .iter()
+        .map(|entry| PresenterBattlePendingState {
+            endpoint: seat_for_pair_endpoint(entry.endpoint, host_seat, guest_seat),
+            event: entry.event.clone(),
+        })
+        .collect::<Vec<_>>();
+    battle_pending.sort_by_key(|entry| (entry.endpoint, entry.event.event_id.clone()));
+    let mut battle_outcomes = snapshot
+        .outcomes
+        .iter()
+        .map(|entry| PresenterBattleOutcomeState {
+            endpoint: seat_for_pair_endpoint(entry.endpoint, host_seat, guest_seat),
+            event_id: entry.outcome.event_id.clone(),
+            outcome: entry.outcome.outcome.clone(),
+        })
+        .collect::<Vec<_>>();
+    battle_outcomes.sort_by_key(|entry| (entry.endpoint, entry.event_id.clone()));
+    let mut tombstones = snapshot
+        .tombstones
+        .iter()
+        .map(|entry| PresenterTombstoneState {
+            endpoint: seat_for_pair_endpoint(entry.endpoint, host_seat, guest_seat),
+            event_id: entry.event_id.clone(),
+        })
+        .collect::<Vec<_>>();
+    tombstones.sort_by_key(|entry| (entry.endpoint, entry.event_id.clone()));
+    restore_presenter(PresenterState {
+        mode: PresenterMode::FaultControlled,
+        pending: Vec::new(),
+        outcomes: Vec::new(),
+        battle_pending,
+        battle_outcomes,
+        tombstones,
+        disposed: snapshot.disposed,
+    })
+    .map_err(|error| pair_snapshot_invalid("presenter", error.to_string()))
+}
+
+fn freeze_storage(
+    state: MemoryStorageState,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<StorageSnapshotV2, SnapshotError> {
+    state
+        .validate()
+        .map_err(|error| pair_snapshot_invalid("storage", error.to_string()))?;
+    let values = state
+        .values
+        .into_iter()
+        .map(|entry| {
+            Ok(StorageValueSnapshotV2 {
+                key: entry.key,
+                canonical_value: canonical_value_bytes(
+                    &entry.value,
+                    "storage.values.canonical_value",
+                )?,
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    let mut pending_requests = state
+        .pending_requests
+        .into_iter()
+        .map(|entry| {
+            let endpoint = pair_endpoint_for_seat(entry.endpoint, host_seat, guest_seat)?;
+            let request = match entry.request.value {
+                None => RestorableStorageRequestV2::Load {
+                    request_id: entry.request.request_id,
+                    key: entry.request.key,
+                },
+                Some(value) => RestorableStorageRequestV2::Persist {
+                    request_id: entry.request.request_id,
+                    key: entry.request.key,
+                    value: canonical_value_bytes(
+                        &value,
+                        "storage.pending_requests.value",
+                    )?,
+                },
+            };
+            Ok(StorageRequestSnapshotV2 { endpoint, request })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    pending_requests.sort_by_key(|entry| {
+        (
+            pair_endpoint_rank(entry.endpoint),
+            entry.request.request_id(),
+        )
+    });
+    let snapshot = StorageSnapshotV2 {
+        next_request_id: state.next_request_id,
+        values,
+        pending_requests,
+        one_shot_fault: state
+            .one_shot_fault
+            .map(|reason| StorageFaultSnapshotV2 { reason }),
+        disposed: state.disposed,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+
+fn thaw_storage(
+    snapshot: &StorageSnapshotV2,
+    host_seat: SeatId,
+    guest_seat: SeatId,
+) -> Result<MemoryStorage, SnapshotError> {
+    let values = snapshot
+        .values
+        .iter()
+        .map(|entry| {
+            Ok(StorageValueState {
+                key: entry.key.clone(),
+                value: decode_canonical_value(
+                    &entry.canonical_value,
+                    "storage.values.canonical_value",
+                )?,
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    let mut pending_requests = snapshot
+        .pending_requests
+        .iter()
+        .map(|entry| {
+            let request = match &entry.request {
+                RestorableStorageRequestV2::Load { request_id, key } => er_types::StorageRequest {
+                    request_id: *request_id,
+                    key: key.clone(),
+                    value: None,
+                },
+                RestorableStorageRequestV2::Persist {
+                    request_id,
+                    key,
+                    value,
+                } => er_types::StorageRequest {
+                    request_id: *request_id,
+                    key: key.clone(),
+                    value: Some(decode_canonical_value(
+                        value,
+                        "storage.pending_requests.value",
+                    )?),
+                },
+            };
+            Ok(StoragePendingRequestState {
+                endpoint: seat_for_pair_endpoint(entry.endpoint, host_seat, guest_seat),
+                request,
+            })
+        })
+        .collect::<Result<Vec<_>, SnapshotError>>()?;
+    pending_requests.sort_by_key(|entry| (entry.endpoint, entry.request.request_id));
+    MemoryStorage::from_state(MemoryStorageState {
+        next_request_id: snapshot.next_request_id,
+        values,
+        pending_requests,
+        one_shot_fault: snapshot
+            .one_shot_fault
+            .as_ref()
+            .map(|fault| fault.reason.clone()),
+        disposed: snapshot.disposed,
+    })
+    .map_err(|error| pair_snapshot_invalid("storage", error.to_string()))
+}
+
+fn freeze_fault_operation(
+    operation: &FaultOperation,
+) -> Result<crate::snapshot::FaultOperationV2, SnapshotError> {
+    Ok(match operation {
+        FaultOperation::Deliver { packet_id } => {
+            crate::snapshot::FaultOperationV2::Deliver {
+                packet_id: *packet_id,
+            }
+        }
+        FaultOperation::DeliverNext => crate::snapshot::FaultOperationV2::DeliverNext,
+        FaultOperation::Drop { packet_id } => crate::snapshot::FaultOperationV2::Drop {
+            packet_id: *packet_id,
+        },
+        FaultOperation::Duplicate { packet_id } => {
+            crate::snapshot::FaultOperationV2::Duplicate {
+                packet_id: *packet_id,
+            }
+        }
+        FaultOperation::Delay {
+            packet_id,
+            additional_ms,
+        } => crate::snapshot::FaultOperationV2::Delay {
+            packet_id: *packet_id,
+            additional_ms: *additional_ms,
+        },
+        FaultOperation::Reorder { packet_ids } => {
+            crate::snapshot::FaultOperationV2::Reorder {
+                packet_ids: packet_ids.clone(),
+            }
+        }
+        FaultOperation::Corrupt {
+            packet_id,
+            corruption,
+        } => crate::snapshot::FaultOperationV2::Corrupt {
+            packet_id: *packet_id,
+            corruption: match corruption {
+                crate::FrameCorruption::Replace { value } => FrameCorruptionV2::Replace {
+                    body: canonical_value_bytes(value, "fault_script.corruption.replace")?,
+                },
+                crate::FrameCorruption::DeleteField { json_pointer } => {
+                    FrameCorruptionV2::DeleteField {
+                        json_pointer: json_pointer.clone(),
+                    }
+                }
+                crate::FrameCorruption::ReplaceField {
+                    json_pointer,
+                    value,
+                } => FrameCorruptionV2::ReplaceField {
+                    json_pointer: json_pointer.clone(),
+                    canonical_value: canonical_value_bytes(
+                        value,
+                        "fault_script.corruption.replace_field",
+                    )?,
+                },
+                crate::FrameCorruption::MalformedJson { text } => {
+                    FrameCorruptionV2::MalformedJson {
+                        body: CanonicalHexBytes::from_bytes(text.as_bytes()),
+                    }
+                }
+            },
+        },
+    })
+}
+
+fn canonical_value_bytes<T: Serialize>(
+    value: &T,
+    path: &str,
+) -> Result<CanonicalHexBytes, SnapshotError> {
+    canonical_bytes(value)
+        .map(|bytes| CanonicalHexBytes::from_bytes(&bytes))
+        .map_err(|error| pair_snapshot_canonical(path, error.to_string()))
+}
+
+fn decode_canonical_value<T>(
+    value: &CanonicalHexBytes,
+    path: &str,
+) -> Result<T, SnapshotError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    let bytes = decode_hex(value, path)?;
+    let decoded = serde_json::from_slice::<T>(&bytes)
+        .map_err(|error| pair_snapshot_invalid(path, error.to_string()))?;
+    let recanonical = canonical_bytes(&decoded)
+        .map_err(|error| pair_snapshot_canonical(path, error.to_string()))?;
+    if recanonical != bytes {
+        return Err(pair_snapshot_invalid(
+            path,
+            "bytes are valid JSON but not the canonical encoding of the decoded value",
+        ));
+    }
+    Ok(decoded)
+}
+
+fn decode_hex(value: &CanonicalHexBytes, path: &str) -> Result<Vec<u8>, SnapshotError> {
+    let text = value.as_str().as_bytes();
+    if text.len() % 2 != 0 {
+        return Err(pair_snapshot_invalid(path, "hex payload has odd length"));
+    }
+    text.chunks_exact(2)
+        .map(|pair| {
+            let high = decode_hex_digit(pair[0])?;
+            let low = decode_hex_digit(pair[1])?;
+            Ok((high << 4) | low)
+        })
+        .collect::<Result<Vec<_>, String>>()
+        .map_err(|reason| pair_snapshot_invalid(path, reason))
+}
+
+fn decode_hex_digit(value: u8) -> Result<u8, String> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        _ => Err("hex payload contains a non-canonical digit".to_owned()),
+    }
+}
+
+fn pair_endpoint_rank(endpoint: PairEndpoint) -> u8 {
+    match endpoint {
+        PairEndpoint::Host => 0,
+        PairEndpoint::Guest => 1,
+    }
+}
+
+fn is_printable_key(code: &PhysicalKey) -> bool {
+    matches!(
+        code,
+        PhysicalKey::Space
+            | PhysicalKey::KeyA
+            | PhysicalKey::KeyB
+            | PhysicalKey::KeyC
+            | PhysicalKey::KeyD
+            | PhysicalKey::KeyE
+            | PhysicalKey::KeyF
+            | PhysicalKey::KeyN
+            | PhysicalKey::KeyR
+            | PhysicalKey::KeyT
+            | PhysicalKey::Unknown(_)
+    )
+}
+
 fn suspension_commands(endpoint: SeatId, suspended: bool) -> Vec<SchedulerCommand> {
     [
         TimeClass::Connected,
@@ -1410,6 +2929,20 @@ fn network_error(error: impl std::fmt::Display) -> SimulatedPairError {
 fn adapter_error(error: impl std::fmt::Display) -> SimulatedPairError {
     SimulatedPairError::Adapter {
         reason: error.to_string(),
+    }
+}
+
+fn m3_pair_event_budget() -> SafeU53 {
+    match SafeU53::new(4_096) {
+        Ok(value) => value,
+        Err(_) => SafeU53::MAX,
+    }
+}
+
+fn empty_fault_script() -> crate::snapshot::FaultScriptSnapshotV2 {
+    crate::snapshot::FaultScriptSnapshotV2 {
+        cursor: SafeU53::ZERO,
+        operations: Vec::new(),
     }
 }
 

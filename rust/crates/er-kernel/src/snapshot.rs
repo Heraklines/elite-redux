@@ -6,6 +6,7 @@
 //! impossible for integration code to mistake DTO-only validation for live
 //! continuation.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
@@ -13,7 +14,8 @@ use er_canonical::content_digest;
 use er_content::pack::ContentPack;
 use er_game::snapshot::GameRuntimeSnapshotV2;
 use er_protocol::{
-    AuthorityLogConfig, AuthorityReplicaConfig, ProtocolRuntimeSnapshotV2,
+    AuthorityLogConfig, AuthorityReplicaConfig, KernelScheduler, KernelSchedulerPauseState,
+    KernelSchedulerRestorableState, KernelSchedulerTimerState, ProtocolRuntimeSnapshotV2,
     ProposalLeaseConfig, RecoveryTransactionConfig, ScheduledTimer,
 };
 pub use er_rng::audit::RngDraw;
@@ -25,7 +27,10 @@ use er_types::battle_ui::{
     BattlePresentationEvent, BattleUiProjection, PresentationSettlementOutcome,
     PresentationPlanDigest,
 };
-use er_types::{GameButton, InputFocus, PhysicalKey, SafeU53, SeatId, TerminalState, TimeClass, TimerId};
+use er_types::{
+    GameButton, InputFocus, PhysicalKey, SafeU53, SeatId, TerminalState, TimeClass, TimerId,
+    TransportState,
+};
 use er_types::OperationId;
 pub use er_types::LiveResourceSnapshot;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _, ser::Error as _};
@@ -43,6 +48,12 @@ use crate::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 /// an existing endpoint.
 pub trait GameKernelSnapshotBridge: Sized {
     fn snapshot_v2(&self) -> Result<RestorableKernelSnapshotV2, SnapshotError>;
+
+    #[doc(hidden)]
+    fn accept_shared_terminal_root(
+        &mut self,
+        terminal: &TerminalState,
+    ) -> Result<(), SnapshotError>;
 
     fn from_snapshot_v2(
         snapshot: RestorableKernelSnapshotV2,
@@ -609,6 +620,62 @@ impl InputRouterSnapshotV2 {
 }
 
 impl KernelSchedulerSnapshotV2 {
+    pub(crate) fn from_scheduler(scheduler: &KernelScheduler) -> Result<Self, SnapshotError> {
+        let state = scheduler.export_restorable_state();
+        let snapshot = Self {
+            next_timer_id: state.next_timer_id,
+            timers: state
+                .timers
+                .into_iter()
+                .map(|timer| RestorableTimerSnapshotV2 {
+                    registration: timer.registration,
+                    original_delay_ms: timer.original_delay_ms,
+                    remaining_active_ms: timer.remaining_active_ms,
+                })
+                .collect(),
+            pauses: state
+                .pauses
+                .into_iter()
+                .map(|pause| TimeClassPauseSnapshotV2 {
+                    endpoint: pause.endpoint,
+                    time_class: pause.time_class,
+                    reasons: pause.reasons,
+                })
+                .collect(),
+            disposed: state.disposed,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    pub(crate) fn into_scheduler(self) -> Result<KernelScheduler, SnapshotError> {
+        self.validate()?;
+        let state = KernelSchedulerRestorableState {
+            next_timer_id: self.next_timer_id,
+            timers: self
+                .timers
+                .into_iter()
+                .map(|timer| KernelSchedulerTimerState {
+                    registration: timer.registration,
+                    original_delay_ms: timer.original_delay_ms,
+                    remaining_active_ms: timer.remaining_active_ms,
+                })
+                .collect(),
+            pauses: self
+                .pauses
+                .into_iter()
+                .map(|pause| KernelSchedulerPauseState {
+                    endpoint: pause.endpoint,
+                    time_class: pause.time_class,
+                    reasons: pause.reasons,
+                })
+                .collect(),
+            disposed: self.disposed,
+        };
+        KernelScheduler::import_restorable_state(state)
+            .map_err(|error| invalid("scheduler", error.to_string()))
+    }
+
     pub fn validate(&self) -> Result<(), SnapshotError> {
         strictly_sorted(
             &self
@@ -980,11 +1047,16 @@ impl RestorableKernelSnapshotV2 {
                 "scheduler/protocol/presentation owners must quiesce at terminal and all owners must quiesce at disposal",
             ));
         }
-        let mut protocol_timer_ids = Vec::new();
+        let mut claimed_timer_ids = self
+            .input_router
+            .repeats
+            .iter()
+            .map(|repeat| repeat.timer_id)
+            .collect::<Vec<_>>();
         if let Some(log) = &self.protocol.authority_log {
             for lease in &log.retained {
                 if let Some(timer_id) = lease.timer_id {
-                    protocol_timer_ids.push(timer_id);
+                    claimed_timer_ids.push(timer_id);
                     let scheduled = self
                         .scheduler
                         .timers
@@ -1011,7 +1083,7 @@ impl RestorableKernelSnapshotV2 {
         }
         if let Some(leases) = &self.protocol.proposal_leases {
             for target in &leases.timer_targets {
-                protocol_timer_ids.push(target.timer_id);
+                claimed_timer_ids.push(target.timer_id);
                 let scheduled = self
                     .scheduler
                     .timers
@@ -1037,7 +1109,7 @@ impl RestorableKernelSnapshotV2 {
         }
         if let Some(recovery) = &self.protocol.recovery {
             for timer in &recovery.timers {
-                protocol_timer_ids.push(timer.timer.timer_id);
+                claimed_timer_ids.push(timer.timer.timer_id);
                 let scheduled = self
                     .scheduler
                     .timers
@@ -1059,7 +1131,20 @@ impl RestorableKernelSnapshotV2 {
                 }
             }
         }
-        strictly_unique(&protocol_timer_ids, "protocol.timer_ids")?;
+        strictly_unique(&claimed_timer_ids, "scheduler.claimed_timer_ids")?;
+        let claimed_timer_ids = claimed_timer_ids.into_iter().collect::<BTreeSet<_>>();
+        let scheduled_timer_ids = self
+            .scheduler
+            .timers
+            .iter()
+            .map(|timer| timer.registration.timer_id)
+            .collect::<BTreeSet<_>>();
+        if claimed_timer_ids != scheduled_timer_ids {
+            return Err(invalid(
+                "scheduler.timers",
+                "scheduler timer inventory must exactly equal input and protocol owner claims",
+            ));
+        }
         self.game
             .validate()
             .map_err(|error| invalid("game", error.to_string()))?;
@@ -1103,7 +1188,7 @@ impl RestorableKernelSnapshotV2 {
             .protocol
             .recovery
             .as_ref()
-            .is_some_and(|recovery| !recovery.fence.control_projection_allowed);
+            .is_some_and(|recovery| recovery.fence.state != er_types::RecoveryFenceState::Open);
         let expected_actionable = projected.control.is_actionable()
             && self
                 .pending_presentations
@@ -1121,6 +1206,41 @@ impl RestorableKernelSnapshotV2 {
         }
         let humans = er_state::format::human_seats(&battle.format)
             .map_err(|error| invalid("game.state.battle.format", error.to_string()))?;
+        if self.pending_presentations.local_endpoint != local_seat {
+            return Err(invalid(
+                "pending_presentations.local_endpoint",
+                "presentation ownership must equal runtime_identity.local_seat",
+            ));
+        }
+        let frame_context = &self.protocol.frame_context.context;
+        if frame_context.sender_seat_id != local_seat
+            || frame_context.authority_seat_id != battle.authority_seat
+        {
+            return Err(invalid(
+                "protocol.frame_context",
+                "protocol sender/authority identity must equal the runtime and GameState topology",
+            ));
+        }
+        let has_disconnected_pause = self.scheduler.pauses.iter().any(|pause| {
+            pause.endpoint == local_seat
+                && pause.time_class == TimeClass::Connected
+                && pause.reasons.iter().any(|reason| reason == "disconnected")
+        });
+        let has_misplaced_disconnected_pause = self.scheduler.pauses.iter().any(|pause| {
+            (pause.endpoint != local_seat || pause.time_class != TimeClass::Connected)
+                && pause.reasons.iter().any(|reason| reason == "disconnected")
+        });
+        let transport_fenced = self
+            .protocol
+            .connections
+            .iter()
+            .any(|connection| connection.state != TransportState::Connected);
+        if has_misplaced_disconnected_pause || has_disconnected_pause != transport_fenced {
+            return Err(invalid(
+                "scheduler.pauses",
+                "connected-time pause state must exactly equal the protocol transport inventory",
+            ));
+        }
         let configured_role = match &self.runtime_identity.protocol_config.role {
             BattleProtocolRoleConfig::Authority { .. } => er_protocol::EndpointRole::Authority,
             BattleProtocolRoleConfig::Replica { .. } => er_protocol::EndpointRole::Replica,
@@ -1148,15 +1268,34 @@ impl RestorableKernelSnapshotV2 {
                         "authority runtime identity requires an admission owner",
                     )
                 })?;
-                let bindings_match = configured_log.peer_bindings.len() == owner.peer_bindings.len()
-                    && configured_log
-                        .peer_bindings
-                        .iter()
-                        .zip(&owner.peer_bindings)
-                        .all(|(configured, restored)| {
-                            configured.seat_id == restored.seat
-                                && configured.connection_generation == restored.generation
-                        });
+                let expected_peer_seats = humans
+                    .iter()
+                    .copied()
+                    .filter(|seat| *seat != local_seat)
+                    .collect::<Vec<_>>();
+                let owner_peer_seats = owner
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| binding.seat)
+                    .collect::<Vec<_>>();
+                let connection_peer_seats = self
+                    .protocol
+                    .connections
+                    .iter()
+                    .map(|connection| connection.peer_seat)
+                    .collect::<Vec<_>>();
+                let mut configured_bindings = configured_log
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| (binding.seat_id, binding.connection_generation))
+                    .collect::<Vec<_>>();
+                configured_bindings.sort_unstable();
+                let restored_bindings = owner
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| (binding.seat, binding.generation))
+                    .collect::<Vec<_>>();
+                let bindings_match = configured_bindings == restored_bindings;
                 if configured_log.local_context != owner.local_context
                     || !bindings_match
                     || configured_log.owner_id != owner.owner_id
@@ -1165,6 +1304,8 @@ impl RestorableKernelSnapshotV2 {
                     || configured_log.delivery_time_class != owner.delivery_time_class
                     || configured_log.max_delivery_attempts != owner.max_delivery_attempts
                     || *proposal_capacity != admission.capacity
+                    || owner_peer_seats != expected_peer_seats
+                    || connection_peer_seats != expected_peer_seats
                 {
                     return Err(invalid(
                         "runtime_identity.protocol_config",
@@ -1195,12 +1336,20 @@ impl RestorableKernelSnapshotV2 {
                         "replica runtime identity requires a recovery owner",
                     )
                 })?;
+                let connection_peer_seats = self
+                    .protocol
+                    .connections
+                    .iter()
+                    .map(|connection| connection.peer_seat)
+                    .collect::<Vec<_>>();
                 if configured_replica.receipt_context != owner.receipt_context
                     || configured_replica.authority_seat_id != owner.authority_seat
                     || configured_replica.authority_connection_generation
                         != owner.authority_generation
                     || proposal_leases != &leases.config
                     || recovery != &recovery_owner.config
+                    || owner.authority_seat != battle.authority_seat
+                    || connection_peer_seats != vec![battle.authority_seat]
                 {
                     return Err(invalid(
                         "runtime_identity.protocol_config",

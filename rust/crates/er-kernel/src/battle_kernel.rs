@@ -4,7 +4,7 @@
 //! input is reduced on cloned deterministic owners, the closed internal FIFO
 //! is drained to quiescence, and only then are state and effects published.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use er_content::pack::ContentPack;
@@ -21,15 +21,20 @@ use er_game::material::{
 use er_game::runtime::{
     BattleGameConfig, BattleUiResult, GameRuntime, GameRuntimeError,
 };
+use er_game::snapshot::{GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2};
 use er_protocol::{
-    AuthorityLog, AuthorityLogAction, AuthorityReplica, FrameValidator, InboundFrameResult,
-    KernelScheduler, ProposalAdmission, ProposalAdmissionLedger, ProposalIdentity,
-    PeerBinding,
+    AuthorityLog, AuthorityLogAction, AuthorityLogSnapshotBridge, AuthorityReplica,
+    AuthorityReplicaSnapshotBridge, ConnectionSnapshotV2, CorrelatedResponseSnapshotV2,
+    EndpointRole, FrameContextSnapshotV2, FrameValidator, InboundFrameResult, KernelScheduler,
+    PeerBinding, PeerIdentitySnapshotV2, PendingRecoverySnapshotV2, ProposalAdmission,
+    ProposalAdmissionLedger, ProposalAdmissionSnapshotBridge, ProposalIdentity,
     ProposalLeaseAction, ProposalLeaseManager, ProposalLeaseSpec, ProposalLeaseStart,
-    RecoveryAction, RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome,
-    RecoveryPhase, RecoveryTransaction, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
-    SchedulerCommand, ValidatedFrame, ValidatedFrameBody, control_id_of,
-    frame_contexts_compatible,
+    ProposalLeaseSnapshotBridge, ProtocolRuntimeSnapshotV2, RecoveryAction,
+    RecoveryBundleValidation, RecoveryFrontierStagingOutcome, RecoveryLiveState,
+    RecoveryMaterialOutcome, RecoveryPhase, RecoveryTransaction, RecoveryTransactionSnapshotBridge,
+    RecoveryValidationContext, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
+    SchedulerCommand, StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody, control_id_of,
+    frame_contexts_compatible, validate_recovery_bundle,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_state::format::human_seats;
@@ -38,7 +43,9 @@ use er_types::battle_command::{
     ReplacementSelection,
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan};
-use er_types::battle_ids::{AuthorityEpoch, BattlePresentationEventId};
+use er_types::battle_ids::{
+    AuthorityEpoch, BattlePresentationEventId, CanonicalHexBytes,
+};
 use er_types::battle_ui::{
     BATTLE_UI_PROJECTION_SCHEMA_VERSION, BattlePresentationEvent, BattleUiProjection,
     PresentationSettlementOutcome,
@@ -46,12 +53,12 @@ use er_types::battle_ui::{
 use er_types::{
     AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceipt,
     AuthorityReceiptBody, ButtonEvent, ConnectionGeneration, ControlProjectionOutcome,
-    FrameContext, InputTimerCommand, KernelEffect, KernelInput, LiveResourceSnapshot, NetworkFrame,
-    ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody,
-    RecoveryFenceState, RecoveryRequestBody, Revision, SeatId, TailRequestBody, TerminalState,
-    TimerId, TransportState,
+    FRAME_PROTOCOL_VERSION, FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput,
+    LiveResourceSnapshot, NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof,
+    RecoveryBundle, RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId,
+    TailRequestBody, TerminalState, TimerId, TransportState,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
 use thiserror::Error;
 
@@ -68,6 +75,10 @@ use crate::battle_replica::{ReplicaApplyError, apply_authority_material};
 use crate::battle_ui::{BattleUiAdapter, BattleUiAdapterError};
 use crate::input_router::{BattleButtonEvent, BattleInputOutput, InputRouteError};
 use crate::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
+use crate::snapshot::{
+    BattleKernelRuntimeIdentitySnapshotV1, InputRouterSnapshotV2,
+    PendingPresentationsSnapshotV1, SnapshotError,
+};
 use crate::ui_reducer::{BattleUiIntent, BattleUiReject};
 
 #[derive(Debug, Error)]
@@ -121,6 +132,15 @@ pub(crate) struct BattleMode {
     presentation_revisions: BTreeMap<BattlePresentationEventId, Revision>,
     suspended: bool,
     terminal_fenced: bool,
+}
+
+pub(crate) struct BattleModeSnapshotParts {
+    pub(crate) runtime_identity: BattleKernelRuntimeIdentitySnapshotV1,
+    pub(crate) input_router: InputRouterSnapshotV2,
+    pub(crate) ui: BattleUiProjection,
+    pub(crate) protocol: ProtocolRuntimeSnapshotV2,
+    pub(crate) game: GameRuntimeSnapshotV2,
+    pub(crate) pending_presentations: PendingPresentationsSnapshotV1,
 }
 
 #[derive(Clone, Debug)]
@@ -177,7 +197,8 @@ struct PendingReplicaMaterial {
     applied: MaterialApplyResult,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BattlePendingRecovery {
     peer: SeatId,
     context: FrameContext,
@@ -440,12 +461,151 @@ impl BattleMode {
         snapshot
     }
 
+    pub(crate) fn snapshot_parts(
+        &self,
+        scheduler: &KernelScheduler,
+        terminal: &Option<TerminalState>,
+        disposed: bool,
+    ) -> Result<BattleModeSnapshotParts, SnapshotError> {
+        self.validate_quiescent()
+            .map_err(|error| battle_snapshot_invalid("battle", error))?;
+
+        let ui = self.ui.snapshot_v2(scheduler)?;
+        let protocol = self.protocol.snapshot_v2()?;
+        let game = self.game.snapshot_v2().map_err(map_game_snapshot_error)?;
+        let pending_presentations = self.presentations.snapshot_v1()?;
+        let owner_quiesced = disposed || terminal.is_some();
+        if ui.disposed != disposed
+            || protocol.disposed != owner_quiesced
+            || pending_presentations.disposed != owner_quiesced
+        {
+            return Err(snapshot_invalid(
+                "disposed",
+                "battle owner disposal flags differ from the root lifecycle",
+            ));
+        }
+
+        let suspended = scheduler_has_reason(scheduler, "suspended");
+        if self.suspended != suspended {
+            return Err(snapshot_invalid(
+                "scheduler.pauses",
+                "battle suspension differs from the scheduler pause projection",
+            ));
+        }
+        let terminal_fenced = disposed || terminal.is_some();
+        if self.terminal_fenced != terminal_fenced {
+            return Err(snapshot_invalid(
+                "terminal",
+                "battle terminal fence differs from the root lifecycle",
+            ));
+        }
+
+        let revisions = presentation_revisions_from_protocol(
+            &protocol,
+            &pending_presentations.pending_barrier_ids,
+        )?;
+        if revisions != self.presentation_revisions {
+            return Err(snapshot_invalid(
+                "pending_presentations",
+                "pending presentation revisions differ from protocol causal evidence",
+            ));
+        }
+
+        let local_seat = self.game.local_seat();
+        if ui.local_seat != local_seat || pending_presentations.local_endpoint != local_seat {
+            return Err(snapshot_invalid(
+                "runtime_identity.local_seat",
+                "game, UI, and presentation owners disagree on the local seat",
+            ));
+        }
+        Ok(BattleModeSnapshotParts {
+            runtime_identity: BattleKernelRuntimeIdentitySnapshotV1 {
+                local_seat,
+                protocol_config: self.protocol_config.clone(),
+            },
+            input_router: ui.input_router,
+            ui: ui.projection,
+            protocol,
+            game,
+            pending_presentations,
+        })
+    }
+
+    pub(crate) fn from_snapshot_parts(
+        parts: BattleModeSnapshotParts,
+        scheduler: &mut KernelScheduler,
+        terminal: &Option<TerminalState>,
+        disposed: bool,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        let BattleModeSnapshotParts {
+            runtime_identity,
+            input_router,
+            ui,
+            protocol,
+            game,
+            pending_presentations,
+        } = parts;
+        let local_seat = runtime_identity.local_seat;
+        let owner_quiesced = disposed || terminal.is_some();
+        if input_router.disposed != disposed
+            || protocol.disposed != owner_quiesced
+            || pending_presentations.disposed != owner_quiesced
+        {
+            return Err(snapshot_invalid(
+                "disposed",
+                "battle owner disposal flags differ from the root lifecycle",
+            ));
+        }
+
+        let presentation_revisions = presentation_revisions_from_protocol(
+            &protocol,
+            &pending_presentations.pending_barrier_ids,
+        )?;
+        let game = GameRuntime::from_snapshot_v2(game, local_seat, content)
+            .map_err(map_game_snapshot_error)?;
+        let presentations = BattlePresentationState::from_snapshot_v1(pending_presentations)?;
+        let ui = BattleUiAdapter::from_snapshot_parts_v2(
+            local_seat,
+            ui,
+            input_router,
+            disposed,
+            scheduler,
+        )?;
+        let protocol = BattleProtocolState::from_snapshot_v2(protocol, scheduler)?;
+        let mode = Self {
+            game,
+            ui,
+            protocol_config: runtime_identity.protocol_config,
+            protocol,
+            presentations,
+            presentation_revisions,
+            suspended: scheduler_has_reason(scheduler, "suspended"),
+            terminal_fenced: disposed || terminal.is_some(),
+        };
+        mode.validate_quiescent()
+            .map_err(|error| battle_snapshot_invalid("battle", error))?;
+        Ok(mode)
+    }
+
     pub(crate) fn dispose(
         &mut self,
         scheduler: &mut KernelScheduler,
         reason: &str,
     ) -> Vec<KernelEffect> {
         let mut effects = Vec::new();
+        self.suspended = false;
+        self.terminal_fenced = true;
+        let mut fenced_projection = self.ui.projection().clone();
+        fenced_projection.actionable = false;
+        if let Err(error) = self.ui.install_projection(fenced_projection) {
+            effects.push(KernelEffect::EnterSharedTerminal {
+                terminal: TerminalState {
+                    terminal_id: "m3-dispose-ui".to_owned(),
+                    reason: error.to_string(),
+                },
+            });
+        }
         let ui = self.ui.dispose(scheduler);
         let _ = map_input_timer_commands(
             &mut effects,
@@ -458,6 +618,7 @@ impl BattleMode {
                 log,
                 proposals,
                 pending_recoveries,
+                transports,
                 staged_local_rebind,
                 staged_peer_rebinds,
                 ..
@@ -465,6 +626,9 @@ impl BattleMode {
                 let actions = log.dispose(reason, scheduler);
                 proposals.dispose();
                 pending_recoveries.clear();
+                for state in transports.values_mut() {
+                    *state = TransportState::Connected;
+                }
                 *staged_local_rebind = None;
                 staged_peer_rebinds.clear();
                 if let Err(error) = map_authority_actions(&mut effects, actions) {
@@ -480,6 +644,7 @@ impl BattleMode {
                 replica,
                 leases,
                 recovery,
+                transports,
                 staged_local_rebind,
                 staged_authority_rebind,
                 ..
@@ -489,6 +654,9 @@ impl BattleMode {
                 let proposal_actions = leases.dispose(reason, scheduler);
                 map_proposal_actions(&mut effects, proposal_actions);
                 replica.dispose(reason);
+                for state in transports.values_mut() {
+                    *state = TransportState::Connected;
+                }
                 *staged_local_rebind = None;
                 *staged_authority_rebind = None;
             }
@@ -748,6 +916,921 @@ impl BattleProtocolState {
                 "stagedAuthorityRebind": staged_authority_rebind,
             }),
         }
+    }
+
+    fn snapshot_v2(&self) -> Result<ProtocolRuntimeSnapshotV2, SnapshotError> {
+        let snapshot = match self {
+            Self::Authority {
+                context,
+                peer_bindings,
+                log,
+                proposals,
+                pending_recoveries,
+                transports,
+                staged_local_rebind,
+                staged_peer_rebinds,
+            } => {
+                let authority_log = log.snapshot_v2().map_err(map_protocol_snapshot_error)?;
+                let proposal_admission = proposals
+                    .snapshot_v2()
+                    .map_err(map_protocol_snapshot_error)?;
+                let disposed = authority_log.disposed;
+                if authority_log.local_context != *context
+                    || authority_log.disposed != proposal_admission.disposed
+                {
+                    return Err(snapshot_invalid(
+                        "protocol.authority",
+                        "authority owners disagree on context or disposal state",
+                    ));
+                }
+                let mut live_bindings = peer_bindings
+                    .iter()
+                    .map(|binding| (binding.seat_id, binding.connection_generation))
+                    .collect::<Vec<_>>();
+                live_bindings.sort_unstable();
+                let snapshot_bindings = authority_log
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| (binding.seat, binding.generation))
+                    .collect::<Vec<_>>();
+                if live_bindings != snapshot_bindings {
+                    return Err(snapshot_invalid(
+                        "protocol.authority_log.peer_bindings",
+                        "battle peer bindings differ from the authority log owner",
+                    ));
+                }
+                validate_transport_inventory(
+                    transports,
+                    std::iter::once(context.sender_seat_id)
+                        .chain(peer_bindings.iter().map(|binding| binding.seat_id)),
+                    "protocol.connections",
+                )?;
+
+                validate_schema_representable_local_transport(
+                    transports,
+                    context.sender_seat_id,
+                    peer_bindings.iter().map(|binding| binding.seat_id),
+                    authority_log.disposed,
+                )?;
+                let mut pending_correlations = Vec::new();
+                let mut pending_recovery_snapshots = Vec::new();
+                for (correlation_id, recovery) in pending_recoveries {
+                    pending_correlations.push(CorrelatedResponseSnapshotV2 {
+                        correlation_id: correlation_id.clone(),
+                        bytes: canonical_snapshot_bytes(
+                            recovery,
+                            "protocol.pending_correlations.authority_recovery",
+                        )?,
+                    });
+                    pending_recovery_snapshots.push(PendingRecoverySnapshotV2 {
+                        correlation_id: correlation_id.clone(),
+                        bundle: None,
+                    });
+                }
+                pending_correlations
+                    .sort_unstable_by(|left, right| left.correlation_id.cmp(&right.correlation_id));
+
+                let mut connections = peer_bindings
+                    .iter()
+                    .map(|binding| {
+                        Ok(ConnectionSnapshotV2 {
+                            peer_seat: binding.seat_id,
+                            generation: binding.connection_generation,
+                            state: transport_state(
+                                transports,
+                                binding.seat_id,
+                                "protocol.connections",
+                            )?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, SnapshotError>>()?;
+                connections.sort_unstable_by_key(|connection| connection.peer_seat);
+                let mut staged_rebinds = staged_peer_rebinds
+                    .iter()
+                    .map(|(seat, generation)| StagedPeerRebindSnapshotV2 {
+                        peer_seat: *seat,
+                        generation: *generation,
+                    })
+                    .collect::<Vec<_>>();
+                if let Some(generation) = staged_local_rebind {
+                    staged_rebinds.push(StagedPeerRebindSnapshotV2 {
+                        peer_seat: context.sender_seat_id,
+                        generation: *generation,
+                    });
+                }
+                staged_rebinds.sort_unstable_by_key(|rebind| rebind.peer_seat);
+                let peer = peer_bindings
+                    .iter()
+                    .min_by_key(|binding| binding.seat_id)
+                    .map(|binding| {
+                        peer_frame_context(
+                            context,
+                            binding.seat_id,
+                            binding.connection_generation,
+                        )
+                    });
+                ProtocolRuntimeSnapshotV2 {
+                    role: EndpointRole::Authority,
+                    authority_log: Some(authority_log),
+                    authority_replica: None,
+                    proposal_admission: Some(proposal_admission),
+                    proposal_leases: None,
+                    recovery: None,
+                    frame_context: FrameContextSnapshotV2 {
+                        context: context.clone(),
+                    },
+                    peer_identity: PeerIdentitySnapshotV2 {
+                        local: context.clone(),
+                        peer,
+                    },
+                    connections,
+                    pending_correlations,
+                    pending_material: None,
+                    pending_control: None,
+                    pending_recoveries: pending_recovery_snapshots,
+                    staged_rebinds,
+                    authority_rebind_pending: staged_local_rebind.is_some(),
+                    disposed,
+                }
+            }
+            Self::Replica {
+                context,
+                authority_seat,
+                authority_generation,
+                replica,
+                leases,
+                recovery,
+                recovery_config,
+                transports,
+                staged_local_rebind,
+                staged_authority_rebind,
+            } => {
+                let authority_replica = replica
+                    .snapshot_v2()
+                    .map_err(map_protocol_snapshot_error)?;
+                let proposal_leases = leases
+                    .snapshot_v2()
+                    .map_err(map_protocol_snapshot_error)?;
+                let recovery_snapshot = recovery
+                    .snapshot_v2()
+                    .map_err(map_protocol_snapshot_error)?;
+                let disposed = authority_replica.disposed;
+                if authority_replica.receipt_context != *context
+                    || authority_replica.authority_seat != *authority_seat
+                    || authority_replica.authority_generation != *authority_generation
+                    || recovery_snapshot.config != *recovery_config
+                    || authority_replica.disposed != proposal_leases.disposed
+                    || authority_replica.disposed != recovery_snapshot.disposed
+                {
+                    return Err(snapshot_invalid(
+                        "protocol.replica",
+                        "replica owners disagree on identity, configuration, or disposal state",
+                    ));
+                }
+                validate_transport_inventory(
+                    transports,
+                    [context.sender_seat_id, *authority_seat],
+                    "protocol.connections",
+                )?;
+                validate_schema_representable_local_transport(
+                    transports,
+                    context.sender_seat_id,
+                    [*authority_seat],
+                    authority_replica.disposed,
+                )?;
+                let mut staged_rebinds = Vec::new();
+                if let Some(generation) = staged_local_rebind {
+                    staged_rebinds.push(StagedPeerRebindSnapshotV2 {
+                        peer_seat: context.sender_seat_id,
+                        generation: *generation,
+                    });
+                }
+                if let Some(generation) = staged_authority_rebind {
+                    staged_rebinds.push(StagedPeerRebindSnapshotV2 {
+                        peer_seat: *authority_seat,
+                        generation: *generation,
+                    });
+                }
+                staged_rebinds.sort_unstable_by_key(|rebind| rebind.peer_seat);
+                ProtocolRuntimeSnapshotV2 {
+                    role: EndpointRole::Replica,
+                    authority_log: None,
+                    authority_replica: Some(authority_replica),
+                    proposal_admission: None,
+                    proposal_leases: Some(proposal_leases),
+                    recovery: Some(recovery_snapshot),
+                    frame_context: FrameContextSnapshotV2 {
+                        context: context.clone(),
+                    },
+                    peer_identity: PeerIdentitySnapshotV2 {
+                        local: context.clone(),
+                        peer: Some(peer_frame_context(
+                            context,
+                            *authority_seat,
+                            *authority_generation,
+                        )),
+                    },
+                    connections: vec![ConnectionSnapshotV2 {
+                        peer_seat: *authority_seat,
+                        generation: *authority_generation,
+                        state: transport_state(
+                            transports,
+                            *authority_seat,
+                            "protocol.connections",
+                        )?,
+                    }],
+                    pending_correlations: Vec::new(),
+                    pending_material: None,
+                    pending_control: None,
+                    pending_recoveries: Vec::new(),
+                    staged_rebinds,
+                    authority_rebind_pending: staged_authority_rebind.is_some(),
+                    disposed,
+                }
+            }
+        };
+        snapshot
+            .validate()
+            .map_err(map_protocol_snapshot_error)?;
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: ProtocolRuntimeSnapshotV2,
+        scheduler: &mut KernelScheduler,
+    ) -> Result<Self, SnapshotError> {
+        snapshot
+            .validate()
+            .map_err(map_protocol_snapshot_error)?;
+        if snapshot.pending_material.is_some() || snapshot.pending_control.is_some() {
+            return Err(snapshot_invalid(
+                "protocol.pending_material",
+                "prepared protocol material/control cannot cross a public kernel boundary",
+            ));
+        }
+        match snapshot.role {
+            EndpointRole::Authority => restore_authority_protocol(snapshot, scheduler),
+            EndpointRole::Replica => restore_replica_protocol(snapshot, scheduler),
+        }
+    }
+}
+
+fn restore_authority_protocol(
+    snapshot: ProtocolRuntimeSnapshotV2,
+    scheduler: &mut KernelScheduler,
+) -> Result<BattleProtocolState, SnapshotError> {
+    let ProtocolRuntimeSnapshotV2 {
+        authority_log,
+        proposal_admission,
+        frame_context,
+        peer_identity,
+        connections,
+        pending_correlations,
+        pending_recoveries,
+        staged_rebinds,
+        authority_rebind_pending,
+        disposed,
+        ..
+    } = snapshot;
+    let authority_log = authority_log.ok_or_else(|| {
+        snapshot_invalid(
+            "protocol.authority_log",
+            "authority snapshot is missing its log owner",
+        )
+    })?;
+    let proposal_admission = proposal_admission.ok_or_else(|| {
+        snapshot_invalid(
+            "protocol.proposal_admission",
+            "authority snapshot is missing its proposal owner",
+        )
+    })?;
+    let context = frame_context.context;
+    let peer_bindings = authority_log
+        .peer_bindings
+        .iter()
+        .map(|binding| PeerBinding {
+            seat_id: binding.seat,
+            connection_generation: binding.generation,
+        })
+        .collect::<Vec<_>>();
+    let expected_peer = peer_bindings
+        .iter()
+        .min_by_key(|binding| binding.seat_id)
+        .map(|binding| {
+            peer_frame_context(
+                &context,
+                binding.seat_id,
+                binding.connection_generation,
+            )
+        });
+    if peer_identity.local != context || peer_identity.peer != expected_peer {
+        return Err(snapshot_invalid(
+            "protocol.peer_identity",
+            "authority peer identity is not the exact active binding projection",
+        ));
+    }
+
+    let mut transports = BTreeMap::new();
+    let mut correlations = correlation_map(pending_correlations)?;
+    if connections.len() != peer_bindings.len() {
+        return Err(snapshot_invalid(
+            "protocol.connections",
+            "authority connection inventory differs from its peer bindings",
+        ));
+    }
+    for binding in &peer_bindings {
+        let connection = connections
+            .iter()
+            .find(|connection| connection.peer_seat == binding.seat_id)
+            .ok_or_else(|| {
+                snapshot_invalid(
+                    "protocol.connections",
+                    "authority peer binding has no connection state",
+                )
+            })?;
+        if connection.generation != binding.connection_generation {
+            return Err(snapshot_invalid(
+                "protocol.connections",
+                "authority connection generation differs from its peer binding",
+            ));
+        }
+        transports.insert(binding.seat_id, connection.state);
+    }
+    let local_transport = local_transport_from_connections(&connections, disposed)?;
+    transports.insert(context.sender_seat_id, local_transport);
+
+    let mut restored_pending = BTreeMap::new();
+    for pending in pending_recoveries {
+        if pending.bundle.is_some() {
+            return Err(snapshot_invalid(
+                "protocol.pending_recoveries",
+                "authority pending recovery cannot carry a replica-owned bundle",
+            ));
+        }
+        let bytes = correlations.remove(&pending.correlation_id).ok_or_else(|| {
+            snapshot_invalid(
+                "protocol.pending_correlations",
+                "authority pending recovery has no exact private causal record",
+            )
+        })?;
+        let recovery: BattlePendingRecovery = decode_canonical_snapshot_bytes(
+            &bytes,
+            "protocol.pending_correlations.authority_recovery",
+        )?;
+        let response_body = serde_json::from_value::<RecoveryBundleBody>(
+            recovery.response_frame.body.clone(),
+        )
+        .map_err(|error| {
+            snapshot_invalid(
+                "protocol.pending_correlations.authority_recovery.response_frame",
+                error.to_string(),
+            )
+        })?;
+        let canonical_response_body = serde_json::to_value(&response_body).map_err(|error| {
+            snapshot_invalid(
+                "protocol.pending_correlations.authority_recovery.response_frame",
+                error.to_string(),
+            )
+        })?;
+        let response_bundle = response_body.with_context(recovery.response_frame.context.clone());
+        let response_validation = validate_recovery_bundle(
+            &RecoveryValidationContext {
+                expected_request_id: pending.correlation_id.clone(),
+                live_context: recovery.context.clone(),
+                captured_frontier: recovery.captured_frontier,
+            },
+            &response_bundle,
+        );
+        let response_final_material = response_bundle
+            .required_tail
+            .last()
+            .map(|entry| &entry.material);
+        let response_control_id = response_bundle.next_control.as_ref().map(control_id_of);
+        if recovery.peer != recovery.context.sender_seat_id
+            || !authority_accepts_peer_frame(
+                &context,
+                &peer_bindings,
+                context.sender_seat_id,
+                &recovery.context,
+            )
+            || !matches!(response_validation, RecoveryBundleValidation::Valid { .. })
+            || canonical_response_body != recovery.response_frame.body
+            || recovery.response_frame.version != FRAME_PROTOCOL_VERSION
+            || recovery.response_frame.frame_type != FrameType::RecoveryBundle
+            || recovery.response_frame.context != context
+            || response_bundle.frontier != recovery.frontier
+            || response_final_material != Some(&response_bundle.material)
+            || response_bundle.material.digest != recovery.material_digest
+            || response_control_id != recovery.control_id
+        {
+            return Err(snapshot_invalid(
+                "protocol.pending_correlations.authority_recovery",
+                "pending recovery peer/context is not an active authority binding",
+            ));
+        }
+        if restored_pending
+            .insert(pending.correlation_id, recovery)
+            .is_some()
+        {
+            return Err(snapshot_invalid(
+                "protocol.pending_recoveries",
+                "duplicate authority recovery correlation",
+            ));
+        }
+    }
+    if !correlations.is_empty() {
+        return Err(snapshot_invalid(
+            "protocol.pending_correlations",
+            "authority snapshot contains an unowned private correlation",
+        ));
+    }
+
+    let mut staged_local_rebind = None;
+    let mut staged_peer_rebinds = BTreeMap::new();
+    for staged in staged_rebinds {
+        if staged.peer_seat == context.sender_seat_id {
+            if staged.generation <= context.connection_generation
+                || staged_local_rebind.replace(staged.generation).is_some()
+            {
+                return Err(snapshot_invalid(
+                    "protocol.staged_rebinds",
+                    "authority local rebind must be one fresh generation",
+                ));
+            }
+            continue;
+        }
+        let binding = peer_bindings
+            .iter()
+            .find(|binding| binding.seat_id == staged.peer_seat)
+            .ok_or_else(|| {
+                snapshot_invalid(
+                    "protocol.staged_rebinds",
+                    "authority rebind names an unknown peer",
+                )
+            })?;
+        if staged.generation <= binding.connection_generation
+            || staged_peer_rebinds
+                .insert(staged.peer_seat, staged.generation)
+                .is_some()
+        {
+            return Err(snapshot_invalid(
+                "protocol.staged_rebinds",
+                "authority peer rebind must be one fresh generation",
+            ));
+        }
+    }
+    if authority_rebind_pending != staged_local_rebind.is_some() {
+        return Err(snapshot_invalid(
+            "protocol.authority_rebind_pending",
+            "authority local rebind marker differs from staged state",
+        ));
+    }
+    let log = <AuthorityLog as AuthorityLogSnapshotBridge>::from_snapshot_v2(
+        authority_log,
+        scheduler,
+    )
+    .map_err(map_protocol_snapshot_error)?;
+    let proposals =
+        <ProposalAdmissionLedger as ProposalAdmissionSnapshotBridge>::from_snapshot_v2(
+            proposal_admission,
+        )
+        .map_err(map_protocol_snapshot_error)?;
+    if disposed != log.snapshot_v2().map_err(map_protocol_snapshot_error)?.disposed {
+        return Err(snapshot_invalid(
+            "protocol.disposed",
+            "restored authority owner differs from the protocol lifecycle",
+        ));
+    }
+    Ok(BattleProtocolState::Authority {
+        context,
+        peer_bindings,
+        log,
+        proposals,
+        pending_recoveries: restored_pending,
+        transports,
+        staged_local_rebind,
+        staged_peer_rebinds,
+    })
+}
+
+fn restore_replica_protocol(
+    snapshot: ProtocolRuntimeSnapshotV2,
+    scheduler: &mut KernelScheduler,
+) -> Result<BattleProtocolState, SnapshotError> {
+    let ProtocolRuntimeSnapshotV2 {
+        authority_replica,
+        proposal_leases,
+        recovery,
+        frame_context,
+        peer_identity,
+        connections,
+        pending_correlations,
+        pending_recoveries,
+        staged_rebinds,
+        authority_rebind_pending,
+        disposed,
+        ..
+    } = snapshot;
+    if !pending_recoveries.is_empty() {
+        return Err(snapshot_invalid(
+            "protocol.pending_recoveries",
+            "replica recovery state belongs exclusively to its recovery owner",
+        ));
+    }
+    let authority_replica = authority_replica.ok_or_else(|| {
+        snapshot_invalid(
+            "protocol.authority_replica",
+            "replica snapshot is missing its frontier owner",
+        )
+    })?;
+    let proposal_leases = proposal_leases.ok_or_else(|| {
+        snapshot_invalid(
+            "protocol.proposal_leases",
+            "replica snapshot is missing its proposal lease owner",
+        )
+    })?;
+    let recovery = recovery.ok_or_else(|| {
+        snapshot_invalid(
+            "protocol.recovery",
+            "replica snapshot is missing its recovery owner",
+        )
+    })?;
+    let context = frame_context.context;
+    let authority_seat = authority_replica.authority_seat;
+    let authority_generation = authority_replica.authority_generation;
+    let expected_peer = peer_frame_context(&context, authority_seat, authority_generation);
+    if peer_identity.local != context || peer_identity.peer.as_ref() != Some(&expected_peer) {
+        return Err(snapshot_invalid(
+            "protocol.peer_identity",
+            "replica peer identity is not its exact active authority binding",
+        ));
+    }
+    if connections.len() != 1
+        || connections[0].peer_seat != authority_seat
+        || connections[0].generation != authority_generation
+    {
+        return Err(snapshot_invalid(
+            "protocol.connections",
+            "replica requires exactly one active authority connection",
+        ));
+    }
+
+    let correlations = correlation_map(pending_correlations)?;
+    if !correlations.is_empty() {
+        return Err(snapshot_invalid(
+            "protocol.pending_correlations",
+            "replica snapshot contains an unowned private correlation",
+        ));
+    }
+    let local_transport = local_transport_from_connections(&connections, disposed)?;
+    let mut staged_local_rebind = None;
+    let mut staged_authority_rebind = None;
+    for staged in staged_rebinds {
+        if staged.peer_seat == context.sender_seat_id {
+            if staged.generation <= context.connection_generation
+                || staged_local_rebind.replace(staged.generation).is_some()
+            {
+                return Err(snapshot_invalid(
+                    "protocol.staged_rebinds",
+                    "replica local rebind must be one fresh generation",
+                ));
+            }
+        } else if staged.peer_seat == authority_seat {
+            if staged.generation <= authority_generation
+                || staged_authority_rebind.replace(staged.generation).is_some()
+            {
+                return Err(snapshot_invalid(
+                    "protocol.staged_rebinds",
+                    "replica authority rebind must be one fresh generation",
+                ));
+            }
+        } else {
+            return Err(snapshot_invalid(
+                "protocol.staged_rebinds",
+                "replica rebind names an unknown endpoint",
+            ));
+        }
+    }
+    if authority_rebind_pending != staged_authority_rebind.is_some() {
+        return Err(snapshot_invalid(
+            "protocol.authority_rebind_pending",
+            "replica authority rebind marker differs from staged state",
+        ));
+    }
+
+    let recovery_config = recovery.config.clone();
+    let replica =
+        <AuthorityReplica as AuthorityReplicaSnapshotBridge>::from_snapshot_v2(authority_replica)
+            .map_err(map_protocol_snapshot_error)?;
+    let leases = <ProposalLeaseManager as ProposalLeaseSnapshotBridge>::from_snapshot_v2(
+        proposal_leases,
+        scheduler,
+    )
+    .map_err(map_protocol_snapshot_error)?;
+    let recovery = <RecoveryTransaction as RecoveryTransactionSnapshotBridge>::from_snapshot_v2(
+        recovery,
+        scheduler,
+    )
+    .map_err(map_protocol_snapshot_error)?;
+    if disposed
+        != replica
+            .snapshot_v2()
+            .map_err(map_protocol_snapshot_error)?
+            .disposed
+    {
+        return Err(snapshot_invalid(
+            "protocol.disposed",
+            "restored replica owner differs from the protocol lifecycle",
+        ));
+    }
+    let local_seat = context.sender_seat_id;
+    Ok(BattleProtocolState::Replica {
+        context,
+        authority_seat,
+        authority_generation,
+        replica,
+        leases,
+        recovery,
+        recovery_config,
+        transports: BTreeMap::from([
+            (local_seat, local_transport),
+            (authority_seat, connections[0].state),
+        ]),
+        staged_local_rebind,
+        staged_authority_rebind,
+    })
+}
+
+fn peer_frame_context(
+    local: &FrameContext,
+    peer_seat: SeatId,
+    generation: ConnectionGeneration,
+) -> FrameContext {
+    let mut peer = local.clone();
+    peer.sender_seat_id = peer_seat;
+    peer.connection_generation = generation;
+    peer
+}
+
+fn validate_transport_inventory<I>(
+    transports: &BTreeMap<SeatId, TransportState>,
+    expected: I,
+    path: &str,
+) -> Result<(), SnapshotError>
+where
+    I: IntoIterator<Item = SeatId>,
+{
+    let expected = expected.into_iter().collect::<BTreeSet<_>>();
+    let actual = transports.keys().copied().collect::<BTreeSet<_>>();
+    if expected != actual || expected.len() != transports.len() {
+        return Err(snapshot_invalid(
+            path,
+            "transport inventory differs from the protocol endpoint topology",
+        ));
+    }
+    Ok(())
+}
+
+fn transport_state(
+    transports: &BTreeMap<SeatId, TransportState>,
+    seat: SeatId,
+    path: &str,
+) -> Result<TransportState, SnapshotError> {
+    transports
+        .get(&seat)
+        .copied()
+        .ok_or_else(|| snapshot_invalid(path, "transport endpoint is absent"))
+}
+
+fn validate_schema_representable_local_transport<I>(
+    transports: &BTreeMap<SeatId, TransportState>,
+    local_seat: SeatId,
+    peer_seats: I,
+    disposed: bool,
+) -> Result<(), SnapshotError>
+where
+    I: IntoIterator<Item = SeatId>,
+{
+    let state = transport_state(transports, local_seat, "protocol.local_transport")?;
+    let peer_states = peer_seats
+        .into_iter()
+        .map(|seat| transport_state(transports, seat, "protocol.connections"))
+        .collect::<Result<Vec<_>, _>>()?;
+    if disposed
+        && (state != TransportState::Connected
+            || peer_states
+                .iter()
+                .any(|peer| *peer != TransportState::Connected))
+    {
+        return Err(snapshot_invalid(
+            "protocol.local_transport",
+            "disposed protocol must normalize every inert transport",
+        ));
+    }
+    if peer_states.is_empty() && state != TransportState::Connected {
+        return Err(snapshot_invalid(
+            "protocol.local_transport",
+            "a local-only transport state is not representable by the frozen protocol schema",
+        ));
+    }
+    if peer_states.iter().any(|peer| *peer != state) {
+        return Err(snapshot_invalid(
+            "protocol.local_transport",
+            "local transport must equal every peer transport to be losslessly derived from connections",
+        ));
+    }
+    Ok(())
+}
+
+fn local_transport_from_connections(
+    connections: &[ConnectionSnapshotV2],
+    disposed: bool,
+) -> Result<TransportState, SnapshotError> {
+    let state = connections
+        .first()
+        .map_or(TransportState::Connected, |connection| connection.state);
+    if connections
+        .iter()
+        .any(|connection| connection.state != state)
+    {
+        return Err(snapshot_invalid(
+            "protocol.connections",
+            "peer transports disagree, so the local transport cannot be derived losslessly",
+        ));
+    }
+    if disposed && state != TransportState::Connected {
+        return Err(snapshot_invalid(
+            "protocol.connections",
+            "disposed protocol must normalize every inert transport",
+        ));
+    }
+    Ok(state)
+}
+
+fn correlation_map(
+    correlations: Vec<CorrelatedResponseSnapshotV2>,
+) -> Result<BTreeMap<String, CanonicalHexBytes>, SnapshotError> {
+    let mut result = BTreeMap::new();
+    for correlation in correlations {
+        if result
+            .insert(correlation.correlation_id, correlation.bytes)
+            .is_some()
+        {
+            return Err(snapshot_invalid(
+                "protocol.pending_correlations",
+                "duplicate correlation identity",
+            ));
+        }
+    }
+    Ok(result)
+}
+
+fn canonical_snapshot_bytes<T: Serialize>(
+    value: &T,
+    path: &str,
+) -> Result<CanonicalHexBytes, SnapshotError> {
+    let bytes = er_canonical::canonical_bytes(value)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    Ok(CanonicalHexBytes::from_bytes(&bytes))
+}
+
+fn decode_canonical_snapshot_bytes<T>(
+    value: &CanonicalHexBytes,
+    path: &str,
+) -> Result<T, SnapshotError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    let raw = value.as_str().as_bytes();
+    if raw.is_empty() {
+        return Err(snapshot_canonical(path, "canonical payload must not be empty"));
+    }
+    let mut bytes = Vec::with_capacity(raw.len() / 2);
+    for index in (0..raw.len()).step_by(2) {
+        let high = snapshot_hex_value(raw[index])
+            .ok_or_else(|| snapshot_canonical(path, "invalid hexadecimal payload"))?;
+        let low = snapshot_hex_value(raw[index + 1])
+            .ok_or_else(|| snapshot_canonical(path, "invalid hexadecimal payload"))?;
+        bytes.push((high << 4) | low);
+    }
+    let decoded = serde_json::from_slice::<T>(&bytes)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    let canonical = er_canonical::canonical_bytes(&decoded)
+        .map_err(|error| snapshot_canonical(path, error.to_string()))?;
+    if canonical != bytes {
+        return Err(snapshot_canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
+    }
+    Ok(decoded)
+}
+
+fn snapshot_hex_value(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        _ => None,
+    }
+}
+
+fn scheduler_has_reason(scheduler: &KernelScheduler, expected: &str) -> bool {
+    scheduler.export_restorable_state().pauses.iter().any(|pause| {
+        pause
+            .reasons
+            .iter()
+            .any(|reason| reason.as_str() == expected)
+    })
+}
+
+fn presentation_revisions_from_protocol(
+    protocol: &ProtocolRuntimeSnapshotV2,
+    pending: &[BattlePresentationEventId],
+) -> Result<BTreeMap<BattlePresentationEventId, Revision>, SnapshotError> {
+    let mut candidates = BTreeMap::<er_types::OperationId, BTreeSet<Revision>>::new();
+    if let Some(log) = &protocol.authority_log {
+        for lease in &log.retained {
+            candidates
+                .entry(lease.entry.identity.operation_id.clone())
+                .or_default()
+                .insert(lease.entry.identity.revision);
+        }
+        if let Some(entry) = &log.latest_committed {
+            candidates
+                .entry(entry.identity.operation_id.clone())
+                .or_default()
+                .insert(entry.identity.revision);
+        }
+    }
+    if let Some(replica) = &protocol.authority_replica {
+        if let Some(pending_entry) = &replica.pending {
+            candidates
+                .entry(pending_entry.entry.identity.operation_id.clone())
+                .or_default()
+                .insert(pending_entry.entry.identity.revision);
+        }
+        for installed in &replica.installed_controls {
+            candidates
+                .entry(installed.identity.operation_id.clone())
+                .or_default()
+                .insert(installed.identity.revision);
+        }
+        if let Some(proof) = &replica.recovery_proof {
+            candidates
+                .entry(proof.operation_id.clone())
+                .or_default()
+                .insert(proof.revision);
+        }
+    }
+
+    let mut result = BTreeMap::new();
+    for event_id in pending {
+        let revisions = candidates.get(&event_id.operation_id).ok_or_else(|| {
+            snapshot_invalid(
+                "pending_presentations.pending_barrier_ids",
+                "pending presentation has no retained protocol revision",
+            )
+        })?;
+        if revisions.len() != 1 {
+            return Err(snapshot_invalid(
+                "pending_presentations.pending_barrier_ids",
+                "pending presentation has ambiguous protocol revisions",
+            ));
+        }
+        let revision = revisions.iter().next().copied().ok_or_else(|| {
+            snapshot_invalid(
+                "pending_presentations.pending_barrier_ids",
+                "pending presentation revision disappeared",
+            )
+        })?;
+        result.insert(event_id.clone(), revision);
+    }
+    Ok(result)
+}
+
+fn map_protocol_snapshot_error(error: er_protocol::SnapshotError) -> SnapshotError {
+    snapshot_invalid("protocol", error.to_string())
+}
+
+fn map_game_snapshot_error(error: er_game::snapshot::SnapshotError) -> SnapshotError {
+    snapshot_invalid("game", error.to_string())
+}
+
+fn battle_snapshot_invalid(path: &str, error: impl std::fmt::Display) -> SnapshotError {
+    snapshot_invalid(path, error.to_string())
+}
+
+fn snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn snapshot_canonical(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Canonical {
+        path: path.into(),
+        reason: reason.into(),
     }
 }
 
@@ -2804,13 +3887,7 @@ impl BattleTransaction {
             )?;
         }
         let connected = state == TransportState::Connected;
-        let scheduler_commands = self
-            .scheduler
-            .set_connected(endpoint, connected)
-            .map_err(protocol_error)?;
-        for command in scheduler_commands {
-            map_scheduler_command(&mut self.effects, command);
-        }
+        let scheduler_commands;
         let mut authority_actions = Vec::new();
         let mut proposal_actions = Vec::new();
         let mut recovery_cleanup_actions = Vec::new();
@@ -2844,6 +3921,15 @@ impl BattleTransaction {
                 };
                 let generation_changed = generation > active_generation;
                 transports.insert(endpoint, state);
+                scheduler_commands = self
+                    .scheduler
+                    .set_connected(
+                        local,
+                        transports
+                            .values()
+                            .all(|transport| *transport == TransportState::Connected),
+                    )
+                    .map_err(protocol_error)?;
                 if endpoint == local && generation_changed {
                     *staged_local_rebind = Some(generation);
                     pending_recoveries.clear();
@@ -2913,6 +3999,15 @@ impl BattleTransaction {
                 };
                 let generation_changed = generation > active_generation;
                 transports.insert(endpoint, state);
+                scheduler_commands = self
+                    .scheduler
+                    .set_connected(
+                        local,
+                        transports
+                            .values()
+                            .all(|transport| *transport == TransportState::Connected),
+                    )
+                    .map_err(protocol_error)?;
                 if endpoint == local && generation_changed {
                     *staged_local_rebind = Some(generation);
                 }
@@ -3007,6 +4102,9 @@ impl BattleTransaction {
             replica.authority_connection_generation = next_authority_generation;
             recovery.local_context = next_context;
         }
+        for command in scheduler_commands {
+            map_scheduler_command(&mut self.effects, command);
+        }
         map_authority_actions(&mut self.effects, authority_actions)?;
         map_recovery_rebind_cleanup(&mut self.effects, recovery_cleanup_actions)?;
         self.apply_proposal_actions(proposal_actions)?;
@@ -3078,6 +4176,7 @@ impl BattleTransaction {
                 log,
                 proposals,
                 pending_recoveries,
+                transports,
                 staged_local_rebind,
                 staged_peer_rebinds,
                 ..
@@ -3085,6 +4184,9 @@ impl BattleTransaction {
                 let actions = log.dispose(&terminal.reason, &mut self.scheduler);
                 proposals.dispose();
                 pending_recoveries.clear();
+                for state in transports.values_mut() {
+                    *state = TransportState::Connected;
+                }
                 *staged_local_rebind = None;
                 staged_peer_rebinds.clear();
                 map_authority_actions(&mut self.effects, actions)?;
@@ -3093,6 +4195,7 @@ impl BattleTransaction {
                 replica,
                 leases,
                 recovery,
+                transports,
                 staged_local_rebind,
                 staged_authority_rebind,
                 ..
@@ -3115,6 +4218,9 @@ impl BattleTransaction {
                     }
                 }
                 replica.dispose(&terminal.reason);
+                for state in transports.values_mut() {
+                    *state = TransportState::Connected;
+                }
                 *staged_local_rebind = None;
                 *staged_authority_rebind = None;
             }
@@ -3129,6 +4235,7 @@ impl BattleTransaction {
         self.pending_replacements.clear();
         self.pending_replica_material = None;
         self.pending_presentation_probes.clear();
+        self.staged.suspended = false;
         self.staged.terminal_fenced = true;
         self.install_current_projection()?;
         self.terminal = Some(terminal.clone());
