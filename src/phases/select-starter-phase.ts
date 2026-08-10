@@ -50,6 +50,7 @@ import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coo
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { initializeMoodyModeState, resetMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import {
   beginShowdownBattle,
   consumePendingShowdownPresetStarters,
@@ -982,6 +983,11 @@ export class SelectStarterPhase extends Phase {
     }
     Promise.all(loadPokemonAssets).then(() => {
       const finishLaunch = () => {
+        if (globalScene.gameMode.isFun && getFunModeConfig().moodyMode) {
+          initializeMoodyModeState(globalScene.seed);
+        } else {
+          resetMoodyModeState();
+        }
         // Guard: the menu BGM may not exist (e.g. the AudioContext never started
         // because the browser blocked autoplay). Fading out a null sound throws,
         // which would reject this promise and leave the run stuck on a blank field.

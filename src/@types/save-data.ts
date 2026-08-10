@@ -9,6 +9,7 @@ import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-s
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import type { TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
+import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
 import type { ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
@@ -141,6 +142,8 @@ export interface SessionSaveData {
   erDifficulty?: ErDifficulty;
   /** Fun Mode randomizer toggles. Absent on every non-Fun and legacy save. */
   funModeConfig?: FunModeConfig;
+  /** Moody Mode's run-local boon, curse, progression, and threat ledger. */
+  moodyModeState?: MoodyModeSaveData;
   /**
    * ER: stableKeys of trainers already encountered this run, so the difficulty's
    * trainer pool doesn't repeat across a save/load. Optional for backwards

@@ -3504,6 +3504,12 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
     if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
       if (active) {
         if (pokemon.customPokemonData.erFunMegaStone === this.formChangeItem) {
+          if (pokemon.customPokemonData.erFunPseudoMega) {
+            const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+            pokemon.calculateStats();
+            pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+            void pokemon.updateInfo();
+          }
           return true;
         }
         const realMega = getFunRealMegaChange(pokemon, this.formChangeItem);

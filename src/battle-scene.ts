@@ -101,6 +101,11 @@ import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
+  generateMoodyEnemyBoonLoadout,
+  resetMoodyEnemyBoonLoadout,
+  setMoodyEnemyBoonLoadout,
+} from "#data/elite-redux/moody/moody-enemy";
+import {
   getShowdownBattleFormat,
   getShowdownFieldOpponentManifest,
   getShowdownFieldOpponentName,
@@ -177,6 +182,7 @@ import {
   RememberMoveModifier,
 } from "#modifiers/modifier";
 import {
+  FormChangeItemModifierType,
   getDefaultModifierTypeForTier,
   getEnemyModifierTypesForWave,
   getLuckString,
@@ -1222,7 +1228,7 @@ export class BattleScene extends SceneBase {
     // Trainer mons are exempt (champion configs legally pin megas); loaded
     // save data is exempt (round-trips whatever was already legal).
     // (TrainerSlot.NONE === 0; numeric compare keeps the type-only import)
-    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0) {
+    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0 && pokemon.getFunMegaStone() == null) {
       const formKey = species.forms?.[pokemon.formIndex]?.formKey ?? "";
       if (/mega|primal|eternamax|gigantamax|gmax/i.test(formKey)) {
         console.warn(`ER #421: wild ${species.name} spawned at battle-only form "${formKey}" - resetting to base`);
@@ -4237,11 +4243,35 @@ export class BattleScene extends SceneBase {
             upgradeChance,
           ).map(mt => mt.newModifier(enemyPokemon).add(this.enemyModifiers, false));
         }
+        const funMegaStone = enemyPokemon.getFunMegaStone();
+        if (
+          this.gameMode.isFun
+          && getFunModeConfig().megaMode
+          && funMegaStone != null
+          && !this.enemyModifiers.some(
+            modifier =>
+              modifier instanceof PokemonFormChangeItemModifier
+              && modifier.pokemonId === enemyPokemon.id
+              && modifier.formChangeItem === funMegaStone,
+          )
+        ) {
+          const stoneModifier = new FormChangeItemModifierType(funMegaStone)
+            .withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM)
+            .newModifier(enemyPokemon);
+          if (stoneModifier instanceof PersistentModifier) {
+            void this.addEnemyModifier(stoneModifier, true, true);
+          }
+        }
         return true;
       });
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
+      if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+        setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(party, this.currentBattle.waveIndex));
+      } else {
+        resetMoodyEnemyBoonLoadout();
+      }
       // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
       // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
       // each wild mon's baseline roll to the floor (never reduces a luckier roll).

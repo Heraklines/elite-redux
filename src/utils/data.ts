@@ -253,6 +253,7 @@ const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
   "weatherRoulette",
   "scrambleMoves",
   "abilityAvalanche",
+  "moodyMode",
 ];
 
 const LEGACY_FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [

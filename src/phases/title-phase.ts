@@ -36,6 +36,7 @@ import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state
 import { resetFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { loadEliteReduxCustomIconsInBackground } from "#data/elite-redux/er-ios-icon-preload";
 import { shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
+import { resetMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
 import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
@@ -415,6 +416,7 @@ export class TitlePhase extends Phase {
             label: GameMode.getModeName(GameModes.FUN),
             handler: () => {
               resetFunModeConfig();
+              resetMoodyModeState();
               setModeAndEnd(GameModes.FUN);
               return true;
             },

@@ -131,6 +131,10 @@ export function applyFunMegaStatDelta(baseStats: readonly number[], item: FormCh
   return baseStats.map((stat, index) => Math.max(1, stat + (delta?.[index] ?? 0)));
 }
 
+export function isFunPseudoMegaActive(markedPseudoMega: boolean, recordedStone: unknown, hasHeldStone: boolean): boolean {
+  return markedPseudoMega && recordedStone != null && hasHeldStone;
+}
+
 function mix32(value: number): number {
   let mixed = value >>> 0;
   mixed ^= mixed >>> 16;

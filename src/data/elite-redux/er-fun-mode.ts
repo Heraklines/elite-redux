@@ -26,6 +26,7 @@ export interface FunModeConfig {
   weatherRoulette: boolean;
   scrambleMoves: boolean;
   abilityAvalanche: boolean;
+  moodyMode: boolean;
   abilityRerollSeed: number;
 }
 
@@ -41,6 +42,7 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   weatherRoulette: false,
   scrambleMoves: false,
   abilityAvalanche: false,
+  moodyMode: false,
   abilityRerollSeed: 0,
 });
 
@@ -65,6 +67,7 @@ export function setFunModeConfig(config: FunModeConfig): void {
     weatherRoulette: config.weatherRoulette === true,
     scrambleMoves: config.scrambleMoves === true,
     abilityAvalanche: config.abilityAvalanche === true,
+    moodyMode: config.moodyMode === true,
     abilityRerollSeed: Number.isFinite(config.abilityRerollSeed) ? Math.max(0, Math.floor(config.abilityRerollSeed)) : 0,
   };
 }

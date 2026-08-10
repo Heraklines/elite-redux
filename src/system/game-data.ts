@@ -85,6 +85,12 @@ import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/e
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
+import {
+  getMoodyModeSaveData,
+  initializeMoodyModeState,
+  resetMoodyModeState,
+  restoreMoodyModeState,
+} from "#data/elite-redux/moody/moody-state";
 import { swapSessionData } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import {
@@ -1971,6 +1977,7 @@ export class GameData {
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
       funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
+      moodyModeState: globalScene.gameMode.isFun && getFunModeConfig().moodyMode ? getMoodyModeSaveData() : undefined,
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
@@ -5162,6 +5169,15 @@ export class GameData {
       } else {
         resetFunModeConfig();
       }
+      if (getFunModeConfig().moodyMode) {
+        if (!restoreMoodyModeState(fromSession.moodyModeState)) {
+          initializeMoodyModeState(fromSession.seed);
+        }
+      } else {
+        resetMoodyModeState();
+      }
+    } else {
+      resetMoodyModeState();
     }
     if (fromSession.challenges) {
       globalScene.gameMode.challenges = fromSession.challenges.map(c => c.toChallenge());

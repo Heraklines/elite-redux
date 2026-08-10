@@ -82,6 +82,11 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
     label: "Ability Avalanche",
     description: "Starting at wave 60, every Pokemon gains one additional randomized active ability every 20 waves.",
   },
+  {
+    key: "moodyMode",
+    label: "Moody Mode",
+    description: "Draft evolving boons after bosses while enemy teams receive an equal fresh boon budget.",
+  },
 ];
 
 const VISIBLE_OPTION_ROWS = 9;

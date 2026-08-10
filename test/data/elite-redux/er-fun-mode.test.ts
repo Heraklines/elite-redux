@@ -11,6 +11,7 @@ import {
   formatFunMegaStatDelta,
   getFunEnemyMegaChance,
   getFunMegaStoneMetadata,
+  isFunPseudoMegaActive,
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
@@ -76,6 +77,7 @@ describe("Fun Mode configuration", () => {
       weatherRoulette: true,
       scrambleMoves: true,
       abilityAvalanche: true,
+      moodyMode: false,
       abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
@@ -90,6 +92,7 @@ describe("Fun Mode configuration", () => {
       weatherRoulette: true,
       scrambleMoves: true,
       abilityAvalanche: true,
+      moodyMode: false,
       abilityRerollSeed: 4,
     });
   });
@@ -107,6 +110,7 @@ describe("Fun Mode configuration", () => {
       weatherRoulette: true,
       scrambleMoves: true,
       abilityAvalanche: true,
+      moodyMode: false,
       abilityRerollSeed: 27,
     };
     saveLastFunModeConfig(config);
@@ -122,6 +126,7 @@ describe("Fun Mode configuration", () => {
       weatherRoulette: true,
       scrambleMoves: true,
       abilityAvalanche: true,
+      moodyMode: false,
     });
   });
 
@@ -152,6 +157,7 @@ describe("Fun Mode configuration", () => {
       weatherRoulette: false,
       scrambleMoves: false,
       abilityAvalanche: false,
+      moodyMode: false,
     });
   });
 });
@@ -279,6 +285,11 @@ describe("Fun Mega Mode statlines", () => {
     );
     expect(restored.erFunMegaStone).toBe(FormChangeItem.SWAMPERTITE);
     expect(restored.erFunPseudoMega).toBe(true);
+  });
+
+  it("does not activate or mark a pseudo-Mega without its held Mega Stone", () => {
+    expect(isFunPseudoMegaActive(true, FormChangeItem.SWAMPERTITE, false)).toBe(false);
+    expect(isFunPseudoMegaActive(true, FormChangeItem.SWAMPERTITE, true)).toBe(true);
   });
 
   it("ramps enemy Mega frequency to certainty at wave 50", () => {

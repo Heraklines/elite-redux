@@ -141,6 +141,7 @@ import {
   getFunEnemyMegaChance,
   getFunMegaStoneItems,
   getFunRealMegaChoices,
+  isFunPseudoMegaActive,
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
@@ -269,6 +270,7 @@ import {
   HiddenAbilityRateBoosterModifier,
   PokemonBaseStatFlatModifier,
   PokemonBaseStatTotalModifier,
+  PokemonFormChangeItemModifier,
   PokemonFriendshipBoosterModifier,
   PokemonHeldItemModifier,
   PokemonIncrementingStatModifier,
@@ -6326,7 +6328,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   public isFunPseudoMega(): boolean {
-    return this.customPokemonData.erFunPseudoMega === true && this.customPokemonData.erFunMegaStone != null;
+    const recordedStone = this.customPokemonData.erFunMegaStone;
+    const hasHeldStone =
+      recordedStone != null
+      && globalScene.findModifier(
+        modifier =>
+          modifier instanceof PokemonFormChangeItemModifier
+          && modifier.pokemonId === this.id
+          && modifier.formChangeItem === recordedStone,
+        this.isPlayer(),
+      ) != null;
+    return isFunPseudoMegaActive(this.customPokemonData.erFunPseudoMega === true, recordedStone, hasHeldStone);
   }
 
   public getFunMegaStone(): FormChangeItem | undefined {
