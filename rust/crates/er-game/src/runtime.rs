@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use er_battle::legality::{
-    build_command_offer, build_replacement_offer, build_scripted_enemy_offer,
+    build_command_offer, build_scripted_enemy_offer,
     validate_command_proposal, validate_replacement_proposal, validate_replacement_selection,
     validate_state_content,
 };
@@ -31,7 +31,7 @@ use er_state::format::{
 use er_state::snapshot::GameState;
 use er_state::validation::StateValidationError;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommandError, BattleCommandOffer, BattleCommandProposalV1,
+    AcceptedBattleCommand, BattleCommandError, BattleCommandProposalV1,
     BattleReplacementProposalV1, CommandAdmissionSource, CommandCollectionState,
     CommandFingerprintEntry, CommandFrontierEntry, CommandFrontierStatus,
     ReplacementProposalFingerprintEntry, ReplacementSelection, player_command_operation_id,
@@ -39,26 +39,27 @@ use er_types::battle_command::{
 };
 use er_types::battle_control::{
     BATTLE_CONTROL_PLAN_SCHEMA_VERSION, BattleControl, BattleControlError, BattleControlPlan,
-    BattleControlPlanError, BattleMenu, BattleMenuError, BattleMenuOption, CommandRootControl,
-    ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator, WaitingControl,
-    WaitingReason,
+    BattleControlPlanError, BattleMenu, SeatBattleControl, SeatMenuInstanceAllocator,
+    WaitingControl, WaitingReason,
 };
 use er_types::battle_ids::{
     AuthorityEpoch, BattleFormat, BattleId, BattleSide, FaintOccurrenceId, FieldSlot,
     MenuInstanceId, PartyIndex, PokemonId,
 };
 use er_types::battle_model::BattleOutcome;
-use er_types::ids::{MenuOptionId, SafeU53, SeatId, StringIdError};
-use er_types::battle_ui::{
-    BattleMenuOptionError, MenuNavigationEdge, MenuOptionLayout, MenuOptionVisibility,
-    NavigationDirection,
-};
+use er_types::ids::{SafeU53, SeatId};
 use er_types::battle_command::ScriptedEnemyPolicyV1;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::internal_event::{
     BattleResolvedPayload, GameIntent, InternalEvent, PreparedBattleResolution,
+};
+use crate::command_menu::{
+    CommandMenuError, CommandRootSelection, build_command_root_control,
+};
+use crate::replacement_menu::{
+    ReplacementMenuError, ReplacementMenuResult, build_replacement_menu,
 };
 
 /// The frozen game configuration schema version.
@@ -142,12 +143,10 @@ pub enum GameRuntimeError {
     Control(#[from] BattleControlPlanError),
     #[error("control node is invalid: {0}")]
     ControlNode(#[from] BattleControlError),
-    #[error("menu construction failed: {0}")]
-    Menu(#[from] BattleMenuError),
-    #[error("menu option construction failed: {0}")]
-    MenuOption(#[from] BattleMenuOptionError),
-    #[error("menu option identity is invalid: {0}")]
-    MenuOptionId(#[from] StringIdError),
+    #[error("command menu projection failed: {0}")]
+    CommandMenu(#[from] CommandMenuError),
+    #[error("replacement menu projection failed: {0}")]
+    ReplacementMenu(#[from] ReplacementMenuError),
     #[error("the battle game config is invalid: {message}")]
     InvalidConfig { message: String },
     #[error("the exact production wave seed is required at the game boundary")]
@@ -857,7 +856,7 @@ impl GameRuntime {
                 project_command_frontier(state, &seats, &self.control.menu_allocators, self.content.as_ref())
             }
             BattleNextDecision::Replacement { occurrence } => {
-                project_replacement(state, *occurrence, &seats, &self.control.menu_allocators, self.content.as_ref())
+                project_replacement(state, *occurrence, &seats, &self.control.menu_allocators)
             }
             BattleNextDecision::Complete(outcome) => {
                 let mut entries = Vec::with_capacity(seats.len());
@@ -1137,8 +1136,15 @@ fn project_command_frontier(
             "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/command",
             battle.battle_id, battle.wave, battle.turn, slot.position, seat,
         );
-        let menu = command_menu(instance_id, *seat, &control_id, &offer)?;
-        let control = BattleControl::CommandRoot(CommandRootControl::new(actor, slot, menu)?);
+        let control = BattleControl::CommandRoot(build_command_root_control(
+            instance_id,
+            *seat,
+            control_id,
+            actor,
+            slot,
+            &offer,
+            CommandRootSelection::Fight,
+        )?);
         seat_entries.push(SeatBattleControl::new(*seat, Some(operation_id), control));
     }
     BattleControlPlan::new(
@@ -1157,7 +1163,6 @@ fn project_replacement(
     occurrence: FaintOccurrenceId,
     seats: &[SeatId],
     allocators: &[SeatMenuInstanceAllocator],
-    content: &ContentPack,
 ) -> Result<BattleControlPlan, GameRuntimeError> {
     let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
     let faint = battle
@@ -1168,7 +1173,6 @@ fn project_replacement(
     let owner = faint
         .owner_seat
         .ok_or_else(|| invalid_config("enemy faint cannot create a human replacement control"))?;
-    let offer = build_replacement_offer(state, occurrence, content).map_err(map_legality_error)?;
     let operation_id = replacement_operation_id(
         faint.source.epoch,
         battle.battle_id,
@@ -1178,7 +1182,16 @@ fn project_replacement(
         faint.slot,
         owner,
     )?;
-    if offer.is_empty() {
+    let owner_allocator = allocators
+        .iter()
+        .find(|allocator| allocator.seat == owner)
+        .ok_or_else(|| invalid_config("missing replacement owner allocator"))?;
+    let projection = build_replacement_menu(
+        battle,
+        occurrence,
+        owner_allocator.next_menu_instance_id,
+    )?;
+    if matches!(projection, ReplacementMenuResult::NoLegalReplacement { .. }) {
         let entries = seats
             .iter()
             .map(|seat| {
@@ -1199,6 +1212,9 @@ fn project_replacement(
         )
         .map_err(GameRuntimeError::Control);
     }
+    let ReplacementMenuResult::Menu(replacement_control) = projection else {
+        return Err(invalid_config("replacement menu projection changed classification"));
+    };
     let mut next_allocators = allocators.to_vec();
     let mut entries = Vec::with_capacity(seats.len());
     for seat in seats {
@@ -1207,33 +1223,15 @@ fn project_replacement(
                 .iter_mut()
                 .find(|allocator| allocator.seat == *seat)
                 .ok_or_else(|| invalid_config("missing replacement owner allocator"))?;
-            let instance_id = allocator.next_menu_instance_id;
-            allocator.next_menu_instance_id = menu_id(increment_safe(instance_id.get(), "menu allocator exhausted")?);
-            let control_id = format!("{operation_id}/control/replacement");
-            let menu = replacement_menu(instance_id, *seat, &control_id, &offer)?;
-            let last = menu
-                .options
-                .first()
-                .ok_or_else(|| invalid_config("replacement menu has no options"))?
-                .option_id
-                .clone();
-            let last_right = menu
-                .options
-                .last()
-                .ok_or_else(|| invalid_config("replacement menu has no options"))?
-                .option_id
-                .clone();
-            let control = BattleControl::ReplacementSelect(ReplacementSelectControl::new(
-                occurrence,
-                faint.source,
-                faint.pokemon,
-                faint.slot,
-                owner,
-                menu,
-                last,
-                last_right,
+            allocator.next_menu_instance_id = menu_id(increment_safe(
+                allocator.next_menu_instance_id.get(),
+                "menu allocator exhausted",
             )?);
-            entries.push(SeatBattleControl::new(*seat, Some(operation_id.clone()), control));
+            entries.push(SeatBattleControl::new(
+                *seat,
+                Some(operation_id.clone()),
+                BattleControl::ReplacementSelect(replacement_control.clone()),
+            ));
         } else {
             entries.push(SeatBattleControl::new(
                 *seat,
@@ -1254,93 +1252,6 @@ fn project_replacement(
         next_allocators,
     )
     .map_err(GameRuntimeError::Control)
-}
-
-fn command_menu(
-    instance_id: MenuInstanceId,
-    owner: SeatId,
-    control_id: &str,
-    offer: &BattleCommandOffer,
-) -> Result<BattleMenu, GameRuntimeError> {
-    let mut options = Vec::new();
-    for move_offer in &offer.fight {
-        let id = MenuOptionId::new(format!("command/fight/{}", move_offer.move_slot.get()))?;
-        options.push(BattleMenuOption::new(
-            id.clone(),
-            "battle.command.fight",
-            MenuOptionVisibility::Visible,
-            true,
-            MenuOptionLayout::new(id, options.len() as u16, 0, 0),
-        )?);
-    }
-    for switch in &offer.switches {
-        let id = MenuOptionId::new(format!("command/switch/{}", switch.party_slot.get()))?;
-        options.push(BattleMenuOption::new(
-            id.clone(),
-            "battle.command.switch",
-            MenuOptionVisibility::Visible,
-            true,
-            MenuOptionLayout::new(id, options.len() as u16, 0, 0),
-        )?);
-    }
-    let selected = options
-        .first()
-        .ok_or_else(|| invalid_config("legal command offer is empty"))?
-        .option_id
-        .clone();
-    let navigation = adjacent_navigation(&options);
-    BattleMenu::new(instance_id, owner, control_id, selected, options, navigation)
-        .map_err(GameRuntimeError::Menu)
-}
-
-fn replacement_menu(
-    instance_id: MenuInstanceId,
-    owner: SeatId,
-    control_id: &str,
-    offer: &[er_types::battle_command::OfferedSwitchCommand],
-) -> Result<BattleMenu, GameRuntimeError> {
-    let mut options = Vec::new();
-    for switch in offer {
-        let id = MenuOptionId::new(format!("party/{}/slot/{}", switch.pokemon, switch.party_slot.get()))?;
-        options.push(BattleMenuOption::new(
-            id.clone(),
-            "battle.replacement.select",
-            MenuOptionVisibility::Visible,
-            true,
-            MenuOptionLayout::new(id, options.len() as u16, 0, 0),
-        )?);
-    }
-    let selected = options
-        .first()
-        .ok_or_else(|| invalid_config("replacement offer is empty"))?
-        .option_id
-        .clone();
-    BattleMenu::new(
-        instance_id,
-        owner,
-        control_id,
-        selected,
-        options.clone(),
-        adjacent_navigation(&options),
-    )
-    .map_err(GameRuntimeError::Menu)
-}
-
-fn adjacent_navigation(options: &[BattleMenuOption]) -> Vec<MenuNavigationEdge> {
-    let mut edges = Vec::new();
-    for pair in options.windows(2) {
-        edges.push(MenuNavigationEdge::new(
-            pair[0].option_id.clone(),
-            NavigationDirection::Down,
-            pair[1].option_id.clone(),
-        ));
-        edges.push(MenuNavigationEdge::new(
-            pair[1].option_id.clone(),
-            NavigationDirection::Up,
-            pair[0].option_id.clone(),
-        ));
-    }
-    edges
 }
 
 fn control_accepts_command(control: &BattleControlPlan, proposal: &BattleCommandProposalV1) -> bool {
