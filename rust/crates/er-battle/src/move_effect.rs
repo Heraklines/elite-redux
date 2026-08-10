@@ -624,10 +624,10 @@ fn apply_non_damage_effects(
                     chance,
                 )
                 .map_err(MoveEffectError::Status)?;
-                if let StatusApplicationOutcome::Applied { mutation } = outcome {
-                    if mutation.before != mutation.after {
-                        target.status = mutation.after;
-                    }
+                if let StatusApplicationOutcome::Applied { mutation } = outcome
+                    && mutation.before != mutation.after
+                {
+                    target.status = mutation.after;
                 }
                 result.status_effects.push(outcome);
             }

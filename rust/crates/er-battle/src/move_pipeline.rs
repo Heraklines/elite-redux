@@ -444,11 +444,11 @@ fn field_occupant(battle: &BattleState, slot: FieldSlot) -> Option<PokemonId> {
         .and_then(|entry| entry.occupant)
 }
 
-fn find_pokemon<'a>(
-    battle: &'a BattleState,
+fn find_pokemon(
+    battle: &BattleState,
     slot: FieldSlot,
     pokemon: PokemonId,
-) -> Option<&'a PokemonState> {
+) -> Option<&PokemonState> {
     match slot.side {
         er_types::battle_ids::BattleSide::Player => {
             battle.player_party.iter().find(|state| state.id == pokemon)
@@ -459,11 +459,11 @@ fn find_pokemon<'a>(
     }
 }
 
-fn find_pokemon_mut<'a>(
-    battle: &'a mut BattleState,
+fn find_pokemon_mut(
+    battle: &mut BattleState,
     slot: FieldSlot,
     pokemon: PokemonId,
-) -> Option<&'a mut PokemonState> {
+) -> Option<&mut PokemonState> {
     match slot.side {
         er_types::battle_ids::BattleSide::Player => battle
             .player_party
