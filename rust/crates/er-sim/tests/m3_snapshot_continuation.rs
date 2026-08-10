@@ -518,8 +518,9 @@ mod live_coop_production {
     };
     use er_kernel::snapshot::PhysicalInputSourceV2;
     use er_protocol::{
-        AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalLeaseConfig,
-        RecoveryTransactionConfig,
+        AckStage, AuthorityEntryBody, AuthorityEntryKind, AuthorityLogConfig, AuthorityReceiptBody,
+        AuthorityReplicaConfig, BackoffPolicy, FrameType, NetworkFrame, PeerBinding,
+        ProposalLeaseConfig, ProposalMessage, RecoveryTransactionConfig,
     };
     use er_sim::snapshot::{
         FaultOperationV2, FrameCorruptionV2, PairDeterminismDigest, PairKernelTraceRecorder,
@@ -544,7 +545,7 @@ mod live_coop_production {
         ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision, PhysicalKey,
         RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
     };
-    use serde::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize, de::DeserializeOwned};
     use serde_json::Value;
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -1304,26 +1305,138 @@ mod live_coop_production {
         lease_live && packet_queued
     }
 
+    fn proposal_result_packet_matches(
+        packet: &QueuedPacketSnapshotV2,
+        expected_operation_id: &OperationId,
+        expected_fingerprint: &str,
+    ) -> bool {
+        match packet.kind {
+            RestorablePacketKindV2::AuthorityFrame => {
+                let Ok(frame) = decode_canonical_packet::<NetworkFrame>(
+                    &packet.body,
+                    "proposal result authority frame",
+                ) else {
+                    return false;
+                };
+                if frame.frame_type != FrameType::AuthorityEntry
+                    || frame.context.connection_generation != generation(1)
+                {
+                    return false;
+                }
+                let Ok(entry) = serde_json::from_value::<AuthorityEntryBody>(frame.body) else {
+                    return false;
+                };
+                if entry.kind != AuthorityEntryKind::TurnCommit {
+                    return false;
+                }
+                let Ok(material) = serde_json::from_value::<
+                    er_game::material::BattleTurnMaterialV1,
+                >(entry.material.payload.clone()) else {
+                    return false;
+                };
+                let Ok(turn_result_operation_id) =
+                    er_types::battle_command::turn_result_operation_id(
+                        material.battle_id,
+                        material.wave,
+                        material.resolved_turn,
+                    )
+                else {
+                    return false;
+                };
+                turn_result_operation_id != *expected_operation_id
+                    && entry.operation_id == turn_result_operation_id
+                    && material.operation_id == turn_result_operation_id
+                    && material
+                        .commands
+                        .entries
+                        .iter()
+                        .filter(|command| command.operation_id() == expected_operation_id)
+                        .count()
+                        == 1
+            }
+            RestorablePacketKindV2::ReplacementProposal => {
+                let Ok(proposal) = decode_canonical_packet::<ProposalMessage>(
+                    &packet.body,
+                    "proposal result replacement",
+                ) else {
+                    return false;
+                };
+                proposal.operation_id == *expected_operation_id
+                    && proposal.fingerprint == expected_fingerprint
+            }
+            _ => false,
+        }
+    }
+
     fn guest_proposal_admitted_with_delivery_pending(
         snapshot: &RestorablePairSnapshotV2,
-    ) -> bool {
-        let admission_live = snapshot
-            .host
-            .protocol
-            .proposal_admission
-            .as_ref()
-            .is_some_and(|admission| !admission.fingerprints.is_empty());
-        let result_packet_pending = snapshot.network.packets.iter().any(|packet| {
+        expected_operation_id: &OperationId,
+        expected_fingerprint: &str,
+    ) -> TestResult<bool> {
+        let Some(admission) = snapshot.host.protocol.proposal_admission.as_ref() else {
+            return Ok(false);
+        };
+        let admission_matches = admission
+            .fingerprints
+            .iter()
+            .filter(|entry| {
+                entry.operation_id == *expected_operation_id
+                    && entry.fingerprint == expected_fingerprint
+            })
+            .count()
+            == 1;
+        if !admission_matches {
+            return Ok(false);
+        }
+
+        let Some(leases) = snapshot.guest.protocol.proposal_leases.as_ref() else {
+            return Ok(false);
+        };
+        let Some(lease) = leases
+            .leases
+            .iter()
+            .find(|lease| lease.operation_id == *expected_operation_id)
+        else {
+            return Ok(false);
+        };
+        if !leases
+            .timer_targets
+            .iter()
+            .any(|target| target.operation_id == *expected_operation_id)
+        {
+            return Ok(false);
+        }
+        let proposal: ProposalMessage = match decode_canonical_packet(
+            &lease.proposal.canonical_envelope_bytes,
+            "proposal lease envelope",
+        ) {
+            Ok(proposal) => proposal,
+            Err(_) => return Ok(false),
+        };
+        if lease.proposal.operation_id != *expected_operation_id
+            || proposal.operation_id != *expected_operation_id
+            || proposal.fingerprint != expected_fingerprint
+        {
+            return Ok(false);
+        }
+
+        let result_packet_matches = snapshot.network.packets.iter().any(|packet| {
             packet.source == PairEndpoint::Host
                 && packet.destination == PairEndpoint::Guest
+                && packet.source_generation == generation(1)
+                && packet.destination_generation == generation(1)
                 && matches!(
                     packet.kind,
                     RestorablePacketKindV2::AuthorityFrame
                         | RestorablePacketKindV2::ReplacementProposal
                 )
+                && proposal_result_packet_matches(
+                    packet,
+                    expected_operation_id,
+                    expected_fingerprint,
+                )
         });
-        let presentation_pending = !pending_battle_presentations(snapshot).is_empty();
-        admission_live && (result_packet_pending || presentation_pending)
+        Ok(result_packet_matches)
     }
 
     fn host_admission_with_blocking_presentation(
@@ -1509,7 +1622,7 @@ mod live_coop_production {
 
     fn reach_guest_proposal_admitted_with_delivery_pending(
         pair: &mut SimulatedPair,
-    ) -> TestResult {
+    ) -> TestResult<(OperationId, String)> {
         reach_guest_proposal_pending(pair)?;
         let proposal = first_packet_v2(
             &pair.snapshot_v2()?,
@@ -1518,6 +1631,9 @@ mod live_coop_production {
             PairEndpoint::Host,
             generation(1),
         )?;
+        let proposal: ProposalMessage =
+            decode_canonical_packet(&proposal.body, "guest proposal")?;
+        let proposal_identity = (proposal.operation_id.clone(), proposal.fingerprint.clone());
         apply_trace_operation(
             pair,
             PairOperationV2::Fault {
@@ -1527,8 +1643,12 @@ mod live_coop_production {
             },
         )?;
         for tick in 0..128 {
-            if guest_proposal_admitted_with_delivery_pending(&pair.snapshot_v2()?) {
-                return Ok(());
+            if guest_proposal_admitted_with_delivery_pending(
+                &pair.snapshot_v2()?,
+                &proposal_identity.0,
+                &proposal_identity.1,
+            )? {
+                return Ok(proposal_identity);
             }
             advance_time_v2(pair, 1)?;
             if tick == 127 {
@@ -1597,6 +1717,48 @@ mod live_coop_production {
         Err(invalid(
             "raw production pair did not expose the blocking-presentation boundary",
         ))
+    }
+
+    fn decode_canonical_packet<T>(body: &CanonicalHexBytes, field: &str) -> TestResult<T>
+    where
+        T: DeserializeOwned + Serialize,
+    {
+        let encoded = body.as_str().as_bytes();
+        if !encoded.len().is_multiple_of(2) {
+            return Err(invalid(format!("{field} has an odd-length hex payload")));
+        }
+        let bytes = encoded
+            .chunks_exact(2)
+            .map(|pair| {
+                let high = match pair[0] {
+                    b'0'..=b'9' => pair[0] - b'0',
+                    b'a'..=b'f' => pair[0] - b'a' + 10,
+                    _ => return Err(invalid(format!("{field} has invalid hex"))),
+                };
+                let low = match pair[1] {
+                    b'0'..=b'9' => pair[1] - b'0',
+                    b'a'..=b'f' => pair[1] - b'a' + 10,
+                    _ => return Err(invalid(format!("{field} has invalid hex"))),
+                };
+                Ok((high << 4) | low)
+            })
+            .collect::<TestResult<Vec<_>>>()?;
+        let decoded = serde_json::from_slice::<T>(&bytes)?;
+        let recanonical = er_canonical::canonical_bytes(&decoded)?;
+        if recanonical != bytes {
+            return Err(invalid(format!("{field} is not canonical JSON")));
+        }
+        Ok(decoded)
+    }
+
+    fn is_guest_host_generation_one_control_receipt(
+        packet: &QueuedPacketSnapshotV2,
+    ) -> bool {
+        packet.kind == RestorablePacketKindV2::ControlReceipt
+            && packet.source == PairEndpoint::Guest
+            && packet.destination == PairEndpoint::Host
+            && packet.source_generation == generation(1)
+            && packet.destination_generation == generation(1)
     }
 
     fn first_packet_v2(
@@ -1675,22 +1837,10 @@ mod live_coop_production {
             .collect()
     }
 
-    fn recovery_fence_held(snapshot: &RestorablePairSnapshotV2) -> bool {
-        snapshot
-            .guest
-            .protocol
-            .recovery
-            .as_ref()
-            .is_some_and(|recovery| {
-                recovery.fence.state == RecoveryFenceState::Held
-                    && recovery.phase.is_some()
-                    && recovery.request_id.is_some()
-            })
-    }
-
-    fn mixed_fault_queue(
+    fn recovery_fence_held(
         snapshot: &RestorablePairSnapshotV2,
-        original_body: &CanonicalHexBytes,
+        stale_receipt_id: SafeU53,
+        stale_receipt_body: &CanonicalHexBytes,
     ) -> bool {
         let Some(guest_generation) = snapshot
             .network
@@ -1701,28 +1851,78 @@ mod live_coop_production {
         else {
             return false;
         };
+        if guest_generation != generation(2) {
+            return false;
+        }
+        let Some(recovery) = snapshot.guest.protocol.recovery.as_ref() else {
+            return false;
+        };
+        let Some(replica) = snapshot.guest.protocol.authority_replica.as_ref() else {
+            return false;
+        };
+        let local_context = &snapshot.guest.protocol.frame_context.context;
+        if recovery.fence.state != RecoveryFenceState::Held
+            || recovery.phase.is_none()
+            || recovery.request_id.as_deref() != Some("recovery-2")
+            || replica.authority_generation != generation(2)
+            || recovery.config.local_context != *local_context
+            || recovery.config.local_context.connection_generation != generation(2)
+            || replica.receipt_context != *local_context
+            || local_context.connection_generation != generation(2)
+        {
+            return false;
+        }
+
+        let stale_receipts = snapshot
+            .network
+            .packets
+            .iter()
+            .filter(|packet| {
+                is_guest_host_generation_one_control_receipt(packet)
+                    && packet.packet_id == stale_receipt_id
+                    && packet.body.as_str() == stale_receipt_body.as_str()
+                    && packet.disposition == PacketDispositionV2::Delayed
+            })
+            .collect::<Vec<_>>();
+        stale_receipts.len() == 1
+    }
+
+    fn mixed_fault_queue(
+        snapshot: &RestorablePairSnapshotV2,
+        stale_packet_ids: [SafeU53; 2],
+        corrupted_body: &CanonicalHexBytes,
+    ) -> bool {
+        let Some(guest_generation) = snapshot
+            .network
+            .links
+            .iter()
+            .find(|link| link.endpoint == PairEndpoint::Guest)
+            .map(|link| link.generation)
+        else {
+            return false;
+        };
+        if guest_generation != generation(2) {
+            return false;
+        }
+        let expected_ids = stale_packet_ids.into_iter().collect::<BTreeSet<_>>();
+        if expected_ids.len() != 2 {
+            return false;
+        }
         let packets = snapshot
             .network
             .packets
             .iter()
             .filter(|packet| {
-                packet.kind == RestorablePacketKindV2::ControlReceipt
-                    && packet.source == PairEndpoint::Guest
-                    && packet.destination == PairEndpoint::Host
+                is_guest_host_generation_one_control_receipt(packet)
                     && packet.disposition == PacketDispositionV2::Delayed
-                    && packet.source_generation != guest_generation
-                    && packet.destination_generation != guest_generation
-                    && packet.body.as_str() != original_body.as_str()
+                    && packet.body.as_str() == corrupted_body.as_str()
             })
             .collect::<Vec<_>>();
-        let Some(first) = packets.first() else {
-            return false;
-        };
-        packets
+        let actual_ids = packets
             .iter()
-            .filter(|packet| packet.body.as_str() == first.body.as_str())
-            .count()
-            >= 2
+            .map(|packet| packet.packet_id)
+            .collect::<BTreeSet<_>>();
+        packets.len() == 2 && actual_ids == expected_ids
     }
 
     fn battle_control_id(control: &BattleControl) -> Option<&str> {
@@ -1744,9 +1944,7 @@ mod live_coop_production {
     ) -> TestResult<bool> {
         let Some(receipt) = snapshot.network.packets.iter().find(|packet| {
             packet.packet_id == receipt_id
-                && packet.kind == RestorablePacketKindV2::ControlReceipt
-                && packet.source == PairEndpoint::Guest
-                && packet.destination == PairEndpoint::Host
+                && is_guest_host_generation_one_control_receipt(packet)
                 && packet.disposition == PacketDispositionV2::Delayed
         }) else {
             return Ok(false);
@@ -1757,6 +1955,29 @@ mod live_coop_production {
         let Some(replica) = snapshot.guest.protocol.authority_replica.as_ref() else {
             return Ok(false);
         };
+        let Some(recovery) = snapshot.guest.protocol.recovery.as_ref() else {
+            return Ok(false);
+        };
+        let frame: NetworkFrame = match decode_canonical_packet(
+            &receipt.body,
+            "delayed control receipt",
+        ) {
+            Ok(frame) => frame,
+            Err(_) => return Ok(false),
+        };
+        if frame.version != 2
+            || frame.frame_type != FrameType::AuthorityReceipt
+            || frame.context != replica.receipt_context
+            || frame.context != snapshot.guest.protocol.frame_context.context
+            || frame.context != recovery.config.local_context
+            || frame.context.connection_generation != generation(1)
+        {
+            return Ok(false);
+        }
+        let receipt_body: AuthorityReceiptBody = match serde_json::from_value(frame.body) {
+            Ok(body) => body,
+            Err(_) => return Ok(false),
+        };
         let Some(installed) = replica
             .installed_controls
             .iter()
@@ -1766,6 +1987,13 @@ mod live_coop_production {
         };
         if installed.identity.revision != installed.revision
             || installed.identity.next_control_id.as_str() != installed.control_id.as_str()
+        {
+            return Ok(false);
+        }
+        if receipt_body.revision != installed.revision
+            || receipt_body.operation_id != installed.identity.operation_id
+            || receipt_body.stage != AckStage::ControlInstalled
+            || receipt_body.control_id.as_deref() != Some(installed.control_id.as_str())
         {
             return Ok(false);
         }
@@ -2224,7 +2452,8 @@ mod live_coop_production {
                 Arc::clone(&content),
                 1103,
             )?;
-            reach_guest_proposal_admitted_with_delivery_pending(&mut pair)?;
+            let (proposal_operation_id, proposal_fingerprint) =
+                reach_guest_proposal_admitted_with_delivery_pending(&mut pair)?;
             let pending_snapshot = pair.snapshot_v2()?;
             let continuation = if let Some(packet) = pending_snapshot
                 .network
@@ -2233,10 +2462,17 @@ mod live_coop_production {
                 .find(|packet| {
                     packet.source == PairEndpoint::Host
                         && packet.destination == PairEndpoint::Guest
+                        && packet.source_generation == generation(1)
+                        && packet.destination_generation == generation(1)
                         && matches!(
                             packet.kind,
                             RestorablePacketKindV2::AuthorityFrame
                                 | RestorablePacketKindV2::ReplacementProposal
+                        )
+                        && proposal_result_packet_matches(
+                            packet,
+                            &proposal_operation_id,
+                            &proposal_fingerprint,
                         )
                 })
             {
@@ -2245,21 +2481,21 @@ mod live_coop_production {
                         packet_id: packet.packet_id,
                     },
                 }
-            } else if let Some((endpoint, event_id)) =
-                pending_battle_presentations(&pending_snapshot).into_iter().next()
-            {
-                PairOperationV2::BattlePresentationOutcome {
-                    endpoint,
-                    event_id,
-                    outcome: PresentationSettlementOutcome::Settled,
-                }
             } else {
-                PairOperationV2::AdvanceTime { delta_ms: safe(1) }
+                return Err(invalid(
+                    "guest proposal boundary omitted its exact queued Authority TURN result",
+                ));
             };
-            scenarios.push(trace_boundary(
+            scenarios.push(trace_boundary_with_live_predicate(
                 "guest-proposal-delivery-pending",
                 &mut pair,
-                guest_proposal_admitted_with_delivery_pending,
+                move |_, snapshot| {
+                    guest_proposal_admitted_with_delivery_pending(
+                        snapshot,
+                        &proposal_operation_id,
+                        &proposal_fingerprint,
+                    )
+                },
                 vec![continuation],
             )?);
         }
@@ -2364,7 +2600,7 @@ mod live_coop_production {
                 .network
                 .packets
                 .iter()
-                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+                .any(is_guest_host_generation_one_control_receipt)
             {
                 settle_all_presentations_v2(&mut pair)?;
             }
@@ -2459,7 +2695,7 @@ mod live_coop_production {
                 .network
                 .packets
                 .iter()
-                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+                .any(is_guest_host_generation_one_control_receipt)
             {
                 settle_all_presentations_v2(&mut pair)?;
             }
@@ -2470,6 +2706,8 @@ mod live_coop_production {
                 PairEndpoint::Host,
                 generation(1),
             )?;
+            let stale_receipt_id = receipt.packet_id;
+            let stale_receipt_body = receipt.body.clone();
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Fault {
@@ -2488,7 +2726,13 @@ mod live_coop_production {
             scenarios.push(trace_boundary(
                 "recovery-fence-held",
                 &mut pair,
-                recovery_fence_held,
+                move |snapshot| {
+                    recovery_fence_held(
+                        snapshot,
+                        stale_receipt_id,
+                        &stale_receipt_body,
+                    )
+                },
                 vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
             )?);
         }
@@ -2605,7 +2849,7 @@ mod live_coop_production {
                 .network
                 .packets
                 .iter()
-                .any(|packet| packet.kind == RestorablePacketKindV2::ControlReceipt)
+                .any(is_guest_host_generation_one_control_receipt)
             {
                 settle_all_presentations_v2(&mut pair)?;
             }
@@ -2644,10 +2888,26 @@ mod live_coop_production {
                 PairEndpoint::Host,
                 generation(1),
             )?;
-            assert_ne!(
-                corrupted.body.as_str(),
-                original_body.as_str(),
-                "production frame corruption did not change the queued receipt body"
+            let original_frame: Value =
+                decode_canonical_packet(&original_body, "original control receipt")?;
+            let corrupted_frame: Value =
+                decode_canonical_packet(&corrupted.body, "corrupted control receipt")?;
+            assert!(
+                original_frame.pointer("/ctx/connectionGeneration").is_some(),
+                "original control receipt omitted its connection generation"
+            );
+            assert!(
+                corrupted_frame.pointer("/ctx/connectionGeneration").is_none(),
+                "corrupted control receipt retained connectionGeneration"
+            );
+            let mut expected_corrupted_frame = original_frame.clone();
+            expected_corrupted_frame
+                .get_mut("ctx")
+                .and_then(Value::as_object_mut)
+                .and_then(|context| context.remove("connectionGeneration"));
+            assert_eq!(
+                corrupted_frame, expected_corrupted_frame,
+                "production corruption changed fields beyond /ctx/connectionGeneration"
             );
             apply_trace_operation(
                 &mut pair,
@@ -2665,17 +2925,29 @@ mod live_coop_production {
                 &corrupted.body,
             );
             assert_eq!(duplicated.len(), 2);
+            let duplicate_packet_id = duplicated
+                .iter()
+                .map(|packet| packet.packet_id)
+                .find(|packet_id| *packet_id != receipt.packet_id)
+                .ok_or_else(|| invalid("fault duplicate did not receive a distinct packet ID"))?;
+            let stale_packet_ids = [receipt.packet_id, duplicate_packet_id];
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Reconnect {
                     endpoint: PairEndpoint::Guest,
                 },
             )?;
-            let original_body_for_predicate = original_body.clone();
+            let corrupted_body_for_predicate = corrupted.body.clone();
             scenarios.push(trace_boundary(
                 "mixed-network-fault-queue",
                 &mut pair,
-                move |snapshot| mixed_fault_queue(snapshot, &original_body_for_predicate),
+                move |snapshot| {
+                    mixed_fault_queue(
+                        snapshot,
+                        stale_packet_ids,
+                        &corrupted_body_for_predicate,
+                    )
+                },
                 vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
             )?);
         }
