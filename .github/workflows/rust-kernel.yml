@@ -2929,7 +2929,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$M3_PARITY_ARTIFACT_DIR" rust-ci-summary
           cargo test --manifest-path rust/Cargo.toml -p er-wasm --test m3_parity \
-            native_m3_serialized_trace_emits_hosted_report_artifact --exact --nocapture \
+            native_m3_serialized_trace_emits_hosted_report_artifact -- --exact --nocapture \
             2>&1 | tee rust-ci-summary/native-report.log
           test -s "$M3_PARITY_ARTIFACT_DIR/trace.json"
           test -s "$M3_PARITY_ARTIFACT_DIR/native-report.json"
@@ -2957,7 +2957,7 @@ jobs:
           mkdir -p "$M3_CONTINUATION_ARTIFACT_DIR" rust-ci-summary
           native_execution_started_ns="$(date +%s%N)"
           cargo test --manifest-path rust/Cargo.toml -p er-sim --test m3_snapshot_continuation \
-            hosted_m3_native_wasm_continuation_suite_emits_artifacts --exact --nocapture \
+            live_coop_production::hosted_m3_native_wasm_continuation_suite_emits_artifacts -- --exact --nocapture \
             2>&1 | tee rust-ci-summary/native-continuation-report.log
           native_execution_finished_ns="$(date +%s%N)"
           echo "native_execution_ms=$(( (native_execution_finished_ns - native_execution_started_ns) / 1000000 ))" \
