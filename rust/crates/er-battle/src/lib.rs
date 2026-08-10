@@ -14,6 +14,7 @@ pub mod legality;
 pub mod move_effect;
 pub mod move_pipeline;
 pub mod outcome;
+pub mod presentation;
 pub mod replacement;
 pub mod resolver;
 pub mod stat_stage;
