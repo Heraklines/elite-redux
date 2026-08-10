@@ -249,6 +249,9 @@ pub fn queue_faint_with_source(
     candidate: FaintCandidate,
     source: FaintSource,
 ) -> Result<FaintQueueResult, FaintQueueError> {
+    if source.epoch == AuthorityEpoch::ZERO {
+        return Err(FaintQueueError::ZeroAuthorityEpoch);
+    }
     if source.wave != battle.wave || source.resolved_turn != battle.turn {
         return Err(FaintQueueError::SourceCoordinateMismatch {
             wave: source.wave,
