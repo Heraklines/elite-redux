@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use er_battle::ability::INTIMIDATE_ABILITY_ID;
 use er_battle::faint::{FaintCandidate, queue_faint};
 use er_battle::legality::{build_command_offer, build_scripted_enemy_offer};
 use er_battle::outcome::derive_battle_outcome;
@@ -33,6 +34,7 @@ use er_types::battle_ids::{
     MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{ActionDisposition, ResolvedActionKind, StatusKind};
+use er_types::battle_ui::BattlePresentationKind;
 use er_types::{OperationId, SafeU53, SeatId};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -391,6 +393,16 @@ fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_in
             .count(),
         1
     );
+    let move_events = transition
+        .presentation
+        .iter()
+        .filter(|event| matches!(&event.kind, BattlePresentationKind::MoveUsed { .. }))
+        .collect::<Vec<_>>();
+    assert_eq!(move_events.len(), 2);
+    for (index, event) in transition.presentation.iter().enumerate() {
+        assert_eq!(event.event_id.operation_id, operation);
+        assert_eq!(event.event_id.sequence, safe(u64::try_from(index)?)?);
+    }
     Ok(())
 }
 
@@ -496,6 +508,18 @@ fn queued_fainted_actor_is_skipped_without_enemy_pp_or_rng() -> TestResult {
     );
     assert_eq!(battle(&transition.after_state)?.enemy_party[0].id, enemy_id);
     assert_eq!(battle(&transition.after_state)?.player_party[0].id, player_id);
+    assert!(transition.presentation.iter().any(|event| {
+        matches!(
+            &event.kind,
+            BattlePresentationKind::MoveUsed { actor, .. } if *actor == player_id
+        )
+    }));
+    assert!(!transition.presentation.iter().any(|event| {
+        matches!(
+            &event.kind,
+            BattlePresentationKind::MoveUsed { actor, .. } if *actor == enemy_id
+        )
+    }));
     Ok(())
 }
 
@@ -558,6 +582,32 @@ fn residual_ko_queues_before_turn_advance_with_exact_source_occurrence() -> Test
     assert_eq!(queued.source.resolved_turn, before_turn);
     assert_eq!(queued.source.turn_occurrence, 0);
     assert_eq!(queued.replacement, ReplacementProgress::NotRequired);
+    let hp_event = transition
+        .presentation
+        .iter()
+        .position(|event| {
+            matches!(
+                &event.kind,
+                BattlePresentationKind::HpChanged {
+                    pokemon,
+                    before: 1,
+                    after: 0,
+                } if *pokemon == enemy_id
+            )
+        })
+        .ok_or("missing residual HP presentation event")?;
+    let faint_event = transition
+        .presentation
+        .iter()
+        .position(|event| {
+            matches!(
+                &event.kind,
+                BattlePresentationKind::Fainted { pokemon, occurrence }
+                    if *pokemon == enemy_id && *occurrence == queued.id
+            )
+        })
+        .ok_or("missing residual faint presentation event")?;
+    assert!(hp_event < faint_event);
     assert_eq!(transition.rng_audit.len(), 0);
     assert_eq!(battle(&transition.after_state)?.turn, turn(2)?);
     Ok(())
@@ -660,6 +710,7 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
         ],
     )?;
     let source_epoch = AuthorityEpoch::new(safe(9)?);
+    battle_mut(&mut state)?.player_party[1].abilities.active = INTIMIDATE_ABILITY_ID;
     let (head, tail) = {
         let battle = battle_mut(&mut state)?;
         battle.player_party[0].hp = 0;
@@ -763,5 +814,21 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
             .count(),
         2
     );
+    assert_eq!(transition.presentation.len(), 2);
+    assert!(matches!(
+        &transition.presentation[0].kind,
+        BattlePresentationKind::Switched {
+            slot,
+            incoming,
+            ..
+        } if *slot == player_slot && *incoming == player_reserve
+    ));
+    assert!(matches!(
+        &transition.presentation[1].kind,
+        BattlePresentationKind::AbilityActivated {
+            pokemon,
+            ability_id,
+        } if *pokemon == player_reserve && *ability_id == INTIMIDATE_ABILITY_ID
+    ));
     Ok(())
 }

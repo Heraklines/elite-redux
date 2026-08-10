@@ -25,7 +25,7 @@ use er_types::{OperationId, SafeU53};
 
 use crate::ability::AbilityError;
 use crate::ability_pipeline::{
-    AbilityPipelineError, DefensiveAbilityInput, DefensiveAbilityOutcome,
+    AbilityPipelineError, DefensiveAbilityInput, DefensiveAbilityOutcome, SwitchInOutcome,
     evaluate_defensive_ability, evaluate_switch_in_ability,
 };
 use crate::action_order::{
@@ -46,6 +46,10 @@ use crate::move_pipeline::{
     resolve_move,
 };
 use crate::outcome::derive_battle_outcome;
+use crate::presentation::{
+    PresentationCausalEvent, ReplacementPresentationInput, TurnPresentationInput,
+    build_replacement_presentation_plan, build_turn_presentation_plan,
+};
 use crate::replacement::{
     apply_selected_replacement, compute_replacement_progress, resolve_no_legal_replacement,
     resolve_not_required, stored_faint_source, validate_stored_replacement_operation,
@@ -96,6 +100,7 @@ pub fn resolve_turn(
     let gate = ContentDefensiveAbilityGate { content };
     let mut action_order = Vec::new();
     let mut mutations = Vec::new();
+    let mut causal_events = Vec::new();
     let mut turn_occurrence = 0_u32;
 
     while let Some(action) = queue
@@ -110,6 +115,7 @@ pub fn resolve_turn(
                     content,
                     &mut action_order,
                     &mut mutations,
+                    &mut causal_events,
                 )?;
             }
             NormalizedBattleCommand::Fight { .. } => {
@@ -123,14 +129,15 @@ pub fn resolve_turn(
                     &mut turn_occurrence,
                     &mut action_order,
                     &mut mutations,
+                    &mut causal_events,
                 )?;
             }
         }
         {
             let battle = active_battle_mut(&mut after)?;
-            drain_internal_faint_heads(battle, &mut mutations)
+            drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
                 .map_err(map_replacement_after_error)?;
-            update_outcome(battle, &mut mutations);
+            update_outcome(battle, &mut mutations, &mut causal_events);
             if battle.outcome != BattleOutcome::Ongoing {
                 break;
             }
@@ -144,16 +151,22 @@ pub fn resolve_turn(
             &mut turn_occurrence,
             &mut action_order,
             &mut mutations,
+            &mut causal_events,
         )?;
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations)
+        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
             .map_err(map_replacement_after_error)?;
-        update_outcome(battle, &mut mutations);
+        update_outcome(battle, &mut mutations, &mut causal_events);
     }
 
-    clear_command_collection(&mut after, &mut mutations)?;
+    clear_command_collection(&mut after, &mut mutations, &mut causal_events)?;
     if active_battle(&after)?.outcome == BattleOutcome::Ongoing {
-        advance_turn_boundary(&mut after, &mut runtime, &mut mutations)?;
+        advance_turn_boundary(
+            &mut after,
+            &mut runtime,
+            &mut mutations,
+            &mut causal_events,
+        )?;
     } else {
         sync_rng_state(&mut after, &runtime)?;
     }
@@ -163,6 +176,12 @@ pub fn resolve_turn(
     let battle = active_battle(&after)?;
     let outcome = battle.outcome;
     let next_decision = next_decision(battle, outcome);
+    let presentation = build_turn_presentation_plan(TurnPresentationInput::new(
+        material_operation_id,
+        &action_order,
+        &causal_events,
+        outcome,
+    ))?;
 
     Ok(BattleTransition {
         before_state: before.clone(),
@@ -172,7 +191,7 @@ pub fn resolve_turn(
         accepted_commands: commands.clone(),
         action_order,
         mutations,
-        presentation: Vec::new(),
+        presentation,
         rng_audit: runtime.audit_entries().to_vec(),
         outcome,
         next_decision,
@@ -210,12 +229,32 @@ pub fn resolve_replacement(
         }
     };
 
-    let mut mutations = primary.mutations.clone();
+    let mut mutations = Vec::with_capacity(primary.mutations.len());
+    let mut causal_events = Vec::with_capacity(primary.mutations.len());
+    for mutation in primary.mutations.iter().cloned() {
+        record_mutation(&mut mutations, &mut causal_events, mutation);
+    }
+    if matches!(*selection, ReplacementSelection::Selected { .. }) {
+        let incoming_slot = primary.occurrence.slot;
+        let ability_subject = slot_ability_subject(&after, incoming_slot);
+        let ability_outcome = evaluate_switch_in_ability(
+            active_battle(&after)?,
+            incoming_slot,
+            content,
+        )
+        .map_err(|source| map_ability_pipeline_error(source, ability_subject))?;
+        apply_switch_in_outcome(
+            &mut after,
+            &ability_outcome,
+            &mut mutations,
+            &mut causal_events,
+        )?;
+    }
     {
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations)
+        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
             .map_err(map_replacement_after_error)?;
-        update_outcome(battle, &mut mutations);
+        update_outcome(battle, &mut mutations, &mut causal_events);
     }
 
     validate_after_state(&after, content)?;
@@ -223,6 +262,11 @@ pub fn resolve_replacement(
     let battle = active_battle(&after)?;
     let outcome = battle.outcome;
     let next_decision = next_decision(battle, outcome);
+    let presentation = build_replacement_presentation_plan(ReplacementPresentationInput::new(
+        material_operation_id,
+        &causal_events,
+        outcome,
+    ))?;
 
     Ok(BattleReplacementTransition {
         before_state: before.clone(),
@@ -232,7 +276,7 @@ pub fn resolve_replacement(
         occurrence: primary.occurrence,
         selection: primary.selection,
         mutations,
-        presentation: Vec::new(),
+        presentation,
         outcome,
         next_decision,
     })
@@ -297,6 +341,7 @@ fn resolve_switch_action(
     content: &ContentPack,
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let resolution = {
         let battle = active_battle_mut(state)?;
@@ -311,20 +356,52 @@ fn resolve_switch_action(
         .map_err(|source| map_ability_pipeline_error(source, ability_subject))?;
 
     push_pending_action(action_order, action, ActionDisposition::Executed)?;
-    mutations.push(resolution.mutation);
-    for change in ability_outcome.mutations() {
+    record_mutation(mutations, causal_events, resolution.mutation);
+    apply_switch_in_outcome(state, &ability_outcome, mutations, causal_events)
+}
+
+fn apply_switch_in_outcome(
+    state: &mut GameState,
+    outcome: &SwitchInOutcome,
+    mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
+) -> Result<(), BattleResolveError> {
+    match outcome {
+        SwitchInOutcome::Triggered {
+            source,
+            ability_id,
+            ..
+        }
+        | SwitchInOutcome::NoMutation {
+            source,
+            ability_id,
+            ..
+        } => causal_events.push(PresentationCausalEvent::ability_activated(
+            *source,
+            *ability_id,
+        )),
+        SwitchInOutcome::NoOp { .. }
+        | SwitchInOutcome::Suppressed { .. }
+        | SwitchInOutcome::NotApplicable { .. } => {}
+    }
+
+    for change in outcome.mutations() {
         let target = find_pokemon_mut(state, change.target_slot, change.target)?;
         set_stage(
             &mut target.stat_stages,
             BattleStat::Attack,
             change.mutation.after,
         );
-        mutations.push(BattleMutation::StatStageChanged {
-            pokemon: change.target,
-            stat: BattleStat::Attack,
-            before: change.mutation.before,
-            after: change.mutation.after,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::StatStageChanged {
+                pokemon: change.target,
+                stat: BattleStat::Attack,
+                before: change.mutation.before,
+                after: change.mutation.after,
+            },
+        );
     }
     Ok(())
 }
@@ -340,6 +417,7 @@ fn resolve_move_action(
     turn_occurrence: &mut u32,
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let rng_before = active_battle(state)?.battle_rng.clone();
     let result = {
@@ -350,24 +428,50 @@ fn resolve_move_action(
     sync_rng_state(state, runtime)?;
     let rng_after = active_battle(state)?.battle_rng.clone();
 
-    push_pending_action(action_order, action, move_disposition(&result))?;
+    let action_sequence = push_pending_action(action_order, action, move_disposition(&result))?;
     if let Some(pp) = result.pp_mutation {
-        mutations.push(BattleMutation::PpChanged {
-            pokemon: pp.pokemon,
-            move_slot: pp.move_slot,
-            before: pp.before,
-            after: pp.after,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::PpChanged {
+                pokemon: pp.pokemon,
+                move_slot: pp.move_slot,
+                before: pp.before,
+                after: pp.after,
+            },
+        );
     }
     if rng_before != rng_after {
-        mutations.push(BattleMutation::BattleRngChanged {
-            before: rng_before,
-            after: rng_after,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::BattleRngChanged {
+                before: rng_before,
+                after: rng_after,
+            },
+        );
     }
+    causal_events.push(PresentationCausalEvent::move_used(
+        action_sequence,
+        result.actor,
+        result.move_id,
+        action.targets.clone(),
+    ));
 
     for target in &result.targets {
-        append_target_mutations(target, mutations);
+        if let (
+            Some(pokemon),
+            TargetEffectDisposition::DefensiveAbilityBlocked {
+                ability: Some(ability_id),
+                ..
+            },
+        ) = (target.pokemon, target.disposition)
+        {
+            causal_events.push(PresentationCausalEvent::ability_activated(
+                pokemon, ability_id,
+            ));
+        }
+        append_target_mutations(target, mutations, causal_events);
         if let Some(request) = target.faint_request {
             queue_faint_action(
                 state,
@@ -376,6 +480,7 @@ fn resolve_move_action(
                 turn_occurrence,
                 action_order,
                 mutations,
+                causal_events,
             )?;
         }
     }
@@ -409,35 +514,51 @@ fn move_disposition(result: &MovePipelineResult) -> ActionDisposition {
     }
 }
 
-fn append_target_mutations(target: &MoveTargetResult, mutations: &mut Vec<BattleMutation>) {
+fn append_target_mutations(
+    target: &MoveTargetResult,
+    mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
+) {
     if let Some(hp) = target.hp_mutation {
-        mutations.push(BattleMutation::HpChanged {
-            pokemon: hp.pokemon,
-            before: hp.before,
-            after: hp.after,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::HpChanged {
+                pokemon: hp.pokemon,
+                before: hp.before,
+                after: hp.after,
+            },
+        );
     }
     for status in &target.status_effects {
         if let StatusApplicationOutcome::Applied { mutation } = status
             && let Some(pokemon) = target.pokemon
         {
-            mutations.push(BattleMutation::StatusChanged {
-                pokemon,
-                before: mutation.before,
-                after: mutation.after,
-            });
+            record_mutation(
+                mutations,
+                causal_events,
+                BattleMutation::StatusChanged {
+                    pokemon,
+                    before: mutation.before,
+                    after: mutation.after,
+                },
+            );
         }
     }
     for stage in &target.stat_stage_effects {
         if stage.changed
             && let Some(pokemon) = target.pokemon
         {
-            mutations.push(BattleMutation::StatStageChanged {
-                pokemon,
-                stat: stage.stat,
-                before: stage.before,
-                after: stage.after,
-            });
+            record_mutation(
+                mutations,
+                causal_events,
+                BattleMutation::StatStageChanged {
+                    pokemon,
+                    stat: stage.stat,
+                    before: stage.before,
+                    after: stage.after,
+                },
+            );
         }
     }
 }
@@ -448,6 +569,7 @@ fn resolve_residual_phase(
     turn_occurrence: &mut u32,
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let occupied_slots: Vec<(FieldSlot, PokemonId)> = active_battle(state)?
         .field
@@ -483,16 +605,24 @@ fn resolve_residual_phase(
             slot,
             speed,
         )?;
-        mutations.push(BattleMutation::StatusChanged {
-            pokemon: pokemon_id,
-            before: mutation.status_before,
-            after: mutation.status_after,
-        });
-        mutations.push(BattleMutation::HpChanged {
-            pokemon: pokemon_id,
-            before: mutation.hp_before,
-            after: mutation.hp_after,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::StatusChanged {
+                pokemon: pokemon_id,
+                before: mutation.status_before,
+                after: mutation.status_after,
+            },
+        );
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::HpChanged {
+                pokemon: pokemon_id,
+                before: mutation.hp_before,
+                after: mutation.hp_after,
+            },
+        );
 
         if mutation.hp_after == 0 {
             queue_faint_action(
@@ -502,6 +632,7 @@ fn resolve_residual_phase(
                 turn_occurrence,
                 action_order,
                 mutations,
+                causal_events,
             )?;
         }
     }
@@ -515,6 +646,7 @@ fn queue_faint_action(
     turn_occurrence: &mut u32,
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let speed = effective_speed(find_pokemon(state, candidate.slot, candidate.pokemon)?)
         .map_err(|source| map_action_order_error(source, state, true))?;
@@ -527,7 +659,7 @@ fn queue_faint_action(
         .checked_add(1)
         .ok_or(FaintQueueError::TurnOccurrenceOverflow)
         .map_err(map_faint_error)?;
-    mutations.push(queued.mutation);
+    record_mutation(mutations, causal_events, queued.mutation);
     push_non_command_action(
         action_order,
         ResolvedActionKind::Faint,
@@ -542,7 +674,7 @@ fn push_pending_action(
     action_order: &mut Vec<ResolvedAction>,
     action: &PendingAction,
     disposition: ActionDisposition,
-) -> Result<(), BattleResolveError> {
+) -> Result<SafeU53, BattleResolveError> {
     let sequence = next_action_sequence(action_order)?;
     action_order.push(ResolvedAction {
         sequence,
@@ -557,7 +689,7 @@ fn push_pending_action(
         tie_order: action.tie_order,
         disposition,
     });
-    Ok(())
+    Ok(sequence)
 }
 
 fn push_non_command_action(
@@ -589,9 +721,19 @@ fn next_action_sequence(action_order: &[ResolvedAction]) -> Result<SafeU53, Batt
     SafeU53::new(value).map_err(|_| RngError::SliceTooLong.into())
 }
 
+fn record_mutation(
+    mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
+    mutation: BattleMutation,
+) {
+    causal_events.push(PresentationCausalEvent::mutation(mutation.clone()));
+    mutations.push(mutation);
+}
+
 fn clear_command_collection(
     state: &mut GameState,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let battle = active_battle_mut(state)?;
     let before = battle.command_state.clone();
@@ -599,7 +741,11 @@ fn clear_command_collection(
         .map_err(CommandLegalityError::Command)?;
     if before != after {
         battle.command_state = after.clone();
-        mutations.push(BattleMutation::CommandCollectionChanged { before, after });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::CommandCollectionChanged { before, after },
+        );
     }
     Ok(())
 }
@@ -608,6 +754,7 @@ fn advance_turn_boundary(
     state: &mut GameState,
     runtime: &mut RngRuntime,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     let before_turn = active_battle(state)?.turn;
     let before_rng = active_battle(state)?.battle_rng.clone();
@@ -617,15 +764,23 @@ fn advance_turn_boundary(
     let after_rng = active_battle(state)?.battle_rng.clone();
     active_battle_mut(state)?.turn = after_turn;
     if before_rng != after_rng {
-        mutations.push(BattleMutation::BattleRngChanged {
-            before: before_rng,
-            after: after_rng,
-        });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::BattleRngChanged {
+                before: before_rng,
+                after: after_rng,
+            },
+        );
     }
-    mutations.push(BattleMutation::TurnAdvanced {
-        before: before_turn,
-        after: after_turn,
-    });
+    record_mutation(
+        mutations,
+        causal_events,
+        BattleMutation::TurnAdvanced {
+            before: before_turn,
+            after: after_turn,
+        },
+    );
     Ok(())
 }
 
@@ -719,6 +874,7 @@ fn validate_after_state(
 fn drain_internal_faint_heads(
     battle: &mut BattleState,
     mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
     loop {
         let Some(head) = unresolved_head(battle) else {
@@ -728,12 +884,16 @@ fn drain_internal_faint_heads(
             ReplacementProgress::NotRequired => {
                 let resolved = resolve_not_required(battle, head.id)
                     .map_err(map_replacement_after_error)?;
-                mutations.extend(resolved.mutations);
+                for mutation in resolved.mutations {
+                    record_mutation(mutations, causal_events, mutation);
+                }
             }
             ReplacementProgress::NoLegalReplacement => {
                 let resolved = resolve_no_legal_replacement(battle, head.id)
                     .map_err(map_replacement_after_error)?;
-                mutations.extend(resolved.mutations);
+                for mutation in resolved.mutations {
+                    record_mutation(mutations, causal_events, mutation);
+                }
             }
             ReplacementProgress::Pending => {
                 if compute_replacement_progress(battle, head.id)
@@ -742,7 +902,9 @@ fn drain_internal_faint_heads(
                 {
                     let resolved = resolve_no_legal_replacement(battle, head.id)
                         .map_err(map_replacement_after_error)?;
-                    mutations.extend(resolved.mutations);
+                    for mutation in resolved.mutations {
+                        record_mutation(mutations, causal_events, mutation);
+                    }
                 } else {
                     return Ok(());
                 }
@@ -761,12 +923,20 @@ fn unresolved_head(battle: &BattleState) -> Option<FaintOccurrence> {
         .find(|entry| entry.replacement != ReplacementProgress::Applied)
 }
 
-fn update_outcome(battle: &mut BattleState, mutations: &mut Vec<BattleMutation>) {
+fn update_outcome(
+    battle: &mut BattleState,
+    mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
+) {
     let before = battle.outcome;
     let after = derive_battle_outcome(battle);
     if before != after {
         battle.outcome = after;
-        mutations.push(BattleMutation::OutcomeChanged { before, after });
+        record_mutation(
+            mutations,
+            causal_events,
+            BattleMutation::OutcomeChanged { before, after },
+        );
     }
 }
 
@@ -1070,6 +1240,20 @@ fn switch_ability_subject(
     party_for_side(battle, field_slot.side)
         .iter()
         .find(|pokemon| pokemon.id == incoming)
+        .map(|pokemon| CapabilitySubject::Ability(pokemon.abilities.active))
+}
+
+fn slot_ability_subject(state: &GameState, slot: FieldSlot) -> Option<CapabilitySubject> {
+    let battle = state.battle.as_ref()?;
+    let pokemon_id = battle
+        .field
+        .slots
+        .iter()
+        .find(|entry| entry.slot == slot)
+        .and_then(|entry| entry.occupant)?;
+    party_for_side(battle, slot.side)
+        .iter()
+        .find(|pokemon| pokemon.id == pokemon_id)
         .map(|pokemon| CapabilitySubject::Ability(pokemon.abilities.active))
 }
 
