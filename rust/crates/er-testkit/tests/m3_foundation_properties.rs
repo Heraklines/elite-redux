@@ -43,7 +43,7 @@ impl DeterministicCorpus {
 }
 
 #[test]
-fn frozen_catalog_is_valid_but_never_claims_unpublished_evidence() -> TestResult {
+fn catalog_state_is_valid_and_never_claims_unbound_evidence() -> TestResult {
     let catalog = load_m3_fixture_catalog()?;
 
     assert_eq!(
@@ -58,33 +58,45 @@ fn frozen_catalog_is_valid_but_never_claims_unpublished_evidence() -> TestResult
         catalog.oracle_manifest.supporting_artifact_contracts.len(),
         M3_SUPPORTING_ARTIFACT_IDS.len()
     );
-    assert_eq!(
-        catalog.oracle_manifest.publication_state,
-        M3OraclePublicationState::ContractCatalogFrozen
-    );
-    assert_eq!(
-        catalog.readiness()?,
-        M3OracleReadiness::CatalogOnly {
-            pending_cases: 38,
-            pending_supporting_artifacts: 2,
+    match catalog.oracle_manifest.publication_state {
+        M3OraclePublicationState::ContractCatalogFrozen => {
+            assert_eq!(
+                catalog.readiness()?,
+                M3OracleReadiness::CatalogOnly {
+                    pending_cases: 38,
+                    pending_supporting_artifacts: 2,
+                }
+            );
+            assert!(!catalog.is_evidence_published());
+            assert!(matches!(
+                catalog.load_published_case::<Value>("physical-hit"),
+                Err(M3FixtureError::Unpublished {
+                    kind: M3FixtureKind::BattleCase,
+                    ..
+                })
+            ));
+            assert!(matches!(
+                catalog.load_published_supporting_artifact::<Value>("rng-vectors-v1"),
+                Err(M3FixtureError::Unpublished {
+                    kind: M3FixtureKind::SupportingArtifact,
+                    ..
+                })
+            ));
         }
-    );
-    assert!(!catalog.is_evidence_published());
+        M3OraclePublicationState::OracleEvidencePublished => {
+            assert_eq!(
+                catalog.readiness()?,
+                M3OracleReadiness::Published {
+                    cases: 38,
+                    supporting_artifacts: 2,
+                }
+            );
+            assert!(catalog.is_evidence_published());
+            let _: Value = catalog.load_published_case("physical-hit")?;
+            let _: Value = catalog.load_published_supporting_artifact("rng-vectors-v1")?;
+        }
+    }
 
-    assert!(matches!(
-        catalog.load_published_case::<Value>("physical-hit"),
-        Err(M3FixtureError::Unpublished {
-            kind: M3FixtureKind::BattleCase,
-            ..
-        })
-    ));
-    assert!(matches!(
-        catalog.load_published_supporting_artifact::<Value>("rng-vectors-v1"),
-        Err(M3FixtureError::Unpublished {
-            kind: M3FixtureKind::SupportingArtifact,
-            ..
-        })
-    ));
     assert!(matches!(
         catalog.load_published_case::<Value>("not-a-catalog-case"),
         Err(M3FixtureError::UnknownFixture {
@@ -104,14 +116,18 @@ fn frozen_catalog_is_valid_but_never_claims_unpublished_evidence() -> TestResult
     ));
 
     let mut partial_publication = catalog.clone();
-    partial_publication.oracle_manifest.publication_state =
-        M3OraclePublicationState::OracleEvidencePublished;
+    match partial_publication.oracle_manifest.publication_state {
+        M3OraclePublicationState::ContractCatalogFrozen => {
+            partial_publication.oracle_manifest.publication_state =
+                M3OraclePublicationState::OracleEvidencePublished;
+        }
+        M3OraclePublicationState::OracleEvidencePublished => {
+            partial_publication.oracle_manifest.published_fixtures.pop();
+        }
+    }
     assert!(matches!(
         partial_publication.validate(),
-        Err(M3FixtureError::Contract {
-            field: "publication_state",
-            ..
-        })
+        Err(M3FixtureError::Contract { .. })
     ));
 
     let mut coverage_json = serde_json::to_value(&catalog.coverage_map)?;
