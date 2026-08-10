@@ -2852,14 +2852,20 @@ impl BattleTransaction {
                     staged_peer_rebinds.insert(endpoint, generation);
                 }
 
-                let has_staged = staged_local_rebind.is_some() || !staged_peer_rebinds.is_empty();
-                let staged_local_connected = staged_local_rebind.as_ref().map_or(true, |_| {
-                    transports.get(&local) == Some(&TransportState::Connected)
+                let complete_generation_staged = staged_local_rebind.is_some()
+                    && peer_bindings
+                        .iter()
+                        .all(|binding| staged_peer_rebinds.contains_key(&binding.seat_id));
+                let staged_local_connected = transports.get(&local)
+                    == Some(&TransportState::Connected);
+                let staged_peers_connected = peer_bindings.iter().all(|binding| {
+                    transports.get(&binding.seat_id) == Some(&TransportState::Connected)
                 });
-                let staged_peers_connected = staged_peer_rebinds.keys().all(|seat| {
-                    transports.get(seat) == Some(&TransportState::Connected)
-                });
-                if connected && has_staged && staged_local_connected && staged_peers_connected {
+                if connected
+                    && complete_generation_staged
+                    && staged_local_connected
+                    && staged_peers_connected
+                {
                     let mut next_context = context.clone();
                     if let Some(staged) = *staged_local_rebind {
                         next_context.connection_generation = staged;
@@ -2913,17 +2919,14 @@ impl BattleTransaction {
                 if endpoint == *authority_seat && generation_changed {
                     *staged_authority_rebind = Some(generation);
                 }
-                let has_staged = staged_local_rebind.is_some()
-                    || staged_authority_rebind.is_some();
-                let staged_local_connected = staged_local_rebind.as_ref().map_or(true, |_| {
-                    transports.get(&local) == Some(&TransportState::Connected)
-                });
-                let staged_authority_connected =
-                    staged_authority_rebind.as_ref().map_or(true, |_| {
-                        transports.get(&*authority_seat) == Some(&TransportState::Connected)
-                    });
+                let complete_generation_staged = staged_local_rebind.is_some()
+                    && staged_authority_rebind.is_some();
+                let staged_local_connected = transports.get(&local)
+                    == Some(&TransportState::Connected);
+                let staged_authority_connected = transports.get(&*authority_seat)
+                    == Some(&TransportState::Connected);
                 if connected
-                    && has_staged
+                    && complete_generation_staged
                     && staged_local_connected
                     && staged_authority_connected
                 {
