@@ -55,7 +55,7 @@ import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
-import { rollFunWeather } from "#data/elite-redux/er-fun-mode";
+import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import {
   erApplyCovenantHeal,
@@ -2397,6 +2397,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetTerrainIfNewBiome(): void {
+    const funTerrain = globalScene.gameMode.isFun ? rollFunTerrain() : null;
+    if (funTerrain != null) {
+      globalScene.arena.trySetTerrain(funTerrain, false, undefined, 0);
+      return;
+    }
     // ER biome identity (#439 §3): vanilla terrainPools are all empty, so biome
     // terrain only exists via this override (Power Plant electric, Grass/Jungle
     // grassy, Space psychic). turnsOverride 0 -> permanent, persists across waves.

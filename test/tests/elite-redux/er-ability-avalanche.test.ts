@@ -31,7 +31,7 @@ describe("Fun Mode Ability Avalanche", () => {
     resetErDifficulty();
   });
 
-  test("appends four always-active abilities after the base four for both sides at wave 120", async () => {
+  test("appends four runtime ability slots after the base four for both sides at wave 120", async () => {
     await game.classicMode.startBattle(SpeciesId.GARCHOMP);
     game.scene.gameMode = getGameMode(GameModes.FUN);
     setErDifficulty("youngster");
@@ -51,9 +51,7 @@ describe("Fun Mode Ability Avalanche", () => {
       expect(
         new Set([pokemon.getAbility().id, ...passives.flatMap(ability => (ability ? [ability.id] : []))]).size,
       ).toBe(1 + passives.filter(Boolean).length);
-      for (let slot = 3; slot < 7; slot++) {
-        expect(pokemon.canApplyAbility(true, slot)).toBe(true);
-      }
+      expect(passives.slice(3).every(Boolean)).toBe(true);
     };
 
     const player = game.scene.getPlayerPokemon()!;

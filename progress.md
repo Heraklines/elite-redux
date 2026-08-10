@@ -7818,3 +7818,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Battle Info always keeps its graphics fallback beneath streamed ROM art, preventing partial/blank panels when a player opens or scrolls the list while assets are still settling.
 - Corrected the prior Mega note: the final transparent Mega Evolution emblem is in `Heraklines/er-assets` feature commit `31c2642a4`. The rejected separate stat panel was removed; reward, summary-item, and battle-item Mega deltas extend the native item description instead.
 - Verification: Fun Mode/Avalanche logic 24/24; focused Biome error gate and `git diff --check` green; final nine-recipe Fun Mega/Avalanche visual regression batch green, including initial/focused Summary and Battle Info states. Fresh screenshots are under `C:\Users\Hafida\Desktop\Fun Mode UI Preview`. No staging or production deployment was made, and `feat/elite-redux-port` remains untouched.
+
+2026-08-10 - Fun Mode selector parity and Weather Chaos correction
+
+- Corrected the selector's premature seven-row scroll limit to the same nine-row budget as Challenge Mode, eliminating the unused lower-left space. Small pixel arrows now independently indicate whether earlier or later modifiers remain off-screen.
+- Added Challenge Mode's saved-setup behavior to the START region: LEFT/RIGHT switches between START and Reuse Last Setup, Confirm applies the selected action, and Cancel returns from the header/START focus to the modifier list. The existing header Last Setup shortcut remains account-specific.
+- Renamed Weather Roulette to Weather Chaos and changed its player-facing description to `Every encounter begins with random weather/terrain, including clear weather.` The behavior now independently rolls every supported weather (including clear) and terrain (including no terrain) at biome entry and between encounters in the same biome.
+- Production remains forbidden. Deploy only the isolated Fun Mode branch to staging, with the co-op signaling Worker disabled.
