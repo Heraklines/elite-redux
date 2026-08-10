@@ -340,6 +340,7 @@ paths = [
   "rust/crates/*/Cargo.toml",
   "rust/crates/*/src/lib.rs",
   "rust/crates/er-battle/src/error.rs",
+  "rust/crates/er-battle/src/resolver.rs",
   "rust/crates/er-kernel/src/kernel.rs",
   "rust/crates/er-kernel/tests/m1_keyboard_menu.rs",
   "rust/crates/er-kernel/tests/m2_protocol_menu.rs",
