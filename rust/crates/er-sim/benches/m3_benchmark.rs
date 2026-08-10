@@ -25,8 +25,9 @@ use er_state::battle::BattleState;
 use er_state::snapshot::GameState;
 use er_types::battle_control::BattleControl;
 use er_types::battle_command::{
-    BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
-    scripted_enemy_command_operation_id,
+    AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandAdmissionSource,
+    CommandFrontierStatus, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
+    player_command_operation_id, scripted_enemy_command_operation_id,
 };
 use er_types::battle_ids::{
     BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex,
@@ -789,54 +790,127 @@ fn assert_local_victory_terminal(kernel: &GameKernel, label: &str) -> TestResult
 }
 
 fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> TestResult {
-    let battle = state_battle(state, label)?;
-    let command_state = battle
-        .get("command_state")
-        .and_then(Value::as_object)
-        .ok_or_else(|| invalid(format!("{label}.game.battle.command_state is invalid")))?;
-    let frontier = command_state
-        .get("frontier")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            invalid(format!(
-                "{label}.game.battle.command_state.frontier is invalid"
-            ))
-        })?;
-    if frontier.is_empty() {
+    let battle: BattleState = serde_json::from_value(state_battle(state, label)?.clone())?;
+    battle.field.validate_for_format(&battle.format)?;
+    battle.command_state.validate()?;
+    if battle.turn.get().get() != expected_turn {
         return Err(invalid(format!(
-            "{label}.game.battle.command_state.frontier is empty"
+            "{label}.game.battle.turn is {}, expected {expected_turn}",
+            battle.turn
         )));
     }
+    if battle.outcome != BattleOutcome::Ongoing {
+        return Err(invalid(format!(
+            "{label}.game.battle.outcome is {:?}, expected ONGOING",
+            battle.outcome
+        )));
+    }
+
+    let expected_slots = battle
+        .field
+        .slots
+        .iter()
+        .filter_map(|entry| entry.occupant.map(|_| entry.slot))
+        .collect::<Vec<_>>();
+    let expected_human_pending = expected_slots
+        .iter()
+        .filter(|slot| slot.side == BattleSide::Player)
+        .count();
+    let expected_scripted_enemy = expected_slots
+        .iter()
+        .filter(|slot| slot.side == BattleSide::Enemy)
+        .count();
+    if expected_human_pending == 0 || expected_scripted_enemy == 0 {
+        return Err(invalid(format!(
+            "{label}.game.battle has no complete occupied player/enemy frontier"
+        )));
+    }
+
     let expected_fragment = format!("/turn/{expected_turn}/");
-    for (index, entry) in frontier.iter().enumerate() {
-        let operation_id = entry
-            .get("operation_id")
-            .and_then(Value::as_str)
-            .ok_or_else(|| invalid(format!("{label}.frontier[{index}].operation_id is invalid")))?;
+    let mut actual_slots = Vec::with_capacity(battle.command_state.frontier.len());
+    let mut human_pending = 0_usize;
+    let mut scripted_enemy_admitted = 0_usize;
+    for (index, entry) in battle.command_state.frontier.iter().enumerate() {
+        let operation_id = entry.operation_id.as_str();
         if !operation_id.contains(expected_fragment.as_str()) {
             return Err(invalid(format!(
                 "{label}.frontier[{index}] is {operation_id}, expected turn {expected_turn}"
             )));
         }
-        let status_kind = entry
-            .get("status")
-            .and_then(Value::as_object)
-            .and_then(|status| status.get("kind"))
-            .and_then(Value::as_str)
-            .ok_or_else(|| invalid(format!("{label}.frontier[{index}].status.kind is invalid")))?;
-        if status_kind != "PENDING" {
-            return Err(invalid(format!(
-                "{label}.frontier[{index}] is not a pending supported control"
-            )));
+        actual_slots.push(entry.field_slot);
+        match (entry.field_slot.side, entry.owner_seat, &entry.status) {
+            (BattleSide::Player, Some(owner), CommandFrontierStatus::Pending) => {
+                let expected_owner = er_state::format::owner_seat_for(
+                    &battle.format,
+                    entry.field_slot,
+                )?
+                .ok_or_else(|| invalid(format!("{label}.frontier[{index}] has no human owner")))?;
+                if owner != expected_owner {
+                    return Err(invalid(format!(
+                        "{label}.frontier[{index}] owner {owner} does not match {expected_owner}"
+                    )));
+                }
+                let expected_operation = player_command_operation_id(
+                    battle.battle_id,
+                    battle.wave,
+                    battle.turn,
+                    entry.field_slot,
+                    owner,
+                )?;
+                if entry.operation_id != expected_operation {
+                    return Err(invalid(format!(
+                        "{label}.frontier[{index}] human operation ID is not canonical"
+                    )));
+                }
+                human_pending = human_pending.saturating_add(1);
+            }
+            (
+                BattleSide::Enemy,
+                None,
+                CommandFrontierStatus::Admitted {
+                    command:
+                        AcceptedBattleCommand::ScriptedEnemy {
+                            command: scripted,
+                            ..
+                        },
+                    source: CommandAdmissionSource::ScriptedEnemy,
+                },
+            ) => {
+                let expected_operation = scripted_enemy_command_operation_id(
+                    battle.battle_id,
+                    battle.wave,
+                    battle.turn,
+                    entry.field_slot,
+                    scripted.script_cursor,
+                )?;
+                if entry.operation_id != expected_operation {
+                    return Err(invalid(format!(
+                        "{label}.frontier[{index}] scripted operation ID is not canonical"
+                    )));
+                }
+                scripted_enemy_admitted = scripted_enemy_admitted.saturating_add(1);
+            }
+            _ => {
+                return Err(invalid(format!(
+                    "{label}.frontier[{index}] has unsupported side/owner/status {:?}/{:?}/{:?}",
+                    entry.field_slot.side, entry.owner_seat, entry.status
+                )));
+            }
         }
     }
-    let outcome = battle
-        .get("outcome")
-        .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{label}.game.battle.outcome is invalid")))?;
-    if outcome != "ONGOING" {
+    if actual_slots != expected_slots {
         return Err(invalid(format!(
-            "{label}.game.battle.outcome is {outcome}, expected ONGOING"
+            "{label}.game.battle.command_state.frontier does not exactly cover occupied slots"
+        )));
+    }
+    if human_pending != expected_human_pending {
+        return Err(invalid(format!(
+            "{label} has {human_pending} pending human entries, expected {expected_human_pending}"
+        )));
+    }
+    if scripted_enemy_admitted != expected_scripted_enemy {
+        return Err(invalid(format!(
+            "{label} has {scripted_enemy_admitted} admitted scripted enemy entries, expected {expected_scripted_enemy}"
         )));
     }
     Ok(())
