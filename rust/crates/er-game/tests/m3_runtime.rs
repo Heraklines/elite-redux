@@ -1279,10 +1279,10 @@ mod m3_oracle_control_axis8 {
     ) -> TestResult {
         require(
             case,
-            plan.menu_allocators.len() == plan.seats.len(),
+            plan.menu_allocators.len() == before.len(),
             format!(
-                "menu allocator seat count differs from projected seats: expected {}, got {}",
-                plan.seats.len(),
+                "menu allocator seat count differs from allocator-before: expected {}, got {}",
+                before.len(),
                 plan.menu_allocators.len()
             ),
         )?;
@@ -1304,17 +1304,12 @@ mod m3_oracle_control_axis8 {
             ),
         )?;
         for previous in before {
-            let Some(actual) = plan.allocator(previous.seat) else {
-                require(
-                    case,
-                    !projected_seats.contains(&previous.seat),
-                    format!(
-                        "projected plan omitted allocator for projected seat {}",
-                        previous.seat
-                    ),
-                )?;
-                continue;
-            };
+            let actual = plan.allocator(previous.seat).ok_or_else(|| {
+                boxed(format!(
+                    "{case}: projected plan omitted allocator for canonical seat {}",
+                    previous.seat
+                ))
+            })?;
             let expected = if consumed.contains(&previous.seat) {
                 next_menu_instance(case, previous.next_menu_instance_id)?
             } else {
@@ -1360,7 +1355,7 @@ mod m3_oracle_control_axis8 {
             .iter()
             .any(|entry| matches!(&entry.control, BattleControl::Complete(_)));
         match (has_command, has_replacement, has_waiting, has_complete) {
-            (true, false, false, false) => Ok("Command"),
+            (true, false, false, false) | (true, false, true, false) => Ok("Command"),
             (false, true, false, false) | (false, true, true, false) => Ok("PartyReplacement"),
             (false, false, true, false) => Ok("Waiting"),
             (false, false, false, true) => Ok("Terminal"),
@@ -1368,7 +1363,7 @@ mod m3_oracle_control_axis8 {
         }
     }
 
-    fn command_owners(plan: &BattleControlPlan) -> Vec<u64> {
+    fn actionable_command_owners(plan: &BattleControlPlan) -> Vec<u64> {
         plan.seats
             .iter()
             .filter_map(|entry| {
@@ -1393,8 +1388,15 @@ mod m3_oracle_control_axis8 {
         match kind {
             "Command" => {
                 for entry in &plan.seats {
-                    let BattleControl::CommandRoot(root) = &entry.control else {
-                        return mismatch(case, "command plan contains a non-command control");
+                    let root = match &entry.control {
+                        BattleControl::CommandRoot(root) => root,
+                        BattleControl::Waiting(_) => continue,
+                        _ => {
+                            return mismatch(
+                                case,
+                                "command plan contains a control other than CommandRoot or Waiting",
+                            );
+                        }
                     };
                     require(
                         case,
@@ -1494,7 +1496,7 @@ mod m3_oracle_control_axis8 {
         )?;
 
         let expected_owners = expected_command_owners(case, control)?;
-        let actual_owners = command_owners(plan);
+        let actual_owners = actionable_command_owners(plan);
         require(
             case,
             expected_owners == actual_owners,
@@ -1574,16 +1576,22 @@ mod m3_oracle_control_axis8 {
             .battle
             .as_ref()
             .ok_or_else(|| boxed(format!("{case}: command projection has no battle")))?;
-        let frontier_command_seats = battle
-            .command_state
-            .frontier
+        let canonical_seats = human_seats(&battle.format)
+            .map_err(|error| boxed(format!("{case}: could not derive human seats: {error}")))?;
+        let frontier_command_seats = canonical_seats
             .iter()
-            .filter(|entry| matches!(&entry.status, CommandFrontierStatus::Pending))
-            .filter_map(|entry| entry.owner_seat)
+            .copied()
+            .filter(|seat| {
+                battle.command_state.frontier.iter().any(|entry| {
+                    entry.owner_seat == Some(*seat)
+                        && matches!(&entry.status, CommandFrontierStatus::Pending)
+                })
+            })
             .collect::<Vec<_>>();
         let projected_command_seats = plan
             .seats
             .iter()
+            .filter(|entry| matches!(&entry.control, BattleControl::CommandRoot(_)))
             .map(|entry| entry.seat)
             .collect::<Vec<_>>();
         require(
@@ -1593,8 +1601,72 @@ mod m3_oracle_control_axis8 {
                 "pending command frontier seats differ: expected {frontier_command_seats:?}, got {projected_command_seats:?}"
             ),
         )?;
+        let mut pending_operation_ids = battle
+            .command_state
+            .frontier
+            .iter()
+            .filter(|entry| matches!(&entry.status, CommandFrontierStatus::Pending))
+            .map(|entry| entry.operation_id.clone())
+            .collect::<Vec<_>>();
+        pending_operation_ids.sort_unstable();
+        require(
+            case,
+            !pending_operation_ids.is_empty(),
+            "command projection has no pending operation identities",
+        )?;
 
+        let mut consumed = Vec::new();
         for seat_control in &plan.seats {
+            let matching_frontier = battle
+                .command_state
+                .frontier
+                .iter()
+                .filter(|entry| {
+                    entry.owner_seat == Some(seat_control.seat)
+                        && matches!(&entry.status, CommandFrontierStatus::Pending)
+                })
+                .collect::<Vec<_>>();
+            require(
+                case,
+                matching_frontier.len() <= 1,
+                format!(
+                    "seat {} owns duplicate pending frontier entries",
+                    seat_control.seat
+                ),
+            )?;
+            let Some(frontier) = matching_frontier.first().copied() else {
+                let waiting = match &seat_control.control {
+                    BattleControl::Waiting(waiting) => waiting,
+                    other => {
+                        return mismatch(
+                            case,
+                            format!(
+                                "non-pending command seat {} projected {other:?}, not Waiting",
+                                seat_control.seat
+                            ),
+                        );
+                    }
+                };
+                require(
+                    case,
+                    waiting.reason == WaitingReason::PartnerCommand
+                        && waiting.operation_ids.as_slice() == pending_operation_ids.as_slice(),
+                    format!(
+                        "non-pending command seat {} waiting identity differs",
+                        seat_control.seat
+                    ),
+                )?;
+                require(
+                    case,
+                    seat_control.decision_operation_id.is_none()
+                        && !seat_control.control.is_actionable(),
+                    format!(
+                        "non-pending command seat {} is incorrectly actionable",
+                        seat_control.seat
+                    ),
+                )?;
+                continue;
+            };
             let root = match &seat_control.control {
                 BattleControl::CommandRoot(root) => root,
                 other => {
@@ -1604,22 +1676,6 @@ mod m3_oracle_control_axis8 {
                     )
                 }
             };
-            let frontier = battle
-                .command_state
-                .frontier
-                .iter()
-                .find(|entry| entry.owner_seat == Some(seat_control.seat))
-                .ok_or_else(|| {
-                    boxed(format!(
-                        "{case}: projected command seat {} has no canonical frontier entry",
-                        seat_control.seat
-                    ))
-                })?;
-            require(
-                case,
-                matches!(frontier.status, CommandFrontierStatus::Pending),
-                format!("frontier entry for seat {} is not pending", seat_control.seat),
-            )?;
             require(
                 case,
                 root.actor == frontier.actor,
@@ -1701,8 +1757,8 @@ mod m3_oracle_control_axis8 {
                     && seat_control.decision_operation_id.is_some(),
                 format!("seat {} command control is not actionable/bound", seat_control.seat),
             )?;
+            consumed.push(seat_control.seat);
         }
-        let consumed = plan.seats.iter().map(|entry| entry.seat).collect::<Vec<_>>();
         require_allocators(case, plan, before, &consumed)
     }
 
@@ -1915,6 +1971,18 @@ mod m3_oracle_control_axis8 {
         })?;
         plan.validate()
             .map_err(|error| boxed(format!("{case}: projected BattleControlPlan is invalid: {error}")))?;
+        let projected_seats = plan
+            .seats
+            .iter()
+            .map(|entry| entry.seat)
+            .collect::<Vec<_>>();
+        require(
+            case,
+            projected_seats.as_slice() == seats.as_slice(),
+            format!(
+                "projected plan does not cover canonical human seats: expected {seats:?}, got {projected_seats:?}"
+            ),
+        )?;
         require(
             case,
             plan.battle_id == battle.battle_id,

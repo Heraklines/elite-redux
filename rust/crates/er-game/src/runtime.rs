@@ -3790,34 +3790,7 @@ pub fn project_battle_control_plan(
     let seats = human_seats(&battle.format)?;
     match decision {
         BattleNextDecision::CommandFrontier => {
-            // Only pending player frontier entries are actionable.  Keep the
-            // allocator vector in lockstep because BattleControlPlan requires
-            // allocator seats to exactly match its projected control seats.
-            let actionable_seats = seats
-                .iter()
-                .copied()
-                .filter(|seat| {
-                    battle.command_state.frontier.iter().any(|entry| {
-                        entry.owner_seat == Some(*seat)
-                            && matches!(&entry.status, CommandFrontierStatus::Pending)
-                    })
-                })
-                .collect::<Vec<_>>();
-            let actionable_allocators = actionable_seats
-                .iter()
-                .filter_map(|seat| {
-                    allocator_before
-                        .iter()
-                        .find(|allocator| allocator.seat == *seat)
-                        .cloned()
-                })
-                .collect::<Vec<_>>();
-            project_command_frontier(
-                state,
-                &actionable_seats,
-                &actionable_allocators,
-                content,
-            )
+            project_command_frontier(state, &seats, allocator_before, content)
         }
         BattleNextDecision::Replacement { occurrence } => {
             project_replacement(state, occurrence, &seats, allocator_before)
@@ -4051,19 +4024,54 @@ fn project_command_frontier(
 ) -> Result<BattleControlPlan, GameRuntimeError> {
     let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
     battle.command_state.validate()?;
-    let mut seat_entries = Vec::new();
+    // Runtime and snapshot invariants keep every canonical human seat in the
+    // plan.  The pending frontier controls actionability; seats excluded from
+    // that frontier wait on the exact operations that can advance it.
+    let pending_entries = battle
+        .command_state
+        .frontier
+        .iter()
+        .filter(|entry| matches!(&entry.status, CommandFrontierStatus::Pending))
+        .collect::<Vec<_>>();
+    if pending_entries.is_empty() {
+        return Err(invalid_config("command frontier has no pending decision"));
+    }
+    for entry in &pending_entries {
+        let owner = entry
+            .owner_seat
+            .ok_or_else(|| invalid_config("pending command entry has no human owner"))?;
+        if entry.field_slot.side != BattleSide::Player || !seats.contains(&owner) {
+            return Err(invalid_config(
+                "pending command entry is not owned by a canonical human seat",
+            ));
+        }
+    }
+    let pending_operation_ids = pending_entries
+        .iter()
+        .map(|entry| entry.operation_id.clone())
+        .collect::<Vec<_>>();
+    let mut seat_entries = Vec::with_capacity(seats.len());
     let mut next_allocators = allocators.to_vec();
     for seat in seats {
-        let entry = battle
-            .command_state
-            .frontier
+        let mut matching_entries = pending_entries
             .iter()
-            .find(|entry| entry.owner_seat == Some(*seat))
-            .ok_or_else(|| invalid_config("human command seat is absent from exact frontier"))?;
-        if entry.field_slot.side != BattleSide::Player
-            || !matches!(&entry.status, CommandFrontierStatus::Pending)
-        {
-            return Err(invalid_config("human command entry is not a pending frontier decision"));
+            .copied()
+            .filter(|entry| entry.owner_seat == Some(*seat));
+        let Some(entry) = matching_entries.next() else {
+            seat_entries.push(SeatBattleControl::new(
+                *seat,
+                None,
+                BattleControl::Waiting(WaitingControl::new(
+                    WaitingReason::PartnerCommand,
+                    pending_operation_ids.clone(),
+                )?),
+            ));
+            continue;
+        };
+        if matching_entries.next().is_some() {
+            return Err(invalid_config(
+                "human seat owns duplicate pending command entries",
+            ));
         }
         let slot = entry.field_slot;
         let actor = entry.actor;
