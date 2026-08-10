@@ -4,8 +4,8 @@ mod battle_presentation;
 use std::error::Error;
 
 use battle_presentation::{
-    BattlePresentationError, BattlePresentationSettlementReport, BattlePresentationState,
-    M3_PRESENTATION_FAILED,
+    BattlePresentationError, BattlePresentationPlan, BattlePresentationSettlementReport,
+    BattlePresentationState, M3_PRESENTATION_FAILED,
 };
 use er_types::battle_ids::BattlePresentationEventId;
 use er_types::battle_ui::{
@@ -103,6 +103,162 @@ fn plan_identity_and_zero_based_order_are_checked_atomically() -> TestResult {
         Err(BattlePresentationError::PlanSequenceMismatch { .. })
     ));
     assert_eq!(state, before);
+    Ok(())
+}
+
+#[test]
+fn concurrent_ordered_plans_settle_in_isolation() -> TestResult {
+    let endpoint = seat(1)?;
+    let first_operation = operation("battle/1/wave/1/turn/8/result")?;
+    let first_blocking = event(
+        &first_operation,
+        0,
+        PresentationBlockingPolicy::BlocksHumanInput,
+        PresentationSkipPolicy::Forbidden,
+    )?;
+    let first_nonblocking = event(
+        &first_operation,
+        1,
+        PresentationBlockingPolicy::NonBlocking,
+        PresentationSkipPolicy::Allowed,
+    )?;
+    let second_operation = operation("battle/1/wave/1/turn/9/result")?;
+    let second_blocking = event(
+        &second_operation,
+        0,
+        PresentationBlockingPolicy::BlocksHumanInput,
+        PresentationSkipPolicy::Forbidden,
+    )?;
+    let second_nonblocking = event(
+        &second_operation,
+        1,
+        PresentationBlockingPolicy::NonBlocking,
+        PresentationSkipPolicy::Allowed,
+    )?;
+    let first_blocking_id = first_blocking.event_id.clone();
+    let first_nonblocking_id = first_nonblocking.event_id.clone();
+    let second_blocking_id = second_blocking.event_id.clone();
+    let second_nonblocking_id = second_nonblocking.event_id.clone();
+
+    let mut state = BattlePresentationState::new(endpoint);
+    state.install_plan(
+        first_operation.clone(),
+        vec![first_blocking, first_nonblocking],
+    )?;
+    state.install_plan(
+        second_operation.clone(),
+        vec![second_blocking, second_nonblocking],
+    )?;
+
+    assert_eq!(state.plan_count(), 2);
+    assert_eq!(
+        state.plan_operation_ids(),
+        vec![first_operation.clone(), second_operation.clone()]
+    );
+    assert_eq!(
+        state.plan().map(BattlePresentationPlan::operation_id),
+        Some(&second_operation)
+    );
+    assert_eq!(state.live_count(), 4);
+    assert_eq!(state.blocking_count(), 2);
+    assert_eq!(state.outcome_count(), 0);
+    assert_eq!(state.snapshot().plan_count(), 2);
+    assert_eq!(state.snapshot().pending_ids(), state.pending_ids());
+    assert_eq!(state.snapshot().blocking_ids(), state.blocking_ids());
+
+    let second_nonblocking_report = settle(
+        &mut state,
+        endpoint,
+        &second_nonblocking_id,
+        PresentationSettlementOutcome::Settled,
+    )?;
+    assert!(!second_nonblocking_report.barrier_cleared());
+    assert!(state.pending_ids().contains(&first_blocking_id));
+    assert!(state.pending_ids().contains(&first_nonblocking_id));
+    assert!(state.pending_ids().contains(&second_blocking_id));
+    assert!(!state.pending_ids().contains(&second_nonblocking_id));
+    assert!(state.blocking_ids().contains(&first_blocking_id));
+    assert!(state.blocking_ids().contains(&second_blocking_id));
+    assert_eq!(
+        state.outcome(&second_nonblocking_id),
+        Some(&PresentationSettlementOutcome::Settled)
+    );
+    assert!(state.plan_for(&first_operation).is_some());
+    assert!(state.plan_for(&second_operation).is_some());
+
+    let second_blocking_report = settle(
+        &mut state,
+        endpoint,
+        &second_blocking_id,
+        PresentationSettlementOutcome::Settled,
+    )?;
+    assert!(!second_blocking_report.barrier_cleared());
+    assert!(state.is_blocked());
+    assert!(state.blocking_ids().contains(&first_blocking_id));
+    assert!(!state.blocking_ids().contains(&second_blocking_id));
+
+    let first_blocking_report = settle(
+        &mut state,
+        endpoint,
+        &first_blocking_id,
+        PresentationSettlementOutcome::Settled,
+    )?;
+    assert!(first_blocking_report.barrier_cleared());
+    assert!(!state.is_blocked());
+    assert!(!state.blocking_ids().contains(&first_blocking_id));
+    assert_eq!(state.live_count(), 1);
+    assert!(state.pending_ids().contains(&first_nonblocking_id));
+    assert_eq!(state.outcome_count(), 3);
+
+    settle(
+        &mut state,
+        endpoint,
+        &first_nonblocking_id,
+        PresentationSettlementOutcome::Settled,
+    )?;
+    assert_eq!(state.live_count(), 0);
+    assert_eq!(state.outcome_count(), 4);
+    state.validate()?;
+    Ok(())
+}
+
+#[test]
+fn duplicate_operation_and_event_ids_are_rejected_atomically() -> TestResult {
+    let endpoint = seat(1)?;
+    let operation_id = operation("battle/1/wave/1/turn/10/result")?;
+    let first_event = event(
+        &operation_id,
+        0,
+        PresentationBlockingPolicy::NonBlocking,
+        PresentationSkipPolicy::Allowed,
+    )?;
+    let mut state = BattlePresentationState::new(endpoint);
+    state.install_plan(operation_id.clone(), vec![first_event.clone()])?;
+    let before_duplicate_operation = state.clone();
+
+    assert!(matches!(
+        state.install_plan(operation_id, vec![first_event]),
+        Err(BattlePresentationError::DuplicateOperationId { .. })
+    ));
+    assert_eq!(state, before_duplicate_operation);
+
+    let duplicate_event_operation = operation("battle/1/wave/1/turn/11/result")?;
+    let duplicate_event = event(
+        &duplicate_event_operation,
+        0,
+        PresentationBlockingPolicy::NonBlocking,
+        PresentationSkipPolicy::Allowed,
+    )?;
+    let before_duplicate_event = state.clone();
+    assert!(matches!(
+        state.install_plan(
+            duplicate_event_operation,
+            vec![duplicate_event.clone(), duplicate_event],
+        ),
+        Err(BattlePresentationError::DuplicateEventId { .. })
+    ));
+    assert_eq!(state, before_duplicate_event);
+    state.validate()?;
     Ok(())
 }
 

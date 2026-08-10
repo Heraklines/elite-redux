@@ -41,7 +41,13 @@ impl BattlePresentationPlan {
     }
 
     pub(crate) fn validate(&self) -> Result<(), BattlePresentationError> {
+        let mut event_ids = BTreeSet::new();
         for (index, event) in self.events.iter().enumerate() {
+            if !event_ids.insert(event.event_id.clone()) {
+                return Err(BattlePresentationError::DuplicateEventId {
+                    event_id: event.event_id.clone(),
+                });
+            }
             let expected_sequence = expected_sequence(index)?;
             if event.event_id.operation_id != self.operation_id {
                 return Err(BattlePresentationError::PlanOperationMismatch {
@@ -75,6 +81,10 @@ pub(crate) enum BattlePresentationError {
     PlanActive,
     #[error("presentation state already reported M3_PRESENTATION_FAILED")]
     PresentationFailed,
+    #[error("presentation operation identity was reused")]
+    DuplicateOperationId { operation_id: OperationId },
+    #[error("presentation event identity was reused")]
+    DuplicateEventId { event_id: BattlePresentationEventId },
     #[error("presentation plan event {event_id:?} has the wrong operation identity")]
     PlanOperationMismatch {
         event_id: BattlePresentationEventId,
@@ -131,11 +141,108 @@ impl BattlePresentationSettlementReport {
     }
 }
 
+/// Deterministic, owned presentation evidence for kernel snapshots and
+/// resource accounting.  Plans remain ordered by operation identity, while
+/// pending, blocking, and outcome projections retain their global BTree order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BattlePresentationSnapshot {
+    local_endpoint: SeatId,
+    plans: BTreeMap<OperationId, BattlePresentationPlan>,
+    last_plan_operation_id: Option<OperationId>,
+    pending: BTreeSet<BattlePresentationEventId>,
+    blocking: BTreeSet<BattlePresentationEventId>,
+    outcomes: BTreeMap<BattlePresentationEventId, PresentationSettlementOutcome>,
+    event_catalog: BTreeMap<BattlePresentationEventId, BattlePresentationEvent>,
+    presentation_failed: bool,
+    disposed: bool,
+}
+
+impl BattlePresentationSnapshot {
+    pub(crate) fn local_endpoint(&self) -> SeatId {
+        self.local_endpoint
+    }
+
+    pub(crate) fn plans(&self) -> &BTreeMap<OperationId, BattlePresentationPlan> {
+        &self.plans
+    }
+
+    pub(crate) fn plan(&self) -> Option<&BattlePresentationPlan> {
+        self.last_plan_operation_id
+            .as_ref()
+            .and_then(|operation_id| self.plans.get(operation_id))
+    }
+
+    pub(crate) fn plan_for(&self, operation_id: &OperationId) -> Option<&BattlePresentationPlan> {
+        self.plans.get(operation_id)
+    }
+
+    pub(crate) fn plan_count(&self) -> usize {
+        self.plans.len()
+    }
+
+    pub(crate) fn plan_operation_ids(&self) -> Vec<OperationId> {
+        self.plans.keys().cloned().collect()
+    }
+
+    pub(crate) fn pending_ids(&self) -> &BTreeSet<BattlePresentationEventId> {
+        &self.pending
+    }
+
+    pub(crate) fn blocking_ids(&self) -> &BTreeSet<BattlePresentationEventId> {
+        &self.blocking
+    }
+
+    pub(crate) fn outcomes(
+        &self,
+    ) -> &BTreeMap<BattlePresentationEventId, PresentationSettlementOutcome> {
+        &self.outcomes
+    }
+
+    pub(crate) fn event_catalog(
+        &self,
+    ) -> &BTreeMap<BattlePresentationEventId, BattlePresentationEvent> {
+        &self.event_catalog
+    }
+
+    pub(crate) fn live_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub(crate) fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub(crate) fn blocking_count(&self) -> usize {
+        self.blocking.len()
+    }
+
+    pub(crate) fn outcome_count(&self) -> usize {
+        self.outcomes.len()
+    }
+
+    pub(crate) fn is_blocked(&self) -> bool {
+        !self.blocking.is_empty()
+    }
+
+    pub(crate) fn is_failed(&self) -> bool {
+        self.presentation_failed
+    }
+
+    pub(crate) fn is_disposed(&self) -> bool {
+        self.disposed
+    }
+
+    pub(crate) fn terminal_reason(&self) -> Option<&'static str> {
+        self.presentation_failed.then_some(M3_PRESENTATION_FAILED)
+    }
+}
+
 /// Deterministic barrier and outcome tombstones for one local endpoint.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct BattlePresentationState {
     local_endpoint: SeatId,
-    plan: Option<BattlePresentationPlan>,
+    plans: BTreeMap<OperationId, BattlePresentationPlan>,
+    last_plan_operation_id: Option<OperationId>,
     pending: BTreeSet<BattlePresentationEventId>,
     blocking: BTreeSet<BattlePresentationEventId>,
     outcomes: BTreeMap<BattlePresentationEventId, PresentationSettlementOutcome>,
@@ -148,7 +255,8 @@ impl BattlePresentationState {
     pub(crate) fn new(local_endpoint: SeatId) -> Self {
         Self {
             local_endpoint,
-            plan: None,
+            plans: BTreeMap::new(),
+            last_plan_operation_id: None,
             pending: BTreeSet::new(),
             blocking: BTreeSet::new(),
             outcomes: BTreeMap::new(),
@@ -169,52 +277,69 @@ impl BattlePresentationState {
     ) -> Result<(), BattlePresentationError> {
         self.ensure_live()?;
         let plan = BattlePresentationPlan::new(operation_id, events)?;
-        if !self.pending.is_empty() || !self.blocking.is_empty() {
-            return Err(BattlePresentationError::PlanActive);
-        }
         if self.presentation_failed {
             return Err(BattlePresentationError::PresentationFailed);
+        }
+        let operation_id = plan.operation_id().clone();
+        if self.plans.contains_key(&operation_id) {
+            return Err(BattlePresentationError::DuplicateOperationId { operation_id });
         }
 
         let mut event_catalog = self.event_catalog.clone();
         for event in plan.events() {
             let event_id = event.event_id.clone();
-            if let Some(existing) = event_catalog.get(&event_id)
-                && existing != event
-            {
-                return Err(BattlePresentationError::ConflictingEventIdentity { event_id });
+            if let Some(existing) = event_catalog.get(&event_id) {
+                if existing != event {
+                    return Err(BattlePresentationError::ConflictingEventIdentity { event_id });
+                }
+                return Err(BattlePresentationError::DuplicateEventId { event_id });
             }
             event_catalog.insert(event_id, event.clone());
         }
 
-        let pending = plan
-            .events()
-            .iter()
-            .filter(|event| !self.outcomes.contains_key(&event.event_id))
-            .map(|event| event.event_id.clone())
-            .collect();
-        let blocking = plan
-            .events()
-            .iter()
-            .filter(|event| {
-                event.policy == PresentationBlockingPolicy::BlocksHumanInput
-                    && !self.outcomes.contains_key(&event.event_id)
-            })
-            .map(|event| event.event_id.clone())
-            .collect();
-
         let mut candidate = self.clone();
-        candidate.plan = Some(plan);
-        candidate.pending = pending;
-        candidate.blocking = blocking;
+        for event in plan.events() {
+            let event_id = event.event_id.clone();
+            if !candidate.outcomes.contains_key(&event_id) {
+                candidate.pending.insert(event_id.clone());
+                if event.policy == PresentationBlockingPolicy::BlocksHumanInput {
+                    candidate.blocking.insert(event_id);
+                }
+            }
+        }
+        candidate
+            .plans
+            .insert(operation_id.clone(), plan);
+        candidate.last_plan_operation_id = Some(operation_id);
         candidate.event_catalog = event_catalog;
         candidate.validate()?;
         *self = candidate;
         Ok(())
     }
 
+    pub(crate) fn plans(&self) -> &BTreeMap<OperationId, BattlePresentationPlan> {
+        &self.plans
+    }
+
+    /// Compatibility accessor for the original single-plan state.  With
+    /// multiple plans it returns the most recently installed plan; callers
+    /// needing an exact operation must use [`Self::plan_for`].
     pub(crate) fn plan(&self) -> Option<&BattlePresentationPlan> {
-        self.plan.as_ref()
+        self.last_plan_operation_id
+            .as_ref()
+            .and_then(|operation_id| self.plans.get(operation_id))
+    }
+
+    pub(crate) fn plan_for(&self, operation_id: &OperationId) -> Option<&BattlePresentationPlan> {
+        self.plans.get(operation_id)
+    }
+
+    pub(crate) fn plan_count(&self) -> usize {
+        self.plans.len()
+    }
+
+    pub(crate) fn plan_operation_ids(&self) -> Vec<OperationId> {
+        self.plans.keys().cloned().collect()
     }
 
     pub(crate) fn blocking_ids(&self) -> &BTreeSet<BattlePresentationEventId> {
@@ -242,12 +367,42 @@ impl BattlePresentationState {
         self.pending.len()
     }
 
+    pub(crate) fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub(crate) fn blocking_count(&self) -> usize {
+        self.blocking.len()
+    }
+
+    pub(crate) fn outcome_count(&self) -> usize {
+        self.outcomes.len()
+    }
+
     pub(crate) fn is_blocked(&self) -> bool {
         !self.blocking.is_empty()
     }
 
     pub(crate) fn is_disposed(&self) -> bool {
         self.disposed
+    }
+
+    pub(crate) fn is_failed(&self) -> bool {
+        self.presentation_failed
+    }
+
+    pub(crate) fn snapshot(&self) -> BattlePresentationSnapshot {
+        BattlePresentationSnapshot {
+            local_endpoint: self.local_endpoint,
+            plans: self.plans.clone(),
+            last_plan_operation_id: self.last_plan_operation_id.clone(),
+            pending: self.pending.clone(),
+            blocking: self.blocking.clone(),
+            outcomes: self.outcomes.clone(),
+            event_catalog: self.event_catalog.clone(),
+            presentation_failed: self.presentation_failed,
+            disposed: self.disposed,
+        }
     }
 
     pub(crate) fn settle(
@@ -282,19 +437,13 @@ impl BattlePresentationState {
             });
         }
 
-        let Some(event) = self.plan.as_ref().and_then(|plan| {
-            plan.events()
-                .iter()
-                .find(|event| event.event_id == event_id)
-                .cloned()
-        }) else {
-            return Err(BattlePresentationError::UnknownEvent { event_id });
-        };
+        let skip_allowed =
+            self.owning_event(&event_id)?.skip_policy == PresentationSkipPolicy::Allowed;
         if !self.pending.contains(&event_id) {
             return Err(BattlePresentationError::UnknownEvent { event_id });
         }
         if matches!(&outcome, PresentationSettlementOutcome::IntentionallySkipped)
-            && event.skip_policy != PresentationSkipPolicy::Allowed
+            && !skip_allowed
         {
             return Err(BattlePresentationError::UnauthorizedSkip { event_id });
         }
@@ -341,13 +490,14 @@ impl BattlePresentationState {
     /// Teardown is terminal, repeatable, and retains only diagnostic tombstones.
     pub(crate) fn dispose(&mut self) {
         self.clear();
-        self.plan = None;
+        self.plans.clear();
+        self.last_plan_operation_id = None;
         self.disposed = true;
     }
 
     pub(crate) fn validate(&self) -> Result<(), BattlePresentationError> {
         if self.disposed {
-            if self.plan.is_some() || !self.pending.is_empty() || !self.blocking.is_empty() {
+            if !self.plans.is_empty() || !self.pending.is_empty() || !self.blocking.is_empty() {
                 return Err(BattlePresentationError::InvalidState(
                     "disposed state retains live presentation data",
                 ));
@@ -382,57 +532,90 @@ impl BattlePresentationState {
             ));
         }
 
-        let Some(plan) = self.plan.as_ref() else {
-            if !self.pending.is_empty() || !self.blocking.is_empty() {
+        let mut plan_event_ids = BTreeSet::new();
+        if self
+            .last_plan_operation_id
+            .as_ref()
+            .is_some_and(|operation_id| !self.plans.contains_key(operation_id))
+        {
+            return Err(BattlePresentationError::InvalidState(
+                "last plan identity is not retained in the plan map",
+            ));
+        }
+        if self.last_plan_operation_id.is_none() && !self.plans.is_empty() {
+            return Err(BattlePresentationError::InvalidState(
+                "plan map is nonempty without a last plan identity",
+            ));
+        }
+        for (operation_id, plan) in &self.plans {
+            if operation_id != plan.operation_id() {
                 return Err(BattlePresentationError::InvalidState(
-                    "live presentation data exists without a plan",
+                    "plan map key does not match operation identity",
                 ));
             }
-            return Ok(());
-        };
-        plan.validate()?;
+            plan.validate()?;
+            for event in plan.events() {
+                let event_id = &event.event_id;
+                if !plan_event_ids.insert(event_id.clone()) {
+                    return Err(BattlePresentationError::InvalidState(
+                        "event identity belongs to more than one presentation plan",
+                    ));
+                }
+                if self.event_catalog.get(event_id) != Some(event) {
+                    return Err(BattlePresentationError::InvalidState(
+                        "plan event differs from its catalog identity",
+                    ));
+                }
+                if self.pending.contains(event_id) && self.outcomes.contains_key(event_id) {
+                    return Err(BattlePresentationError::InvalidState(
+                        "pending event also has an outcome tombstone",
+                    ));
+                }
 
-        for event in plan.events() {
-            let event_id = &event.event_id;
-            if self.event_catalog.get(event_id) != Some(event) {
-                return Err(BattlePresentationError::InvalidState(
-                    "active plan event differs from its catalog identity",
-                ));
-            }
-            if self.pending.contains(event_id) && self.outcomes.contains_key(event_id) {
-                return Err(BattlePresentationError::InvalidState(
-                    "pending event also has an outcome tombstone",
-                ));
-            }
-
-            let has_failed_outcome = matches!(
-                self.outcomes.get(event_id),
-                Some(PresentationSettlementOutcome::Failed { .. })
-            );
-            let should_block = event.policy == PresentationBlockingPolicy::BlocksHumanInput
-                && (self.pending.contains(event_id) || has_failed_outcome);
-            if should_block != self.blocking.contains(event_id) {
-                return Err(BattlePresentationError::InvalidState(
-                    "barrier does not match the exact blocking event set",
-                ));
+                let has_failed_outcome = matches!(
+                    self.outcomes.get(event_id),
+                    Some(PresentationSettlementOutcome::Failed { .. })
+                );
+                let should_block = event.policy == PresentationBlockingPolicy::BlocksHumanInput
+                    && (self.pending.contains(event_id) || has_failed_outcome);
+                if should_block != self.blocking.contains(event_id) {
+                    return Err(BattlePresentationError::InvalidState(
+                        "barrier does not match the exact blocking event set",
+                    ));
+                }
             }
         }
 
         for event_id in &self.pending {
-            if !plan.events().iter().any(|event| &event.event_id == event_id) {
+            let Some(plan) = self.plans.get(&event_id.operation_id) else {
                 return Err(BattlePresentationError::InvalidState(
-                    "pending event is not in the active plan",
+                    "pending event is not in an active plan",
+                ));
+            };
+            if !plan
+                .events()
+                .iter()
+                .any(|event| &event.event_id == event_id)
+            {
+                return Err(BattlePresentationError::InvalidState(
+                    "pending event is not in its owning plan",
                 ));
             }
         }
+
         for event_id in &self.blocking {
+            let Some(plan) = self.plans.get(&event_id.operation_id) else {
+                return Err(BattlePresentationError::InvalidState(
+                    "blocking event is not in an active plan",
+                ));
+            };
             let Some(event) = plan
                 .events()
                 .iter()
                 .find(|event| &event.event_id == event_id)
             else {
                 return Err(BattlePresentationError::InvalidState(
-                    "blocking event is not in the active plan",
+                    "blocking event is not in its owning plan",
                 ));
             };
             if event.policy != PresentationBlockingPolicy::BlocksHumanInput {
@@ -442,6 +625,32 @@ impl BattlePresentationState {
             }
         }
         Ok(())
+    }
+
+    fn owning_event(
+        &self,
+        event_id: &BattlePresentationEventId,
+    ) -> Result<&BattlePresentationEvent, BattlePresentationError> {
+        let Some(plan) = self.plans.get(&event_id.operation_id) else {
+            return Err(BattlePresentationError::UnknownEvent {
+                event_id: event_id.clone(),
+            });
+        };
+        let Some(event) = plan
+            .events()
+            .iter()
+            .find(|event| &event.event_id == event_id)
+        else {
+            return Err(BattlePresentationError::UnknownEvent {
+                event_id: event_id.clone(),
+            });
+        };
+        if self.event_catalog.get(event_id) != Some(event) {
+            return Err(BattlePresentationError::InvalidState(
+                "settled event differs from its owning plan identity",
+            ));
+        }
+        Ok(event)
     }
 
     fn terminal_reason(&self) -> Option<&'static str> {
