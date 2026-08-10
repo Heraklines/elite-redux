@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "PokéRogue Redux",
-  "publication_state": "CONTRACT_CATALOG_FROZEN",
+  "publication_state": "ORACLE_EVIDENCE_PUBLISHED",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "oracle_protocol_version": "er-coop-47",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
@@ -197,8 +197,790 @@
       "fixture_path": "rust/fixtures/m3/oracle/battle-cases/defeat.json"
     }
   ],
-  "published_fixtures": [],
-  "published_supporting_artifacts": [],
+  "published_fixtures": [
+    {
+      "scenario_id": "physical-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/physical-hit.json",
+      "sha256": "1d8057e1d347cc0d8ac0d2766d212a67b22f58a484a9c53c0dd7d7424dd88b23",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "critical-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/critical-hit.json",
+      "sha256": "67d7946bfebc5aa9e4f53b937783d710780952527e330d464818a95bd776598a",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "special-hit-priority",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/special-hit-priority.json",
+      "sha256": "7bc8e731eca895a24eb956765f91fe09b70a73fe0bbf5fceb6ec8b3490ff8e6a",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "always-hit",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/always-hit.json",
+      "sha256": "1ca888ff8f32e2ebae98b33a21f9fed4b6d0ff31ff57d4a1681e6d819cac675c",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "miss",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/miss.json",
+      "sha256": "ce0d137dc576432117775330003392c2d21a3c7c33b3d229e555ad00ae6ddb37",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "poison-type-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-type-immunity.json",
+      "sha256": "7fc69ce039d66e875b328c0febb5b02af04eb1773e0375da8f6623438cd29b7b",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "grass-powder-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/grass-powder-immunity.json",
+      "sha256": "1587d90ec4957f5190f89cfe9aed628a227fa20cebb17d3d8cbaf2e5abc25cb5",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "existing-status-rejected",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/existing-status-rejected.json",
+      "sha256": "56a8f95c5044eba38996bdab08e09631b93383f4108c8b5b96630a56f55c4cc8",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "speed-tie",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/speed-tie.json",
+      "sha256": "33e37190c0801c48e403853affb1eb9921fa9115424b4aeafd68cb032cd5affd",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "pp-consumption",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/pp-consumption.json",
+      "sha256": "e079416f73ef51d400c2a0ea72048a2a34d457fb11d30ac892bc82368cdf03c2",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "pp-unusable-rejected",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json",
+      "sha256": "9349f2fa2db04a188fa07892648bbe8fd46c422719bc64b5f26ca03f701bf981",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "poison-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-application.json",
+      "sha256": "48d45d5a5939f4a3ef4aa56f7194ed5dc6cff7d5f20c0fb0a2ce1aef0ae39809",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "poison-residual",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/poison-residual.json",
+      "sha256": "8b79363db60f2245204da05143e4ed568d8d93cde90ce24df351b1f2b282e51d",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "paralysis-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-application.json",
+      "sha256": "1e8742253c7ed3adc760c8dce4bec4a14556f8361598a9e962456b1c9a5d4c3e",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "paralysis-full-stop",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-full-stop.json",
+      "sha256": "989a2ffebb668cd20cb4aad00ed296a457643a3206aa5295c6304ece9cae41b6",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "paralysis-speed-order",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/paralysis-speed-order.json",
+      "sha256": "b226ab2bc1ed43016608e49fd1d92f65432567534ddac6244aa5bb24397557c4",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "burn-application",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-application.json",
+      "sha256": "472745bf38614bf2ba81fb9db6aebfd20e9a24b57f623fe9502e61b728cd226b",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "burn-residual",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-residual.json",
+      "sha256": "e04f9fd2ce6b1026b5fa8eb853004b1763db934e6c76752ac6a2feb85c617cc1",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "burn-physical-penalty",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/burn-physical-penalty.json",
+      "sha256": "9fadbf84feef98dd044d6c3be99f141fc2ad6d447f07cfa13277cd30887e964d",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "spread-stage-down",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/spread-stage-down.json",
+      "sha256": "2a2a1d42072bd83944d85be084ed8305abe0692be0e2fc33e843700b37793315",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "stage-floor-cap",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/stage-floor-cap.json",
+      "sha256": "e8d71e031ede6e4342706caf244fec5671ed924d5ee4701325792cdc576976fc",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "none-ability-no-trigger",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json",
+      "sha256": "17076dabdeacaec6278e63e2c863d586b56e45a0d06f6a84f208db75b17cf901",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "intimidate-switch-in",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/intimidate-switch-in.json",
+      "sha256": "6c23fc5ed9c35616577bb5c6c9671b981ecfd177bc2e629dcb1378481215652a",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "intimidate-stage-floor",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json",
+      "sha256": "2369e6f9fa7e62302d8fc23a31a08f90020f413504a844c09cd562511eab0b71",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "wonder-guard-block",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-block.json",
+      "sha256": "64369a99ea691f3eff2f68c8d2ab6bf5646817d36e944718dd9c6f70b2ec7123",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "wonder-guard-super-effective-pass",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-super-effective-pass.json",
+      "sha256": "aaa593045405ef7fc79501d32f1c33b6723a0c87d221f39bf5321d302a66b14b",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "wonder-guard-status-pass",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json",
+      "sha256": "411617bae39a6416983c1fa47445adaf68e74a790c6715414639fd5cf5efbcfe",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "type-weakness",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-weakness.json",
+      "sha256": "aea24b86158f33966591f27dcfbf61cc5487dca2e912cd65e9896f503c96dfd2",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "type-resistance",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-resistance.json",
+      "sha256": "b42cd78e2075b407408a2eb91bd5322b478024bbf097db2ddd429d0b7c661e83",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "type-native-immunity",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/type-native-immunity.json",
+      "sha256": "ba6bda3e0231ab5a516f9020467b3aee59be9ce69c448e95d81e456556d3a408",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "voluntary-switch",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/voluntary-switch.json",
+      "sha256": "d3e1093dbe68813caf6ce6cb1932dc7462a3d9df4b9b4e42e9583dd731e5b0d9",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "doubles-single-target",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/doubles-single-target.json",
+      "sha256": "dd5736f8e1767bb0666d39f535eaf1f24ccd492a95d8ca9eb24512fe43f64f0c",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "same-side-simultaneous-faint",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/same-side-simultaneous-faint.json",
+      "sha256": "d3b823338e7e71382fbaa8087f794f5597cd24d68e7f7289ce28ca6dafd58430",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "mixed-side-simultaneous-faint",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/mixed-side-simultaneous-faint.json",
+      "sha256": "9494c6efa64f4e8939a5094956a3ae474f06e79b462fc85b4c810a1207728522",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "forced-replacement",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/forced-replacement.json",
+      "sha256": "1c8ae7067e6b4528a5e6635a9c48ff4389b5398e58dd23f7ba8fbc2f1091c0f5",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "no-legal-replacement",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/no-legal-replacement.json",
+      "sha256": "c8c2463fb8ae1a6d19c24ee9df63be035be4b05aa76baa8ff3ac27da452dbfce",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "victory",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/victory.json",
+      "sha256": "07c6e8cbcc03ac0a2ed6fd3f349d874305951e88eb3258abcbef322028451ff4",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "scenario_id": "defeat",
+      "fixture_path": "rust/fixtures/m3/oracle/battle-cases/defeat.json",
+      "sha256": "73f946616b7b82b52fa2e82f5549b4e16f27cbd1046c33d8858f85f5cd02d63e",
+      "required_axes": [
+        "INITIAL_STATE_AND_RNG",
+        "ADMITTED_COMMANDS",
+        "CONSUMING_RNG_DRAWS",
+        "DYNAMIC_ACTION_ORDER",
+        "CAUSAL_MUTATIONS",
+        "PRESENTATION_PLAN",
+        "FINAL_STATE_AND_RNG",
+        "NEXT_LOGICAL_CONTROL"
+      ],
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    }
+  ],
+  "published_supporting_artifacts": [
+    {
+      "artifact_id": "content-pack-v1",
+      "fixture_path": "rust/fixtures/m3/oracle/content-pack-v1.json",
+      "sha256": "7fc0bdc24570843c132ed528c3e529cc707e392c13d219fd4fd03f212d704f7d",
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    },
+    {
+      "artifact_id": "rng-vectors-v1",
+      "fixture_path": "rust/fixtures/m3/oracle/rng-vectors-v1.json",
+      "sha256": "90972c30e617d2f0edadcedbfd7131ee43f7b1e4129d4670180f11cf86166b85",
+      "gap_free": true,
+      "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+      "oracle_tree_sha": "6d2811a1ab94f081dac58e03a30afd76cc072422",
+      "exporter_commit_sha": "6ea5e947f1229444f66d1c9097c246c630dab303",
+      "content_pack_hash": "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8"
+    }
+  ],
   "publication_rules": {
     "contract_catalog_must_match_coverage_map_exactly": true,
     "each_published_fixture_must_match_one_contract": true,
