@@ -614,7 +614,7 @@ fn residual_ko_queues_before_turn_advance_with_exact_source_occurrence() -> Test
 }
 
 #[test]
-fn player_faint_stays_pending_or_auto_resolves_without_a_legal_reserve() -> TestResult {
+fn player_faint_stays_pending_until_replacement_material_resolves_it() -> TestResult {
     let content = selected_content_pack()?;
     for with_reserve in [true, false] {
         let active_id = pokemon_id(1)?;
@@ -659,34 +659,67 @@ fn player_faint_stays_pending_or_auto_resolves_without_a_legal_reserve() -> Test
             .first()
             .ok_or("missing player faint occurrence")?;
 
+        assert_eq!(transition.outcome, BattleOutcome::Ongoing);
+        assert_eq!(occurrence.replacement, ReplacementProgress::Pending);
+        assert_eq!(
+            transition.next_decision,
+            BattleNextDecision::Replacement {
+                occurrence: occurrence.id,
+            }
+        );
+        assert_eq!(
+            after_battle
+                .field
+                .occupant(&after_battle.format, slot(BattleSide::Player, 0)?)?,
+            Some(active_id)
+        );
+        assert_eq!(after_battle.turn, turn(2)?);
+
         if with_reserve {
-            assert_eq!(transition.outcome, BattleOutcome::Ongoing);
-            assert_eq!(occurrence.replacement, ReplacementProgress::Pending);
-            assert_eq!(
-                transition.next_decision,
-                BattleNextDecision::Replacement {
-                    occurrence: occurrence.id,
-                }
-            );
-            assert_eq!(
-                after_battle
-                    .field
-                    .occupant(&after_battle.format, slot(BattleSide::Player, 0)?)?,
-                Some(active_id)
-            );
-            assert_eq!(after_battle.turn, turn(2)?);
             assert_eq!(after_battle.player_party[1].id, reserve_id);
         } else {
-            assert_eq!(transition.outcome, BattleOutcome::Defeat);
-            assert_eq!(occurrence.replacement, ReplacementProgress::Applied);
-            assert_eq!(transition.next_decision, BattleNextDecision::Complete(BattleOutcome::Defeat));
+            let occurrence = *occurrence;
+            let before_replacement = transition.after_state.clone();
+            let before_replacement_battle = battle(&before_replacement)?;
+            let operation = replacement_operation_id(
+                occurrence.source.epoch,
+                before_replacement_battle.battle_id,
+                occurrence.source.wave,
+                occurrence.source.resolved_turn,
+                occurrence.source.turn_occurrence,
+                occurrence.slot,
+                occurrence.owner_seat.ok_or("missing replacement owner")?,
+            )?;
+            let replacement = resolve_replacement(
+                &before_replacement,
+                occurrence.id,
+                &ReplacementSelection::NoLegalReplacement,
+                &operation,
+                &content,
+            )?;
+            let replacement_battle = battle(&replacement.after_state)?;
+            assert_eq!(replacement.before_state, before_replacement);
+            assert_eq!(replacement.selection, ReplacementSelection::NoLegalReplacement);
+            assert_eq!(replacement.occurrence.replacement, ReplacementProgress::Applied);
+            assert_eq!(replacement.outcome, BattleOutcome::Defeat);
             assert_eq!(
-                after_battle
+                replacement.next_decision,
+                BattleNextDecision::Complete(BattleOutcome::Defeat)
+            );
+            assert_eq!(
+                replacement_battle
                     .field
-                    .occupant(&after_battle.format, slot(BattleSide::Player, 0)?)?,
+                    .occupant(&replacement_battle.format, occurrence.slot)?,
                 None
             );
-            assert_eq!(after_battle.turn, battle(&before)?.turn);
+            assert_eq!(replacement_battle.turn, after_battle.turn);
+            assert_eq!(replacement_battle.battle_rng, after_battle.battle_rng);
+            assert_eq!(replacement.presentation.len(), 1);
+            assert!(matches!(
+                &replacement.presentation[0].kind,
+                BattlePresentationKind::BattleLost
+            ));
+            assert_eq!(replacement.presentation[0].event_id.operation_id, operation);
         }
     }
     Ok(())

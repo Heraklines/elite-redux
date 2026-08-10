@@ -51,9 +51,8 @@ use crate::presentation::{
     build_replacement_presentation_plan, build_turn_presentation_plan,
 };
 use crate::replacement::{
-    apply_selected_replacement, compute_replacement_progress, resolve_no_legal_replacement,
+    ReplacementError, apply_selected_replacement, resolve_no_legal_replacement,
     resolve_not_required, stored_faint_source, validate_stored_replacement_operation,
-    ReplacementError,
 };
 use crate::resolver::{
     BattleMutation, BattleNextDecision, BattleReplacementTransition, BattleTransition,
@@ -135,8 +134,7 @@ pub fn resolve_turn(
         }
         {
             let battle = active_battle_mut(&mut after)?;
-            drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
-                .map_err(map_replacement_after_error)?;
+            drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)?;
             update_outcome(battle, &mut mutations, &mut causal_events);
             if battle.outcome != BattleOutcome::Ongoing {
                 break;
@@ -154,8 +152,7 @@ pub fn resolve_turn(
             &mut causal_events,
         )?;
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
-            .map_err(map_replacement_after_error)?;
+        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)?;
         update_outcome(battle, &mut mutations, &mut causal_events);
     }
 
@@ -223,6 +220,9 @@ pub fn resolve_replacement(
                     .map_err(|source| map_replacement_error(source, false))?
             }
             ReplacementSelection::NoLegalReplacement => {
+                // `er-game` constructs this branch only as an internal
+                // deterministic intent. The resolver independently proves
+                // that the stored owner has no legal candidate.
                 resolve_no_legal_replacement(battle, occurrence)
                     .map_err(|source| map_replacement_error(source, false))?
             }
@@ -252,8 +252,7 @@ pub fn resolve_replacement(
     }
     {
         let battle = active_battle_mut(&mut after)?;
-        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)
-            .map_err(map_replacement_after_error)?;
+        drain_internal_faint_heads(battle, &mut mutations, &mut causal_events)?;
         update_outcome(battle, &mut mutations, &mut causal_events);
     }
 
@@ -895,19 +894,8 @@ fn drain_internal_faint_heads(
                     record_mutation(mutations, causal_events, mutation);
                 }
             }
-            ReplacementProgress::Pending => {
-                if compute_replacement_progress(battle, head.id)
-                    .map_err(map_replacement_after_error)?
-                    == ReplacementProgress::NoLegalReplacement
-                {
-                    let resolved = resolve_no_legal_replacement(battle, head.id)
-                        .map_err(map_replacement_after_error)?;
-                    for mutation in resolved.mutations {
-                        record_mutation(mutations, causal_events, mutation);
-                    }
-                } else {
-                    return Ok(());
-                }
+            ReplacementProgress::Pending | ReplacementProgress::NoLegalReplacement => {
+                return Ok(())
             }
             ReplacementProgress::Selected { .. } => return Ok(()),
             ReplacementProgress::Applied => return Ok(()),
@@ -1344,7 +1332,7 @@ fn map_target_selection_error(source: TargetSelectionError) -> BattleResolveErro
         TargetSelectionError::Empty | TargetSelectionError::AllEnemiesCount => {
             map_legality_command(BattleCommandError::EmptyTargetSelection)
         }
-        TargetSelectionError::Duplicate => {
+        TargetSelectionError::Duplicate { .. } => {
             map_legality_command(BattleCommandError::DuplicateTargetSelection)
         }
         TargetSelectionError::NonCanonicalOrder => {
