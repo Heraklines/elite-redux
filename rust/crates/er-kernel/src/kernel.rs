@@ -46,6 +46,29 @@ pub struct ProtocolKernelConfig {
     pub menu_plans: Vec<ControlMenuPlan>,
 }
 
+/// Frozen protocol composition for the production M3 battle kernel.
+///
+/// Unlike the M2 fixture configuration, this boundary contains no authored
+/// menu projections or resolver outcomes.  Those values are derived by the
+/// game runtime and typed material path.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BattleProtocolConfig {
+    pub role: BattleProtocolRoleConfig,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BattleProtocolRoleConfig {
+    Authority {
+        log: AuthorityLogConfig,
+        proposal_capacity: SafeU53,
+    },
+    Replica {
+        replica: AuthorityReplicaConfig,
+        proposal_leases: ProposalLeaseConfig,
+        recovery: RecoveryTransactionConfig,
+    },
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProtocolRoleConfig {
     Authority {
