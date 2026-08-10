@@ -1836,11 +1836,8 @@ fn near_other_rejects_empty_and_nonadjacent_targets_before_pp_or_rng() -> TestRe
 
     let actor_slot = slot(BattleSide::Player, 0)?;
     let adjacent_target = slot(BattleSide::Enemy, 0)?;
-    let nonadjacent_format = BattleFormat::new(
-        2,
-        2,
-        vec![AdjacencyEdge::new(actor_slot, adjacent_target)?],
-    )?;
+    let nonadjacent_format =
+        BattleFormat::new(2, 2, vec![AdjacencyEdge::new(actor_slot, adjacent_target)?])?;
     let mut nonadjacent = battle_with_format(
         nonadjacent_format,
         vec![actor],
