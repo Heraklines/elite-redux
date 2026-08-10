@@ -84,6 +84,10 @@ use crate::replacement_menu::{
     ReplacementMenuError, ReplacementMenuResult, build_replacement_menu,
     navigate_replacement_menu,
 };
+use crate::snapshot::{
+    GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2, SeatControlHistorySnapshotV1,
+    SnapshotError,
+};
 
 /// The frozen game configuration schema version.
 pub const BATTLE_START_SCHEMA_VERSION: u32 = 1;
@@ -2600,6 +2604,647 @@ impl GameRuntime {
             }
         }
     }
+}
+
+impl GameRuntimeSnapshotBridge for GameRuntime {
+    fn snapshot_v2(&self) -> Result<GameRuntimeSnapshotV2, SnapshotError> {
+        if self.pending_no_legal_replacement.is_some() {
+            return Err(snapshot_invalid(
+                "pending_no_legal_replacement",
+                "an internal FIFO marker cannot cross the public snapshot boundary",
+            ));
+        }
+        self.validate()
+            .map_err(|error| snapshot_runtime_invalid("runtime", error))?;
+
+        let snapshot = GameRuntimeSnapshotV2::from_runtime(self)?;
+        validate_snapshot_control_consistency(&snapshot)?;
+        let menu_history = menu_history_from_snapshot(&snapshot.control_history)?;
+        let mut public_candidate = self.clone();
+        public_candidate.menu_history = menu_history;
+        ensure_public_quiescent_boundary(&public_candidate)?;
+
+        let rebuilt_paths = rebuild_authority_remote_paths(
+            &public_candidate,
+            &snapshot.control_history,
+        )?;
+        if rebuilt_paths != self.authority_remote_paths {
+            return Err(snapshot_invalid(
+                "authority_remote_paths",
+                "live remote admission evidence is missing, ambiguous, or differs from the runtime proof",
+            ));
+        }
+        Ok(snapshot)
+    }
+
+    fn from_snapshot_v2(
+        snapshot: GameRuntimeSnapshotV2,
+        local_seat: SeatId,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate()?;
+        validate_snapshot_control_consistency(&snapshot)?;
+        if snapshot.state.content_hash != content.hash {
+            return Err(snapshot_invalid(
+                "state.content_hash",
+                "snapshot content identity differs from supplied ContentPack",
+            ));
+        }
+        content
+            .validate()
+            .map_err(|error| snapshot_invalid("content", error.to_string()))?;
+        if snapshot.current_control.seat(local_seat).is_none() {
+            return Err(snapshot_invalid(
+                "local_seat",
+                "seat must have a current control entry",
+            ));
+        }
+
+        let menu_history = menu_history_from_snapshot(&snapshot.control_history)?;
+        let GameRuntimeSnapshotV2 {
+            state,
+            current_control,
+            control_history,
+            command_admission,
+            scripted_enemy_policy,
+            ..
+        } = snapshot;
+        let mut runtime = Self {
+            state,
+            control: current_control,
+            local_seat,
+            scripted_enemy_policy,
+            menu_history,
+            command_fingerprints: command_admission.command_tombstones,
+            replacement_fingerprints: command_admission.replacement_tombstones,
+            authority_remote_paths: BTreeMap::new(),
+            pending_no_legal_replacement: None,
+            content,
+        };
+        runtime
+            .validate()
+            .map_err(|error| snapshot_runtime_invalid("runtime", error))?;
+        ensure_public_quiescent_boundary(&runtime)?;
+        runtime.authority_remote_paths = rebuild_authority_remote_paths(
+            &runtime,
+            &control_history,
+        )?;
+        runtime
+            .validate()
+            .map_err(|error| snapshot_runtime_invalid("runtime", error))?;
+        Ok(runtime)
+    }
+}
+
+fn snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn snapshot_runtime_invalid(path: &str, error: GameRuntimeError) -> SnapshotError {
+    snapshot_invalid(path, error.to_string())
+}
+
+fn menu_history_from_snapshot(
+    histories: &[SeatControlHistorySnapshotV1],
+) -> Result<Vec<MenuHistoryEntry>, SnapshotError> {
+    let mut menu_history = Vec::new();
+    for (history_index, history) in histories.iter().enumerate() {
+        for pair in history.controls.windows(2) {
+            if pair[0] == pair[1] {
+                return Err(snapshot_invalid(
+                    format!("control_history[{history_index}].controls"),
+                    "causal history cannot contain an unchanged control transition",
+                ));
+            }
+            menu_history.push(MenuHistoryEntry {
+                seat: history.seat,
+                from: pair[0].clone(),
+                to: pair[1].clone(),
+            });
+        }
+    }
+    Ok(menu_history)
+}
+
+fn validate_snapshot_control_consistency(
+    snapshot: &GameRuntimeSnapshotV2,
+) -> Result<(), SnapshotError> {
+    let battle = snapshot
+        .state
+        .battle
+        .as_ref()
+        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let completed_from_state = battle.outcome != BattleOutcome::Ongoing;
+    if snapshot.completed != completed_from_state {
+        return Err(snapshot_invalid(
+            "completed",
+            "completion flag must equal the canonical battle outcome",
+        ));
+    }
+    for seat in &snapshot.current_control.seats {
+        if completed_from_state {
+            if seat.decision_operation_id.is_some()
+                || !matches!(&seat.control, BattleControl::Complete(outcome) if *outcome == battle.outcome)
+            {
+                return Err(snapshot_invalid(
+                    "current_control",
+                    "a completed battle must expose the exact matching Complete control for every seat",
+                ));
+            }
+        } else if matches!(&seat.control, BattleControl::Complete(_)) {
+            return Err(snapshot_invalid(
+                "current_control",
+                "an ongoing battle cannot expose a Complete control",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_public_quiescent_boundary(runtime: &GameRuntime) -> Result<(), SnapshotError> {
+    if runtime.pending_no_legal_replacement.is_some() {
+        return Err(snapshot_invalid(
+            "pending_no_legal_replacement",
+            "an internal FIFO marker cannot be restored as public state",
+        ));
+    }
+    let decision = decision_for_state(&runtime.state)
+        .map_err(|error| snapshot_runtime_invalid("state", error))?;
+    if runtime
+        .no_legal_replacement_followup(&runtime.state, &decision)
+        .map_err(|error| snapshot_runtime_invalid("current_control", error))?
+        .is_some()
+    {
+        return Err(snapshot_invalid(
+            "current_control",
+            "the DTO is at the internal no-legal-replacement FIFO boundary rather than a public quiescent boundary",
+        ));
+    }
+    Ok(())
+}
+
+fn rebuild_authority_remote_paths(
+    runtime: &GameRuntime,
+    histories: &[SeatControlHistorySnapshotV1],
+) -> Result<BTreeMap<er_types::OperationId, RuntimeAuthorityMenuPath>, SnapshotError> {
+    let battle = runtime
+        .state
+        .battle
+        .as_ref()
+        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let authority_runtime = runtime.local_seat == battle.authority_seat;
+    let mut paths = BTreeMap::new();
+
+    for frontier in &battle.command_state.frontier {
+        let (accepted, source) = match &frontier.status {
+            CommandFrontierStatus::Retained { command, source }
+            | CommandFrontierStatus::Admitted { command, source } => (command, *source),
+            CommandFrontierStatus::Pending => continue,
+        };
+        if !authority_runtime || source != CommandAdmissionSource::AuthorityRemoteProposal {
+            continue;
+        }
+        let AcceptedBattleCommand::Human { proposal, .. } = accepted else {
+            return Err(snapshot_invalid(
+                "state.battle.command_state.frontier",
+                "a remote proposal proof must retain a human command proposal",
+            ));
+        };
+        if proposal.owner_seat == battle.authority_seat {
+            return Err(snapshot_invalid(
+                "state.battle.command_state.frontier",
+                "AuthorityRemoteProposal cannot belong to the authority seat",
+            ));
+        }
+        let Some(tombstone) = runtime
+            .command_fingerprints
+            .iter()
+            .find(|entry| entry.operation_id == proposal.operation_id)
+        else {
+            return Err(snapshot_invalid(
+                "command_admission.command_tombstones",
+                "a retained/admitted remote command is missing its admission tombstone",
+            ));
+        };
+        if tombstone.fingerprint != proposal.fingerprint() {
+            return Err(snapshot_invalid(
+                "command_admission.command_tombstones",
+                "remote command tombstone does not match the retained/admitted proposal",
+            ));
+        }
+
+        let path = rebuild_remote_command_path(runtime, histories, proposal)?;
+        if paths.insert(proposal.operation_id.clone(), path).is_some() {
+            return Err(snapshot_invalid(
+                "authority_remote_paths",
+                "remote command proofs contain a duplicate operation identity",
+            ));
+        }
+    }
+
+    let decision = decision_for_state(&runtime.state)
+        .map_err(|error| snapshot_runtime_invalid("state", error))?;
+    if let BattleNextDecision::Replacement { occurrence } = decision {
+        let faint = battle
+            .faint_queue
+            .iter()
+            .find(|candidate| candidate.id == occurrence)
+            .copied()
+            .ok_or_else(|| {
+                snapshot_invalid(
+                    "state.battle.faint_queue",
+                    "replacement decision occurrence is not stored",
+                )
+            })?;
+        let Some(owner) = faint.owner_seat else {
+            return Err(snapshot_invalid(
+                "state.battle.faint_queue",
+                "a player replacement occurrence must have a human owner",
+            ));
+        };
+        if authority_runtime && owner != battle.authority_seat {
+            let operation_id = replacement_operation_id(
+                faint.source.epoch,
+                battle.battle_id,
+                faint.source.wave,
+                faint.source.resolved_turn,
+                faint.source.turn_occurrence,
+                faint.slot,
+                owner,
+            )
+            .map_err(|error| snapshot_invalid("command_admission.replacement_tombstones", error.to_string()))?;
+            if let Some(tombstone) = runtime
+                .replacement_fingerprints
+                .iter()
+                .find(|entry| entry.operation_id == operation_id)
+            {
+                let path = rebuild_remote_replacement_path(
+                    runtime,
+                    histories,
+                    occurrence,
+                    owner,
+                    &operation_id,
+                    tombstone,
+                )?;
+                if paths.insert(operation_id, path).is_some() {
+                    return Err(snapshot_invalid(
+                        "authority_remote_paths",
+                        "remote command and replacement proofs share an operation identity",
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(paths)
+}
+
+fn rebuild_remote_command_path(
+    runtime: &GameRuntime,
+    histories: &[SeatControlHistorySnapshotV1],
+    proposal: &BattleCommandProposalV1,
+) -> Result<RuntimeAuthorityMenuPath, SnapshotError> {
+    let menu_count = match &proposal.command {
+        BattleCommand::Fight { targets, .. } => {
+            if matches!(targets, BattleTargetSelection::Implicit) {
+                1
+            } else {
+                2
+            }
+        }
+        BattleCommand::Switch { .. } => 2,
+    };
+    let first_menu_instance_id = remote_menu_allocator_before_final(
+        runtime,
+        proposal.owner_seat,
+        proposal.menu_instance_id,
+        menu_count,
+        "authority_remote_paths.command",
+    )?;
+    let mut paths = Vec::new();
+    let mut first_failure = None;
+    let mut prior_controls = Vec::new();
+    for history in histories.iter().filter(|history| history.seat == proposal.owner_seat) {
+        for control in &history.controls {
+            if !matches!(control, BattleControl::CommandRoot(_))
+                || prior_controls.iter().any(|previous| previous == control)
+            {
+                continue;
+            }
+            prior_controls.push(control.clone());
+        }
+    }
+    for prior_control in prior_controls {
+        let candidate = match runtime_with_prior_control(
+            runtime,
+            proposal.owner_seat,
+            &prior_control,
+            &proposal.operation_id,
+            first_menu_instance_id,
+        ) {
+            Ok(candidate) => candidate,
+            Err(error) => {
+                if first_failure.is_none() {
+                    first_failure = Some(error.to_string());
+                }
+                continue;
+            }
+        };
+        match candidate.prepare_remote_command_path(proposal) {
+            Ok(path) => paths.push(path),
+            Err(error) => {
+                if first_failure.is_none() {
+                    first_failure = Some(error.to_string());
+                }
+            }
+        }
+    }
+    match paths.len() {
+        1 => paths
+            .into_iter()
+            .next()
+            .ok_or_else(|| snapshot_invalid("authority_remote_paths.command", "remote command proof disappeared")),
+        0 => Err(snapshot_invalid(
+            "authority_remote_paths.command",
+            format!(
+                "no matching prior CommandRoot control can replay the retained proposal{}",
+                first_failure
+                    .map(|failure| format!(": {failure}"))
+                    .unwrap_or_default()
+            ),
+        )),
+        _ => Err(snapshot_invalid(
+            "authority_remote_paths.command",
+            "more than one prior CommandRoot control can replay the retained proposal",
+        )),
+    }
+}
+
+fn rebuild_remote_replacement_path(
+    runtime: &GameRuntime,
+    histories: &[SeatControlHistorySnapshotV1],
+    occurrence: FaintOccurrenceId,
+    owner: SeatId,
+    operation_id: &er_types::OperationId,
+    tombstone: &ReplacementProposalFingerprintEntry,
+) -> Result<RuntimeAuthorityMenuPath, SnapshotError> {
+    let allocator = runtime
+        .control
+        .allocator(owner)
+        .ok_or_else(|| snapshot_invalid("menu_allocators", "remote replacement owner allocator is absent"))?;
+    let next_value = allocator.next_menu_instance_id.get().get();
+    if next_value <= 1 {
+        return Err(snapshot_invalid(
+            "menu_allocators",
+            "remote replacement allocator has no consumed menu instance to replay",
+        ));
+    }
+    let final_menu_instance_id = MenuInstanceId::new(
+        SafeU53::new(next_value - 1)
+            .map_err(|error| snapshot_invalid("menu_allocators", error.to_string()))?,
+    );
+    let battle = runtime
+        .state
+        .battle
+        .as_ref()
+        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let faint = battle
+        .faint_queue
+        .iter()
+        .find(|candidate| candidate.id == occurrence)
+        .copied()
+        .ok_or_else(|| snapshot_invalid("state.battle.faint_queue", "replacement occurrence is absent"))?;
+    let mut prior_controls = Vec::new();
+    for history in histories.iter().filter(|history| history.seat == owner) {
+        for control in &history.controls {
+            let BattleControl::ReplacementSelect(value) = control else {
+                continue;
+            };
+            if value.occurrence != occurrence
+                || value.owner_seat != owner
+                || value.field_slot != faint.slot
+                || value.source != faint.source
+                || prior_controls.iter().any(|previous| previous == control)
+            {
+                continue;
+            }
+            prior_controls.push(control.clone());
+        }
+    }
+
+    let mut matches = Vec::new();
+    let mut matched_proposals = Vec::new();
+    let mut first_failure = None;
+    for prior_control in prior_controls {
+        let candidate = match runtime_with_prior_control(
+            runtime,
+            owner,
+            &prior_control,
+            operation_id,
+            final_menu_instance_id,
+        ) {
+            Ok(candidate) => candidate,
+            Err(error) => {
+                if first_failure.is_none() {
+                    first_failure = Some(error.to_string());
+                }
+                continue;
+            }
+        };
+        let BattleControl::ReplacementSelect(current) = &prior_control else {
+            continue;
+        };
+        for (index, pokemon) in battle.player_party.iter().enumerate() {
+            let Ok(index) = u8::try_from(index) else {
+                continue;
+            };
+            let Ok(party_slot) = PartyIndex::new(index) else {
+                continue;
+            };
+            if pokemon.owner_seat != Some(owner) || pokemon.fainted {
+                continue;
+            }
+            let Ok(selected_option) = party_option_id(pokemon.id, party_slot) else {
+                continue;
+            };
+            if !current
+                .menu
+                .option(selected_option.clone())
+                .is_some_and(|option| option.enabled)
+            {
+                continue;
+            }
+            let selected = match replay_replacement_selection(
+                battle,
+                current.clone(),
+                &selected_option,
+            ) {
+                Ok(selected) => selected,
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                    continue;
+                }
+            };
+            let option_control = match open_party_option_menu_from_control(
+                battle,
+                &BattleControl::ReplacementSelect(selected),
+                current.menu.instance_id,
+                final_menu_instance_id,
+            ) {
+                Ok(option_control) => option_control,
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                    continue;
+                }
+            };
+            let proposal = match BattleReplacementProposalV1::new(
+                operation_id.clone(),
+                battle.battle_id,
+                battle.wave,
+                current.source.resolved_turn,
+                owner,
+                occurrence,
+                current.source.turn_occurrence,
+                current.field_slot,
+                ReplacementSelection::selected(party_slot, pokemon.id),
+                final_menu_instance_id,
+                option_control.menu.control_id.clone(),
+            ) {
+                Ok(proposal) => proposal,
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                    continue;
+                }
+            };
+            if proposal.fingerprint() != tombstone.fingerprint {
+                continue;
+            }
+            if matched_proposals.iter().any(|previous| previous == &proposal) {
+                continue;
+            }
+            matched_proposals.push(proposal.clone());
+            match candidate.prepare_remote_replacement_path(&proposal) {
+                Ok(path) => matches.push(path),
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                }
+            }
+        }
+    }
+    match matches.len() {
+        1 => matches
+            .into_iter()
+            .next()
+            .ok_or_else(|| snapshot_invalid("authority_remote_paths.replacement", "remote replacement proof disappeared")),
+        0 => Err(snapshot_invalid(
+            "authority_remote_paths.replacement",
+            format!(
+                "no matching prior ReplacementSelect control and proposal can replay the live tombstone{}",
+                first_failure
+                    .map(|failure| format!(": {failure}"))
+                    .unwrap_or_default()
+            ),
+        )),
+        _ => Err(snapshot_invalid(
+            "authority_remote_paths.replacement",
+            "more than one replacement proposal matches the live tombstone",
+        )),
+    }
+}
+
+fn remote_menu_allocator_before_final(
+    runtime: &GameRuntime,
+    seat: SeatId,
+    final_menu_instance_id: MenuInstanceId,
+    menu_count: usize,
+    path: &str,
+) -> Result<MenuInstanceId, SnapshotError> {
+    if menu_count == 0 {
+        return Err(snapshot_invalid(path, "remote menu replay must consume at least one menu instance"));
+    }
+    let allocator = runtime
+        .control
+        .allocator(seat)
+        .ok_or_else(|| snapshot_invalid(path, "remote proposal owner allocator is absent"))?;
+    let final_value = final_menu_instance_id.get().get();
+    let expected_next = final_value
+        .checked_add(1)
+        .ok_or_else(|| snapshot_invalid(path, "remote proposal menu instance exhausted its allocator"))?;
+    if allocator.next_menu_instance_id.get().get() != expected_next {
+        return Err(snapshot_invalid(
+            path,
+            "remote proposal menu instance is not the exact consumed allocator value",
+        ));
+    }
+    let first_value = final_value
+        .checked_sub((menu_count - 1) as u64)
+        .ok_or_else(|| snapshot_invalid(path, "remote proposal menu sequence underflowed"))?;
+    if first_value == 0 {
+        return Err(snapshot_invalid(path, "remote proposal menu sequence contains zero"));
+    }
+    Ok(MenuInstanceId::new(
+        SafeU53::new(first_value).map_err(|error| snapshot_invalid(path, error.to_string()))?,
+    ))
+}
+
+fn runtime_with_prior_control(
+    runtime: &GameRuntime,
+    seat: SeatId,
+    prior_control: &BattleControl,
+    operation_id: &er_types::OperationId,
+    allocator_before: MenuInstanceId,
+) -> Result<GameRuntime, SnapshotError> {
+    if prior_control.owner_seat().is_some_and(|owner| owner != seat) {
+        return Err(snapshot_invalid(
+            "control_history",
+            "a replay prior control belongs to a different seat",
+        ));
+    }
+    let mut seats = runtime.control.seats.clone();
+    let Some(seat_control) = seats.iter_mut().find(|entry| entry.seat == seat) else {
+        return Err(snapshot_invalid(
+            "control_history",
+            "a replay prior control has no current seat entry",
+        ));
+    };
+    seat_control.control = prior_control.clone();
+    seat_control.decision_operation_id = Some(operation_id.clone());
+    let mut allocators = runtime.control.menu_allocators.clone();
+    let Some(allocator) = allocators.iter_mut().find(|allocator| allocator.seat == seat) else {
+        return Err(snapshot_invalid(
+            "menu_allocators",
+            "a replay prior control has no seat allocator",
+        ));
+    };
+    allocator.next_menu_instance_id = allocator_before;
+    let control = BattleControlPlan::new(
+        runtime.control.schema_version,
+        runtime.control.battle_id,
+        runtime.control.wave,
+        runtime.control.turn,
+        seats,
+        allocators,
+    )
+    .map_err(|error| snapshot_invalid("control_history", error.to_string()))?;
+    let mut candidate = runtime.clone();
+    candidate.control = control;
+    candidate.authority_remote_paths.clear();
+    candidate.pending_no_legal_replacement = None;
+    candidate
+        .validate()
+        .map_err(|error| snapshot_runtime_invalid("control_history", error))?;
+    Ok(candidate)
 }
 
 fn control_menu(control: &BattleControl) -> Option<&BattleMenu> {
