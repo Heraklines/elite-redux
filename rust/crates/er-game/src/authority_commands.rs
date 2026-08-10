@@ -790,7 +790,7 @@ pub fn admit_replacement_proposal_with_context(
 
     validate_state_content(state, content).map_err(legality)?;
     let battle = active_battle(state)?;
-    validate_replacement_control_plan(control, battle)?;
+    validate_replacement_control_plan(control, battle, proposal.occurrence)?;
     validate_replacement_control(control, prepared, battle.authority_seat, proposal, battle)?;
     validate_replacement_proposal(state, proposal, content).map_err(legality)?;
 
@@ -898,13 +898,20 @@ fn validate_command_control_plan(
 fn validate_replacement_control_plan(
     control: &BattleControlPlan,
     battle: &BattleState,
+    occurrence: FaintOccurrenceId,
 ) -> Result<(), AuthorityCommandError> {
     control
         .validate()
         .map_err(AuthorityCommandError::ControlPlan)?;
+    let source = battle
+        .faint_queue
+        .iter()
+        .find(|candidate| candidate.id == occurrence)
+        .ok_or(AuthorityCommandError::ReplacementHeadMismatch { occurrence })?
+        .source;
     if control.battle_id != battle.battle_id
-        || control.wave != battle.wave
-        || control.turn != battle.turn
+        || control.wave != source.wave
+        || control.turn != source.resolved_turn
     {
         return Err(AuthorityCommandError::ControlCoordinatesMismatch);
     }

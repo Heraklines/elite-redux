@@ -667,9 +667,20 @@ fn validate_prepared_projection(
         .ok_or_else(|| AuthorityTransactionError::ControlProjection {
             reason: "prepared resolver candidate has no after battle".to_owned(),
         })?;
+    let expected_turn = match next_decision {
+        BattleNextDecision::Replacement { occurrence } => battle
+            .faint_queue
+            .iter()
+            .find(|candidate| candidate.id == occurrence)
+            .map(|candidate| candidate.source.resolved_turn)
+            .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                reason: "prepared replacement candidate lost its occurrence".to_owned(),
+            })?,
+        BattleNextDecision::CommandFrontier | BattleNextDecision::Complete(_) => battle.turn,
+    };
     if control_plan.battle_id != battle.battle_id
         || control_plan.wave != battle.wave
-        || control_plan.turn != battle.turn
+        || control_plan.turn != expected_turn
     {
         return Err(AuthorityTransactionError::ControlProjection {
             reason: "prepared control plan coordinates do not match after_state".to_owned(),
