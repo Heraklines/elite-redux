@@ -73,12 +73,18 @@ pub enum TargetSelectionError {
     NearOtherCount,
     #[error("all-near-enemies move requires at least one target")]
     AllEnemiesCount,
+    #[error("target {slot:?} is outside the battle format capacity")]
+    SlotOutsideCapacity { slot: FieldSlot },
     #[error("target {slot:?} is on the actor's side")]
     SameSide { slot: FieldSlot },
     #[error("target selection contains duplicate slot {slot:?}")]
     Duplicate { slot: FieldSlot },
     #[error("target selection is not in canonical field-slot order")]
     NonCanonicalOrder,
+    #[error(
+        "all-near-enemies target selection does not exactly match the canonical active opposing candidates"
+    )]
+    AllEnemiesNotCanonical,
 }
 
 /// Fail-closed errors for the action-level boundary.
@@ -233,7 +239,7 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
         }
     })?;
 
-    validate_targets(source_slot, targets, move_definition.target)?;
+    validate_targets(battle, source_slot, targets, move_definition.target)?;
 
     // PP validity/usability is checked before the paralysis activation draw.
     let max_pp =
@@ -369,6 +375,7 @@ fn skipped_actor_result(
 }
 
 fn validate_targets(
+    battle: &BattleState,
     source_slot: FieldSlot,
     targets: &[FieldSlot],
     move_target: MoveTarget,
@@ -387,6 +394,9 @@ fn validate_targets(
         return Err(TargetSelectionError::AllEnemiesCount);
     }
     for (index, target) in targets.iter().copied().enumerate() {
+        if !slot_within_format_capacity(battle, target) {
+            return Err(TargetSelectionError::SlotOutsideCapacity { slot: target });
+        }
         if target.side == actor_side {
             return Err(TargetSelectionError::SameSide { slot: target });
         }
@@ -399,7 +409,56 @@ fn validate_targets(
             return Err(TargetSelectionError::NonCanonicalOrder);
         }
     }
+    if move_target == MoveTarget::AllNearEnemies {
+        let expected = canonical_active_opposing_targets(battle, source_slot);
+        if expected.is_empty() {
+            return Err(TargetSelectionError::AllEnemiesCount);
+        }
+        if targets != expected.as_slice() {
+            return Err(TargetSelectionError::AllEnemiesNotCanonical);
+        }
+    }
     Ok(())
+}
+
+fn slot_within_format_capacity(battle: &BattleState, slot: FieldSlot) -> bool {
+    let capacity = match slot.side {
+        er_types::battle_ids::BattleSide::Player => battle.format.player_capacity,
+        er_types::battle_ids::BattleSide::Enemy => battle.format.enemy_capacity,
+    };
+    slot.position < capacity
+}
+
+fn canonical_active_opposing_targets(
+    battle: &BattleState,
+    source_slot: FieldSlot,
+) -> Vec<FieldSlot> {
+    let mut candidates = battle
+        .field
+        .slots
+        .iter()
+        .filter_map(|entry| {
+            let target_slot = entry.slot;
+            if target_slot.side == source_slot.side
+                || !slot_within_format_capacity(battle, target_slot)
+                || !are_adjacent(battle, source_slot, target_slot)
+            {
+                return None;
+            }
+            let target_id = entry.occupant?;
+            let target = find_pokemon(battle, target_slot, target_id)?;
+            (!target.fainted && target.hp > 0).then_some(target_slot)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_unstable();
+    candidates
+}
+
+fn are_adjacent(battle: &BattleState, left: FieldSlot, right: FieldSlot) -> bool {
+    battle.format.adjacency.iter().any(|edge| {
+        (edge.first == left && edge.second == right)
+            || (edge.first == right && edge.second == left)
+    })
 }
 
 fn deduct_pp(

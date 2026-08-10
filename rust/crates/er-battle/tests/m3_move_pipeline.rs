@@ -2,6 +2,10 @@ use std::cell::RefCell;
 use std::error::Error;
 
 use er_battle::command::NormalizedBattleCommand;
+use er_battle::ability::WONDER_GUARD_ABILITY_ID;
+use er_battle::ability_pipeline::{
+    DefensiveAbilityInput, DefensiveAbilityOutcome, evaluate_defensive_ability,
+};
 use er_battle::damage::DamageInput;
 use er_battle::move_effect::{
     DefensiveAbilityBlockReason, DefensiveAbilityGate, DefensiveAbilityGateError,
@@ -388,6 +392,39 @@ impl DefensiveAbilityGate for RecordingGate {
                 reason: DefensiveAbilityGateUnsupportedReason::UnsupportedAbilityEffect,
             }),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RealAbilityGate<'a> {
+    content: &'a ContentPack,
+}
+
+impl DefensiveAbilityGate for RealAbilityGate<'_> {
+    fn evaluate(
+        &self,
+        input: DefensiveAbilityGateInput<'_>,
+    ) -> Result<DefensiveAbilityGateResult, DefensiveAbilityGateError> {
+        let outcome = evaluate_defensive_ability(
+            DefensiveAbilityInput {
+                ability_id: input.target.abilities.active,
+                ability_suppressed: input.target.abilities.active_suppressed,
+                global_suppressed: input.abilities_ignored,
+                move_category: input.move_category,
+                type_effectiveness: input.effectiveness,
+            },
+            self.content,
+        )
+        .map_err(|_| DefensiveAbilityGateError::InvalidContext)?;
+        Ok(match outcome {
+            DefensiveAbilityOutcome::Passed { .. } => DefensiveAbilityGateResult::Pass,
+            DefensiveAbilityOutcome::Blocked { ability_id, .. } => {
+                DefensiveAbilityGateResult::Blocked {
+                    ability: Some(ability_id),
+                    reason: DefensiveAbilityBlockReason::NonSuperEffectiveAttack,
+                }
+            }
+        })
     }
 }
 
@@ -1676,5 +1713,294 @@ fn target_selection_failure_is_typed_and_atomic_before_pp_or_rng() -> TestResult
     assert_eq!(battle, before_battle);
     assert_eq!(runtime, before_runtime);
     assert!(runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn target_slot_outside_format_is_typed_and_atomic_before_pp_or_rng() -> TestResult {
+    let content = selected_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[1],
+        0,
+    )?;
+    let target = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let mut battle = single_battle(actor, target, Some(pokemon_id(1)?), Some(pokemon_id(2)?))?;
+    let before_battle = battle.clone();
+    let mut runtime = runtime_for_seed("outside-format-target")?;
+    let before_runtime = runtime.clone();
+    let invalid_slot = slot(BattleSide::Enemy, 1)?;
+    let error = resolve_move(
+        &mut battle,
+        &fight_command(1, vec![invalid_slot])?,
+        &content,
+        &mut runtime,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("outside-format target unexpectedly resolved"))?;
+    assert!(matches!(
+        error,
+        MovePipelineError::TargetSelection(TargetSelectionError::SlotOutsideCapacity { slot })
+            if slot == invalid_slot
+    ));
+    assert_eq!(battle, before_battle);
+    assert_eq!(runtime, before_runtime);
+    assert!(runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn incomplete_play_nice_spread_is_typed_and_atomic_before_pp_or_rng() -> TestResult {
+    let content = selected_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[589],
+        0,
+    )?;
+    let enemy_zero = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let enemy_one = pokemon(
+        3,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let mut battle = double_battle(actor, enemy_zero, enemy_one)?;
+    let before_battle = battle.clone();
+    let mut runtime = runtime_for_seed("incomplete-play-nice")?;
+    let before_runtime = runtime.clone();
+    let error = resolve_move(
+        &mut battle,
+        &fight_command(589, vec![slot(BattleSide::Enemy, 0)?])?,
+        &content,
+        &mut runtime,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("incomplete Play Nice spread unexpectedly resolved"))?;
+    assert!(matches!(
+        error,
+        MovePipelineError::TargetSelection(TargetSelectionError::AllEnemiesNotCanonical)
+    ));
+    assert_eq!(battle, before_battle);
+    assert_eq!(runtime, before_runtime);
+    assert!(runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn direct_invalid_content_is_typed_and_atomic_before_rng_or_target_mutation() -> TestResult {
+    let content = selected_content_pack()?;
+    let mut invalid_content = content.clone();
+    invalid_content.schema_version = 0;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let target = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let target_before = target.clone();
+    let mut target = target;
+    let mut runtime = runtime_for_seed("direct-invalid-content")?;
+    let before_runtime = runtime.clone();
+    let error = resolve_target_effect(
+        &mut runtime,
+        &actor,
+        target_slot()?,
+        &mut target,
+        &move_definition(&content, 1)?,
+        &invalid_content,
+        1,
+        false,
+        &NoDefensiveAbilityGate,
+    )
+    .err()
+    .ok_or_else(|| test_error("direct invalid content unexpectedly resolved"))?;
+    assert!(matches!(
+        error,
+        MoveEffectError::Content(er_content::pack::ContentPackError::SchemaVersionMismatch {
+            expected: 1,
+            actual: 0,
+        })
+    ));
+    assert_eq!(target, target_before);
+    assert_eq!(runtime, before_runtime);
+    assert!(runtime.audit_entries().is_empty());
+    Ok(())
+}
+
+#[test]
+fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective() -> TestResult {
+    let content = selected_content_pack()?;
+
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[1],
+        0,
+    )?;
+    let mut target = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    target.abilities.active = WONDER_GUARD_ABILITY_ID;
+    let mut neutral_battle = single_battle(
+        actor,
+        target,
+        Some(pokemon_id(1)?),
+        Some(pokemon_id(2)?),
+    )?;
+    let mut neutral_runtime = runtime_with(
+        "wonder-guard-neutral",
+        PHYSICAL_RUN_STATE,
+        None,
+    )?;
+    let neutral_gate = RealAbilityGate { content: &content };
+    let neutral = resolve_move(
+        &mut neutral_battle,
+        &fight_command(1, vec![target_slot()?])?,
+        &content,
+        &mut neutral_runtime,
+        &neutral_gate,
+    )?;
+    let [neutral_target] = neutral.targets.as_slice() else {
+        return Err(test_error("Wonder Guard neutral case did not produce one target").into());
+    };
+    assert_eq!(
+        neutral_target.disposition,
+        TargetEffectDisposition::DefensiveAbilityBlocked {
+            ability: Some(WONDER_GUARD_ABILITY_ID),
+            reason: DefensiveAbilityBlockReason::NonSuperEffectiveAttack,
+        }
+    );
+    assert!(neutral_target.hp_mutation.is_none());
+    assert!(neutral_runtime.audit_entries().is_empty());
+
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[351],
+        0,
+    )?;
+    let mut target = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Water, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    target.abilities.active = WONDER_GUARD_ABILITY_ID;
+    let mut super_battle = single_battle(
+        actor,
+        target,
+        Some(pokemon_id(1)?),
+        Some(pokemon_id(2)?),
+    )?;
+    let mut super_runtime = runtime_with(
+        "wonder-guard-super-effective",
+        ALWAYS_HIT_RUN_STATE,
+        None,
+    )?;
+    let super_gate = RealAbilityGate { content: &content };
+    let super_effective = resolve_move(
+        &mut super_battle,
+        &fight_command(351, vec![target_slot()?])?,
+        &content,
+        &mut super_runtime,
+        &super_gate,
+    )?;
+    let [super_target] = super_effective.targets.as_slice() else {
+        return Err(test_error("Wonder Guard super-effective case did not produce one target").into());
+    };
+    assert_eq!(super_target.disposition, TargetEffectDisposition::Executed);
+    assert_eq!(
+        super_target
+            .effectiveness
+            .map(|effectiveness| effectiveness.multiplier),
+        Some(er_battle::type_effectiveness::EffectivenessMultiplier::Two)
+    );
+    assert_eq!(
+        super_target.defensive_gate,
+        Some(DefensiveAbilityGateResult::Pass)
+    );
+    assert!(super_target.hp_mutation.is_some());
+    assert_reasons(
+        &super_runtime,
+        &[RngReason::CriticalHit, RngReason::DamageVariance],
+    );
     Ok(())
 }

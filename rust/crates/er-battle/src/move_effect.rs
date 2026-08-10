@@ -250,6 +250,7 @@ pub fn resolve_target_effect<G: DefensiveAbilityGate>(
     abilities_ignored: bool,
     defensive_gate: &G,
 ) -> Result<MoveTargetResult, MoveEffectError> {
+    content.validate().map_err(MoveEffectError::Content)?;
     if target_count == 0 {
         return Err(MoveEffectError::EmptyTargetSet);
     }
