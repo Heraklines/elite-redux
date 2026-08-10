@@ -804,9 +804,10 @@ fn status_differential(case_name: &str, expected_label: &str) -> Result<(), Box<
     let initial_target = canonical_party_member(&document, case_name, false)?;
     let final_target = canonical_party_member(&document, case_name, true)?;
     let initial_status = status_state_from_oracle(
-        initial_target.get("status").cloned().ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: initial status is missing"))
-        })?,
+        initial_target
+            .get("status")
+            .cloned()
+            .ok_or_else(|| FixtureError::new(format!("{case_name}: initial status is missing")))?,
         case_name,
         "initial",
     )?;
