@@ -9,6 +9,7 @@ use thiserror::Error;
 use crate::input_router::{
     BattleButtonEvent, BattleInputError, BattleInputOutput, BattleInputRouter, InputRouteError,
 };
+use crate::snapshot::{InputRouterSnapshotV2, SnapshotError};
 use crate::ui_reducer::{BattleUiIntent, BattleUiReducer, BattleUiReject, BattleUiReduction};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -30,6 +31,17 @@ pub(crate) enum BattleUiAdapterError {
     Disposed,
     #[error("battle UI projection belongs to a different local seat")]
     LocalSeatMismatch,
+}
+
+/// The exact owner boundary used by the kernel snapshot bridge.  The public
+/// endpoint DTO stores these fields in separate locations, but restoration
+/// must pass them through one fail-atomic UI-owner constructor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BattleUiAdapterSnapshot {
+    pub(crate) local_seat: SeatId,
+    pub(crate) projection: BattleUiProjection,
+    pub(crate) input_router: InputRouterSnapshotV2,
+    pub(crate) disposed: bool,
 }
 
 /// Composes menu-instance-bound physical input with the exact graph reducer.
@@ -88,6 +100,97 @@ impl BattleUiAdapter {
 
     pub(crate) fn input(&self) -> &BattleInputRouter {
         &self.input
+    }
+
+    pub(crate) fn snapshot_v2(
+        &self,
+        scheduler: &KernelScheduler,
+    ) -> Result<BattleUiAdapterSnapshot, SnapshotError> {
+        if self.projection().seat_control.seat != self.local_seat {
+            return Err(ui_snapshot_invalid(
+                "ui.local_seat",
+                "projection seat differs from the adapter local seat",
+            ));
+        }
+        self.projection()
+            .validate()
+            .map_err(|error| ui_snapshot_invalid("ui.projection", error.to_string()))?;
+        let input_router = self.input.snapshot_v2(scheduler)?;
+        if input_router.disposed != self.disposed {
+            return Err(ui_snapshot_invalid(
+                "ui.disposed",
+                "adapter and input-router disposal flags differ",
+            ));
+        }
+        Ok(BattleUiAdapterSnapshot {
+            local_seat: self.local_seat,
+            projection: self.projection().clone(),
+            input_router,
+            disposed: self.disposed,
+        })
+    }
+
+    /// Build every UI owner from validated snapshot parts before returning a
+    /// value.  No existing adapter is mutated if projection, router, seat, or
+    /// disposal validation fails.
+    pub(crate) fn from_snapshot_v2(
+        snapshot: BattleUiAdapterSnapshot,
+        scheduler: &KernelScheduler,
+    ) -> Result<Self, SnapshotError> {
+        if snapshot.projection.seat_control.seat != snapshot.local_seat {
+            return Err(ui_snapshot_invalid(
+                "ui.local_seat",
+                "projection seat differs from the snapshot local seat",
+            ));
+        }
+        snapshot
+            .projection
+            .validate()
+            .map_err(|error| ui_snapshot_invalid("ui.projection", error.to_string()))?;
+        if snapshot.input_router.disposed != snapshot.disposed {
+            return Err(ui_snapshot_invalid(
+                "ui.disposed",
+                "adapter and input-router disposal flags differ",
+            ));
+        }
+
+        let reducer = BattleUiReducer::new(snapshot.projection.clone())
+            .map_err(|error| ui_snapshot_invalid("ui.projection", error.to_string()))?;
+        let input = BattleInputRouter::from_snapshot_v2(snapshot.input_router, scheduler)?;
+        Ok(Self {
+            local_seat: snapshot.local_seat,
+            input,
+            reducer,
+            disposed: snapshot.disposed,
+        })
+    }
+
+    pub(crate) fn from_snapshot_parts_v2(
+        local_seat: SeatId,
+        projection: BattleUiProjection,
+        input_router: InputRouterSnapshotV2,
+        disposed: bool,
+        scheduler: &KernelScheduler,
+    ) -> Result<Self, SnapshotError> {
+        Self::from_snapshot_v2(
+            BattleUiAdapterSnapshot {
+                local_seat,
+                projection,
+                input_router,
+                disposed,
+            },
+            scheduler,
+        )
+    }
+
+    pub(crate) fn restore_snapshot_v2(
+        &mut self,
+        snapshot: BattleUiAdapterSnapshot,
+        scheduler: &KernelScheduler,
+    ) -> Result<(), SnapshotError> {
+        let candidate = Self::from_snapshot_v2(snapshot, scheduler)?;
+        *self = candidate;
+        Ok(())
     }
 
     pub(crate) fn install_projection(
@@ -284,7 +387,7 @@ impl BattleUiAdapter {
             return BattleUiOutput::default();
         }
         self.disposed = true;
-        let routed = self.input.clear(scheduler);
+        let routed = self.input.dispose(scheduler);
         BattleUiOutput {
             timers: routed.timers,
             ..BattleUiOutput::default()
@@ -338,5 +441,12 @@ impl BattleUiAdapter {
         }
 
         output
+    }
+}
+
+fn ui_snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
     }
 }

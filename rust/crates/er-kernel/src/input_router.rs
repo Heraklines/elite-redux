@@ -10,6 +10,11 @@ use er_types::{
 use er_types::battle_ids::MenuInstanceId;
 use thiserror::Error;
 
+use crate::snapshot::{
+    HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRepeatSnapshotV2,
+    InputRouterSnapshotV2, PhysicalInputSourceV2, PressedPhysicalInputSnapshotV2, SnapshotError,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PhysicalPress {
     Accepted(GameButton),
@@ -404,6 +409,22 @@ pub(crate) enum BattlePhysicalSource {
     Gamepad(u16),
 }
 
+impl BattlePhysicalSource {
+    fn snapshot(&self) -> PhysicalInputSourceV2 {
+        match self {
+            Self::Keyboard(code) => PhysicalInputSourceV2::Keyboard(code.clone()),
+            Self::Gamepad(button) => PhysicalInputSourceV2::Gamepad(*button),
+        }
+    }
+
+    fn from_snapshot(source: PhysicalInputSourceV2) -> Self {
+        match source {
+            PhysicalInputSourceV2::Keyboard(code) => Self::Keyboard(code),
+            PhysicalInputSourceV2::Gamepad(button) => Self::Gamepad(button),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum BattleButtonEvent {
     Pressed {
@@ -433,6 +454,7 @@ struct BattleHeldContext {
     button: GameButton,
     menu_instance_id: MenuInstanceId,
     timer_id: Option<TimerId>,
+    printable: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -453,8 +475,8 @@ struct BattleTimerContext {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum BattlePhysicalPress {
     Accepted(BattleHeldContext),
-    Blocked,
-    Suppressed,
+    Blocked { printable: bool },
+    Suppressed { printable: bool },
 }
 
 /// Menu-instance-bound raw input for M3 battle mode.
@@ -472,6 +494,7 @@ pub(crate) struct BattleInputRouter {
     locks: BTreeMap<(SeatId, GameButton), BattleLockContext>,
     timers: BTreeMap<TimerId, BattleTimerContext>,
     focus: InputFocus,
+    disposed: bool,
 }
 
 impl BattleInputRouter {
@@ -484,6 +507,7 @@ impl BattleInputRouter {
             locks: BTreeMap::new(),
             timers: BTreeMap::new(),
             focus: InputFocus::Game,
+            disposed: false,
         }
     }
 
@@ -617,6 +641,7 @@ impl BattleInputRouter {
         if held.timer_id != Some(timer_id)
             || held.button != timer_context.button
             || held.menu_instance_id != timer_context.menu_instance_id
+            || held.printable != timer_context.printable
         {
             return Err(InputRouteError::UnknownTimer { timer_id });
         }
@@ -643,11 +668,24 @@ impl BattleInputRouter {
                 if let Some(held) = self.held.get_mut(&held_key) {
                     held.timer_id = None;
                 }
+                if let Some(BattlePhysicalPress::Accepted(pressed)) =
+                    self.pressed.get_mut(&held_key)
+                {
+                    pressed.timer_id = None;
+                }
                 return Err(error.into());
             }
         };
         let SchedulerCommand::Schedule { timer } = command else {
             self.timers.remove(&timer_id);
+            if let Some(held) = self.held.get_mut(&held_key) {
+                held.timer_id = None;
+            }
+            if let Some(BattlePhysicalPress::Accepted(pressed)) =
+                self.pressed.get_mut(&held_key)
+            {
+                pressed.timer_id = None;
+            }
             return Err(InputRouteError::SchedulerInvariant);
         };
 
@@ -664,6 +702,9 @@ impl BattleInputRouter {
         );
         if let Some(held) = self.held.get_mut(&held_key) {
             held.timer_id = Some(timer.timer_id);
+        }
+        if let Some(BattlePhysicalPress::Accepted(pressed)) = self.pressed.get_mut(&held_key) {
+            pressed.timer_id = Some(timer.timer_id);
         }
 
         Ok(BattleInputOutput {
@@ -698,12 +739,31 @@ impl BattleInputRouter {
         }
     }
 
+    pub(crate) fn dispose(&mut self, scheduler: &mut KernelScheduler) -> BattleInputOutput {
+        if self.disposed {
+            return BattleInputOutput::default();
+        }
+        self.disposed = true;
+        self.clear(scheduler)
+    }
+
+    pub(crate) fn is_disposed(&self) -> bool {
+        self.disposed
+    }
+
     pub(crate) fn discard_timer(&mut self, timer_id: TimerId, scheduler: &mut KernelScheduler) {
         let _ = scheduler.cancel(timer_id);
         self.timers.remove(&timer_id);
         for held in self.held.values_mut() {
             if held.timer_id == Some(timer_id) {
                 held.timer_id = None;
+            }
+        }
+        for press in self.pressed.values_mut() {
+            if let BattlePhysicalPress::Accepted(held) = press {
+                if held.timer_id == Some(timer_id) {
+                    held.timer_id = None;
+                }
             }
         }
     }
@@ -723,10 +783,13 @@ impl BattleInputRouter {
         }
         if printable && self.focus == InputFocus::TextEntry {
             self.suppressed.insert((endpoint, code));
-            self.pressed.insert(key, BattlePhysicalPress::Suppressed);
+            self.pressed
+                .insert(key, BattlePhysicalPress::Suppressed { printable });
             return Ok(BattleInputOutput::default());
         }
         let Some(button) = self.keyboard_button(&code) else {
+            self.pressed
+                .insert(key, BattlePhysicalPress::Blocked { printable });
             return Ok(BattleInputOutput::default());
         };
         self.accept_physical(
@@ -766,6 +829,8 @@ impl BattleInputRouter {
             return Ok(BattleInputOutput::default());
         }
         let Some(button) = self.gamepad_button(button_index) else {
+            self.pressed
+                .insert(key, BattlePhysicalPress::Blocked { printable: false });
             return Ok(BattleInputOutput::default());
         };
         self.accept_physical(
@@ -818,7 +883,8 @@ impl BattleInputRouter {
     ) -> Result<BattleInputOutput, BattleInputError> {
         let key = (endpoint, source.clone());
         if self.locks.contains_key(&(endpoint, button)) {
-            self.pressed.insert(key, BattlePhysicalPress::Blocked);
+            self.pressed
+                .insert(key, BattlePhysicalPress::Blocked { printable });
             return Ok(BattleInputOutput::default());
         }
 
@@ -835,6 +901,7 @@ impl BattleInputRouter {
             button,
             menu_instance_id,
             timer_id: Some(timer.timer_id),
+            printable,
         };
         self.pressed
             .insert(key.clone(), BattlePhysicalPress::Accepted(held.clone()));
@@ -922,6 +989,618 @@ impl BattleInputRouter {
             timers,
         })
     }
+
+    /// Capture the complete battle-owned physical input graph.  Battle mode
+    /// has one fixed production map; accepting another map here would make a
+    /// restored physical source resolve to a different logical button.
+    pub(crate) fn snapshot_v2(
+        &self,
+        scheduler: &KernelScheduler,
+    ) -> Result<InputRouterSnapshotV2, SnapshotError> {
+        self.validate_fixed_map()?;
+        self.validate_live_state()?;
+        let snapshot = self.snapshot_payload();
+        snapshot.validate()?;
+        validate_snapshot_map_bindings(&snapshot, &self.map)?;
+        validate_scheduler_repeat_ownership(&snapshot, scheduler, &self.map)?;
+        Ok(snapshot)
+    }
+
+    /// Construct a fresh router from an exact snapshot without mutating the
+    /// scheduler or any existing owner.
+    pub(crate) fn from_snapshot_v2(
+        snapshot: InputRouterSnapshotV2,
+        scheduler: &KernelScheduler,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate()?;
+        let map = Self::default_map();
+        validate_snapshot_map_bindings(&snapshot, &map)?;
+        validate_scheduler_repeat_ownership(&snapshot, scheduler, &map)?;
+
+        let mut router = Self::new(map);
+        router.focus = snapshot.focus;
+        router.disposed = snapshot.disposed;
+
+        for pressed in &snapshot.pressed {
+            let source = BattlePhysicalSource::from_snapshot(pressed.source.clone());
+            let key = (pressed.seat, source.clone());
+            let press = if pressed.accepted {
+                let button = pressed.logical_button.ok_or_else(|| {
+                    input_snapshot_invalid(
+                        "input_router.pressed",
+                        "accepted physical input has no logical button",
+                    )
+                })?;
+                let menu_instance_id = pressed.menu_instance_id.ok_or_else(|| {
+                    input_snapshot_invalid(
+                        "input_router.pressed",
+                        "accepted physical input has no menu instance identity",
+                    )
+                })?;
+                if !snapshot.held_buttons.iter().any(|held| {
+                    held.seat == pressed.seat
+                        && held.button == button
+                        && held.source == pressed.source
+                        && held.menu_instance_id == menu_instance_id
+                }) {
+                    return Err(input_snapshot_invalid(
+                        "input_router.held_buttons",
+                        "accepted physical input has no exact held owner",
+                    ));
+                }
+                let timer_id = snapshot
+                    .repeats
+                    .iter()
+                    .find(|repeat| {
+                        repeat.seat == pressed.seat
+                            && repeat.button == button
+                            && repeat.source == pressed.source
+                            && repeat.menu_instance_id == menu_instance_id
+                    })
+                    .map(|repeat| repeat.timer_id);
+                BattlePhysicalPress::Accepted(BattleHeldContext {
+                    button,
+                    menu_instance_id,
+                    timer_id,
+                    printable: pressed.printable,
+                })
+            } else if matches!(&source, BattlePhysicalSource::Keyboard(code)
+                if snapshot.suppressed_printable_keys.contains(code))
+            {
+                if !pressed.printable {
+                    return Err(input_snapshot_invalid(
+                        "input_router.suppressed_printable_keys",
+                        "a suppressed printable key must retain printable=true",
+                    ));
+                }
+                let BattlePhysicalSource::Keyboard(code) = &source else {
+                    return Err(input_snapshot_invalid(
+                        "input_router.suppressed_printable_keys",
+                        "only keyboard sources can be suppressed",
+                    ));
+                };
+                router.suppressed.insert((pressed.seat, code.clone()));
+                BattlePhysicalPress::Suppressed {
+                    printable: pressed.printable,
+                }
+            } else {
+                BattlePhysicalPress::Blocked {
+                    printable: pressed.printable,
+                }
+            };
+            if router.pressed.insert(key, press).is_some() {
+                return Err(input_snapshot_invalid(
+                    "input_router.pressed",
+                    "physical source identity was duplicated during restoration",
+                ));
+            }
+        }
+
+        for suppressed in &snapshot.suppressed_printable_keys {
+            let matching = snapshot
+                .pressed
+                .iter()
+                .filter(|pressed| {
+                    pressed.source == PhysicalInputSourceV2::Keyboard(suppressed.clone())
+                        && !pressed.accepted
+                })
+                .collect::<Vec<_>>();
+            if matching.len() != 1 || !matching[0].printable {
+                return Err(input_snapshot_invalid(
+                    "input_router.suppressed_printable_keys",
+                    "every suppressed key must have exactly one blocked physical press",
+                ));
+            }
+        }
+
+        for held in &snapshot.held_buttons {
+            let source = BattlePhysicalSource::from_snapshot(held.source.clone());
+            let key = (held.seat, source.clone());
+            let Some(pressed) = snapshot.pressed.iter().find(|pressed| {
+                pressed.seat == held.seat
+                    && pressed.source == held.source
+                    && pressed.accepted
+                    && pressed.logical_button == Some(held.button)
+                    && pressed.menu_instance_id == Some(held.menu_instance_id)
+            }) else {
+                return Err(input_snapshot_invalid(
+                    "input_router.held_buttons",
+                    "held logical button has no exact accepted physical press",
+                ));
+            };
+            let timer_id = snapshot
+                .repeats
+                .iter()
+                .find(|repeat| {
+                    repeat.seat == held.seat
+                        && repeat.button == held.button
+                        && repeat.source == held.source
+                        && repeat.menu_instance_id == held.menu_instance_id
+                })
+                .map(|repeat| repeat.timer_id);
+            let context = BattleHeldContext {
+                button: held.button,
+                menu_instance_id: held.menu_instance_id,
+                timer_id,
+                printable: pressed.printable,
+            };
+            if router.held.insert(key, context).is_some() {
+                return Err(input_snapshot_invalid(
+                    "input_router.held_buttons",
+                    "held source identity was duplicated during restoration",
+                ));
+            }
+        }
+
+        for lock in &snapshot.locks {
+            let owners = snapshot
+                .held_buttons
+                .iter()
+                .filter(|held| {
+                    held.seat == lock.seat
+                        && held.button == lock.button
+                        && held.menu_instance_id == lock.menu_instance_id
+                })
+                .collect::<Vec<_>>();
+            if owners.len() != 1 {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "every logical lock must identify exactly one held source",
+                ));
+            }
+            let source = BattlePhysicalSource::from_snapshot(owners[0].source.clone());
+            if router
+                .locks
+                .insert(
+                    (lock.seat, lock.button),
+                    BattleLockContext {
+                        source,
+                        menu_instance_id: lock.menu_instance_id,
+                    },
+                )
+                .is_some()
+            {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "a logical button has more than one lock owner",
+                ));
+            }
+        }
+
+        for repeat in &snapshot.repeats {
+            let source = BattlePhysicalSource::from_snapshot(repeat.source.clone());
+            let Some(held) = router.held.get(&(repeat.seat, source.clone())) else {
+                return Err(input_snapshot_invalid(
+                    "input_router.repeats",
+                    "repeat timer has no exact held source",
+                ));
+            };
+            if held.button != repeat.button || held.menu_instance_id != repeat.menu_instance_id {
+                return Err(input_snapshot_invalid(
+                    "input_router.repeats",
+                    "repeat timer identity differs from its held source",
+                ));
+            }
+            let context = BattleTimerContext {
+                endpoint: repeat.seat,
+                source,
+                button: repeat.button,
+                menu_instance_id: repeat.menu_instance_id,
+                printable: held.printable,
+            };
+            if router.timers.insert(repeat.timer_id, context).is_some() {
+                return Err(input_snapshot_invalid(
+                    "input_router.repeats",
+                    "repeat timer identity was duplicated during restoration",
+                ));
+            }
+        }
+
+        router.validate_live_state()?;
+        Ok(router)
+    }
+
+    /// Restore into an existing router only after checking that its live map
+    /// is the production map.  The candidate is built before assignment, so
+    /// any rejection leaves the existing owner untouched.
+    pub(crate) fn restore_snapshot_v2(
+        &mut self,
+        snapshot: InputRouterSnapshotV2,
+        scheduler: &KernelScheduler,
+    ) -> Result<(), SnapshotError> {
+        self.validate_fixed_map()?;
+        let candidate = Self::from_snapshot_v2(snapshot, scheduler)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    fn snapshot_payload(&self) -> InputRouterSnapshotV2 {
+        let mut held_buttons = self
+            .held
+            .iter()
+            .map(|((seat, source), context)| HeldLogicalButtonSnapshotV2 {
+                seat: *seat,
+                button: context.button,
+                source: source.snapshot(),
+                menu_instance_id: context.menu_instance_id,
+            })
+            .collect::<Vec<_>>();
+        held_buttons.sort_unstable_by_key(|held| {
+            (held.seat, held.button, BattlePhysicalSource::from_snapshot(held.source.clone()))
+        });
+
+        let mut locks = self
+            .locks
+            .iter()
+            .map(|((seat, button), context)| InputButtonLockSnapshotV2 {
+                seat: *seat,
+                button: *button,
+                menu_instance_id: context.menu_instance_id,
+            })
+            .collect::<Vec<_>>();
+        locks.sort_unstable_by_key(|lock| (lock.seat, lock.button, lock.menu_instance_id));
+
+        let mut repeats = self
+            .timers
+            .iter()
+            .map(|(timer_id, context)| InputRepeatSnapshotV2 {
+                seat: context.endpoint,
+                button: context.button,
+                source: context.source.snapshot(),
+                menu_instance_id: context.menu_instance_id,
+                timer_id: *timer_id,
+            })
+            .collect::<Vec<_>>();
+        repeats.sort_unstable_by_key(|repeat| {
+            (
+                repeat.seat,
+                repeat.button,
+                BattlePhysicalSource::from_snapshot(repeat.source.clone()),
+            )
+        });
+
+        let pressed = self
+            .pressed
+            .iter()
+            .map(|((seat, source), press)| {
+                let (logical_button, printable, accepted, menu_instance_id) = match press {
+                    BattlePhysicalPress::Accepted(context) => (
+                        Some(context.button),
+                        context.printable,
+                        true,
+                        Some(context.menu_instance_id),
+                    ),
+                    BattlePhysicalPress::Blocked { printable }
+                    | BattlePhysicalPress::Suppressed { printable } => {
+                        (None, *printable, false, None)
+                    }
+                };
+                PressedPhysicalInputSnapshotV2 {
+                    seat: *seat,
+                    source: source.snapshot(),
+                    logical_button,
+                    printable,
+                    accepted,
+                    menu_instance_id,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut suppressed_printable_keys = self
+            .suppressed
+            .iter()
+            .map(|(_, code)| code.clone())
+            .collect::<Vec<_>>();
+        suppressed_printable_keys.sort_unstable();
+
+        InputRouterSnapshotV2 {
+            focus: self.focus,
+            pressed,
+            suppressed_printable_keys,
+            held_buttons,
+            locks,
+            repeats,
+            disposed: self.disposed,
+        }
+    }
+
+    fn validate_fixed_map(&self) -> Result<(), SnapshotError> {
+        if self.map != Self::default_map() {
+            return Err(input_snapshot_invalid(
+                "input_router.map",
+                "production battle input map differs from the fixed default map",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_live_state(&self) -> Result<(), SnapshotError> {
+        if self.disposed
+            && (!self.pressed.is_empty()
+                || !self.suppressed.is_empty()
+                || !self.held.is_empty()
+                || !self.locks.is_empty()
+                || !self.timers.is_empty())
+        {
+            return Err(input_snapshot_invalid(
+                "input_router.disposed",
+                "disposed router cannot retain live input state",
+            ));
+        }
+
+        for ((seat, source), press) in &self.pressed {
+            match press {
+                BattlePhysicalPress::Accepted(expected) => {
+                    let Some(held) = self.held.get(&(*seat, source.clone())) else {
+                        return Err(input_snapshot_invalid(
+                            "input_router.pressed",
+                            "accepted physical press has no held source",
+                        ));
+                    };
+                    if held.button != expected.button
+                        || held.menu_instance_id != expected.menu_instance_id
+                        || held.printable != expected.printable
+                    {
+                        return Err(input_snapshot_invalid(
+                            "input_router.pressed",
+                            "accepted physical press differs from its held source",
+                        ));
+                    }
+                }
+                BattlePhysicalPress::Blocked { .. } => {
+                    if self.held.contains_key(&(*seat, source.clone())) {
+                        return Err(input_snapshot_invalid(
+                            "input_router.pressed",
+                            "blocked physical press retains a held source",
+                        ));
+                    }
+                }
+                BattlePhysicalPress::Suppressed { printable } => {
+                    let BattlePhysicalSource::Keyboard(code) = source else {
+                        return Err(input_snapshot_invalid(
+                            "input_router.suppressed_printable_keys",
+                            "only keyboard presses can be suppressed",
+                        ));
+                    };
+                    if !*printable
+                        || !self.suppressed.contains(&(*seat, code.clone()))
+                        || self.held.contains_key(&(*seat, source.clone()))
+                    {
+                        return Err(input_snapshot_invalid(
+                            "input_router.suppressed_printable_keys",
+                            "suppressed key state is not retained exactly",
+                        ));
+                    }
+                }
+            }
+        }
+
+        for (seat, code) in &self.suppressed {
+            let source = BattlePhysicalSource::Keyboard(code.clone());
+            if !matches!(
+                self.pressed.get(&(*seat, source)),
+                Some(BattlePhysicalPress::Suppressed { printable: true })
+            ) {
+                return Err(input_snapshot_invalid(
+                    "input_router.suppressed_printable_keys",
+                    "suppressed key has no exact retained physical press",
+                ));
+            }
+        }
+
+        for ((seat, source), held) in &self.held {
+            let Some(BattlePhysicalPress::Accepted(pressed)) =
+                self.pressed.get(&(*seat, source.clone()))
+            else {
+                return Err(input_snapshot_invalid(
+                    "input_router.held_buttons",
+                    "held source has no accepted physical press",
+                ));
+            };
+            if pressed.button != held.button
+                || pressed.menu_instance_id != held.menu_instance_id
+                || pressed.printable != held.printable
+            {
+                return Err(input_snapshot_invalid(
+                    "input_router.held_buttons",
+                    "held source differs from its accepted physical press",
+                ));
+            }
+            let Some(lock) = self.locks.get(&(*seat, held.button)) else {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "held source has no logical button lock",
+                ));
+            };
+            if lock.source != *source || lock.menu_instance_id != held.menu_instance_id {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "logical button lock differs from its held source",
+                ));
+            }
+        }
+
+        for ((seat, button), lock) in &self.locks {
+            let Some(held) = self.held.get(&(*seat, lock.source.clone())) else {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "logical button lock has no held source",
+                ));
+            };
+            if held.button != *button || held.menu_instance_id != lock.menu_instance_id {
+                return Err(input_snapshot_invalid(
+                    "input_router.locks",
+                    "logical button lock identity differs from its held source",
+                ));
+            }
+        }
+
+        for (timer_id, timer) in &self.timers {
+            let Some(held) = self.held.get(&(timer.endpoint, timer.source.clone())) else {
+                return Err(input_snapshot_invalid(
+                    "input_router.repeats",
+                    "repeat timer has no held source",
+                ));
+            };
+            if held.timer_id != Some(*timer_id)
+                || held.button != timer.button
+                || held.menu_instance_id != timer.menu_instance_id
+                || held.printable != timer.printable
+            {
+                return Err(input_snapshot_invalid(
+                    "input_router.repeats",
+                    "repeat timer context differs from its held source",
+                ));
+            }
+        }
+        for ((seat, source), held) in &self.held {
+            if let Some(timer_id) = held.timer_id {
+                let Some(timer) = self.timers.get(&timer_id) else {
+                    return Err(input_snapshot_invalid(
+                        "input_router.repeats",
+                        "held source references a missing repeat timer",
+                    ));
+                };
+                if timer.endpoint != *seat
+                    || timer.source != *source
+                    || timer.button != held.button
+                    || timer.menu_instance_id != held.menu_instance_id
+                    || timer.printable != held.printable
+                {
+                    return Err(input_snapshot_invalid(
+                        "input_router.repeats",
+                        "held source repeat identity differs from its timer context",
+                    ));
+                }
+            }
+        }
+
+        let snapshot = self.snapshot_payload();
+        snapshot.validate()
+    }
+}
+
+fn input_snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: reason.into(),
+    }
+}
+
+fn validate_scheduler_repeat_ownership(
+    snapshot: &InputRouterSnapshotV2,
+    scheduler: &KernelScheduler,
+    map: &InputMap,
+) -> Result<(), SnapshotError> {
+    for repeat in &snapshot.repeats {
+        let Some(scheduled) = scheduler.timer(repeat.timer_id) else {
+            return Err(input_snapshot_invalid(
+                "input_router.repeats",
+                format!("repeat timer {} is absent from KernelScheduler", repeat.timer_id),
+            ));
+        };
+        if scheduled.endpoint != repeat.seat
+            || scheduled.owner != TimerOwner::input_repeat(repeat.button)
+            || scheduled.delay_ms != map.repeat_interval_ms
+            || scheduled.time_class != TimeClass::HumanInput
+        {
+            return Err(input_snapshot_invalid(
+                "input_router.repeats",
+                format!(
+                    "repeat timer {} does not exactly match its KernelScheduler owner",
+                    repeat.timer_id
+                ),
+            ));
+        }
+    }
+
+    for scheduled in scheduler.live_timers() {
+        if scheduled.owner.owner_id == "input-router" && scheduled.owner.reason == "input-repeat" {
+            let Some(repeat) = snapshot
+                .repeats
+                .iter()
+                .find(|repeat| repeat.timer_id == scheduled.timer_id)
+            else {
+                return Err(input_snapshot_invalid(
+                    "scheduler.timers",
+                    format!(
+                        "input-router repeat timer {} has no router repeat context",
+                        scheduled.timer_id
+                    ),
+                ));
+            };
+            if scheduled.owner != TimerOwner::input_repeat(repeat.button)
+                || scheduled.endpoint != repeat.seat
+                || scheduled.delay_ms != map.repeat_interval_ms
+                || scheduled.time_class != TimeClass::HumanInput
+            {
+                return Err(input_snapshot_invalid(
+                    "scheduler.timers",
+                    format!(
+                        "input-router timer {} has a mismatched repeat owner",
+                        scheduled.timer_id
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_snapshot_map_bindings(
+    snapshot: &InputRouterSnapshotV2,
+    map: &InputMap,
+) -> Result<(), SnapshotError> {
+    for pressed in &snapshot.pressed {
+        if !pressed.accepted {
+            continue;
+        }
+        let Some(button) = pressed.logical_button else {
+            return Err(input_snapshot_invalid(
+                "input_router.pressed",
+                "accepted physical input has no logical button",
+            ));
+        };
+        let mapped = match &pressed.source {
+            PhysicalInputSourceV2::Keyboard(code) => map
+                .keyboard
+                .iter()
+                .find(|binding| binding.key == *code)
+                .map(|binding| binding.button),
+            PhysicalInputSourceV2::Gamepad(button_index) => map
+                .gamepad
+                .iter()
+                .find(|binding| binding.button_index == *button_index)
+                .map(|binding| binding.button),
+        };
+        if mapped != Some(button) {
+            return Err(input_snapshot_invalid(
+                "input_router.pressed",
+                "accepted physical input does not match the fixed production map",
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

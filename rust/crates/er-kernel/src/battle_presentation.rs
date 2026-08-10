@@ -10,6 +10,11 @@ use er_types::battle_ui::{
 use er_types::{OperationId, SafeU53, SeatId};
 use thiserror::Error;
 
+use crate::snapshot::{
+    PendingPresentationsSnapshotV1, PresentationOutcomeSnapshotV1, PresentationPlanSnapshotV1,
+    SnapshotError,
+};
+
 pub(crate) const M3_PRESENTATION_FAILED: &str = "M3_PRESENTATION_FAILED";
 
 /// One immutable, ordered presentation plan owned by a local endpoint.
@@ -405,6 +410,100 @@ impl BattlePresentationState {
         }
     }
 
+    /// Convert every typed plan, ordering identity, barrier projection, event
+    /// catalog entry, and outcome tombstone into the closed snapshot DTO.
+    pub(crate) fn snapshot_v1(&self) -> Result<PendingPresentationsSnapshotV1, SnapshotError> {
+        self.validate()
+            .map_err(|error| presentation_snapshot_invalid("pending_presentations", error))?;
+
+        let snapshot = PendingPresentationsSnapshotV1 {
+            local_endpoint: self.local_endpoint,
+            plans: self
+                .plans
+                .values()
+                .map(|plan| PresentationPlanSnapshotV1 {
+                    operation_id: plan.operation_id().clone(),
+                    events: plan.events().to_vec(),
+                })
+                .collect(),
+            last_plan_operation_id: self.last_plan_operation_id.clone(),
+            pending_barrier_ids: self.pending.iter().cloned().collect(),
+            blocking_barrier_ids: self.blocking.iter().cloned().collect(),
+            outcomes: self
+                .outcomes
+                .iter()
+                .map(|(event_id, outcome)| PresentationOutcomeSnapshotV1 {
+                    event_id: event_id.clone(),
+                    outcome: outcome.clone(),
+                })
+                .collect(),
+            event_catalog: self.event_catalog.values().cloned().collect(),
+            presentation_failed: self.presentation_failed,
+            disposed: self.disposed,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+
+    /// Reconstruct typed plans before installing any state, then run the
+    /// complete owner invariant check.  All tombstones and explicit disposal
+    /// state are copied; no live state is inferred from an empty projection.
+    pub(crate) fn from_snapshot_v1(
+        snapshot: PendingPresentationsSnapshotV1,
+    ) -> Result<Self, SnapshotError> {
+        snapshot.validate()?;
+
+        let mut plans = BTreeMap::new();
+        for plan_snapshot in snapshot.plans {
+            let operation_id = plan_snapshot.operation_id.clone();
+            let plan = BattlePresentationPlan::new(operation_id.clone(), plan_snapshot.events)
+                .map_err(|error| {
+                    presentation_snapshot_invalid("pending_presentations.plans", error)
+                })?;
+            if plans.insert(operation_id, plan).is_some() {
+                return Err(presentation_snapshot_invalid(
+                    "pending_presentations.plans",
+                    BattlePresentationError::InvalidState(
+                        "duplicate plan operation identity during restoration",
+                    ),
+                ));
+            }
+        }
+
+        let state = Self {
+            local_endpoint: snapshot.local_endpoint,
+            plans,
+            last_plan_operation_id: snapshot.last_plan_operation_id,
+            pending: snapshot.pending_barrier_ids.into_iter().collect(),
+            blocking: snapshot.blocking_barrier_ids.into_iter().collect(),
+            outcomes: snapshot
+                .outcomes
+                .into_iter()
+                .map(|outcome| (outcome.event_id, outcome.outcome))
+                .collect(),
+            event_catalog: snapshot
+                .event_catalog
+                .into_iter()
+                .map(|event| (event.event_id.clone(), event))
+                .collect(),
+            presentation_failed: snapshot.presentation_failed,
+            disposed: snapshot.disposed,
+        };
+        state
+            .validate()
+            .map_err(|error| presentation_snapshot_invalid("pending_presentations", error))?;
+        Ok(state)
+    }
+
+    pub(crate) fn restore_snapshot_v1(
+        &mut self,
+        snapshot: PendingPresentationsSnapshotV1,
+    ) -> Result<(), SnapshotError> {
+        let candidate = Self::from_snapshot_v1(snapshot)?;
+        *self = candidate;
+        Ok(())
+    }
+
     pub(crate) fn settle(
         &mut self,
         endpoint: SeatId,
@@ -663,5 +762,15 @@ impl BattlePresentationState {
         } else {
             Ok(())
         }
+    }
+}
+
+fn presentation_snapshot_invalid(
+    path: impl Into<String>,
+    error: impl std::fmt::Display,
+) -> SnapshotError {
+    SnapshotError::Invalid {
+        path: path.into(),
+        reason: error.to_string(),
     }
 }
