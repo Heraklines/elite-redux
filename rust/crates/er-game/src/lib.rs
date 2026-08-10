@@ -1,5 +1,7 @@
 //! Deterministic battle-game runtime for PokéRogue Redux.
 
+#[doc(hidden)]
+pub mod authority_commands;
 pub mod command_menu;
 pub mod internal_event;
 mod local_battle;
