@@ -53,7 +53,6 @@ import type {
 } from "#modifiers/modifier-type";
 import type { VoucherType } from "#system/voucher";
 import type { ModifierInstanceMap, ModifierString } from "#types/modifier-types";
-import { FunMegaStatPreview } from "#ui/fun-mega-stat-preview";
 import { addTextObject } from "#ui/text";
 import { hslToHex } from "#utils/color-utils";
 import { BooleanHolder, NumberHolder, randSeedFloat, randSeedItem, toDmgValue } from "#utils/common";
@@ -77,21 +76,12 @@ export const modifierSortFunc = (a: Modifier, b: Modifier): number => {
 export class ModifierBar extends Phaser.GameObjects.Container {
   private player: boolean;
   private modifierCache: PersistentModifier[];
-  private funMegaStatPreview: FunMegaStatPreview | null = null;
 
   constructor(enemy?: boolean) {
     super(globalScene, 1 + (enemy ? 302 : 0), 2);
 
     this.player = !enemy;
     this.setScale(0.5);
-  }
-
-  private ensureFunMegaStatPreview(): FunMegaStatPreview {
-    if (!this.funMegaStatPreview) {
-      this.funMegaStatPreview = new FunMegaStatPreview(80, 42, 160);
-      globalScene.uiContainer.add(this.funMegaStatPreview.container);
-    }
-    return this.funMegaStatPreview;
   }
 
   /**
@@ -124,19 +114,12 @@ export class ModifierBar extends Phaser.GameObjects.Container {
       icon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 32, 24), Phaser.Geom.Rectangle.Contains);
       icon.on("pointerover", () => {
         globalScene.ui.showTooltip(modifier.type.name, modifier.type.getDescription());
-        if (modifier instanceof PokemonFormChangeItemModifier) {
-          const funMegaStatPreview = this.ensureFunMegaStatPreview();
-          if (funMegaStatPreview.show(modifier.formChangeItem)) {
-            globalScene.uiContainer.bringToTop(funMegaStatPreview.container);
-          }
-        }
         if (this.modifierCache && this.modifierCache.length > iconOverflowIndex) {
           this.updateModifierOverflowVisibility(true);
         }
       });
       icon.on("pointerout", () => {
         globalScene.ui.hideTooltip();
-        this.funMegaStatPreview?.hide();
         if (this.modifierCache && this.modifierCache.length > iconOverflowIndex) {
           this.updateModifierOverflowVisibility(false);
         }
@@ -148,12 +131,6 @@ export class ModifierBar extends Phaser.GameObjects.Container {
     }
 
     this.modifierCache = modifiers;
-  }
-
-  override destroy(fromScene?: boolean): void {
-    this.funMegaStatPreview?.container.destroy();
-    this.funMegaStatPreview = null;
-    super.destroy(fromScene);
   }
 
   updateModifierOverflowVisibility(ignoreLimit: boolean) {

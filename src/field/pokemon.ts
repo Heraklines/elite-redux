@@ -144,6 +144,7 @@ import {
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
+  getFunAbilityAvalancheIds,
   getFunEvolutionTarget,
   getFunModeConfig,
   getFunRandomAbilityId,
@@ -2888,6 +2889,19 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
+      const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
+      for (const avalancheId of getFunAbilityAvalancheIds(
+        this.id,
+        globalScene.currentBattle?.waveIndex ?? 1,
+        excludedIds,
+      )) {
+        const avalancheAbility = allAbilities[avalancheId];
+        if (avalancheAbility && !slots.some(ability => ability?.id === avalancheAbility.id)) {
+          slots.push(avalancheAbility);
+        }
+      }
+    }
     // ER Black Shinies (#349): append the active GIFT abilities — this mon's
     // own gift plus any on-field black-shiny ally's gift. Flowing them through
     // the passive list makes combat + every abilities screen pick them up.
@@ -2921,9 +2935,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!ability) {
         continue;
       }
-      const isGiftSlot = slot >= 3;
+      const isAlwaysOnExtraSlot = slot >= 3;
       const isFormChangeDriver = this.abilityDrivesFormChange(ability);
-      if (!isGiftSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
+      if (!isAlwaysOnExtraSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
         continue;
       }
       if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint, ignoreMentalPollution)) {
@@ -3409,18 +3423,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // (Battle Bond is deliberately EXCLUDED from that exemption — it is a power
     // spike, not passive identity, so a locked Battle Bond innate does nothing.)
     const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
-    // ER Black Shinies (#349): the GIFT slot (>= 3) is exempt from hasPassive
-    // and from candy unlock gates — it is always live (suppression below still
-    // applies, so Neutralizing Gas / ER Frisk affect it like any ability).
-    const isGiftSlot = passive && passiveSlot >= 3;
-    if (passive && !isGiftSlot && !this.hasPassive() && !drivesFormChange) {
+    // Runtime-added slots (Ability Avalanche and Black Shiny gifts) are exempt
+    // from base-innate unlock gates, but still respect ability suppression.
+    const isAlwaysOnExtraSlot = passive && passiveSlot >= 3;
+    if (passive && !isAlwaysOnExtraSlot && !this.hasPassive() && !drivesFormChange) {
       return false;
     }
     // ER 3-passive model: gate each innate slot individually for the player by its
     // candy unlock + enable state. Skipped when a passive override forces passives
     // on (tests/dev) or the slot drives a form change. Enemy slot gating is by
     // level, applied in applyAbAttrsInternal.
-    if (passive && !isGiftSlot && this.isPlayer() && !drivesFormChange) {
+    if (passive && !isAlwaysOnExtraSlot && this.isPlayer() && !drivesFormChange) {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {

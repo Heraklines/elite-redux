@@ -24,6 +24,7 @@ export interface FunModeConfig {
   itemChaos: boolean;
   weatherRoulette: boolean;
   scrambleMoves: boolean;
+  abilityAvalanche: boolean;
   abilityRerollSeed: number;
 }
 
@@ -38,6 +39,7 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   itemChaos: false,
   weatherRoulette: false,
   scrambleMoves: false,
+  abilityAvalanche: false,
   abilityRerollSeed: 0,
 });
 
@@ -61,6 +63,7 @@ export function setFunModeConfig(config: FunModeConfig): void {
     itemChaos: config.itemChaos === true,
     weatherRoulette: config.weatherRoulette === true,
     scrambleMoves: config.scrambleMoves === true,
+    abilityAvalanche: config.abilityAvalanche === true,
     abilityRerollSeed: Number.isFinite(config.abilityRerollSeed) ? Math.max(0, Math.floor(config.abilityRerollSeed)) : 0,
   };
 }
@@ -111,6 +114,33 @@ export function getFunRandomAbilityId(pokemonId: number, slot: number): AbilityI
     if (pool.length === 0) {
       break;
     }
+  }
+  return selected;
+}
+
+export function getFunAbilityAvalancheCount(waveIndex: number): number {
+  const normalizedWave = Math.max(0, Math.floor(waveIndex));
+  return normalizedWave < 60 ? 0 : Math.floor((normalizedWave - 60) / 20) + 1;
+}
+
+export function getFunAbilityAvalancheIds(
+  pokemonId: number,
+  waveIndex: number,
+  excludedIds: readonly AbilityId[] = [],
+): AbilityId[] {
+  if (!currentConfig.abilityAvalanche) {
+    return [];
+  }
+  const count = getFunAbilityAvalancheCount(waveIndex);
+  if (count === 0) {
+    return [];
+  }
+  const excluded = new Set(excludedIds);
+  const available = abilityPool().filter(abilityId => !excluded.has(abilityId));
+  const selected: AbilityId[] = [];
+  for (let slot = 0; slot < count && available.length > 0; slot++) {
+    const index = deterministicIndex(pokemonId, 0xa51 + slot, available.length);
+    selected.push(available.splice(index, 1)[0]);
   }
   return selected;
 }

@@ -17,6 +17,7 @@ import {
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
 import { ensureErSpriteAnim, playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
@@ -37,7 +38,6 @@ import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { modifierSortFunc, PokemonHeldItemModifier } from "#modifiers/modifier";
-import { FormChangeItemModifierType } from "#modifiers/modifier-type";
 import type { Move } from "#moves/move";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import {
@@ -53,7 +53,6 @@ import {
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
-import { FunMegaStatPreview } from "#ui/fun-mega-stat-preview";
 import { OmniformEvolutionStrip, omniformStripWidth } from "#ui/omniform-evolution-strip";
 import {
   currentEvolutionIndex,
@@ -108,14 +107,10 @@ export class SummaryUiHandler extends UiHandler {
    * page; hidden (tabSprite shown) on all vanilla pages.
    */
   private abilitiesTabText: Phaser.GameObjects.Text;
-  /** ER ABILITIES page: which row (0=main ability, 1-3=innates) is selected. */
+  /** ER ABILITIES page: which row (0=main ability, 1-3=base innates, 4+=extras) is selected. */
   private abilitiesCursor = 0;
-  /**
-   * ER ABILITIES page: whether ability-row selection is active. While `false`
-   * (the default on entering the page), Up/Down switch party members like every
-   * other summary page. Pressing {@link Button.ACTION} enters selection mode so
-   * Up/Down move the row cursor; {@link Button.CANCEL} exits back to browsing.
-   */
+  private abilitiesVisibleStart = 0;
+  /** Confirm enters the ability list; Cancel returns directional input to party switching. */
   private abilitiesSelectMode = false;
   /** ER ABILITIES page: number of rendered rows (main + present innates). */
   private abilitiesRowCount = 0;
@@ -144,7 +139,6 @@ export class SummaryUiHandler extends UiHandler {
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
   private megaIcon: Phaser.GameObjects.Sprite;
-  private funMegaStatPreview: FunMegaStatPreview | null = null;
   private pokeball: Phaser.GameObjects.Sprite;
   private levelText: Phaser.GameObjects.Text;
   private genderText: Phaser.GameObjects.Text;
@@ -906,8 +900,8 @@ export class SummaryUiHandler extends UiHandler {
         // setCursor(samePage): its page branch drops the overrideChanged flag
         // (changed is recomputed as `this.cursor !== cursor`, i.e. false), so
         // the re-render is skipped — and even when forced it runs the full tab
-        // re-animation / abilitiesSelectMode reset / detail teardown. Rebuilding
-        // just this page's container keeps the cursor + select-mode intact.
+        // re-animation / detail teardown. Rebuilding just this page's container
+        // keeps the ability cursor intact.
         this.populatePageContainer(this.summaryPageContainer);
         success = true;
       } else {
@@ -919,13 +913,12 @@ export class SummaryUiHandler extends UiHandler {
           // Detail overlay open → close it.
           this.closeAbilityDetail();
         } else if (this.abilitiesSelectMode) {
-          // Already selecting → open the full-screen detail for the chosen row.
+          // A second Confirm opens the selected ability's long description.
           this.openAbilityDetail();
-        } else {
-          // First press: enter ability-selection mode (cursor appears). Up/Down
-          // now move between abilities instead of switching party members.
+        } else if (this.abilitiesRowCount > 0) {
           this.abilitiesSelectMode = true;
           this.abilitiesCursor = 0;
+          this.abilitiesVisibleStart = 0;
           this.refreshAbilitiesCursor();
         }
         success = true;
@@ -953,7 +946,6 @@ export class SummaryUiHandler extends UiHandler {
         this.closeAbilityDetail();
         success = true;
       } else if (this.cursor === Page.ABILITIES && this.abilitiesSelectMode) {
-        // Exit ability-selection mode back to party browsing (Up/Down switch mon).
         this.abilitiesSelectMode = false;
         this.refreshAbilitiesCursor();
         success = true;
@@ -981,19 +973,17 @@ export class SummaryUiHandler extends UiHandler {
           if (this.summaryUiMode === SummaryUiMode.LEARN_MOVE) {
             break;
           }
-          // ER ABILITIES page: in selection mode, Up/Down move the ability-row
-          // cursor. Otherwise (the default), fall through to party-member
-          // switching like every other page. (Detail overlay open → ignore.)
           if (this.cursor === Page.ABILITIES && this.abilitiesSelectMode) {
             if (this.abilitiesDetailContainer || this.abilitiesRowCount === 0) {
               break;
             }
             const delta = button === Button.DOWN ? 1 : -1;
             this.abilitiesCursor = (this.abilitiesCursor + delta + this.abilitiesRowCount) % this.abilitiesRowCount;
-            this.refreshAbilitiesCursor();
+            this.populatePageContainer(this.summaryPageContainer);
             success = true;
             break;
           }
+          // Outside list focus, Up/Down retain normal party switching.
           if (this.cursor === Page.ABILITIES && this.abilitiesDetailContainer) {
             break; // detail overlay open — don't switch party members
           }
@@ -1114,8 +1104,8 @@ export class SummaryUiHandler extends UiHandler {
         if (this.cursor === Page.ABILITIES && cursor !== Page.ABILITIES) {
           this.closeAbilityDetail();
         }
-        // Any page change resets ability-selection mode so the page is always
-        // entered in the default party-browsing state.
+        this.abilitiesCursor = 0;
+        this.abilitiesVisibleStart = 0;
         this.abilitiesSelectMode = false;
         const forward = this.cursor < cursor;
         this.cursor = cursor;
@@ -1443,8 +1433,6 @@ export class SummaryUiHandler extends UiHandler {
       case Page.STATS: {
         this.statsContainer = globalScene.add.container(0, -pageBg.height);
         pageContainer.add(this.statsContainer);
-        this.funMegaStatPreview = new FunMegaStatPreview(5, 70, 204);
-        this.statsContainer.add(this.funMegaStatPreview.container);
         this.permStatsContainer = globalScene.add.container(27, 56);
         this.statsContainer.add(this.permStatsContainer);
         this.ivContainer = globalScene.add.container(27, 56);
@@ -1536,16 +1524,9 @@ export class SummaryUiHandler extends UiHandler {
           icon.setInteractive(new Phaser.Geom.Rectangle(0, 0, 32, 32), Phaser.Geom.Rectangle.Contains);
           icon.on("pointerover", () => {
             globalScene.ui.showTooltip(item.type.name, item.type.getDescription(), true);
-            if (
-              item.type instanceof FormChangeItemModifierType
-              && this.funMegaStatPreview?.show(item.type.formChangeItem)
-            ) {
-              this.statsContainer.bringToTop(this.funMegaStatPreview.container);
-            }
           });
           icon.on("pointerout", () => {
             globalScene.ui.hideTooltip();
-            this.funMegaStatPreview?.hide();
           });
         });
 
@@ -1947,6 +1928,7 @@ export class SummaryUiHandler extends UiHandler {
     // page rather than crashing the summary UI; log the culprit for a real fix.
     this.abilitiesRows = [];
     this.abilitiesRowCount = 0;
+    this.abilitiesVisibleStart = 0;
     try {
       this.populateAbilitiesPageInner(pageContainer, pageBg);
     } catch (err) {
@@ -1997,6 +1979,7 @@ export class SummaryUiHandler extends UiHandler {
       slot?: PassiveSlot;
       /** ER Black Shiny gift row — distinct styling, never locked. */
       gift?: boolean;
+      avalanche?: boolean;
     }
     const rows: Row[] = [];
 
@@ -2021,6 +2004,16 @@ export class SummaryUiHandler extends UiHandler {
         ability,
         slot: slot as PassiveSlot,
       });
+    }
+
+    if (!viewOnly && globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
+      const avalancheCount = getFunAbilityAvalancheCount(globalScene.currentBattle?.waveIndex ?? 1);
+      for (let index = 0; index < avalancheCount; index++) {
+        const ability = innateAbilities[3 + index];
+        if (ability && ability.id !== AbilityId.NONE) {
+          rows.push({ label: `Ability ${index + 5}`, ability, avalanche: true });
+        }
+      }
     }
 
     // ER Black Shinies (#349): the GIFT row — the 5th, switchable ability.
@@ -2050,7 +2043,8 @@ export class SummaryUiHandler extends UiHandler {
     // aligned label + name, then the abbreviated description below.
     const panelW = pageBg.width; // 214
     const panelH = pageBg.height; // 159
-    const rowH = Math.floor((panelH - 4) / Math.max(rows.length, 1));
+    const maxVisibleRows = 5;
+    const controlsH = 13;
     const headerH = 13;
     const labelX = 5;
     const nameX = 72;
@@ -2061,9 +2055,20 @@ export class SummaryUiHandler extends UiHandler {
     if (this.abilitiesCursor >= rows.length) {
       this.abilitiesCursor = 0;
     }
+    if (this.abilitiesCursor < this.abilitiesVisibleStart) {
+      this.abilitiesVisibleStart = this.abilitiesCursor;
+    } else if (this.abilitiesCursor >= this.abilitiesVisibleStart + maxVisibleRows) {
+      this.abilitiesVisibleStart = this.abilitiesCursor - maxVisibleRows + 1;
+    }
+    this.abilitiesVisibleStart = Math.max(
+      0,
+      Math.min(this.abilitiesVisibleStart, Math.max(0, rows.length - maxVisibleRows)),
+    );
+    const visibleRows = rows.slice(this.abilitiesVisibleStart, this.abilitiesVisibleStart + maxVisibleRows);
+    const rowH = Math.floor((panelH - controlsH - 4) / Math.max(visibleRows.length, 1));
 
-    rows.forEach((row, i) => {
-      const top = 2 + i * rowH;
+    visibleRows.forEach((row, i) => {
+      const top = controlsH + 2 + i * rowH;
 
       // Lock state.
       let locked = false;
@@ -2073,7 +2078,7 @@ export class SummaryUiHandler extends UiHandler {
       // candy/level/seal lock chrome applies (it is the live mon's state).
       if (viewOnly) {
         // no lock — fall through to the neutral render below
-      } else if (runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
+      } else if (!row.gift && !row.avalanche && runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
         locked = true;
         lockIconKey = "icon_lock";
         reason = i18next.t("pokemonSummary:abilitySealedRun");
@@ -2175,7 +2180,22 @@ export class SummaryUiHandler extends UiHandler {
       this.abilitiesRows.push({ ability: row.ability, y: top, locked });
     });
 
-    // Selection cursor + "Ⓐ Detail" prompt over the selected row.
+    const hiddenAbove = this.abilitiesVisibleStart > 0;
+    const hiddenBelow = this.abilitiesVisibleStart + visibleRows.length < rows.length;
+    const listPrompt = this.abilitiesSelectMode
+      ? `${hiddenAbove ? "▲ " : ""}Scroll${hiddenBelow ? " ▼" : ""}${
+          rows.length > maxVisibleRows
+            ? `  ${this.abilitiesVisibleStart + 1}-${this.abilitiesVisibleStart + visibleRows.length}/${rows.length}`
+            : ""
+        }  Back: Exit`
+      : `Confirm: Browse${hiddenBelow ? " ▼" : ""}${
+          rows.length > maxVisibleRows ? `  1-${visibleRows.length}/${rows.length}` : ""
+        }`;
+    const cyclePrompt = addTextObject(panelW - 4, 2, listPrompt, TextStyle.SUMMARY, { fontSize: "38px" });
+    cyclePrompt.setOrigin(1, 0);
+    container.add(cyclePrompt);
+
+    // Selection cursor + "Ⓐ Detail" prompt while the list owns directional input.
     this.abilitiesCursorObj = globalScene.add
       .nineslice(0, 0, "select_cursor", undefined, panelW - 2, headerH + 2, 1, 1, 1, 1)
       .setOrigin(0, 0)
@@ -2200,9 +2220,11 @@ export class SummaryUiHandler extends UiHandler {
     if (!this.abilitiesCursorObj || this.abilitiesRows.length === 0) {
       return;
     }
-    const row = this.abilitiesRows[Math.min(this.abilitiesCursor, this.abilitiesRows.length - 1)];
-    // The cursor + "Ⓐ Detail" prompt only show while in ability-selection mode;
-    // in the default browsing mode Up/Down switch party members.
+    const visibleIndex = Math.max(
+      0,
+      Math.min(this.abilitiesCursor - this.abilitiesVisibleStart, this.abilitiesRows.length - 1),
+    );
+    const row = this.abilitiesRows[visibleIndex];
     this.abilitiesCursorObj.setPosition(0, row.y - 1).setVisible(this.abilitiesSelectMode);
     this.abilitiesDetailPrompt?.setVisible(this.abilitiesSelectMode);
   }
@@ -2215,7 +2237,11 @@ export class SummaryUiHandler extends UiHandler {
     if (this.abilitiesDetailContainer || this.abilitiesRows.length === 0) {
       return;
     }
-    const row = this.abilitiesRows[Math.min(this.abilitiesCursor, this.abilitiesRows.length - 1)];
+    const visibleIndex = Math.max(
+      0,
+      Math.min(this.abilitiesCursor - this.abilitiesVisibleStart, this.abilitiesRows.length - 1),
+    );
+    const row = this.abilitiesRows[visibleIndex];
     const ability = row.ability;
 
     // Cover only the right page panel (214x159 at summaryPageContainer's

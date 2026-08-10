@@ -19,7 +19,6 @@ import {
   canUseFunMegaStone,
   formatFunMegaStatDelta,
   getFunMegaStoneItems,
-  getFunMegaStoneMetadata,
   getFunRealMegaChange,
 } from "#data/elite-redux/er-fun-mega-mode";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
@@ -1698,10 +1697,7 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
       return description;
     }
     const delta = formatFunMegaStatDelta(this.formChangeItem);
-    const metadata = getFunMegaStoneMetadata(this.formChangeItem);
-    return delta && metadata
-      ? `${description}\n${metadata.sourceName} -> ${metadata.targetName}\n${delta}`
-      : description;
+    return delta ? `${description}\nMega stat changes: ${delta}` : description;
   }
 
   getPregenArgs(): any[] {
