@@ -1088,7 +1088,7 @@ fn status_moves_bypass_type_chart_and_defensive_gate_then_apply_selected_statuse
     assert_eq!(paralysis_target.status.kind, StatusKind::Paralysis);
     assert!(gate.calls().is_empty());
 
-    let gate = RecordingGate::new(GateBehavior::Error);
+    let gate = RecordingGate::new(GateBehavior::Pass);
     let (burn_result, burn_target, burn_runtime) = direct_effect(
         &content,
         52,
@@ -1123,7 +1123,17 @@ fn status_moves_bypass_type_chart_and_defensive_gate_then_apply_selected_statuse
             RngReason::DamageVariance,
         ],
     );
-    assert!(gate.calls().is_empty());
+    let calls = gate.calls();
+    assert_eq!(calls.len(), 1);
+    let [call] = calls.as_slice() else {
+        return Err(test_error("Ember defensive gate call was not recorded").into());
+    };
+    assert_eq!(call.move_category, MoveCategory::Special);
+    assert_eq!(call.move_type, PokemonType::Fire);
+    assert_eq!(call.target_slot, target_slot()?);
+    assert_eq!(call.target, pokemon_id(2)?);
+    assert!(call.effectiveness.is_neutral());
+    assert!(!call.abilities_ignored);
     Ok(())
 }
 

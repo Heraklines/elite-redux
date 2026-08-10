@@ -24,7 +24,7 @@ use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
 use er_state::field::{FieldSlotState, FieldState, FieldStateError};
-use er_state::format::BattleFormat;
+use er_state::format::{BattleFormat, BattleFormatError, FormatTopologyError};
 use er_state::pokemon::{AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState};
 use er_types::battle_ids::{
     AbilityId, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, PokemonId, TurnIndex, WaveIndex,
@@ -584,7 +584,7 @@ fn switch_and_target_evaluators_reject_malformed_field_closure() -> TestResult {
 }
 
 #[test]
-fn intimidate_respects_custom_canonical_nonadjacency() -> TestResult {
+fn ability_pipeline_rejects_custom_canonical_non_m3_topology() -> TestResult {
     let content = selected_content_pack()?;
     let player_zero = slot(BattleSide::Player, 0)?;
     let player_one = slot(BattleSide::Player, 1)?;
@@ -606,9 +606,11 @@ fn intimidate_respects_custom_canonical_nonadjacency() -> TestResult {
         [0, 0],
         Some(pokemon_id(1)?),
     )?;
-    let outcome = evaluate_switch_in(&battle, player_zero, &content)?;
-    assert!(matches!(outcome, SwitchInOutcome::NoMutation { .. }));
-    assert!(outcome.target_slots().is_empty());
-    assert!(!outcome.has_mutation());
+    assert!(matches!(
+        evaluate_switch_in(&battle, player_zero, &content),
+        Err(AbilityPipelineError::Format(
+            FormatTopologyError::InvalidFormat(BattleFormatError::UnsupportedTopology)
+        ))
+    ));
     Ok(())
 }

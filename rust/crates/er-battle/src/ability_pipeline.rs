@@ -11,7 +11,7 @@ use crate::type_effectiveness::TypeEffectiveness;
 use er_content::pack::ContentPack;
 use er_state::battle::BattleState;
 use er_state::field::FieldStateError;
-use er_state::format::{FormatTopologyError, validate_format, validate_slot};
+use er_state::format::{FormatTopologyError, validate_m3_supported, validate_slot};
 use er_state::pokemon::PokemonState;
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, PokemonId};
 use er_types::battle_model::{AbilityEffectDefinition, BattleStat, MoveCategory};
@@ -260,7 +260,7 @@ pub fn evaluate_switch_in(
     incoming_slot: FieldSlot,
     content: &ContentPack,
 ) -> Result<SwitchInOutcome, AbilityPipelineError> {
-    validate_format(&battle.format)?;
+    validate_m3_supported(&battle.format)?;
     validate_slot(&battle.format, incoming_slot)?;
     battle.field.validate_for_format(&battle.format)?;
 
@@ -424,7 +424,7 @@ pub fn evaluate_defensive_ability_for_target(
     type_effectiveness: TypeEffectiveness,
     content: &ContentPack,
 ) -> Result<DefensiveAbilityOutcome, AbilityPipelineError> {
-    validate_format(&battle.format)?;
+    validate_m3_supported(&battle.format)?;
     validate_slot(&battle.format, target_slot)?;
     battle.field.validate_for_format(&battle.format)?;
     let target_id = battle
