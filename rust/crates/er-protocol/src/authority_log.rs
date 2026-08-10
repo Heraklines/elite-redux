@@ -220,7 +220,28 @@ pub struct AuthorityLog {
 
 impl AuthorityLog {
     pub fn new(config: AuthorityLogConfig) -> Result<Self, AuthorityLogError> {
-        validate_config(&config)?;
+        validate_config(&config, true)?;
+        Self::from_validated_config(config)
+    }
+
+    /// Construct the authority log for a single-endpoint M3 battle.
+    ///
+    /// The ordinary protocol constructor continues to require at least one
+    /// remote peer.  Local singles still use the same revision, material,
+    /// preparation, publication, and retention machinery, but have no
+    /// delivery lease or synthetic peer to acknowledge it.
+    #[doc(hidden)]
+    pub fn new_local(config: AuthorityLogConfig) -> Result<Self, AuthorityLogError> {
+        if !config.peer_bindings.is_empty() {
+            return Err(AuthorityLogError::InvalidConfig {
+                reason: "a local authority log must not declare remote peer bindings".to_owned(),
+            });
+        }
+        validate_config(&config, false)?;
+        Self::from_validated_config(config)
+    }
+
+    fn from_validated_config(config: AuthorityLogConfig) -> Result<Self, AuthorityLogError> {
 
         let mut peer_bindings = BTreeMap::new();
         for peer in config.peer_bindings {
@@ -1068,7 +1089,10 @@ impl AuthorityLog {
     }
 }
 
-fn validate_config(config: &AuthorityLogConfig) -> Result<(), AuthorityLogError> {
+fn validate_config(
+    config: &AuthorityLogConfig,
+    require_remote_peer: bool,
+) -> Result<(), AuthorityLogError> {
     if !valid_frame_context(&config.local_context) {
         return Err(AuthorityLogError::InvalidConfig {
             reason: "local context is malformed".to_owned(),
@@ -1079,7 +1103,7 @@ fn validate_config(config: &AuthorityLogConfig) -> Result<(), AuthorityLogError>
             reason: "local context must be authority-signed".to_owned(),
         });
     }
-    if config.peer_bindings.is_empty() {
+    if require_remote_peer && config.peer_bindings.is_empty() {
         return Err(AuthorityLogError::InvalidConfig {
             reason: "at least one remote peer binding is required".to_owned(),
         });
