@@ -897,6 +897,15 @@ async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
     game.scene.gameMode = getGameMode(coopOwners == null ? GameModes.CLASSIC : GameModes.COOP);
     const starterPhase = new SelectStarterPhase();
     game.scene.phaseManager.pushNew("EncounterPhase", false);
+    const scenarioSeed = spec.run?.seed?.trim();
+    if (!scenarioSeed) {
+      fail("EXPORT_CONFIGURATION", "every M3 oracle scenario must pin a non-empty run seed");
+    }
+    // Match the production co-op launch boundary: seed immediately before
+    // party construction so legacy PIDs are deterministic, then let the
+    // ordinary encounter reset derive the wave stream from the same run seed.
+    game.scene.setSeed(scenarioSeed);
+    game.scene.resetSeed();
     starterPhase.initBattle(starters, true, coopOwners);
     postLaunch();
   });
@@ -2052,10 +2061,15 @@ function recordResolvedAction(
 
 function buildIdentity(game: GameManager, trace: ObservationTrace): AnyRecord[] {
   const mapping: AnyRecord[] = [];
+  const legacyPids = new Set<number>();
   trace.identity = new WeakMap<object, number>();
   let next = 1;
   const add = (side: "PLAYER" | "ENEMY", party: Pokemon[]): void => {
     party.forEach((mon, partyIndex) => {
+      if (!Number.isSafeInteger(mon.id) || mon.id < 0 || mon.id > 0xffffffff || legacyPids.has(mon.id)) {
+        fail("CANONICAL_STATE_UNOBSERVABLE", `invalid or duplicate legacy PID ${String(mon.id)}`);
+      }
+      legacyPids.add(mon.id);
       trace.identity?.set(mon, next);
       mapping.push({
         side,
