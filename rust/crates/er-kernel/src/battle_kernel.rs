@@ -32,6 +32,7 @@ use er_protocol::{
     frame_contexts_compatible,
 };
 use er_state::digest::MechanicalStateDigest;
+use er_state::format::human_seats;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommandProposalV1, BattleReplacementProposalV1,
     ReplacementSelection,
@@ -218,22 +219,50 @@ impl BattleMode {
             .as_ref()
             .ok_or_else(|| protocol_init("battle runtime has no active battle"))?
             .authority_seat;
+        let human_seat_values = human_seats(
+            &game
+                .state()
+                .battle
+                .as_ref()
+                .ok_or_else(|| protocol_init("battle runtime has no active battle"))?
+                .format,
+        )
+        .map_err(|error| protocol_init(&format!("battle topology: {error}")))?;
         match &protocol_config.role {
-            BattleProtocolRoleConfig::Authority { .. } if local_seat != battle_authority => {
-                return Err(protocol_init(
-                    "authority protocol role does not match the battle authority seat",
-                ));
+            BattleProtocolRoleConfig::Authority { log, .. } => {
+                if local_seat != battle_authority {
+                    return Err(protocol_init(
+                        "authority protocol role does not match the battle authority seat",
+                    ));
+                }
+                let mut expected_peers = human_seat_values
+                    .iter()
+                    .copied()
+                    .filter(|seat| *seat != battle_authority)
+                    .collect::<Vec<_>>();
+                expected_peers.sort_unstable();
+                let mut actual_peers = log
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| binding.seat_id)
+                    .collect::<Vec<_>>();
+                actual_peers.sort_unstable();
+                if actual_peers != expected_peers {
+                    return Err(protocol_init(
+                        "authority peer bindings do not exactly match the battle human topology",
+                    ));
+                }
             }
-            BattleProtocolRoleConfig::Replica { replica, .. }
+            BattleProtocolRoleConfig::Replica { replica, .. } => {
                 if local_seat == battle_authority
-                    || replica.authority_seat_id != battle_authority =>
-            {
-                return Err(protocol_init(
-                    "replica protocol role does not match the battle authority seat",
-                ));
+                    || replica.authority_seat_id != battle_authority
+                    || !human_seat_values.contains(&local_seat)
+                {
+                    return Err(protocol_init(
+                        "replica protocol role does not match the battle authority seat",
+                    ));
+                }
             }
-            BattleProtocolRoleConfig::Authority { .. }
-            | BattleProtocolRoleConfig::Replica { .. } => {}
         }
         let protocol = BattleProtocolState::new(&protocol_config, local_seat)?;
         let presentations = BattlePresentationState::new(local_seat);
@@ -1038,6 +1067,10 @@ impl BattleTransaction {
             BattleUiResult::ControlChanged => self.install_current_projection(),
             BattleUiResult::CommandProposal(proposal) => {
                 if self.staged.protocol.is_authority() {
+                    let envelope = BattleProposalEnvelope::Command(proposal.clone());
+                    if !self.admit_local_authority_proposal(&envelope)? {
+                        return Ok(());
+                    }
                     self.queue.push(InternalEvent::command_proposal(
                         proposal,
                         self.staged.protocol.authority_epoch(),
@@ -1052,6 +1085,10 @@ impl BattleTransaction {
             BattleUiResult::ReplacementProposal(proposal) => {
                 let epoch = self.staged.protocol.authority_epoch();
                 if self.staged.protocol.is_authority() {
+                    let envelope = BattleProposalEnvelope::Replacement(proposal.clone());
+                    if !self.admit_local_authority_proposal(&envelope)? {
+                        return Ok(());
+                    }
                     self.pending_replacements.insert(
                         proposal.operation_id.clone(),
                         proposal.clone(),
@@ -1067,6 +1104,41 @@ impl BattleTransaction {
                     self.install_current_projection()
                 }
             }
+        }
+    }
+
+    fn admit_local_authority_proposal(
+        &mut self,
+        envelope: &BattleProposalEnvelope,
+    ) -> Result<bool, BattleKernelError> {
+        let owner_seat = match envelope {
+            BattleProposalEnvelope::Command(proposal) => proposal.owner_seat,
+            BattleProposalEnvelope::Replacement(proposal) => proposal.owner_seat,
+        };
+        if owner_seat != self.staged.game.local_seat() {
+            return Err(BattleKernelError::Invariant {
+                reason: "authority-local proposal does not belong to the local authority seat"
+                    .to_owned(),
+            });
+        }
+        let identity = ProposalIdentity {
+            operation_id: envelope.operation_id().clone(),
+            fingerprint: envelope.fingerprint(),
+        };
+        let admission = match &mut self.staged.protocol {
+            BattleProtocolState::Authority { proposals, .. } => proposals.admit(&identity),
+            BattleProtocolState::Replica { .. } => {
+                return Err(BattleKernelError::Invariant {
+                    reason: "replica attempted authority-local proposal admission".to_owned(),
+                });
+            }
+        };
+        match admission {
+            ProposalAdmission::Admitted => Ok(true),
+            ProposalAdmission::Duplicate => Ok(false),
+            other => Err(BattleKernelError::Protocol {
+                reason: format!("authority-local proposal admission failed: {other:?}"),
+            }),
         }
     }
 
@@ -1336,6 +1408,10 @@ impl BattleTransaction {
                     reason: "replica ControlInstalled identity mismatch".to_owned(),
                 });
             }
+            let committed_local_proposals = committed_local_proposal_ids(
+                &pending.entry,
+                self.staged.game.local_seat(),
+            )?;
             let actions = match &mut self.staged.protocol {
                 BattleProtocolState::Replica { replica, .. } => replica
                     .record_replica_stage(
@@ -1352,6 +1428,7 @@ impl BattleTransaction {
                 }
             };
             self.map_replica_actions(actions)?;
+            self.retire_local_proposal_leases(&committed_local_proposals)?;
             let revision = pending.entry.revision;
             let operation_id = pending.entry.operation_id.clone();
             self.install_presentation_plan(
@@ -2188,6 +2265,12 @@ impl BattleTransaction {
             });
         }
 
+        for (entry, _) in &applied_tail {
+            let operation_ids =
+                committed_local_proposal_ids(entry, self.staged.game.local_seat())?;
+            self.retire_local_proposal_leases(&operation_ids)?;
+        }
+
         let final_revision = recovered_entry.revision;
         let final_operation_id = recovered_entry.operation_id.clone();
         let final_index = applied_tail.len().saturating_sub(1);
@@ -2830,14 +2913,20 @@ impl BattleTransaction {
                 if endpoint == *authority_seat && generation_changed {
                     *staged_authority_rebind = Some(generation);
                 }
-                let authority_link_connected = endpoint == *authority_seat
-                    && connected
-                    && *staged_authority_rebind == Some(generation);
-                let local_only_connected = endpoint == local
-                    && connected
-                    && *staged_local_rebind == Some(generation)
-                    && staged_authority_rebind.is_none();
-                if authority_link_connected || local_only_connected {
+                let has_staged = staged_local_rebind.is_some()
+                    || staged_authority_rebind.is_some();
+                let staged_local_connected = staged_local_rebind.as_ref().map_or(true, |_| {
+                    transports.get(&local) == Some(&TransportState::Connected)
+                });
+                let staged_authority_connected =
+                    staged_authority_rebind.as_ref().map_or(true, |_| {
+                        transports.get(&*authority_seat) == Some(&TransportState::Connected)
+                    });
+                if connected
+                    && has_staged
+                    && staged_local_connected
+                    && staged_authority_connected
+                {
                     let mut next_context = context.clone();
                     if let Some(staged) = *staged_local_rebind {
                         next_context.connection_generation = staged;
@@ -3065,6 +3154,33 @@ impl BattleTransaction {
         Ok(())
     }
 
+    fn retire_local_proposal_leases(
+        &mut self,
+        operation_ids: &[er_types::OperationId],
+    ) -> Result<(), BattleKernelError> {
+        if operation_ids.is_empty() {
+            return Ok(());
+        }
+        let mut actions = Vec::new();
+        match &mut self.staged.protocol {
+            BattleProtocolState::Replica { leases, .. } => {
+                for operation_id in operation_ids {
+                    actions.extend(
+                        leases
+                            .observe_committed(operation_id, &mut self.scheduler)
+                            .1,
+                    );
+                }
+            }
+            BattleProtocolState::Authority { .. } => {
+                return Err(BattleKernelError::Invariant {
+                    reason: "authority attempted to retire replica proposal leases".to_owned(),
+                });
+            }
+        }
+        self.apply_proposal_actions(actions)
+    }
+
     fn validate_quiescent(&self) -> Result<(), BattleKernelError> {
         if !self.queue.is_empty()
             || self.pending_authority.is_some()
@@ -3286,6 +3402,45 @@ fn recovery_reconstruction_context(
             reason: "non-battle recovery material kind".to_owned(),
         }),
     }
+}
+
+fn committed_local_proposal_ids(
+    entry: &AuthorityEntry,
+    local_seat: SeatId,
+) -> Result<Vec<er_types::OperationId>, BattleKernelError> {
+    let invalid_material = || BattleKernelError::TerminalRequired {
+        reason: crate::battle_replica::M3_INVALID_AUTHORITY_MATERIAL.to_owned(),
+    };
+    let bytes = serde_json::to_vec(&entry.material.payload).map_err(|_| invalid_material())?;
+    let mut operation_ids = match entry.kind {
+        AuthorityEntryKind::TurnCommit => decode_turn_material(&bytes)
+            .map_err(|_| invalid_material())?
+            .commands
+            .entries
+            .into_iter()
+            .filter_map(|command| match command {
+                AcceptedBattleCommand::Human { proposal, .. }
+                    if proposal.owner_seat == local_seat =>
+                {
+                    Some(proposal.operation_id)
+                }
+                AcceptedBattleCommand::Human { .. }
+                | AcceptedBattleCommand::ScriptedEnemy { .. } => None,
+            })
+            .collect::<Vec<_>>(),
+        AuthorityEntryKind::ReplacementCommit => {
+            let material = decode_replacement_material(&bytes).map_err(|_| invalid_material())?;
+            if material.occurrence.owner_seat == Some(local_seat) {
+                vec![material.operation_id]
+            } else {
+                Vec::new()
+            }
+        }
+        _ => return Err(invalid_material()),
+    };
+    operation_ids.sort_unstable();
+    operation_ids.dedup();
+    Ok(operation_ids)
 }
 
 fn validate_replica_protocol_control(
