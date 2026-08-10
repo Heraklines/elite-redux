@@ -655,6 +655,8 @@ impl Default for KernelSnapshot {
 pub struct LiveResourceSnapshot {
     pub timers: BTreeSet<TimerId>,
     pub presentations: BTreeSet<PresentationEventId>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub battle_presentations: BTreeSet<BattlePresentationEventId>,
     pub storage_requests: BTreeSet<SafeU53>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub delivery_leases: BTreeSet<String>,

@@ -1,8 +1,11 @@
 //! Side-effect-free kernel entry point.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use er_canonical::content_digest;
+use er_content::pack::ContentPack;
+use er_game::runtime::BattleGameConfig;
 use er_protocol::{
     AuthorityEntryBody, AuthorityEntryDraft, AuthorityLog, AuthorityLogAction, AuthorityLogConfig,
     AuthorityReplica, AuthorityReplicaConfig, FrameValidator, InboundFrameResult, KernelScheduler,
@@ -29,6 +32,7 @@ pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapsh
 use serde_json::{Value, json};
 use thiserror::Error;
 
+use crate::battle_kernel::{BattleInitializationError, BattleMode};
 use crate::{InputRouteError, InputRouter, UiReducer};
 
 #[derive(Clone, Debug, Default)]
@@ -133,6 +137,7 @@ pub enum ControlMenuPlan {
 
 #[derive(Clone, Debug)]
 pub struct GameKernel {
+    battle: Option<Box<BattleMode>>,
     input_router: InputRouter,
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
@@ -272,6 +277,7 @@ impl GameKernel {
             None => (None, None),
         };
         let mut kernel = Self {
+            battle: None,
             input_router: InputRouter::new(config.input_map),
             ui_reducer: UiReducer::new(config.initial_ui),
             scheduler: KernelScheduler::new(),
@@ -290,6 +296,20 @@ impl GameKernel {
         kernel
     }
 
+    /// Construct the production M3 Battle kernel. The fixture-authored M1/M2
+    /// protocol and menu-plan surfaces are not installed on this path.
+    pub fn new_battle(
+        config: BattleGameConfig,
+        protocol: BattleProtocolConfig,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, BattleInitializationError> {
+        let battle = BattleMode::new(config, protocol, content)?;
+        let mut kernel = Self::new(KernelConfig::default());
+        kernel.live_resources = battle.live_resources(&kernel.scheduler);
+        kernel.battle = Some(Box::new(battle));
+        Ok(kernel)
+    }
+
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
         if self.disposed {
             return Err(KernelError::Disposed);
@@ -301,6 +321,15 @@ impl GameKernel {
         }
         if self.terminal.is_some() {
             return Ok(Vec::new());
+        }
+        if let Some(battle) = self.battle.as_mut() {
+            let effects = battle
+                .step(&mut self.scheduler, &mut self.terminal, input)
+                .map_err(|error| KernelError::Battle {
+                    reason: error.to_string(),
+                })?;
+            self.live_resources = battle.live_resources(&self.scheduler);
+            return Ok(effects);
         }
         match input {
             KernelInput::RawInput { seat, event } => {
@@ -428,6 +457,18 @@ impl GameKernel {
     }
 
     pub fn snapshot(&self) -> KernelSnapshot {
+        if let Some(battle) = self.battle.as_ref() {
+            let mut state = battle.state_value();
+            if let Value::Object(fields) = &mut state {
+                fields.insert("terminal".to_owned(), json!(self.terminal));
+                fields.insert("liveResources".to_owned(), json!(self.live_resources));
+                fields.insert("disposed".to_owned(), json!(self.disposed));
+            }
+            return KernelSnapshot {
+                ui: UiState::default(),
+                state,
+            };
+        }
         KernelSnapshot {
             ui: self.ui_reducer.state().clone(),
             state: self.protocol_snapshot(),
@@ -449,6 +490,14 @@ impl GameKernel {
         self.protocol_config.as_ref()
     }
 
+    pub fn battle_protocol_config(&self) -> Option<&BattleProtocolConfig> {
+        self.battle.as_ref().map(|battle| battle.protocol_config())
+    }
+
+    pub fn battle_ui_projection(&self) -> Option<&er_types::battle_ui::BattleUiProjection> {
+        self.battle.as_ref().map(|battle| battle.projection())
+    }
+
     pub fn is_disposed(&self) -> bool {
         self.disposed
     }
@@ -456,6 +505,18 @@ impl GameKernel {
     pub fn dispose(&mut self, reason: &str) -> Vec<KernelEffect> {
         if self.disposed {
             return Vec::new();
+        }
+
+        if let Some(mut battle) = self.battle.take() {
+            let mut effects = battle.dispose(&mut self.scheduler, reason);
+            for command in self.scheduler.dispose() {
+                if let SchedulerCommand::Cancel { endpoint, timer_id } = command {
+                    effects.push(KernelEffect::CancelTimer { endpoint, timer_id });
+                }
+            }
+            self.disposed = true;
+            self.live_resources = LiveResourceSnapshot::default();
+            return effects;
         }
 
         let contexts = self.repeat_timers.clone();
@@ -540,7 +601,7 @@ impl GameKernel {
         actionable: bool,
         menu: MenuState,
     ) -> MenuGeneration {
-        if self.disposed || self.terminal.is_some() {
+        if self.battle.is_some() || self.disposed || self.terminal.is_some() {
             return self.ui_reducer.state().generation;
         }
         let generation = self.ui_reducer.replace_menu(owner_seat, actionable, menu);
@@ -2734,6 +2795,10 @@ impl GameKernel {
     }
 
     fn sync_live_resources(&mut self) {
+        if let Some(battle) = self.battle.as_ref() {
+            self.live_resources = battle.live_resources(&self.scheduler);
+            return;
+        }
         self.sync_live_timers();
         self.live_resources.presentations = self.pending_presentations.keys().copied().collect();
         self.live_resources.storage_requests.clear();
@@ -3039,7 +3104,7 @@ fn network_frame(
     })
 }
 
-fn authority_entry_frame(entry: &AuthorityEntry) -> Result<NetworkFrame, String> {
+pub(crate) fn authority_entry_frame(entry: &AuthorityEntry) -> Result<NetworkFrame, String> {
     network_frame(
         &entry.context,
         FrameType::AuthorityEntry,
@@ -3047,7 +3112,7 @@ fn authority_entry_frame(entry: &AuthorityEntry) -> Result<NetworkFrame, String>
     )
 }
 
-fn receipt_frame(receipt: &AuthorityReceipt) -> Result<NetworkFrame, String> {
+pub(crate) fn receipt_frame(receipt: &AuthorityReceipt) -> Result<NetworkFrame, String> {
     network_frame(
         &receipt.context,
         FrameType::AuthorityReceipt,
@@ -3061,7 +3126,7 @@ fn receipt_frame(receipt: &AuthorityReceipt) -> Result<NetworkFrame, String> {
     )
 }
 
-fn tail_request_frame(
+pub(crate) fn tail_request_frame(
     context: &FrameContext,
     missing_from: Revision,
 ) -> Result<NetworkFrame, String> {
@@ -3173,6 +3238,8 @@ pub enum KernelError {
     Input(#[from] InputRouteError),
     #[error("kernel state could not be canonicalized: {reason}")]
     Canonical { reason: String },
+    #[error("battle kernel transition failed: {reason}")]
+    Battle { reason: String },
     #[error("kernel is disposed")]
     Disposed,
 }

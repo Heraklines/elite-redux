@@ -6,11 +6,14 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-game = { path = "../er-game" }
 er-protocol = { path = "../er-protocol" }
+er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
