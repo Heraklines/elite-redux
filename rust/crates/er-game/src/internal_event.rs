@@ -349,6 +349,47 @@ pub enum InternalEventKind {
 }
 
 impl InternalEvent {
+    /// Wrap one already-typed command proposal at the trusted kernel/game
+    /// composition seam. The causal identity is derived from the proposal;
+    /// callers cannot supply a different operation or control identity.
+    #[doc(hidden)]
+    pub fn command_proposal(
+        proposal: BattleCommandProposalV1,
+        authority_epoch: AuthorityEpoch,
+    ) -> Self {
+        let causal = CausalIdentity::new(
+            Some(proposal.operation_id.clone()),
+            Some(proposal.control_id.clone()),
+        );
+        Self::Game(GameEventPayload::new(
+            GameIntent::CommandProposal {
+                proposal,
+                authority_epoch,
+            },
+            causal,
+        ))
+    }
+
+    /// Replacement counterpart to [`Self::command_proposal`]. Automatic
+    /// no-legal replacement remains unavailable through this public seam.
+    #[doc(hidden)]
+    pub fn replacement_proposal(
+        proposal: BattleReplacementProposalV1,
+        authority_epoch: AuthorityEpoch,
+    ) -> Self {
+        let causal = CausalIdentity::new(
+            Some(proposal.operation_id.clone()),
+            Some(proposal.control_id.clone()),
+        );
+        Self::Game(GameEventPayload::new(
+            GameIntent::ReplacementProposal {
+                proposal,
+                authority_epoch,
+            },
+            causal,
+        ))
+    }
+
     /// Construct the automatic no-legal-replacement causal event.
     ///
     /// This remains crate-private so only game/kernel logic that has already
