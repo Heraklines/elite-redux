@@ -1,6 +1,5 @@
 //! Wasm JSON boundary for native/schema/trace parity tests.
 
-pub mod m3_continuation;
 pub mod m3_parity;
 pub mod m3_schema;
 

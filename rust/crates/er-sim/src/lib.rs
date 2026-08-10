@@ -1,7 +1,6 @@
 //! Deterministic virtual environment for the production Rust kernel.
 
 pub mod clock;
-pub mod m3_continuation;
 pub mod network;
 pub mod pair;
 pub mod presenter;
