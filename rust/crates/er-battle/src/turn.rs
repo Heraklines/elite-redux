@@ -9,30 +9,28 @@ use er_state::battle::{
 use er_state::digest::compute_mechanical_state_digest;
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
-use er_types::{OperationId, SafeU53};
 use er_types::battle_command::{
     CommandSet, ReplacementSelection, validate_turn_result_operation_id,
 };
 use er_types::battle_ids::{AuthorityEpoch, BattleSide, FaintOccurrenceId, FieldSlot, PokemonId};
-use er_types::battle_model::{
-    ActionDisposition, BattleStat, ResolvedAction, ResolvedActionKind,
-};
+use er_types::battle_model::{ActionDisposition, BattleStat, ResolvedAction, ResolvedActionKind};
+use er_types::{OperationId, SafeU53};
 
 use crate::ability_pipeline::{
     DefensiveAbilityInput, DefensiveAbilityOutcome, evaluate_defensive_ability,
     evaluate_switch_in_ability,
 };
-use crate::action_order::{PendingAction, build_pending_action_queue_from_commands, effective_speed};
+use crate::action_order::{
+    PendingAction, build_pending_action_queue_from_commands, effective_speed,
+};
 use crate::command::NormalizedBattleCommand;
 use crate::error::{BattleInvariantError, BattleResolveError};
 use crate::faint::{FaintCandidate, FaintQueueError, queue_faint};
-use crate::legality::{
-    CommandLegalityError, normalize_command_set, validate_state_content,
-};
+use crate::legality::{CommandLegalityError, normalize_command_set, validate_state_content};
 use crate::move_effect::{
     DefensiveAbilityBlockReason, DefensiveAbilityGate, DefensiveAbilityGateError,
     DefensiveAbilityGateInput, DefensiveAbilityGateResult, MoveTargetResult,
-    StatusApplicationOutcome, TargetEffectDisposition,
+    TargetEffectDisposition,
 };
 use crate::move_pipeline::{MovePipelineDisposition, MovePipelineResult, resolve_move};
 use crate::outcome::derive_battle_outcome;
@@ -44,7 +42,9 @@ use crate::resolver::{
     BattleMutation, BattleNextDecision, BattleReplacementTransition, BattleTransition,
 };
 use crate::stat_stage::set_stage;
-use crate::status::{StatusResidualInput, StatusResidualOutcome, resolve_residual};
+use crate::status::{
+    StatusApplicationOutcome, StatusResidualInput, StatusResidualOutcome, resolve_residual,
+};
 use crate::switch::resolve_switch;
 
 /// Resolve one complete admitted turn as an atomic transition.
@@ -57,7 +57,9 @@ pub fn resolve_turn(
 ) -> Result<BattleTransition, BattleResolveError> {
     validate_state_content(before, content)?;
     if authority_epoch == AuthorityEpoch::ZERO {
-        return Err(BattleResolveError::Faint(FaintQueueError::ZeroAuthorityEpoch));
+        return Err(BattleResolveError::Faint(
+            FaintQueueError::ZeroAuthorityEpoch,
+        ));
     }
     let before_battle = active_battle(before)?;
     validate_turn_result_operation_id(
@@ -173,11 +175,7 @@ pub fn resolve_replacement(
     let primary = {
         let battle = active_battle_mut(&mut after)?;
         let stored = stored_faint_source(battle, occurrence)?;
-        validate_stored_replacement_operation(
-            material_operation_id,
-            battle.battle_id,
-            stored,
-        )?;
+        validate_stored_replacement_operation(material_operation_id, battle.battle_id, stored)?;
         match selection {
             ReplacementSelection::Selected { .. } => {
                 apply_selected_replacement(battle, occurrence, selection)?
@@ -337,9 +335,7 @@ fn resolve_move_action(
 fn move_disposition(result: &MovePipelineResult) -> ActionDisposition {
     match result.disposition {
         MovePipelineDisposition::SkippedActorInactive => ActionDisposition::SkippedActorInactive,
-        MovePipelineDisposition::CancelledByParalysis => {
-            ActionDisposition::CancelledByParalysis
-        }
+        MovePipelineDisposition::CancelledByParalysis => ActionDisposition::CancelledByParalysis,
         MovePipelineDisposition::Executed => {
             if result
                 .targets
@@ -533,9 +529,7 @@ fn push_non_command_action(
     Ok(())
 }
 
-fn next_action_sequence(
-    action_order: &[ResolvedAction],
-) -> Result<SafeU53, BattleResolveError> {
+fn next_action_sequence(action_order: &[ResolvedAction]) -> Result<SafeU53, BattleResolveError> {
     let value = u64::try_from(action_order.len()).map_err(|_| RngError::SliceTooLong)?;
     SafeU53::new(value).map_err(|_| RngError::SliceTooLong.into())
 }
@@ -580,10 +574,7 @@ fn advance_turn_boundary(
     Ok(())
 }
 
-fn sync_rng_state(
-    state: &mut GameState,
-    runtime: &RngRuntime,
-) -> Result<(), BattleResolveError> {
+fn sync_rng_state(state: &mut GameState, runtime: &RngRuntime) -> Result<(), BattleResolveError> {
     let battle_rng = runtime
         .battle_state()
         .cloned()
@@ -632,10 +623,7 @@ fn party_for_side(battle: &BattleState, side: BattleSide) -> &[PokemonState] {
     }
 }
 
-fn party_for_side_mut(
-    battle: &mut BattleState,
-    side: BattleSide,
-) -> &mut [PokemonState] {
+fn party_for_side_mut(battle: &mut BattleState, side: BattleSide) -> &mut [PokemonState] {
     match side {
         BattleSide::Player => &mut battle.player_party,
         BattleSide::Enemy => &mut battle.enemy_party,
