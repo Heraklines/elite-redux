@@ -42,6 +42,7 @@ import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
+import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
@@ -108,7 +109,6 @@ import {
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { buildIvChartData, StatsContainer } from "#ui/containers/stats-container";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
-import { FunMegaStatPreview } from "#ui/fun-mega-stat-preview";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
@@ -457,8 +457,8 @@ function hideUnrasterizedFunMegaIcon(root: Phaser.GameObjects.Container): void {
   const pending: Phaser.GameObjects.GameObject[] = [...root.list];
   while (pending.length > 0) {
     const object = pending.pop() as Phaser.GameObjects.GameObject & { list?: Phaser.GameObjects.GameObject[] };
-    if (object.name === "icon_fun_mega") {
-      object.setVisible(false);
+    if (object.name === "icon_fun_mega" && "setVisible" in object) {
+      (object as typeof object & { setVisible(visible: boolean): unknown }).setVisible(false);
     }
     if (object.list) {
       pending.push(...object.list);
@@ -487,6 +487,36 @@ async function startBattleWithFunPseudoMega(game: GameManager) {
   game.scene.addModifier(modifier, true, false, false, true);
   game.scene.getModifierBar().updateModifiers(game.scene.modifiers);
   return { mon, stone, type };
+}
+
+async function startBattleWithAbilityAvalanche(game: GameManager, waveIndex = 120) {
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("Ability Avalanche render recipe: no player pokemon after startBattle");
+  }
+  game.scene.gameMode = getGameMode(GameModes.FUN);
+  setErDifficulty("youngster");
+  setFunModeConfig({
+    ...DEFAULT_FUN_MODE_CONFIG,
+    randomizePokemon: false,
+    randomizeTypes: false,
+    randomizeAbilities: false,
+    randomizeLevelUpMoves: false,
+    abilityAvalanche: true,
+  });
+  game.scene.currentBattle.waveIndex = waveIndex;
+  mon.id = 0xa11a0001;
+  const enemy = game.scene.getEnemyPokemon();
+  if (enemy) {
+    enemy.id = 0xa11a0002;
+  }
+  return mon;
+}
+
+function addDemoFusion(mon: Awaited<ReturnType<typeof startBattleWithFunPseudoMega>>["mon"]): void {
+  mon.fusionSpecies = getPokemonSpecies(SpeciesId.BULBASAUR);
+  mon.fusionFormIndex = 0;
 }
 
 function bargainArgs(): any[] {
@@ -1758,11 +1788,35 @@ const RECIPES: Record<string, Recipe> = {
     },
     afterShow: handler => {
       handler.megaIcon?.setVisible(false);
-      handler.funMegaStatPreview?.show(FormChangeItem.GARCHOMPITE);
-      if (handler.funMegaStatPreview) {
-        handler.statsContainer?.bringToTop(handler.funMegaStatPreview.container);
-      }
+      const type = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      handler.getUi().showTooltip(type.name, type.getDescription(), true);
     },
+    diffTolerance: 40000,
+  },
+  "summary-fun-pseudo-mega-fusion-icons": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game);
+      addDemoFusion(mon);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
+    diffTolerance: 40000,
+  },
+  "summary-ability-avalanche": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithAbilityAvalanche(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000,
+  },
+  "summary-ability-avalanche-scrolled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithAbilityAvalanche(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN],
     diffTolerance: 40000,
   },
   // Production IV-chart repro: HP=0 and Defense=0 sit on either side of Attack=31.
@@ -1931,6 +1985,35 @@ const RECIPES: Record<string, Recipe> = {
       (game.scene as any).ui.setActiveHandler?.(overlay);
     },
   },
+  "battle-info-ability-avalanche": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await startBattleWithAbilityAvalanche(game);
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      overlay.handleInput(Button.RIGHT);
+      (game.scene as any).ui.setActiveHandler?.(overlay);
+    },
+  },
+  "battle-info-ability-avalanche-scrolled": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await startBattleWithAbilityAvalanche(game);
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      overlay.handleInput(Button.RIGHT);
+      (overlay as BattleInfoOverlay & { processInput: (button: Button) => boolean }).processInput = button =>
+        overlay.handleInput(button);
+      (game.scene as any).ui.setActiveHandler?.(overlay);
+    },
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN],
+  },
   // Showdown construction-time vanilla mega. A vanilla-species mega built AT its mega
   // formIndex directly at battle build (addPlayerPokemon(formIndex=1), no mid-run form
   // change) - the same path the showdown teambuilder fields a picked mega stage. The PNG
@@ -1991,12 +2074,19 @@ const RECIPES: Record<string, Recipe> = {
       await startBattleWithFunPseudoMega(game);
       return [];
     },
-    render: (_game, ctx) => {
+    render: (game, ctx) => {
       hideUnrasterizedFunMegaIcon(ctx.fieldRoot);
-      const preview = new FunMegaStatPreview(0, 0, 160);
-      preview.container.setPosition(80 * 6, 42 * 6).setScale(6);
-      ctx.fieldRoot.add(preview.container);
-      preview.show(FormChangeItem.GARCHOMPITE);
+      const type = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      game.scene.ui.showTooltip(type.name, type.getDescription(), true);
+    },
+  },
+  "battle-fun-pseudo-mega-fusion-icons": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game);
+      addDemoFusion(mon);
+      return [];
     },
   },
   // Battlefield in a DOUBLE battle: two mons + stacked HP bars per side. Exercises the

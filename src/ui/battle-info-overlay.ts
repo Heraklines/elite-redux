@@ -10,7 +10,8 @@
 //
 // Left column: only the Pokémon CURRENTLY ON THE FIELD — player side first,
 // then enemy side (2 icons in singles, 4 in doubles). Up/Down switches which
-// on-field Pokémon is inspected; Left/Right cycles pages; anything else closes.
+// on-field Pokémon is inspected; Left/Right cycles pages. Confirm focuses the
+// Abilities list so Up/Down can scroll it; Cancel restores Pokémon switching.
 //
 // Coordinate note: the `ui` container draws at NEGATIVE y (origin bottom-left),
 // so the panel anchors at y = -canvasHeight + topMargin and lays out downward.
@@ -26,6 +27,7 @@ import {
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
+import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
@@ -190,6 +192,9 @@ export class BattleInfoOverlay {
   private container: Phaser.GameObjects.Container | null = null;
   private pageIndex = 0;
   private slotIndex = 0;
+  private abilityCursor = 0;
+  private abilityRowCount = 0;
+  private abilityListFocused = false;
   private assetsRequested = false;
 
   get isOpen(): boolean {
@@ -223,6 +228,8 @@ export class BattleInfoOverlay {
     }
     this.pageIndex = 0;
     this.slotIndex = 0;
+    this.abilityCursor = 0;
+    this.abilityListFocused = false;
     this.render();
   }
 
@@ -241,12 +248,16 @@ export class BattleInfoOverlay {
       case Btn.LEFT: {
         const n = this.getPages().length;
         this.pageIndex = (this.pageIndex - 1 + n) % n;
+        this.abilityCursor = 0;
+        this.abilityListFocused = false;
         this.render();
         return true;
       }
       case Btn.RIGHT: {
         const n = this.getPages().length;
         this.pageIndex = (this.pageIndex + 1) % n;
+        this.abilityCursor = 0;
+        this.abilityListFocused = false;
         this.render();
         return true;
       }
@@ -272,12 +283,37 @@ export class BattleInfoOverlay {
       }
       case Btn.UP:
       case Btn.DOWN: {
+        if (this.getPages()[this.pageIndex] === "abilities" && this.abilityListFocused && this.abilityRowCount > 0) {
+          const delta = button === Btn.DOWN ? 1 : -1;
+          this.abilityCursor = (this.abilityCursor + delta + this.abilityRowCount) % this.abilityRowCount;
+          this.render();
+          return true;
+        }
         const n = Math.max(1, this.onField().length);
         const d = button === Btn.DOWN ? 1 : -1;
         this.slotIndex = (this.slotIndex + d + n) % n;
+        this.abilityCursor = 0;
         this.render();
         return true;
       }
+      case Btn.ACTION:
+        if (this.getPages()[this.pageIndex] === "abilities") {
+          if (!this.abilityListFocused) {
+            this.abilityListFocused = true;
+            this.render();
+          }
+          return true;
+        }
+        this.close();
+        return true;
+      case Btn.CANCEL:
+        if (this.abilityListFocused) {
+          this.abilityListFocused = false;
+          this.render();
+          return true;
+        }
+        this.close();
+        return true;
       default:
         this.close();
         return true;
@@ -300,11 +336,12 @@ export class BattleInfoOverlay {
     const scrim = globalScene.add.rectangle(-offX, -offY, W, H, 0x000000, 0.62).setOrigin(0, 0);
     c.add(scrim);
 
-    // Panel: authentic ROM background if streamed in, else a graphics fallback.
+    // Keep the fallback beneath the authentic ROM art. This prevents a blank or
+    // partially transparent panel while the streamed texture settles.
+    this.drawPanel(c, page);
     if (globalScene.textures.exists(BG_KEY[page])) {
       c.add(globalScene.add.image(0, 0, BG_KEY[page]).setOrigin(0, 0));
     } else {
-      this.drawPanel(c, page);
       this.ensureAssets();
     }
 
@@ -470,7 +507,8 @@ export class BattleInfoOverlay {
     const title = addTextObject(PANEL_X, 2, PAGE_TITLE[page], TextStyle.SUMMARY, { fontSize: "60px" });
     title.setOrigin(0, 0);
     c.add(title);
-    const hint = addTextObject(BG_W - 3, 4, "Ⓐ Scroll  ✛ Switch  ✛ Page", TextStyle.SUMMARY, { fontSize: "38px" });
+    const controls = page === "abilities" && this.abilityListFocused ? "Scroll  Back: Exit" : "✛ Switch  ✛ Page";
+    const hint = addTextObject(BG_W - 3, 4, controls, TextStyle.SUMMARY, { fontSize: "38px" });
     hint.setOrigin(1, 0);
     c.add(hint);
   }
@@ -670,6 +708,16 @@ export class BattleInfoOverlay {
       rows.push({ label, abilityId: ability.id, locked });
     }
 
+    if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
+      const avalancheCount = getFunAbilityAvalancheCount(globalScene.currentBattle?.waveIndex ?? 1);
+      for (let index = 0; index < avalancheCount; index++) {
+        const ability = innates[3 + index];
+        if (ability?.id) {
+          rows.push({ label: `Ability ${index + 5}`, abilityId: ability.id, locked: false });
+        }
+      }
+    }
+
     // ER Black Shinies (#349): the GIFT — the black shiny's own active choice
     // and/or the gift shared by an on-field black ALLY. Always live.
     const ownGift = getErActiveGiftAbilityId(mon);
@@ -681,9 +729,16 @@ export class BattleInfoOverlay {
       rows.push({ label, abilityId: giftId, locked: false, gift: true });
     }
 
-    const boxes = rows.length <= 4 ? ROW4_BOXES : MOVE_ROW5_BOXES;
-    boxes.slice(0, rows.length).forEach(([, by], i) => {
-      const r = rows[i];
+    this.abilityRowCount = rows.length;
+    this.abilityCursor = Math.max(0, Math.min(this.abilityCursor, Math.max(0, rows.length - 1)));
+    const maxVisibleRows = 4;
+    const visibleStart = Math.max(
+      0,
+      Math.min(this.abilityCursor - maxVisibleRows + 1, Math.max(0, rows.length - maxVisibleRows)),
+    );
+    const visibleRows = rows.slice(visibleStart, visibleStart + maxVisibleRows);
+    ROW4_BOXES.slice(0, visibleRows.length).forEach(([, by], i) => {
+      const r = visibleRows[i];
       const ability = allAbilities[r.abilityId];
       const head = addTextObject(68, by + 1, `${r.label}: ${ability?.name ?? ""}`, TextStyle.SUMMARY, {
         fontSize: "46px",
@@ -707,6 +762,32 @@ export class BattleInfoOverlay {
       }
       c.add(d);
     });
+
+    if (rows.length > maxVisibleRows) {
+      const hiddenAbove = visibleStart > 0;
+      const hiddenBelow = visibleStart + visibleRows.length < rows.length;
+      const range = addTextObject(
+        232,
+        17,
+        this.abilityListFocused
+          ? `${hiddenAbove ? "▲ " : ""}Scroll${hiddenBelow ? " ▼" : ""}  ${visibleStart + 1}-${
+              visibleStart + visibleRows.length
+            }/${rows.length}`
+          : `Confirm: Browse${hiddenBelow ? " ▼" : ""}  ${visibleStart + 1}-${visibleStart + visibleRows.length}/${rows.length}`,
+        TextStyle.SUMMARY,
+        { fontSize: "34px" },
+      );
+      range.setOrigin(1, 0);
+      c.add(range);
+    }
+    if (this.abilityListFocused && visibleRows.length > 0) {
+      const visibleCursor = this.abilityCursor - visibleStart;
+      const [bx, by, bw, bh] = ROW4_BOXES[visibleCursor];
+      const focus = globalScene.add.graphics();
+      focus.lineStyle(2, 0xffffff, 1);
+      focus.strokeRoundedRect(bx - 2, by - 2, bw + 4, bh + 4, 5);
+      c.add(focus);
+    }
   }
 
   // --- per-Pokémon: MOVES --------------------------------------------------

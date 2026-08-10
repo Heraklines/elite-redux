@@ -27,13 +27,16 @@
 
 import { globalScene } from "#app/global-scene";
 import { ER_NEWCOMER_FRONT_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
+import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
+import { addTextObject } from "#ui/text";
+import { addWindow } from "#ui/ui-theme";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { createCanvas, GlobalFonts, loadImage, Image as NapiImage } from "@napi-rs/canvas";
 import Phaser from "phaser";
 
-const ASSET_ROOTS = ["../er-assets", "public"];
+const ASSET_ROOTS = [process.env.ER_ASSET_ROOT, "../er-assets", "public"].filter((root): root is string => !!root);
 
 // Loads whose texture KEY differs from the file BASENAME (loadImage(key, folder, filename)).
 // Pure key==basename loads resolve automatically via the index; these few are renamed.
@@ -55,6 +58,7 @@ const KEY_FILE_OVERRIDES: Record<string, string> = {
   shiny_star_small: "images/ui/shiny_small.png",
   shiny_star_small_1: "images/ui/shiny_small_1.png",
   shiny_star_small_2: "images/ui/shiny_small_2.png",
+  icon_fun_mega: "images/elite-redux/ui/pseudo-mega-symbol.png",
 };
 
 /**
@@ -663,6 +667,26 @@ function makeUiSurface(ctx: RenderContext, originalUi: any): any {
     apply: () => noopChain,
   });
   const msg = noopChain;
+  let tooltipContainer: Phaser.GameObjects.Container | null = null;
+  let tooltipBg: Phaser.GameObjects.GameObject | null = null;
+  let tooltipTitle: Phaser.GameObjects.Text | null = null;
+  let tooltipContent: Phaser.GameObjects.Text | null = null;
+
+  const ensureTooltip = (): void => {
+    if (tooltipContainer?.scene) {
+      return;
+    }
+    tooltipContainer = null;
+    tooltipBg = null;
+    tooltipTitle = null;
+    tooltipContent = null;
+    tooltipContainer = globalScene.add.container(4, 4 - globalScene.scaledCanvas.height).setName("tooltip");
+    tooltipTitle = addTextObject(64, 4, "", TextStyle.TOOLTIP_TITLE).setOrigin(0.5, 0);
+    tooltipContent = addTextObject(6, 16, "", TextStyle.TOOLTIP_CONTENT);
+    tooltipContent.setWordWrapWidth(850);
+    tooltipContainer.add([tooltipTitle, tooltipContent]);
+    ctx.uiInner.add(tooltipContainer);
+  };
 
   // Construct a fresh handler for a mode (the registered instance's children are MockSprites
   // from GameManager boot, so we mirror the primary-page approach and build a new one).
@@ -704,8 +728,22 @@ function makeUiSurface(ctx: RenderContext, originalUi: any): any {
     showText: () => {},
     showDialogue: () => {},
     clearText: () => {},
-    showTooltip: () => {},
-    hideTooltip: () => {},
+    showTooltip: (title: string, content: string) => {
+      ensureTooltip();
+      tooltipTitle!.setText(title || "");
+      const wrappedContent = tooltipContent!.runWordWrap(content);
+      tooltipContent!.setText(wrappedContent);
+      tooltipContent!.y = title ? 16 : 4;
+      const width = Math.min(Math.max(tooltipTitle!.displayWidth, tooltipContent!.displayWidth) + 12, 838);
+      const height = (title ? 31 : 19) + 10.5 * (wrappedContent.split("\n").length - 1);
+      tooltipBg?.destroy();
+      tooltipBg = addWindow(0, 0, width, height).setOrigin(0);
+      tooltipContainer!.addAt(tooltipBg, 0);
+      tooltipTitle!.x = width / 2;
+      tooltipContainer!.setVisible(true);
+      ctx.uiInner.bringToTop(tooltipContainer!);
+    },
+    hideTooltip: () => tooltipContainer?.setVisible(false),
     getMessageHandler: () => msg,
     getHandler: () => active ?? undefined,
     // Some handlers branch on the current mode during render (e.g. the OPTION_SELECT

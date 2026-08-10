@@ -77,6 +77,11 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
     description:
       "After a Pokemon finishes using a move, that moveset slot becomes a different random implemented move for both sides.",
   },
+  {
+    key: "abilityAvalanche",
+    label: "Ability Avalanche",
+    description: "Starting at wave 60, every Pokemon gains one additional randomized active ability every 20 waves.",
+  },
 ];
 
 const VISIBLE_OPTION_ROWS = 7;

@@ -15,6 +15,8 @@ import {
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
   DEFAULT_FUN_MODE_CONFIG,
+  getFunAbilityAvalancheCount,
+  getFunAbilityAvalancheIds,
   getFunEvolutionTarget,
   getFunModeConfig,
   getFunRandomAbilityId,
@@ -72,6 +74,7 @@ describe("Fun Mode configuration", () => {
       itemChaos: true,
       weatherRoulette: true,
       scrambleMoves: true,
+      abilityAvalanche: true,
       abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
@@ -85,6 +88,7 @@ describe("Fun Mode configuration", () => {
       itemChaos: true,
       weatherRoulette: true,
       scrambleMoves: true,
+      abilityAvalanche: true,
       abilityRerollSeed: 4,
     });
   });
@@ -101,6 +105,7 @@ describe("Fun Mode configuration", () => {
       itemChaos: true,
       weatherRoulette: true,
       scrambleMoves: true,
+      abilityAvalanche: true,
       abilityRerollSeed: 27,
     };
     saveLastFunModeConfig(config);
@@ -115,6 +120,7 @@ describe("Fun Mode configuration", () => {
       itemChaos: true,
       weatherRoulette: true,
       scrambleMoves: true,
+      abilityAvalanche: true,
     });
   });
 
@@ -144,6 +150,7 @@ describe("Fun Mode configuration", () => {
       itemChaos: false,
       weatherRoulette: false,
       scrambleMoves: false,
+      abilityAvalanche: false,
     });
   });
 });
@@ -175,6 +182,22 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
     const after = slots.map(slot => getFunRandomAbilityId(12345, slot));
     expect(after).not.toEqual(before);
     expect(slots.map(slot => getFunRandomAbilityId(12345, slot))).toEqual(after);
+  });
+
+  it("adds prefix-stable, duplicate-free Avalanche abilities every 20 waves from wave 60", () => {
+    setFunModeConfig({ ...getFunModeConfig(), abilityAvalanche: true });
+    expect([59, 60, 79, 80, 100].map(getFunAbilityAvalancheCount)).toEqual([0, 1, 1, 2, 3]);
+    const excluded = [allAbilities[1].id, allAbilities[2].id];
+    const wave60 = getFunAbilityAvalancheIds(12345, 60, excluded);
+    const wave100 = getFunAbilityAvalancheIds(12345, 100, excluded);
+    expect(wave60).toHaveLength(1);
+    expect(wave100).toHaveLength(3);
+    expect(wave100.slice(0, wave60.length)).toEqual(wave60);
+    expect(new Set(wave100).size).toBe(wave100.length);
+    expect(wave100.some(abilityId => excluded.includes(abilityId))).toBe(false);
+    for (const abilityId of wave100) {
+      expect(allAbilities[abilityId].unimplemented).toBe(false);
+    }
   });
 
   it("retains learn levels while excluding unavailable moves", () => {
