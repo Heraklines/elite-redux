@@ -170,50 +170,79 @@ struct RecoveryFrontierProof {
     identity: EntryIdentity,
 }
 
+#[derive(Clone, Debug)]
+enum EntryMaterialIdentity {
+    Complete(Material),
+    DigestOnly { digest: String },
+}
+
+impl EntryMaterialIdentity {
+    fn digest(&self) -> &str {
+        match self {
+            Self::Complete(material) => &material.digest,
+            Self::DigestOnly { digest } => digest,
+        }
+    }
+
+    fn matches(&self, other: &Self) -> bool {
+        self.digest() == other.digest()
+            && match (self, other) {
+                (Self::Complete(left), Self::Complete(right)) => left.payload == right.payload,
+                _ => true,
+            }
+    }
+
+    /// The frozen action shape still carries a Material payload, but restored
+    /// identities are intentionally opaque.  The placeholder is only for the
+    /// presentation-probe action and is never used for identity matching.
+    fn for_probe_action(&self) -> Material {
+        match self {
+            Self::Complete(material) => material.clone(),
+            Self::DigestOnly { digest } => Material {
+                digest: digest.clone(),
+                payload: Value::Null,
+            },
+        }
+    }
+}
+
 /// Complete local identity for one authenticated authority entry.
 ///
 /// The revision is kept in the identity even where a surrounding map is
 /// already keyed by it.  That makes every comparison path use the same
-/// complete value: revision, all entry material/control fields, and all
-/// authenticated frame-context dimensions.
+/// value: revision, material digest (and payload when available), all
+/// control fields, and all authenticated frame-context dimensions.
 #[derive(Clone, Debug)]
 struct EntryIdentity {
     revision: Revision,
     context: FrameContext,
     operation_id: OperationId,
     kind: AuthorityEntryKind,
-    material: Material,
+    material: EntryMaterialIdentity,
     next_control: NextControl,
     subsumes: Vec<Revision>,
-    material_payload_known: bool,
 }
 
-impl PartialEq for EntryIdentity {
-    fn eq(&self, other: &Self) -> bool {
+impl EntryIdentity {
+    fn matches(&self, other: &Self) -> bool {
         self.revision == other.revision
             && self.context == other.context
             && self.operation_id == other.operation_id
             && self.kind == other.kind
-            && self.material.digest == other.material.digest
-            && (!self.material_payload_known
-                || !other.material_payload_known
-                || self.material.payload == other.material.payload)
+            && self.material.matches(&other.material)
             && self.next_control == other.next_control
             && self.subsumes == other.subsumes
     }
-}
 
-impl EntryIdentity {
     fn from_entry(entry: &AuthorityEntry) -> Self {
         Self {
             revision: entry.revision,
             context: entry.context.clone(),
             operation_id: entry.operation_id.clone(),
             kind: entry.kind,
-            material: entry.material.clone(),
+            material: EntryMaterialIdentity::Complete(entry.material.clone()),
             next_control: entry.next_control.clone(),
             subsumes: entry.subsumes.clone(),
-            material_payload_known: true,
         }
     }
 
@@ -223,15 +252,36 @@ impl EntryIdentity {
             && self.next_control == terminal.next_control
     }
 
-    fn to_entry(&self) -> AuthorityEntry {
+    fn to_probe_entry(&self) -> AuthorityEntry {
         AuthorityEntry {
             context: self.context.clone(),
             revision: self.revision,
             operation_id: self.operation_id.clone(),
             kind: self.kind,
-            material: self.material.clone(),
+            material: self.material.for_probe_action(),
             next_control: self.next_control.clone(),
             subsumes: self.subsumes.clone(),
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        if revision_value(self.revision) == 0
+            || validate_authority_operation_id(self.operation_id.as_str()).is_err()
+            || validate_authority_material_digest(self.material.digest()).is_err()
+            || !is_valid_context(&self.context)
+            || self
+                .subsumes
+                .iter()
+                .any(|revision| revision_value(*revision) == 0)
+            || !is_valid_successor_control(&self.next_control)
+        {
+            return false;
+        }
+        match self.kind {
+            AuthorityEntryKind::TerminalCommit => {
+                matches!(self.next_control, NextControl::Terminal(_))
+            }
+            _ => !matches!(self.next_control, NextControl::Terminal(_)),
         }
     }
 }
@@ -442,7 +492,7 @@ impl AuthorityReplica {
                     "already-installed recovery control proof is not the exact live frontier",
                 ));
             }
-            let entry = installed.identity.to_entry();
+            let entry = installed.identity.to_probe_entry();
             return Ok(vec![
                 self.receipt_action(&entry, AckStage::ControlInstalled, Some(control_id.clone())),
                 ReplicaAction::ProbePresentation { entry },
@@ -663,7 +713,7 @@ impl AuthorityReplica {
             })
             && self.pending.is_none()
             && self.installed_controls.get(&entry.revision).is_some_and(|installed| {
-                installed.identity == entry_identity
+                installed.identity.matches(&entry_identity)
                     && installed.control_id == control_id_of(&entry.next_control)
             })
         {
@@ -689,7 +739,7 @@ impl AuthorityReplica {
             ));
         };
         if let Some(proof) = self.recovery_proof.as_ref() {
-            if proof.identity != entry_identity
+            if !proof.identity.matches(&entry_identity)
                 || !self.identity_matches_current_context(&proof.identity)
                 || self.frontier.received != entry.revision
                 || self.frontier.material != entry.revision
@@ -942,7 +992,9 @@ impl AuthorityReplica {
                 "positive terminal-only adoption requires the complete recovery proof",
             ));
         };
-        if proof.identity != identity || !self.identity_matches_current_context(&proof.identity) {
+        if !proof.identity.matches(&identity)
+            || !self.identity_matches_current_context(&proof.identity)
+        {
             return Err(invalid_recovery(
                 "recovery proof conflicts with the complete pending entry identity",
             ));
@@ -1094,32 +1146,15 @@ fn previous_revision(revision: Revision) -> Option<Revision> {
 }
 
 fn same_entry_identity(left: &AuthorityEntry, right: &AuthorityEntry) -> bool {
-    EntryIdentity::from_entry(left) == EntryIdentity::from_entry(right)
+    EntryIdentity::from_entry(left).matches(&EntryIdentity::from_entry(right))
 }
 
 fn installed_matches_entry(installed: &InstalledControl, entry: &AuthorityEntry) -> bool {
-    installed.identity == EntryIdentity::from_entry(entry)
+    installed.identity.matches(&EntryIdentity::from_entry(entry))
 }
 
 fn is_valid_entry(entry: &AuthorityEntry) -> bool {
-    if revision_value(entry.revision) == 0
-        || validate_authority_operation_id(entry.operation_id.as_str()).is_err()
-        || validate_authority_material_digest(entry.material.digest.as_str()).is_err()
-        || !is_valid_context(&entry.context)
-        || entry
-            .subsumes
-            .iter()
-            .any(|revision| revision_value(*revision) == 0)
-        || !is_valid_successor_control(&entry.next_control)
-    {
-        return false;
-    }
-    match entry.kind {
-        AuthorityEntryKind::TerminalCommit => {
-            matches!(entry.next_control, NextControl::Terminal(_))
-        }
-        _ => !matches!(entry.next_control, NextControl::Terminal(_)),
-    }
+    EntryIdentity::from_entry(entry).is_valid()
 }
 
 fn is_valid_context(context: &FrameContext) -> bool {
@@ -1348,7 +1383,7 @@ fn validate_replica_snapshot_state(
                     "installed control is outside the live frontier or authenticated context",
                 ));
             }
-            if !is_valid_entry(&installed.identity.to_entry()) {
+            if !installed.identity.is_valid() {
                 return Err(snapshot_invalid(
                     "authority_replica.installed_controls",
                     "installed control identity is invalid",
@@ -1399,6 +1434,8 @@ fn validate_replica_snapshot_state(
                 "pending stage does not match the ordered frontier",
             ));
         }
+    } else if snapshot.disposed {
+        validate_disposed_frontier(&snapshot.frontier)?;
     } else if snapshot.frontier.received != snapshot.frontier.material
         || snapshot.frontier.material != snapshot.frontier.control
     {
@@ -1419,7 +1456,7 @@ fn validate_replica_snapshot_state(
 
     match (recovery_proof, pending) {
         (Some(proof), Some(pending)) if pending.stage == PendingStage::MaterialApplied => {
-            if proof != &EntryIdentity::from_entry(&pending.entry)
+            if !proof.matches(&EntryIdentity::from_entry(&pending.entry))
                 || proof.context != expected_context
                 || proof.revision != pending.entry.revision
             {
@@ -1458,6 +1495,34 @@ fn validate_replica_snapshot_state(
     Ok(())
 }
 
+fn validate_disposed_frontier(
+    frontier: &AuthorityFrontier,
+) -> Result<(), crate::snapshot::SnapshotError> {
+    // dispose clears the pending entry but deliberately leaves the ordered
+    // frontier observable.  A partial disposed frontier can therefore only
+    // be the one admitted or material-applied successor that was cleared.
+    if frontier.control == frontier.material && frontier.material == frontier.received {
+        return Ok(());
+    }
+
+    let Some(next) = next_revision(frontier.control) else {
+        return Err(snapshot_invalid(
+            "authority_replica.frontier",
+            "disposed incomplete frontier must have a successor revision",
+        ));
+    };
+    let was_admitted = frontier.material == frontier.control && frontier.received == next;
+    let was_material_applied = frontier.material == next && frontier.received == next;
+    if was_admitted || was_material_applied {
+        Ok(())
+    } else {
+        Err(snapshot_invalid(
+            "authority_replica.frontier",
+            "disposed incomplete frontier must retain exactly one cleared pending revision",
+        ))
+    }
+}
+
 fn identity_snapshot_from_identity(
     identity: &EntryIdentity,
 ) -> crate::snapshot::AuthorityEntryIdentitySnapshotV2 {
@@ -1466,7 +1531,7 @@ fn identity_snapshot_from_identity(
         context: identity.context.clone(),
         operation_id: identity.operation_id.clone(),
         kind: identity.kind,
-        material_digest: identity.material.digest.clone(),
+        material_digest: identity.material.digest().to_owned(),
         next_control_id: control_id_of(&identity.next_control),
         subsumes: identity.subsumes.clone(),
     }
@@ -1563,32 +1628,23 @@ fn entry_identity_from_snapshot(
     }
     let next_control = parse_control_id(&identity.next_control_id)
         .ok_or_else(|| snapshot_invalid(path, "next control identity is not reversible"))?;
-    let material = Material {
-        digest: identity.material_digest.clone(),
-        payload: Value::Null,
-    };
-    let entry = AuthorityEntry {
-        context: identity.context.clone(),
-        revision: identity.revision,
-        operation_id: identity.operation_id.clone(),
-        kind: identity.kind,
-        material: material.clone(),
-        next_control: next_control.clone(),
-        subsumes: identity.subsumes.clone(),
-    };
-    if !is_valid_entry(&entry) || control_id_of(&next_control) != identity.next_control_id {
-        return Err(snapshot_invalid(path, "entry identity is invalid"));
-    }
-    Ok(EntryIdentity {
+    let restored_identity = EntryIdentity {
         revision: identity.revision,
         context: identity.context.clone(),
         operation_id: identity.operation_id.clone(),
         kind: identity.kind,
-        material,
+        material: EntryMaterialIdentity::DigestOnly {
+            digest: identity.material_digest.clone(),
+        },
         next_control,
         subsumes: identity.subsumes.clone(),
-        material_payload_known: false,
-    })
+    };
+    if !restored_identity.is_valid()
+        || control_id_of(&restored_identity.next_control) != identity.next_control_id
+    {
+        return Err(snapshot_invalid(path, "entry identity is invalid"));
+    }
+    Ok(restored_identity)
 }
 
 fn snapshot_invalid(
