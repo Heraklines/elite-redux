@@ -7,7 +7,7 @@
 //! evaluation live in [`crate::ability_pipeline`].
 
 use er_content::abilities::find_ability;
-use er_content::pack::ContentPack;
+use er_content::pack::{ContentPack, ContentPackError};
 use er_types::battle_ids::AbilityId;
 use er_types::battle_model::{
     AbilityEffectDefinition, CapabilityStatus, UnsupportedReasonCode,
@@ -79,8 +79,16 @@ pub enum AbilityUnsupportedReason {
 }
 
 /// Fail-closed ability content resolution error.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum AbilityError {
+    /// The immutable pack failed its complete schema, content, or hash
+    /// validation.  This is distinct from an unsupported requested ID.
+    #[error("selected content pack is invalid: {source}")]
+    InvalidContentPack {
+        /// The exact full-pack validation failure.
+        #[source]
+        source: ContentPackError,
+    },
     /// Missing, explicitly unsupported, or non-canonical IDs are all typed
     /// unsupported content.  In particular, none of these paths becomes
     /// [`NONE_ABILITY_ID`].
@@ -94,17 +102,19 @@ pub enum AbilityError {
 }
 
 impl AbilityError {
-    /// Return the rejected ID without requiring callers to destructure the
-    /// error before mapping it into their own boundary.
-    pub const fn ability_id(&self) -> AbilityId {
+    /// Return the rejected ID for unsupported-content failures.  Whole-pack
+    /// corruption has no truthful ability-local ID and therefore returns
+    /// `None`.
+    pub const fn ability_id(&self) -> Option<AbilityId> {
         match self {
-            Self::UnsupportedContent { ability_id, .. } => *ability_id,
+            Self::InvalidContentPack { .. } => None,
+            Self::UnsupportedContent { ability_id, .. } => Some(*ability_id),
         }
     }
 
-    /// Every current ability error is an unsupported-content failure.
+    /// Whether this is specifically an unsupported-content failure.
     pub const fn is_unsupported_content(&self) -> bool {
-        true
+        matches!(self, Self::UnsupportedContent { .. })
     }
 }
 
@@ -117,6 +127,10 @@ pub fn resolve_ability(
     content: &ContentPack,
     ability_id: AbilityId,
 ) -> Result<ResolvedAbility, AbilityError> {
+    content
+        .validate()
+        .map_err(|source| AbilityError::InvalidContentPack { source })?;
+
     let definition = find_ability(&content.abilities, ability_id).map_err(|_| {
         unsupported(ability_id, AbilityUnsupportedReason::Missing)
     })?;
