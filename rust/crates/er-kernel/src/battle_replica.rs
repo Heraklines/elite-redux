@@ -10,7 +10,6 @@ use er_game::material::{
     decode_replacement_material, decode_turn_material,
 };
 use er_types::{AuthorityEntryKind, Material};
-use serde_json::Value;
 use thiserror::Error;
 
 /// Shared terminal reason for a material content identity failure.
@@ -85,30 +84,6 @@ pub fn apply_replacement_material_bytes(
     let material = decode_replacement_material(bytes)
         .map_err(|_| ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial))?;
     apply_replacement_material(current, &material, content).map_err(map_material_apply_error)
-}
-
-/// Apply a typed Authority `Material.payload` value after preserving its raw
-/// JSON object order for the exact canonical codec check.
-pub fn apply_authority_material_payload(
-    current: &BattleMaterialApplyContext,
-    kind: AuthorityEntryKind,
-    payload: &Value,
-    content: &ContentPack,
-) -> Result<MaterialApplyResult, ReplicaApplyError> {
-    let bytes = serde_json::to_vec(payload)
-        .map_err(|_| ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial))?;
-    match kind {
-        AuthorityEntryKind::TurnCommit => apply_turn_material_bytes(current, &bytes, content),
-        AuthorityEntryKind::ReplacementCommit => {
-            apply_replacement_material_bytes(current, &bytes, content)
-        }
-        AuthorityEntryKind::InteractionCommit
-        | AuthorityEntryKind::ControlCommit
-        | AuthorityEntryKind::WaveAdvance
-        | AuthorityEntryKind::TerminalCommit => Err(ReplicaApplyError::ProtocolViolation(
-            ProtocolViolation::MalformedBattleMaterial,
-        )),
-    }
 }
 
 /// Apply a complete Authority material envelope, checking its declared kind.

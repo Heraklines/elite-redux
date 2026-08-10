@@ -11,6 +11,7 @@ use er_battle::legality::{
     normalize_command_set, validate_replacement_selection, validate_state_content,
 };
 use er_battle::command::NormalizedBattleCommand;
+use er_battle::replacement::legal_replacement_candidates;
 use er_content::moves::find_move;
 use er_battle::{
     BattleMutation, BattleNextDecision, validate_battle_mutation_evidence,
@@ -359,7 +360,7 @@ pub fn apply_replacement_material(
     validate_state_content(&material.before_state, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     validate_replacement_identity(material)?;
-    validate_replacement_selection(
+    validate_material_replacement_selection(
         &material.before_state,
         material.occurrence.id,
         &material.selection,
@@ -576,7 +577,7 @@ fn reconcile_turn_frontier(
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
     validate_state_content(&current.current_state, content)
-        .map_err(|_| BattleMaterialApplyError::LocalBeforeStateMismatch)?;
+        .map_err(|_| BattleMaterialApplyError::Invariant)?;
     if state_without_command_collection(&current.current_state)
         != state_without_command_collection(&material.before_state)
     {
@@ -695,6 +696,35 @@ fn validate_turn_commands(
     normalize_command_set(before, commands, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     Ok(())
+}
+
+fn validate_material_replacement_selection(
+    before: &GameState,
+    occurrence: er_types::battle_ids::FaintOccurrenceId,
+    selection: &ReplacementSelection,
+    content: &ContentPack,
+) -> Result<(), BattleMaterialApplyError> {
+    let battle = before
+        .battle
+        .as_ref()
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let stored = battle
+        .faint_queue
+        .iter()
+        .find(|candidate| candidate.id == occurrence)
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    if *selection == ReplacementSelection::NoLegalReplacement
+        && stored.replacement == ReplacementProgress::NoLegalReplacement
+    {
+        let candidates = legal_replacement_candidates(battle, occurrence)
+            .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        if candidates.is_empty() {
+            return Ok(());
+        }
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    validate_replacement_selection(before, occurrence, selection, content)
+        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)
 }
 
 fn validate_turn_evidence(
@@ -1291,9 +1321,11 @@ fn validate_next_state_command_collection(
             validate_fresh_command_frontier(after_state, battle, content)
         }
         BattleNextDecision::Replacement { .. } | BattleNextDecision::Complete(_) => {
-            if !battle.command_state.frontier.is_empty()
-                || !battle.command_state.tombstones.is_empty()
-            {
+            battle
+                .command_state
+                .validate()
+                .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
+            if !battle.command_state.frontier.is_empty() {
                 return Err(BattleMaterialApplyError::InvalidAfterState);
             }
             Ok(())
@@ -1310,10 +1342,6 @@ fn validate_fresh_command_frontier(
         .command_state
         .validate()
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-    if !battle.command_state.tombstones.is_empty() {
-        return Err(BattleMaterialApplyError::InvalidAfterState);
-    }
-
     let expected_slots = canonical_slots(&battle.format)
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
     let mut living_active = Vec::new();
@@ -1470,14 +1498,13 @@ fn validate_allocator_projection(
         let mut ids = grouped.remove(seat).unwrap_or_default();
         ids.sort_unstable();
         ids.dedup();
-        if ids.iter().any(|id| *id >= after_id) {
+        if ids
+            .iter()
+            .any(|id| *id < before_id || *id >= after_id)
+        {
             return Err(BattleMaterialApplyError::MenuAllocatorMismatch);
         }
-        let fresh = ids
-            .iter()
-            .copied()
-            .filter(|id| *id >= before_id)
-            .collect::<Vec<_>>();
+        let fresh = ids;
         for (offset, id) in fresh.iter().enumerate() {
             let expected = menu_id_add(before_id, offset)?;
             if *id != expected {

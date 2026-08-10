@@ -251,7 +251,7 @@ fn allocator_internal_validation_precedes_endpoint_recovery_classification() {
     assert!(MATERIAL_SOURCE.contains("MenuAllocatorMismatch"));
     assert!(MATERIAL_SOURCE.contains("LocalBeforeStateMismatch"));
     assert!(MATERIAL_SOURCE.contains("after_id < before_id"));
-    assert!(MATERIAL_SOURCE.contains("ids.iter().any(|id| *id >= after_id)"));
+    assert!(MATERIAL_SOURCE.contains("*id < before_id || *id >= after_id"));
 }
 
 #[test]
@@ -267,6 +267,7 @@ fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
 
 #[test]
 fn adapter_rejects_non_material_authority_entry_kinds_without_fallback() {
+    assert!(!REPLICA_SOURCE.contains("pub fn apply_authority_material_payload"));
     for kind in [
         "AuthorityEntryKind::InteractionCommit",
         "AuthorityEntryKind::ControlCommit",
