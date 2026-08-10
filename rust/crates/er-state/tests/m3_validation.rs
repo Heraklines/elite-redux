@@ -474,6 +474,41 @@ fn faint_queue_preserves_allocator_causality_and_stored_replacement_truth()
 }
 
 #[test]
+fn pending_last_player_faint_defers_defeat_until_replacement_applies()
+-> Result<(), Box<dyn Error>> {
+    let mut state = valid_game()?;
+    let battle = state.battle.as_mut().ok_or("missing battle")?;
+    battle.player_party[0] = pokemon(17, Some(seat(1)), true)?;
+    battle.faint_queue.push(FaintOccurrence {
+        id: FaintOccurrenceId::ZERO,
+        source: FaintSource {
+            epoch: er_types::battle_ids::AuthorityEpoch::new(safe(1)),
+            wave: battle.wave,
+            resolved_turn: battle.turn,
+            turn_occurrence: 0,
+        },
+        slot: slot(BattleSide::Player, 0),
+        pokemon: PokemonId::new(safe(17)),
+        owner_seat: Some(seat(1)),
+        replacement: ReplacementProgress::Pending,
+    });
+    battle.next_faint_occurrence = FaintOccurrenceId::new(safe(1));
+    assert_eq!(battle.outcome, BattleOutcome::Ongoing);
+    assert!(validate_battle_state(battle).is_ok());
+
+    battle.outcome = BattleOutcome::Defeat;
+    assert!(matches!(
+        validate_battle_state(battle),
+        Err(StateValidationError::OutcomeMismatch { .. })
+    ));
+
+    battle.faint_queue[0].replacement = ReplacementProgress::Applied;
+    battle.field.slots[0].occupant = None;
+    assert!(validate_battle_state(battle).is_ok());
+    Ok(())
+}
+
+#[test]
 fn faint_queue_rejects_noncanonical_authority_and_unresolved_subjects() -> Result<(), Box<dyn Error>>
 {
     let mut state = valid_game()?;

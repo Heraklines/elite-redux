@@ -831,10 +831,16 @@ fn has_legal_replacement(battle: &BattleState, owner: Option<SeatId>) -> bool {
 fn validate_outcome(battle: &BattleState) -> Result<(), StateValidationError> {
     let player_alive = battle.player_party.iter().any(|pokemon| !pokemon.fainted);
     let enemy_alive = battle.enemy_party.iter().any(|pokemon| !pokemon.fainted);
+    let unresolved_player_replacement = battle.faint_queue.iter().any(|occurrence| {
+        occurrence.slot.side == BattleSide::Player
+            && occurrence.replacement != ReplacementProgress::Applied
+    });
     let valid = match battle.outcome {
-        BattleOutcome::Ongoing => player_alive && enemy_alive,
+        BattleOutcome::Ongoing => {
+            (player_alive && enemy_alive) || (!player_alive && unresolved_player_replacement)
+        }
         BattleOutcome::Victory => player_alive && !enemy_alive,
-        BattleOutcome::Defeat => !player_alive,
+        BattleOutcome::Defeat => !player_alive && !unresolved_player_replacement,
     };
     if valid {
         Ok(())
