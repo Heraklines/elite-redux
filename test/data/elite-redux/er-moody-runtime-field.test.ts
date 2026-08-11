@@ -402,11 +402,8 @@ function curseEvent(id: MoodyRuntimeFieldCurseId): {
       return {
         event: {
           ...base,
-          kind: "battle-start",
-          isBoss: false,
-          isTrainer: true,
-          activePokemonId: player.id,
-          party: [player, ally],
+          kind: "lead-selection",
+          pokemonId: player.id,
         },
       };
     case "type-tax":
@@ -631,6 +628,39 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(multiplier(boon("prismatic-opening", 3, "prismatic-doctrine"))).toBe(0.65);
   });
 
+  it("records Restless Lead at encounter selection and rejects it on the next battle", () => {
+    const selected = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("restless-lead")],
+      state: createMoodyRuntimeFieldState(),
+      event: { ...base, kind: "lead-selection", pokemonId: player.id },
+    });
+    expect(selected.state.values["persistent:restless-lead:last-lead"]).toBe(player.id);
+    expect(selected.commands).not.toContainEqual(expect.objectContaining({ kind: "invalidate-lead" }));
+
+    const repeated = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("restless-lead")],
+      state: selected.state,
+      event: { ...base, battleId: "battle:next", kind: "lead-selection", pokemonId: player.id },
+    });
+    expect(repeated.commands).toContainEqual(
+      expect.objectContaining({ kind: "invalidate-lead", subjectId: player.id }),
+    );
+    expect(repeated.state.values["persistent:restless-lead:last-lead"]).toBe(player.id);
+
+    const replacement = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("restless-lead")],
+      state: repeated.state,
+      event: { ...base, battleId: "battle:next", kind: "lead-selection", pokemonId: ally.id },
+    });
+    expect(replacement.state.values["persistent:restless-lead:last-lead"]).toBe(ally.id);
+  });
+
   it("limits Public Enemy roster growth to trainers and gives boss trainers one complete Second Act", () => {
     const wild = resolveMoodyRuntimeField({
       ownerSide: "player",
@@ -712,12 +742,12 @@ describe("Moody runtime field deterministic mechanics", () => {
 
   it("only advances Reverse Snowball after a flawless win", () => {
     const persistentKey = "persistent:reverse-snowball:streak";
-    const state = { numbers: { [persistentKey]: 4 }, values: {}, lists: {} };
+    const runtimeState = { numbers: { [persistentKey]: 4 }, values: {}, lists: {} };
     const held = resolveMoodyRuntimeField({
       ownerSide: "player",
       boons: [],
       curses: [curse("reverse-snowball")],
-      state,
+      state: runtimeState,
       event: {
         ...base,
         kind: "battle-won",

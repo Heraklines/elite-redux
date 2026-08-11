@@ -85,9 +85,22 @@ function boonDetail(instance: MoodyBoonInstance, showTarget = false): MoodyBattl
     description: [
       ...(showTarget ? [`Bound to: ${moodyTargetSummary(instance.target)}`] : []),
       effect,
-      ...progress.map(line => `Progress: ${line}`),
+      ...progress.map(line => `Current: ${line}`),
     ].join("\n"),
     tone: "boon",
+  };
+}
+
+function curseDetail(curseId: string, progress: readonly string[]): MoodyBattleHudDetail {
+  const definition = MOODY_CURSE_BY_ID.get(curseId);
+  return {
+    id: `curse:${curseId}`,
+    title: definition?.name ?? curseId,
+    description: [
+      definition?.description ?? "No description available.",
+      ...progress.map(line => `Current: ${line}`),
+    ].join("\n"),
+    tone: "curse",
   };
 }
 
@@ -291,7 +304,11 @@ export class MoodyRuntimeUi {
     for (const globalRule of globalRules) {
       rules.push(MOODY_BOON_BY_ID.get(globalRule.boonId)?.name ?? globalRule.boonId);
     }
-    const numbers = state.fieldRuntime == null ? {} : deserializeMoodyRuntimeFieldState(state.fieldRuntime).numbers;
+    const fieldRuntime =
+      state.fieldRuntime == null
+        ? { numbers: {}, values: {}, lists: {} }
+        : deserializeMoodyRuntimeFieldState(state.fieldRuntime);
+    const { numbers } = fieldRuntime;
     const coordinatorBarriers = Object.fromEntries(
       globalScene.getPlayerField(true).map(pokemon => [String(pokemon.id), getMoodyCoordinatorBarrier(pokemon.id)]),
     );
@@ -357,29 +374,35 @@ export class MoodyRuntimeUi {
     }
 
     const hpOverlay = activeOverlays[0]?.hpOverlay;
+    const partyNames = new Map(globalScene.getPlayerParty().map(pokemon => [pokemon.id, pokemon.getNameToRender()]));
     const details: MoodyBattleHudDetail[] = [
+      ...state.boons.map(boon => boonDetail(boon)),
       ...state.curses.map(curse => {
-        const definition = MOODY_CURSE_BY_ID.get(curse.curseId);
-        return {
-          id: `curse:${curse.curseId}`,
-          title: `CURSE - ${definition?.name ?? curse.curseId}`,
-          description: definition?.description ?? "No description available.",
-          tone: "curse" as const,
-        };
+        const progress: string[] = [];
+        if (curse.curseId === "restless-lead") {
+          const previousLead = Number(fieldRuntime.values["persistent:restless-lead:last-lead"] ?? -1);
+          if (Number.isSafeInteger(previousLead) && partyNames.has(previousLead)) {
+            progress.push(
+              `Previous lead: ${partyNames.get(previousLead)}; choose a different conscious lead next battle`,
+            );
+          }
+        } else if (curse.curseId === "reverse-snowball") {
+          const streak = Math.max(0, numbers["persistent:reverse-snowball:streak"] ?? 0);
+          progress.push(
+            `${streak} flawless win${streak === 1 ? "" : "s"}; future enemy stats +${Math.min(30, streak * 3)}%`,
+          );
+        } else if (curse.curseId === "accumulated-fatigue") {
+          for (const [key, waves] of Object.entries(numbers)) {
+            const match = /^persistent:accumulated-fatigue:pokemon:(\d+):waves$/.exec(key);
+            const pokemonId = Number(match?.[1]);
+            const name = partyNames.get(pokemonId);
+            if (name != null && waves > 0) {
+              progress.push(`${name}: ${waves}/3 consecutive waves${waves >= 3 ? " - 15% damage penalty active" : ""}`);
+            }
+          }
+        }
+        return curseDetail(curse.curseId, progress);
       }),
-      ...state.boons.map(boonDetail),
-      ...trackers.map(tracker => ({
-        id: `tracker:${tracker.id}`,
-        title: `${tracker.label} ${tracker.value}`,
-        description: tracker.detail ?? "Live battle tracker.",
-        tone: "tracker" as const,
-      })),
-      ...this.feed.slice(-12).map(entry => ({
-        id: `feed:${entry.order}`,
-        title: "RECENT TRIGGER",
-        description: entry.detail == null ? entry.label : `${entry.label}\n${entry.detail}`,
-        tone: "feed" as const,
-      })),
     ];
     return {
       ruleLines: rules,

@@ -1988,8 +1988,8 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "A selected Pokémon at least five levels below the current party average gains 2% to non-HP stats per missing level, maximum 20%, and 50% increased experience.\n\nIf it is not fully evolved, both bonuses are multiplied by 1.25. Mega Evolution does not count as an ordinary evolution stage for this check.",
-    rankTwo: "Maximum stat compensation becomes 30%; experience becomes +75%.",
+    base: "Choose one Pokémon. While it is at least five levels below the party's average level, it gains +2% Attack, Defense, Sp. Atk, Sp. Def, and Speed for each level it is behind (maximum +20%) and earns 50% more experience.\n\nIf it can still evolve normally, multiply both bonuses by 1.25. Mega Evolution does not affect this check.",
+    rankTwo: "The stat-bonus cap becomes +30%, and the experience bonus becomes +75% before the unevolved multiplier.",
     evolutions: [
       {
         id: "giant-killer",
@@ -2003,7 +2003,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** A selected Pokémon at least five levels below the current party average gains 2% to non-HP stats per missing level, maximum 20%, and 50% increased experience.\n\nIf it is not fully evolved, both bonuses are multiplied by 1.25. Mega Evolution does not count as an ordinary evolution stage for this check.\n\n**Rank II:** Maximum stat compensation becomes 30%; experience becomes +75%.\n\n**Evolution — Giant Killer:** The temporary combat bonus doubles against enemies above its own level.\n\n**Evolution — Graduate:** When it catches up, it retains a permanent 5% stat bonus.",
+      "**Base:** Choose one Pokémon. While it is at least five levels below the party's average level, it gains +2% Attack, Defense, Sp. Atk, Sp. Def, and Speed for each level it is behind (maximum +20%) and earns 50% more experience.\n\nIf it can still evolve normally, multiply both bonuses by 1.25. Mega Evolution does not affect this check.\n\n**Rank II:** The stat-bonus cap becomes +30%, and the experience bonus becomes +75% before the unevolved multiplier.\n\n**Evolution — Giant Killer:** The temporary combat bonus doubles against enemies above its own level.\n\n**Evolution — Graduate:** When it catches up, it retains a permanent 5% stat bonus.",
   },
   {
     id: "growth-ring",
@@ -2376,13 +2376,14 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "pre-battle information",
     targetKind: "team",
-    base: "Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.",
+    base: "Before each trainer battle:\n\n1. The enemy roster and active leads are generated.\n2. Every active enemy commits its first action.\n3. The player sees each lead and its committed move.\n4. The player may replace only the opening lead slots once.\n5. The enemy cannot recalculate those committed actions.\n\nThe revealed moves are committed and cannot be recalculated.",
     rankTwo: "The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.",
     evolutions: [
       {
         id: "parallel-futures",
         name: "Parallel Futures",
-        description: "In doubles or triples, the committed action of every currently active enemy is revealed.",
+        description:
+          "In doubles or triples, the complete visible moveset, abilities, and item stacks of every active enemy are revealed.",
       },
       {
         id: "contingency-plan",
@@ -2392,7 +2393,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the committed action of every currently active enemy is revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
+      "**Base:** Before each trainer battle:\n\n1. The enemy roster and active leads are generated.\n2. Every active enemy commits its first action.\n3. The player sees each lead and its committed move.\n4. The player may replace only the opening lead slots once.\n5. The enemy cannot recalculate those committed actions.\n\nThe revealed moves are committed and cannot be recalculated.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the complete visible moveset, abilities, and item stacks of every active enemy are revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
   },
   {
     id: "pressure-valve",

@@ -27,6 +27,7 @@ export interface MoodyOperationOption {
 }
 
 export interface MoodyCommittedActionPresentation {
+  pokemonId?: string;
   actor: string;
   action: string;
   target: string;
@@ -42,6 +43,7 @@ export interface MoodyOperationModel {
   minSelections?: number;
   maxSelections?: number;
   reorderable?: boolean;
+  leadCount?: number;
   committedActions?: readonly MoodyCommittedActionPresentation[];
   detailLines?: readonly string[];
   trackerLabel?: string;

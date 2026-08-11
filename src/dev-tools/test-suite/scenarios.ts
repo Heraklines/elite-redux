@@ -118,6 +118,7 @@ import {
   demoMoodyTargetPicker,
   demoMoodyTransitionSections,
 } from "#ui/moody/moody-demo-data";
+import type { MoodyOperationModel } from "#ui/moody/moody-operation";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -1642,7 +1643,7 @@ function installMoodyUiDemoState(): void {
         },
   );
   restoreMoodyModeState(state);
-  setMoodyEnemyBoonLoadout({ waveIndex: 31, boons: demoMoodyEnemyPanel().boons });
+  setMoodyEnemyBoonLoadout({ waveIndex: 31, boons: [...demoMoodyEnemyPanel().boons] });
   const livePresentation = demoMoodyLivePresentation(ids);
   const captureTarget = globalScene.getEnemyField().find(pokemon => pokemon?.isActive(true));
   if (livePresentation.recruiterEye != null && captureTarget != null) {
@@ -1664,6 +1665,31 @@ function openMoodyUiHarness(open: () => void): void {
   });
 }
 
+function openMoodyBattleUiHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  installMoodyUiDemoState();
+  const openWhenCommandReady = () => {
+    if (globalScene.ui.getMode() !== UiMode.COMMAND) {
+      globalScene.time.delayedCall(50, openWhenCommandReady);
+      return;
+    }
+    open();
+    const signalWhenVisible = () => {
+      if (globalScene.ui.getMode() !== UiMode.MOODY_CHOICE) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  };
+  openWhenCommandReady();
+}
+
 function openMoodyFlyoutHarness(open: () => void): void {
   setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
   globalScene.showMoodyEffectFlyouts = true;
@@ -1682,6 +1708,38 @@ function openMoodyFlyoutHarness(open: () => void): void {
     };
     signalWhenVisible();
   });
+}
+
+function hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames = 30): void {
+  const trainer = globalScene.currentBattle?.trainer;
+  trainer?.setVisible(false);
+  for (const sprite of trainer?.getSprites() ?? []) {
+    sprite.setVisible(false);
+  }
+  if (remainingFrames > 0) {
+    globalScene.time.delayedCall(50, () => hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames - 1));
+  }
+}
+
+function buildMoodyBorrowedFutureHarnessModel(): MoodyOperationModel {
+  const model = demoMoodyBorrowedFutureOperation();
+  const enemies = globalScene.getEnemyField().filter(pokemon => pokemon?.isActive(true));
+  const party = globalScene.getPlayerParty();
+  return {
+    ...model,
+    leadCount: globalScene.currentBattle.getBattlerCount(),
+    committedActions: enemies.map(pokemon => ({
+      pokemonId: String(pokemon.id),
+      actor: pokemon.getNameToRender(),
+      action: pokemon.getMoveset()[0]?.getName() ?? "No move",
+      target: "Committed target",
+    })),
+    options: party.map(pokemon => ({
+      id: String(pokemon.id),
+      label: pokemon.getNameToRender(),
+      description: "Available for a lead slot.",
+    })),
+  };
 }
 
 const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
@@ -1769,12 +1827,7 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
     setup: setupMoodyTrainerFlyoutHarness,
     onBattleStart: () =>
       openMoodyFlyoutHarness(() => {
-        globalScene.ui.pushMoodyTrigger("Mithridatism II: Poison cure 2/3", {
-          effectId: "mithridatism",
-          name: "Mithridatism II",
-          kind: "boon",
-          side: "player",
-        });
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "player");
       }),
   },
   {
@@ -1784,6 +1837,7 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
     setup: setupMoodyTrainerFlyoutHarness,
     onBattleStart: () =>
       openMoodyFlyoutHarness(() => {
+        hideMoodyEnemyTrainerHarnessFieldSprite();
         void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "enemy");
       }),
   },
@@ -1834,11 +1888,13 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
   },
   {
     label: "UI: Moody Borrowed Future",
-    description: "Production planning handler with committed enemy actions and one-time party reorder.",
+    description: "Compact one-to-three lead forecast with committed moves and restricted party reorder.",
     gameMode: GameModes.FUN,
-    setup: setupMoodyUiHarness,
+    setup: setupMoodyAdaptivePartyHarness,
     onBattleStart: () =>
-      openMoodyUiHarness(() => void globalScene.ui.showMoodyBorrowedFuture(demoMoodyBorrowedFutureOperation())),
+      openMoodyBattleUiHarness(
+        () => void globalScene.ui.showMoodyBorrowedFuture(buildMoodyBorrowedFutureHarnessModel()),
+      ),
   },
   {
     label: "UI: Moody bounty board",

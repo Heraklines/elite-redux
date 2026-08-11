@@ -68,7 +68,7 @@ describe("Moody party-card indicators", () => {
       progress: { counters: { "cures.poison": 1 } },
     };
     expect(buildMoodyPartySlotPresentation([mithridatism])?.effectLabels).toContain(
-      "Mithridatism - Poison: 1/3 cures - Resistance I at 3",
+      "Mithridatism - Poison: 1/3 cures - Resistance I at 3 (50% prevention)",
     );
   });
 

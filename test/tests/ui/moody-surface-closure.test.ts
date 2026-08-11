@@ -60,6 +60,17 @@ describe("Moody operation contracts", () => {
     expect(handler).toMatch(/case Button\.(ACTION|SUBMIT)/);
     expect(handler).toMatch(/case Button\.(LEFT|RIGHT)/);
   });
+
+  it("uses a compact lead forecast and the normal party screen for Borrowed Future reordering", () => {
+    const handler = source("src/ui/moody/moody-choice-ui-handler.ts");
+    const party = source("src/ui/handlers/party-ui-handler.ts");
+    expect(handler).toContain("BORROWED_FUTURE_HEIGHT");
+    expect(handler).toContain("addPokemonIcon");
+    expect(handler).toContain("PartyUiMode.BORROWED_FUTURE_REORDER");
+    expect(handler).toMatch(/case Button\.UP:[\s\S]*openBorrowedFutureReorder/);
+    expect(party).toContain("cursor < this.borrowedFutureLeadCount");
+    expect(party).toContain("Choose a lead to replace. Back when finished.");
+  });
 });
 
 describe("Moody draft cadence wiring", () => {
@@ -76,9 +87,19 @@ describe("Moody draft cadence wiring", () => {
     const adapter = source("src/data/elite-redux/moody/moody-scene-adapter.ts");
     const scenarios = source("src/dev-tools/test-suite/scenarios.ts");
     expect(bar).toContain("globalScene.currentBattle?.trainer?.getSprites().at(0)");
-    expect(bar).toContain('.setFlipX(side === "enemy")');
+    expect(bar).toContain(".setFrame(source.frame.name)");
+    expect(bar).toContain(".clearTint()");
+    expect(bar).toContain("setTintFill(trainerEffectTint[kind])");
+    expect(bar).toContain("trainerPortraitCropHeightRatio");
+    expect(bar).toContain(".setCrop(cropX, cropY, cropWidth, cropHeight)");
+    expect(bar).toContain("source.frame.realWidth");
+    expect(bar).toContain("source.frame.realHeight");
+    expect(bar).toContain("this.bringToTop(this.trainerPortrait)");
+    expect(bar).not.toContain("TRAINER BOON");
+    expect(bar).not.toContain("TRAINER CURSE");
     expect(adapter).toContain('getMoodyEffectFlyoutCue({ boons: loadout.boons, curses: [] }, effectId, "enemy")');
     expect(scenarios).toContain('label: "UI: Moody enemy trainer boon flyout"');
+    expect(scenarios).not.toContain("showMoodyEnemyTrainerHarnessPortrait()");
     expect(scenarios).toContain('showTrainerEffect("Mithridatism II", "boon", "enemy")');
   });
 
@@ -129,6 +150,22 @@ describe("Moody draft cadence wiring", () => {
     expect(hud).toContain("getMoodyBattleHudWrapCharacters(width)");
     expect(hud).toContain("(width - 14) / PANEL_TEXT_CHARACTER_WIDTH");
     expect(hud).not.toContain("(width - 14) / 4.5");
+  });
+
+  it("uses a names-first boon/curse accordion without internal trigger history", () => {
+    const hud = source("src/ui/moody/moody-battle-hud.ts");
+    const runtime = source("src/ui/moody/moody-runtime-ui.ts");
+    expect(hud).toContain('title: "BOONS"');
+    expect(hud).toContain('title: "CURSES"');
+    expect(hud).toContain("expandedDetailId");
+    expect(hud).toContain("expandedDetailId = details[selectedDetailIndex]?.id ?? null");
+    expect(runtime).not.toContain('title: "RECENT TRIGGER"');
+    expect(runtime).not.toContain("...trackers.map(tracker => ({");
+  });
+
+  it("labels Borrowed Future commitments as moves", () => {
+    const handler = source("src/ui/moody/moody-choice-ui-handler.ts");
+    expect(handler).toContain("`MOVE: ${action.action}`");
   });
 
   it("keeps the collapsed battle drawer compact while retaining a larger touch target", () => {

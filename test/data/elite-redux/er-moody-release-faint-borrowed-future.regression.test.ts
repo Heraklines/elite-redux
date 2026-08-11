@@ -9,6 +9,7 @@ import {
   resolveMoodyCommittedEnemyTargetIndices,
 } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { createMoodyModeState, resetMoodyModeState, restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -79,6 +80,7 @@ interface BorrowedSceneResult {
 function installBorrowedScene(
   result: MoodyOperationResult | Promise<MoodyOperationResult> = new Promise<MoodyOperationResult>(() => undefined),
   contingencyResult?: MoodyOperationResult,
+  battleType: BattleType = BattleType.TRAINER,
 ): BorrowedSceneResult {
   const party = [battler(11, 0), battler(22, 1)];
   const playerField = [...party];
@@ -103,6 +105,7 @@ function installBorrowedScene(
   initGlobalScene({
     currentBattle: {
       waveIndex: 20,
+      battleType,
       battleSeed: "borrowed-future-live",
       turn: 1,
       arrangement: { playerCapacity: 2 },
@@ -200,12 +203,21 @@ describe("Moody release blocker: Borrowed Future", () => {
     expect(scene.playerField.map(pokemon => pokemon.id)).toEqual([22, 11]);
   });
 
-  it("reveals only one enemy commitment before Parallel Futures", () => {
+  it("reveals every active enemy lead in doubles", () => {
     restoreBorrowedFuture();
     const scene = installBorrowedScene();
     prepareMoodyCoordinatorEnemyActionCommitments();
     const model = startQueuedOperation(scene);
-    expect(model.committedActions).toHaveLength(1);
+    expect(model.committedActions).toHaveLength(2);
+    expect(model.leadCount).toBe(2);
+  });
+
+  it("does not interrupt wild battles", () => {
+    restoreBorrowedFuture();
+    const scene = installBorrowedScene(new Promise<MoodyOperationResult>(() => undefined), undefined, BattleType.WILD);
+    prepareMoodyCoordinatorEnemyActionCommitments();
+    expect(scene.queuedPhases).toHaveLength(0);
+    expect(scene.requestMoodyOperation).not.toHaveBeenCalled();
   });
 
   it("reveals every active enemy commitment with Parallel Futures", () => {

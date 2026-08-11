@@ -1802,18 +1802,17 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
 
     switch (id) {
       case "restless-lead":
-        if (
-          event.kind === "lead-selection"
-          && valueAt(currentState(), `persistent:${id}:last-lead`, -1) === event.pokemonId
-        ) {
-          curseCommand("invalidate-lead", { subjectId: event.pokemonId });
-        }
-        if (event.kind === "battle-start") {
-          setValue(`persistent:${id}:last-lead`, event.activePokemonId);
-          curseCommand("mark-trigger", {
-            subjectId: event.activePokemonId,
-            value: "lead-recorded",
-          });
+        if (event.kind === "lead-selection") {
+          const previousLead = valueAt(currentState(), `persistent:${id}:last-lead`, -1);
+          if (previousLead === event.pokemonId) {
+            curseCommand("invalidate-lead", { subjectId: event.pokemonId });
+          } else {
+            setValue(`persistent:${id}:last-lead`, event.pokemonId);
+            curseCommand("mark-trigger", {
+              subjectId: event.pokemonId,
+              value: "lead-recorded",
+            });
+          }
         }
         break;
       case "type-tax":

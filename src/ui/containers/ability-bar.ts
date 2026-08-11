@@ -8,6 +8,7 @@ import i18next from "i18next";
 const defaultBarWidth = 118;
 const defaultLegacyBarWidth = 90;
 const defaultBarHeight = 31;
+const enemyTrainerPortraitBaseline = 7;
 const screenLeft = 0;
 const baseY = -116;
 const textPadding = 15;
@@ -15,18 +16,62 @@ const legacyUiPlayerTextPadding = 16;
 const legacyUiEnemyTextPadding = 6;
 const trainerPortraitInset = 4;
 const trainerPortraitGap = 4;
+const enemyTrainerPortraitNudgeX = 6;
 const trainerEffectTextInset = 6;
-const trainerPortraitHeight = 23;
+const trainerPortraitHeight = 39;
+const trainerPortraitMaxWidth = 34;
+const trainerPortraitCropWidthRatio = 1;
+const trainerPortraitCropHeightRatio = 0.72;
 const trainerNameScale = 0.1666666667;
 const trainerNameMinScale = 0.125;
 const trainerEffectTint = {
-  boon: 0xb889e3,
-  curse: 0x9254bd,
+  boon: 0x7550a8,
+  curse: 0x4e286f,
 } as const;
 const trainerEffectAccent = {
   boon: 0xd4adf3,
   curse: 0xb66add,
 } as const;
+
+interface VisibleFrameBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+const visibleTrainerFrameBounds = new Map<string, VisibleFrameBounds>();
+
+function getVisibleTrainerFrameBounds(source: Phaser.GameObjects.Sprite): VisibleFrameBounds {
+  const width = source.frame.realWidth;
+  const height = source.frame.realHeight;
+  const cacheKey = `${source.texture.key}:${String(source.frame.name)}:${width}x${height}`;
+  const cached = visibleTrainerFrameBounds.get(cacheKey);
+  if (cached != null) {
+    return cached;
+  }
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (globalScene.textures.getPixelAlpha(x, y, source.texture.key, source.frame.name) <= 0) {
+        continue;
+      }
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  const bounds =
+    right >= left && bottom >= top
+      ? { left, top, right, bottom }
+      : { left: 0, top: 0, right: width - 1, bottom: height - 1 };
+  visibleTrainerFrameBounds.set(cacheKey, bounds);
+  return bounds;
+}
 
 export class AbilityBar extends Phaser.GameObjects.Container {
   private readonly abilityBars: (Phaser.GameObjects.Image | Phaser.GameObjects.NineSlice)[];
@@ -36,7 +81,6 @@ export class AbilityBar extends Phaser.GameObjects.Container {
   private readonly isLegacyUi: boolean;
   private trainerPortrait: Phaser.GameObjects.Sprite;
   private trainerAccent: Phaser.GameObjects.Rectangle;
-  private trainerEffectKindText: Phaser.GameObjects.Text;
   private trainerEffectNameText: Phaser.GameObjects.Text;
   private player: boolean;
   private screenRight: number; // hold screenRight in case size changes between show and hide
@@ -105,17 +149,12 @@ export class AbilityBar extends Phaser.GameObjects.Container {
       .rectangle(0, 0, this.currentBarWidth, 2, trainerEffectAccent.boon)
       .setOrigin(0)
       .setVisible(false);
-    this.trainerEffectKindText = addTextObject(trainerEffectTextInset, 3, "", TextStyle.MESSAGE, {
-      fontSize: "48px",
+    this.trainerEffectNameText = addTextObject(trainerEffectTextInset, defaultBarHeight / 2, "", TextStyle.MESSAGE, {
+      fontSize: "72px",
     })
-      .setOrigin(0)
+      .setOrigin(0, 0.5)
       .setVisible(false);
-    this.trainerEffectNameText = addTextObject(trainerEffectTextInset, 14, "", TextStyle.MESSAGE, {
-      fontSize: "66px",
-    })
-      .setOrigin(0)
-      .setVisible(false);
-    this.add([this.trainerAccent, this.trainerPortrait, this.trainerEffectKindText, this.trainerEffectNameText]);
+    this.add([this.trainerAccent, this.trainerPortrait, this.trainerEffectNameText]);
 
     this.setVisible(false) //
       .setX(-this.currentBarWidth); // start hidden (right edge of bar at x=0)
@@ -128,7 +167,6 @@ export class AbilityBar extends Phaser.GameObjects.Container {
     if (!value) {
       this.trainerPortrait?.setVisible(false);
       this.trainerAccent?.setVisible(false);
-      this.trainerEffectKindText?.setVisible(false);
       this.trainerEffectNameText?.setVisible(false);
     }
     this.shown = value;
@@ -141,7 +179,6 @@ export class AbilityBar extends Phaser.GameObjects.Container {
     }
     this.trainerPortrait.setVisible(false);
     this.trainerAccent.setVisible(false);
-    this.trainerEffectKindText.setVisible(false);
     this.trainerEffectNameText.setVisible(false);
     this.abilityBarText?.setVisible(true);
     this.legacyUiPokemonText?.setVisible(true);
@@ -225,25 +262,52 @@ export class AbilityBar extends Phaser.GameObjects.Container {
     );
   }
 
-  private configureTrainerPortrait(side: MoodyEffectSide): { left: number; right: number } | null {
+  private configureTrainerPortrait(
+    side: MoodyEffectSide,
+  ): { left: number; right: number; width: number; visibleCenterOffset: number } | null {
     const source = side === "player" ? globalScene.trainer : globalScene.currentBattle?.trainer?.getSprites().at(0);
     if (source == null || source.texture == null) {
       this.trainerPortrait.setVisible(false);
       return null;
     }
-    const cropHeight = Math.max(1, Math.ceil(source.frame.height * 0.4));
-    const scale = Math.min(1, trainerPortraitHeight / cropHeight);
-    const displayWidth = source.frame.width * scale;
-    const left = side === "player" ? trainerPortraitInset : this.currentBarWidth - trainerPortraitInset - displayWidth;
+
+    const visibleBounds = side === "enemy" ? getVisibleTrainerFrameBounds(source) : null;
+    const sourceWidth = side === "enemy" ? source.frame.realWidth : source.frame.width;
+    const sourceHeight = side === "enemy" ? source.frame.realHeight : source.frame.height;
+    const cropWidth = Math.max(1, Math.round(sourceWidth * trainerPortraitCropWidthRatio));
+    const cropX = Math.round((sourceWidth - cropWidth) / 2);
+    const cropY = visibleBounds?.top ?? 0;
+    const cropHeight =
+      visibleBounds == null
+        ? Math.max(1, Math.round(source.frame.height * trainerPortraitCropHeightRatio))
+        : Math.max(1, Math.ceil((visibleBounds.bottom - visibleBounds.top + 1) / 2));
+    const visibleWidth = visibleBounds == null ? cropWidth : visibleBounds.right - visibleBounds.left + 1;
+    const scale = Math.min(1, trainerPortraitHeight / cropHeight, trainerPortraitMaxWidth / visibleWidth);
+    const displayWidth = visibleWidth * scale;
+    const visibleCenterX =
+      side === "player"
+        ? trainerPortraitInset + trainerPortraitMaxWidth / 2
+        : this.currentBarWidth - trainerPortraitInset - trainerPortraitMaxWidth / 2;
+    const visibleCenterOffset =
+      visibleBounds == null ? 0 : ((visibleBounds.left + visibleBounds.right + 1) / 2 - sourceWidth / 2) * scale;
+    const spriteX = visibleCenterX - visibleCenterOffset;
+    const left = visibleCenterX - displayWidth / 2;
+    const portraitOriginX = 0.5;
+    const portraitOriginY = side === "player" ? 1 : (cropY + cropHeight) / sourceHeight;
+    const portraitBaselineY = side === "player" ? defaultBarHeight + 1 : enemyTrainerPortraitBaseline;
     this.trainerPortrait
-      .setTexture(source.texture.key, source.frame.name)
-      .setCrop(0, 0, source.frame.width, cropHeight)
+      .setTexture(source.texture.key)
+      .setFrame(source.frame.name)
+      .setCrop(cropX, cropY, cropWidth, cropHeight)
       .setScale(scale)
-      .setFlipX(side === "enemy")
-      .setOrigin(0)
-      .setPosition(left, Math.round((defaultBarHeight - trainerPortraitHeight) / 2))
+      .setFlipX(false)
+      .setAlpha(1)
+      .clearTint()
+      .setOrigin(portraitOriginX, portraitOriginY)
+      .setPosition(spriteX, portraitBaselineY)
       .setVisible(true);
-    return { left, right: left + displayWidth };
+    this.bringToTop(this.trainerPortrait);
+    return { left, right: left + displayWidth, width: displayWidth, visibleCenterOffset };
   }
 
   private fitTrainerEffectName(maxWidth: number): void {
@@ -281,7 +345,7 @@ export class AbilityBar extends Phaser.GameObjects.Container {
     this.abilityBarText?.setVisible(false);
     this.legacyUiPokemonText?.setVisible(false);
     this.legacyUiAbilityText?.setVisible(false);
-    this.abilityBars[+this.player].setTint(trainerEffectTint[kind]);
+    this.abilityBars[+this.player].setTintFill(trainerEffectTint[kind]);
     this.trainerAccent.setFillStyle(trainerEffectAccent[kind]).setSize(this.currentBarWidth, 2).setVisible(true);
     const portraitBounds = this.configureTrainerPortrait(side);
 
@@ -294,13 +358,18 @@ export class AbilityBar extends Phaser.GameObjects.Container {
         ? this.currentBarWidth - textX - trainerEffectTextInset
         : (portraitBounds?.left ?? this.currentBarWidth) - textX - trainerPortraitGap,
     );
-    this.trainerEffectKindText
-      .setText(kind === "boon" ? "TRAINER BOON" : "TRAINER CURSE")
-      .setX(textX)
-      .setColor(kind === "boon" ? "#e1c6f5" : "#d7a6ee")
-      .setVisible(true);
     this.trainerEffectNameText.setText(name).setX(textX).setColor("#ffffff").setWordWrapWidth(0).setVisible(true);
     this.fitTrainerEffectName(maxWidth);
+    if (!player && portraitBounds != null) {
+      const left = Math.min(
+        this.currentBarWidth - trainerPortraitInset - portraitBounds.width,
+        textX + this.trainerEffectNameText.displayWidth + trainerPortraitGap,
+      );
+      this.trainerPortrait.setX(
+        left + portraitBounds.width / 2 - portraitBounds.visibleCenterOffset + enemyTrainerPortraitNudgeX,
+      );
+    }
+    this.bringToTop(this.trainerEffectNameText);
 
     let y = baseY;
     if (player) {

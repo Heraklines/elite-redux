@@ -437,6 +437,8 @@ export enum PartyUiMode {
    * type of selection can be cancelled.
    */
   CHECK,
+  /** Moody Borrowed Future: replace only the active lead slots before the committed opening turn. */
+  BORROWED_FUTURE_REORDER,
   /**
    * Indicates that the party UI is open to select a party member for an arbitrary effect.
    * This is generally used in for Mystery Encounter or special effects that require the player to select a Pokemon
@@ -510,6 +512,7 @@ export type PokemonMoveSelectFilter = (pokemonMove: PokemonMove) => string | nul
 export class PartyUiHandler extends MessageUiHandler {
   private partyUiMode: PartyUiMode;
   private fieldIndex: number;
+  private borrowedFutureLeadCount = 1;
 
   private partyBg: Phaser.GameObjects.Image;
   private partyContainer: Phaser.GameObjects.Container;
@@ -727,6 +730,10 @@ export class PartyUiHandler extends MessageUiHandler {
     this.partyUiMode = args[0] as PartyUiMode;
 
     this.fieldIndex = args.length > 1 ? (args[1] as number) : -1;
+    this.borrowedFutureLeadCount =
+      this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER
+        ? Math.max(1, Math.min(globalScene.getPlayerParty().length, this.fieldIndex))
+        : 1;
 
     this.selectCallback = args.length > 2 && args[2] instanceof Function ? args[2] : undefined;
     this.selectFilter =
@@ -1382,7 +1389,10 @@ export class PartyUiHandler extends MessageUiHandler {
     // mon (enter transferMode, mirroring SPLICE); the second MOVE on a DIFFERENT mon
     // swaps their party slots. The new order is in `getPlayerParty()` and serializes
     // with the session at the next save (wave end / Save & Quit).
-    if (this.partyUiMode === PartyUiMode.CHECK && option === PartyOption.MOVE) {
+    if (
+      (this.partyUiMode === PartyUiMode.CHECK || this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER)
+      && option === PartyOption.MOVE
+    ) {
       if (this.transferMode) {
         const party = globalScene.getPlayerParty();
         const src = this.transferCursor;
@@ -1677,7 +1687,8 @@ export class PartyUiHandler extends MessageUiHandler {
     if (
       (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER
         || this.partyUiMode === PartyUiMode.SPLICE
-        || this.partyUiMode === PartyUiMode.CHECK) // ER: B cancels an in-progress reorder
+        || this.partyUiMode === PartyUiMode.CHECK
+        || this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER) // B cancels an in-progress reorder
       && this.transferMode
     ) {
       this.clearTransfer();
@@ -1919,6 +1930,9 @@ export class PartyUiHandler extends MessageUiHandler {
           optionsMessage = i18next.t("partyUiHandler:selectAnotherPokemonToSplice");
         }
         break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        optionsMessage = this.transferMode ? "Choose the replacement Pokemon." : "Choose a lead slot to replace.";
+        break;
       case PartyUiMode.DISCARD:
         optionsMessage = i18next.t("partyUiHandler:changeQuantityDiscard");
     }
@@ -1938,6 +1952,12 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   showPartyText() {
+    if (this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER) {
+      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px").setMaxLines(2);
+      this.showText("Choose a lead to replace. Back when finished.");
+      return;
+    }
+
     const focusedPokemon =
       this.cursor >= 0 && this.cursor < this.partySlots.length ? this.partySlots[this.cursor].getPokemon() : null;
     const presentation = focusedPokemon == null ? null : getMoodyPartySlotPresentation(focusedPokemon.id, this.cursor);
@@ -2236,6 +2256,15 @@ export class PartyUiHandler extends MessageUiHandler {
           }
         }
         break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        if (this.transferMode) {
+          if (this.cursor !== this.transferCursor) {
+            this.options.push(PartyOption.MOVE);
+          }
+        } else if (this.cursor < this.borrowedFutureLeadCount && globalScene.getPlayerParty().length > 1) {
+          this.options.push(PartyOption.MOVE);
+        }
+        break;
       case PartyUiMode.SELECT:
         this.options.push(PartyOption.SELECT);
         this.addCommonOptions(pokemon);
@@ -2272,6 +2301,15 @@ export class PartyUiHandler extends MessageUiHandler {
           break;
         }
         this.options.push(PartyOption.RELEASE);
+        break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        if (this.transferMode) {
+          if (this.cursor !== this.transferCursor) {
+            this.options.push(PartyOption.MOVE);
+          }
+        } else if (this.cursor < this.borrowedFutureLeadCount && globalScene.getPlayerParty().length > 1) {
+          this.options.push(PartyOption.MOVE);
+        }
         break;
     }
 

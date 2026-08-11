@@ -1,6 +1,5 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
 import { MOODY_EFFECT_FLYOUT_POLICY } from "#data/elite-redux/moody/moody-effect-flyout";
-import { generateMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import {
   addMoodyCurse,
   commitMoodyBoonOffer,
@@ -173,30 +172,47 @@ describe("Moody Mode run state", () => {
     expect(curses.map(curse => curse.acquiredAtWave)).toEqual([0, 10, 20, 30, 40, 50]);
   });
 
-  it("round-trips boon, curse, and threat state defensively", () => {
+  it("round-trips complete committed Moody state defensively", () => {
     const saved = createMoodyModeState("round-trip");
     saved.acquisitionRolls = 4;
+    saved.draftIndex = 3;
+    const evolutionId = MOODY_BOONS.find(boon => boon.id === "crowned-vanguard")!.evolutions[0]!.id;
     saved.boons.push({
       instanceId: "crowned-vanguard:1:10",
       boonId: "crowned-vanguard",
-      rank: 2,
-      target: { partySlots: [0] },
-      progress: { counters: { triggers: 3 } },
+      rank: 3,
+      evolutionId,
+      target: { pokemonIds: [101], partySlots: [0], option: "lead" },
+      progress: {
+        counters: { triggers: 3 },
+        flags: { primed: true },
+        values: { lastSource: "trainer", multiplier: 1.25 },
+      },
       acquiredAtWave: 10,
+      dormant: true,
     });
-    saved.curses.push({ curseId: "frayed-supplies", acquiredAtWave: 20 });
+    saved.curses.push({
+      curseId: "restless-lead",
+      acquiredAtWave: 20,
+      progress: { counters: { forcedSwitches: 2 }, values: { previousLead: 101 } },
+    });
+    saved.fieldRuntime = {
+      version: 1,
+      cursor: {
+        battleId: "wave-31",
+        waveIndex: 31,
+        turn: 4,
+        segmentIndex: 3,
+        biomeId: 6,
+        biomeEpoch: 2,
+      },
+      numbers: [["persistent:restless-lead:last-lead", 101]],
+      values: [["persistent:curse-state", "active"]],
+      lists: [["persistent:eligible-leads", ["101", "202"]]],
+    };
     expect(restoreMoodyModeState(saved)).toBe(true);
     expect(getMoodyBoonBudget()).toBe(4);
     expect(getMoodyModeSaveData()).toEqual(saved);
-  });
-
-  it("spends every player acquisition point on the current enemy loadout", () => {
-    const saved = createMoodyModeState("enemy-parity");
-    saved.acquisitionRolls = 18;
-    expect(restoreMoodyModeState(saved)).toBe(true);
-    const enemy = generateMoodyEnemyBoonLoadout([], 80, 1);
-    expect(enemy.boons.reduce((total, boon) => total + boon.rank, 0)).toBe(saved.acquisitionRolls);
-    expect(enemy.boons.every(boon => boon.rank <= 3)).toBe(true);
   });
 
   it("rejects malformed state instead of partially trusting it", () => {

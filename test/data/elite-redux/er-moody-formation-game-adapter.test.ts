@@ -547,6 +547,7 @@ describe("Moody formation live command executor", () => {
     expect(triggerSpy).toHaveBeenCalledTimes(1);
     expect(triggerSpy).toHaveBeenCalledWith(
       "Revenge Entry: +1 Speed, +30% barrier, volatile conditions cleared, +1 Attack",
+      expect.objectContaining({ effectId: "revenge-entry", kind: "boon", side: "player" }),
     );
   });
 

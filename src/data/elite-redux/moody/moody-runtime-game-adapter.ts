@@ -43,6 +43,7 @@ import {
 } from "#data/elite-redux/moody/moody-state";
 import { PokemonSummonData } from "#data/pokemon/pokemon-data";
 import { Status } from "#data/status-effect";
+import { BattleType } from "#enums/battle-type";
 import { Command } from "#enums/command";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -1079,7 +1080,7 @@ export function prepareMoodyCoordinatorEnemyActionCommitments(): void {
     committedEnemyActions: actions as unknown as MoodyRuntimeValue,
   }));
   const borrowedFuture = activeBoon("borrowed-future");
-  if (battle.turn === 1 && borrowedFuture != null) {
+  if (battle.turn === 1 && borrowedFuture != null && battle.battleType === BattleType.TRAINER) {
     runGameplay({
       type: "prebattle-commit",
       seed: state.seed ^ battle.waveIndex,
@@ -1105,9 +1106,13 @@ export function prepareMoodyCoordinatorEnemyActionCommitments(): void {
       updateMoodyCoordinatorEffectValues("borrowed-future", values => ({ ...values, planningShown: planningKey }));
       const party = globalScene.getPlayerParty();
       const enemyById = new Map(globalScene.getEnemyParty().map(enemy => [String(enemy.id), enemy]));
-      const visibleActions = borrowedFuture.evolutionId === "parallel-futures" ? actions : actions.slice(0, 1);
+      const visibleActions = actions;
+      const detailedActions =
+        borrowedFuture.evolutionId === "parallel-futures" ? visibleActions : visibleActions.slice(0, 1);
       const leadDetails =
-        borrowedFuture.rank >= 2 ? borrowedFutureLeadDetails(enemyById.get(actions[0]!.pokemonId)) : [];
+        borrowedFuture.rank >= 2
+          ? detailedActions.flatMap(action => borrowedFutureLeadDetails(enemyById.get(action.pokemonId)))
+          : [];
       globalScene.phaseManager.unshiftPhase(
         new MoodyCoordinatorOperationPhase(
           {
@@ -1117,9 +1122,11 @@ export function prepareMoodyCoordinatorEnemyActionCommitments(): void {
             confirmLabel: "begin battle",
             cancellable: false,
             reorderable: true,
+            leadCount: Math.max(1, battle.arrangement.playerCapacity),
             minSelections: 0,
             detailLines: leadDetails,
             committedActions: visibleActions.map(action => ({
+              pokemonId: action.pokemonId,
               actor: enemyById.get(action.pokemonId)?.getNameToRender() ?? `Enemy ${action.pokemonId}`,
               action: allMoves[action.moveId]?.name ?? `Move ${action.moveId}`,
               target:
@@ -1491,12 +1498,14 @@ export function notifyMoodyCoordinatorExperience(pokemon: Pokemon): number {
     return 1;
   }
   const party = globalScene.getPlayerParty().toSorted((left, right) => left.level - right.level || left.id - right.id);
-  const highestLevel = Math.max(...party.map(member => member.level), pokemon.level);
+  const averageLevel =
+    party.length === 0 ? pokemon.level : party.reduce((total, member) => total + member.level, 0) / party.length;
+  const levelGap = Math.max(0, averageLevel - pokemon.level);
   const experienceCommands = runGameplay({
     type: "experience-query",
     seed: state.seed ^ pokemon.id ^ (globalScene.currentBattle?.waveIndex ?? 0),
     pokemonId: String(pokemon.id),
-    levelGap: highestLevel - pokemon.level,
+    levelGap,
     isLowest: party[0]?.id === pokemon.id,
     isSecondLowest: party[1]?.id === pokemon.id,
   });
@@ -1504,10 +1513,10 @@ export function notifyMoodyCoordinatorExperience(pokemon: Pokemon): number {
     type: "pokemon-stat-query",
     seed: state.seed ^ pokemon.id,
     pokemonId: String(pokemon.id),
-    levelGap: highestLevel - pokemon.level,
+    levelGap,
     fullyEvolved: pokemon.getEvolution() == null,
     enemyAboveLevel: globalScene.getEnemyParty().some(enemy => enemy.level > pokemon.level),
-    caughtUp: highestLevel - pokemon.level < 5,
+    caughtUp: levelGap < 5,
   });
   return [...experienceCommands, ...statCommands]
     .filter(command => command.kind === "apply-experience-multiplier" || command.kind === "apply-pokemon-growth")

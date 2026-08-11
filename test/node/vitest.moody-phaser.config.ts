@@ -11,6 +11,7 @@ export default defineConfig({
     setupFiles: ["./test/setup/font-face.setup.ts", "./test/setup/vitest.setup.ts", "./test/setup/matchers.setup.ts"],
     include: [
       "./test/data/elite-redux/er-moody-faint-lifecycle.test.ts",
+      "./test/data/elite-redux/er-moody-enemy-loadout.test.ts",
       "./test/data/elite-redux/er-moody-formation-game-adapter.test.ts",
       "./test/data/elite-redux/er-moody-runtime-live-adapter.test.ts",
       "./test/data/elite-redux/er-moody-release-apex-pressure.regression.test.ts",

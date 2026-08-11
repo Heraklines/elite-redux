@@ -156,24 +156,24 @@ export function demoMoodyBattleHud(): MoodyBattleHudModel {
     ],
     details: [
       {
-        id: "curse-fatigue",
-        title: "CURSE - Accumulated Fatigue",
-        description:
-          "A Pokemon used in three consecutive waves deals 15% less damage until it sits out one full battle.",
-        tone: "curse",
-      },
-      {
         id: "mithridatism",
         title: "Mithridatism I",
         description:
-          "After three cures of the same status, gain Resistance I against it.\nProgress: Poison: 1/3 cures - Resistance I at 3",
+          "After three cures of the same status, gain Resistance I against it.\nCurrent: Poison: 1/3 cures - Resistance I at 3 (50% prevention)",
         tone: "boon",
       },
       {
-        id: "glory",
-        title: "Glory 8/10",
-        description: "Two more Glory stacks until the next permanent offensive increase.",
-        tone: "tracker",
+        id: "revenge-entry",
+        title: "Revenge Entry I",
+        description: "Entering immediately after an ally faints grants +1 Speed and 20% move power for two turns.",
+        tone: "boon",
+      },
+      {
+        id: "curse-fatigue",
+        title: "Accumulated Fatigue",
+        description:
+          "A Pokemon used in three consecutive waves deals 15% less damage until it sits out one full battle.\nCurrent: Charizard: 3/3 consecutive waves - 15% damage penalty active",
+        tone: "curse",
       },
     ],
     hpOverlay: { barrier: 64, damageDebt: 38, debtDueLabel: "end of next turn", revivalGlyph: "♦", revivalCharges: 1 },

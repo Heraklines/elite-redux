@@ -145,10 +145,10 @@ describe("Moody presentation: offer cards", () => {
 describe("Moody presentation: quantified progress", () => {
   it("shows Mithridatism cure thresholds and active percentages", () => {
     const base = boon("mithridatism", 10, { progress: { counters: { "cures.poison": 2 } } });
-    expect(moodyProgressLines(base)).toEqual(["Poison: 2/3 cures - Resistance I at 3"]);
+    expect(moodyProgressLines(base)).toEqual(["Poison: 2/3 cures - Resistance I at 3 (50% prevention)"]);
 
     const resistant = boon("mithridatism", 10, { progress: { counters: { "cures.poison": 4 } } });
-    expect(moodyProgressLines(resistant)).toEqual(["Poison: 4/6 cures - Resistance I active"]);
+    expect(moodyProgressLines(resistant)).toEqual(["Poison: 4/6 cures - Resistance I active (50% prevention)"]);
 
     const evolved = boon("mithridatism", 10, {
       rank: 3,
@@ -162,7 +162,7 @@ describe("Moody presentation: quantified progress", () => {
 
   it("never exposes serialized runtime metadata as boon progress", () => {
     const instance = boon("chosen-one", 10, {
-      progress: { counters: { glory: 4 }, values: { __moodyRuntimeValuesV1: "{}" } },
+      progress: { counters: { glory: 4 }, values: { __moodyRuntimeValuesV1: "{}", in: "RXfyMEy4B0h0iAPpM3lziqGA2" } },
     });
     expect(moodyProgressLines(instance)).toEqual(["Glory: 4"]);
   });

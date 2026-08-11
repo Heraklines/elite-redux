@@ -81,13 +81,38 @@ function compactTracker(model: MoodyTrackerChipModel): string {
   return `${urgency}${model.label} ${model.value}`;
 }
 
-export function buildMoodyBattleHudLines(model: MoodyBattleHudModel, maxChars: number): MoodyBattleHudLine[] {
+export function buildMoodyBattleHudLines(
+  model: MoodyBattleHudModel,
+  maxChars: number,
+  selectedDetailIndex = 0,
+  expandedDetailId: string | null = null,
+): MoodyBattleHudLine[] {
   if (model.details != null && model.details.length > 0) {
-    return model.details.flatMap(detail => [
-      { text: detail.title, color: DETAIL_COLORS[detail.tone] },
-      ...moodyWrapText(detail.description, maxChars).map(text => ({ text, color: "#ece8f2" })),
-      { text: "", color: "#ece8f2" },
-    ]);
+    const lines: MoodyBattleHudLine[] = [];
+    const groups = [
+      { title: "BOONS", details: model.details.filter(detail => detail.tone === "boon" || detail.tone === "enemy") },
+      { title: "CURSES", details: model.details.filter(detail => detail.tone === "curse") },
+    ];
+    for (const group of groups) {
+      if (group.details.length === 0) {
+        continue;
+      }
+      lines.push({ text: group.title, color: group.title === "CURSES" ? "#dca4ef" : "#f8e5a2" });
+      for (const detail of group.details) {
+        const detailIndex = model.details.indexOf(detail);
+        const selected = detailIndex === selectedDetailIndex;
+        lines.push({
+          text: `${selected ? ">" : " "} ${detail.title}`,
+          color: selected ? "#ffffff" : DETAIL_COLORS[detail.tone],
+        });
+        if (detail.id === expandedDetailId) {
+          lines.push(
+            ...moodyWrapText(detail.description, maxChars - 2).map(text => ({ text: `  ${text}`, color: "#ece8f2" })),
+          );
+        }
+      }
+    }
+    return lines;
   }
 
   const ordered = orderMoodyTrackerChips(model.trackers, model.trackers.length);
@@ -160,6 +185,8 @@ export function createMoodyBattleHud(
   let expanded = false;
   let tripleLayout = false;
   let scrollTop = 0;
+  let selectedDetailIndex = 0;
+  let expandedDetailId: string | null = null;
   let lastModel: MoodyBattleHudModel | null = null;
 
   const render = (model: MoodyBattleHudModel): void => {
@@ -170,8 +197,26 @@ export function createMoodyBattleHud(
     tabText.setText(expanded === (side === "left") ? ">" : "<");
     tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
 
-    const lines = buildMoodyBattleHudLines(model, getMoodyBattleHudWrapCharacters(width));
+    const detailCount = model.details?.length ?? 0;
+    selectedDetailIndex = Math.max(0, Math.min(selectedDetailIndex, Math.max(0, detailCount - 1)));
+    if (expandedDetailId != null && model.details?.some(detail => detail.id === expandedDetailId) !== true) {
+      expandedDetailId = null;
+    }
+    const lines = buildMoodyBattleHudLines(
+      model,
+      getMoodyBattleHudWrapCharacters(width),
+      selectedDetailIndex,
+      expandedDetailId,
+    );
     scrollTop = Math.max(0, Math.min(scrollTop, Math.max(0, lines.length - PANEL_ROWS)));
+    if (detailCount > 0 && expandedDetailId == null) {
+      const selectedLine = lines.findIndex(line => line.text.startsWith("> "));
+      if (selectedLine < scrollTop) {
+        scrollTop = selectedLine;
+      } else if (selectedLine >= scrollTop + PANEL_ROWS) {
+        scrollTop = selectedLine - PANEL_ROWS + 1;
+      }
+    }
     rows.forEach((row, index) => {
       const line = lines[scrollTop + index];
       row.setText(line?.text ?? "").setColor(line?.color ?? "#ece8f2");
@@ -184,6 +229,8 @@ export function createMoodyBattleHud(
     expanded = !expanded;
     if (expanded) {
       scrollTop = 0;
+      selectedDetailIndex = 0;
+      expandedDetailId = null;
     }
     if (lastModel != null) {
       render(lastModel);
@@ -213,16 +260,65 @@ export function createMoodyBattleHud(
     if (!expanded) {
       return false;
     }
-    const lines = lastModel == null ? [] : buildMoodyBattleHudLines(lastModel, getMoodyBattleHudWrapCharacters(width));
+    const details = lastModel?.details ?? [];
+    const lines =
+      lastModel == null
+        ? []
+        : buildMoodyBattleHudLines(
+            lastModel,
+            getMoodyBattleHudWrapCharacters(width),
+            selectedDetailIndex,
+            expandedDetailId,
+          );
+    if (expandedDetailId != null) {
+      switch (button) {
+        case Button.UP:
+          scrollTop = Math.max(0, scrollTop - 1);
+          break;
+        case Button.DOWN:
+          scrollTop = Math.min(Math.max(0, lines.length - PANEL_ROWS), scrollTop + 1);
+          break;
+        case Button.SUBMIT:
+        case Button.ACTION:
+        case Button.CANCEL:
+          expandedDetailId = null;
+          break;
+        case Button.LEFT:
+        case Button.RIGHT:
+          toggle();
+          return true;
+        default:
+          return true;
+      }
+      if (lastModel != null) {
+        render(lastModel);
+      }
+      return true;
+    }
     switch (button) {
       case Button.UP:
-        scrollTop = Math.max(0, scrollTop - 1);
+        if (details.length === 0) {
+          scrollTop = Math.max(0, scrollTop - 1);
+        } else {
+          selectedDetailIndex = Math.max(0, selectedDetailIndex - 1);
+        }
         if (lastModel != null) {
           render(lastModel);
         }
         return true;
       case Button.DOWN:
-        scrollTop = Math.min(Math.max(0, lines.length - PANEL_ROWS), scrollTop + 1);
+        if (details.length === 0) {
+          scrollTop = Math.min(Math.max(0, lines.length - PANEL_ROWS), scrollTop + 1);
+        } else {
+          selectedDetailIndex = Math.min(Math.max(0, details.length - 1), selectedDetailIndex + 1);
+        }
+        if (lastModel != null) {
+          render(lastModel);
+        }
+        return true;
+      case Button.SUBMIT:
+      case Button.ACTION:
+        expandedDetailId = details[selectedDetailIndex]?.id ?? null;
         if (lastModel != null) {
           render(lastModel);
         }

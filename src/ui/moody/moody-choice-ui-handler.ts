@@ -31,6 +31,7 @@ import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { PartyUiMode } from "#ui/handlers/party-ui-handler";
 import {
   isMoodyOperationModel,
   type MoodyOperationModel,
@@ -83,6 +84,9 @@ const OP_RIGHT_WRAP_WIDTH = (OP_RIGHT_PANE_WIDTH - 11) * 6;
 const OP_PAGER_Y = OP_PANE_Y + OP_PANE_HEIGHT - 9;
 
 const SCALE = 6;
+const BORROWED_FUTURE_Y = 4;
+const BORROWED_FUTURE_CELL_WIDTH = 62;
+const BORROWED_FUTURE_HEIGHT = 24;
 
 export class MoodyChoiceUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -100,6 +104,7 @@ export class MoodyChoiceUiHandler extends UiHandler {
   private operationPagerText: Phaser.GameObjects.Text;
   private pagerUpHit: Phaser.GameObjects.Zone;
   private pagerDownHit: Phaser.GameObjects.Zone;
+  private borrowedFutureContainer: Phaser.GameObjects.Container;
 
   private model: MoodyChoicePanelModel | MoodyOperationModel | null = null;
   private operationOptions: MoodyOperationOption[] = [];
@@ -109,6 +114,7 @@ export class MoodyChoiceUiHandler extends UiHandler {
   private detailPages: string[] = [""];
   private detailPageIndex = 0;
   private compactChoice = false;
+  private borrowedFuture = false;
   private choicePaneX = 0;
   private choicePaneY = 0;
   private choicePaneWidth = PANE_WIDTH;
@@ -249,6 +255,9 @@ export class MoodyChoiceUiHandler extends UiHandler {
       }
     });
     this.container.add([this.pagerUpHit, this.pagerDownHit]);
+
+    this.borrowedFutureContainer = globalScene.add.container(0, 0).setVisible(false);
+    this.container.add(this.borrowedFutureContainer);
   }
 
   /**
@@ -267,13 +276,25 @@ export class MoodyChoiceUiHandler extends UiHandler {
     this.operationOptions = isMoodyOperationModel(this.model) ? this.model.options.map(option => ({ ...option })) : [];
     this.operationSelected = new Set(this.operationOptions.filter(option => option.selected).map(option => option.id));
     const operation = isMoodyOperationModel(this.model);
+    this.borrowedFuture = operation && isMoodyOperationModel(this.model) && this.model.kind === "borrowed-future";
     this.compactChoice = !operation && this.model.title === "FINAL DRAFT";
-    this.dimmer.setVisible(!this.compactChoice);
-    this.operationDetailBg.setVisible(operation);
-    this.operationDetailText.setVisible(operation);
+    this.dimmer.setVisible(!this.compactChoice && !this.borrowedFuture);
+    this.pane.setVisible(!this.borrowedFuture);
+    this.titleText.setVisible(!this.borrowedFuture);
+    this.queueText.setVisible(!this.borrowedFuture);
+    this.promptText.setVisible(!this.borrowedFuture);
+    this.optionHit.setVisible(!this.borrowedFuture);
+    this.operationDetailBg.setVisible(operation && !this.borrowedFuture);
+    this.operationDetailText.setVisible(operation && !this.borrowedFuture);
+    this.borrowedFutureContainer.setVisible(this.borrowedFuture);
     const paneX = (globalScene.scaledCanvas.width - PANE_WIDTH) / 2;
     const paneY = (globalScene.scaledCanvas.height - PANE_HEIGHT) / 2;
-    if (operation) {
+    if (this.borrowedFuture) {
+      this.choicePaneX = 0;
+      this.choicePaneY = BORROWED_FUTURE_Y;
+      this.choicePaneWidth = 0;
+      this.choiceRowStep = 0;
+    } else if (operation) {
       this.titleText.setOrigin(0.5, 0).setFontSize("40px");
       this.pane.setPosition(OP_LEFT_PANE_X, OP_PANE_Y).setSize(OP_LEFT_PANE_WIDTH, OP_PANE_HEIGHT);
       this.titleText.setPosition(OP_LEFT_PANE_X + OP_LEFT_PANE_WIDTH / 2, OP_PANE_Y + 5);
@@ -329,8 +350,12 @@ export class MoodyChoiceUiHandler extends UiHandler {
       this.choiceRowStep = OPTION_ROW_STEP;
     }
     for (let row = 0; row < MAX_VISIBLE_OPTIONS; row++) {
-      if (operation) {
+      if (this.borrowedFuture) {
+        this.optionLabels[row].setVisible(false).setText("");
+        this.optionDescs[row].setVisible(false).setText("");
+      } else if (operation) {
         this.optionLabels[row]
+          .setVisible(true)
           .setPosition(OP_LABEL_X, OP_LIST_TOP + row * OPTION_ROW_STEP)
           .setWordWrapWidth(OP_LABEL_WRAP_WIDTH, true)
           .setFixedSize((OP_LEFT_PANE_WIDTH - 16) * SCALE, 9 * SCALE)
@@ -338,6 +363,7 @@ export class MoodyChoiceUiHandler extends UiHandler {
         this.optionDescs[row].setVisible(false).setText("");
       } else if (this.compactChoice) {
         this.optionLabels[row]
+          .setVisible(true)
           .setPosition(this.choicePaneX + 8, this.choicePaneY + 16 + row * COMPACT_ROW_STEP)
           .setFixedSize((COMPACT_PANE_WIDTH - 14) * SCALE, 10 * SCALE)
           .setMaxLines(1)
@@ -345,6 +371,7 @@ export class MoodyChoiceUiHandler extends UiHandler {
         this.optionDescs[row].setVisible(false).setText("");
       } else {
         this.optionLabels[row]
+          .setVisible(true)
           .setPosition(paneX + 14, paneY + 26 + row * OPTION_ROW_STEP)
           .setFixedSize(0, 0)
           .setMaxLines(0);
@@ -363,6 +390,10 @@ export class MoodyChoiceUiHandler extends UiHandler {
 
   private refresh(): void {
     if (this.model == null) {
+      return;
+    }
+    if (this.borrowedFuture && isMoodyOperationModel(this.model)) {
+      this.refreshBorrowedFuture();
       return;
     }
     const options = this.getOptions();
@@ -413,6 +444,113 @@ export class MoodyChoiceUiHandler extends UiHandler {
       const cost = option.costLine == null ? "" : `\n${option.costLine}`;
       this.optionDescs[slot].setText(this.compactChoice ? "" : `${option.description}${cost}`);
     }
+  }
+
+  private refreshBorrowedFuture(): void {
+    if (this.model == null || !isMoodyOperationModel(this.model)) {
+      return;
+    }
+    this.borrowedFutureContainer.removeAll(true);
+    const actions = this.model.committedActions ?? [];
+    const actionCount = Math.max(1, Math.min(3, actions.length));
+    const width = Math.min(194, Math.max(148, actionCount * BORROWED_FUTURE_CELL_WIDTH + 8));
+    const x = Math.round((globalScene.scaledCanvas.width - width) / 2);
+    this.borrowedFutureContainer.add(addWindow(x, BORROWED_FUTURE_Y, width, BORROWED_FUTURE_HEIGHT));
+
+    const title = addTextObject(x + 5, BORROWED_FUTURE_Y + 2, "BORROWED FUTURE", TextStyle.SUMMARY_HEADER, {
+      fontSize: "28px",
+    }).setOrigin(0);
+    const begin = addTextObject(x + width - 55, BORROWED_FUTURE_Y + 2, "A BEGIN", TextStyle.SETTINGS_LABEL, {
+      fontSize: "24px",
+    }).setOrigin(1, 0);
+    const reorder = addTextObject(x + width - 4, BORROWED_FUTURE_Y + 2, "\u2191 REORDER", TextStyle.SETTINGS_LABEL, {
+      fontSize: "24px",
+    }).setOrigin(1, 0);
+    this.borrowedFutureContainer.add([title, begin, reorder]);
+
+    const contentTop = BORROWED_FUTURE_Y + 9;
+    const cellWidth = (width - 8) / actionCount;
+    const enemyById = new Map(globalScene.getEnemyParty().map(pokemon => [String(pokemon.id), pokemon]));
+    for (let index = 0; index < actionCount; index++) {
+      const action = actions[index];
+      const cellX = x + 4 + index * cellWidth;
+      if (index > 0) {
+        this.borrowedFutureContainer.add(
+          globalScene.add.rectangle(cellX, contentTop + 1, 1, BORROWED_FUTURE_HEIGHT - 12, 0x8d66b5).setOrigin(0),
+        );
+      }
+      if (action == null) {
+        this.borrowedFutureContainer.add(
+          addTextObject(cellX + cellWidth / 2, contentTop + 8, "NO COMMIT", TextStyle.SETTINGS_LABEL, {
+            fontSize: "36px",
+          }).setOrigin(0.5, 0),
+        );
+        continue;
+      }
+      const pokemon = action.pokemonId == null ? undefined : enemyById.get(action.pokemonId);
+      if (pokemon != null) {
+        this.borrowedFutureContainer.add(
+          globalScene.addPokemonIcon(pokemon, cellX + 10, contentTop + 1, 0.5, 0, true).setScale(0.36),
+        );
+      }
+      const textX = cellX + (pokemon == null ? 4 : 18);
+      const actor = addTextObject(textX, contentTop + 1, action.actor, TextStyle.SETTINGS_LABEL, {
+        fontSize: "28px",
+      }).setOrigin(0);
+      const move = addTextObject(textX, contentTop + 7, `MOVE: ${action.action}`, TextStyle.WINDOW, {
+        fontSize: "34px",
+      }).setOrigin(0);
+      const textWidth = Math.max(12, cellX + cellWidth - 4 - textX);
+      if (actor.displayWidth > textWidth) {
+        actor.setScale(Math.max(0.72, textWidth / actor.displayWidth));
+      }
+      if (move.displayWidth > textWidth) {
+        move.setScale(Math.max(0.68, textWidth / move.displayWidth));
+      }
+      this.borrowedFutureContainer.add([actor, move]);
+    }
+
+    const beginHit = globalScene.add
+      .zone(x + width - 82, BORROWED_FUTURE_Y, 32, 13)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true });
+    beginHit.on("pointerdown", () => this.confirm());
+    const reorderHit = globalScene.add
+      .zone(x + width - 50, BORROWED_FUTURE_Y, 50, 13)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true });
+    reorderHit.on("pointerdown", () => this.openBorrowedFutureReorder());
+    this.borrowedFutureContainer.add([beginHit, reorderHit]);
+    this.cursorObj.setVisible(false);
+    this.operationPagerText.setVisible(false);
+    this.pagerUpHit.setVisible(false);
+    this.pagerDownHit.setVisible(false);
+  }
+
+  private syncBorrowedFutureOrder(): void {
+    const byId = new Map(this.operationOptions.map(option => [option.id, option]));
+    this.operationOptions = globalScene.getPlayerParty().flatMap(pokemon => {
+      const option = byId.get(String(pokemon.id));
+      return option == null ? [] : [option];
+    });
+  }
+
+  private openBorrowedFutureReorder(): void {
+    if (!this.borrowedFuture || this.model == null || !isMoodyOperationModel(this.model)) {
+      return;
+    }
+    const leadCount = Math.max(1, Math.min(this.model.leadCount ?? 1, globalScene.getPlayerParty().length));
+    this.getUi().playSelect();
+    this.borrowedFutureContainer.setVisible(false);
+    this.getUi().setOverlayMode(UiMode.PARTY, PartyUiMode.BORROWED_FUTURE_REORDER, leadCount, () => {
+      this.getUi()
+        .revertMode()
+        .then(() => {
+          this.syncBorrowedFutureOrder();
+          this.borrowedFutureContainer.setVisible(true);
+          this.refreshBorrowedFuture();
+        });
+    });
   }
 
   /** Operation layout: left checklist, right paged detail pane with committed actions on page 1. */
@@ -670,6 +808,9 @@ export class MoodyChoiceUiHandler extends UiHandler {
       return;
     }
     if (isMoodyOperationModel(this.model)) {
+      if (this.borrowedFuture) {
+        this.syncBorrowedFutureOrder();
+      }
       const min = Math.max(0, this.model.minSelections ?? (this.model.reorderable ? 0 : 1));
       if (this.operationSelected.size < min) {
         this.getUi().playError();
@@ -722,6 +863,20 @@ export class MoodyChoiceUiHandler extends UiHandler {
   processInput(button: Button): boolean {
     if (!this.active || this.model == null) {
       return false;
+    }
+    if (this.borrowedFuture) {
+      switch (button) {
+        case Button.UP:
+          this.openBorrowedFutureReorder();
+          return true;
+        case Button.ACTION:
+        case Button.SUBMIT:
+        case Button.CANCEL:
+          this.confirm();
+          return true;
+        default:
+          return false;
+      }
     }
     const count = this.getOptions().length;
     switch (button) {
@@ -831,6 +986,9 @@ export class MoodyChoiceUiHandler extends UiHandler {
     this.operationDetailBg.setVisible(false);
     this.operationDetailText.setVisible(false);
     this.operationPagerText?.setVisible(false);
+    this.borrowedFutureContainer.removeAll(true);
+    this.borrowedFutureContainer.setVisible(false);
+    this.borrowedFuture = false;
     this.detailPages = [""];
     this.detailPageIndex = 0;
     this.onComplete = null;

@@ -218,20 +218,7 @@ export function moodyRankLabel(instance: MoodyBoonInstance, definition?: MoodyBo
 
 /** The first human-readable progress counter on an instance, if any. */
 export function moodyProgressText(instance: MoodyBoonInstance): string | undefined {
-  const counters = instance.progress?.counters;
-  if (counters == null) {
-    return;
-  }
-  const entries = Object.entries(counters);
-  if (entries.length === 0) {
-    return;
-  }
-  const [key, value] = entries[0];
-  const label = key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .trim();
-  return `${label} ${value}`;
+  return moodyProgressLines(instance)[0];
 }
 
 function moodyProgressKeyLabel(key: string): string {
@@ -245,13 +232,21 @@ function moodyProgressKeyLabel(key: string): string {
   );
 }
 
+function isPlayerFacingProgressKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return (
+    !normalized.startsWith("__")
+    && !/(^|[._-])(id|ids|key|seed|json|runtime|binding|source|target|input|output|in|out)([._-]|$)/.test(normalized)
+  );
+}
+
 /** Human-readable live counters for compact HUD and party surfaces. */
 export function moodyProgressLines(
   instance: MoodyBoonInstance,
   progress: MoodyBoonProgress | undefined = instance.progress,
 ): string[] {
   const counters = Object.entries(progress?.counters ?? {}).filter(
-    ([key, value]) => !key.startsWith("__") && Number.isFinite(value),
+    ([key, value]) => isPlayerFacingProgressKey(key) && Number.isFinite(value),
   );
   if (instance.boonId === "mithridatism") {
     const cures = counters.filter(([key]) => key.startsWith("cures."));
@@ -264,22 +259,17 @@ export function moodyProgressLines(
         return `${status}: ${value} cures - Resistance II, +25% damage, 20% damage reduction while afflicted`;
       }
       if (value >= 3) {
-        return `${status}: ${value}/6 cures - Resistance I active`;
+        return `${status}: ${value}/6 cures - Resistance I active (50% prevention)`;
       }
-      return `${status}: ${value}/3 cures - Resistance I at 3`;
+      return `${status}: ${value}/3 cures - Resistance I at 3 (50% prevention)`;
     });
   }
 
   const lines = counters.map(([key, value]) => `${moodyProgressKeyLabel(key)}: ${value}`);
   lines.push(
     ...Object.entries(progress?.flags ?? {})
-      .filter(([key, value]) => !key.startsWith("__") && value)
+      .filter(([key, value]) => isPlayerFacingProgressKey(key) && value)
       .map(([key]) => `${moodyProgressKeyLabel(key)}: active`),
-  );
-  lines.push(
-    ...Object.entries(progress?.values ?? {})
-      .filter(([key, value]) => !key.startsWith("__") && value !== false && value !== "" && value != null)
-      .map(([key, value]) => `${moodyProgressKeyLabel(key)}: ${String(value)}`),
   );
   return lines;
 }

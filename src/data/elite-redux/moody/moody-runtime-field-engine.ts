@@ -2185,6 +2185,12 @@ export function enforceMoodyRuntimeLead(): void {
     const replacement = party.findIndex((pokemon, index) => index > 0 && !pokemon.isFainted(true));
     if (replacement > 0) {
       party.unshift(party.splice(replacement, 1)[0]);
+      resolveMoodySceneFieldEvent(adapter.leadSelection(party[0]));
+      consumeScenePending("lead-selection", command => {
+        if (command.kind !== "invalidate-lead") {
+          throw new Error(`Invalid Moody lead command: ${command.kind}`);
+        }
+      });
     }
   }
 }
