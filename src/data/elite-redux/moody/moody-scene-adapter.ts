@@ -4,6 +4,7 @@ import {
   consumeMoodyCoordinatorMovePower,
   getMoodyCoordinatorSpectralPower,
 } from "#data/elite-redux/moody/moody-coordinator-combat-state";
+import { getMoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import {
   type MoodyPassiveEffectResult,
   type MoodyPassiveFlags,
@@ -57,6 +58,8 @@ import type { Move } from "#moves/move";
 import type { PokemonMove } from "#moves/pokemon-move";
 
 const EMPTY_STATE: MoodyPassiveState = Object.freeze({ boons: [], curses: [] });
+let enemyCueBattleId = "";
+const emittedEnemyCues = new Set<string>();
 
 function sideOf(pokemon: Pokemon): "player" | "enemy" {
   return pokemon.isPlayer() ? "player" : "enemy";
@@ -64,6 +67,35 @@ function sideOf(pokemon: Pokemon): "player" | "enemy" {
 
 function rawMaxHp(pokemon: Pokemon): number {
   return Math.max(1, pokemon.summonData.stats[Stat.HP] || pokemon.stats[Stat.HP] || 1);
+}
+
+function emitEnemyPassiveCues(source: Pokemon, target: Pokemon, effects: MoodyPassiveEffectResult): void {
+  const loadout = getMoodyEnemyBoonLoadout();
+  const battle = globalScene.currentBattle;
+  if (loadout == null || battle == null) {
+    return;
+  }
+  const battleId = String(battle.battleSeed);
+  if (enemyCueBattleId !== battleId) {
+    enemyCueBattleId = battleId;
+    emittedEnemyCues.clear();
+  }
+  const enemyBoonIds = new Set(loadout.boons.map(boon => boon.boonId));
+  const triggeredIds = new Set(
+    effects.applications.map(application => application.effectId).filter(effectId => enemyBoonIds.has(effectId)),
+  );
+  for (const effectId of triggeredIds) {
+    if (!shouldShowMoodyEffectFlyout(effectId)) {
+      continue;
+    }
+    const key = `${battle.turn}:${source.id}:${target.id}:${effectId}`;
+    if (emittedEnemyCues.has(key)) {
+      continue;
+    }
+    emittedEnemyCues.add(key);
+    const cue = getMoodyEffectFlyoutCue({ boons: loadout.boons, curses: [] }, effectId, "enemy");
+    globalScene.ui.pushMoodyTrigger(cue.name, cue);
+  }
 }
 
 function statusOf(pokemon: Pokemon): MoodyPassivePokemonContext["status"] {
@@ -311,6 +343,7 @@ export function applyMoodyDamageCalculation(
         effects.applications.map(application => application.effectId).filter(effectId => activeBoonIds.has(effectId)),
       ),
     ]);
+    emitEnemyPassiveCues(source, target, effects);
   }
   // Field-runtime commands own Deferred Pain's split/debt state. The passive
   // adapter still reports it for coverage/UI, but applying it here as well

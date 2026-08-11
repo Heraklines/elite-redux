@@ -71,6 +71,17 @@ describe("Moody draft cadence wiring", () => {
     expect(source("src/ui/containers/ability-bar.ts")).toContain("showTrainerEffect");
   });
 
+  it("renders and emits enemy-owned boon cues from the opposing trainer side", () => {
+    const bar = source("src/ui/containers/ability-bar.ts");
+    const adapter = source("src/data/elite-redux/moody/moody-scene-adapter.ts");
+    const scenarios = source("src/dev-tools/test-suite/scenarios.ts");
+    expect(bar).toContain("globalScene.currentBattle?.trainer?.getSprites().at(0)");
+    expect(bar).toContain('.setFlipX(side === "enemy")');
+    expect(adapter).toContain('getMoodyEffectFlyoutCue({ boons: loadout.boons, curses: [] }, effectId, "enemy")');
+    expect(scenarios).toContain('label: "UI: Moody enemy trainer boon flyout"');
+    expect(scenarios).toContain('showTrainerEffect("Mithridatism II", "boon", "enemy")');
+  });
+
   it("uses the shared concise delta formatter in the live boon cards", () => {
     const handler = source("src/ui/handlers/moody-boon-select-ui-handler.ts");
     expect(handler).toContain("moodyOfferDescription(offer, definition)");

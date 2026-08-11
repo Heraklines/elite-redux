@@ -1667,7 +1667,21 @@ function openMoodyUiHarness(open: () => void): void {
 function openMoodyFlyoutHarness(open: () => void): void {
   setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
   globalScene.showMoodyEffectFlyouts = true;
-  globalScene.time.delayedCall(600, open);
+  globalScene.time.delayedCall(600, () => {
+    open();
+    const signalWhenVisible = () => {
+      if (!globalScene.abilityBar.isVisible()) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  });
 }
 
 const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
@@ -1761,6 +1775,16 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
           kind: "boon",
           side: "player",
         });
+      }),
+  },
+  {
+    label: "UI: Moody enemy trainer boon flyout",
+    description: "Violet enemy-side ability-bar variant with the opposing trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "enemy");
       }),
   },
   {
