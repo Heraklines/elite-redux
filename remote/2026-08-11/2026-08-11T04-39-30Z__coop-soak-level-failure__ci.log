@@ -1,0 +1,347 @@
+{
+  "invariant": "no-park",
+  "seed": 20260811,
+  "wave": 3,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 2 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260811",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 2,
+    "guestInteractionCounter": 2,
+    "hostWave": 3,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 2912154177,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 300,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1974785143,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1559320013,
+        "battlerIndex": 2,
+        "speciesId": 420,
+        "speciesName": "Cherubi",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 331,
+            "ppUsed": 0
+          },
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 74,
+            "ppUsed": 0
+          },
+          {
+            "id": 381,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3101167980,
+        "battlerIndex": 3,
+        "speciesId": 572,
+        "speciesName": "Minccino",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 589,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 1
+          },
+          {
+            "id": 47,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 2912154177,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 300,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 1
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1974785143,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 1
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1559320013,
+        "battlerIndex": -1,
+        "speciesId": 420,
+        "speciesName": "Cherubi",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 331,
+            "ppUsed": 0
+          },
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 74,
+            "ppUsed": 0
+          },
+          {
+            "id": 381,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3101167980,
+        "battlerIndex": -1,
+        "speciesId": 572,
+        "speciesName": "Minccino",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 589,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 1
+          },
+          {
+            "id": 47,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260811 preseeded=false",
+    "wave 1 turn 1: replay guest crossed cmd:1:1 through real public COMMAND=opened",
+    "wave 1 turn 1: host SWITCH -> party[2]",
+    "wave 1: host slot move=53 guest slot move=53",
+    "wave 1 turn 1: progress enemyHp=[16:14/14,263:0/14] playerHp=[149:213/213,94:179/179]",
+    "wave 1 turn 2: replay guest crossed cmd:1:2 through real public COMMAND=opened",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2 turn 1: host SWITCH -> party[2]",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[661:16/16,415:16/16] playerHp=[143:300/303,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2 turn 2: guest SWITCH -> party[5]",
+    "wave 2 turn 3: replay guest crossed cmd:2:3 through real public COMMAND=opened",
+    "wave 2 turn 3: guest SWITCH -> party[5]",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=85 guest slot move=53",
+    "wave 3 turn 1: progress enemyHp=[420:0/16,572:0/17] playerHp=[143:300/303,248:225/225]"
+  ]
+}
