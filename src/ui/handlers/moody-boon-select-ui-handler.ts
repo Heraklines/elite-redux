@@ -1031,11 +1031,8 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
     this.getUi().playSelect();
     // Revert to the previous mode (clears this handler via the mode chain), then
     // fire the completion callback exactly once.
-    this.getUi()
-      .revertMode()
-      .then(() => {
-        onComplete?.();
-      });
+    const finish = () => onComplete?.();
+    this.getUi().revertMode().then(finish, finish);
   }
 
   // ---------------------------------------------------------------------------

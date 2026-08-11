@@ -50,6 +50,9 @@ const OPTION_ROW_STEP = 24;
 const MAX_VISIBLE_OPTIONS = 4;
 const PANE_WIDTH = 232;
 const PANE_HEIGHT = 8 + 12 + MAX_VISIBLE_OPTIONS * OPTION_ROW_STEP + 6;
+const COMPACT_PANE_WIDTH = 122;
+const COMPACT_PANE_HEIGHT = 62;
+const COMPACT_ROW_STEP = 15;
 
 // ---------------------------------------------------------------------------
 // Operation panel geometry (320x180 logical viewport).
@@ -83,6 +86,7 @@ const SCALE = 6;
 
 export class MoodyChoiceUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
+  private dimmer: Phaser.GameObjects.Rectangle;
   private titleText: Phaser.GameObjects.Text;
   private promptText: Phaser.GameObjects.Text;
   private optionLabels: Phaser.GameObjects.Text[] = [];
@@ -104,6 +108,11 @@ export class MoodyChoiceUiHandler extends UiHandler {
   private scrollTop = 0;
   private detailPages: string[] = [""];
   private detailPageIndex = 0;
+  private compactChoice = false;
+  private choicePaneX = 0;
+  private choicePaneY = 0;
+  private choicePaneWidth = PANE_WIDTH;
+  private choiceRowStep = OPTION_ROW_STEP;
 
   constructor() {
     super(UiMode.MOODY_CHOICE);
@@ -124,8 +133,8 @@ export class MoodyChoiceUiHandler extends UiHandler {
     const paneX = (w - paneW) / 2;
     const paneY = (h - paneH) / 2;
 
-    const bg = globalScene.add.rectangle(0, 0, w, h, 0x000000, 0.55).setOrigin(0);
-    this.container.add(bg);
+    this.dimmer = globalScene.add.rectangle(0, 0, w, h, 0x000000, 0.55).setOrigin(0);
+    this.container.add(this.dimmer);
     this.pane = addWindow(paneX, paneY, paneW, paneH);
     this.container.add(this.pane);
 
@@ -170,8 +179,8 @@ export class MoodyChoiceUiHandler extends UiHandler {
       if (!this.active) {
         return;
       }
-      const localY = pointer.y / 6 - (paneY + 22);
-      const slot = Math.max(0, Math.min(MAX_VISIBLE_OPTIONS - 1, Math.floor(localY / OPTION_ROW_STEP)));
+      const localY = pointer.y / 6 - (this.choicePaneY + (this.compactChoice ? 14 : 22));
+      const slot = Math.max(0, Math.min(MAX_VISIBLE_OPTIONS - 1, Math.floor(localY / this.choiceRowStep)));
       const index = this.scrollTop + slot;
       if (this.model == null || index >= this.model.options.length) {
         return;
@@ -258,11 +267,14 @@ export class MoodyChoiceUiHandler extends UiHandler {
     this.operationOptions = isMoodyOperationModel(this.model) ? this.model.options.map(option => ({ ...option })) : [];
     this.operationSelected = new Set(this.operationOptions.filter(option => option.selected).map(option => option.id));
     const operation = isMoodyOperationModel(this.model);
+    this.compactChoice = !operation && this.model.title === "FINAL DRAFT";
+    this.dimmer.setVisible(!this.compactChoice);
     this.operationDetailBg.setVisible(operation);
     this.operationDetailText.setVisible(operation);
     const paneX = (globalScene.scaledCanvas.width - PANE_WIDTH) / 2;
     const paneY = (globalScene.scaledCanvas.height - PANE_HEIGHT) / 2;
     if (operation) {
+      this.titleText.setOrigin(0.5, 0).setFontSize("40px");
       this.pane.setPosition(OP_LEFT_PANE_X, OP_PANE_Y).setSize(OP_LEFT_PANE_WIDTH, OP_PANE_HEIGHT);
       this.titleText.setPosition(OP_LEFT_PANE_X + OP_LEFT_PANE_WIDTH / 2, OP_PANE_Y + 5);
       this.queueText.setPosition(OP_LEFT_PANE_X + OP_LEFT_PANE_WIDTH - 5, OP_PANE_Y + 6);
@@ -274,15 +286,47 @@ export class MoodyChoiceUiHandler extends UiHandler {
       this.optionHit
         .setPosition(OP_LEFT_PANE_X, OP_LIST_TOP - 4)
         .setSize(OP_LEFT_PANE_WIDTH, MAX_VISIBLE_OPTIONS * OPTION_ROW_STEP + 4);
+      this.promptText.setVisible(true);
+      this.choicePaneX = OP_LEFT_PANE_X;
+      this.choicePaneY = OP_PANE_Y;
+      this.choicePaneWidth = OP_LEFT_PANE_WIDTH;
+      this.choiceRowStep = OPTION_ROW_STEP;
+    } else if (this.compactChoice) {
+      const compactX = globalScene.scaledCanvas.width - COMPACT_PANE_WIDTH - 4;
+      const compactY = globalScene.scaledCanvas.height - COMPACT_PANE_HEIGHT - 4;
+      this.choicePaneX = compactX;
+      this.choicePaneY = compactY;
+      this.choicePaneWidth = COMPACT_PANE_WIDTH;
+      this.choiceRowStep = COMPACT_ROW_STEP;
+      this.pane.setPosition(compactX, compactY).setSize(COMPACT_PANE_WIDTH, COMPACT_PANE_HEIGHT);
+      this.titleText
+        .setOrigin(0, 0)
+        .setPosition(compactX + 6, compactY + 3)
+        .setFontSize("30px");
+      this.queueText
+        .setVisible(true)
+        .setPosition(compactX + COMPACT_PANE_WIDTH - 5, compactY + 3)
+        .setFontSize("24px");
+      this.promptText.setVisible(false);
+      this.optionHit
+        .setPosition(compactX, compactY + 14)
+        .setSize(COMPACT_PANE_WIDTH, MAX_VISIBLE_OPTIONS * COMPACT_ROW_STEP + 2);
     } else {
+      this.titleText.setOrigin(0.5, 0).setFontSize("40px");
+      this.queueText.setVisible(true).setFontSize("30px");
       this.pane.setPosition(paneX, paneY).setSize(PANE_WIDTH, PANE_HEIGHT);
       this.titleText.setPosition(paneX + PANE_WIDTH / 2, paneY + 4);
       this.queueText.setPosition(paneX + PANE_WIDTH - 8, paneY + 5);
       this.promptText
+        .setVisible(true)
         .setPosition(paneX + 10, paneY + 14)
         .setFixedSize(0, 0)
         .setMaxLines(0);
       this.optionHit.setPosition(paneX, paneY + 22).setSize(PANE_WIDTH, MAX_VISIBLE_OPTIONS * OPTION_ROW_STEP + 4);
+      this.choicePaneX = paneX;
+      this.choicePaneY = paneY;
+      this.choicePaneWidth = PANE_WIDTH;
+      this.choiceRowStep = OPTION_ROW_STEP;
     }
     for (let row = 0; row < MAX_VISIBLE_OPTIONS; row++) {
       if (operation) {
@@ -291,6 +335,13 @@ export class MoodyChoiceUiHandler extends UiHandler {
           .setWordWrapWidth(OP_LABEL_WRAP_WIDTH, true)
           .setFixedSize((OP_LEFT_PANE_WIDTH - 16) * SCALE, 9 * SCALE)
           .setMaxLines(1);
+        this.optionDescs[row].setVisible(false).setText("");
+      } else if (this.compactChoice) {
+        this.optionLabels[row]
+          .setPosition(this.choicePaneX + 8, this.choicePaneY + 16 + row * COMPACT_ROW_STEP)
+          .setFixedSize((COMPACT_PANE_WIDTH - 14) * SCALE, 10 * SCALE)
+          .setMaxLines(1)
+          .setFontSize("28px");
         this.optionDescs[row].setVisible(false).setText("");
       } else {
         this.optionLabels[row]
@@ -333,12 +384,15 @@ export class MoodyChoiceUiHandler extends UiHandler {
     this.operationPagerText.setVisible(false);
     this.pagerUpHit.setVisible(false);
     this.pagerDownHit.setVisible(false);
-    const paneY = (globalScene.scaledCanvas.height - PANE_HEIGHT) / 2;
-    const paneX = (globalScene.scaledCanvas.width - PANE_WIDTH) / 2;
+    const paneY = this.choicePaneY;
+    const paneX = this.choicePaneX;
     this.cursorObj
       .setVisible(count > 0)
-      .setPosition(paneX + 5, paneY + 25 + (this.cursor - this.scrollTop) * OPTION_ROW_STEP)
-      .setSize(PANE_WIDTH - 12, OPTION_ROW_STEP - 2);
+      .setPosition(
+        paneX + 4,
+        paneY + (this.compactChoice ? 15 : 25) + (this.cursor - this.scrollTop) * this.choiceRowStep,
+      )
+      .setSize(this.choicePaneWidth - 8, this.choiceRowStep - 1);
     for (let slot = 0; slot < MAX_VISIBLE_OPTIONS; slot++) {
       const option = options[this.scrollTop + slot] as MoodyChoicePanelModel["options"][number] | undefined;
       if (option == null) {
@@ -346,9 +400,18 @@ export class MoodyChoiceUiHandler extends UiHandler {
         this.optionDescs[slot].setText("");
         continue;
       }
-      this.optionLabels[slot].setText(option.label).setAlpha(1);
+      this.optionLabels[slot]
+        .setText(
+          this.compactChoice
+            ? moodyTruncate(
+                `${option.label}: ${option.description}${option.costLine == null ? "" : `; ${option.costLine}`}`,
+                41,
+              )
+            : option.label,
+        )
+        .setAlpha(1);
       const cost = option.costLine == null ? "" : `\n${option.costLine}`;
-      this.optionDescs[slot].setText(`${option.description}${cost}`);
+      this.optionDescs[slot].setText(this.compactChoice ? "" : `${option.description}${cost}`);
     }
   }
 

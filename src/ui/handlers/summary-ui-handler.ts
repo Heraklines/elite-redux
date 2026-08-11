@@ -81,7 +81,7 @@ import { getDexNumber } from "#utils/pokemon-utils";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import i18next from "i18next";
 
-enum Page {
+export enum Page {
   PROFILE,
   /** Elite Redux: dedicated 4-row stack page showing Ability + 3 Innates. */
   ABILITIES,
@@ -1885,7 +1885,8 @@ export class SummaryUiHandler extends UiHandler {
         continue;
       }
       const text = addTextObject(10, 22 + visible * 16, row.label, TextStyle.SUMMARY, {
-        fixedWidth: 118 * 6,
+        fontSize: "34px",
+        fixedWidth: 116 * 6,
         maxLines: 1,
       })
         .setOrigin(0, 0)
@@ -1901,11 +1902,12 @@ export class SummaryUiHandler extends UiHandler {
       }
     }
     const selected = rows[this.moodyCursor];
-    const detail = addTextObject(136, 22, selected?.detail ?? "", TextStyle.WINDOW_ALT, {
-      fontSize: "30px",
-      fixedWidth: 70 * 6,
-      maxLines: 12,
-      wordWrap: { width: 70 * 6, useAdvancedWrap: true },
+    mood.add(globalScene.add.rectangle(128, 18, 81, 120, 0xf8f8f8, 0.92).setOrigin(0));
+    const detail = addTextObject(131, 22, selected?.detail ?? "", TextStyle.WINDOW_ALT, {
+      fontSize: "38px",
+      fixedWidth: 76 * 6,
+      maxLines: 10,
+      wordWrap: { width: 76 * 6, useAdvancedWrap: true },
     }).setOrigin(0, 0);
     mood.add(detail);
     if (this.moodyVisibleStart > 0) {

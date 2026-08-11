@@ -12,6 +12,7 @@ import type {
   MoodyBoonTarget,
   MoodyCurseInstance,
   MoodyCurseOffer,
+  MoodyDread,
   MoodyFormationEngineSaveData,
   MoodyModeSaveData,
   MoodyRarity,
@@ -404,6 +405,78 @@ export function commitMoodyCurseOffer(offer: MoodyCurseOffer, target?: MoodyBoon
     curseId: offer.curseId,
     acquiredAtWave: 0,
     ...(target == null ? {} : { target: structuredClone(target) }),
+  };
+  currentState.curses.push(instance);
+  pendingCurseOffers = null;
+  return instance;
+}
+
+export type MoodyCurseDreadWeights = Readonly<Record<MoodyDread, number>>;
+
+/**
+ * Curse pressure starts entirely at Dread I and rises gradually with each
+ * ten-wave segment. Keeping this pure makes the cadence easy to pin in tests.
+ */
+export function getMoodyCurseDreadWeights(waveIndex: number): MoodyCurseDreadWeights {
+  const segment = Math.max(0, Math.floor(Math.max(0, waveIndex) / 10));
+  const dreadThree = Math.min(45, Math.max(0, segment - 4) * 4);
+  const dreadTwo = Math.min(50, segment * 5);
+  return {
+    1: Math.max(5, 100 - dreadTwo - dreadThree),
+    2: dreadTwo,
+    3: dreadThree,
+  };
+}
+
+/** Attach the deterministic random curse that follows a completed boon draft. */
+export function rollAndCommitMoodyCurse(
+  waveIndex: number,
+  partyPokemonIds: readonly number[] = [],
+): MoodyCurseInstance | null {
+  if (currentState == null) {
+    return null;
+  }
+
+  const owned = new Set(currentState.curses.map(curse => curse.curseId));
+  const available = MOODY_CURSES.filter(curse => !owned.has(curse.id));
+  if (available.length === 0) {
+    return null;
+  }
+
+  const weights = getMoodyCurseDreadWeights(waveIndex);
+  const availableDreads = ([1, 2, 3] as const).filter(dread => available.some(curse => curse.dread === dread));
+  const totalWeight = availableDreads.reduce((sum, dread) => sum + weights[dread], 0);
+  const salt = 0x43555253 + waveIndex * 131 + currentState.curses.length * 17;
+  let selectedDread: MoodyDread = availableDreads[0] ?? 1;
+  if (totalWeight > 0) {
+    let dreadRoll = seededUnit(currentState.seed, salt) * totalWeight;
+    for (const dread of availableDreads) {
+      dreadRoll -= weights[dread];
+      if (dreadRoll < 0) {
+        selectedDread = dread;
+        break;
+      }
+    }
+  }
+
+  const candidates = available.filter(curse => curse.dread === selectedDread);
+  const definition = candidates[Math.floor(seededUnit(currentState.seed, salt + 1) * candidates.length)];
+  if (definition == null) {
+    return null;
+  }
+
+  let target: MoodyBoonTarget | undefined;
+  if (definition.id === "oathbound" && partyPokemonIds.length > 0) {
+    const targetIndex = Math.floor(seededUnit(currentState.seed, salt + 2) * partyPokemonIds.length);
+    target = {
+      pokemonIds: [partyPokemonIds[targetIndex]],
+      partySlots: [targetIndex],
+    };
+  }
+  const instance: MoodyCurseInstance = {
+    curseId: definition.id,
+    acquiredAtWave: Math.max(0, waveIndex),
+    ...(target == null ? {} : { target }),
   };
   currentState.curses.push(instance);
   pendingCurseOffers = null;

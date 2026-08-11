@@ -480,7 +480,7 @@ export function executeMoodyRuntimeCommands<TPokemon>(
           numbers[barrierExpiryKey(battleId, id)] =
             command.durationTurns == null
               ? Number.MAX_SAFE_INTEGER
-              : (globalScene.currentBattle?.turn ?? 0) + command.durationTurns;
+              : (globalScene?.currentBattle?.turn ?? 0) + command.durationTurns;
           if (typeof command.value === "string") {
             lists[barrierTagKey(battleId, id)] = [command.value];
           }

@@ -6,13 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { TextStyle } from "#enums/text-style";
-import {
-  buildMoodyFeed,
-  type MoodyFeedEntry,
-  type MoodyTrackerChipModel,
-  orderMoodyTrackerChips,
-} from "#ui/moody/moody-presentation";
-import { createMoodyTrackerChip, type MoodyTrackerChipComponent } from "#ui/moody/moody-tracker-chip";
+import { type MoodyFeedEntry, type MoodyTrackerChipModel, orderMoodyTrackerChips } from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 
 export interface MoodyBattleHpOverlay {
@@ -27,14 +21,9 @@ export interface MoodyBattleHudModel {
   ruleLines: string[];
   trackers: MoodyTrackerChipModel[];
   feed: MoodyFeedEntry[];
-  /** Backward-compatible first-active overlay. */
   hpOverlay?: MoodyBattleHpOverlay;
-  /** Exact overlays for every active player battler. */
   hpOverlays?: readonly (MoodyBattleHpOverlay & { pokemonId: number; pokemonName: string })[];
 }
-
-const MAX_CHIPS = 4;
-const MAX_FEED_ROWS = 4;
 
 export interface MoodyBattleHudComponent {
   container: Phaser.GameObjects.Container;
@@ -43,114 +32,88 @@ export interface MoodyBattleHudComponent {
   isFeedExpanded(): boolean;
 }
 
+const PANEL_ROWS = 6;
+const PANEL_ROW_HEIGHT = 9;
+
+function compactTracker(model: MoodyTrackerChipModel): string {
+  const urgency = model.urgency === "critical" ? "!! " : model.urgency === "warning" ? "! " : "";
+  return `${urgency}${model.label} ${model.value}`;
+}
+
 export function createMoodyBattleHud(x: number, y: number, width: number): MoodyBattleHudComponent {
   const container = globalScene.add.container(x, y).setName("moody-battle-hud").setVisible(false);
-  const ruleBg = globalScene.add.rectangle(0, 0, width, 12, 0x14101c, 0.85).setOrigin(0);
-  ruleBg.setStrokeStyle(1, 0x8f7ab5, 0.6);
-  const ruleText = addTextObject(3, 1, "", TextStyle.SETTINGS_LABEL, {
+  const tabBg = globalScene.add.rectangle(0, 0, 28, 10, 0x14101c, 0.9).setOrigin(0);
+  tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
+  const tabText = addTextObject(4, 1, "MOOD", TextStyle.SETTINGS_LABEL, {
     fontSize: "28px",
-    fixedWidth: (width - 6) * 6,
+    fixedWidth: 22 * 6,
     maxLines: 1,
-  }).setOrigin(0, 0);
-  container.add([ruleBg, ruleText]);
+  })
+    .setOrigin(0, 0)
+    .setColor("#f8e5a2");
 
-  const chips: MoodyTrackerChipComponent[] = [];
-  for (let index = 0; index < MAX_CHIPS; index++) {
-    const chip = createMoodyTrackerChip(0, 14);
-    container.add(chip.container);
-    chips.push(chip);
-  }
-
-  const feedBg = globalScene.add.rectangle(0, 27, width, 22, 0x14101c, 0.7).setOrigin(0);
-  container.add(feedBg);
-  const feedRows: Phaser.GameObjects.Text[] = [];
-  for (let row = 0; row < MAX_FEED_ROWS; row++) {
-    const text = addTextObject(3, 28 + row * 9, "", TextStyle.SETTINGS_LABEL, {
-      fontSize: "26px",
-      fixedWidth: (width - 6) * 6,
+  const panel = globalScene.add.container(0, 11).setVisible(false);
+  const panelBg = globalScene.add
+    .rectangle(0, 0, width, PANEL_ROWS * PANEL_ROW_HEIGHT + 7, 0x14101c, 0.92)
+    .setOrigin(0);
+  panelBg.setStrokeStyle(1, 0x8f7ab5, 0.75);
+  panel.add(panelBg);
+  const rows: Phaser.GameObjects.Text[] = [];
+  for (let index = 0; index < PANEL_ROWS; index++) {
+    const row = addTextObject(4, 3 + index * PANEL_ROW_HEIGHT, "", TextStyle.SETTINGS_LABEL, {
+      fontSize: "34px",
+      fixedWidth: (width - 8) * 6,
       maxLines: 1,
     }).setOrigin(0, 0);
-    container.add(text);
-    feedRows.push(text);
+    row.setColor("#f8e5a2");
+    panel.add(row);
+    rows.push(row);
   }
-  const hpText = addTextObject(3, 51, "", TextStyle.SETTINGS_LABEL, {
-    fontSize: "28px",
-    fixedWidth: (width - 6) * 6,
-    maxLines: 2,
-  }).setOrigin(0, 0);
-  container.add(hpText);
+  container.add([tabBg, tabText, panel]);
 
-  let feedExpanded = false;
+  let expanded = false;
   let lastModel: MoodyBattleHudModel | null = null;
 
   const render = (model: MoodyBattleHudModel): void => {
     lastModel = model;
     container.setVisible(true);
-    ruleBg.setVisible(model.ruleLines.length > 0);
-    ruleText.setVisible(model.ruleLines.length > 0).setText(model.ruleLines.join(" | "));
+    panel.setVisible(expanded);
 
-    const ordered = orderMoodyTrackerChips(model.trackers, 3).slice(0, MAX_CHIPS);
-    let chipX = 0;
-    for (let index = 0; index < MAX_CHIPS; index++) {
-      const chip = chips[index];
-      const chipModel = ordered[index] ?? null;
-      chip.container.setPosition(chipX, 14);
-      chip.setModel(chipModel);
-      if (chipModel != null) {
-        chipX += chip.getWidth() + 3;
-      }
-    }
+    const ordered = orderMoodyTrackerChips(model.trackers, 3);
+    const activeCount = model.ruleLines.length + ordered.length;
+    tabText.setText(`MOOD ${activeCount}`);
+    tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
 
-    const feedModel = buildMoodyFeed(model.feed, feedExpanded ? MAX_FEED_ROWS : 2);
-    feedBg.setVisible(feedModel.visible.length > 0).setSize(width, feedExpanded ? 40 : 22);
-    for (let row = 0; row < MAX_FEED_ROWS; row++) {
-      feedRows[row].setVisible(feedExpanded || row < 2).setText(feedModel.visible[row]?.label ?? "");
+    const lines: string[] = [];
+    if (model.ruleLines.length > 0) {
+      lines.push(`RULE ${model.ruleLines[0]}${model.ruleLines.length > 1 ? ` +${model.ruleLines.length - 1}` : ""}`);
     }
-    if (!feedExpanded && feedModel.collapsed > 0 && feedModel.summaryLabel != null) {
-      feedRows[1].setText(`${feedModel.summaryLabel} [Inspect]`);
+    lines.push(...ordered.slice(0, 3).map(compactTracker));
+    const latestFeed = model.feed.at(-1)?.label;
+    if (latestFeed != null) {
+      lines.push(`NOW ${latestFeed}`);
     }
-
-    const overlays =
-      model.hpOverlays
-      ?? (model.hpOverlay == null ? [] : [{ pokemonId: -1, pokemonName: "Active", ...model.hpOverlay }]);
-    hpText.setText(
-      overlays
-        .map(overlay => {
-          const parts: string[] = [];
-          if ((overlay.barrier ?? 0) > 0) {
-            parts.push(`barrier ${overlay.barrier}`);
-          }
-          if ((overlay.damageDebt ?? 0) > 0) {
-            parts.push(`debt ${overlay.damageDebt}${overlay.debtDueLabel == null ? "" : ` (${overlay.debtDueLabel})`}`);
-          }
-          if ((overlay.revivalCharges ?? 0) > 0) {
-            parts.push(`${overlay.revivalGlyph ?? "revive"} ${"◆".repeat(overlay.revivalCharges ?? 0)}`);
-          }
-          return parts.length === 0 ? "" : `${overlay.pokemonName}: ${parts.join(" / ")}`;
-        })
-        .filter(Boolean)
-        .join("   "),
-    );
+    const hidden = model.ruleLines.length + ordered.length + (latestFeed == null ? 0 : 1) - lines.length;
+    if (hidden > 0 || lines.length < PANEL_ROWS) {
+      lines.push(hidden > 0 ? `+${hidden} more - open Ledger` : "Full details: Ledger");
+    }
+    rows.forEach((row, index) => row.setText(lines[index] ?? ""));
   };
 
-  const feedHit = globalScene.add.zone(0, 27, width, 40).setOrigin(0).setInteractive({ useHandCursor: true });
-  feedHit.on("pointerdown", () => {
-    feedExpanded = !feedExpanded;
+  const toggle = (): void => {
+    expanded = !expanded;
     if (lastModel != null) {
       render(lastModel);
     }
-  });
-  container.add(feedHit);
+  };
+  const tabHit = globalScene.add.zone(0, 0, 28, 10).setOrigin(0).setInteractive({ useHandCursor: true });
+  tabHit.on("pointerdown", toggle);
+  container.add(tabHit);
 
   return {
     container,
     render,
-    toggleFeed() {
-      feedExpanded = !feedExpanded;
-      if (lastModel != null) {
-        render(lastModel);
-      }
-    },
-    isFeedExpanded: () => feedExpanded,
+    toggleFeed: toggle,
+    isFeedExpanded: () => expanded,
   };
 }

@@ -4,7 +4,6 @@ import {
   getCurrentMoodyLiveProjection,
 } from "#data/elite-redux/moody/moody-runtime-live-adapter";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
-import { MoodySectionReportPhase } from "#phases/moody-section-report-phase";
 import type { MoodyTransitionSection } from "#ui/moody/moody-presentation";
 
 function activeItemSetLines(activeSets: readonly unknown[]): string[] {
@@ -89,12 +88,9 @@ export function queueMoodyBiomeTransitionReport(): boolean {
   if (sections.length === 0) {
     return false;
   }
-  globalScene.phaseManager.unshiftPhase(
-    new MoodySectionReportPhase({
-      title: "BIOME TRANSITION",
-      sections,
-      footer: "UP/DOWN: Scroll   ACTION: Continue",
-    }),
+  const lineCount = sections.reduce((count, section) => count + section.lines.length, 0);
+  globalScene.ui.pushMoodyTrigger(
+    `Biome transition: ${lineCount} Moody change${lineCount === 1 ? "" : "s"}. Details are in the Ledger.`,
   );
   return true;
 }

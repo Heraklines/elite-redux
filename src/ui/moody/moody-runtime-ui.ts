@@ -24,14 +24,7 @@ import {
 import { getMoodyLivePresentationSnapshot } from "#ui/moody/moody-live-presentation";
 import type { MoodyFeedEntry, MoodyTrackerChipModel } from "#ui/moody/moody-presentation";
 
-const BATTLE_MODES = new Set([
-  UiMode.MESSAGE,
-  UiMode.COMMAND,
-  UiMode.FIGHT,
-  UiMode.BALL,
-  UiMode.TARGET_SELECT,
-  UiMode.PARTY,
-]);
+const BATTLE_MODES = new Set([UiMode.MESSAGE, UiMode.COMMAND, UiMode.FIGHT, UiMode.BALL, UiMode.TARGET_SELECT]);
 
 export interface MoodyActiveBattlerUiSource {
   readonly pokemonId: number;
@@ -134,7 +127,7 @@ export class MoodyRuntimeUi {
   private overrideModel: MoodyBattleHudModel | null = null;
 
   constructor() {
-    this.hud = createMoodyBattleHud(81, 2, 158);
+    this.hud = createMoodyBattleHud(0, 54, 120);
     this.hud.container.setDepth(90);
     globalScene.uiContainer.add(this.hud.container);
   }
@@ -159,7 +152,7 @@ export class MoodyRuntimeUi {
   }
 
   refresh(mode: UiMode): void {
-    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
+    const enabled = getFunModeConfig().moodyMode;
     const state = enabled ? getMoodyModeState() : null;
     const visible = state != null && globalScene.currentBattle != null && BATTLE_MODES.has(mode);
     if (!visible) {
@@ -168,7 +161,9 @@ export class MoodyRuntimeUi {
     }
 
     this.captureProgressChanges(state);
-    this.hud.render(this.overrideModel ?? this.buildLiveModel(state));
+    const model = this.overrideModel ?? this.buildLiveModel(state);
+    this.applyBattlerDecorations(state, model);
+    this.hud.render(model);
   }
 
   destroy(): void {
@@ -295,5 +290,39 @@ export class MoodyRuntimeUi {
         ...overlay.hpOverlay,
       })),
     };
+  }
+
+  private applyBattlerDecorations(
+    state: NonNullable<ReturnType<typeof getMoodyModeState>>,
+    model: MoodyBattleHudModel,
+  ): void {
+    const playerField = globalScene.getPlayerField(true);
+    const overlays = new Map((model.hpOverlays ?? []).map(overlay => [overlay.pokemonId, overlay]));
+    if (model.hpOverlay != null && model.hpOverlays == null && playerField[0] != null) {
+      overlays.set(playerField[0].id, {
+        pokemonId: playerField[0].id,
+        pokemonName: playerField[0].getNameToRender(),
+        ...model.hpOverlay,
+      });
+    }
+    for (const pokemon of playerField) {
+      const partySlot = globalScene.getPlayerParty().findIndex(candidate => candidate.id === pokemon.id);
+      const targetedBoons = state.boons.filter(
+        boon => boon.target?.pokemonIds?.includes(pokemon.id) || boon.target?.partySlots?.includes(partySlot),
+      );
+      const targetedCurses = state.curses.filter(
+        curse => curse.target?.pokemonIds?.includes(pokemon.id) || curse.target?.partySlots?.includes(partySlot),
+      );
+      const overlay = overlays.get(pokemon.id);
+      const runtimeEffects =
+        (overlay?.barrier ?? 0) > 0 || (overlay?.damageDebt ?? 0) > 0 || (overlay?.revivalCharges ?? 0) > 0 ? 1 : 0;
+      pokemon.getBattleInfo().setMoodyPresentation({
+        effectCount: targetedBoons.length + targetedCurses.length + runtimeEffects,
+        curseCount: targetedCurses.length,
+        barrier: overlay?.barrier ?? 0,
+        maxHp: pokemon.getMaxHp(),
+        hpRatio: pokemon.getHpRatio(true),
+      });
+    }
   }
 }

@@ -138,6 +138,9 @@ export interface MoodyPartySlotPresentation {
   indicators: MoodyPartySlotIndicator[];
   overflow: number;
   summary: string;
+  effectCount: number;
+  curseCount: number;
+  borderColor: number;
 }
 
 function truncateMoodyLabel(label: string, maxLength: number): string {
@@ -203,22 +206,62 @@ export function buildMoodyPartySlotPresentation(
   const hiddenSummaryCount = entries.length - summaryParts.length;
   const summary = `Boons: ${summaryParts.join(", ")}${hiddenSummaryCount > 0 ? ` +${hiddenSummaryCount}` : ""}`;
 
-  return { indicators, overflow, summary };
+  return {
+    indicators,
+    overflow,
+    summary,
+    effectCount: entries.length,
+    curseCount: 0,
+    borderColor: indicators[0].color,
+  };
 }
 
 export function getMoodyPartySlotPresentation(
   pokemonId: number,
   partySlot: number,
-  enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode,
+  enabled = getFunModeConfig().moodyMode && getMoodyModeState() != null,
 ): MoodyPartySlotPresentation | null {
   if (!enabled) {
     return null;
   }
+  const state = getMoodyModeState();
   const boons =
-    getMoodyModeState()?.boons.filter(
-      boon => boon.target?.pokemonIds?.includes(pokemonId) || boon.target?.partySlots?.includes(partySlot),
+    state?.boons.filter(
+      boon =>
+        boon.target != null
+        && (boon.target.pokemonIds?.includes(pokemonId) || boon.target.partySlots?.includes(partySlot)),
     ) ?? getMoodyBoonsForPokemon(pokemonId, partySlot);
-  return buildMoodyPartySlotPresentation(boons);
+  const curses =
+    state?.curses.filter(
+      curse =>
+        curse.target != null
+        && (curse.target.pokemonIds?.includes(pokemonId) || curse.target.partySlots?.includes(partySlot)),
+    ) ?? [];
+  if (boons.length === 0 && curses.length === 0) {
+    return null;
+  }
+  const base = buildMoodyPartySlotPresentation(boons);
+  if (curses.length === 0) {
+    return base;
+  }
+
+  const curseIndicator: MoodyPartySlotIndicator = {
+    rarity: "rogue",
+    color: 0xb06ac0,
+    attachment: "pokemon",
+    emblem: "!",
+    dormant: false,
+  };
+  const indicators = [curseIndicator, ...(base?.indicators ?? [])].slice(0, 3);
+  const effectCount = boons.length + curses.length;
+  return {
+    indicators,
+    overflow: Math.max(0, effectCount - indicators.length),
+    summary: `${boons.length} boon${boons.length === 1 ? "" : "s"}, ${curses.length} curse${curses.length === 1 ? "" : "s"}`,
+    effectCount,
+    curseCount: curses.length,
+    borderColor: curseIndicator.color,
+  };
 }
 
 /**
@@ -651,24 +694,7 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   private refreshMoodyTeamStrip(): void {
-    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
-    const state = enabled ? getMoodyModeState() : null;
-    const teamBoons =
-      state?.boons.filter(boon => {
-        const definition = MOODY_BOON_BY_ID.get(boon.boonId);
-        return definition != null && moodyAttachmentClass(definition) === "team";
-      }) ?? [];
-    if (teamBoons.length === 0) {
-      this.moodyTeamText.setVisible(false);
-      return;
-    }
-    const names = teamBoons
-      .slice(0, 3)
-      .map(boon => `${boon.dormant ? "[Dormant] " : ""}${MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId}`)
-      .join(" / ");
-    this.moodyTeamText
-      .setText(`TEAM MOOD: ${names}${teamBoons.length > 3 ? ` +${teamBoons.length - 3}` : ""}`)
-      .setVisible(true);
+    this.moodyTeamText.setVisible(false);
   }
 
   private processSummaryOption(pokemon: Pokemon): boolean {
@@ -1856,26 +1882,9 @@ export class PartyUiHandler extends MessageUiHandler {
       runtime == null
         ? []
         : [
-            ...(runtime.itemStacks ?? []).map(stack => {
-              const attachments = stack.attachedEffects ?? [];
-              return `${stack.disabled ? "[DISABLED] " : ""}${stack.name} x${stack.count}${
-                attachments.length > 0 ? ` (${attachments.join(", ")})` : ""
-              }`;
-            }),
-            ...(runtime.temporaryAbilities ?? []).map(
-              ability => `${ability.carousel ? "Ability 5" : "Temp"}: ${ability.name}`,
-            ),
             (runtime.barrier ?? 0) > 0 ? `Barrier ${runtime.barrier}` : "",
-            (runtime.damageDebt ?? 0) > 0
-              ? `Debt ${runtime.damageDebt}${runtime.debtDueLabel == null ? "" : ` (${runtime.debtDueLabel})`}`
-              : "",
+            (runtime.damageDebt ?? 0) > 0 ? `Debt ${runtime.damageDebt}` : "",
             (runtime.revivalCharges ?? 0) > 0 ? `${runtime.revivalLabel ?? "Revival"} x${runtime.revivalCharges}` : "",
-            ...(liveSnapshot?.trackers ?? [])
-              .filter(tracker => tracker.pokemonId === focusedPokemon?.id)
-              .map(tracker => `${tracker.label}: ${tracker.value}`),
-            ...(liveSnapshot?.curseMarkers ?? [])
-              .filter(marker => marker.pokemonId === focusedPokemon?.id)
-              .map(marker => `[CURSE] ${marker.label}: ${marker.detail}`),
           ].filter(Boolean);
 
     if (presentation == null && runtimeLines.length === 0) {
@@ -1903,13 +1912,19 @@ export class PartyUiHandler extends MessageUiHandler {
         break;
     }
 
-    const moodSummary = [presentation?.summary ?? "", ...runtimeLines].filter(Boolean).join(" / ");
+    const liveMarkerCount =
+      liveSnapshot?.curseMarkers?.filter(marker => marker.pokemonId === focusedPokemon?.id).length ?? 0;
+    const totalEffects = (presentation?.effectCount ?? 0) + liveMarkerCount;
+    const effectSummary = totalEffects > 0 ? `${totalEffects} Moody effect${totalEffects === 1 ? "" : "s"}` : "";
+    const moodSummary = [focusedPokemon?.getNameToRender(), effectSummary, ...runtimeLines.slice(0, 2)]
+      .filter(Boolean)
+      .join("  |  ");
     text = text.length > 0 ? `${text}\n${moodSummary}` : moodSummary;
 
     const messageWidth = 248 * 6;
-    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("48px");
+    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("96px");
     this.showText(text, 0);
-    this.partyMessageBox.setSize(262, 42);
+    this.partyMessageBox.setSize(262, 30);
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -2679,6 +2694,15 @@ class PartySlot extends Phaser.GameObjects.Container {
     const fullSlotBgKey = this.pokemon.hp ? this.slotBgKey : `${this.slotBgKey}${"_fnt"}`;
     this.slotBg = globalScene.add.sprite(0, 0, this.slotBgKey, fullSlotBgKey);
     this.slotBg.setOrigin(0);
+    const moodyPresentation = getMoodyPartySlotPresentation(this.pokemon.id, this.slotIndex);
+    if (moodyPresentation != null) {
+      const moodyOutline = globalScene.add
+        .sprite(-1, -1, this.slotBgKey, fullSlotBgKey)
+        .setOrigin(0)
+        .setDisplaySize(this.slotBg.displayWidth + 2, this.slotBg.displayHeight + 2)
+        .setTintFill(moodyPresentation.borderColor);
+      this.add(moodyOutline);
+    }
     this.add(this.slotBg);
 
     const genderSymbol = getGenderSymbol(this.pokemon.getGender(true));
@@ -2851,7 +2875,6 @@ class PartySlot extends Phaser.GameObjects.Container {
       }
     }
 
-    const moodyPresentation = getMoodyPartySlotPresentation(this.pokemon.id, this.slotIndex);
     if (moodyPresentation != null) {
       let indicatorRight = this.slotBg.displayWidth - 3;
       if (moodyPresentation.overflow > 0) {
@@ -2863,21 +2886,14 @@ class PartySlot extends Phaser.GameObjects.Container {
         indicatorRight -= overflowText.displayWidth + 2;
       }
       for (const indicator of moodyPresentation.indicators) {
-        const markerWidth = indicator.attachment === "slot" ? 2 : indicator.attachment === "team" ? 7 : 4;
-        const markerHeight = indicator.attachment === "slot" ? 6 : indicator.attachment === "pair" ? 4 : 3;
+        const markerWidth = 6;
+        const markerHeight = 6;
         const marker = globalScene.add
           .rectangle(indicatorRight, 1, markerWidth, markerHeight, indicator.color)
           .setOrigin(1, 0)
           .setAlpha(indicator.dormant ? 0.4 : 1)
           .setStrokeStyle(1, 0x202028);
         slotInfoContainer.add(marker);
-        if (indicator.emblem.length > 0) {
-          const emblem = addTextObject(indicatorRight - markerWidth / 2, 0, indicator.emblem, TextStyle.PARTY)
-            .setOrigin(0.5, 0)
-            .setScale(0.45)
-            .setAlpha(indicator.dormant ? 0.4 : 1);
-          slotInfoContainer.add(emblem);
-        }
         indicatorRight -= markerWidth + 2;
       }
     }

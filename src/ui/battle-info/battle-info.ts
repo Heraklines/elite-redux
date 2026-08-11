@@ -127,6 +127,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected levelContainer: Phaser.GameObjects.Container;
   protected hpLabel: Phaser.GameObjects.Image;
   protected hpBar: Phaser.GameObjects.Image;
+  protected moodyBarrierBar: Phaser.GameObjects.Rectangle;
+  protected moodyEffectText: Phaser.GameObjects.Text;
   protected levelNumbersContainer: Phaser.GameObjects.Container;
   protected type1Icon: Phaser.GameObjects.Sprite;
   protected type2Icon: Phaser.GameObjects.Sprite;
@@ -342,6 +344,19 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.hpBar = globalScene.add.image(posParams.hpBarX, posParams.hpBarY, "overlay_hp").setName("hp_bar").setOrigin(0);
     this.add(this.hpBar);
 
+    this.moodyBarrierBar = globalScene.add
+      .rectangle(posParams.hpBarX, posParams.hpBarY, 0, 2, 0xf8f8f8, 1)
+      .setName("moody_barrier")
+      .setOrigin(0)
+      .setVisible(false);
+    this.add(this.moodyBarrierBar);
+
+    this.moodyEffectText = addTextObject(0, 0, "", TextStyle.BATTLE_INFO, { fontSize: "30px" })
+      .setName("moody_effect")
+      .setOrigin(0)
+      .setVisible(false);
+    this.add(this.moodyEffectText);
+
     this.hpLabel = globalScene.add
       .image(posParams.hpBarX - 1, posParams.hpBarY - 3, getLocalizedSpriteKey("overlay_hp_label"))
       .setOrigin(1, 0);
@@ -359,6 +374,31 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   getStatsValueContainer(): Phaser.GameObjects.Container {
     return this.statValuesContainer;
+  }
+
+  public setMoodyPresentation(model: {
+    effectCount: number;
+    curseCount: number;
+    barrier: number;
+    maxHp: number;
+    hpRatio: number;
+  }): void {
+    const nameAndGenderRight = this.nameText.x + this.nameText.displayWidth + this.genderText.displayWidth + 1;
+    const rightmostIcon = [this.teraIcon, this.splicedIcon, this.megaIcon, this.shinyIcon, this.fusionShinyIcon]
+      .filter(icon => icon.visible)
+      .reduce((right, icon) => Math.max(right, icon.x + icon.displayWidth), nameAndGenderRight);
+    this.moodyEffectText
+      .setText(model.effectCount > 1 ? `M${model.effectCount}` : "M")
+      .setColor(model.curseCount > 0 ? "#d78ae5" : "#f8d878")
+      .setPosition(rightmostIcon + 1, this.nameText.y + 2)
+      .setVisible(model.effectCount > 0);
+
+    const fullWidth = this.hpBar.width;
+    const barrierRatio = model.maxHp <= 0 ? 0 : Math.min(Math.max(model.barrier / model.maxHp, 0), model.hpRatio);
+    this.moodyBarrierBar
+      .setPosition(this.hpBar.x + fullWidth * Math.max(0, model.hpRatio - barrierRatio), this.hpBar.y)
+      .setSize(fullWidth * barrierRatio, 2)
+      .setVisible(barrierRatio > 0);
   }
 
   //#region Initialization methods

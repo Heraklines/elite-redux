@@ -28,6 +28,7 @@ describe("Moody party-card indicators", () => {
 
     expect(presentation?.indicators.map(indicator => indicator.rarity)).toEqual(["master", "ultra", "great"]);
     expect(presentation?.overflow).toBe(2);
+    expect(presentation?.borderColor).toBe(presentation?.indicators[0].color);
     expect(presentation?.summary).toContain("Sanctuary Seat");
     expect(presentation?.summary).toContain("+3");
   });

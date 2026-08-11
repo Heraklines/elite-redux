@@ -6,12 +6,14 @@ import {
   createMoodyModeState,
   getMoodyBoonBudget,
   getMoodyBoonOffers,
+  getMoodyCurseDreadWeights,
   getMoodyCurseOffers,
   getMoodyModeSaveData,
   initializeMoodyModeState,
   isMoodyBoonRewardWave,
   resetMoodyModeState,
   restoreMoodyModeState,
+  rollAndCommitMoodyCurse,
   rollMoodyBoonDefinition,
 } from "#data/elite-redux/moody/moody-state";
 import type { MoodyBoonOffer } from "#data/elite-redux/moody/moody-types";
@@ -101,6 +103,33 @@ describe("Moody Mode run state", () => {
     expect(committed).toMatchObject({ curseId: first[0].curseId, target: { pokemonIds: [42] } });
     expect(getMoodyCurseOffers()).toEqual([]);
     expect(() => commitMoodyCurseOffer(first[1])).toThrow("active draft");
+  });
+
+  it("attaches a deterministic Dread I curse after the opening boon and scales later dread pressure", () => {
+    initializeMoodyModeState("automatic-curse");
+    const opening = rollAndCommitMoodyCurse(0, [11, 22, 33]);
+    expect(opening).not.toBeNull();
+    expect(MOODY_CURSES.find(curse => curse.id === opening?.curseId)?.dread).toBe(1);
+    expect(opening?.acquiredAtWave).toBe(0);
+
+    initializeMoodyModeState("automatic-curse");
+    expect(rollAndCommitMoodyCurse(0, [11, 22, 33])).toEqual(opening);
+    expect(getMoodyModeSaveData()?.curses).toHaveLength(1);
+
+    expect(getMoodyCurseDreadWeights(0)).toEqual({ 1: 100, 2: 0, 3: 0 });
+    expect(getMoodyCurseDreadWeights(100)[1]).toBeLessThan(getMoodyCurseDreadWeights(10)[1]);
+    expect(getMoodyCurseDreadWeights(100)[3]).toBeGreaterThan(0);
+  });
+
+  it("adds one non-repeating random curse after successive ten-wave drafts", () => {
+    initializeMoodyModeState("curse-cadence");
+    for (const wave of [0, 10, 20, 30, 40, 50]) {
+      expect(rollAndCommitMoodyCurse(wave, [101, 202])).not.toBeNull();
+    }
+    const curses = getMoodyModeSaveData()?.curses ?? [];
+    expect(curses).toHaveLength(6);
+    expect(new Set(curses.map(curse => curse.curseId)).size).toBe(6);
+    expect(curses.map(curse => curse.acquiredAtWave)).toEqual([0, 10, 20, 30, 40, 50]);
   });
 
   it("round-trips boon, curse, and threat state defensively", () => {

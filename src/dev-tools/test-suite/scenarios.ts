@@ -101,6 +101,7 @@ import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
+import { Page as SummaryPage, SummaryUiMode } from "#ui/handlers/summary-ui-handler";
 import {
   demoMoodyBattleHud,
   demoMoodyBloodMarketOperation,
@@ -108,7 +109,6 @@ import {
   demoMoodyBountyOperation,
   demoMoodyChoice,
   demoMoodyEnemyPanel,
-  demoMoodyItemStackOperation,
   demoMoodyLegacyOperation,
   demoMoodyLivePresentation,
   demoMoodyPressureValveOperation,
@@ -1674,7 +1674,13 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
     setup: setupMoodyUiHarness,
     onBattleStart: () =>
       openMoodyUiHarness(
-        () => void globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, globalScene.getPlayerParty()[0]),
+        () =>
+          void globalScene.ui.setModeWithoutClear(
+            UiMode.SUMMARY,
+            globalScene.getPlayerParty()[0],
+            SummaryUiMode.DEFAULT,
+            SummaryPage.MOOD,
+          ),
       ),
   },
   {
@@ -1767,12 +1773,13 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
   },
   {
     label: "UI: Moody item stack",
-    description:
-      "Production item-stack attachment choice with stack count, existing effects, set progress, and suppression.",
+    description: "Native party item-management flow with Moody stack markers and contextual status.",
     gameMode: GameModes.FUN,
     setup: setupMoodyUiHarness,
     onBattleStart: () =>
-      openMoodyUiHarness(() => void globalScene.ui.requestMoodyItemStackAttachment(demoMoodyItemStackOperation())),
+      openMoodyUiHarness(
+        () => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.MODIFIER_TRANSFER, -1, () => {}),
+      ),
   },
   {
     label: "UI: Moody run recap",

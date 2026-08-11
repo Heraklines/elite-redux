@@ -1,5 +1,6 @@
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getTypeRgb } from "#data/type";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
@@ -310,6 +311,12 @@ export class CommandUiHandler extends UiHandler {
           } else if ((cursor === Command.FIGHT || cursor === Command.POKEMON) && this.canTera()) {
             success = this.setCursor(Command.TERA);
             this.toggleTeraButton();
+          } else if (
+            getFunModeConfig().moodyMode
+            && (cursor === Command.FIGHT || cursor === Command.POKEMON || cursor === Command.TERA)
+          ) {
+            ui.toggleMoodyTriggerFeed();
+            success = true;
           }
           break;
         case Button.RIGHT:

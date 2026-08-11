@@ -16,8 +16,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+const repoRoot = process.env.INIT_CWD ?? process.cwd();
+
 function source(path: string): string {
-  return readFileSync(resolve(process.cwd(), path), "utf8");
+  return readFileSync(resolve(repoRoot, path), "utf8");
 }
 
 describe("Moody operation contracts", () => {
@@ -57,6 +59,24 @@ describe("Moody operation contracts", () => {
     expect(handler).toContain("orderedIds: this.operationOptions.map");
     expect(handler).toMatch(/case Button\.(ACTION|SUBMIT)/);
     expect(handler).toMatch(/case Button\.(LEFT|RIGHT)/);
+  });
+});
+
+describe("Moody draft cadence wiring", () => {
+  it("opens with a boon and attaches a random curse only after the boon completes", () => {
+    const starterPhase = source("src/phases/select-starter-phase.ts");
+    expect(starterPhase).toContain("const completeOpeningDraft = () =>");
+    expect(starterPhase).toContain("rollAndCommitMoodyCurse(");
+    expect(starterPhase).toMatch(/\.setMode\([^,]+, initialDraftWave, completeOpeningDraft\)/);
+    expect(starterPhase).toContain(".catch(completeOpeningDraft)");
+    expect(starterPhase).not.toContain("MOODY_CURSE_SELECT");
+  });
+
+  it("attaches the next random curse after every ten-wave boon draft", () => {
+    const phase = source("src/phases/select-moody-boon-phase.ts");
+    expect(phase).toContain("const completeDraft = () =>");
+    expect(phase).toContain("rollAndCommitMoodyCurse(");
+    expect(phase).toMatch(/setMode\([^,]+, this\.waveIndex, completeDraft\)\.catch\(completeDraft\)/);
   });
 });
 

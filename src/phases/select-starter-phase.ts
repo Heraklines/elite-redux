@@ -50,7 +50,14 @@ import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coo
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { initializeMoodyModeState, resetMoodyModeState } from "#data/elite-redux/moody/moody-state";
+import { notifyMoodyRuntimeBoonDraft } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { applyMoodyCoordinatorBoonOffers } from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
+  getMoodyBoonOffers,
+  initializeMoodyModeState,
+  resetMoodyModeState,
+  rollAndCommitMoodyCurse,
+} from "#data/elite-redux/moody/moody-state";
 import {
   beginShowdownBattle,
   consumePendingShowdownPresetStarters,
@@ -1074,11 +1081,29 @@ export class SelectStarterPhase extends Phase {
             completingPhaseManager.shiftPhase(completingPhase);
           }
         };
-        if (moodyMode) {
-          void globalScene.ui.setMode(UiMode.MOODY_CURSE_SELECT, launchRun);
-        } else {
+        if (!moodyMode) {
           launchRun();
+          return;
         }
+
+        const initialDraftWave = 0;
+        applyMoodyCoordinatorBoonOffers(initialDraftWave);
+        notifyMoodyRuntimeBoonDraft(getMoodyBoonOffers(initialDraftWave).map(offer => offer.offerId));
+        let openingDraftCompleted = false;
+        const completeOpeningDraft = () => {
+          if (openingDraftCompleted) {
+            return;
+          }
+          openingDraftCompleted = true;
+          rollAndCommitMoodyCurse(
+            initialDraftWave,
+            party.map(pokemon => pokemon.id),
+          );
+          launchRun();
+        };
+        void globalScene.ui
+          .setMode(UiMode.MOODY_BOON_SELECT, initialDraftWave, completeOpeningDraft)
+          .catch(completeOpeningDraft);
       };
       if (globalScene.gameMode.isFun && getFunModeConfig().randomizeAbilities) {
         void globalScene.ui.setMode(UiMode.FUN_ABILITY_REVIEW, party, finishLaunch);
