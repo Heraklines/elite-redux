@@ -129,6 +129,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected hpLabel: Phaser.GameObjects.Image;
   protected hpBar: Phaser.GameObjects.Image;
   protected moodyBarrierBar: Phaser.GameObjects.Rectangle;
+  protected moodyBarrierPattern: Phaser.GameObjects.Graphics;
   protected moodyEffectText: Phaser.GameObjects.Text;
   protected levelNumbersContainer: Phaser.GameObjects.Container;
   protected type1Icon: Phaser.GameObjects.Sprite;
@@ -346,11 +347,14 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.add(this.hpBar);
 
     this.moodyBarrierBar = globalScene.add
-      .rectangle(posParams.hpBarX, posParams.hpBarY, 0, 2, 0xf8f8f8, 1)
+      .rectangle(posParams.hpBarX, posParams.hpBarY, 0, 2, 0xdffaff, 1)
       .setName("moody_barrier")
       .setOrigin(0)
       .setVisible(false);
     this.add(this.moodyBarrierBar);
+
+    this.moodyBarrierPattern = globalScene.add.graphics().setName("moody_barrier_pattern").setVisible(false);
+    this.add(this.moodyBarrierPattern);
 
     this.moodyEffectText = addTextObject(0, 0, "", TextStyle.BATTLE_INFO, { fontSize: "30px" })
       .setName("moody_effect")
@@ -396,10 +400,29 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
     const fullWidth = this.hpBar.width;
     const barrierLayout = buildMoodyBarrierLayout(model.barrier, model.maxHp, model.hpRatio);
+    const barrierX = this.hpBar.x + fullWidth * barrierLayout.startRatio;
+    const barrierWidth = fullWidth * barrierLayout.barrierRatio;
     this.moodyBarrierBar
-      .setPosition(this.hpBar.x + fullWidth * barrierLayout.startRatio, this.hpBar.y)
-      .setSize(fullWidth * barrierLayout.barrierRatio, 2)
+      .setPosition(barrierX, this.hpBar.y)
+      .setSize(barrierWidth, 2)
       .setVisible(barrierLayout.barrierRatio > 0);
+
+    this.moodyBarrierPattern.clear().setVisible(barrierLayout.barrierRatio > 0);
+    if (barrierLayout.barrierRatio > 0) {
+      this.moodyBarrierPattern.fillStyle(0x178bb5, 1).fillRect(barrierX, this.hpBar.y, Math.min(1, barrierWidth), 2);
+      this.moodyBarrierPattern.fillStyle(0x62cdea, 1);
+      for (let offset = 2; offset < barrierWidth; offset += 4) {
+        this.moodyBarrierPattern.fillRect(barrierX + offset, this.hpBar.y, Math.min(1, barrierWidth - offset), 1);
+        if (offset + 1 < barrierWidth) {
+          this.moodyBarrierPattern.fillRect(
+            barrierX + offset + 1,
+            this.hpBar.y + 1,
+            Math.min(1, barrierWidth - offset - 1),
+            1,
+          );
+        }
+      }
+    }
   }
 
   //#region Initialization methods
