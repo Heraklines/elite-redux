@@ -31,6 +31,13 @@ describe("Moody party-card indicators", () => {
     expect(presentation?.borderColor).toBe(presentation?.indicators[0].color);
     expect(presentation?.summary).toContain("Sanctuary Seat");
     expect(presentation?.summary).toContain("+3");
+    expect(presentation?.effectLabels).toEqual([
+      "Sanctuary Seat",
+      "Echo Seat",
+      "Crowned Vanguard",
+      "Bastion Seat",
+      "Relay Seat",
+    ]);
   });
 
   it("keeps dormant effects visible and marks their compact presentation", () => {

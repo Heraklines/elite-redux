@@ -13,6 +13,7 @@ import type { Pokemon } from "#field/pokemon";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import { getErShinyLabNameStyleForPokemon, getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
+import { buildMoodyBarrierLayout } from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
 import { toCamelCase } from "#utils/strings";
@@ -394,11 +395,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .setVisible(model.effectCount > 0);
 
     const fullWidth = this.hpBar.width;
-    const barrierRatio = model.maxHp <= 0 ? 0 : Math.min(Math.max(model.barrier / model.maxHp, 0), model.hpRatio);
+    const barrierLayout = buildMoodyBarrierLayout(model.barrier, model.maxHp, model.hpRatio);
     this.moodyBarrierBar
-      .setPosition(this.hpBar.x + fullWidth * Math.max(0, model.hpRatio - barrierRatio), this.hpBar.y)
-      .setSize(fullWidth * barrierRatio, 2)
-      .setVisible(barrierRatio > 0);
+      .setPosition(this.hpBar.x + fullWidth * barrierLayout.startRatio, this.hpBar.y)
+      .setSize(fullWidth * barrierLayout.barrierRatio, 2)
+      .setVisible(barrierLayout.barrierRatio > 0);
   }
 
   //#region Initialization methods

@@ -58,6 +58,23 @@ export const MOODY_DREAD_LABEL: Readonly<Record<1 | 2 | 3, string>> = {
   3: "DREAD III",
 };
 
+export interface MoodyBarrierLayout {
+  hpRatio: number;
+  barrierRatio: number;
+  startRatio: number;
+}
+
+/** Place Barrier as a white terminal segment of current HP, sized against maximum HP. */
+export function buildMoodyBarrierLayout(barrier: number, maxHp: number, hpRatio: number): MoodyBarrierLayout {
+  const clampedHpRatio = Math.min(Math.max(hpRatio, 0), 1);
+  const barrierRatio = maxHp <= 0 ? 0 : Math.min(Math.max(barrier / maxHp, 0), clampedHpRatio);
+  return {
+    hpRatio: clampedHpRatio,
+    barrierRatio,
+    startRatio: clampedHpRatio - barrierRatio,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Scope glyphs + target-kind labels.
 // Scope and state must never rely on color alone (rarity colors are busy), so

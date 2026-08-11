@@ -4,6 +4,7 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import {
   buildMoodyBadge,
+  buildMoodyBarrierLayout,
   buildMoodyEnemyPanelRows,
   buildMoodyFeed,
   buildMoodyHistoryRows,
@@ -156,6 +157,24 @@ describe("Moody presentation: paging math", () => {
   it("wrapText breaks on word boundaries", () => {
     const lines = moodyWrapText("the quick brown fox jumps over", 11);
     expect(lines).toEqual(["the quick", "brown fox", "jumps over"]);
+  });
+});
+
+describe("Moody presentation: Barrier HP geometry", () => {
+  it("uses max HP and occupies the terminal part of the filled HP bar", () => {
+    expect(buildMoodyBarrierLayout(40, 200, 0.75)).toEqual({
+      hpRatio: 0.75,
+      barrierRatio: 0.2,
+      startRatio: 0.55,
+    });
+  });
+
+  it("never paints beyond the current HP fill", () => {
+    expect(buildMoodyBarrierLayout(80, 100, 0.25)).toEqual({
+      hpRatio: 0.25,
+      barrierRatio: 0.25,
+      startRatio: 0,
+    });
   });
 });
 

@@ -23,7 +23,12 @@ import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tra
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
-import { getMoodyBoonsForPokemon, getMoodyModeState, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
+import {
+  getMoodyBoonsForPokemon,
+  getMoodyModeState,
+  MOODY_BOON_BY_ID,
+  MOODY_CURSE_BY_ID,
+} from "#data/elite-redux/moody/moody-state";
 import type { MoodyBoonInstance, MoodyRarity } from "#data/elite-redux/moody/moody-types";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -138,6 +143,7 @@ export interface MoodyPartySlotPresentation {
   indicators: MoodyPartySlotIndicator[];
   overflow: number;
   summary: string;
+  effectLabels: string[];
   effectCount: number;
   curseCount: number;
   borderColor: number;
@@ -210,6 +216,7 @@ export function buildMoodyPartySlotPresentation(
     indicators,
     overflow,
     summary,
+    effectLabels: entries.map(entry => `${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`),
     effectCount: entries.length,
     curseCount: 0,
     borderColor: indicators[0].color,
@@ -254,10 +261,12 @@ export function getMoodyPartySlotPresentation(
   };
   const indicators = [curseIndicator, ...(base?.indicators ?? [])].slice(0, 3);
   const effectCount = boons.length + curses.length;
+  const curseLabels = curses.map(curse => MOODY_CURSE_BY_ID.get(curse.curseId)?.name ?? curse.curseId);
   return {
     indicators,
     overflow: Math.max(0, effectCount - indicators.length),
     summary: `${boons.length} boon${boons.length === 1 ? "" : "s"}, ${curses.length} curse${curses.length === 1 ? "" : "s"}`,
+    effectLabels: [...(base?.effectLabels ?? []), ...curseLabels],
     effectCount,
     curseCount: curses.length,
     borderColor: curseIndicator.color,
@@ -1912,19 +1921,21 @@ export class PartyUiHandler extends MessageUiHandler {
         break;
     }
 
-    const liveMarkerCount =
-      liveSnapshot?.curseMarkers?.filter(marker => marker.pokemonId === focusedPokemon?.id).length ?? 0;
-    const totalEffects = (presentation?.effectCount ?? 0) + liveMarkerCount;
-    const effectSummary = totalEffects > 0 ? `${totalEffects} Moody effect${totalEffects === 1 ? "" : "s"}` : "";
-    const moodSummary = [focusedPokemon?.getNameToRender(), effectSummary, ...runtimeLines.slice(0, 2)]
+    const liveEffectLabels =
+      liveSnapshot?.curseMarkers?.filter(marker => marker.pokemonId === focusedPokemon?.id).map(marker => marker.label)
+      ?? [];
+    const detailItems = [...new Set([...(presentation?.effectLabels ?? []), ...liveEffectLabels, ...runtimeLines])];
+    const visibleDetails = detailItems.slice(0, 4);
+    const hiddenDetailCount = detailItems.length - visibleDetails.length;
+    const moodSummary = [...visibleDetails, hiddenDetailCount > 0 ? `+${hiddenDetailCount} more` : ""]
       .filter(Boolean)
       .join("  |  ");
     text = text.length > 0 ? `${text}\n${moodSummary}` : moodSummary;
 
     const messageWidth = 248 * 6;
-    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("96px");
+    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("60px");
     this.showText(text, 0);
-    this.partyMessageBox.setSize(262, 30);
+    this.partyMessageBox.setSize(262, 40);
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -2877,14 +2888,6 @@ class PartySlot extends Phaser.GameObjects.Container {
 
     if (moodyPresentation != null) {
       let indicatorRight = this.slotBg.displayWidth - 3;
-      if (moodyPresentation.overflow > 0) {
-        const overflowText = addTextObject(0, 0, `+${moodyPresentation.overflow}`, TextStyle.PARTY)
-          .setOrigin(1, 0)
-          .setScale(0.67)
-          .setPosition(indicatorRight, 0);
-        slotInfoContainer.add(overflowText);
-        indicatorRight -= overflowText.displayWidth + 2;
-      }
       for (const indicator of moodyPresentation.indicators) {
         const markerWidth = 6;
         const markerHeight = 6;
