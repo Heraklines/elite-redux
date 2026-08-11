@@ -154,6 +154,7 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // the guest boots from the host's launch session, applyCoopLaunchSession).
   [UiMode.CHALLENGE_SELECT]: "local-only",
   [UiMode.FUN_MODE_SELECT]: "local-only",
+  [UiMode.FUN_ABILITY_REVIEW]: "local-only",
   [UiMode.COMMUNITY_CHALLENGES]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_CREATE]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_TEXT]: "local-only",
@@ -226,6 +227,18 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // Showdown Sync guest command surface: versus-only and driven locally by the guest; only the
   // serialized command crosses the Showdown relay. It is never part of a shared co-op interaction.
   [UiMode.SHOWDOWN_SYNC_COMMAND]: "local-only",
+
+  // Fun Mode "Moody Mode" screens. REVIEW (conservative): the post-boss boon DRAFT is a shared-run
+  // reward surface (like MODIFIER_SELECT) and the co-op owner/watcher wiring is not part of this
+  // bounded UI task - classify "local-only" so the staging tripwire still fires if it leaks into a
+  // partner-owned interaction unmirrored. The LEDGER is a read-only per-client view of run state.
+  [UiMode.MOODY_BOON_SELECT]: "local-only",
+  [UiMode.MOODY_LEDGER]: "local-only",
+  [UiMode.MOODY_CURSE_SELECT]: "local-only",
+  [UiMode.MOODY_TARGET_PICKER]: "local-only",
+  [UiMode.MOODY_CHOICE]: "local-only",
+  [UiMode.MOODY_ENEMY_PANEL]: "local-only",
+  [UiMode.MOODY_SECTION_REPORT]: "local-only",
 };
 
 /**

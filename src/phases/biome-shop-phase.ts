@@ -68,10 +68,17 @@ import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-re
 import { erRecordBiomeShopPurchase, erRecordBlackMarketPurchase } from "#data/elite-redux/er-achievement-detection";
 import { erAchvRun } from "#data/elite-redux/er-achievement-run-state";
 import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
+import {
+  applyMoodyCoordinatorMarketPrice,
+  canMoodyCoordinatorPayWithBlood,
+  getMoodyCoordinatorBloodDebtPreview,
+  isMoodyCoordinatorBloodPremiumPurchase,
+  isMoodyHealingMarketItem,
+  notifyMoodyCoordinatorMarketPurchase,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
-import type { Modifier } from "#modifiers/modifier";
-import { HealShopCostModifier } from "#modifiers/modifier";
+import { HealShopCostModifier, type Modifier, PersistentModifier } from "#modifiers/modifier";
 import type { ModifierTypeOption } from "#modifiers/modifier-type";
 import { getPlayerShopModifierTypeOptionsForWave, PokemonModifierType } from "#modifiers/modifier-type";
 import type { ModifierSelectCallback } from "#phases/select-modifier-phase";
@@ -104,6 +111,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
   protected qtys: number[] = [];
   /** Slot index awaiting a purchase result, so applyModifier can decrement it. */
   private pendingIndex = -1;
+  private pendingMoodyPayment: "money" | "blood" = "money";
 
   /** Co-op (#673): the alternation counter pinned when this market opened (-1 = solo). */
   private coopBiomeStart = -1;
@@ -279,6 +287,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     copied.coopBiomeOwner = this.coopBiomeOwner;
     copied.coopBiomeOptionOwner = this.coopBiomeOptionOwner;
     copied.coopBiomeContinuation = true;
+    copied.pendingMoodyPayment = this.pendingMoodyPayment;
     copied.coopRewardOperationBinding = this.coopRewardOperationBinding;
     return copied;
   }
@@ -423,6 +432,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // Same hook the reward screen used: on x0 waves this returns the 16-slot
     // biome market stock (see getPlayerShopModifierTypeOptionsForWave).
     this.shopOptions = getPlayerShopModifierTypeOptionsForWave(waveIndex, baseCost.value, /* forBiomeShop */ true);
+    for (const option of this.shopOptions) {
+      option.cost = applyMoodyCoordinatorMarketPrice(option.cost, isMoodyHealingMarketItem(option.type.id));
+    }
     // Stock count per slot by the item's rarity tier (rarer = scarcer).
     this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
   }
@@ -479,8 +491,72 @@ export class BiomeShopPhase extends SelectModifierPhase {
       globalScene.ui.playError();
       return false;
     }
-    const cost = option.cost;
-    if (globalScene.money < cost && !Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
+    const listedCost = option.cost;
+    const canUseBlood = !Overrides.WAIVE_ROLL_FEE_OVERRIDE && canMoodyCoordinatorPayWithBlood();
+    if (globalScene.money < listedCost && !Overrides.WAIVE_ROLL_FEE_OVERRIDE && !canUseBlood) {
+      globalScene.ui.playError();
+      return false;
+    }
+    if (canUseBlood) {
+      const canUseMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE || globalScene.money >= listedCost;
+      const debtors = getMoodyCoordinatorBloodDebtPreview(option.type.tier);
+      void globalScene.ui
+        .requestMoodyBloodMarket({
+          kind: "blood-market",
+          title: "BLOOD MARKET",
+          prompt: `Choose how to pay for ${option.type.name}.`,
+          confirmLabel: "purchase",
+          cancellable: true,
+          minSelections: 1,
+          maxSelections: 1,
+          options: [
+            ...(canUseMoney
+              ? [
+                  {
+                    id: "money",
+                    label: "PAY MONEY",
+                    description: `${listedCost}`,
+                    consequenceLines: ["No maximum-HP debt."],
+                  },
+                ]
+              : []),
+            {
+              id: "blood",
+              label: "PAY BLOOD",
+              description:
+                debtors.length === 0
+                  ? "No eligible debtor."
+                  : `Debtor${debtors.length === 1 ? "" : "s"}: ${debtors.map(debtor => debtor.pokemonName).join(" + ")}`,
+              consequenceLines: [
+                ...debtors.map(debtor => `${debtor.pokemonName}: -${debtor.hpDebt} maximum HP until biome transition.`),
+                "Usable once per biome.",
+              ],
+              eligible: debtors.length > 0,
+              ...(debtors.length === 0 ? { ineligibleReason: "No party Pokemon can carry the debt." } : {}),
+            },
+          ],
+        })
+        .then(result => {
+          const payment = result.action === "confirm" ? result.selectedIds[0] : undefined;
+          if (payment === "money" || payment === "blood") {
+            this.purchaseMoodyOption(index, payment);
+          } else {
+            this.openBiomeShop();
+          }
+        })
+        .catch(() => this.openBiomeShop());
+      return true;
+    }
+    return this.purchaseMoodyOption(index, "money");
+  }
+
+  private purchaseMoodyOption(index: number, payment: "money" | "blood"): boolean {
+    const option = this.shopOptions[index];
+    if (option == null || (this.qtys[index] ?? 0) <= 0) {
+      return false;
+    }
+    const listedCost = option.cost;
+    if (payment === "money" && !Overrides.WAIVE_ROLL_FEE_OVERRIDE && globalScene.money < listedCost) {
       globalScene.ui.playError();
       return false;
     }
@@ -489,9 +565,10 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // BIOME_SHOP mode (via getModifierSelectMode) and the shop stays open.
     // Remember the slot so applyModifier can decrement its stock on success.
     this.pendingIndex = index;
+    this.pendingMoodyPayment = payment;
     this.coopResolvedModifierOption = 0;
     const noop: ModifierSelectCallback = () => false;
-    return this.applyChosenModifier(option.type, cost, noop, `biome:${index}`);
+    return this.applyChosenModifier(option.type, payment === "blood" ? 0 : listedCost, noop, `biome:${index}`);
   }
 
   /**
@@ -1601,10 +1678,18 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.coopPendingAuthorityOperationId = null;
     }
     let applied = false;
+    const bloodPremium = cost !== -1 && isMoodyCoordinatorBloodPremiumPurchase(this.pendingMoodyPayment);
+    const bloodPremiumOriginalStack = modifier instanceof PersistentModifier ? modifier.stackCount : null;
+    if (bloodPremium && modifier instanceof PersistentModifier) {
+      modifier.stackCount += 1;
+    }
     try {
       applied = super.applyModifier(modifier, cost, playSound);
       if (!applied) {
         throw new Error("modifier engine rejected the purchase");
+      }
+      if (bloodPremium && !(modifier instanceof PersistentModifier)) {
+        super.applyModifier(modifier, -1, false);
       }
 
       if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
@@ -1630,6 +1715,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.coopPendingAuthorityOperationId = null;
       }
     } catch (error) {
+      if (bloodPremiumOriginalStack != null && modifier instanceof PersistentModifier) {
+        modifier.stackCount = bloodPremiumOriginalStack;
+      }
       queueBoundary?.rollback();
       this.qtys = qtysBefore;
       this.pendingIndex = pendingIndexBefore;
@@ -1663,6 +1751,8 @@ export class BiomeShopPhase extends SelectModifierPhase {
     // or BIOME_TOURIST (distinct biome shop types). Fully guarded - never disturbs the buy.
     try {
       if (cost !== -1) {
+        notifyMoodyCoordinatorMarketPurchase(modifier.type.tier, this.pendingMoodyPayment);
+        this.pendingMoodyPayment = "money";
         if (this.erIsBlackMarket()) {
           const run = erAchvRun();
           if (!run.blackMarketCredited) {

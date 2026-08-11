@@ -108,6 +108,16 @@ import { LoginPhase } from "#phases/login-phase";
 import { MessagePhase } from "#phases/message-phase";
 import { ModifierRewardPhase } from "#phases/modifier-reward-phase";
 import { MoneyRewardPhase } from "#phases/money-reward-phase";
+import {
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+} from "#phases/moody-coordinator-choice-phase";
+import { MoodyCoordinatorEchoCleanupPhase, MoodyCoordinatorEchoPhase } from "#phases/moody-coordinator-echo-phase";
+import { MoodyFormationChoicePhase } from "#phases/moody-formation-choice-phase";
+import { MoodyRuntimeChoicePhase } from "#phases/moody-runtime-choice-phase";
+import { MoodySectionReportPhase } from "#phases/moody-section-report-phase";
 import { MoveAnimPhase } from "#phases/move-anim-phase";
 import { MoveChargePhase } from "#phases/move-charge-phase";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
@@ -148,11 +158,13 @@ import { SelectChallengePhase } from "#phases/select-challenge-phase";
 import { SelectFunModePhase } from "#phases/select-fun-mode-phase";
 import { SelectGenderPhase } from "#phases/select-gender-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { SelectMoodyBoonPhase } from "#phases/select-moody-boon-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { SelectTargetPhase } from "#phases/select-target-phase";
 import { ShiftSummonPhase } from "#phases/shift-summon-phase";
 import { ShinySparklePhase } from "#phases/shiny-sparkle-phase";
 import { ShowAbilityPhase } from "#phases/show-ability-phase";
+import { ShowMoodyEffectPhase } from "#phases/show-moody-effect-phase";
 import { ShowPartyExpBarPhase } from "#phases/show-party-exp-bar-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { ShowdownEnemyFaintSwitchPhase } from "#phases/showdown-enemy-faint-switch-phase";
@@ -276,6 +288,14 @@ const PHASES = Object.freeze({
   LoadMoveAnimPhase,
   LoginPhase,
   MessagePhase,
+  MoodyFormationChoicePhase,
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+  MoodyCoordinatorEchoCleanupPhase,
+  MoodyCoordinatorEchoPhase,
+  MoodySectionReportPhase,
   ModifierRewardPhase,
   MoneyRewardPhase,
   MoveAnimPhase,
@@ -316,11 +336,14 @@ const PHASES = Object.freeze({
   SelectFunModePhase,
   SelectGenderPhase,
   SelectModifierPhase,
+  SelectMoodyBoonPhase,
+  MoodyRuntimeChoicePhase,
   SelectStarterPhase,
   SelectTargetPhase,
   ShiftSummonPhase,
   ShinySparklePhase,
   ShowAbilityPhase,
+  ShowMoodyEffectPhase,
   ShowdownEnemyFaintSwitchPhase,
   ShowdownResultPhase,
   ShowPartyExpBarPhase,
@@ -968,6 +991,14 @@ export class PhaseManager {
     this.unshiftPhase(
       show ? new ShowAbilityPhase(pokemon.getBattlerIndex(), passive, passiveSlot) : new HideAbilityPhase(),
     );
+  }
+
+  /** Queue one trainer-owned Moody effect through the normal ability-bar presentation lane. */
+  public queueMoodyEffectDisplay(cue: ConstructorParameters<typeof ShowMoodyEffectPhase>[0]): void {
+    if (!globalScene.showMoodyEffectFlyouts) {
+      return;
+    }
+    this.unshiftPhase(new ShowMoodyEffectPhase(cue), new HideAbilityPhase());
   }
 
   /**

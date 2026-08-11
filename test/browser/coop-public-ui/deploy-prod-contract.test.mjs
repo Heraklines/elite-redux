@@ -38,10 +38,13 @@ test("production verifies one save-worker and browser contract before publishing
   assert.ok(dictionary < pages, "the exact data dictionary must be live before the browser is published");
 });
 
-test("production enables player and Showdown telemetry while keeping tournaments, co-op, and developer tools gated", () => {
+test("production independently controls player training data while keeping Showdown telemetry available", () => {
   assert.match(workflow, /echo "VITE_SERVER_URL=https:\/\/er-save-api\.heraklines\.workers\.dev"/u);
   assert.match(workflow, /echo "VITE_SERVER_URL_TELEMETRY=https:\/\/er-telemetry\.heraklines\.workers\.dev"/u);
+  assert.match(workflow, /^\s*collect_player_training_data:\s*$/mu);
+  assert.match(workflow, /inputs\.collect_player_training_data/u);
   assert.match(workflow, /echo "VITE_TELEMETRY=prod"/u);
+  assert.match(workflow, /echo "VITE_TELEMETRY=off"/u);
   assert.match(workflow, /echo "VITE_BUILD_SHA=\$\{PROMOTED_SHA\}"/u);
   assert.match(workflow, /echo "VITE_AI_DICTIONARY_HASH=\$\{AI_DICTIONARY_HASH\}"/u);
   assert.match(workflow, /node scripts\/export-data-dictionary\.mjs/u);

@@ -13,6 +13,7 @@ import type { Pokemon } from "#field/pokemon";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import { getErShinyLabNameStyleForPokemon, getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
+import { buildMoodyBarrierLayout } from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
 import { toCamelCase } from "#utils/strings";
@@ -116,6 +117,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected shinyIcon: Phaser.GameObjects.Sprite;
   protected fusionShinyIcon: Phaser.GameObjects.Sprite;
   protected splicedIcon: Phaser.GameObjects.Sprite;
+  protected megaIcon: Phaser.GameObjects.Sprite;
   protected statusIndicator: Phaser.GameObjects.Sprite;
   /**
    * Elite Redux custom statuses (bleed/frostbite/fear) have no frame in the
@@ -126,6 +128,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected levelContainer: Phaser.GameObjects.Container;
   protected hpLabel: Phaser.GameObjects.Image;
   protected hpBar: Phaser.GameObjects.Image;
+  protected moodyBarrierBar: Phaser.GameObjects.Rectangle;
+  protected moodyBarrierPattern: Phaser.GameObjects.Graphics;
+  protected moodyEffectText: Phaser.GameObjects.Text;
   protected levelNumbersContainer: Phaser.GameObjects.Container;
   protected type1Icon: Phaser.GameObjects.Sprite;
   protected type2Icon: Phaser.GameObjects.Sprite;
@@ -188,7 +193,16 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .setInteractive(hitArea, hitCallback)
       .setPositionRelative(this.nameText, 0, 2);
 
-    this.add([this.teraIcon, this.shinyIcon, this.fusionShinyIcon, this.splicedIcon]);
+    this.megaIcon = globalScene.add
+      .sprite(0, 0, "icon_fun_mega")
+      .setName("icon_fun_mega")
+      .setVisible(false)
+      .setOrigin(0)
+      .setScale(0.42)
+      .setInteractive(hitArea, hitCallback)
+      .setPositionRelative(this.nameText, 0, 2);
+
+    this.add([this.teraIcon, this.shinyIcon, this.fusionShinyIcon, this.splicedIcon, this.megaIcon]);
   }
 
   /**
@@ -332,6 +346,22 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.hpBar = globalScene.add.image(posParams.hpBarX, posParams.hpBarY, "overlay_hp").setName("hp_bar").setOrigin(0);
     this.add(this.hpBar);
 
+    this.moodyBarrierBar = globalScene.add
+      .rectangle(posParams.hpBarX, posParams.hpBarY, 0, 2, 0xdffaff, 1)
+      .setName("moody_barrier")
+      .setOrigin(0)
+      .setVisible(false);
+    this.add(this.moodyBarrierBar);
+
+    this.moodyBarrierPattern = globalScene.add.graphics().setName("moody_barrier_pattern").setVisible(false);
+    this.add(this.moodyBarrierPattern);
+
+    this.moodyEffectText = addTextObject(0, 0, "", TextStyle.BATTLE_INFO, { fontSize: "30px" })
+      .setName("moody_effect")
+      .setOrigin(0)
+      .setVisible(false);
+    this.add(this.moodyEffectText);
+
     this.hpLabel = globalScene.add
       .image(posParams.hpBarX - 1, posParams.hpBarY - 3, getLocalizedSpriteKey("overlay_hp_label"))
       .setOrigin(1, 0);
@@ -349,6 +379,50 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   getStatsValueContainer(): Phaser.GameObjects.Container {
     return this.statValuesContainer;
+  }
+
+  public setMoodyPresentation(model: {
+    effectCount: number;
+    curseCount: number;
+    barrier: number;
+    maxHp: number;
+    hpRatio: number;
+  }): void {
+    const nameAndGenderRight = this.nameText.x + this.nameText.displayWidth + this.genderText.displayWidth + 1;
+    const rightmostIcon = [this.teraIcon, this.splicedIcon, this.megaIcon, this.shinyIcon, this.fusionShinyIcon]
+      .filter(icon => icon.visible)
+      .reduce((right, icon) => Math.max(right, icon.x + icon.displayWidth), nameAndGenderRight);
+    this.moodyEffectText
+      .setText(model.effectCount > 1 ? `M${model.effectCount}` : "M")
+      .setColor(model.curseCount > 0 ? "#d78ae5" : "#f8d878")
+      .setPosition(rightmostIcon + 1, this.nameText.y + 2)
+      .setVisible(model.effectCount > 0);
+
+    const fullWidth = this.hpBar.width;
+    const barrierLayout = buildMoodyBarrierLayout(model.barrier, model.maxHp, model.hpRatio);
+    const barrierX = this.hpBar.x + fullWidth * barrierLayout.startRatio;
+    const barrierWidth = fullWidth * barrierLayout.barrierRatio;
+    this.moodyBarrierBar
+      .setPosition(barrierX, this.hpBar.y)
+      .setSize(barrierWidth, 2)
+      .setVisible(barrierLayout.barrierRatio > 0);
+
+    this.moodyBarrierPattern.clear().setVisible(barrierLayout.barrierRatio > 0);
+    if (barrierLayout.barrierRatio > 0) {
+      this.moodyBarrierPattern.fillStyle(0x178bb5, 1).fillRect(barrierX, this.hpBar.y, Math.min(1, barrierWidth), 2);
+      this.moodyBarrierPattern.fillStyle(0x62cdea, 1);
+      for (let offset = 2; offset < barrierWidth; offset += 4) {
+        this.moodyBarrierPattern.fillRect(barrierX + offset, this.hpBar.y, Math.min(1, barrierWidth - offset), 1);
+        if (offset + 1 < barrierWidth) {
+          this.moodyBarrierPattern.fillRect(
+            barrierX + offset + 1,
+            this.hpBar.y + 1,
+            Math.min(1, barrierWidth - offset - 1),
+            1,
+          );
+        }
+      }
+    }
   }
 
   //#region Initialization methods
@@ -370,6 +444,22 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       .on("pointerout", () => globalScene.ui.hideTooltip());
   }
 
+  private initFunMegaIcon(pokemon: Pokemon, baseWidth: number): void {
+    this.megaIcon
+      .setPositionRelative(
+        this.nameText,
+        baseWidth
+          + this.genderText.displayWidth
+          + 1
+          + (this.teraIcon.visible ? this.teraIcon.displayWidth + 1 : 0)
+          + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0),
+        1,
+      )
+      .setVisible(pokemon.isFunPseudoMega())
+      .on("pointerover", () => globalScene.ui.showTooltip("", "Pseudo Mega"))
+      .on("pointerout", () => globalScene.ui.hideTooltip());
+  }
+
   /**
    * Called by {@linkcode initInfo} to initialize the shiny icon
    * @param pokemon - The pokemon object attached to this battle info
@@ -385,7 +475,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
         + this.genderText.displayWidth
         + 1
         + (this.teraIcon.visible ? this.teraIcon.displayWidth + 1 : 0)
-        + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0),
+        + (this.splicedIcon.visible ? this.splicedIcon.displayWidth + 1 : 0)
+        + (this.megaIcon.visible ? this.megaIcon.displayWidth + 1 : 0),
       2.5,
     );
     this.shinyIcon
@@ -445,6 +536,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
     const isFusion = pokemon.isFusion(true);
     this.initSplicedIcon(pokemon, nameTextWidth);
+    this.initFunMegaIcon(pokemon, nameTextWidth);
 
     const doubleShiny = isFusion && pokemon.shiny && pokemon.fusionShiny;
     this.initShinyIcon(pokemon, nameTextWidth, doubleShiny);

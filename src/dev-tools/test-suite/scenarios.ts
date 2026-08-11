@@ -46,6 +46,7 @@ import {
   resolveErCustomTrainerMoveIds,
 } from "#data/elite-redux/er-custom-trainers";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
+import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -68,6 +69,8 @@ import {
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import { setMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
+import { restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -89,6 +92,7 @@ import { SpeciesId } from "#enums/species-id";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { TimeOfDay } from "#enums/time-of-day";
+import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -98,6 +102,24 @@ import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
+import { Page as SummaryPage, SummaryUiMode } from "#ui/handlers/summary-ui-handler";
+import {
+  demoMoodyBattleHud,
+  demoMoodyBloodMarketOperation,
+  demoMoodyBorrowedFutureOperation,
+  demoMoodyBountyOperation,
+  demoMoodyChoice,
+  demoMoodyEnemyPanel,
+  demoMoodyLegacyOperation,
+  demoMoodyLivePresentation,
+  demoMoodyPressureValveOperation,
+  demoMoodyRecyclerOperation,
+  demoMoodyState,
+  demoMoodyTargetPicker,
+  demoMoodyTransitionSections,
+} from "#ui/moody/moody-demo-data";
+import type { MoodyOperationModel } from "#ui/moody/moody-operation";
+import { PartyUiMode } from "#ui/party-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { type ErCustomTrainerLaunchPlan, planErCustomTrainerLaunch } from "./custom-trainer-picker";
@@ -1549,7 +1571,419 @@ const EASY_ABILITY_ADDITION_SCENARIOS: DevScenario[] = [
   }),
 ];
 
+function setupMoodyUiHarness(): Starter[] {
+  resetDevOverrides();
+  setFunModeConfig({
+    ...DEFAULT_FUN_MODE_CONFIG,
+    randomizePokemon: false,
+    randomizeTypes: false,
+    randomizeAbilities: false,
+    randomizeLevelUpMoves: false,
+    weatherRoulette: true,
+    moodyMode: false,
+  });
+  setOverrides({
+    STARTING_WAVE_OVERRIDE: 31,
+    STARTING_LEVEL_OVERRIDE: 60,
+    BATTLE_STYLE_OVERRIDE: "single",
+    BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+    DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+    ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+    ENEMY_LEVEL_OVERRIDE: 20,
+    ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+    ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+  });
+  return [
+    makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.FLAMETHROWER, MoveId.FLY, MoveId.ROOST, MoveId.SOLAR_BEAM] }),
+    makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.PROTECT, MoveId.AURA_SPHERE] }),
+    makeStarter(SpeciesId.VENUSAUR, {
+      moveset: [MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.SLEEP_POWDER, MoveId.SYNTHESIS],
+    }),
+    makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.THUNDERBOLT, MoveId.VOLT_SWITCH, MoveId.SURF, MoveId.PROTECT] }),
+    makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.SLEEP_TALK] }),
+    makeStarter(SpeciesId.GENGAR, {
+      moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.DESTINY_BOND, MoveId.THUNDERBOLT],
+    }),
+  ];
+}
+
+function setupMoodyAdaptivePartyHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({ BATTLE_STYLE_OVERRIDE: "triple" });
+  return party.slice(0, 4);
+}
+
+function setupMoodyTrainerFlyoutHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({
+    BATTLE_TYPE_OVERRIDE: BattleType.TRAINER,
+    DISABLE_STANDARD_TRAINERS_OVERRIDE: false,
+    ENEMY_SPECIES_OVERRIDE: null,
+    ENEMY_LEVEL_OVERRIDE: 0,
+    ENEMY_ABILITY_OVERRIDE: AbilityId.NONE,
+    ENEMY_MOVESET_OVERRIDE: [],
+  });
+  return party;
+}
+
+function installMoodyUiDemoState(): void {
+  const state = demoMoodyState();
+  const ids = globalScene.getPlayerParty().map(pokemon => pokemon.id);
+  state.boons = state.boons.map(boon =>
+    boon.target == null
+      ? { ...boon }
+      : {
+          ...boon,
+          target: {
+            ...boon.target,
+            ...(boon.target.pokemonIds == null
+              ? {}
+              : { pokemonIds: boon.target.pokemonIds.map(id => ids[Math.max(0, id - 1001)] ?? ids[0]!) }),
+          },
+        },
+  );
+  restoreMoodyModeState(state);
+  setMoodyEnemyBoonLoadout({ waveIndex: 31, boons: [...demoMoodyEnemyPanel().boons] });
+  const livePresentation = demoMoodyLivePresentation(ids);
+  const captureTarget = globalScene.getEnemyField().find(pokemon => pokemon?.isActive(true));
+  if (livePresentation.recruiterEye != null && captureTarget != null) {
+    livePresentation.recruiterEye = { ...livePresentation.recruiterEye, pokemonId: captureTarget.id };
+  }
+  globalScene.ui.setMoodyLivePresentation(livePresentation);
+}
+
+function openMoodyUiHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  installMoodyUiDemoState();
+  globalScene.time.delayedCall(600, () => {
+    open();
+    (
+      window as typeof window & {
+        __erMoodyUiHarnessReady?: boolean;
+      }
+    ).__erMoodyUiHarnessReady = true;
+  });
+}
+
+function openMoodyBattleUiHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  installMoodyUiDemoState();
+  const openWhenCommandReady = () => {
+    if (globalScene.ui.getMode() !== UiMode.COMMAND) {
+      globalScene.time.delayedCall(50, openWhenCommandReady);
+      return;
+    }
+    open();
+    const signalWhenVisible = () => {
+      if (globalScene.ui.getMode() !== UiMode.MOODY_CHOICE) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  };
+  openWhenCommandReady();
+}
+
+function openMoodyFlyoutHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  globalScene.showMoodyEffectFlyouts = true;
+  globalScene.time.delayedCall(600, () => {
+    open();
+    const signalWhenVisible = () => {
+      if (!globalScene.abilityBar.isVisible()) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  });
+}
+
+function hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames = 30): void {
+  const trainer = globalScene.currentBattle?.trainer;
+  trainer?.setVisible(false);
+  for (const sprite of trainer?.getSprites() ?? []) {
+    sprite.setVisible(false);
+  }
+  if (remainingFrames > 0) {
+    globalScene.time.delayedCall(50, () => hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames - 1));
+  }
+}
+
+function buildMoodyBorrowedFutureHarnessModel(): MoodyOperationModel {
+  const model = demoMoodyBorrowedFutureOperation();
+  const enemies = globalScene.getEnemyField().filter(pokemon => pokemon?.isActive(true));
+  const party = globalScene.getPlayerParty();
+  return {
+    ...model,
+    leadCount: globalScene.currentBattle.getBattlerCount(),
+    committedActions: enemies.map(pokemon => ({
+      pokemonId: String(pokemon.id),
+      actor: pokemon.getNameToRender(),
+      action: pokemon.getMoveset()[0]?.getName() ?? "No move",
+      target: "Committed target",
+    })),
+    options: party.map(pokemon => ({
+      id: String(pokemon.id),
+      label: pokemon.getNameToRender(),
+      description: "Available for a lead slot.",
+    })),
+  };
+}
+
+const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
+  {
+    label: "UI: Moody boon lifecycle",
+    description: "Real post-boss boon handler with rank/evolution/replacement and target flows.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_BOON_SELECT, 100, () => {})),
+  },
+  {
+    label: "UI: Moody Ledger dense",
+    description: "Five-tab Ledger with a full twelve-line build, bindings, progress, history, and Codex.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_LEDGER)),
+  },
+  {
+    label: "UI: Moody party attach",
+    description: "Live six-mon party cards with slot, Pokemon, pair, item, and team Moody attachments.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
+  },
+  {
+    label: "UI: Moody party adaptive",
+    description: "Four-mon triple party with three compact active cards and one vertically centered reserve.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
+  },
+  {
+    label: "UI: Moody summary attach",
+    description: "Live summary MOOD tab with bound Pokemon, move, item, slot, pair, and team details.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(
+        () =>
+          void globalScene.ui.setModeWithoutClear(
+            UiMode.SUMMARY,
+            globalScene.getPlayerParty()[0],
+            SummaryUiMode.DEFAULT,
+            SummaryPage.MOOD,
+          ),
+      ),
+  },
+  {
+    label: "UI: Moody enemy eight",
+    description: "Enemy Mood panel with eight roster positions, hidden reserves, observed boons, and debug details.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_ENEMY_PANEL, demoMoodyEnemyPanel())),
+  },
+  {
+    label: "UI: Moody battle HUD",
+    description: "Live battle rule strip, tracker tray, trigger feed, barrier, debt, and revival overlays.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => {
+        globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
+        globalScene.ui.pushMoodyTrigger("Bastion Seat II: +64 barrier");
+      }),
+  },
+  {
+    label: "UI: Moody battle HUD triple",
+    description: "Triple-battle player and enemy side drawers positioned clear of both three-mon health stacks.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => {
+        globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
+        globalScene.ui.pushMoodyTrigger("Mithridatism: Poison 2/3 cures");
+      }),
+  },
+  {
+    label: "UI: Moody trainer boon flyout",
+    description: "Violet ability-bar variant with the player trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "player");
+      }),
+  },
+  {
+    label: "UI: Moody enemy trainer boon flyout",
+    description: "Violet enemy-side ability-bar variant with the opposing trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        hideMoodyEnemyTrainerHarnessFieldSprite();
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "enemy");
+      }),
+  },
+  {
+    label: "UI: Moody trainer curse flyout",
+    description: "Dark-violet ability-bar variant with the player trainer portrait attached to a curse trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        globalScene.ui.pushMoodyTrigger("Reverse Snowball: enemy stats +9%", {
+          effectId: "reverse-snowball",
+          name: "Reverse Snowball",
+          kind: "curse",
+          side: "player",
+        });
+      }),
+  },
+  {
+    label: "UI: Moody curse received",
+    description: "Mandatory post-draft curse reveal with Dread, exact effect text, target, and confirm-only exit.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.showMoodyCurseReceived({ curseId: "type-tax", acquiredAtWave: 10 })),
+  },
+  {
+    label: "UI: Moody choice queue",
+    description: "Queued contextual choice using the same input path as Final Draft and post-battle decisions.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.requestMoodyChoice(demoMoodyChoice())),
+  },
+  {
+    label: "UI: Moody target eight",
+    description: "Generic target/binding picker with eight candidates, attachments, previews, and ineligible reasons.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.requestMoodyTarget(demoMoodyTargetPicker())),
+  },
+  {
+    label: "UI: Moody biome report",
+    description: "Paged biome-transition report for Mood Swing, Cursed Inventory, Entropy, debt, and healing.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.showMoodyBiomeReport(demoMoodyTransitionSections())),
+  },
+  {
+    label: "UI: Moody Borrowed Future",
+    description: "Compact one-to-three lead forecast with committed moves and restricted party reorder.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyBattleUiHarness(
+        () => void globalScene.ui.showMoodyBorrowedFuture(buildMoodyBorrowedFutureHarnessModel()),
+      ),
+  },
+  {
+    label: "UI: Moody bounty board",
+    description: "Bounty Board objectives with progress, rewards, feasibility, and failure conditions.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.showMoodyBountyBoard(demoMoodyBountyOperation())),
+  },
+  {
+    label: "UI: Moody Recycler",
+    description: "Production reward operation: choose an exact destroyed offer and return it to the reward owner.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyRecycler(demoMoodyRecyclerOperation())),
+  },
+  {
+    label: "UI: Moody Legacy Slot",
+    description: "Production release/replacement inheritance selection with exact retained progression.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyLegacySlot(demoMoodyLegacyOperation())),
+  },
+  {
+    label: "UI: Moody Blood Market",
+    description: "Production money-versus-blood payment choice with debtor, debt duration, premium, and growth.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyBloodMarket(demoMoodyBloodMarketOperation())),
+  },
+  {
+    label: "UI: Moody Pressure Valve",
+    description: "Production acquisition choice returning exactly Healing, Barrier, or PP.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyPressureValve(demoMoodyPressureValveOperation())),
+  },
+  {
+    label: "UI: Moody item stack",
+    description: "Native party item-management flow with Moody stack markers and contextual status.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(
+        () => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.MODIFIER_TRANSFER, -1, () => {}),
+      ),
+  },
+  {
+    label: "UI: Moody run recap",
+    description: "End-run recap built from the live Moody save state.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.showMoodyRunRecap("UI-HARNESS-SEED")),
+  },
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
+  ...MOODY_UI_HARNESS_SCENARIOS,
+  {
+    label: "UI: Moody boss draft",
+    description:
+      "Starts a Fun run on wave 10 with only Moody Mode enabled.\n"
+      + "DO: defeat the harmless Magikarp and inspect the three-card boon draft, its long-text paging, targeting, and the Moody Ledger in the pause menu.\n"
+      + "EXPECT: exactly one mandatory draft appears before the biome market; selecting a boon records it in the ledger.",
+    gameMode: GameModes.FUN,
+    setup: () => {
+      resetDevOverrides();
+      setFunModeConfig({
+        ...DEFAULT_FUN_MODE_CONFIG,
+        randomizePokemon: false,
+        randomizeTypes: false,
+        randomizeAbilities: false,
+        randomizeLevelUpMoves: false,
+        moodyMode: true,
+      });
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 1,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.FLAMETHROWER, MoveId.SPLASH] })];
+    },
+  },
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
   ...EASY_ABILITY_ADDITION_SCENARIOS,

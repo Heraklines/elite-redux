@@ -21,7 +21,16 @@ import {
 } from "#data/elite-redux/coop/coop-shop-check-relay";
 import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
+import {
+  getMoodyBoonRuntimeProgress,
+  getMoodyBoonsForPokemon,
+  getMoodyModeState,
+  MOODY_BOON_BY_ID,
+  MOODY_CURSE_BY_ID,
+} from "#data/elite-redux/moody/moody-state";
+import type { MoodyBoonInstance, MoodyRarity } from "#data/elite-redux/moody/moody-types";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { Button } from "#enums/buttons";
@@ -45,6 +54,8 @@ import { getVariantTint } from "#sprites/variant";
 import type { TurnMove } from "#types/turn-move";
 import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
 import { MessageUiHandler } from "#ui/message-ui-handler";
+import { getMoodyLivePresentationSnapshot, getMoodyPokemonPresentation } from "#ui/moody/moody-live-presentation";
+import { type MoodyAttachmentClass, moodyAttachmentClass, moodyProgressLines } from "#ui/moody/moody-presentation";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { addBBCodeTextObject, addTextObject, getTextColor } from "#ui/text";
@@ -68,42 +79,255 @@ export function resolveItemManageVerticalCursor(
   battlerCount: number,
   direction: Button.UP | Button.DOWN,
 ): number {
+  const cancelCursor = Math.max(6, slotCount);
+  const discardCursor = cancelCursor + 1;
   const activeCount = Math.min(slotCount, Math.max(1, battlerCount));
   const lastActive = activeCount - 1;
   const hasBench = slotCount > activeCount;
 
   if (direction === Button.UP) {
-    if (cursor === 6) {
-      return hasBench ? slotCount - 1 : 7;
+    if (cursor === cancelCursor) {
+      return hasBench ? slotCount - 1 : discardCursor;
     }
-    if (cursor === 7) {
+    if (cursor === discardCursor) {
       return lastActive;
     }
     if (hasBench && cursor === activeCount) {
-      return 7;
+      return discardCursor;
     }
-    if (cursor > 0 && cursor < 6) {
+    if (cursor > 0 && cursor < slotCount) {
       return cursor - 1;
     }
-    return 6;
+    return cancelCursor;
   }
 
-  if (cursor === 6) {
+  if (cursor === cancelCursor) {
     return 0;
   }
-  if (cursor === 7) {
-    return hasBench ? activeCount : 6;
+  if (cursor === discardCursor) {
+    return hasBench ? activeCount : cancelCursor;
   }
   if (cursor === lastActive) {
-    return 7;
+    return discardCursor;
   }
   if (cursor < slotCount - 1) {
     return cursor + 1;
   }
-  return 6;
+  return cancelCursor;
 }
 
 const defaultMessage = i18next.t("partyUiHandler:choosePokemon");
+
+const MOODY_RARITY_COLORS: Readonly<Record<MoodyRarity, number>> = {
+  great: 0x4aa3ff,
+  ultra: 0xf4d44d,
+  rogue: 0xd94b64,
+  master: 0xb96cff,
+};
+
+const MOODY_RARITY_PRIORITY: Readonly<Record<MoodyRarity, number>> = {
+  great: 0,
+  ultra: 1,
+  rogue: 2,
+  master: 3,
+};
+
+export interface MoodyPartySlotIndicator {
+  rarity: MoodyRarity;
+  color: number;
+  attachment: MoodyAttachmentClass;
+  emblem: string;
+  dormant: boolean;
+}
+
+export interface MoodyPartySlotPresentation {
+  indicators: MoodyPartySlotIndicator[];
+  overflow: number;
+  summary: string;
+  effectLabels: string[];
+  effectCount: number;
+  curseCount: number;
+  borderColor: number;
+}
+
+function truncateMoodyLabel(label: string, maxLength: number): string {
+  return label.length <= maxLength ? label : `${label.slice(0, Math.max(1, maxLength - 3)).trimEnd()}...`;
+}
+
+/** Build the compact party-card representation from the live Moody catalog. */
+export function buildMoodyPartySlotPresentation(
+  boons: readonly MoodyBoonInstance[],
+): MoodyPartySlotPresentation | null {
+  const entries = boons
+    .map(boon => {
+      const definition = MOODY_BOON_BY_ID.get(boon.boonId);
+      if (definition == null) {
+        return null;
+      }
+      const evolution =
+        boon.evolutionId == null ? null : definition.evolutions.find(candidate => candidate.id === boon.evolutionId);
+      const label = evolution?.name ?? `${definition.name}${boon.rank === 2 ? " II" : boon.rank === 3 ? " III" : ""}`;
+      return { boon, definition, label };
+    })
+    .filter(entry => entry != null)
+    .toSorted(
+      (left, right) =>
+        MOODY_RARITY_PRIORITY[right.definition.rarity] - MOODY_RARITY_PRIORITY[left.definition.rarity]
+        || left.boon.acquiredAtWave - right.boon.acquiredAtWave
+        || left.boon.instanceId.localeCompare(right.boon.instanceId),
+    );
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const visibleCount = Math.min(3, entries.length);
+  const indicators = entries.slice(0, visibleCount).map(({ boon, definition }) => ({
+    rarity: definition.rarity,
+    color: MOODY_RARITY_COLORS[definition.rarity],
+    attachment: moodyAttachmentClass(definition),
+    dormant: boon.dormant === true,
+    emblem:
+      moodyAttachmentClass(definition) === "slot"
+        ? "S"
+        : moodyAttachmentClass(definition) === "pair"
+          ? "P"
+          : moodyAttachmentClass(definition) === "pokemon"
+            ? "M"
+            : "",
+  }));
+  const overflow = entries.length - visibleCount;
+
+  const summaryParts: string[] = [];
+  for (const entry of entries) {
+    const candidate = truncateMoodyLabel(`${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`, 26);
+    const withCandidate = `Boons: ${[...summaryParts, candidate].join(", ")}`;
+    if (withCandidate.length > 40 && summaryParts.length > 0) {
+      break;
+    }
+    summaryParts.push(candidate);
+    if (withCandidate.length >= 34) {
+      break;
+    }
+  }
+  const hiddenSummaryCount = entries.length - summaryParts.length;
+  const summary = `Boons: ${summaryParts.join(", ")}${hiddenSummaryCount > 0 ? ` +${hiddenSummaryCount}` : ""}`;
+
+  return {
+    indicators,
+    overflow,
+    summary,
+    effectLabels: entries.flatMap(entry => {
+      const label = `${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`;
+      const progress = moodyProgressLines(entry.boon, getMoodyBoonRuntimeProgress(entry.boon.instanceId));
+      return progress.length === 0 ? [label] : progress.map(line => `${label} - ${line}`);
+    }),
+    effectCount: entries.length,
+    curseCount: 0,
+    borderColor: indicators[0].color,
+  };
+}
+
+export function getMoodyPartySlotPresentation(
+  pokemonId: number,
+  partySlot: number,
+  enabled = getFunModeConfig().moodyMode && getMoodyModeState() != null,
+): MoodyPartySlotPresentation | null {
+  if (!enabled) {
+    return null;
+  }
+  const state = getMoodyModeState();
+  const boons =
+    state?.boons.filter(
+      boon =>
+        boon.target != null
+        && (boon.target.pokemonIds?.includes(pokemonId) || boon.target.partySlots?.includes(partySlot)),
+    ) ?? getMoodyBoonsForPokemon(pokemonId, partySlot);
+  const curses =
+    state?.curses.filter(
+      curse =>
+        curse.target != null
+        && (curse.target.pokemonIds?.includes(pokemonId) || curse.target.partySlots?.includes(partySlot)),
+    ) ?? [];
+  if (boons.length === 0 && curses.length === 0) {
+    return null;
+  }
+  const base = buildMoodyPartySlotPresentation(boons);
+  if (curses.length === 0) {
+    return base;
+  }
+
+  const curseIndicator: MoodyPartySlotIndicator = {
+    rarity: "rogue",
+    color: 0xb06ac0,
+    attachment: "pokemon",
+    emblem: "!",
+    dormant: false,
+  };
+  const indicators = [curseIndicator, ...(base?.indicators ?? [])].slice(0, 3);
+  const effectCount = boons.length + curses.length;
+  const curseLabels = curses.map(curse => MOODY_CURSE_BY_ID.get(curse.curseId)?.name ?? curse.curseId);
+  return {
+    indicators,
+    overflow: Math.max(0, effectCount - indicators.length),
+    summary: `${boons.length} boon${boons.length === 1 ? "" : "s"}, ${curses.length} curse${curses.length === 1 ? "" : "s"}`,
+    effectLabels: [...(base?.effectLabels ?? []), ...curseLabels],
+    effectCount,
+    curseCount: curses.length,
+    borderColor: curseIndicator.color,
+  };
+}
+
+export interface MoodyPartyMessageLayout {
+  fontSize: string;
+  boxHeight: number;
+  maxLines: number;
+  visibleEffects: number;
+}
+
+/** Keep a short single-effect label readable while allowing dense late-run stacks to fit. */
+export function resolveMoodyPartyMessageLayout(effectCount: number, textLength: number): MoodyPartyMessageLayout {
+  if (effectCount <= 1 && textLength <= 52) {
+    return { fontSize: "84px", boxHeight: 30, maxLines: 2, visibleEffects: 4 };
+  }
+  if (effectCount <= 3 && textLength <= 130) {
+    return { fontSize: "68px", boxHeight: 34, maxLines: 3, visibleEffects: 6 };
+  }
+  if (effectCount <= 6 && textLength <= 260) {
+    return { fontSize: "54px", boxHeight: 40, maxLines: 5, visibleEffects: 9 };
+  }
+  return { fontSize: "44px", boxHeight: 46, maxLines: 7, visibleEffects: 12 };
+}
+
+/** Center the actual reserve count instead of reserving vertical space for a hypothetical eight-mon party. */
+export function resolvePartySlotY(
+  slotIndex: number,
+  onFieldCount: number,
+  partyCount: number,
+  itemManageMode: boolean,
+  doubleBattle: boolean,
+): number {
+  if (slotIndex >= onFieldCount) {
+    const benchIndex = slotIndex - onFieldCount;
+    const benchCount = Math.max(1, partyCount - onFieldCount);
+    const benchTop = -168;
+    const benchBottom = -62;
+    const benchStep =
+      benchCount <= 1
+        ? 0
+        : Math.min(doubleBattle || onFieldCount >= 3 ? 36 : 30, (benchBottom - benchTop) / (benchCount - 1));
+    const usedHeight = benchStep * (benchCount - 1);
+    return (benchTop + benchBottom - usedHeight) / 2 + benchIndex * benchStep;
+  }
+  if (onFieldCount >= 3) {
+    return -164 + (itemManageMode ? -2 : 0) + (itemManageMode ? 35 : 37) * slotIndex;
+  }
+  let y = -148.5;
+  if (doubleBattle) {
+    y += itemManageMode ? -20 : -8;
+  }
+  return y + (itemManageMode ? (doubleBattle ? 47 : 55) : 64) * slotIndex;
+}
 
 /**
  * Co-op (#633): decode a `COOP_CHECK_OP_*` op code to a stable, greppable name for the
@@ -213,6 +437,8 @@ export enum PartyUiMode {
    * type of selection can be cancelled.
    */
   CHECK,
+  /** Moody Borrowed Future: replace only the active lead slots before the committed opening turn. */
+  BORROWED_FUTURE_REORDER,
   /**
    * Indicates that the party UI is open to select a party member for an arbitrary effect.
    * This is generally used in for Mystery Encounter or special effects that require the player to select a Pokemon
@@ -286,6 +512,7 @@ export type PokemonMoveSelectFilter = (pokemonMove: PokemonMove) => string | nul
 export class PartyUiHandler extends MessageUiHandler {
   private partyUiMode: PartyUiMode;
   private fieldIndex: number;
+  private borrowedFutureLeadCount = 1;
 
   private partyBg: Phaser.GameObjects.Image;
   private partyContainer: Phaser.GameObjects.Container;
@@ -295,6 +522,7 @@ export class PartyUiHandler extends MessageUiHandler {
   private partyDiscardModeButton: PartyDiscardModeButton;
   private partyMessageBox: Phaser.GameObjects.NineSlice;
   private moveInfoOverlay: MoveInfoOverlay;
+  private moodyTeamText: Phaser.GameObjects.Text;
 
   private optionsMode: boolean;
   private optionsScroll: boolean;
@@ -416,6 +644,15 @@ export class PartyUiHandler extends MessageUiHandler {
 
     this.partyBg.setOrigin(0, 1);
 
+    this.moodyTeamText = addTextObject(7, -178, "", TextStyle.PARTY, {
+      fontSize: "26px",
+      fixedWidth: 250 * 6,
+      maxLines: 1,
+    })
+      .setOrigin(0, 0)
+      .setVisible(false);
+    partyContainer.add(this.moodyTeamText);
+
     const partySlotsContainer = globalScene.add.container(0, 0);
     partySlotsContainer.setName("party-slots");
     partyContainer.add(partySlotsContainer);
@@ -493,6 +730,10 @@ export class PartyUiHandler extends MessageUiHandler {
     this.partyUiMode = args[0] as PartyUiMode;
 
     this.fieldIndex = args.length > 1 ? (args[1] as number) : -1;
+    this.borrowedFutureLeadCount =
+      this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER
+        ? Math.max(1, Math.min(globalScene.getPlayerParty().length, this.fieldIndex))
+        : 1;
 
     this.selectCallback = args.length > 2 && args[2] instanceof Function ? args[2] : undefined;
     this.selectFilter =
@@ -513,6 +754,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     this.populatePartySlots();
+    this.refreshMoodyTeamStrip();
     // If we are currently transferring items, set the icon to its proper state and reveal the button.
     if (this.isItemManageMode()) {
       this.partyDiscardModeButton.toggleIcon(this.partyUiMode as PartyUiMode.MODIFIER_TRANSFER | PartyUiMode.DISCARD);
@@ -521,6 +763,10 @@ export class PartyUiHandler extends MessageUiHandler {
     this.setCursor(0);
 
     return true;
+  }
+
+  private refreshMoodyTeamStrip(): void {
+    this.moodyTeamText.setVisible(false);
   }
 
   private processSummaryOption(pokemon: Pokemon): boolean {
@@ -1143,7 +1389,10 @@ export class PartyUiHandler extends MessageUiHandler {
     // mon (enter transferMode, mirroring SPLICE); the second MOVE on a DIFFERENT mon
     // swaps their party slots. The new order is in `getPlayerParty()` and serializes
     // with the session at the next save (wave end / Save & Quit).
-    if (this.partyUiMode === PartyUiMode.CHECK && option === PartyOption.MOVE) {
+    if (
+      (this.partyUiMode === PartyUiMode.CHECK || this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER)
+      && option === PartyOption.MOVE
+    ) {
       if (this.transferMode) {
         const party = globalScene.getPlayerParty();
         const src = this.transferCursor;
@@ -1367,19 +1616,25 @@ export class PartyUiHandler extends MessageUiHandler {
     return this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER || this.partyUiMode === PartyUiMode.DISCARD;
   }
 
+  private getPartyActionCursors(): { cancel: number; discard: number } {
+    const cancel = Math.max(6, this.partySlots.length, globalScene.getPlayerParty().length);
+    return { cancel, discard: cancel + 1 };
+  }
+
   private processPartyActionInput(): boolean {
     const ui = this.getUi();
+    const actionCursors = this.getPartyActionCursors();
 
     // ER (#560): with the fusion preview up, A fuses the SHOWN combo directly.
     if (this.fusionPreviewActive) {
-      if (this.cursor === 6) {
+      if (this.cursor === actionCursors.cancel) {
         return this.processPartyCancelInput(); // A on Cancel backs out the base lock
       }
       this.confirmFusionPreview();
       return true;
     }
 
-    if (this.cursor < 6) {
+    if (this.cursor < this.partySlots.length) {
       if (
         (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER && !this.transferMode)
         || this.partyUiMode === PartyUiMode.DISCARD
@@ -1400,7 +1655,7 @@ export class PartyUiHandler extends MessageUiHandler {
 
     // Toggle item transfer mode to discard items or vice versa
     // Prevent changing mode, when currently transfering an item
-    if (this.cursor === 7 && !this.transferMode) {
+    if (this.cursor === actionCursors.discard && !this.transferMode) {
       switch (this.partyUiMode) {
         case PartyUiMode.DISCARD:
           this.partyUiMode = PartyUiMode.MODIFIER_TRANSFER;
@@ -1418,7 +1673,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     // Pressing return button
-    if (this.cursor === 6) {
+    if (this.cursor === actionCursors.cancel) {
       if (this.allowCancel()) {
         return this.processInput(Button.CANCEL);
       }
@@ -1432,7 +1687,8 @@ export class PartyUiHandler extends MessageUiHandler {
     if (
       (this.partyUiMode === PartyUiMode.MODIFIER_TRANSFER
         || this.partyUiMode === PartyUiMode.SPLICE
-        || this.partyUiMode === PartyUiMode.CHECK) // ER: B cancels an in-progress reorder
+        || this.partyUiMode === PartyUiMode.CHECK
+        || this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER) // B cancels an in-progress reorder
       && this.transferMode
     ) {
       this.clearTransfer();
@@ -1456,11 +1712,12 @@ export class PartyUiHandler extends MessageUiHandler {
     const ui = this.getUi();
     const slotCount = this.partySlots.length;
     const battlerCount = globalScene.currentBattle.getBattlerCount();
+    const { cancel, discard } = this.getPartyActionCursors();
 
     if (this.lastCursor < battlerCount) {
       this.lastLeftPokemonCursor = this.lastCursor;
     }
-    if (this.lastCursor >= battlerCount && this.lastCursor < 6) {
+    if (this.lastCursor >= battlerCount && this.lastCursor < slotCount) {
       this.lastRightPokemonCursor = this.lastCursor;
     }
 
@@ -1474,27 +1731,29 @@ export class PartyUiHandler extends MessageUiHandler {
           success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
           break;
         }
-        success = this.setCursor(this.cursor ? (this.cursor < 6 ? this.cursor - 1 : slotCount - 1) : 6);
+        success = this.setCursor(this.cursor ? (this.cursor < slotCount ? this.cursor - 1 : slotCount - 1) : cancel);
         break;
       case Button.DOWN:
         if (this.isItemManageMode()) {
           success = this.setCursor(resolveItemManageVerticalCursor(this.cursor, slotCount, battlerCount, button));
           break;
         }
-        success = this.setCursor(this.cursor < 6 ? (this.cursor < slotCount - 1 ? this.cursor + 1 : 6) : 0);
+        success = this.setCursor(
+          this.cursor < slotCount ? (this.cursor < slotCount - 1 ? this.cursor + 1 : cancel) : 0,
+        );
         break;
       case Button.LEFT:
-        if (this.cursor === 6) {
-          success = this.setCursor(this.isItemManageMode() ? 7 : this.lastLeftPokemonCursor);
+        if (this.cursor === cancel) {
+          success = this.setCursor(this.isItemManageMode() ? discard : this.lastLeftPokemonCursor);
         }
-        if (this.cursor >= battlerCount && this.cursor < 6) {
+        if (this.cursor >= battlerCount && this.cursor < slotCount) {
           success = this.setCursor(this.lastLeftPokemonCursor);
         }
         break;
       case Button.RIGHT:
         // Scrolling right from item transfer button or with no backup party members goes to cancel
-        if (this.cursor === 7 || slotCount <= battlerCount) {
-          success = this.setCursor(6);
+        if (this.cursor === discard || slotCount <= battlerCount) {
+          success = this.setCursor(cancel);
           break;
         }
         if (this.cursor < battlerCount) {
@@ -1519,13 +1778,14 @@ export class PartyUiHandler extends MessageUiHandler {
     this.clearPartySlots();
 
     const party = globalScene.getPlayerParty();
+    const cancelCursor = Math.max(6, party.length);
 
-    if (this.cursor < 6 && this.cursor >= party.length) {
+    if (this.cursor < cancelCursor && this.cursor >= party.length) {
       this.cursor = party.length - 1;
-    } else if (this.cursor === 6) {
+    } else if (this.cursor === cancelCursor) {
       this.partyCancelButton.select();
     }
-    if (this.lastCursor < 6 && this.lastCursor >= party.length) {
+    if (this.lastCursor < cancelCursor && this.lastCursor >= party.length) {
       this.lastCursor = party.length - 1;
     }
 
@@ -1547,25 +1807,34 @@ export class PartyUiHandler extends MessageUiHandler {
     }
     const changed = this.cursor !== cursor;
     if (changed) {
+      const { cancel, discard } = this.getPartyActionCursors();
       this.lastCursor = this.cursor;
       this.cursor = cursor;
-      if (this.lastCursor < 6) {
-        this.partySlots[this.lastCursor].deselect();
-      } else if (this.lastCursor === 6) {
+      if (this.lastCursor < this.partySlots.length) {
+        this.partySlots[this.lastCursor]?.deselect();
+      } else if (this.lastCursor === cancel) {
         this.partyCancelButton.deselect();
-      } else if (this.lastCursor === 7) {
+      } else if (this.lastCursor === discard) {
         this.partyDiscardModeButton.deselect();
       }
-      if (cursor < 6) {
-        this.partySlots[cursor].select();
-      } else if (cursor === 6) {
+      if (cursor < this.partySlots.length) {
+        this.partySlots[cursor]?.select();
+      } else if (cursor === cancel) {
         this.partyCancelButton.select();
-      } else if (cursor === 7) {
+      } else if (cursor === discard) {
         this.partyDiscardModeButton.select();
       }
       // ER (#560): refresh the live fusion preview for (locked base, hovered).
       if (this.fusionPreviewActive) {
         this.updateFusionPreview();
+      }
+      if (
+        globalScene.gameMode?.isFun === true
+        && getFunModeConfig().moodyMode
+        && !this.transferMode
+        && !this.fusionPreviewActive
+      ) {
+        this.showPartyText();
       }
     }
     return changed;
@@ -1636,7 +1905,7 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   showOptions() {
-    if (this.cursor === 6) {
+    if (this.cursor === this.getPartyActionCursors().cancel) {
       return;
     }
 
@@ -1661,6 +1930,9 @@ export class PartyUiHandler extends MessageUiHandler {
           optionsMessage = i18next.t("partyUiHandler:selectAnotherPokemonToSplice");
         }
         break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        optionsMessage = this.transferMode ? "Choose the replacement Pokemon." : "Choose a lead slot to replace.";
+        break;
       case PartyUiMode.DISCARD:
         optionsMessage = i18next.t("partyUiHandler:changeQuantityDiscard");
     }
@@ -1680,17 +1952,73 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   showPartyText() {
+    if (this.partyUiMode === PartyUiMode.BORROWED_FUTURE_REORDER) {
+      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px").setMaxLines(2);
+      this.showText("Choose a lead to replace. Back when finished.");
+      return;
+    }
+
+    const focusedPokemon =
+      this.cursor >= 0 && this.cursor < this.partySlots.length ? this.partySlots[this.cursor].getPokemon() : null;
+    const presentation = focusedPokemon == null ? null : getMoodyPartySlotPresentation(focusedPokemon.id, this.cursor);
+    const runtime = focusedPokemon == null ? null : getMoodyPokemonPresentation(focusedPokemon.id);
+    const liveSnapshot = getMoodyLivePresentationSnapshot();
+    const runtimeLines =
+      runtime == null
+        ? []
+        : [
+            (runtime.barrier ?? 0) > 0 ? `Barrier ${runtime.barrier}` : "",
+            (runtime.damageDebt ?? 0) > 0 ? `Debt ${runtime.damageDebt}` : "",
+            (runtime.revivalCharges ?? 0) > 0 ? `${runtime.revivalLabel ?? "Revival"} x${runtime.revivalCharges}` : "",
+          ].filter(Boolean);
+
+    if (presentation == null && runtimeLines.length === 0) {
+      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px").setMaxLines(2);
+      switch (this.partyUiMode) {
+        case PartyUiMode.MODIFIER_TRANSFER:
+          this.showText(i18next.t("partyUiHandler:partyTransfer"));
+          return;
+        case PartyUiMode.DISCARD:
+          this.showText(i18next.t("partyUiHandler:partyDiscard"));
+          return;
+        default:
+          this.showText("", 0);
+          return;
+      }
+    }
+
+    let text = "";
     switch (this.partyUiMode) {
       case PartyUiMode.MODIFIER_TRANSFER:
-        this.showText(i18next.t("partyUiHandler:partyTransfer"));
+        text = i18next.t("partyUiHandler:partyTransfer");
         break;
       case PartyUiMode.DISCARD:
-        this.showText(i18next.t("partyUiHandler:partyDiscard"));
-        break;
-      default:
-        this.showText("", 0);
+        text = i18next.t("partyUiHandler:partyDiscard");
         break;
     }
+
+    const liveEffectLabels =
+      liveSnapshot?.curseMarkers?.filter(marker => marker.pokemonId === focusedPokemon?.id).map(marker => marker.label)
+      ?? [];
+    const detailItems = [...new Set([...(presentation?.effectLabels ?? []), ...liveEffectLabels, ...runtimeLines])];
+    const initialLayout = resolveMoodyPartyMessageLayout(detailItems.length, detailItems.join("  |  ").length);
+    const visibleDetails = detailItems.slice(0, initialLayout.visibleEffects);
+    const hiddenDetailCount = detailItems.length - visibleDetails.length;
+    const moodSummary = [...visibleDetails, hiddenDetailCount > 0 ? `+${hiddenDetailCount} more` : ""]
+      .filter(Boolean)
+      .join("  |  ");
+    text = text.length > 0 ? `${text}\n${moodSummary}` : moodSummary;
+
+    const layout = resolveMoodyPartyMessageLayout(detailItems.length, text.length);
+    const messageWidth = 248 * 6;
+    this.message
+      .setFixedSize(messageWidth, 0)
+      .setWordWrapWidth(messageWidth, true)
+      .setFontSize(layout.fontSize)
+      .setMaxLines(layout.maxLines);
+    this.showText(text, 0);
+    this.partyMessageBox.setSize(262, layout.boxHeight);
+    this.message.setY(10 - (layout.boxHeight - 30));
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -1928,6 +2256,15 @@ export class PartyUiHandler extends MessageUiHandler {
           }
         }
         break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        if (this.transferMode) {
+          if (this.cursor !== this.transferCursor) {
+            this.options.push(PartyOption.MOVE);
+          }
+        } else if (this.cursor < this.borrowedFutureLeadCount && globalScene.getPlayerParty().length > 1) {
+          this.options.push(PartyOption.MOVE);
+        }
+        break;
       case PartyUiMode.SELECT:
         this.options.push(PartyOption.SELECT);
         this.addCommonOptions(pokemon);
@@ -1964,6 +2301,15 @@ export class PartyUiHandler extends MessageUiHandler {
           break;
         }
         this.options.push(PartyOption.RELEASE);
+        break;
+      case PartyUiMode.BORROWED_FUTURE_REORDER:
+        if (this.transferMode) {
+          if (this.cursor !== this.transferCursor) {
+            this.options.push(PartyOption.MOVE);
+          }
+        } else if (this.cursor < this.borrowedFutureLeadCount && globalScene.getPlayerParty().length > 1) {
+          this.options.push(PartyOption.MOVE);
+        }
         break;
     }
 
@@ -2131,7 +2477,7 @@ export class PartyUiHandler extends MessageUiHandler {
     }
     const party = globalScene.getPlayerParty();
     const base = party[this.transferCursor];
-    const partner = this.cursor < 6 ? party[this.cursor] : undefined;
+    const partner = this.cursor < party.length ? party[this.cursor] : undefined;
     if (base && partner && this.cursor !== this.transferCursor) {
       this.fusionPreviewPanel.show(base, partner);
     } else {
@@ -2146,7 +2492,8 @@ export class PartyUiHandler extends MessageUiHandler {
       return;
     }
     const ui = this.getUi();
-    if (this.cursor < 6 && this.cursor !== this.transferCursor && this.selectCallback) {
+    const party = globalScene.getPlayerParty();
+    if (this.cursor < party.length && this.cursor !== this.transferCursor && this.selectCallback) {
       (this.selectCallback as PartyModifierSpliceSelectCallback)(this.transferCursor, this.cursor);
       this.clearTransfer();
       ui.playSelect();
@@ -2415,22 +2762,13 @@ class PartySlot extends Phaser.GameObjects.Container {
     // tighter step and a higher start than the 1/2-slot single/double layout - otherwise
     // the 3rd on-field slot is spread off the bottom (the reported "3rd mon missing").
     const onFieldCount = globalScene.currentBattle.getBattlerCount();
-    const isTripleField = onFieldCount >= 3;
-
-    let slotPositionY: number;
-    if (isBenched) {
-      slotPositionY = -196 + (isDoubleBattle || isTripleField ? -40 : 0);
-      slotPositionY += (28 + (isDoubleBattle || isTripleField ? 8 : 0)) * slotIndex;
-    } else if (isTripleField) {
-      slotPositionY = -160 + (isItemManageMode ? -12 : 0);
-      slotPositionY += (isItemManageMode ? 38 : 44) * slotIndex;
-    } else {
-      slotPositionY = -148.5;
-      if (isDoubleBattle) {
-        slotPositionY += isItemManageMode ? -20 : -8;
-      }
-      slotPositionY += (isItemManageMode ? (isDoubleBattle ? 47 : 55) : 64) * slotIndex;
-    }
+    const slotPositionY = resolvePartySlotY(
+      slotIndex,
+      onFieldCount,
+      globalScene.getPlayerParty().length,
+      isItemManageMode,
+      isDoubleBattle,
+    );
 
     super(globalScene, slotPositionX, slotPositionY);
 
@@ -2449,18 +2787,29 @@ class PartySlot extends Phaser.GameObjects.Container {
   setup(partyUiMode: PartyUiMode, tmMoveId: MoveId) {
     const isItemManageMode = partyUiMode === PartyUiMode.MODIFIER_TRANSFER || partyUiMode === PartyUiMode.DISCARD;
 
+    const compactActive = !this.isBenched && globalScene.currentBattle.getBattlerCount() >= 3;
     this.slotBgKey = this.isBenched
       ? "party_slot"
-      : isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1
+      : compactActive || (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1)
         ? "party_slot_main_short"
         : "party_slot_main";
     const fullSlotBgKey = this.pokemon.hp ? this.slotBgKey : `${this.slotBgKey}${"_fnt"}`;
     this.slotBg = globalScene.add.sprite(0, 0, this.slotBgKey, fullSlotBgKey);
     this.slotBg.setOrigin(0);
+    const moodyPresentation = getMoodyPartySlotPresentation(this.pokemon.id, this.slotIndex);
+    if (moodyPresentation != null) {
+      const moodyOutline = globalScene.add
+        .sprite(-1, -1, this.slotBgKey, fullSlotBgKey)
+        .setOrigin(0)
+        .setDisplaySize(this.slotBg.displayWidth + 2, this.slotBg.displayHeight + 2)
+        .setTintFill(moodyPresentation.borderColor);
+      this.add(moodyOutline);
+    }
     this.add(this.slotBg);
 
     const genderSymbol = getGenderSymbol(this.pokemon.getGender(true));
     const isFusion = this.pokemon.isFusion();
+    const isPseudoMega = this.pokemon.isFunPseudoMega();
 
     // Here we define positions and offsets
     // Base values are for the active pokemon; they are changed for benched pokemon,
@@ -2471,7 +2820,7 @@ class PartySlot extends Phaser.GameObjects.Container {
     // name position relative to slot background
     let namePosition = { x: 24, y: 10 };
     // maximum allowed length of name; must accomodate fusion symbol
-    let maxNameTextWidth = 76 - (isFusion ? 8 : 0);
+    let maxNameTextWidth = 76 - (isFusion ? 8 : 0) - (isPseudoMega ? 8 : 0);
     // "Lv." label position relative to slot background
     let levelLabelPosition = { x: 24 + 8, y: 10 + 12 };
     // offset from "Lv." to the level number; should not be changed.
@@ -2491,7 +2840,7 @@ class PartySlot extends Phaser.GameObjects.Container {
     let descriptionLabelPosition = { x: 32, y: 46 };
 
     // If in item management mode, the active slots are shorter
-    if (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1 && !this.isBenched) {
+    if ((compactActive || (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1)) && !this.isBenched) {
       namePosition.y -= 8;
       levelLabelPosition.y -= 8;
       hpBarPosition.y -= 8;
@@ -2584,6 +2933,19 @@ class PartySlot extends Phaser.GameObjects.Container {
       slotInfoContainer.add(splicedIcon);
     }
 
+    if (isPseudoMega) {
+      const megaIcon = globalScene.add
+        .image(0, 0, "icon_fun_mega")
+        .setScale(0.42)
+        .setOrigin(0)
+        .setPositionRelative(
+          slotLevelLabel,
+          splicedIconToLevelLabelOffset.x + (isFusion ? 8 : 0),
+          splicedIconToLevelLabelOffset.y,
+        );
+      slotInfoContainer.add(megaIcon);
+    }
+
     if (this.pokemon.status) {
       const statusIndicator = globalScene.add
         .sprite(0, 0, getLocalizedSpriteKey("statuses"))
@@ -2612,6 +2974,21 @@ class PartySlot extends Phaser.GameObjects.Container {
           .setPosition(shinyStar.x, shinyStar.y)
           .setTint(getVariantTint(this.pokemon.fusionVariant));
         slotInfoContainer.add(fusionShinyStar);
+      }
+    }
+
+    if (moodyPresentation != null) {
+      let indicatorRight = this.slotBg.displayWidth - 3;
+      for (const indicator of moodyPresentation.indicators) {
+        const markerWidth = 6;
+        const markerHeight = 6;
+        const marker = globalScene.add
+          .rectangle(indicatorRight, 1, markerWidth, markerHeight, indicator.color)
+          .setOrigin(1, 0)
+          .setAlpha(indicator.dormant ? 0.4 : 1)
+          .setStrokeStyle(1, 0x202028);
+        slotInfoContainer.add(marker);
+        indicatorRight -= markerWidth + 2;
       }
     }
 

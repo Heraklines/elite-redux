@@ -47,8 +47,17 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { notifyMoodyRuntimeBoonDraft } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { applyMoodyCoordinatorBoonOffers } from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
+  getMoodyBoonOffers,
+  initializeMoodyModeState,
+  resetMoodyModeState,
+  rollAndCommitMoodyCurse,
+} from "#data/elite-redux/moody/moody-state";
 import {
   beginShowdownBattle,
   consumePendingShowdownPresetStarters,
@@ -980,77 +989,130 @@ export class SelectStarterPhase extends Phase {
       }
     }
     Promise.all(loadPokemonAssets).then(() => {
-      // Guard: the menu BGM may not exist (e.g. the AudioContext never started
-      // because the browser blocked autoplay). Fading out a null sound throws,
-      // which would reject this promise and leave the run stuck on a blank field.
-      const menuBgm = globalScene.sound.get("menu");
-      if (menuBgm) {
-        SoundFade.fadeOut(globalScene, menuBgm, 500, true);
-      }
-      globalScene.time.delayedCall(500, () => globalScene.playBgm());
-      if (globalScene.gameMode.isClassic) {
-        globalScene.gameData.gameStats.classicSessionsPlayed++;
-      } else {
-        globalScene.gameData.gameStats.endlessSessionsPlayed++;
-      }
-      // Restart rebuilds the title screen, which clears old custom-trainer
-      // forces. Arm the staged force at the last possible point so Reset always
-      // recreates this trainer battle instead of falling through to a wild wave.
-      const pendingCustomTrainerForce = consumePendingDevCustomTrainerForce();
-      if (pendingCustomTrainerForce) {
-        setErCustomTrainerDevForce(pendingCustomTrainerForce);
-      }
-      globalScene.newBattle();
-      const partyRewardFixtureId = getCoopBrowserPartyRewardFixtureId();
-      if (partyRewardFixtureId === "TERA_SHARD") {
-        globalScene.addModifier(modifierTypes.TERA_ORB().withIdFromFunc(modifierTypes.TERA_ORB).newModifier(), true);
-      }
-      const fixtureReserve = party[3];
-      if (
-        fixtureReserve != null
-        && ["POTION", "SUPER_POTION", "HYPER_POTION", "MAX_POTION", "FULL_RESTORE"].includes(partyRewardFixtureId ?? "")
-      ) {
-        fixtureReserve.hp = Math.max(1, Math.floor(fixtureReserve.getMaxHp() / 4));
-      }
-      if (fixtureReserve != null && ["FULL_RESTORE", "FULL_HEAL"].includes(partyRewardFixtureId ?? "")) {
-        fixtureReserve.doSetStatus(StatusEffect.BURN);
-      }
-      if (fixtureReserve != null && ["REVIVE", "MAX_REVIVE"].includes(partyRewardFixtureId ?? "")) {
-        fixtureReserve.hp = 0;
-      }
-      if (partyRewardFixtureId === "SACRED_ASH") {
-        for (const reserveSlot of [2, 3]) {
-          const reserve = party[reserveSlot];
-          if (reserve != null) {
-            reserve.hp = 0;
-          }
+      const finishLaunch = () => {
+        const moodyMode = globalScene.gameMode.isFun && getFunModeConfig().moodyMode;
+        if (moodyMode) {
+          initializeMoodyModeState(globalScene.seed);
+        } else {
+          resetMoodyModeState();
         }
-      }
-      // ER (dev-tools only): a staff tester picking a custom trainer from the
-      // in-game Dev Scenarios picker arms a one-shot dev force. The FIRST wave of a
-      // run never runs NewBattlePhase (which normally installs custom trainers), so
-      // install here too when a force is armed - otherwise the forced pick would
-      // drop into a normal wild/trainer battle instead of the chosen trainer. Inert
-      // in prod (the force read is gated to dev tools) and on any un-forced run.
-      if (isErCustomTrainerDevForceArmed()) {
-        installErCustomTrainerForCurrentWave();
-      }
-      // ER #439: the biome Map is a DEFAULT item on every run, all difficulties -
-      // players can always choose their next biome from the start (daily runs
-      // already grant it in TitlePhase; this covers classic/endless/challenge +
-      // the ER difficulty modes + dev scenarios, which all route through here).
-      globalScene.addModifier(modifierTypes.MAP().withIdFromFunc(modifierTypes.MAP).newModifier(), true);
-      globalScene.arena.init();
-      globalScene.sessionPlayTime = 0;
-      globalScene.lastSavePlayTime = 0;
-      // Ensures Keldeo (or any future Pokemon that have this type of form change) starts in the correct form
-      globalScene.getPlayerParty().forEach(p => {
-        globalScene.triggerPokemonFormChange(p, SpeciesFormChangeMoveLearnedTrigger);
-      });
-      if (completingPhase === this) {
-        this.end();
+        const launchRun = () => {
+          // Guard: the menu BGM may not exist (e.g. the AudioContext never started
+          // because the browser blocked autoplay). Fading out a null sound throws,
+          // which would reject this promise and leave the run stuck on a blank field.
+          const menuBgm = globalScene.sound.get("menu");
+          if (menuBgm) {
+            SoundFade.fadeOut(globalScene, menuBgm, 500, true);
+          }
+          globalScene.time.delayedCall(500, () => globalScene.playBgm());
+          if (globalScene.gameMode.isClassic) {
+            globalScene.gameData.gameStats.classicSessionsPlayed++;
+          } else {
+            globalScene.gameData.gameStats.endlessSessionsPlayed++;
+          }
+          // Restart rebuilds the title screen, which clears old custom-trainer
+          // forces. Arm the staged force at the last possible point so Reset always
+          // recreates this trainer battle instead of falling through to a wild wave.
+          const pendingCustomTrainerForce = consumePendingDevCustomTrainerForce();
+          if (pendingCustomTrainerForce) {
+            setErCustomTrainerDevForce(pendingCustomTrainerForce);
+          }
+          if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+            const bracelet = modifierTypes.MEGA_BRACELET().withIdFromFunc(modifierTypes.MEGA_BRACELET).newModifier();
+            if (bracelet) {
+              globalScene.addModifier(bracelet, true);
+            }
+          }
+          globalScene.newBattle();
+          const partyRewardFixtureId = getCoopBrowserPartyRewardFixtureId();
+          if (partyRewardFixtureId === "TERA_SHARD") {
+            globalScene.addModifier(
+              modifierTypes.TERA_ORB().withIdFromFunc(modifierTypes.TERA_ORB).newModifier(),
+              true,
+            );
+          }
+          const fixtureReserve = party[3];
+          if (
+            fixtureReserve != null
+            && ["POTION", "SUPER_POTION", "HYPER_POTION", "MAX_POTION", "FULL_RESTORE"].includes(
+              partyRewardFixtureId ?? "",
+            )
+          ) {
+            fixtureReserve.hp = Math.max(1, Math.floor(fixtureReserve.getMaxHp() / 4));
+          }
+          if (fixtureReserve != null && ["FULL_RESTORE", "FULL_HEAL"].includes(partyRewardFixtureId ?? "")) {
+            fixtureReserve.doSetStatus(StatusEffect.BURN);
+          }
+          if (fixtureReserve != null && ["REVIVE", "MAX_REVIVE"].includes(partyRewardFixtureId ?? "")) {
+            fixtureReserve.hp = 0;
+          }
+          if (partyRewardFixtureId === "SACRED_ASH") {
+            for (const reserveSlot of [2, 3]) {
+              const reserve = party[reserveSlot];
+              if (reserve != null) {
+                reserve.hp = 0;
+              }
+            }
+          }
+          // ER (dev-tools only): a staff tester picking a custom trainer from the
+          // in-game Dev Scenarios picker arms a one-shot dev force. The FIRST wave of a
+          // run never runs NewBattlePhase (which normally installs custom trainers), so
+          // install here too when a force is armed - otherwise the forced pick would
+          // drop into a normal wild/trainer battle instead of the chosen trainer. Inert
+          // in prod (the force read is gated to dev tools) and on any un-forced run.
+          if (isErCustomTrainerDevForceArmed()) {
+            installErCustomTrainerForCurrentWave();
+          }
+          // ER #439: the biome Map is a DEFAULT item on every run, all difficulties -
+          // players can always choose their next biome from the start (daily runs
+          // already grant it in TitlePhase; this covers classic/endless/challenge +
+          // the ER difficulty modes + dev scenarios, which all route through here).
+          globalScene.addModifier(modifierTypes.MAP().withIdFromFunc(modifierTypes.MAP).newModifier(), true);
+          globalScene.arena.init();
+          globalScene.sessionPlayTime = 0;
+          globalScene.lastSavePlayTime = 0;
+          // Ensures Keldeo (or any future Pokemon that have this type of form change) starts in the correct form
+          globalScene.getPlayerParty().forEach(p => {
+            globalScene.triggerPokemonFormChange(p, SpeciesFormChangeMoveLearnedTrigger);
+          });
+          if (completingPhase === this) {
+            this.end();
+          } else {
+            completingPhaseManager.shiftPhase(completingPhase);
+          }
+        };
+        if (!moodyMode) {
+          launchRun();
+          return;
+        }
+
+        const initialDraftWave = 0;
+        applyMoodyCoordinatorBoonOffers(initialDraftWave);
+        notifyMoodyRuntimeBoonDraft(getMoodyBoonOffers(initialDraftWave).map(offer => offer.offerId));
+        let openingDraftCompleted = false;
+        const completeOpeningDraft = () => {
+          if (openingDraftCompleted) {
+            return;
+          }
+          openingDraftCompleted = true;
+          const curse = rollAndCommitMoodyCurse(
+            initialDraftWave,
+            party.map(pokemon => pokemon.id),
+          );
+          if (curse == null) {
+            launchRun();
+            return;
+          }
+          void globalScene.ui.showMoodyCurseReceived(curse).then(launchRun, launchRun);
+        };
+        void globalScene.ui
+          .setOverlayMode(UiMode.MOODY_BOON_SELECT, initialDraftWave, completeOpeningDraft)
+          .catch(completeOpeningDraft);
+      };
+      if (globalScene.gameMode.isFun && getFunModeConfig().randomizeAbilities) {
+        void globalScene.ui.setMode(UiMode.FUN_ABILITY_REVIEW, party, finishLaunch);
       } else {
-        completingPhaseManager.shiftPhase(completingPhase);
+        finishLaunch();
       }
     });
   }

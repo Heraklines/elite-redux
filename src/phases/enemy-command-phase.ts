@@ -9,6 +9,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { applyMoodyCoordinatorCommittedEnemyAction } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -85,6 +86,12 @@ export class EnemyCommandPhase extends FieldPhase {
     // local perspective, so both peers await the opponent and apply that choice to their enemy side.
     if (isShowdownSyncSession() || (isVersusSession() && getCoopController()?.role === "host")) {
       void this.resolveVersusEnemyCommand();
+      return;
+    }
+
+    const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
+    if (enemyPokemon != null && applyMoodyCoordinatorCommittedEnemyAction(enemyPokemon, this.fieldIndex)) {
+      this.end();
       return;
     }
 

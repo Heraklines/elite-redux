@@ -22,7 +22,10 @@ import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tra
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { isMoodyBoonRewardWave } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -318,7 +321,13 @@ export class VictoryPhase extends PokemonPhase {
         // The mid-biome x0 heal is an automatic shared mutation. It must drain before the retained victory
         // image is sealed; previously it ran after the interactive market and therefore could never be part
         // of the wave's authoritative boundary.
-        if (erRouting && fireBiomeShop && !biomeEnding && !isCoopAuthoritativeGuest()) {
+        if (
+          erRouting
+          && fireBiomeShop
+          && !biomeEnding
+          && !isCoopAuthoritativeGuest()
+          && isMoodyAutomaticBiomeHealingEnabled()
+        ) {
           globalScene.phaseManager.pushNew("PartyHealPhase", false);
         }
 
@@ -335,6 +344,10 @@ export class VictoryPhase extends PokemonPhase {
             false,
             { kind: "wave-boundary" },
           );
+        }
+
+        if (isMoodyBoonRewardWave(currentWaveIndex) && gameMode.isFun && getFunModeConfig().moodyMode) {
+          globalScene.phaseManager.pushNew("SelectMoodyBoonPhase", currentWaveIndex);
         }
 
         if (fireBiomeShop) {

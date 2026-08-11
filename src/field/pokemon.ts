@@ -17,11 +17,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/moves/signature-moves";
-import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import {
   FusionSpeciesFormEvolution,
   pokemonEvolutions,
   pokemonPrevolutions,
+  SpeciesFormEvolution,
   validateShedinjaEvo,
 } from "#balance/pokemon-evolutions";
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
@@ -137,6 +137,17 @@ import {
 } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
+  applyFunMegaStatDelta,
+  getFunEnemyMegaChance,
+  getFunMegaMixEffects,
+  getFunMegaStoneItems,
+  getFunRealMegaChoices,
+  isFunPseudoMegaActive,
+  shuffleFunStats,
+} from "#data/elite-redux/er-fun-mega-mode";
+import {
+  getFunAbilityAvalancheIds,
+  getFunEvolutionTarget,
   getFunModeConfig,
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
@@ -182,6 +193,38 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
+import {
+  absorbMoodyFormationBarrier,
+  applyMoodyFormationLethalClamp,
+  notifyMoodyFormationStatusEffectCured,
+  shouldMoodyFormationPreventStatusEffect,
+  shouldMoodyFormationPreventVolatile,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyRuntimeMoveTypeOverride,
+  notifyMoodyRuntimeDamageApplied,
+  notifyMoodyRuntimeHeal,
+  notifyMoodyRuntimeStatusApplied,
+  notifyMoodyRuntimeStatusCured,
+  notifyMoodyRuntimeVolatileApplied,
+  shouldMoodyRuntimePreventStatus,
+  shouldMoodyRuntimePreventVolatile,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorTypeEffectiveness,
+  getMoodyCoordinatorExtraAbilityIds,
+  getMoodyCoordinatorHpDebt,
+  getMoodyCoordinatorMaxHpMultiplier,
+  notifyMoodyCoordinatorBossSegmentBroken,
+  notifyMoodyCoordinatorHealingUsed,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
+  applyMoodyDamageCalculation,
+  getMoodyAccuracyMultiplier,
+  getMoodyHealingMultiplier,
+  getMoodyStatMultiplier,
+  grantMoodyItemSetHealingBarrier,
+} from "#data/elite-redux/moody/moody-scene-adapter";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -221,6 +264,7 @@ import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
+import type { FormChangeItem } from "#enums/form-change-item";
 import { HitResult } from "#enums/hit-result";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { MoveCategory } from "#enums/move-category";
@@ -259,6 +303,7 @@ import {
   HiddenAbilityRateBoosterModifier,
   PokemonBaseStatFlatModifier,
   PokemonBaseStatTotalModifier,
+  PokemonFormChangeItemModifier,
   PokemonFriendshipBoosterModifier,
   PokemonHeldItemModifier,
   PokemonIncrementingStatModifier,
@@ -1859,11 +1904,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The numeric value of the desired {@linkcode Stat}.
    */
   getStat(stat: PermanentStat, bypassSummonData = true): number {
-    if (!bypassSummonData) {
-      // 0 = no override
-      return this.summonData.stats[stat] || this.stats[stat];
-    }
-    return this.stats[stat];
+    const rawStat = bypassSummonData ? this.stats[stat] : this.summonData.stats[stat] || this.stats[stat];
+    return Math.max(1, Math.floor(rawStat * getMoodyStatMultiplier(this, stat)));
   }
 
   /**
@@ -2193,7 +2235,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   calculateBaseStats(): number[] {
-    const baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    let baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    if (this.isFunPseudoMega() && funMegaStone != null) {
+      baseStats = applyFunMegaStatDelta(baseStats, funMegaStone);
+    }
+    if (getFunModeConfig().shuffleStats) {
+      baseStats = shuffleFunStats(baseStats, this.id, this.isMega() ? funMegaStone : undefined);
+    }
     applyChallenges(ChallengeType.FLIP_STAT, this, baseStats);
     // Shuckle Juice
     globalScene.applyModifiers(PokemonBaseStatTotalModifier, this.isPlayer(), this, baseStats);
@@ -2259,7 +2308,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   // TODO: Convert this into a getter
   getMaxHp(): number {
-    return this.getStat(Stat.HP);
+    return Math.max(
+      1,
+      Math.floor(this.getStat(Stat.HP) * getMoodyCoordinatorMaxHpMultiplier(this)) - getMoodyCoordinatorHpDebt(this.id),
+    );
   }
 
   /** Returns the amount of hp currently missing from this {@linkcode Pokemon} (max - current) */
@@ -2608,6 +2660,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && getFunModeConfig().randomizeTypes
       && (ignoreOverride || this.summonData.types.length === 0);
     const types = new Set(shouldUseRandomTypes ? getFunRandomTypes(this.id, baseTypes) : baseTypes);
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    if (
+      globalScene.gameMode.isFun
+      && getFunModeConfig().megaMixMode
+      && funMegaStone != null
+      && this.isFunPseudoMega()
+    ) {
+      const mixEffects = getFunMegaMixEffects(funMegaStone, [...types]);
+      if (mixEffects?.addedType != null) {
+        types.add(mixEffects.addedType);
+      }
+    }
 
     // become UNKNOWN if no types are present, or remove it if other types are present.
     // TODO: Move this after the added type checks once Roost is refactored to check removed types correctly
@@ -2741,7 +2805,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
     if (globalScene.gameMode.isFun) {
-      const randomized = getFunRandomAbilityId(this.id, 0);
+      const randomized = getFunRandomAbilityId(this.id, this.abilityIndex);
       if (randomized != null) {
         return allAbilities[randomized];
       }
@@ -2791,7 +2855,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     if (globalScene.gameMode.isFun) {
-      const randomized = getFunRandomAbilityId(this.id, 1);
+      const randomized = getFunRandomAbilityId(this.id, 3);
       if (randomized != null) {
         return allAbilities[randomized];
       }
@@ -2848,7 +2912,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (abilityId === AbilityId.NONE) {
           return AbilityId.NONE;
         }
-        return getFunRandomAbilityId(this.id, slot + 1) ?? abilityId;
+        return getFunRandomAbilityId(this.id, slot + 3) ?? abilityId;
       }) as [AbilityId, AbilityId, AbilityId];
     }
 
@@ -2863,7 +2927,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const customSlot1 = this.getAbilityOverrideForSlot(2);
     const customSlot2 = this.getAbilityOverrideForSlot(3);
     const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
-    const slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    let slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    const mixEffects =
+      globalScene.gameMode.isFun && getFunModeConfig().megaMixMode && funMegaStone != null && this.isFunPseudoMega()
+        ? getFunMegaMixEffects(funMegaStone)
+        : null;
+    if (mixEffects != null) {
+      if (transformOverride?.[0] == null) {
+        slot0 = mixEffects.innate1 === AbilityId.NONE ? null : allAbilities[mixEffects.innate1];
+      }
+      if (transformOverride?.[2] == null) {
+        slot2Id = mixEffects.innate3;
+      }
+    }
     if (transformOverride?.[0] != null) {
       slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }
@@ -2872,6 +2949,32 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    const legacyTemporaryPassiveId = this.summonData.passiveAbility;
+    if (legacyTemporaryPassiveId != null) {
+      const temporary = allAbilities[legacyTemporaryPassiveId];
+      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
+        slots.push(temporary);
+      }
+    }
+    for (const abilityId of getMoodyCoordinatorExtraAbilityIds(this.id)) {
+      const temporary = allAbilities[abilityId];
+      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
+        slots.push(temporary);
+      }
+    }
+    if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
+      const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
+      for (const avalancheId of getFunAbilityAvalancheIds(
+        this.id,
+        globalScene.currentBattle?.waveIndex ?? 1,
+        excludedIds,
+      )) {
+        const avalancheAbility = allAbilities[avalancheId];
+        if (avalancheAbility && !slots.some(ability => ability?.id === avalancheAbility.id)) {
+          slots.push(avalancheAbility);
+        }
+      }
+    }
     // ER Black Shinies (#349): append the active GIFT abilities — this mon's
     // own gift plus any on-field black-shiny ally's gift. Flowing them through
     // the passive list makes combat + every abilities screen pick them up.
@@ -2905,9 +3008,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!ability) {
         continue;
       }
-      const isGiftSlot = slot >= 3;
+      const isAlwaysOnExtraSlot = slot >= 3;
       const isFormChangeDriver = this.abilityDrivesFormChange(ability);
-      if (!isGiftSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
+      if (!isAlwaysOnExtraSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
         continue;
       }
       if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint, ignoreMentalPollution)) {
@@ -3393,18 +3496,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // (Battle Bond is deliberately EXCLUDED from that exemption — it is a power
     // spike, not passive identity, so a locked Battle Bond innate does nothing.)
     const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
-    // ER Black Shinies (#349): the GIFT slot (>= 3) is exempt from hasPassive
-    // and from candy unlock gates — it is always live (suppression below still
-    // applies, so Neutralizing Gas / ER Frisk affect it like any ability).
-    const isGiftSlot = passive && passiveSlot >= 3;
-    if (passive && !isGiftSlot && !this.hasPassive() && !drivesFormChange) {
+    // Runtime-added slots (Ability Avalanche and Black Shiny gifts) are exempt
+    // from base-innate unlock gates, but still respect ability suppression.
+    const isAlwaysOnExtraSlot = passive && passiveSlot >= 3;
+    if (passive && !isAlwaysOnExtraSlot && !this.hasPassive() && !drivesFormChange) {
       return false;
     }
     // ER 3-passive model: gate each innate slot individually for the player by its
     // candy unlock + enable state. Skipped when a passive override forces passives
     // on (tests/dev) or the slot drives a form change. Enemy slot gating is by
     // level, applied in applyAbAttrsInternal.
-    if (passive && !isGiftSlot && this.isPlayer() && !drivesFormChange) {
+    if (passive && !isAlwaysOnExtraSlot && this.isPlayer() && !drivesFormChange) {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
@@ -3740,7 +3842,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && (move.id === MoveId.TERA_BLAST
         || (move.id === MoveId.TERA_STARSTORM && moveTypeHolder.value === PokemonType.STELLAR))
     ) {
-      return moveTypeHolder.value as PokemonType;
+      return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
     }
 
     globalScene.arena.applyTags(ArenaTagType.ION_DELUGE, moveTypeHolder);
@@ -3757,7 +3859,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       moveTypeHolder.value = primedType;
     }
 
-    return moveTypeHolder.value as PokemonType;
+    return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
   }
 
   /**
@@ -4085,7 +4187,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ) {
       multi.value = 1;
     }
-    return multi.value as TypeDamageMultiplier;
+    return applyMoodyCoordinatorTypeEffectiveness(source, this, multi.value, simulated) as TypeDamageMultiplier;
   }
 
   /**
@@ -4280,6 +4382,28 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           valid.push(fe);
         }
       }
+    }
+
+    if (globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions) {
+      return valid.map((evolution, index) => {
+        const target = getFunEvolutionTarget(this.id, this.species.speciesId, index);
+        if (!target) {
+          return evolution;
+        }
+        const form = target.species.forms[target.formIndex] as { formKey?: string } | undefined;
+        const shuffled = new SpeciesFormEvolution(
+          target.species.speciesId,
+          evolution.preFormKey,
+          form?.formKey || null,
+          evolution.level,
+          evolution.item,
+          evolution.condition?.data ?? null,
+          evolution.evoLevelThreshold,
+        );
+        return evolution instanceof FusionSpeciesFormEvolution
+          ? new FusionSpeciesFormEvolution(evolution.primarySpeciesId, shuffled)
+          : shuffled;
+      });
     }
 
     return valid;
@@ -5144,7 +5268,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     // ER Zoom Lens (held by the attacker): +20% accuracy when the target has
     // already acted this turn.
-    return (accuracyMultiplier.value / evasionMultiplier.value) * erTacticalZoomLensMultiplier(this, target);
+    return (
+      (accuracyMultiplier.value / evasionMultiplier.value)
+      * erTacticalZoomLensMultiplier(this, target)
+      * getMoodyAccuracyMultiplier(this, target, sourceMove)
+    );
   }
 
   /**
@@ -5933,6 +6061,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage.value = Math.min(damage.value, opponentDamageBoostSuppressionCeiling);
     }
 
+    damage.value = applyMoodyDamageCalculation(source, this, move, damage.value, simulated);
+
     // debug message for when damage is applied
     if (!simulated) {
       console.log(`Move: ${move.name} | Attack damage: ${damage.value}`);
@@ -6178,6 +6308,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!isIndirectDamage && source && damage > 0) {
       damage -= erApplySoulmateRedirect(this, damage);
     }
+    damage = absorbMoodyFormationBarrier(this, damage);
+    damage = applyMoodyFormationLethalClamp(this, damage, !isIndirectDamage && source != null);
     // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
     // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
     // carries the ability — and the attacker is Drenched. Direct hits only
@@ -6192,6 +6324,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase, result, isCritical);
+    notifyMoodyRuntimeDamageApplied(source, this, damage, !isIndirectDamage);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
     damagePhase.updateAmount(damage);
@@ -6211,8 +6344,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The true amount of HP restored; may be less than `amount` if `amount` would overheal
    */
   public heal(amount: number): number {
+    const requestedAmount = amount;
+    amount = Math.floor(amount * getMoodyHealingMultiplier(this));
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    notifyMoodyRuntimeHeal(this, requestedAmount, healAmount);
+    notifyMoodyCoordinatorHealingUsed(this, healAmount);
+    grantMoodyItemSetHealingBarrier(this, healAmount);
     // Healing is an HP presentation boundary just like damage. Record the authoritative post-heal
     // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
     // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
@@ -6268,9 +6406,28 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       SpeciesFormKey.PRIMAL,
     ] as string[];
     return (
-      megaForms.includes(this.getFormKey())
+      this.isFunPseudoMega()
+      || megaForms.includes(this.getFormKey())
       || (!!this.getFusionFormKey() && megaForms.includes(this.getFusionFormKey()!))
     );
+  }
+
+  public isFunPseudoMega(): boolean {
+    const recordedStone = this.customPokemonData.erFunMegaStone;
+    const hasHeldStone =
+      recordedStone != null
+      && globalScene.findModifier(
+        modifier =>
+          modifier instanceof PokemonFormChangeItemModifier
+          && modifier.pokemonId === this.id
+          && modifier.formChangeItem === recordedStone,
+        this.isPlayer(),
+      ) != null;
+    return isFunPseudoMegaActive(this.customPokemonData.erFunPseudoMega === true, recordedStone, hasHeldStone);
+  }
+
+  public getFunMegaStone(): FormChangeItem | undefined {
+    return this.customPokemonData.erFunMegaStone;
   }
 
   private formUsesDerivedAbilities(formKey: string | null | undefined): boolean {
@@ -6381,6 +6538,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventVolatile(this, tagType)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventVolatile(this, tagType)) {
+      return false;
+    }
+
     // ER Ward Stones (#358): block external CC tags (flinch / confusion /
     // infatuation / the ER statuses) before they attach, one charge per block.
     if (
@@ -6416,6 +6580,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (newTag.canAdd(this)) {
       this.summonData.tags.push(newTag);
       newTag.onAdd(this);
+      notifyMoodyRuntimeVolatileApplied(this, tagType);
       if (
         (tagType === BattlerTagType.CONFUSED || tagType === BattlerTagType.ER_ENRAGE)
         && this.hasAbility(AbilityId.BERSERK)
@@ -6902,14 +7067,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       delay: fixedInt(delay),
       repeat: -1,
       callback: () => {
-        frameThreshold = sprite.anims.msPerFrame / crySoundConfig.rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / crySoundConfig.rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (cry && !cry.pendingRemove) {
           cry.setRate(crySoundConfig.rate * 0.99);
@@ -6991,14 +7159,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       repeat: -1,
       callback: () => {
         ++i;
-        frameThreshold = sprite.anims.msPerFrame / rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (i === transitionIndex && fusionCryKey) {
           SoundFade.fadeOut(globalScene, cry, fixedInt(Math.ceil((duration / rate) * 0.2)));
@@ -7293,6 +7464,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventStatus(this, effect, sourcePokemon)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventStatusEffect(this, effect)) {
+      return false;
+    }
+
     // ER: the vanilla FREEZE status does not exist — it is replaced by Frostbite
     // (an ER battler tag). Any attempt to freeze a Pokemon (vanilla Ice moves,
     // abilities, etc.) instead inflicts ER_FROSTBITE, which carries its own
@@ -7444,6 +7622,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
+    notifyMoodyRuntimeStatusApplied(this, effect);
     if (effect !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -7504,6 +7683,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public clearStatus(confusion: boolean, reloadAssets: boolean) {
     const lastStatus = this.status?.effect;
     this.status = null;
+    if (lastStatus != null) {
+      notifyMoodyRuntimeStatusCured(this, lastStatus);
+      notifyMoodyFormationStatusEffectCured(this, lastStatus);
+    }
     if (lastStatus != null && lastStatus !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -9089,11 +9272,28 @@ export class EnemyPokemon extends Pokemon {
     forRival = false,
   ) {
     let generatedFormIndex: number | undefined;
+    let generatedFunMegaStone: FormChangeItem | undefined;
+    let generatedFunPseudoMega = false;
     if (!dataSource && globalScene.gameMode.isFun) {
       const randomized = rollFunRandomSpecies();
       if (randomized) {
         species = randomized.species;
         generatedFormIndex = randomized.formIndex;
+      }
+      if (
+        getFunModeConfig().megaMode
+        && randSeedFloat() < getFunEnemyMegaChance(globalScene.currentBattle?.waveIndex ?? 1)
+      ) {
+        const baseFormIndex = generatedFormIndex ?? 0;
+        const realMegas = getFunRealMegaChoices(species, baseFormIndex);
+        if (realMegas.length > 0) {
+          const mega = randSeedItem(realMegas);
+          generatedFormIndex = mega.formIndex;
+          generatedFunMegaStone = mega.item;
+        } else {
+          generatedFunMegaStone = randSeedItem(getFunMegaStoneItems());
+          generatedFunPseudoMega = generatedFunMegaStone != null;
+        }
       }
     }
     super(
@@ -9120,6 +9320,13 @@ export class EnemyPokemon extends Pokemon {
     // round-trip change only the guest from `undefined/undefined` to `0/0`, despite identical gameplay
     // semantics.  `setBoss(false)` is the class's own neutral-state initializer and consumes no RNG.
     this.setBoss(boss, dataSource?.bossSegments);
+
+    if (!dataSource && generatedFunMegaStone != null) {
+      this.customPokemonData.erFunMegaStone = generatedFunMegaStone;
+      this.customPokemonData.erFunPseudoMega = generatedFunPseudoMega;
+      this.calculateStats();
+      this.hp = this.getMaxHp();
+    }
 
     if (Overrides.ENEMY_STATUS_OVERRIDE) {
       this.status = new Status(Overrides.ENEMY_STATUS_OVERRIDE, 0, 4);
@@ -10045,6 +10252,10 @@ export class EnemyPokemon extends Pokemon {
     // TODO: Rewrite this bespoke logic to improve clarity
     while (this.bossSegmentIndex > 0 && segmentIndex - 1 < this.bossSegmentIndex) {
       this.bossSegmentIndex--;
+      const breaker = globalScene.getPlayerField()[globalScene.currentBattle.lastPlayerInvolved];
+      if (breaker != null) {
+        notifyMoodyCoordinatorBossSegmentBroken(breaker, this);
+      }
 
       // Continue, _not_ break here, to ensure that each segment is still broken
       if (!doStatBoost) {

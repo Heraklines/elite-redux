@@ -1004,6 +1004,49 @@ registerDevMenu(ctx => {
   // one whose battle is over) never leaks into a NORMAL run started from the title.
   // A fought forced trainer already self-clears on install; this covers backing out.
   setErCustomTrainerDevForce(null);
+  (
+    window as typeof window & {
+      __erLaunchDevScenarioByLabel?: (label: string) => boolean;
+      __erLaunchMoodyUiCaptureByLabel?: (label: string) => boolean;
+      __erAdvanceMoodyUiCapture?: () => boolean;
+      __erGetDevHarnessState?: () => { phaseName?: string; uiMode: string };
+    }
+  ).__erGetDevHarnessState = () => ({
+    phaseName: globalScene.phaseManager.getCurrentPhase()?.phaseName,
+    uiMode: UiMode[globalScene.ui.getMode()],
+  });
+  (
+    window as typeof window & {
+      __erLaunchDevScenarioByLabel?: (label: string) => boolean;
+    }
+  ).__erLaunchDevScenarioByLabel = label => {
+    const scenario = DEV_SCENARIOS.find(candidate => candidate.label === label);
+    return scenario == null ? false : launchScenario(ctx, scenario);
+  };
+  (
+    window as typeof window & {
+      __erLaunchMoodyUiCaptureByLabel?: (label: string) => boolean;
+    }
+  ).__erLaunchMoodyUiCaptureByLabel = label => {
+    const scenario = DEV_SCENARIOS.find(candidate => candidate.label === label);
+    if (scenario == null || !label.startsWith("UI: Moody ")) {
+      return false;
+    }
+    return launchScenario(ctx, { ...scenario, gameMode: GameModes.CLASSIC });
+  };
+  (
+    window as typeof window & {
+      __erAdvanceMoodyUiCapture?: () => boolean;
+    }
+  ).__erAdvanceMoodyUiCapture = () => {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (phase?.phaseName !== "SelectFunModePhase") {
+      return false;
+    }
+    globalScene.phaseManager.unshiftNew("SelectStarterPhase");
+    phase.end();
+    return true;
+  };
   // Fast-iteration handoff: if the banner's Reset / Next / Pick button tore the
   // run down (teardownThen), run the staged action now that we have a FRESH
   // title launch ctx. Deferred so the title menu is fully built first; this is

@@ -1,5 +1,7 @@
 Original prompt: Build a true two-real-browser public-UI game-over journey that proves the retained terminal race end-to-end using only keyboard/DOM input after boot, with an exact build-time production-call-chain fixture, workflow dispatch, exact evidence, ownership, and remote proof.
 
+- 2026-08-11 Moody banner refinement in `codex/fun-mega-mode-20260809`: removed the redundant TRAINER BOON/CURSE label, switched the reused ability bar to a true violet tint fill, vertically centered the single effect name, preserved the full untrimmed enemy trainer frame, and aligned its upper-half cut edge with the banner. Browser verification is complete; production and normal staging remain untouched.
+
 - Based isolated branch `ci/coop/p33-gameover-public-ui` on integration SHA `abb57b17c1c6b5bcad3309cb242359b089c1e816`.
 - Added exact build+URL-gated visible Memento starter fixture and retained `WAVE_ADVANCE(gameOver)` RTC delay.
 - Added public journey assertions for raw-hint rejection, retained journal bootstrap, phantom replay unpark, terminal continuation, paired GameOver, and host authority release.
@@ -7759,3 +7761,138 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Implemented Klutz item suppression and adjacent-ally Symbiosis transfer. Removed stale `(N)` markers from Klutz, Symbiosis, Overzealous, Sunstrike, and Tempest Storm, and aligned their displayed descriptions with runtime behavior.
 - Verification: Fun Mode suite 11/11, Klutz/Symbiosis focused integration scenarios green, ability-overhaul suite 25/25, targeted TypeScript diagnostics clear, full Vite build green, and staging deploy `31290756176` green at `a578bf5f7`.
 - Visual harness: desktop and 390x844 mobile layouts are non-overlapping; toggles, START, direct starter-select flow, and return-to-config behavior work; no browser console errors were emitted. Production remains untouched.
+
+2026-08-09 - Fun Mega Mode staging checkpoint (UI revision pending approval)
+
+- Added Mega Mode and Stat Shuffle toggles plus a one-time pre-wave-1 party ability review/reroll screen.
+- Mega Stone metadata now derives each stone's stat delta from its real source and target Mega forms. Species with real Megas use only their compatible form; species without one receive a saved, temporary pseudo-Mega record that preserves their sprite and abilities while applying the stone delta.
+- Stat Shuffle applies to every Pokemon whenever selected and preserves that Pokemon's BST. When a Pokemon is real- or pseudo-Mega'd, the shuffle runs after the Mega statline is established, so it redistributes the full effective Mega BST rather than the pre-Mega stats.
+- Pseudo-Megas expose `isMega()`, save/load through `CustomPokemonData`, and show a compact gold `M` marker beside their name in battle info, party, and summary UI.
+- Mega Mode starts with a Mega Bracelet, puts all available Mega Stones in the Ultra reward generator, suppresses the Rogue stone generator, increases stone frequency, and ramps generated enemy Megas from 8% on wave 1 to 100% from wave 50.
+- Every Mega Stone reward/item description previews its source-to-Mega transition and all six stat deltas. The pseudo-Mega applies that delta only after the stone is assigned; Stat Shuffle then redistributes the already-effective Mega statline without changing its BST.
+- Verification after the Stat Shuffle correction: focused Fun Mode suite 17/17, no targeted TypeScript diagnostics, Biome has informational complexity notices only, and the full Vite production build is green. The repository-wide typecheck still has unrelated baseline failures outside the touched files.
+- UI approval gate: three selector/reroll directions are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options`. Do not treat the compact reroll layout as approved or deploy its revision until one option is selected. Production remains forbidden.
+- UI process rule: for new player-facing screens, prepare multiple labeled visual options on the Desktop for owner approval before locking in or deploying the layout; continue non-visual implementation and testing in parallel.
+- Exact staging artifact: `5a92e90a76586fb7c122ce23748abe7566606256`, deploy run `31333105827`. Topic branch only; production and `feat/elite-redux-port` remain untouched.
+
+2026-08-09 - Fun Mode UI continuation
+
+- Fun Mode's modifier selector now follows the Challenge Mode presentation and controls: 60/40 list/detail split, matching boolean arrows, orange description text, matching START bar/cursor, and a header `Last Setup` button.
+- Last Setup is saved per account when a Fun Mode run starts. It restores all six modifier choices and deliberately resets the ability-reroll seed instead of silently restoring a previous randomized party result.
+- The ability review no longer hides descriptions behind Pokemon selection. Its two-column/six-card layout renders every party member's active ability, three innates, and all 24 short descriptions at once; only `REROLL ALL` and `START RUN` receive input focus.
+- Alternative all-description layouts are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`. The implemented baseline is the refined two-column Option A requested by the owner; visual iteration can continue without reverting the persistence or input work.
+- Verification: focused Fun Mode suite 18/18, touched-file TypeScript diagnostics clear, Biome clean except one pre-existing informational notice in `src/utils/data.ts`, and the full Vite production build is green. Staging canvas verification remains required before promotion; production remains forbidden.
+
+2026-08-09 - Fun Mode refined ability review
+
+- Replaced the interim card layout with the selected refined Option C: no title/header band, six compact full-width Pokemon rows, four always-visible ability columns per row, and smaller `REROLL ALL` / `START` controls.
+- Each Pokemon now receives six distinct deterministic randomized abilities. Slots 0-2 are three independently randomized choice abilities and slots 3-5 are three independently randomized innates; `REROLL ALL` regenerates the complete six-slot set.
+- A selected Pokemon shows a compact `R A1/3` indicator. `R` cycles that Pokemon's active choice ability, while every current ability name and description remains visible for the full party.
+- Long descriptions are word-safe paginated and rotate automatically every 2.8 seconds with dynamic text sizing, preventing them from overflowing their ability column.
+- Verification: focused Fun Mode suite 18/18, including six-slot uniqueness and reroll stability; touched-file TypeScript diagnostics clear; `git diff --check` clean; full Vite production build green. Production remains forbidden.
+- Exact staging artifact: `a4361d4422865fd5ade18a2a05fb9d432434cbf1`, deploy run `31336966322`. Live Phaser verification covered the Challenge-style selector, three-Pokemon ability review, `R` choice cycling, timed long-description paging, complete reroll, and continuation into the run without layout overlap or Fun Mode UI exceptions. The static A/B/C comparison images remain under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`; the live staging pass was inspected directly in the browser harness. The shared feature branch and production remain untouched.
+
+2026-08-10 - Fun Mode modifier continuation (ability UI approval still blocked)
+
+- The live Option C at staging artifact `a4361d4422865fd5ade18a2a05fb9d432434cbf1` was explicitly rejected: its source text rendered unreadably small and the three-Pokemon case left most of the screen unused. It is not approved. No replacement ability-review layout has been added to the game diff or deployed.
+- Added four independent, composable Fun Mode modifiers: Evolution Shuffle, Item Chaos, Weather Roulette, and Move Scrambler. Last Setup accepts legacy six-toggle saves and initializes every newer toggle to off.
+- Evolution Shuffle preserves each original evolution trigger and timing, but deterministically replaces the result with a starter-safe random species/form. Generated enemies use the same shuffled evolution result once their normal evolution threshold succeeds.
+- Item Chaos gives every eligible reward tier and item equal weight, suppresses luck-based tier upgrades, applies the same equal weighting to enemy held-item pools, and guarantees at least one random held item per generated enemy. Explicit scripted/guaranteed rewards remain explicit.
+- Weather Roulette rerolls clear or a supported normal/Elite Redux weather at every encounter. Move Scrambler replaces the successfully used move slot after resolution for player and enemy Pokemon, excludes unavailable moves and duplicates, resets PP state, and does not fire on charge setup or virtual follow-up uses.
+- Updated the Challenge-style Fun Mode selector to scroll ten independent toggles while retaining the Last Setup and Start controls. The ability-review UI remains untouched pending visual approval.
+- New three- and six-starter layout mockups are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v3`. They are review images only. C1 adapts from three spacious rows to six compact full-width rows; C2 demonstrates the smaller two-column tradeoff.
+- Verification: focused Fun Mode suite 22/22; no touched-file TypeScript diagnostics (repository-wide typecheck still has unrelated baseline failures); `git diff --check` clean; full Vite development build green. No staging or production deployment was made from this continuation, and `feat/elite-redux-port` remains untouched.
+
+2026-08-10 - Fun Mode adaptive ability review and Mega presentation
+
+- Replaced the rejected fixed six-row ability review with the approved C1 adaptive layout. One to three starters use three spacious rows; four, five, and six starters progressively use 40-, 32-, and 27-pixel rows. Icon scale, name width, typography, wrapping, description page length, dividers, and cursor bounds change as one density so every ability and description remains visible without shrinking to unreadable text.
+- Mega Mode's Ultra reward generator now includes every registered Mega Stone. Stones matching a real Mega in the current party receive four entries in the weighted pool while every other stone retains one entry, so compatible stones are preferred without excluding unusual pseudo-Mega templates.
+- An unmatched stone may now grant a stat-only pseudo-Mega to any non-Mega Pokemon, including a species that has a different real Mega. A matching stone still selects the actual Mega form. The saved pseudo-Mega record, effective-Mega Stat Shuffle order, and single-stone-per-Pokemon rule are unchanged.
+- Replaced the placeholder gold `M` with a transparent gold Mega emblem in battle info, party slots, and summary. The emblem lives in `Heraklines/er-assets` commit `2e3a97169` so staging can pin it without changing production's current immutable asset SHA.
+- Added one shared six-stat delta panel for Mega Stone rewards and summary item hover. It names the source and target form, displays exact signed deltas, and draws positive/negative bars around a common baseline. Ordinary runs retain their existing item-description behavior.
+- Verification: focused Fun Mode suite 22/22 and standalone Cloudflare payload build green. Repository-wide typecheck remains red only on unrelated baseline terrain/vendor/test errors and reports no touched-file error. Production remains forbidden.
+
+2026-08-10 - Ability Avalanche and final Mega presentation correction
+
+- Ability Avalanche preserves the normal active ability plus all three base innate slots. Its first randomized extra is explicitly `Ability 5` at wave 60, followed by Ability 6/7/etc. every 20 waves; extras are deterministic, duplicate-free, and apply to player, wild, and trainer Pokemon.
+- Summary and in-battle Info now use the same focus contract: Confirm enters the ability list, Up/Down scroll only while focused, and Cancel exits list focus. Outside list focus, Up/Down retain their existing Pokemon-switching behavior. A second Confirm in Summary opens the selected ability's long description.
+- Both screens reserve a separate control strip with scroll arrows/ranges, so the controls never overlap ability descriptions. The initial Summary frame visibly contains the active ability, all three base innates, and Ability 5; scrolled frames visibly reach Ability 6 and later slots.
+- Battle Info always keeps its graphics fallback beneath streamed ROM art, preventing partial/blank panels when a player opens or scrolls the list while assets are still settling.
+- Corrected the prior Mega note: the final transparent Mega Evolution emblem is in `Heraklines/er-assets` feature commit `31c2642a4`. The rejected separate stat panel was removed; reward, summary-item, and battle-item Mega deltas extend the native item description instead.
+- Verification: Fun Mode/Avalanche logic 24/24; focused Biome error gate and `git diff --check` green; final nine-recipe Fun Mega/Avalanche visual regression batch green, including initial/focused Summary and Battle Info states. Fresh screenshots are under `C:\Users\Hafida\Desktop\Fun Mode UI Preview`. No staging or production deployment was made, and `feat/elite-redux-port` remains untouched.
+
+2026-08-10 - Fun Mode selector parity and Weather Chaos correction
+
+- Corrected the selector's premature seven-row scroll limit to the same nine-row budget as Challenge Mode, eliminating the unused lower-left space. Small pixel arrows now independently indicate whether earlier or later modifiers remain off-screen.
+- Added Challenge Mode's saved-setup behavior to the START region: LEFT/RIGHT switches between START and Reuse Last Setup, Confirm applies the selected action, and Cancel returns from the header/START focus to the modifier list. The existing header Last Setup shortcut remains account-specific.
+- Renamed Weather Roulette to Weather Chaos and changed its player-facing description to `Every encounter begins with random weather/terrain, including clear weather.` The behavior now independently rolls every supported weather (including clear) and terrain (including no terrain) at biome entry and between encounters in the same biome.
+- Production remains forbidden. Deploy only the isolated Fun Mode branch to staging, with the co-op signaling Worker disabled.
+
+2026-08-11 - Moody Mode implementation and visual closure
+
+- Normal staging and production remain forbidden. No deployment was made. The only allowed publication target remains a separate isolated Moody preview with co-op signaling disabled.
+- The catalog contains 100 boons and 30 curses. All 30 curses and 99 boons are executable through production-reachable adapters with deterministic event, choice, lifecycle, combat, progression, and save/load coverage.
+- Set Collector is the sole deliberate exception: its source specification explicitly blocks release until the item-and-vitamin catalogue is audited and sensible sets are authored. It remains fail-closed and cannot be drafted; a regression pins that boundary so invented generic sets cannot silently ship.
+- Recruiter's Eye generates durable encounter-scoped ability, egg-move, and nature traits; capture odds and post-capture ownership commit through AttemptCapturePhase. Bounty contracts, Recycler, Warranty, Contraband, Blood Market alternatives, formation/field timed effects, Feedback Loop accounting, Apex segments, and coordinator choices are wired through their live producers and consumers.
+- Moody UI now covers boon lifecycle choice, dense Ledger, party/summary attachments, enemy ability overflow, battle HUD progress, contextual choice/target queues, biome reports, Borrowed Future, Bounty, Recycler, Legacy, Blood Market, Pressure, item stacks, and run recap. Desktop and mobile captures cover all 17 surfaces.
+- Synthetic Kimi K3 visual review identified three blocking layout defects. Boon description pagination now reserves a whole-line pager gutter, Ledger title/tabs/footer no longer collide, and the party state summary no longer overlaps Cancel. All three were recaptured and verified on desktop and mobile.
+- Final deterministic evidence: core suite 15/15 files and 489/489 tests; field suite 3/3 files and 192/192 tests; Phaser/UI suite 8/8 files and 50/50 tests. The final Vite development bundle built 3,583 modules and minified 14,365 JSON files successfully.
+- Repository-wide TypeScript remains red only on unrelated baseline files and produced no Moody/touched-file diagnostic. Scoped formatting and `git diff --check` are required to remain green before committing or publishing the isolated preview.
+- Isolated preview publication completed at `https://elite-redux-moody.pages.dev/`. It is a new Cloudflare Pages project, uses staging save/telemetry endpoints, has Showdown/tournaments disabled, and points co-op at a non-routable origin. Neither normal staging nor production was deployed.
+- The preview bundle is pinned to immutable `er-assets` SHA `478de96ef00e8edd2955003c66bbef4b02d63d1e`. A fresh deployed-browser smoke pass reached the Phaser canvas at desktop size with zero failed or HTTP 4xx/5xx asset requests; direct checks for the pseudo-Mega emblem and new arena art returned 200.
+
+2026-08-11 - Moody cadence and native UI correction
+
+- Corrected the run cadence: the opening presents three boons first and attaches one deterministic Dread I curse only after the chosen boon commits. Every later ten-wave boon draft attaches one new non-repeating random curse, with Dread II/III weight increasing by wave.
+- Both the opening draft and recurring draft now share an exactly-once completion path. A successful selection or a rejected UI transition commits the curse and advances the run/phase once, removing the former curse-first black-screen route.
+- Removed the permanent battle overlay. Battle now defaults to a compact left-edge `MOOD` tab that expands on left navigation or touch; the complete inspection surface remains the Summary `MOOD` page and Ledger.
+- Party effects use the native active/benched slot silhouette as a one-pixel rarity-colored outline plus compact color pips. The outline follows each sprite's chamfered corners; pip text was removed after visual testing proved pixel-font glyphs could obscure the card.
+- Battler-specific Moody state is marked beside the native name icons. Barrier is rendered as a white terminal segment inside the existing HP bar instead of a separate panel. Automatic biome reports and Final Draft choices use compact contextual surfaces.
+- Desktop and 390x844 captures were reviewed twice with Synthetic Kimi K3. The final pass found no blocker in the native party outline/pips, Summary detail view, expanded battle panel, or collapsed battle default.
+- Verification: focused cadence/UI suite 27/27; complete Moody suite 25 files and 572/572 tests; Frostbound's state-only runtime regression 18/18; touched-file TypeScript diagnostics clear; direct scoped Biome check and `git diff --check` green. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+- Isolated preview deployment `2707aecc` is live at `https://elite-redux-moody.pages.dev/`, built from game commit `1b1694cb0` with the immutable assets pin, staging save/telemetry endpoints, disabled co-op origin, and Showdown/tournaments disabled. The canonical domain serves the exact built entry bundle and a deployed-browser smoke reached the 1920x1080 Phaser canvas with no failed requests.
+- Removed the oversized party-card overflow text and the redundant selected Pokemon name from the Moody detail box. The box now lists four exact boon/curse/runtime labels plus a compact remaining count; desktop/mobile harness captures verify the native card markers and single-line detail layout. Barrier geometry is explicitly tested as a terminal HP-bar segment sized by `barrier / maxHp` and clamped to current HP; its final pale-cyan base, diagonal cyan shield hatch, and solid leading cap visually separate it from both green HP and the empty white track.
+
+2026-08-11 - Moody progression clarity and trainer parity
+
+- Rank-up cards now show the current and next ranks as a compact arrow plus only the exact upgrade delta. They no longer repeat the full previous-rank description.
+- Mithridatism now exposes exact cure progress and thresholds in player-facing UI. Resistance I activates after three cures at 50% prevention; Resistance II activates after six cures at 75%, and Weaponized displays its exact +25% damage and 20% damage-reduction effects while afflicted.
+- Fixed the live Mithridatism formation adapter to apply the documented 50%/75% prevention tiers. Internal serialized tracker keys are filtered from every player-facing progress list.
+- Trainer boon generation now spends the same number of boon acquisition points as the player and cannot waste a point by rolling an already max-rank boon. Trainers remain curse-free. Their actual boon loadout, rank, target, description, and accumulated power are available from a mirrored right-side battle drawer.
+- The player and trainer battle drawers use shared keyboard, controller, and pointer input, include scrolling indicators, and reposition between the opposing health stacks in triple battles. The post-draft curse report displays the exact curse and requires confirmation before play resumes.
+- Party layout and its selected-effect panel now adapt to the actual party size and visible progress volume. Counter-based boons, including Mithridatism, show their current counts and next threshold.
+- Verification: focused Moody logic/UI suite 5 files and 264/264 tests; scoped formatting and `git diff --check` green; standalone Cloudflare payload build green with 1,735 files. Synthetic Kimi K3 visual review was completed; the final pass corrected the curse dialog's fixed-height dead space, widened battle-drawer wrapping to the actual panel bounds, and strengthened its scroll indicator. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+- Isolated preview deployment `e8043048` is live at `https://elite-redux-moody.pages.dev/` from game commit `a962c5ded`. Canonical and deployment URLs serve the final bundle, and the deployed asset redirects were directly verified against immutable `er-assets` SHA `478de96ef00e8edd2955003c66bbef4b02d63d1e`.
+
+2026-08-11 - Moody draft transition regression
+
+- Root cause of the post-boon black screen: both opening and recurring boon drafts were destructively opened with `setMode`, while the picker closes through `revertMode`. That left no prior UI mode in the chain, so the mandatory curse receipt restored a dead/full-screen draft owner instead of the battle or starter surface.
+- Both draft entry points now use `setOverlayMode`, matching the picker and curse report close contract. Focused Moody surface tests pass 14/14. No site was deployed.
+
+2026-08-11 - Moody trainer-effect flyouts and pre-battle guard
+
+- Boon and curse activations now reuse the native ability-bar lane with a violet trainer-owned treatment: a compact `TRAINER BOON`/`TRAINER CURSE` label, exact effect name, accent line, and a cropped upper-trainer portrait contained inside the bar. Long names scale and truncate within the existing bar width; no new persistent battle overlay was added.
+- Every one of the 100 boons and 30 curses has an explicit `flyout` or `drawer-only` policy. Runtime and formation adapters emit structured player/enemy cues, while passive/economy effects remain in the Ledger/drawers. Display Settings exposes `Boon & Curse Trigger Banners`, defaulting to On.
+- An occupied ability bar is hidden before the trainer effect is retried, preserving the shared presentation lane without overlapping or looping banners. Dedicated boon and curse dev scenarios cover the visual treatment.
+- Fixed a second opening-run black-screen source: pre-battle stat queries could dereference `currentBattle` before EncounterPhase created it. The runtime battle key now returns a deterministic `prebattle` sentinel, with a regression proving speed lookup is neutral before a battle exists.
+- Live Phaser verification reached combat from the Fun selector and displayed the violet Mithridatism trainer banner after the opening switch prompt and move commitment. The complete focused gate passed 5 files and 226/226 tests; the local production build compiled 3,584 modules and minified 14,365 JSON files successfully.
+- No normal staging, isolated preview, Cloudflare Worker, asset host, or production deployment was performed for this work.
+
+2026-08-11 - Moody inspection, persistence, lead enforcement, and trainer banner closure
+
+- Replaced the battle drawer's debug-oriented output with a names-first accordion: player boons precede curses, the enemy drawer lists boons only, Confirm expands exactly one selected entry, and internal progress IDs plus recent-trigger history are no longer player-facing. Expanded entries retain human-readable counters, thresholds, stacks, and effect values.
+- Restless Lead now validates the selected lead against the previous battle's persistent lead, records valid selections immediately, and automatically moves the first conscious reserve into lead when the repeated lead is invalid. The replacement is recorded through the same event path, preventing the curse from becoming a no-op on the next battle.
+- Underdog Dividend now uses the live party-average level in both its description and runtime calculation. Its UI states the exact five-level threshold, +2% per-level five-stat scaling, caps, XP multipliers, and unevolved multiplier.
+- Borrowed Future is trainer-battle-only, shows each active opposing lead and its committed move in a compact top strip, and delegates lead changes to the native party reorder screen. Only active lead slots can initiate replacement, the forecast is hidden while reordering, and the player can begin or leave the reorder screen without becoming trapped.
+- Confirmed save/reload persistence for committed boon ranks/evolutions/targets, curse state, counters/flags/values, dormancy, formation state, and persistent field values such as Restless Lead's previous lead. The round-trip regression compares the complete serialized Moody payload after restore.
+- Trainer-owned boon/curse cues reuse the native ability flyout with the approved violet treatment and no redundant TRAINER BOON/CURSE text. The player portrait path remains unchanged. Enemy portraits scan the original untrimmed atlas dimensions, preserve the full horizontal sprite, display the actual upper half, clear inherited tint/flip state, sit after the title, and align their cut edge to the visible banner boundary.
+- Runtime ownership remains complete for all 30 curses and 99 releasable boons. Set Collector is still the sole fail-closed exception and remains excluded from drafting until its curated set catalogue is authored.
+- Verification: engine-neutral Moody gate 15/15 files and 514/514 tests; field gate 3/3 files and 198/198 tests; Phaser/UI gate 9/9 files and 56/56 tests. Repository-wide TypeScript still exits on unrelated baseline failures and reports no diagnostic in any touched file. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+
+2026-08-11 - Full Mix, trigger noise, and telemetry controls
+
+- Added Full Mix as the second Mega Mode variant. Pseudo-Mega stones can now apply their stat delta alone or additionally contribute one non-duplicate Mega type and replace innate slots one and three with the selected Mega template's corresponding innates. Proper Mega evolutions retain their authored forms.
+- Summary Stats Confirm now cycles through calculated stats, IVs, and the effective six-stat base spread. The base-spread view deliberately reuses the native stat rows without an oversized BST heading.
+- Continuous Moody effects are drawer-only. Trigger flyouts are restricted to discrete combat events, and Type Tax no longer emits a false trigger when the acting Pokemon has no duplicated type.
+- Added a general `build:standalone:no-telemetry` target. Staging and production deploy workflows now expose a default-on `collect_player_training_data` switch; disabling it sets only `VITE_TELEMETRY=off` and leaves save, tournament, Showdown, and matchmaking endpoints intact.
+- Moody remains unpromoted until integration verification completes. No normal staging or production deployment was performed.

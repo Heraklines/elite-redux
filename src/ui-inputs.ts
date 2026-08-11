@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { InputsController } from "#app/inputs-controller";
 import { isDev } from "#constants/app-constants";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { Setting, SettingKeys, settingIndex } from "#system/settings";
@@ -8,6 +9,7 @@ import { CommandUiHandler } from "#ui/command-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
+import { MoodyLedgerUiHandler } from "#ui/moody-ledger-ui-handler";
 import { PartyUiHandler } from "#ui/party-ui-handler";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokedexUiHandler } from "#ui/pokedex-ui-handler";
@@ -24,6 +26,16 @@ import { SummaryUiHandler } from "#ui/summary-ui-handler";
 import Phaser from "phaser";
 
 type ActionKeys = Record<Button, () => void>;
+
+export function mapMoodyLedgerCycleButton(button: Button): Button {
+  if (button === Button.CYCLE_FORM) {
+    return Button.CYCLE_ABILITY;
+  }
+  if (button === Button.CYCLE_SHINY) {
+    return Button.CYCLE_FORM;
+  }
+  return button;
+}
 
 export class UiInputs {
   private events: Phaser.Events.EventEmitter;
@@ -260,6 +272,22 @@ export class UiInputs {
   }
 
   buttonCycleOption(button: Button): void {
+    const uiHandler = globalScene.ui?.getHandler();
+    if (
+      button === Button.CYCLE_GENDER
+      && globalScene.gameMode?.isFun === true
+      && getFunModeConfig().moodyMode
+      && [UiMode.MESSAGE, UiMode.COMMAND, UiMode.FIGHT, UiMode.BALL, UiMode.TARGET_SELECT].includes(
+        globalScene.ui.getMode(),
+      )
+    ) {
+      globalScene.ui.toggleMoodyTriggerFeed();
+      return;
+    }
+    if (uiHandler instanceof MoodyLedgerUiHandler) {
+      globalScene.ui.processInput(mapMoodyLedgerCycleButton(button));
+      return;
+    }
     const whitelist = [
       // ER (#356): the fight menu's right panel cycles STATS → DESCRIPTION →
       // DMG CALC on CYCLE_SHINY (R / RB). Without this entry the button was
@@ -299,7 +327,6 @@ export class UiInputs {
       SettingsGamepadUiHandler,
       SettingsKeyboardUiHandler,
     ];
-    const uiHandler = globalScene.ui?.getHandler();
     if (whitelist.some(handler => uiHandler instanceof handler)) {
       globalScene.ui.processInput(button);
     } else if (button === Button.CYCLE_TERA) {

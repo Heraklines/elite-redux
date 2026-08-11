@@ -16,6 +16,9 @@ import { failCoopSharedSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
+import { notifyMoodyFormationSwitch } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeEntry } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorDirectPairSwitch } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballTintColor } from "#data/pokeball";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -283,6 +286,12 @@ export class SwitchSummonPhase extends SummonPhase {
       markChivalryRedirect(switchedInPokemon, this.lastPokemon);
     }
 
+    const voluntaryMoodySwitch =
+      this.switchType === SwitchType.SWITCH
+      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON;
+    notifyMoodyFormationSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
+    notifyMoodyCoordinatorDirectPairSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
+
     if (this.lastPokemon.isOnField()) {
       this.lastPokemon.leaveField(this.switchType === SwitchType.SWITCH);
     }
@@ -372,6 +381,7 @@ export class SwitchSummonPhase extends SummonPhase {
       // survive. No-op for an empty snapshot (relic absent / not a voluntary
       // player switch).
       erBondedCharmApply(switchedInPokemon, bondedCharmStages);
+      notifyMoodyRuntimeEntry(switchedInPokemon, this.switchType !== SwitchType.INITIAL_SWITCH);
       this.summon();
     };
 

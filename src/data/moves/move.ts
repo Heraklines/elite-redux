@@ -58,6 +58,15 @@ import {
   erPunchingGloveStripsContact,
   erTacticalBlocksPowder,
 } from "#data/elite-redux/er-tactical-items";
+import {
+  getMoodyFormationSecondaryChance,
+  shouldMoodyFormationPreventForcedSwitch,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyRuntimeSecondaryChanceBonus,
+  shouldMoodyRuntimeGuaranteeSecondary,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { getMoodyMovePriorityDelta } from "#data/elite-redux/moody/moody-scene-adapter";
 import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-triggers";
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -1384,7 +1393,7 @@ export abstract class Move implements Localizable {
     applyMoveAttrs("IncrementMovePriorityAttr", user, null, this, priority);
     applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority });
 
-    return priority.value;
+    return priority.value + getMoodyMovePriorityDelta(user, this);
   }
 
   public getPriorityModifier(user: Pokemon, simulated = true): MovePriorityInBracket {
@@ -2016,7 +2025,11 @@ export class MoveEffectAttr extends MoveAttr {
     if (moveChance.value > 0 && moveChance.value < 100) {
       moveChance.value += erLuckyHeartChanceBonus(user);
     }
-    return moveChance.value;
+    const formationChance = getMoodyFormationSecondaryChance(user, moveChance.value);
+    if (shouldMoodyRuntimeGuaranteeSecondary(user) && formationChance > 0) {
+      return 100;
+    }
+    return Math.min(100, formationChance + getMoodyRuntimeSecondaryChanceBonus(user));
   }
 }
 
@@ -8752,6 +8765,10 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
 
     /** The {@linkcode Pokemon} to be switched out with this effect */
     const switchOutTarget = this.selfSwitch ? user : target;
+
+    if (!this.selfSwitch && shouldMoodyFormationPreventForcedSwitch(switchOutTarget)) {
+      return false;
+    }
 
     // If the switch-out target is a Dondozo with a Tatsugiri in its mouth
     // (e.g. when it uses Flip Turn), make it spit out the Tatsugiri before switching out.

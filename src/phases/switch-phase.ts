@@ -38,6 +38,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
+import { shouldMoodyRuntimePreventSwitch } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -95,6 +96,16 @@ export class SwitchPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    const switchingPokemon = globalScene.getPlayerParty()[this.fieldIndex];
+    if (
+      switchingPokemon != null
+      && shouldMoodyRuntimePreventSwitch(switchingPokemon, this.switchType === SwitchType.SWITCH && !this.isModal)
+    ) {
+      globalScene.phaseManager.queueMessage(`${switchingPokemon.getNameToRender()} cannot switch out!`);
+      super.end();
+      return;
+    }
 
     // Skip modal switch if impossible (no remaining party members that aren't already in battle). A V2
     // half-wipe is the exception: the surviving partner can be the only battle-legal mon and already on

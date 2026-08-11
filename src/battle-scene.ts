@@ -71,6 +71,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -99,6 +100,19 @@ import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-ho
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import {
+  generateMoodyEnemyBoonLoadout,
+  resetMoodyEnemyBoonLoadout,
+  setMoodyEnemyBoonLoadout,
+} from "#data/elite-redux/moody/moody-enemy";
+import { prepareMoodyFormationItemActivation } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyCoordinatorItemRule,
+  notifyMoodyCoordinatorPokemonPermanentlyRemoved,
+  prepareMoodyCoordinatorEnemyGeneration,
+  prepareMoodyCoordinatorItemActivation,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { notifyMoodyCoordinatorItemInventory } from "#data/elite-redux/moody/moody-runtime-item-adapter";
 import {
   getShowdownBattleFormat,
   getShowdownFieldOpponentManifest,
@@ -176,6 +190,7 @@ import {
   RememberMoveModifier,
 } from "#modifiers/modifier";
 import {
+  FormChangeItemModifierType,
   getDefaultModifierTypeForTier,
   getEnemyModifierTypesForWave,
   getLuckString,
@@ -277,6 +292,42 @@ export interface InfoToggle {
  */
 const TRIPLE_ROLL_SEED_OFFSET = 0x74_72_70_6c; // "trpl"
 
+function applyPersistentModifierWithMoody(modifier: PersistentModifier, args: unknown[]): boolean {
+  if (!(modifier instanceof PokemonHeldItemModifier)) {
+    return (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  const pokemon = modifier.getPokemon();
+  if (pokemon == null) {
+    return false;
+  }
+  const plan = prepareMoodyFormationItemActivation(pokemon, modifier.type.id, "bespoke");
+  const coordinatorPlan = pokemon.isPlayer()
+    ? prepareMoodyCoordinatorItemActivation(pokemon, modifier.type.id, "consumed" in modifier)
+    : { preserveStack: false, repeatActivation: false, effectMultiplier: 1 };
+  const holders = args.filter((value): value is NumberHolder => value instanceof NumberHolder);
+  const before = holders.map(holder => holder.value);
+  if (coordinatorPlan.effectMultiplier <= 0) {
+    return false;
+  }
+  const applied = (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  if (!applied) {
+    return false;
+  }
+  holders.forEach((holder, index) => {
+    holder.value = before[index] + (holder.value - before[index]) * plan.multiplier * coordinatorPlan.effectMultiplier;
+  });
+  if (plan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.preserveStack && "consumed" in modifier) {
+    (modifier as PersistentModifier & { consumed: boolean }).consumed = false;
+  }
+  return true;
+}
+
 /**
  * The `BattleScene` is the primary scene for the game.
  *
@@ -312,6 +363,7 @@ export class BattleScene extends SceneBase {
   public showMissingRibbons = false;
   public showMovesetFlyout = true;
   public showArenaFlyout = true;
+  public showMoodyEffectFlyouts = true;
   public showTimeOfDayWidget = true;
   /** ER: when false, the field stays at daytime brightness (no dusk/night darkening). */
   public dayNightTint = true;
@@ -1221,7 +1273,7 @@ export class BattleScene extends SceneBase {
     // Trainer mons are exempt (champion configs legally pin megas); loaded
     // save data is exempt (round-trips whatever was already legal).
     // (TrainerSlot.NONE === 0; numeric compare keeps the type-only import)
-    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0) {
+    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0 && pokemon.getFunMegaStone() == null) {
       const formKey = species.forms?.[pokemon.formIndex]?.formKey ?? "";
       if (/mega|primal|eternamax|gigantamax|gmax/i.test(formKey)) {
         console.warn(`ER #421: wild ${species.name} spawned at battle-only form "${formKey}" - resetting to base`);
@@ -3885,7 +3937,28 @@ export class BattleScene extends SceneBase {
     this.validateAchvs(ModifierAchv, modifier);
     const modifiersToRemove: PersistentModifier[] = [];
     if (modifier instanceof PersistentModifier) {
-      if ((modifier as PersistentModifier).add(this.modifiers, !!virtual)) {
+      let added = (modifier as PersistentModifier).add(this.modifiers, !!virtual);
+      if (!added && !virtual && modifier instanceof PokemonHeldItemModifier) {
+        const pokemon = modifier.getPokemon();
+        const matching = this.modifiers.find(
+          candidate =>
+            candidate instanceof PokemonHeldItemModifier
+            && candidate.pokemonId === modifier.pokemonId
+            && candidate.matchType(modifier),
+        ) as PokemonHeldItemModifier | undefined;
+        if (pokemon != null && matching != null) {
+          const rule = getMoodyCoordinatorItemRule(pokemon, modifier.type.id);
+          const extraCapacity = rule.ignoreStackCap ? Math.max(1, rule.extraCap) : rule.extraCap;
+          if (
+            extraCapacity > 0
+            && matching.stackCount + modifier.stackCount <= matching.getMaxStackCount() + extraCapacity
+          ) {
+            matching.stackCount += modifier.stackCount;
+            added = true;
+          }
+        }
+      }
+      if (added) {
         // The modifier was added: report success so purchase flows that gate on
         // the return value (e.g. SelectModifierPhase.applyModifier deducting the
         // cost) charge for it. Previously `success` stayed false for a normal
@@ -3968,6 +4041,9 @@ export class BattleScene extends SceneBase {
           success ||= result;
         }
       }
+    }
+    if (success && modifier instanceof PersistentModifier && !virtual) {
+      notifyMoodyCoordinatorItemInventory(this.modifiers);
     }
     return success;
   }
@@ -4143,6 +4219,7 @@ export class BattleScene extends SceneBase {
   removePartyMemberModifiers(partyMemberIndex: number): Promise<void> {
     return new Promise(resolve => {
       const pokemonId = this.getPlayerParty()[partyMemberIndex].id;
+      notifyMoodyCoordinatorPokemonPermanentlyRemoved(pokemonId);
       const modifiersToRemove = this.modifiers.filter(
         m => m instanceof PokemonHeldItemModifier && (m as PokemonHeldItemModifier).pokemonId === pokemonId,
       );
@@ -4156,6 +4233,12 @@ export class BattleScene extends SceneBase {
 
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
+      if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+        prepareMoodyCoordinatorEnemyGeneration(this.getEnemyParty().some(pokemon => pokemon.isBoss()));
+        setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(this.getEnemyParty(), this.currentBattle.waveIndex));
+      } else {
+        resetMoodyEnemyBoonLoadout();
+      }
       if (this.currentBattle.isClassicFinalBoss) {
         return resolve();
       }
@@ -4222,6 +4305,9 @@ export class BattleScene extends SceneBase {
               count++;
             }
           }
+          if (this.gameMode.isFun && getFunModeConfig().itemChaos) {
+            count = Math.max(1, count);
+          }
           if (isBoss) {
             count = Math.max(count, Math.floor(chances / 2));
           }
@@ -4232,6 +4318,25 @@ export class BattleScene extends SceneBase {
             this.currentBattle.battleType === BattleType.TRAINER ? ModifierPoolType.TRAINER : ModifierPoolType.WILD,
             upgradeChance,
           ).map(mt => mt.newModifier(enemyPokemon).add(this.enemyModifiers, false));
+        }
+        const funMegaStone = enemyPokemon.getFunMegaStone();
+        if (
+          this.gameMode.isFun
+          && getFunModeConfig().megaMode
+          && funMegaStone != null
+          && !this.enemyModifiers.some(
+            modifier =>
+              modifier instanceof PokemonFormChangeItemModifier
+              && modifier.pokemonId === enemyPokemon.id
+              && modifier.formChangeItem === funMegaStone,
+          )
+        ) {
+          const stoneModifier = new FormChangeItemModifierType(funMegaStone)
+            .withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM)
+            .newModifier(enemyPokemon);
+          if (stoneModifier instanceof PersistentModifier) {
+            void this.addEnemyModifier(stoneModifier, true, true);
+          }
         }
         return true;
       });
@@ -4382,6 +4487,9 @@ export class BattleScene extends SceneBase {
           modifier.apply(pokemon, false);
         }
       }
+      if (!enemy) {
+        notifyMoodyCoordinatorItemInventory(this.modifiers);
+      }
       return true;
     }
 
@@ -4476,7 +4584,7 @@ export class BattleScene extends SceneBase {
   ): T[] {
     const appliedModifiers: T[] = [];
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         appliedModifiers.push(modifier);
       }
@@ -4501,7 +4609,7 @@ export class BattleScene extends SceneBase {
       (m): m is T => m instanceof modifierType && m.shouldApply(...args),
     );
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         return modifier;
       }

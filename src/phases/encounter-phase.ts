@@ -55,6 +55,7 @@ import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import {
   erApplyCovenantHeal,
@@ -67,6 +68,14 @@ import {
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import {
+  enforceMoodyRuntimeLead,
+  prepareMoodyRuntimeEncounter,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorWildEncounter,
+  prepareMoodyCoordinatorTrainerRoster,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import {
   maybeBeginSinglePlayerReplayRecording,
   maybeCaptureReplayCheckpoint,
@@ -580,6 +589,7 @@ export class EncounterPhase extends BattlePhase {
 
   start() {
     super.start();
+    enforceMoodyRuntimeLead();
 
     // ReturnPhase is structural and therefore neutralized on the authoritative guest.
     // Its subsequent player SummonPhase never owns ShowTrainerPhase's exit there, so clear
@@ -1215,6 +1225,19 @@ export class EncounterPhase extends BattlePhase {
     // resizing it for a wild override) - that fielded fewer than 3 foes in-game ("3v1"). Pad
     // it to enemyCapacity here, AFTER all prior resizes, so the field always fills. Binary
     // (cap <= 2) is a no-op.
+    const fieldRosterSize = prepareMoodyRuntimeEncounter(battle.enemyLevels?.length ?? 0);
+    const moodyRosterSize = prepareMoodyCoordinatorTrainerRoster(
+      fieldRosterSize,
+      8,
+      battle.battleType === BattleType.TRAINER,
+      battle.trainer?.config.isBoss === true,
+    );
+    if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < moodyRosterSize) {
+      const fill = battle.enemyLevels.at(-1) ?? 1;
+      while (battle.enemyLevels.length < moodyRosterSize) {
+        battle.enemyLevels.push(fill);
+      }
+    }
     const enemyCapacity = battle.arrangement.enemyCapacity;
     if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
       const fill = battle.enemyLevels.at(-1) ?? battle.enemyLevels[0] ?? 1;
@@ -1266,6 +1289,7 @@ export class EncounterPhase extends BattlePhase {
             TrainerSlot.NONE,
             !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
           );
+          applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
             battle.enemyParty[e].ivs.fill(31);
           }
@@ -2363,6 +2387,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetWeatherIfNewBiome(): void {
+    const funWeather = globalScene.gameMode.isFun ? rollFunWeather() : null;
+    if (funWeather != null) {
+      globalScene.arena.trySetWeather(funWeather);
+      return;
+    }
     // ER biome identity (#439 §3): some biomes FORCE a baseline weather instead
     // of rolling the vanilla pool (e.g. Desert/Badlands sandstorm, Ice Cave snow,
     // Graveyard fog). No `user` -> permanent (turnsLeft 0), so it persists across
@@ -2391,6 +2420,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetTerrainIfNewBiome(): void {
+    const funTerrain = globalScene.gameMode.isFun ? rollFunTerrain() : null;
+    if (funTerrain != null) {
+      globalScene.arena.trySetTerrain(funTerrain, false, undefined, 0);
+      return;
+    }
     // ER biome identity (#439 §3): vanilla terrainPools are all empty, so biome
     // terrain only exists via this override (Power Plant electric, Grass/Jungle
     // grassy, Space psychic). turnsOverride 0 -> permanent, persists across waves.

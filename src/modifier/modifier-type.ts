@@ -15,6 +15,14 @@ import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
+import {
+  canUseFunMegaStone,
+  formatFunMegaMixEffects,
+  formatFunMegaStatDelta,
+  getFunMegaStoneItems,
+  getFunRealMegaChange,
+} from "#data/elite-redux/er-fun-mega-mode";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
@@ -1641,6 +1649,14 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
         : FormChangeItem[formChangeItem].toLowerCase(),
       (_type, args) => new PokemonFormChangeItemModifier(this, (args[0] as PlayerPokemon).id, formChangeItem, true),
       (pokemon: PlayerPokemon) => {
+        if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+          const alreadyHoldingStone = globalScene.findModifier(
+            modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+          );
+          return !alreadyHoldingStone && canUseFunMegaStone(pokemon, this.formChangeItem)
+            ? null
+            : PartyUiHandler.NoEffectMessage;
+        }
         // Make sure the Pokemon has alternate forms
         if (
           Object.hasOwn(pokemonFormChanges, pokemon.species.speciesId) // Get all form changes for this species with an item trigger, including any compound triggers
@@ -1677,7 +1693,16 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
   }
 
   getDescription(): string {
-    return i18next.t("modifierType:ModifierType.FormChangeItemModifierType.description");
+    const description = i18next.t("modifierType:ModifierType.FormChangeItemModifierType.description");
+    if (!globalScene.gameMode.isFun || !getFunModeConfig().megaMode) {
+      return description;
+    }
+    const delta = formatFunMegaStatDelta(this.formChangeItem);
+    if (!delta) {
+      return description;
+    }
+    const mix = getFunModeConfig().megaMixMode ? formatFunMegaMixEffects(this.formChangeItem) : null;
+    return `${description}\nMega: ${delta}${mix ? `\nFull: ${mix}` : ""}`;
   }
 
   getPregenArgs(): any[] {
@@ -2020,6 +2045,28 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
       (party: readonly Pokemon[], pregenArgs?: any[]) => {
         if (pregenArgs && pregenArgs.length === 1 && pregenArgs[0] in FormChangeItem) {
           return new FormChangeItemModifierType(pregenArgs[0] as FormChangeItem);
+        }
+
+        if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+          if (isRareFormChangeItem) {
+            return null;
+          }
+          const availablePokemon = party.filter(
+            pokemon =>
+              !pokemon.isMega()
+              && !globalScene.findModifier(
+                modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+              ),
+          );
+          if (availablePokemon.length === 0) {
+            return null;
+          }
+          const allStones = getFunMegaStoneItems();
+          const matchingStones = allStones.filter(item =>
+            availablePokemon.some(pokemon => getFunRealMegaChange(pokemon, item) != null),
+          );
+          const weightedStones = [...allStones, ...matchingStones, ...matchingStones, ...matchingStones];
+          return weightedStones.length > 0 ? new FormChangeItemModifierType(randSeedItem(weightedStones)) : null;
         }
 
         const formChangeItemPool = [
@@ -2982,6 +3029,10 @@ export function regenerateModifierPoolThresholds(
   rerollCount = 0,
 ) {
   const pool = getModifierPoolForType(poolType);
+  const equalizeItemPool =
+    globalScene.gameMode.isFun
+    && getFunModeConfig().itemChaos
+    && [ModifierPoolType.PLAYER, ModifierPoolType.WILD, ModifierPoolType.TRAINER].includes(poolType);
   itemPoolChecks.forEach((_v, k) => {
     itemPoolChecks.set(k, false);
   });
@@ -3006,7 +3057,7 @@ export function regenerateModifierPoolThresholds(
             weightedModifierType.modifierType instanceof ModifierTypeGenerator
               ? weightedModifierType.modifierType.generateType(party)
               : weightedModifierType.modifierType;
-          const weight =
+          const naturalWeight =
             existingModifiers.length === 0
             || itemModifierType instanceof PokemonHeldItemModifierType
             || itemModifierType instanceof FormChangeItemModifierType
@@ -3016,6 +3067,7 @@ export function regenerateModifierPoolThresholds(
                   (weightedModifierType.weight as Function)(party, rerollCount)
                 : (weightedModifierType.weight as number)
               : 0;
+          const weight = equalizeItemPool && naturalWeight > 0 ? 1 : naturalWeight;
           if (weightedModifierType.maxWeight) {
             const modifierId = weightedModifierType.modifierType.id;
             tierModifierIds.push(modifierId);
@@ -3474,7 +3526,7 @@ export function getDailyRunStarterModifiers(party: PlayerPokemon[]): PokemonHeld
  * @param retryCount Max allowed tries before the next tier down is checked for a valid ModifierType
  * @param allowLuckUpgrades Default true. If false, will not allow ModifierType to randomly upgrade to next tier
  */
-function getNewModifierTypeOption(
+export function getNewModifierTypeOption(
   party: Pokemon[],
   poolType: ModifierPoolType,
   tier?: ModifierTier,
@@ -3501,6 +3553,24 @@ function getNewModifierTypeOption(
     case ModifierPoolType.DAILY_STARTER:
       thresholds = dailyStarterModifierPoolThresholds;
       break;
+  }
+  const itemChaos =
+    globalScene.gameMode.isFun
+    && getFunModeConfig().itemChaos
+    && [ModifierPoolType.PLAYER, ModifierPoolType.WILD, ModifierPoolType.TRAINER].includes(poolType);
+  if (tier === undefined && itemChaos) {
+    const availableTiers = [
+      ModifierTier.COMMON,
+      ModifierTier.GREAT,
+      ModifierTier.ULTRA,
+      ModifierTier.ROGUE,
+      ModifierTier.MASTER,
+    ].filter(candidate => Object.keys(thresholds[candidate] ?? {}).length > 0);
+    if (availableTiers.length === 0) {
+      return null;
+    }
+    tier = randSeedItem(availableTiers);
+    upgradeCount = 0;
   }
   if (tier === undefined) {
     const tierValue = randSeedInt(1024);

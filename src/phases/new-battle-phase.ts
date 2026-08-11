@@ -15,6 +15,9 @@ import {
   releaseCoopTransitionPresentation,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import { startMoodyFormationBattle } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeBiomeTransition } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { shouldMoodyCoordinatorForceElitePursuit } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -568,6 +571,8 @@ export class NewBattlePhase extends BattlePhase {
       beginCoopTransitionRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
     }
     globalScene.newBattle();
+    notifyMoodyRuntimeBiomeTransition();
+    startMoodyFormationBattle();
 
     if (!this.routeCommittedHostBiomeEncounter(sourceWave)) {
       return;
@@ -582,6 +587,13 @@ export class NewBattlePhase extends BattlePhase {
     // Runs after newBattle() has built the wave but before EncounterPhase's
     // genPartyMember, so we can convert the wave into the authored trainer.
     installErCustomTrainerForCurrentWave();
+    const moodyWave = globalScene.currentBattle?.waveIndex ?? 0;
+    if (
+      globalScene.currentBattle?.battleType === BattleType.WILD
+      && shouldMoodyCoordinatorForceElitePursuit(moodyWave, globalScene.gameMode.isBoss(moodyWave))
+    ) {
+      this.convertWildToTrainer(moodyWave, undefined);
+    }
 
     // After newBattle has populated the upcoming wave's enemy levels, consume
     // any pending LLM Director inter-beat override for that wave. v1 applies
