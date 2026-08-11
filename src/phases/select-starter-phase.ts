@@ -1106,7 +1106,7 @@ export class SelectStarterPhase extends Phase {
           void globalScene.ui.showMoodyCurseReceived(curse).then(launchRun, launchRun);
         };
         void globalScene.ui
-          .setMode(UiMode.MOODY_BOON_SELECT, initialDraftWave, completeOpeningDraft)
+          .setOverlayMode(UiMode.MOODY_BOON_SELECT, initialDraftWave, completeOpeningDraft)
           .catch(completeOpeningDraft);
       };
       if (globalScene.gameMode.isFun && getFunModeConfig().randomizeAbilities) {

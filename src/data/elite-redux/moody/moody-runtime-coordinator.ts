@@ -61,8 +61,8 @@ export const MOODY_COORDINATOR_OVERLAP_POLICY = {
       effectId: "compound-interest",
       coordinatorEvent: "wave-completed",
       coordinatorCommand: "grant-money",
-      legacyOwner: "src/data/elite-redux/moody/moody-scene-adapter.ts:getMoodyBossMoneyGainMultiplier",
-      defaultResolution: "legacy-scene-owned; coordinator route is skipped, including its state delta",
+      legacyOwner: "retired; boss reward multiplier is fixed at 1",
+      defaultResolution: "coordinator-owned; pays current-money interest and persists the run cap",
     },
     {
       effectId: "recruiter-s-eye",
@@ -884,15 +884,6 @@ export function coordinateMoodyRuntime(
     if (
       overlapMode === "legacy-scene-compatible"
       && MOODY_COORDINATOR_LEGACY_FIELD_OWNED_EFFECT_IDS.has(effect.effectId)
-    ) {
-      return effect;
-    }
-    if (
-      overlapMode === "legacy-scene-compatible"
-      && effect.effectId === "compound-interest"
-      && routedEvent.type === "wave-completed"
-      && routedEvent.victory
-      && routedEvent.isBoss
     ) {
       return effect;
     }

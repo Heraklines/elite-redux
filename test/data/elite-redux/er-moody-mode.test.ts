@@ -1,4 +1,5 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import { MOODY_EFFECT_FLYOUT_POLICY } from "#data/elite-redux/moody/moody-effect-flyout";
 import { generateMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import {
   addMoodyCurse,
@@ -30,12 +31,51 @@ describe("Moody Mode catalog", () => {
     expect(new Set(MOODY_BOONS.map(boon => boon.id)).size).toBe(100);
     expect(new Set(MOODY_CURSES.map(curse => curse.id)).size).toBe(30);
     expect(MOODY_BOONS.every(boon => boon.base.length > 0 && boon.rankTwo.length > 0)).toBe(true);
-    expect(MOODY_BOONS.every(boon => boon.evolutions.length === 2)).toBe(true);
+    expect(MOODY_BOONS.every(boon => boon.evolutions.length > 0 && boon.evolutions.length <= 2)).toBe(true);
+    expect(MOODY_BOONS.find(boon => boon.id === "weather-wake")?.evolutions.map(branch => branch.id)).toEqual([
+      "lingering-wake",
+    ]);
+    expect(
+      MOODY_BOONS.every(
+        boon =>
+          !boon.fullDescription.includes("\n---")
+          && !boon.evolutions.some(evolution => /(^|\n)#{1,6}\s/.test(evolution.description)),
+      ),
+    ).toBe(true);
+    expect(MOODY_CURSES.every(curse => !curse.description.includes("\n---"))).toBe(true);
+    const playerFacingText = [
+      ...MOODY_BOONS.flatMap(boon => [
+        boon.base,
+        boon.rankTwo,
+        boon.fullDescription,
+        ...boon.evolutions.map(evolution => evolution.description),
+      ]),
+      ...MOODY_CURSES.map(curse => curse.description),
+    ].join("\n");
+    for (const editorialPhrase of [
+      "does not disappear when",
+      "not above +3",
+      "discarded Usurer",
+      "deliberately extremely rare",
+      "screenshot wording",
+      "This version",
+    ]) {
+      expect(playerFacingText).not.toContain(editorialPhrase);
+    }
     const setCollector = MOODY_BOONS.find(boon => boon.id === "set-collector");
     expect(
       setCollector != null
         && (!("implementationStatus" in setCollector) || setCollector.implementationStatus !== "blocked"),
     ).toBe(true);
+  });
+
+  it("classifies every boon and curse for trainer-effect flyouts", () => {
+    const catalogIds = [...MOODY_BOONS, ...MOODY_CURSES].map(definition => definition.id).sort();
+    expect(Object.keys(MOODY_EFFECT_FLYOUT_POLICY).sort()).toEqual(catalogIds);
+    expect(new Set(Object.values(MOODY_EFFECT_FLYOUT_POLICY))).toEqual(new Set(["flyout", "drawer-only"]));
+    expect(MOODY_EFFECT_FLYOUT_POLICY.mithridatism).toBe("flyout");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["compound-interest"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["reverse-snowball"]).toBe("flyout");
   });
 
   it("preserves the authored Unicode text instead of mojibake", () => {

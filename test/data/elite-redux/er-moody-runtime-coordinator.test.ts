@@ -119,7 +119,7 @@ describe("Moody runtime coordinator", () => {
     ]);
   });
 
-  it("prevents legacy scene money and capture paths from being applied twice", () => {
+  it("owns Compound Interest in the coordinator while preventing duplicate capture effects", () => {
     const compoundState: MoodyCoordinatorState = {
       effects: [{ effectId: "compound-interest", stage: "rank-two" }],
     };
@@ -127,8 +127,8 @@ describe("Moody runtime coordinator", () => {
     const coordinatorMoney = coordinateMoodyRuntime(compoundState, waveEvent, {
       overlapMode: "coordinator-owned",
     });
-    expect(legacyMoney.commands).toEqual([]);
-    expect(legacyMoney.state).toEqual(compoundState);
+    expect(legacyMoney.commands.filter(command => command.kind === "grant-money")).toHaveLength(1);
+    expect(legacyMoney.state.effects[0].state?.counters?.accumulatedInterest).toBe(75);
     expect(coordinatorMoney.commands.filter(command => command.kind === "grant-money")).toHaveLength(1);
 
     const captureEvent: MoodyCoordinatorEvent = {

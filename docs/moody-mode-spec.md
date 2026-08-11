@@ -71,8 +71,6 @@ The numerical values below are initial balance targets.
 
 **Evolution — Ambush Doctrine:** Every occupied party slot receives a weaker version once per battle. Existing priority moves gain 15% power.
 
-This absorbs Ambush Doctrine as a proper late-line ascension rather than a separate base boon.
-
 ---
 
 ### 02. Bastion Seat — **Great; slot**
@@ -119,8 +117,6 @@ The echo consumes no PP and does not reproduce secondary effects, recoil, charge
 
 **Base:** The first major status or volatile condition directed at the occupant each battle is completely negated.
 
-This is deliberately extremely rare.
-
 **Rank II:** The first direct stat reduction is also negated, using a separate charge.
 
 **Evolution — Hallowed Seat:** The status/volatile protection refreshes once after the occupant re-enters.
@@ -157,7 +153,7 @@ This is deliberately extremely rare.
 
 **Base:** Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.
 
-There is no cap. Empty and fainted are distinct states.
+Empty and fainted slots are counted separately, with no cap.
 
 **Rank II:** Empty slots grant +12%; fainted slots grant +8%.
 
@@ -239,7 +235,7 @@ The tag evolution requires a properly audited move-tag registry. Elemental type 
 
 **Base:** After the selected Pokémon uses four distinct move slots during one battle, it gains +1 in a random stat. Once per battle.
 
-This explicitly means four slots, even when the Pokémon knows up to eight moves.
+All four slots count, including on Pokémon that know more than four moves.
 
 **Rank II:** It can trigger twice per battle.
 
@@ -265,8 +261,6 @@ This explicitly means four slots, even when the Pokémon knows up to eight moves
 
 **Base:** Once per biome, if the selected Pokémon would faint from above 20% HP, it survives at 1 HP and gains +2 Speed.
 
-This remains one of the rarest ordinary boons.
-
 **Rank II:** It also clears negative stat stages and volatile conditions.
 
 **Evolution — Deathless Pride:** The trigger becomes once per boss battle.
@@ -278,8 +272,6 @@ This remains one of the rarest ordinary boons.
 ### 17. Quiet Mentor — **Great; Pokémon affecting adjacent slots**
 
 **Base:** At battle start, the two party slots adjacent to the Mentor gain +1 in the Mentor’s highest non-HP stat for one turn.
-
-The effect does not disappear when the Mentor enters. It simply expires naturally.
 
 **Rank II:** Duration becomes two turns.
 
@@ -397,8 +389,6 @@ Restrictions:
 
 **Evolution — Protective Revenge:** The power bonus is replaced by a 30% barrier and a full volatile-condition cleanse.
 
-This remains intentionally simple; it is a clean lower-rarity line rather than a flagship mechanic.
-
 ---
 
 ### 26. Turntable — **Rogue; team rhythm rule**
@@ -466,8 +456,6 @@ The current beat must be displayed prominently.
 
 **Evolution — Specialist Doctrine:** Every ally receives +15% for the selected type and −5% for other damaging types.
 
-The penalty remains part of the line rather than disappearing with upgrades.
-
 ---
 
 ### 31. Conservation Law — **Ultra; Pokémon**
@@ -513,7 +501,7 @@ The penalty remains part of the line rather than disappearing with upgrades.
 
 Using all three categories triggers **Curtain Call**, rolling two additional rewards.
 
-The boon is offered only to Pokémon with access to all three categories or a realistic route to acquire them.
+Only Pokémon that can use all three move categories, or can realistically learn them, are eligible.
 
 **Rank II:** Reward magnitudes increase by approximately 25%.
 
@@ -592,7 +580,7 @@ Because this choice happens only at a highly specific moment, it is acceptable d
 
 **Base:** The selected Pokémon’s first damaging move each battle becomes the most effective legal elemental type against its target, but deals 30% less damage.
 
-It does not ignore explicit immunity rules unless an upgrade says so.
+Explicit type immunities still apply.
 
 **Rank II:** Penalty becomes 20%.
 
@@ -635,8 +623,6 @@ Repeating a type resets the chain. Switching does not.
 ### 41. Microclimate — **Ultra; slot**
 
 **Base:** On the marked slot’s first entry each battle, choose one of three seeded weather options. The selected weather lasts three turns.
-
-This is the smaller boon version of the existing Stormglass-style relic.
 
 **Rank II:** Four weather options and four turns.
 
@@ -721,8 +707,6 @@ Enemy setters can immediately replace them. Scripted biome weather, form-control
 The Sand and Snow effects are temporary directional screens, not absorbable HP barriers.
 
 **Rank II:** Power, healing, and mitigation increase by approximately one-third.
-
-**Evolution — Violent Front:** The aftereffect applies to the entire team where meaningful.
 
 **Evolution — Lingering Wake:** The aftereffect lasts two turns.
 
@@ -868,7 +852,7 @@ If the target is invalid, the status remains stored.
 
 **Evolution — Rehabilitation:** Each distinct status can trigger its rebound once per battle.
 
-**Evolution — Community Care:** Adjacent party slots receive a reduced version of the rebound.
+**Evolution — Community Care:** Adjacent active allies receive half of the healing or barrier rebound. Their Attack or Speed rebound lasts one turn; the Sleep rebound still applies only to their next action.
 
 ---
 
@@ -1043,11 +1027,11 @@ Starting at 65/35 is safer than immediately using 50/50 because the latter creat
 
 ### 72. Compound Interest — **Great; economy**
 
-**Base:** Unspent money increases by 5% after every boss, with a run-level cap.
+**Base:** After every boss, gain 5% of your current unspent money. Total interest earned is capped at 25% of your current money.
 
 **Rank II:** Growth becomes 7.5%.
 
-**Evolution — Patient Capital:** The cap increases substantially and biome transitions produce an additional smaller interest payment.
+**Evolution — Patient Capital:** The total-interest cap becomes 50% of current money. Each biome transition also pays 3% of current unspent money within that cap.
 
 **Evolution — Aggressive Investment:** Growth becomes 10%, but purchasing anything resets accumulated interest growth.
 
@@ -1062,8 +1046,6 @@ Starting at 65/35 is safer than immediately using 50/50 because the latter creat
 **Evolution — Lifetime Warranty:** The first activation is doubled as well as preserved.
 
 **Evolution — Extended Warranty:** Every party member’s first consumable has a chance not to be consumed, but the selected stack retains guaranteed preservation.
-
-This remains deliberately rare.
 
 ---
 
@@ -1189,8 +1171,6 @@ Count every unique elemental type represented anywhere in the party exactly once
 
 **Evolution — Adaptive Charter:** At ten unique types, the first super-effective hit received by each Pokémon also creates a 15% barrier.
 
-This makes the boon very strong when deliberately built around, without merely handing out a linear bonus for every typing.
-
 ---
 
 ### 81. Monotype Oath — **Ultra; team plus elemental type**
@@ -1271,9 +1251,9 @@ Luck is applied only afterward.
 
 **Base:** Select one enemy type. Every ten KOs against that type grants a choice between:
 
-* Increased damage against it.
-* Increased resistance to it.
-* Increased capture effectiveness against it.
+* +15% damage against it.
+* +15% resistance to its attacks.
+* +15% capture effectiveness against it.
 
 **Rank II:** Threshold becomes eight KOs.
 
@@ -1321,7 +1301,7 @@ When it reaches within four levels, the Academy retargets. Each successful gradu
 
 **Evolution — Veteran Breaker:** Every three segments broken grants a permanent 2% boss-damage bonus, maximum five stacks.
 
-This line references actual health segments only, not hypothetical shields or affixes.
+Only actual boss health segments count.
 
 ---
 
@@ -1464,7 +1444,7 @@ When that Pokémon would faint, the segment breaks and restores it to 25% HP. Th
 4. The player may reorder the party once.
 5. The enemy cannot recalculate that committed action.
 
-This must reveal an authoritative commitment, not an approximate AI prediction.
+The revealed action is committed and cannot be recalculated.
 
 **Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.
 
@@ -1484,7 +1464,7 @@ At acquisition, choose one valve:
 * **Healing valve:** heal 6% per excess stage.
 * **PP valve:** restore 1 PP to the most depleted move per excess stage.
 
-The trigger is overflow above +6, not above +3.
+Only stat stages above the normal +6 cap are converted.
 
 **Rank II:** Values become 12% barrier, 10% healing, or 2 PP.
 
@@ -1495,8 +1475,6 @@ The trigger is overflow above +6, not above +3.
 ---
 
 ### 100. Negative Space — **Ultra; Pokémon plus sealed moves**
-
-The boon cannot rely on naturally empty move capacity because the game has no ordinary move-unlearning loop.
 
 **Base:** On acquisition, select one known move to **seal**. The move remains learned and visible but cannot be selected while the boon is active. The Pokémon gains 10% damage and 6% damage reduction.
 
@@ -1640,9 +1618,9 @@ The chain resets when another ally scores a KO or the battle ends. Switching doe
 
 ### 23. Public Enemy
 
-Certain trainers may generate seven or eight Pokémon.
+Every trainer may generate seven or eight Pokémon. Extra roster slots use legal members from that trainer's normal generation pool.
 
-Boss trainers also gain **Second Act**: when their final Pokémon first faints, it revives at full HP with one additional full health segment and +1 to all stats.
+Boss trainers also gain **Second Act**: when their final Pokémon first faints, it revives at full HP with one additional full health segment and +1 to all stats. Boss trainers are encounters flagged by the game as bosses, including Gym Leaders, Elite Four, Champions, evil-team admins and leaders, major rivals, and equivalent named bosses.
 
 ### 24. Mood Swing
 
@@ -1665,7 +1643,7 @@ Bosses are especially likely to receive boons that pressure the carry’s:
 * Healing loop
 * Item concentration
 
-This modifies fresh enemy generation; it does not create persistent enemy ownership.
+Counter-weighting applies when each new enemy team is generated.
 
 ### 26. Blood Moon
 
@@ -1675,7 +1653,7 @@ Negative stat stages and major statuses are cleared. Consumed items are not rest
 
 ### 27. Reverse Snowball
 
-Every consecutive battle won without an allied faint grants future enemies 3% increased stats, subject to a safety cap.
+Every consecutive battle won without an allied faint grants future enemies 3% increased HP and other stats, up to +30% after ten flawless wins.
 
 The bonus resets only when **more than half of the player’s current party faints during one battle**.
 
@@ -1705,9 +1683,7 @@ Whenever one action activates multiple boon effects, the acting Pokémon suffers
 * Third boon: another 6%.
 * Fourth and later: another 8% each.
 
-Feedback cannot directly reduce the Pokémon below 1 HP, but it can leave it exposed to ordinary damage. This specifically punishes extremely dense boon-synergy engines without turning individual boons off.
-
-This replaces the discarded Usurer’s Gift concept. A boon acquired during the middle of a run cannot coherently say that the player “begins with two additional boons,” so that premise is removed entirely.
+Feedback cannot directly reduce the Pokémon below 1 HP, but ordinary damage can still make it faint.
 
 ---
 
@@ -1736,5 +1712,3 @@ This replaces the discarded Usurer’s Gift concept. A boon acquired during the 
 * **Release Dividend:** successor inheritance remains insufficiently distinctive and potentially exploitable.
 * **Fault Tolerance:** viable but niche; every suppressible ability, item, and boon would need a bespoke “one final enhanced activation” definition.
 * **Set Collector:** included as a valid base line, but its actual content remains blocked on the item-and-vitamin set audit.
-
-This version preserves the accepted effects, incorporates the specific mechanical corrections, prevents team-wide cards from casually outclassing Pokémon- or slot-bound cards, and provides a concrete upgrade identity for every active boon line.

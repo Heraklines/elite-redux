@@ -35,7 +35,7 @@ export interface MoodyBoonDefinition {
   targetKind: MoodyTargetKind;
   base: string;
   rankTwo: string;
-  evolutions: readonly [MoodyEvolutionDefinition, MoodyEvolutionDefinition];
+  evolutions: readonly MoodyEvolutionDefinition[];
   fullDescription: string;
   implementationStatus?: "ready" | "blocked";
   implementationNote?: string;

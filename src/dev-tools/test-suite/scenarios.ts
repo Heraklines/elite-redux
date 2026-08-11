@@ -1651,6 +1651,12 @@ function openMoodyUiHarness(open: () => void): void {
   });
 }
 
+function openMoodyFlyoutHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  globalScene.showMoodyEffectFlyouts = true;
+  globalScene.time.delayedCall(600, open);
+}
+
 const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
   {
     label: "UI: Moody boon lifecycle",
@@ -1727,6 +1733,36 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
       openMoodyUiHarness(() => {
         globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
         globalScene.ui.pushMoodyTrigger("Mithridatism: Poison 2/3 cures");
+      }),
+  },
+  {
+    label: "UI: Moody trainer boon flyout",
+    description: "Violet ability-bar variant with the player trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        globalScene.ui.pushMoodyTrigger("Mithridatism II: Poison cure 2/3", {
+          effectId: "mithridatism",
+          name: "Mithridatism II",
+          kind: "boon",
+          side: "player",
+        });
+      }),
+  },
+  {
+    label: "UI: Moody trainer curse flyout",
+    description: "Dark-violet ability-bar variant with the player trainer portrait attached to a curse trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        globalScene.ui.pushMoodyTrigger("Reverse Snowball: enemy stats +9%", {
+          effectId: "reverse-snowball",
+          name: "Reverse Snowball",
+          kind: "curse",
+          side: "player",
+        });
       }),
   },
   {

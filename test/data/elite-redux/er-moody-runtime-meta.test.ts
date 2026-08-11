@@ -228,7 +228,8 @@ describe("Moody runtime meta exact coverage", () => {
     for (const meta of MOODY_RUNTIME_EFFECTS.filter(effect => effect.source === "boon" && effect.status === "ready")) {
       expect(meta.base.length, `${meta.id}:base`).toBeGreaterThan(0);
       expect(meta.rankTwo?.length, `${meta.id}:rank-two`).toBeGreaterThan(0);
-      expect(meta.evolutions, meta.id).toHaveLength(2);
+      expect(meta.evolutions.length, meta.id).toBeGreaterThanOrEqual(1);
+      expect(meta.evolutions.length, meta.id).toBeLessThanOrEqual(2);
       for (const stage of ["base", "rank-two", ...meta.evolutions.map(evolution => evolution.id)]) {
         const state: MoodyRuntimeState = {
           counters: { ledgerMarks: 6, hunterProgress: 7, tempo: 3 },
@@ -307,6 +308,15 @@ describe("Moody runtime meta progression", () => {
     );
     expect(base.commands[0]?.kind).toBe("queue-post-battle-hunter-choice");
     expect(ranked.commands[0]?.kind).toBe("queue-post-battle-hunter-choice");
+  });
+
+  it("stores each Hunter's Mark choice as an exact 15% bonus", () => {
+    const resolved = resolveMoodyRuntimeEffect("hunter-s-mark", "base", {
+      kind: "hunter-choice-resolved",
+      seed: 1,
+      data: { choice: "damageBonus", amount: 0.15 },
+    });
+    expect(resolved.stateDeltas).toContainEqual(expect.objectContaining({ path: "counters.damageBonus", value: 0.15 }));
   });
 
   it("makes Cursed Inventory and Entropy deterministic for a seed", () => {

@@ -63,6 +63,14 @@ describe("Moody operation contracts", () => {
 });
 
 describe("Moody draft cadence wiring", () => {
+  it("reuses the ability lane and replaces an occupied bar in hide-then-show order", () => {
+    const phase = source("src/phases/show-moody-effect-phase.ts");
+    expect(phase).toMatch(
+      /if \(globalScene\.abilityBar\.isVisible\(\)\) \{[\s\S]*unshiftNew\("HideAbilityPhase"\);[\s\S]*unshiftPhase\(new ShowMoodyEffectPhase\(this\.cue\)\)/,
+    );
+    expect(source("src/ui/containers/ability-bar.ts")).toContain("showTrainerEffect");
+  });
+
   it("uses the shared concise delta formatter in the live boon cards", () => {
     const handler = source("src/ui/handlers/moody-boon-select-ui-handler.ts");
     expect(handler).toContain("moodyOfferDescription(offer, definition)");
@@ -75,7 +83,7 @@ describe("Moody draft cadence wiring", () => {
     expect(starterPhase).toContain("const completeOpeningDraft = () =>");
     expect(starterPhase).toContain("rollAndCommitMoodyCurse(");
     expect(starterPhase).toContain("showMoodyCurseReceived(curse)");
-    expect(starterPhase).toMatch(/\.setMode\([^,]+, initialDraftWave, completeOpeningDraft\)/);
+    expect(starterPhase).toMatch(/\.setOverlayMode\([^,]+, initialDraftWave, completeOpeningDraft\)/);
     expect(starterPhase).toContain(".catch(completeOpeningDraft)");
     expect(starterPhase).not.toContain("MOODY_CURSE_SELECT");
   });
@@ -85,7 +93,7 @@ describe("Moody draft cadence wiring", () => {
     expect(phase).toContain("const completeDraft = () =>");
     expect(phase).toContain("rollAndCommitMoodyCurse(");
     expect(phase).toContain("showMoodyCurseReceived(curse)");
-    expect(phase).toMatch(/setMode\([^,]+, this\.waveIndex, completeDraft\)\.catch\(completeDraft\)/);
+    expect(phase).toMatch(/setOverlayMode\([^,]+, this\.waveIndex, completeDraft\)\.catch\(completeDraft\)/);
   });
 
   it("requires confirmation on the post-draft curse report", () => {

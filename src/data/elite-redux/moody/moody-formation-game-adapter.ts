@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getMoodyEffectFlyoutCue } from "#data/elite-redux/moody/moody-effect-flyout";
 import { MOODY_PASSIVE_SUPPORTED_BOON_IDS } from "#data/elite-redux/moody/moody-effects";
 import { recordMoodyRuntimeActionTriggers } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import {
@@ -760,9 +761,13 @@ function emitMoodyFormationTriggers(
     }
     emitted.add(key);
     const effect = effects.get(trace.effectInstanceId);
-    const name = effect == null ? trace.effectInstanceId : (MOODY_BOON_BY_ID.get(effect.boonId)?.name ?? effect.boonId);
+    if (effect == null) {
+      continue;
+    }
+    const name = MOODY_BOON_BY_ID.get(effect.boonId)?.name ?? effect.boonId;
     const details = [...new Set(trace.commands.map(formationCommandTriggerLabel))];
-    globalScene.ui?.pushMoodyTrigger(`${name}: ${details.join(", ")}`);
+    const cue = getMoodyEffectFlyoutCue(getMoodyModeState()!, effect.boonId);
+    globalScene.ui?.pushMoodyTrigger(`${name}: ${details.join(", ")}`, cue);
   }
 }
 

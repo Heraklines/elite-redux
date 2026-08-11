@@ -406,7 +406,9 @@ export function moodyOfferDescription(offer: MoodyBoonOffer, definition: MoodyBo
     case "rank-up":
       return "RANK I -> RANK II";
     case "evolution":
-      return `CHOOSE: ${definition.evolutions[0].name} OR ${definition.evolutions[1].name}`;
+      return definition.evolutions.length === 1
+        ? `EVOLVE: ${definition.evolutions[0].name}`
+        : `CHOOSE: ${definition.evolutions.map(branch => branch.name).join(" OR ")}`;
     default:
       return definition.base;
   }

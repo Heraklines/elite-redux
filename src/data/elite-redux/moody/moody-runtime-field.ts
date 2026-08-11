@@ -254,6 +254,7 @@ export type MoodyRuntimeFieldEvent =
     })
   | (EventBase & {
       readonly kind: "faint";
+      readonly isBoss?: boolean;
       readonly pokemon: MoodyRuntimePokemonSnapshot;
       readonly committedMove?: {
         readonly moveId: string;
@@ -293,6 +294,7 @@ export type MoodyRuntimeFieldEvent =
   | (EventBase & {
       readonly kind: "encounter-generate";
       readonly isBoss: boolean;
+      readonly isTrainer?: boolean;
       readonly baseRosterSize: number;
       readonly playerThreatPokemonId?: number;
       readonly noFaintWinStreak: number;
@@ -414,7 +416,7 @@ export const MOODY_RUNTIME_FIELD_VARIANTS = Object.freeze(
     ]),
   ),
 ) as unknown as Readonly<
-  Record<MoodyRuntimeFieldBoonId, { base: true; rankTwo: true; evolutionIds: readonly [string, string] }>
+  Record<MoodyRuntimeFieldBoonId, { base: true; rankTwo: true; evolutionIds: readonly string[] }>
 >;
 
 export const MOODY_RUNTIME_FIELD_COVERAGE = Object.freeze({
@@ -812,10 +814,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         }
         const strength = rankTwo(boon) ? 4 / 3 : 1;
         const duration = boon.evolutionId === "lingering-wake" ? 2 : 1;
-        const targets =
-          boon.evolutionId === "violent-front"
-            ? [event.activePokemon.id, ...(event.lowestHpBenchedAlly ? [event.lowestHpBenchedAlly.id] : [])]
-            : [event.activePokemon.id];
+        const targets = [event.activePokemon.id];
         if (event.previous === "sun") {
           baseCommand("queue-next-move-power", {
             targetIds: targets,
@@ -1257,6 +1256,26 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         break;
       }
       case "aftercare": {
+        if (event.kind === "turn-end" && boon.evolutionId === "community-care") {
+          const prefix = `${event.battleId}:${id}:temporary-stat:`;
+          for (const [key, amount] of Object.entries(currentState().numbers)) {
+            if (!key.startsWith(prefix) || key.endsWith(":expires") || amount <= 0) {
+              continue;
+            }
+            if (event.turn < numberAt(currentState(), `${key}:expires`)) {
+              continue;
+            }
+            const [pokemonId, stat] = key.slice(prefix.length).split(":");
+            baseCommand("modify-stat", {
+              subjectId: Number(pokemonId),
+              amount: -amount,
+              value: stat,
+            });
+            setNumber(key, 0);
+            setNumber(`${key}:expires`, 0);
+          }
+          break;
+        }
         if (
           event.kind !== "status-cured"
           || event.target.side !== input.ownerSide
@@ -1272,30 +1291,35 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         if (valueAt(currentState(), triggerKey, false)) {
           break;
         }
-        const recipients =
-          boon.evolutionId === "community-care"
-            ? [event.target.id, ...(event.adjacentAllies?.map(ally => ally.id) ?? [])]
-            : [event.target.id];
-        const adjacentScale = boon.evolutionId === "community-care" ? 0.5 : 1;
+        const adjacentIds =
+          boon.evolutionId === "community-care" ? (event.adjacentAllies?.map(ally => ally.id) ?? []) : [];
+        const recipients = [event.target.id, ...adjacentIds];
+        const addStatRebound = (stat: "attack" | "speed"): void => {
+          baseCommand("modify-stat", { subjectId: event.target.id, amount: 1, value: stat });
+          for (const pokemonId of adjacentIds) {
+            baseCommand("modify-stat", { subjectId: pokemonId, amount: 1, value: stat, durationTurns: 1 });
+            const key = `${event.battleId}:${id}:temporary-stat:${pokemonId}:${stat}`;
+            setNumber(key, numberAt(currentState(), key) + 1);
+            setNumber(`${key}:expires`, Math.max(numberAt(currentState(), `${key}:expires`), event.turn + 1));
+          }
+        };
         if (event.status === "burn") {
-          baseCommand("modify-stat", {
-            targetIds: recipients,
-            amount: 1,
-            value: "attack",
-          });
+          addStatRebound("attack");
         }
         if (event.status === "poison" || event.status === "toxic") {
           baseCommand("heal", {
-            targetIds: recipients,
-            fraction: (rankTwo(boon) ? 0.25 : 0.2) * adjacentScale,
+            subjectId: event.target.id,
+            fraction: rankTwo(boon) ? 0.25 : 0.2,
           });
+          if (adjacentIds.length > 0) {
+            baseCommand("heal", {
+              targetIds: adjacentIds,
+              fraction: (rankTwo(boon) ? 0.25 : 0.2) * 0.5,
+            });
+          }
         }
         if (event.status === "paralysis") {
-          baseCommand("modify-stat", {
-            targetIds: recipients,
-            amount: 1,
-            value: "speed",
-          });
+          addStatRebound("speed");
         }
         if (event.status === "sleep") {
           baseCommand("modify-priority", {
@@ -1306,9 +1330,15 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         }
         if (event.status === "frostbite") {
           baseCommand("apply-barrier", {
-            targetIds: recipients,
-            fraction: (rankTwo(boon) ? 0.35 : 0.25) * adjacentScale,
+            subjectId: event.target.id,
+            fraction: rankTwo(boon) ? 0.35 : 0.25,
           });
+          if (adjacentIds.length > 0) {
+            baseCommand("apply-barrier", {
+              targetIds: adjacentIds,
+              fraction: (rankTwo(boon) ? 0.35 : 0.25) * 0.5,
+            });
+          }
         }
         setValue(triggerKey, true);
         break;
@@ -1961,13 +1991,14 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         }
         break;
       case "public-enemy":
-        if (event.kind === "encounter-generate") {
+        if (event.kind === "encounter-generate" && event.isTrainer) {
           curseCommand("set-enemy-roster-size", {
             amount: Math.max(event.baseRosterSize, 7 + deterministicIndex(event.seed, id, 2)),
           });
         }
         if (
           event.kind === "faint"
+          && event.isBoss
           && event.finalEnemyPokemon
           && event.pokemon.side !== input.ownerSide
           && !valueAt(currentState(), battleKey(id, "second-act-used"), false)
@@ -2023,14 +2054,16 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
       case "reverse-snowball":
         if (event.kind === "encounter-generate") {
           curseCommand("apply-enemy-stat-multiplier", {
-            multiplier: Math.min(1.6, 1 + event.noFaintWinStreak * 0.03),
+            multiplier: Math.min(1.3, 1 + event.noFaintWinStreak * 0.03),
           });
         }
         if (event.kind === "battle-won") {
           const reset = event.alliedFaints > event.party.length / 2;
-          setNumber(`persistent:${id}:streak`, reset ? 0 : numberAt(currentState(), `persistent:${id}:streak`) + 1);
+          const currentStreak = numberAt(currentState(), `persistent:${id}:streak`);
+          const nextStreak = reset ? 0 : event.alliedFaints === 0 ? currentStreak + 1 : currentStreak;
+          setNumber(`persistent:${id}:streak`, nextStreak);
           curseCommand("mark-trigger", {
-            value: reset ? "streak-reset" : "streak-increased",
+            value: reset ? "streak-reset" : event.alliedFaints === 0 ? "streak-increased" : "streak-held",
           });
         }
         break;
@@ -2104,7 +2137,12 @@ export function assertMoodyRuntimeFieldCoverage(): void {
   }
   for (const boonId of MOODY_RUNTIME_FIELD_BOON_IDS) {
     const variants = MOODY_RUNTIME_FIELD_VARIANTS[boonId];
-    if (!variants?.base || !variants.rankTwo || variants.evolutionIds.length !== 2) {
+    if (
+      !variants?.base
+      || !variants.rankTwo
+      || variants.evolutionIds.length === 0
+      || variants.evolutionIds.length > 2
+    ) {
       throw new Error(`Moody runtime field variant coverage incomplete: ${boonId}`);
     }
   }

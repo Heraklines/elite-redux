@@ -39,6 +39,6 @@ export class SelectMoodyBoonPhase extends BattlePhase {
         () => this.end(),
       );
     };
-    void globalScene.ui.setMode(UiMode.MOODY_BOON_SELECT, this.waveIndex, completeDraft).catch(completeDraft);
+    void globalScene.ui.setOverlayMode(UiMode.MOODY_BOON_SELECT, this.waveIndex, completeDraft).catch(completeDraft);
   }
 }

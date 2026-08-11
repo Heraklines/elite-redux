@@ -384,6 +384,7 @@ function curseEvent(id: MoodyRuntimeFieldCurseId): {
     ...base,
     kind: "encounter-generate",
     isBoss: true,
+    isTrainer: true,
     baseRosterSize: 6,
     playerThreatPokemonId: player.id,
     noFaintWinStreak: 5,
@@ -628,6 +629,181 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(multiplier(boon("prismatic-opening", 2))).toBe(0.8);
     expect(multiplier(boon("prismatic-opening", 3, "perfect-refraction"))).toBe(1);
     expect(multiplier(boon("prismatic-opening", 3, "prismatic-doctrine"))).toBe(0.65);
+  });
+
+  it("limits Public Enemy roster growth to trainers and gives boss trainers one complete Second Act", () => {
+    const wild = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("public-enemy")],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...base,
+        kind: "encounter-generate",
+        isBoss: false,
+        isTrainer: false,
+        baseRosterSize: 1,
+        noFaintWinStreak: 0,
+      },
+    });
+    expect(wild.commands).toEqual([]);
+
+    const trainer = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("public-enemy")],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...base,
+        kind: "encounter-generate",
+        isBoss: false,
+        isTrainer: true,
+        baseRosterSize: 4,
+        noFaintWinStreak: 0,
+      },
+    });
+    const rosterSize = trainer.commands.find(command => command.kind === "set-enemy-roster-size")?.amount;
+    expect(rosterSize).toBeGreaterThanOrEqual(7);
+    expect(rosterSize).toBeLessThanOrEqual(8);
+
+    const secondAct = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("public-enemy")],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...base,
+        kind: "faint",
+        isBoss: true,
+        pokemon: { ...enemy, currentHp: 0, fainted: true },
+        otherConsciousAllies: [],
+        finalEnemyPokemon: true,
+      },
+    });
+    expect(secondAct.commands).toContainEqual(
+      expect.objectContaining({
+        kind: "revive",
+        fraction: 1,
+        data: expect.objectContaining({ healthSegments: 1, allStats: 1 }),
+      }),
+    );
+    expect(secondAct.state.values[`${base.battleId}:public-enemy:second-act-used`]).toBe(true);
+  });
+
+  it("caps Reverse Snowball at +30% enemy stats", () => {
+    const result = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("reverse-snowball")],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...base,
+        kind: "encounter-generate",
+        isBoss: false,
+        isTrainer: false,
+        baseRosterSize: 1,
+        noFaintWinStreak: 99,
+      },
+    });
+    expect(result.commands).toContainEqual(
+      expect.objectContaining({ kind: "apply-enemy-stat-multiplier", multiplier: 1.3 }),
+    );
+  });
+
+  it("only advances Reverse Snowball after a flawless win", () => {
+    const persistentKey = "persistent:reverse-snowball:streak";
+    const state = { numbers: { [persistentKey]: 4 }, values: {}, lists: {} };
+    const held = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("reverse-snowball")],
+      state,
+      event: {
+        ...base,
+        kind: "battle-won",
+        party: [player, ally, { ...ally, id: 103 }],
+        alliedFaints: 1,
+      },
+    });
+    expect(held.state.numbers[persistentKey]).toBe(4);
+    expect(held.commands).toContainEqual(expect.objectContaining({ kind: "mark-trigger", value: "streak-held" }));
+
+    const advanced = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("reverse-snowball")],
+      state: held.state,
+      event: {
+        ...base,
+        kind: "battle-won",
+        party: [player, ally, { ...ally, id: 103 }],
+        alliedFaints: 0,
+      },
+    });
+    expect(advanced.state.numbers[persistentKey]).toBe(5);
+
+    const reset = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("reverse-snowball")],
+      state: advanced.state,
+      event: {
+        ...base,
+        kind: "battle-won",
+        party: [player, ally, { ...ally, id: 103 }],
+        alliedFaints: 2,
+      },
+    });
+    expect(reset.state.numbers[persistentKey]).toBe(0);
+  });
+
+  it("expires Community Care's adjacent stat rebound after one full turn", () => {
+    const community = boon("aftercare", 3, "community-care");
+    const cured = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [community],
+      curses: [],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...base,
+        kind: "status-cured",
+        target: player,
+        status: "burn",
+        adjacentAllies: [ally],
+      },
+    });
+    expect(cured.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-stat", subjectId: player.id, amount: 1, value: "attack" }),
+    );
+    expect(cured.commands).toContainEqual(
+      expect.objectContaining({
+        kind: "modify-stat",
+        subjectId: ally.id,
+        amount: 1,
+        value: "attack",
+        durationTurns: 1,
+      }),
+    );
+
+    const beforeExpiry = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [community],
+      curses: [],
+      state: cured.state,
+      event: { ...base, kind: "turn-end", activePokemonIds: [player.id, ally.id] },
+    });
+    expect(beforeExpiry.commands).not.toContainEqual(expect.objectContaining({ kind: "modify-stat", amount: -1 }));
+
+    const expired = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [community],
+      curses: [],
+      state: beforeExpiry.state,
+      event: { ...base, turn: base.turn + 1, kind: "turn-end", activePokemonIds: [player.id, ally.id] },
+    });
+    expect(expired.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-stat", subjectId: ally.id, amount: -1, value: "attack" }),
+    );
   });
 
   it("keeps Status Bank FIFO and upgrades held poison after a full turn", () => {

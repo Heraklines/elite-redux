@@ -1228,7 +1228,7 @@ export class EncounterPhase extends BattlePhase {
     const fieldRosterSize = prepareMoodyRuntimeEncounter(battle.enemyLevels?.length ?? 0);
     const moodyRosterSize = prepareMoodyCoordinatorTrainerRoster(
       fieldRosterSize,
-      PLAYER_PARTY_MAX_SIZE,
+      8,
       battle.battleType === BattleType.TRAINER,
       battle.trainer?.config.isBoss === true,
     );

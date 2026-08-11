@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import { getMoodyEffectFlyoutCue } from "#data/elite-redux/moody/moody-effect-flyout";
 import {
   type MoodyRuntimeCommand,
   type MoodyRuntimeCommandKind,
@@ -234,7 +235,7 @@ export interface MoodyRuntimeExecutionPort<TPokemon> {
   cureStatus(pokemon: TPokemon): void;
   clearNegativeStages(pokemon: TPokemon, amount: number, categoryChoice: boolean): void;
   modifyStat(pokemon: TPokemon, stat: string, stages: number): void;
-  revive(pokemon: TPokemon, fraction: number): void;
+  revive(pokemon: TPokemon, fraction: number, extraHealthSegments?: number, allStatStages?: number): void;
   setWeather(weather: string, turns?: number): void;
   setTerrain(terrain: string, turns?: number): void;
   shortenStatus(pokemon: TPokemon, status: string, turns: number): void;
@@ -463,7 +464,14 @@ export function executeMoodyRuntimeCommands<TPokemon>(
         executedCommands.push(command);
         break;
       case "revive":
-        targets.forEach(pokemon => port.revive(pokemon, command.fraction ?? 0.25));
+        targets.forEach(pokemon =>
+          port.revive(
+            pokemon,
+            command.fraction ?? 0.25,
+            Number(command.data?.healthSegments ?? 0),
+            Number(command.data?.allStats ?? 0),
+          ),
+        );
         executedCommands.push(command);
         break;
       case "set-weather":
@@ -656,6 +664,9 @@ function hashString(value: string): number {
 
 function battleId(): string {
   const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return "prebattle";
+  }
   return `${battle.waveIndex}:${battle.battleSeed}`;
 }
 
@@ -773,8 +784,9 @@ function emitMoodyRuntimeTriggerLabels(
   }
   freshIds.forEach(effectId => seen.add(effectId));
   EMITTED_MOODY_UI_TRIGGERS.set(key, seen);
-  for (const label of getMoodyRuntimeTriggerLabels(state, freshIds)) {
-    globalScene.ui.pushMoodyTrigger(label);
+  for (const effectId of freshIds) {
+    const cue = getMoodyEffectFlyoutCue(state, effectId);
+    globalScene.ui.pushMoodyTrigger(cue.name, cue);
   }
 }
 
@@ -794,7 +806,7 @@ export function createMoodySceneFieldAdapter(): MoodyRuntimeFieldEventAdapter<Po
       waveIndex: battle.waveIndex,
       turn: battle.turn,
       seed: hashString(`${state.seed}:${battle.battleSeed}`),
-      isBoss: globalScene.getEnemyParty().some(pokemon => pokemon.isBoss()),
+      isBoss: battle.trainer?.config.isBoss === true || globalScene.getEnemyParty().some(pokemon => pokemon.isBoss()),
       isTrainer: battle.battleType === BattleType.TRAINER,
       biomeId,
       biomeEpoch,
@@ -940,10 +952,18 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         pokemon.setStatStage(resolved, pokemon.getStatStage(resolved) + stages);
       }
     },
-    revive: (pokemon, fraction) => {
+    revive: (pokemon, fraction, extraHealthSegments = 0, allStatStages = 0) => {
       if (pokemon.isFainted(true)) {
         pokemon.resetStatus(true, false, false, false);
         pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * fraction));
+        if (extraHealthSegments > 0 && pokemon.isEnemy()) {
+          pokemon.setBoss(true, Math.max(2, pokemon.bossSegments + extraHealthSegments));
+        }
+        if (allStatStages > 0) {
+          for (const stat of BATTLE_STATS) {
+            pokemon.setStatStage(stat, Math.max(pokemon.getStatStage(stat), allStatStages));
+          }
+        }
         pokemon.updateInfo(true);
       }
     },

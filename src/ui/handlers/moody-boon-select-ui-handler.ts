@@ -531,6 +531,11 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
       return;
     }
     if (offer.kind === "evolution") {
+      const definition = this.definitionOf(offer);
+      if (definition?.evolutions.length === 1) {
+        this.commitOffer(offer, {}, definition.evolutions[0].id);
+        return;
+      }
       this.openStep(TargetStep.EVOLVE);
       return;
     }
@@ -656,8 +661,10 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
         return this.heldItems.length;
       case TargetStep.TYPE:
         return this.typeOptions.length;
-      case TargetStep.EVOLVE:
-        return 2;
+      case TargetStep.EVOLVE: {
+        const offer = this.currentOffer();
+        return offer == null ? 0 : (this.definitionOf(offer)?.evolutions.length ?? 0);
+      }
       case TargetStep.REPLACE:
         return this.replaceCandidates.length;
       default:
@@ -762,9 +769,11 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
       row.setText(label).setAlpha(greyed ? 0.4 : 1);
     }
 
+    const evolutionCount = definition?.evolutions.length ?? 0;
     this.evolutionTexts.forEach((text, index) => {
-      text.setVisible(evolutionStep);
-      this.evolutionPageLabels[index].setVisible(evolutionStep);
+      const branchVisible = evolutionStep && index < evolutionCount;
+      text.setVisible(branchVisible);
+      this.evolutionPageLabels[index].setVisible(branchVisible);
       if (!evolutionStep) {
         return;
       }
@@ -782,10 +791,11 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
     }
 
     if (evolutionStep) {
+      const branchWidth = evolutionCount === 1 ? 204 : 101;
       this.targetCursor
         .setVisible(true)
         .setPosition((globalScene.scaledCanvas.width - paneW) / 2 + 5 + this.targetCursorIndex * 103, paneY + 22)
-        .setSize(101, paneY + 130 - (paneY + 22));
+        .setSize(branchWidth, paneY + 130 - (paneY + 22));
     } else {
       const cursorY = paneY + 24 + (this.targetCursorIndex - this.targetScrollTop) * ROW_STEP;
       this.targetCursor

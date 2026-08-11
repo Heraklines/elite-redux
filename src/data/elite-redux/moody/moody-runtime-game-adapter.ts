@@ -425,8 +425,8 @@ function toPokemonPort(pokemon: Pokemon): MoodyLivePokemonPort {
     },
     revive: (hpFraction, extraHealthSegments, allStatStages) => {
       pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * hpFraction));
-      if (extraHealthSegments > 0 && segmented.bossSegments < extraHealthSegments) {
-        segmented.bossSegments = extraHealthSegments;
+      if (extraHealthSegments > 0 && pokemon.isEnemy()) {
+        pokemon.setBoss(true, Math.max(2, segmented.bossSegments + extraHealthSegments));
       }
       for (const stat of BATTLE_STATS) {
         pokemon.setStatStage(stat, Math.max(pokemon.getStatStage(stat), allStatStages));
@@ -833,7 +833,7 @@ export function notifyMoodyCoordinatorBattleEnd(victory: boolean): void {
     alliedFaintCount: globalScene.getPlayerParty().filter(pokemon => pokemon.isFainted(true)).length,
     partySize: globalScene.getPlayerParty().length,
     money: globalScene.money,
-    compoundInterestCapRemaining: Math.max(0, Math.floor(globalScene.money * 0.25)),
+    compoundInterestCapRemaining: getMoodyCompoundInterestCapRemaining(),
     biomeFailureShieldAvailable: true,
     activeBoonInstanceIds: state.boons.filter(boon => !boon.dormant).map(boon => boon.instanceId),
   });
@@ -873,7 +873,7 @@ function queueMoodyHunterChoice(): void {
         type: "hunter-choice-resolved",
         seed: state.seed ^ (globalScene.currentBattle?.waveIndex ?? 0),
         choice,
-        amount: 1,
+        amount: 0.15,
       });
     }),
   );
@@ -1367,7 +1367,7 @@ export function notifyMoodyCoordinatorBiomeTransition(): void {
     seed: state.seed ^ (globalScene.currentBattle?.waveIndex ?? 0),
     waveIndex: globalScene.currentBattle?.waveIndex ?? 0,
     money: globalScene.money,
-    compoundInterestCapRemaining: Math.max(0, Math.floor(globalScene.money * 0.25)),
+    compoundInterestCapRemaining: getMoodyCompoundInterestCapRemaining(),
     patientCapitalRate: 0.03,
     usageRanking,
     eligibleStacksByPokemon,
@@ -1384,6 +1384,19 @@ export function notifyMoodyCoordinatorBiomeTransition(): void {
       previousUsageRanking: usageRanking,
     }));
   }
+}
+
+function getMoodyCompoundInterestCapRemaining(): number {
+  const compound = activeBoon("compound-interest");
+  if (compound == null) {
+    return 0;
+  }
+  const capFraction = compound.evolutionId === "patient-capital" ? 0.5 : 0.25;
+  const accumulated = Math.max(
+    0,
+    Number(getMoodyCoordinatorEffectState("compound-interest")?.counters?.accumulatedInterest ?? 0),
+  );
+  return Math.max(0, Math.floor(globalScene.money * capFraction) - accumulated);
 }
 
 export function prepareMoodyCoordinatorTrainerRoster(

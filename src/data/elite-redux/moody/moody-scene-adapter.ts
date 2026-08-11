@@ -448,10 +448,7 @@ export function getMoodyExperienceMultiplier(pokemon: Pokemon): number {
 }
 
 export function getMoodyBossMoneyGainMultiplier(): number {
-  if (!globalScene.getEnemyParty().some(pokemon => pokemon.isBoss())) {
-    return 1;
-  }
-  return queryMoodySceneEffects({ economy: { event: "boss-interest" } })?.moneyGainMultiplier ?? 1;
+  return 1;
 }
 
 export function getMoodyCaptureMultiplier(target: Pokemon): number {

@@ -8,9 +8,9 @@ import type { MoodyOperationModel, MoodyOperationResult } from "#ui/moody/moody-
 export type MoodyHunterChoice = "damageBonus" | "resistanceBonus" | "captureBonus";
 
 const HUNTER_LABELS: Readonly<Record<MoodyHunterChoice, string>> = {
-  damageBonus: "Damage against marked types",
-  resistanceBonus: "Resistance to marked types",
-  captureBonus: "Capture rate for marked types",
+  damageBonus: "+15% damage against marked types",
+  resistanceBonus: "+15% resistance to marked-type attacks",
+  captureBonus: "+15% capture effectiveness for marked types",
 };
 
 export class MoodyCoordinatorChoicePhase extends Phase {

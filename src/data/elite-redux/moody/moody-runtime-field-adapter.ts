@@ -588,6 +588,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
     return {
       ...this.common(),
       kind: "faint",
+      isBoss: this.battle.isBoss,
       pokemon: this.pokemon(input.pokemon),
       ...optionalField("committedMove", input.committedMove),
       otherConsciousAllies: input.otherConsciousAllies.map(pokemon => this.pokemon(pokemon)),
@@ -657,6 +658,7 @@ export class MoodyRuntimeFieldEventAdapter<TPokemon> {
       ...this.common(),
       kind: "encounter-generate",
       isBoss: this.battle.isBoss,
+      isTrainer: this.battle.isTrainer,
       baseRosterSize: input.baseRosterSize,
       ...optionalField("playerThreatPokemonId", input.playerThreatPokemonId),
       noFaintWinStreak: input.noFaintWinStreak,

@@ -71,7 +71,7 @@ const boonMatches = [...boonSection.matchAll(boonHeading)];
 const boons = boonMatches.map((match, index) => {
   const bodyStart = match.index + match[0].length;
   const bodyEnd = index + 1 < boonMatches.length ? boonMatches[index + 1].index : boonSection.length;
-  const fullDescription = clean(boonSection.slice(bodyStart, bodyEnd).replace(/\n---\s*$/s, ""));
+  const fullDescription = clean(boonSection.slice(bodyStart, bodyEnd).replace(/\n---[\s\S]*$/s, ""));
   const rankIndex = fullDescription.indexOf("**Rank II:**");
   const evolutionIndex = fullDescription.indexOf("**Evolution —");
   const base = clean(fullDescription.slice("**Base:**".length, rankIndex));
@@ -82,8 +82,8 @@ const boons = boonMatches.map((match, index) => {
     name: evolution[1],
     description: clean(evolution[2]),
   }));
-  if (evolutions.length !== 2) {
-    throw new Error(`Expected two evolutions for ${match[2]}, found ${evolutions.length}`);
+  if (evolutions.length === 0 || evolutions.length > 2) {
+    throw new Error(`Expected one or two evolutions for ${match[2]}, found ${evolutions.length}`);
   }
   return {
     id: slug(match[2]),

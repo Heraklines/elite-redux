@@ -224,7 +224,8 @@ export function generateMoodyEnemyBoonLoadout(
       existing.rank = 2;
     } else if (existing.rank === 2) {
       existing.rank = 3;
-      existing.evolutionId = definition.evolutions[Math.floor(seededUnit(seed, roll + 500) * 2)].id;
+      existing.evolutionId =
+        definition.evolutions[Math.floor(seededUnit(seed, roll + 500) * definition.evolutions.length)].id;
     }
   }
   return { waveIndex, boons };

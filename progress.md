@@ -7861,3 +7861,17 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Party layout and its selected-effect panel now adapt to the actual party size and visible progress volume. Counter-based boons, including Mithridatism, show their current counts and next threshold.
 - Verification: focused Moody logic/UI suite 5 files and 264/264 tests; scoped formatting and `git diff --check` green; standalone Cloudflare payload build green with 1,735 files. Synthetic Kimi K3 visual review was completed; the final pass corrected the curse dialog's fixed-height dead space, widened battle-drawer wrapping to the actual panel bounds, and strengthened its scroll indicator. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
 - Isolated preview deployment `e8043048` is live at `https://elite-redux-moody.pages.dev/` from game commit `a962c5ded`. Canonical and deployment URLs serve the final bundle, and the deployed asset redirects were directly verified against immutable `er-assets` SHA `478de96ef00e8edd2955003c66bbef4b02d63d1e`.
+
+2026-08-11 - Moody draft transition regression
+
+- Root cause of the post-boon black screen: both opening and recurring boon drafts were destructively opened with `setMode`, while the picker closes through `revertMode`. That left no prior UI mode in the chain, so the mandatory curse receipt restored a dead/full-screen draft owner instead of the battle or starter surface.
+- Both draft entry points now use `setOverlayMode`, matching the picker and curse report close contract. Focused Moody surface tests pass 14/14. No site was deployed.
+
+2026-08-11 - Moody trainer-effect flyouts and pre-battle guard
+
+- Boon and curse activations now reuse the native ability-bar lane with a violet trainer-owned treatment: a compact `TRAINER BOON`/`TRAINER CURSE` label, exact effect name, accent line, and a cropped upper-trainer portrait contained inside the bar. Long names scale and truncate within the existing bar width; no new persistent battle overlay was added.
+- Every one of the 100 boons and 30 curses has an explicit `flyout` or `drawer-only` policy. Runtime and formation adapters emit structured player/enemy cues, while passive/economy effects remain in the Ledger/drawers. Display Settings exposes `Boon & Curse Trigger Banners`, defaulting to On.
+- An occupied ability bar is hidden before the trainer effect is retried, preserving the shared presentation lane without overlapping or looping banners. Dedicated boon and curse dev scenarios cover the visual treatment.
+- Fixed a second opening-run black-screen source: pre-battle stat queries could dereference `currentBattle` before EncounterPhase created it. The runtime battle key now returns a deterministic `prebattle` sentinel, with a regression proving speed lookup is neutral before a battle exists.
+- Live Phaser verification reached combat from the Fun selector and displayed the violet Mithridatism trainer banner after the opening switch prompt and move commitment. The complete focused gate passed 5 files and 226/226 tests; the local production build compiled 3,584 modules and minified 14,365 JSON files successfully.
+- No normal staging, isolated preview, Cloudflare Worker, asset host, or production deployment was performed for this work.

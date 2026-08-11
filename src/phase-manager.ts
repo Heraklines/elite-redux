@@ -164,6 +164,7 @@ import { SelectTargetPhase } from "#phases/select-target-phase";
 import { ShiftSummonPhase } from "#phases/shift-summon-phase";
 import { ShinySparklePhase } from "#phases/shiny-sparkle-phase";
 import { ShowAbilityPhase } from "#phases/show-ability-phase";
+import { ShowMoodyEffectPhase } from "#phases/show-moody-effect-phase";
 import { ShowPartyExpBarPhase } from "#phases/show-party-exp-bar-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { ShowdownEnemyFaintSwitchPhase } from "#phases/showdown-enemy-faint-switch-phase";
@@ -342,6 +343,7 @@ const PHASES = Object.freeze({
   ShiftSummonPhase,
   ShinySparklePhase,
   ShowAbilityPhase,
+  ShowMoodyEffectPhase,
   ShowdownEnemyFaintSwitchPhase,
   ShowdownResultPhase,
   ShowPartyExpBarPhase,
@@ -989,6 +991,14 @@ export class PhaseManager {
     this.unshiftPhase(
       show ? new ShowAbilityPhase(pokemon.getBattlerIndex(), passive, passiveSlot) : new HideAbilityPhase(),
     );
+  }
+
+  /** Queue one trainer-owned Moody effect through the normal ability-bar presentation lane. */
+  public queueMoodyEffectDisplay(cue: ConstructorParameters<typeof ShowMoodyEffectPhase>[0]): void {
+    if (!globalScene.showMoodyEffectFlyouts) {
+      return;
+    }
+    this.unshiftPhase(new ShowMoodyEffectPhase(cue), new HideAbilityPhase());
   }
 
   /**

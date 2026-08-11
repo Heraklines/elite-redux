@@ -36,6 +36,7 @@ import {
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { type MoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import { getMoodyModeState, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
 import type { MoodyCurseInstance } from "#data/elite-redux/moody/moody-types";
 import type { Button } from "#enums/buttons";
@@ -377,8 +378,11 @@ export class UI extends Phaser.GameObjects.Container {
   }
 
   /** Push one ordered, non-modal Moody activation row into the live battle feed. */
-  public pushMoodyTrigger(label: string): void {
+  public pushMoodyTrigger(label: string, cue?: MoodyEffectFlyoutCue): void {
     this.moodyRuntimeUi?.pushTrigger(label);
+    if (cue != null && shouldShowMoodyEffectFlyout(cue.effectId)) {
+      globalScene.phaseManager.queueMoodyEffectDisplay(cue);
+    }
   }
 
   /** Keyboard/controller/mobile callers share the same expansion state as tapping the feed. */

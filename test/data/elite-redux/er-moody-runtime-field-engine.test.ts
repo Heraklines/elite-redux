@@ -16,6 +16,7 @@ import {
   consumeMoodyRuntimePendingCommands,
   doesMoodyMoveRaiseUserStats,
   executeMoodyRuntimeCommands,
+  getMoodyRuntimeSpeedMultiplier,
   getMoodyRuntimeTriggerLabels,
   getMoodyRuntimeTriggerResolutionKey,
   isLegalMoodyEntropyReplacement,
@@ -45,6 +46,7 @@ interface FakePokemon {
   pp: number;
   status?: MoodyRuntimeStatus;
   stages: Record<string, number>;
+  extraHealthSegments?: number;
 }
 
 function fakePort(pokemon: FakePokemon[]): MoodyRuntimeExecutionPort<FakePokemon> {
@@ -88,9 +90,13 @@ function fakePort(pokemon: FakePokemon[]): MoodyRuntimeExecutionPort<FakePokemon
     modifyStat: (target, stat, stages) => {
       target.stages[stat] = (target.stages[stat] ?? 0) + stages;
     },
-    revive: (target, fraction) => {
+    revive: (target, fraction, extraHealthSegments = 0, allStatStages = 0) => {
       if (target.hp === 0) {
         target.hp = Math.max(1, Math.floor(target.maxHp * fraction));
+        target.extraHealthSegments = extraHealthSegments;
+        for (const stat of ["attack", "defense", "special-attack", "special-defense", "speed"]) {
+          target.stages[stat] = Math.max(target.stages[stat] ?? 0, allStatStages);
+        }
       }
     },
     setWeather: () => undefined,
@@ -109,6 +115,10 @@ function fakePort(pokemon: FakePokemon[]): MoodyRuntimeExecutionPort<FakePokemon
 }
 
 const EMPTY_STATE: MoodyRuntimeFieldState = { numbers: {}, values: {}, lists: {} };
+
+it("keeps pre-battle stat reads inert before currentBattle exists", () => {
+  expect(getMoodyRuntimeSpeedMultiplier({ id: 99 } as Pokemon)).toBe(1);
+});
 
 const PLAYER = {
   id: 1,
@@ -539,6 +549,27 @@ describe("Moody live field engine", () => {
       fakePort(pokemon),
     );
     expect(executed.state.numbers[`${EVENT_BASE.battleId}:runtime-barrier:pokemon:${PLAYER.id}:amount`]).toBe(25);
+  });
+
+  it("executes Public Enemy's complete Second Act payload", () => {
+    const boss: FakePokemon = { id: 99, hp: 0, maxHp: 240, pp: 4, stages: { attack: -2 } };
+    executeMoodyRuntimeCommands(
+      [
+        {
+          kind: "revive",
+          effectId: "public-enemy",
+          targetIds: [boss.id],
+          fraction: 1,
+          data: { healthSegments: 1, allStats: 1 },
+        },
+      ],
+      EMPTY_STATE,
+      EVENT_BASE.battleId,
+      fakePort([boss]),
+    );
+    expect(boss.hp).toBe(240);
+    expect(boss.extraHealthSegments).toBe(1);
+    expect(Object.values(boss.stages).every(stage => stage >= 1)).toBe(true);
   });
 
   it("keeps Entropy replacements in category and approximate power while rejecting structural moves", () => {

@@ -23,11 +23,11 @@ export const MOODY_BOONS = [
         id: "ambush-doctrine",
         name: "Ambush Doctrine",
         description:
-          "Every occupied party slot receives a weaker version once per battle. Existing priority moves gain 15% power.\n\nThis absorbs Ambush Doctrine as a proper late-line ascension rather than a separate base boon.",
+          "Every occupied party slot receives a weaker version once per battle. Existing priority moves gain 15% power.",
       },
     ],
     fullDescription:
-      "**Base:** The occupant’s first damaging move each battle gains +1 priority.\n\n**Rank II:** If that move already has increased priority, it gains 20% power instead.\n\n**Evolution — Royal Vanguard:** The effect refreshes once after the occupant leaves the field and spends at least three complete turns benched.\n\n**Evolution — Ambush Doctrine:** Every occupied party slot receives a weaker version once per battle. Existing priority moves gain 15% power.\n\nThis absorbs Ambush Doctrine as a proper late-line ascension rather than a separate base boon.",
+      "**Base:** The occupant’s first damaging move each battle gains +1 priority.\n\n**Rank II:** If that move already has increased priority, it gains 20% power instead.\n\n**Evolution — Royal Vanguard:** The effect refreshes once after the occupant leaves the field and spends at least three complete turns benched.\n\n**Evolution — Ambush Doctrine:** Every occupied party slot receives a weaker version once per battle. Existing priority moves gain 15% power.",
   },
   {
     id: "bastion-seat",
@@ -110,7 +110,7 @@ export const MOODY_BOONS = [
     rarity: "master",
     scope: "slot",
     targetKind: "slot",
-    base: "The first major status or volatile condition directed at the occupant each battle is completely negated.\n\nThis is deliberately extremely rare.",
+    base: "The first major status or volatile condition directed at the occupant each battle is completely negated.",
     rankTwo: "The first direct stat reduction is also negated, using a separate charge.",
     evolutions: [
       {
@@ -125,7 +125,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** The first major status or volatile condition directed at the occupant each battle is completely negated.\n\nThis is deliberately extremely rare.\n\n**Rank II:** The first direct stat reduction is also negated, using a separate charge.\n\n**Evolution — Hallowed Seat:** The status/volatile protection refreshes once after the occupant re-enters.\n\n**Evolution — Sanctuary Doctrine:** The first two qualifying effects directed at anyone on the team are negated.",
+      "**Base:** The first major status or volatile condition directed at the occupant each battle is completely negated.\n\n**Rank II:** The first direct stat reduction is also negated, using a separate charge.\n\n**Evolution — Hallowed Seat:** The status/volatile protection refreshes once after the occupant re-enters.\n\n**Evolution — Sanctuary Doctrine:** The first two qualifying effects directed at anyone on the team are negated.",
   },
   {
     id: "hungry-seat",
@@ -183,7 +183,7 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "team",
     targetKind: "team",
-    base: "Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nThere is no cap. Empty and fainted are distinct states.",
+    base: "Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nEmpty and fainted slots are counted separately, with no cap.",
     rankTwo: "Empty slots grant +12%; fainted slots grant +8%.",
     evolutions: [
       {
@@ -199,7 +199,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nThere is no cap. Empty and fainted are distinct states.\n\n**Rank II:** Empty slots grant +12%; fainted slots grant +8%.\n\n**Evolution — Solitary Kingdom:** Each empty slot additionally grants +5% Speed.\n\n**Evolution — Court of Ashes:** Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.\n\nCurrent absolute HP should remain unchanged when maximum HP changes; the boon must not create hidden proportional healing.",
+      "**Base:** Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nEmpty and fainted slots are counted separately, with no cap.\n\n**Rank II:** Empty slots grant +12%; fainted slots grant +8%.\n\n**Evolution — Solitary Kingdom:** Each empty slot additionally grants +5% Speed.\n\n**Evolution — Court of Ashes:** Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.\n\nCurrent absolute HP should remain unchanged when maximum HP changes; the boon must not create hidden proportional healing.",
   },
   {
     id: "rotating-spotlight",
@@ -243,12 +243,11 @@ export const MOODY_BOONS = [
       {
         id: "refusal-to-fall",
         name: "Refusal to Fall",
-        description:
-          "It gains a 30% barrier and becomes immune to forced switching for the rest of the battle.\n\n---\n\n## II. Pokémon-bound identity and progression",
+        description: "It gains a 30% barrier and becomes immune to forced switching for the rest of the battle.",
       },
     ],
     fullDescription:
-      "**Base:** When the occupant becomes the final conscious party member, it heals 25%, clears negative stat stages, and gains +1 Speed. Once per battle.\n\n**Rank II:** Healing becomes 35%, and volatile conditions are also cleared.\n\n**Evolution — Sole Survivor:** It additionally gains +1 in its highest offensive stat and 20% damage for three turns.\n\n**Evolution — Refusal to Fall:** It gains a 30% barrier and becomes immune to forced switching for the rest of the battle.\n\n---\n\n## II. Pokémon-bound identity and progression",
+      "**Base:** When the occupant becomes the final conscious party member, it heals 25%, clears negative stat stages, and gains +1 Speed. Once per battle.\n\n**Rank II:** Healing becomes 35%, and volatile conditions are also cleared.\n\n**Evolution — Sole Survivor:** It additionally gains +1 in its highest offensive stat and 20% damage for three turns.\n\n**Evolution — Refusal to Fall:** It gains a 30% barrier and becomes immune to forced switching for the rest of the battle.",
   },
   {
     id: "chosen-one",
@@ -332,7 +331,7 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "After the selected Pokémon uses four distinct move slots during one battle, it gains +1 in a random stat. Once per battle.\n\nThis explicitly means four slots, even when the Pokémon knows up to eight moves.",
+    base: "After the selected Pokémon uses four distinct move slots during one battle, it gains +1 in a random stat. Once per battle.\n\nAll four slots count, including on Pokémon that know more than four moves.",
     rankTwo: "It can trigger twice per battle.",
     evolutions: [
       {
@@ -348,7 +347,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** After the selected Pokémon uses four distinct move slots during one battle, it gains +1 in a random stat. Once per battle.\n\nThis explicitly means four slots, even when the Pokémon knows up to eight moves.\n\n**Rank II:** It can trigger twice per battle.\n\n**Evolution — Virtuoso:** It triggers after three distinct move slots and rolls two random stats.\n\n**Evolution — Improvisational Doctrine:** Every allied Pokémon can trigger a weaker one-stat version once per battle after using four distinct move slots.",
+      "**Base:** After the selected Pokémon uses four distinct move slots during one battle, it gains +1 in a random stat. Once per battle.\n\nAll four slots count, including on Pokémon that know more than four moves.\n\n**Rank II:** It can trigger twice per battle.\n\n**Evolution — Virtuoso:** It triggers after three distinct move slots and rolls two random stats.\n\n**Evolution — Improvisational Doctrine:** Every allied Pokémon can trigger a weaker one-stat version once per battle after using four distinct move slots.",
   },
   {
     id: "blood-rival",
@@ -382,7 +381,7 @@ export const MOODY_BOONS = [
     rarity: "master",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "Once per biome, if the selected Pokémon would faint from above 20% HP, it survives at 1 HP and gains +2 Speed.\n\nThis remains one of the rarest ordinary boons.",
+    base: "Once per biome, if the selected Pokémon would faint from above 20% HP, it survives at 1 HP and gains +2 Speed.",
     rankTwo: "It also clears negative stat stages and volatile conditions.",
     evolutions: [
       {
@@ -398,7 +397,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Once per biome, if the selected Pokémon would faint from above 20% HP, it survives at 1 HP and gains +2 Speed.\n\nThis remains one of the rarest ordinary boons.\n\n**Rank II:** It also clears negative stat stages and volatile conditions.\n\n**Evolution — Deathless Pride:** The trigger becomes once per boss battle.\n\n**Evolution — Last Laugh:** The next damaging move after surviving gains 100% power and cannot miss, but the trigger remains once per biome.",
+      "**Base:** Once per biome, if the selected Pokémon would faint from above 20% HP, it survives at 1 HP and gains +2 Speed.\n\n**Rank II:** It also clears negative stat stages and volatile conditions.\n\n**Evolution — Deathless Pride:** The trigger becomes once per boss battle.\n\n**Evolution — Last Laugh:** The next damaging move after surviving gains 100% power and cannot miss, but the trigger remains once per biome.",
   },
   {
     id: "quiet-mentor",
@@ -407,7 +406,7 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "Pokémon affecting adjacent slots",
     targetKind: "slot",
-    base: "At battle start, the two party slots adjacent to the Mentor gain +1 in the Mentor’s highest non-HP stat for one turn.\n\nThe effect does not disappear when the Mentor enters. It simply expires naturally.",
+    base: "At battle start, the two party slots adjacent to the Mentor gain +1 in the Mentor’s highest non-HP stat for one turn.",
     rankTwo: "Duration becomes two turns.",
     evolutions: [
       {
@@ -423,7 +422,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** At battle start, the two party slots adjacent to the Mentor gain +1 in the Mentor’s highest non-HP stat for one turn.\n\nThe effect does not disappear when the Mentor enters. It simply expires naturally.\n\n**Rank II:** Duration becomes two turns.\n\n**Evolution — Senior Mentor:** Every other occupied slot receives the one-turn bonus.\n\n**Evolution — Balanced Tutelage:** One adjacent slot receives the Mentor’s highest offensive stat; the other receives its highest defensive stat.",
+      "**Base:** At battle start, the two party slots adjacent to the Mentor gain +1 in the Mentor’s highest non-HP stat for one turn.\n\n**Rank II:** Duration becomes two turns.\n\n**Evolution — Senior Mentor:** Every other occupied slot receives the one-turn bonus.\n\n**Evolution — Balanced Tutelage:** One adjacent slot receives the Mentor’s highest offensive stat; the other receives its highest defensive stat.",
   },
   {
     id: "copycat-heart",
@@ -493,11 +492,11 @@ export const MOODY_BOONS = [
         id: "family-treasury",
         name: "Family Treasury",
         description:
-          "A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.\n\n---\n\n## III. Switching, pairing, and tempo",
+          "A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.",
       },
     ],
     fullDescription:
-      "**Base:** Select one exact held-item stack. Its numerical or trigger-based effect becomes 25% stronger and it cannot be stolen or suppressed.\n\n**Rank II:** Amplification becomes 40%.\n\n**Evolution — Living Heirloom:** Its first eligible activation each battle triggers twice.\n\n**Evolution — Family Treasury:** A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.\n\n---\n\n## III. Switching, pairing, and tempo",
+      "**Base:** Select one exact held-item stack. Its numerical or trigger-based effect becomes 25% stronger and it cannot be stolen or suppressed.\n\n**Rank II:** Amplification becomes 40%.\n\n**Evolution — Living Heirloom:** Its first eligible activation each battle triggers twice.\n\n**Evolution — Family Treasury:** A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.",
   },
   {
     id: "parting-gift",
@@ -614,12 +613,11 @@ export const MOODY_BOONS = [
       {
         id: "protective-revenge",
         name: "Protective Revenge",
-        description:
-          "The power bonus is replaced by a 30% barrier and a full volatile-condition cleanse.\n\nThis remains intentionally simple; it is a clean lower-rarity line rather than a flagship mechanic.",
+        description: "The power bonus is replaced by a 30% barrier and a full volatile-condition cleanse.",
       },
     ],
     fullDescription:
-      "**Base:** Entering immediately after an ally faints grants +1 Speed and 20% move power for two turns.\n\n**Rank II:** It also grants +1 in the Pokémon’s highest offensive stat.\n\n**Evolution — Vengeful Sweep:** Scoring a KO during the window extends the effect by one turn.\n\n**Evolution — Protective Revenge:** The power bonus is replaced by a 30% barrier and a full volatile-condition cleanse.\n\nThis remains intentionally simple; it is a clean lower-rarity line rather than a flagship mechanic.",
+      "**Base:** Entering immediately after an ally faints grants +1 Speed and 20% move power for two turns.\n\n**Rank II:** It also grants +1 in the Pokémon’s highest offensive stat.\n\n**Evolution — Vengeful Sweep:** Scoring a KO during the window extends the effect by one turn.\n\n**Evolution — Protective Revenge:** The power bonus is replaced by a 30% barrier and a full volatile-condition cleanse.",
   },
   {
     id: "turntable",
@@ -664,12 +662,11 @@ export const MOODY_BOONS = [
       {
         id: "call-and-response",
         name: "Call and Response",
-        description:
-          "Every ally can trigger a weaker version once per battle.\n\n---\n\n## IV. Movecraft, elemental sequencing, and PP",
+        description: "Every ally can trigger a weaker version once per battle.",
       },
     ],
     fullDescription:
-      "**Base:** When the opponent uses the same move twice consecutively, the selected Pokémon’s next different move gains +1 priority, cannot miss, and deals 20% more damage.\n\n**Rank II:** The trigger can occur twice per battle.\n\n**Evolution — Dissonance:** The repeated enemy move’s secondary effects are suppressed on its next use.\n\n**Evolution — Call and Response:** Every ally can trigger a weaker version once per battle.\n\n---\n\n## IV. Movecraft, elemental sequencing, and PP",
+      "**Base:** When the opponent uses the same move twice consecutively, the selected Pokémon’s next different move gains +1 priority, cannot miss, and deals 20% more damage.\n\n**Rank II:** The trigger can occur twice per battle.\n\n**Evolution — Dissonance:** The repeated enemy move’s secondary effects are suppressed on its next use.\n\n**Evolution — Call and Response:** Every ally can trigger a weaker version once per battle.",
   },
   {
     id: "type-echo",
@@ -737,12 +734,11 @@ export const MOODY_BOONS = [
       {
         id: "specialist-doctrine",
         name: "Specialist Doctrine",
-        description:
-          "Every ally receives +15% for the selected type and −5% for other damaging types.\n\nThe penalty remains part of the line rather than disappearing with upgrades.",
+        description: "Every ally receives +15% for the selected type and −5% for other damaging types.",
       },
     ],
     fullDescription:
-      "**Base:** Select one elemental type. The Pokémon’s moves of that type gain 20% power; all of its other damaging move types lose 5%.\n\n**Rank II:** Selected type becomes +35%; other types become −10%.\n\n**Evolution — Fanatic:** Selected type becomes +55%; other types become −15%.\n\n**Evolution — Specialist Doctrine:** Every ally receives +15% for the selected type and −5% for other damaging types.\n\nThe penalty remains part of the line rather than disappearing with upgrades.",
+      "**Base:** Select one elemental type. The Pokémon’s moves of that type gain 20% power; all of its other damaging move types lose 5%.\n\n**Rank II:** Selected type becomes +35%; other types become −10%.\n\n**Evolution — Fanatic:** Selected type becomes +55%; other types become −15%.\n\n**Evolution — Specialist Doctrine:** Every ally receives +15% for the selected type and −5% for other damaging types.",
   },
   {
     id: "conservation-law",
@@ -799,7 +795,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "The first use each battle of a Physical, Special, and Status move rolls a non-repeating reward from a broad pool:\n\n* 20% barrier\n* Heal 20%\n* Restore 3 total PP\n* Remove one major status or volatile condition\n* +1 random stat\n* Next move gains +1 priority\n* Next damaging move guarantees an eligible secondary effect\n* Temporary resistance to the last damaging type received\n\nUsing all three categories triggers **Curtain Call**, rolling two additional rewards.\n\nThe boon is offered only to Pokémon with access to all three categories or a realistic route to acquire them.",
+    base: "The first use each battle of a Physical, Special, and Status move rolls a non-repeating reward from a broad pool:\n\n* 20% barrier\n* Heal 20%\n* Restore 3 total PP\n* Remove one major status or volatile condition\n* +1 random stat\n* Next move gains +1 priority\n* Next damaging move guarantees an eligible secondary effect\n* Temporary resistance to the last damaging type received\n\nUsing all three categories triggers **Curtain Call**, rolling two additional rewards.\n\nOnly Pokémon that can use all three move categories, or can realistically learn them, are eligible.",
     rankTwo: "Reward magnitudes increase by approximately 25%.",
     evolutions: [
       {
@@ -815,7 +811,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** The first use each battle of a Physical, Special, and Status move rolls a non-repeating reward from a broad pool:\n\n* 20% barrier\n* Heal 20%\n* Restore 3 total PP\n* Remove one major status or volatile condition\n* +1 random stat\n* Next move gains +1 priority\n* Next damaging move guarantees an eligible secondary effect\n* Temporary resistance to the last damaging type received\n\nUsing all three categories triggers **Curtain Call**, rolling two additional rewards.\n\nThe boon is offered only to Pokémon with access to all three categories or a realistic route to acquire them.\n\n**Rank II:** Reward magnitudes increase by approximately 25%.\n\n**Evolution — Virtuoso:** Curtain Call triggers after two categories, while using all three grants another reward.\n\n**Evolution — Repertoire Doctrine:** Every party member receives a reduced version, but only one category reward per category per battle.",
+      "**Base:** The first use each battle of a Physical, Special, and Status move rolls a non-repeating reward from a broad pool:\n\n* 20% barrier\n* Heal 20%\n* Restore 3 total PP\n* Remove one major status or volatile condition\n* +1 random stat\n* Next move gains +1 priority\n* Next damaging move guarantees an eligible secondary effect\n* Temporary resistance to the last damaging type received\n\nUsing all three categories triggers **Curtain Call**, rolling two additional rewards.\n\nOnly Pokémon that can use all three move categories, or can realistically learn them, are eligible.\n\n**Rank II:** Reward magnitudes increase by approximately 25%.\n\n**Evolution — Virtuoso:** Curtain Call triggers after two categories, while using all three grants another reward.\n\n**Evolution — Repertoire Doctrine:** Every party member receives a reduced version, but only one category reward per category per battle.",
   },
   {
     id: "refrain",
@@ -907,12 +903,11 @@ export const MOODY_BOONS = [
       {
         id: "collected-works",
         name: "Collected Works",
-        description:
-          "Every move can trigger a weaker Final Draft once per battle.\n\n---\n\n## V. Weather, terrain, and elemental field manipulation",
+        description: "Every move can trigger a weaker Final Draft once per battle.",
       },
     ],
     fullDescription:
-      "**Base:** When the selected move reaches its final PP, choose one ending:\n\n* **Climax:** +100% power.\n* **Precision:** perfect accuracy and guaranteed eligible secondary effect.\n* **Revision:** normal use, then restore 2 PP by paying 15% maximum HP.\n\nBecause this choice happens only at a highly specific moment, it is acceptable despite minimizing routine battle pop-ups.\n\n**Rank II:** Climax becomes +130%, Revision restores 3 PP, and Precision also gains 20% power.\n\n**Evolution — Director’s Cut:** Choose two endings, but the move becomes unusable for the rest of that battle afterward.\n\n**Evolution — Collected Works:** Every move can trigger a weaker Final Draft once per battle.\n\n---\n\n## V. Weather, terrain, and elemental field manipulation",
+      "**Base:** When the selected move reaches its final PP, choose one ending:\n\n* **Climax:** +100% power.\n* **Precision:** perfect accuracy and guaranteed eligible secondary effect.\n* **Revision:** normal use, then restore 2 PP by paying 15% maximum HP.\n\nBecause this choice happens only at a highly specific moment, it is acceptable despite minimizing routine battle pop-ups.\n\n**Rank II:** Climax becomes +130%, Revision restores 3 PP, and Precision also gains 20% power.\n\n**Evolution — Director’s Cut:** Choose two endings, but the move becomes unusable for the rest of that battle afterward.\n\n**Evolution — Collected Works:** Every move can trigger a weaker Final Draft once per battle.",
   },
   {
     id: "prismatic-opening",
@@ -921,7 +916,7 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "The selected Pokémon’s first damaging move each battle becomes the most effective legal elemental type against its target, but deals 30% less damage.\n\nIt does not ignore explicit immunity rules unless an upgrade says so.",
+    base: "The selected Pokémon’s first damaging move each battle becomes the most effective legal elemental type against its target, but deals 30% less damage.\n\nExplicit type immunities still apply.",
     rankTwo: "Penalty becomes 20%.",
     evolutions: [
       {
@@ -936,7 +931,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** The selected Pokémon’s first damaging move each battle becomes the most effective legal elemental type against its target, but deals 30% less damage.\n\nIt does not ignore explicit immunity rules unless an upgrade says so.\n\n**Rank II:** Penalty becomes 20%.\n\n**Evolution — Perfect Refraction:** The penalty is removed.\n\n**Evolution — Prismatic Doctrine:** Every allied Pokémon receives one use, but at a 35% penalty.",
+      "**Base:** The selected Pokémon’s first damaging move each battle becomes the most effective legal elemental type against its target, but deals 30% less damage.\n\nExplicit type immunities still apply.\n\n**Rank II:** Penalty becomes 20%.\n\n**Evolution — Perfect Refraction:** The penalty is removed.\n\n**Evolution — Prismatic Doctrine:** Every allied Pokémon receives one use, but at a 35% penalty.",
   },
   {
     id: "elemental-dividend",
@@ -994,7 +989,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "slot",
     targetKind: "slot",
-    base: "On the marked slot’s first entry each battle, choose one of three seeded weather options. The selected weather lasts three turns.\n\nThis is the smaller boon version of the existing Stormglass-style relic.",
+    base: "On the marked slot’s first entry each battle, choose one of three seeded weather options. The selected weather lasts three turns.",
     rankTwo: "Four weather options and four turns.",
     evolutions: [
       {
@@ -1010,7 +1005,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** On the marked slot’s first entry each battle, choose one of three seeded weather options. The selected weather lasts three turns.\n\nThis is the smaller boon version of the existing Stormglass-style relic.\n\n**Rank II:** Four weather options and four turns.\n\n**Evolution — Stormglass Heart:** All available weather conditions are offered and last five turns.\n\n**Evolution — Mobile Front:** The effect can activate a second time after the occupant leaves and re-enters, but each weather lasts only three turns.",
+      "**Base:** On the marked slot’s first entry each battle, choose one of three seeded weather options. The selected weather lasts three turns.\n\n**Rank II:** Four weather options and four turns.\n\n**Evolution — Stormglass Heart:** All available weather conditions are offered and last five turns.\n\n**Evolution — Mobile Front:** The effect can activate a second time after the occupant leaves and re-enters, but each weather lasts only three turns.",
   },
   {
     id: "eye-of-the-storm",
@@ -1144,18 +1139,13 @@ export const MOODY_BOONS = [
     rankTwo: "Power, healing, and mitigation increase by approximately one-third.",
     evolutions: [
       {
-        id: "violent-front",
-        name: "Violent Front",
-        description: "The aftereffect applies to the entire team where meaningful.",
-      },
-      {
         id: "lingering-wake",
         name: "Lingering Wake",
-        description: "The aftereffect lasts two turns.\n\n---\n\n## VI. Status-oriented playstyles",
+        description: "The aftereffect lasts two turns.",
       },
     ],
     fullDescription:
-      "**Base:** Replacing or ending weather creates a final aftereffect:\n\n* **Sun:** The next Fire move gains 30% power.\n* **Rain:** The active Pokémon heals 15%.\n* **Sand:** The player receives a one-turn Reflect-like effect reducing physical damage by 25%.\n* **Snow:** The player receives a one-turn Light Screen-like effect reducing special damage by 25%.\n* **Fog:** The active Pokémon gains +1 Accuracy, and its next eligible secondary-effect chance increases by 20 percentage points.\n\nThe Sand and Snow effects are temporary directional screens, not absorbable HP barriers.\n\n**Rank II:** Power, healing, and mitigation increase by approximately one-third.\n\n**Evolution — Violent Front:** The aftereffect applies to the entire team where meaningful.\n\n**Evolution — Lingering Wake:** The aftereffect lasts two turns.\n\n---\n\n## VI. Status-oriented playstyles",
+      "**Base:** Replacing or ending weather creates a final aftereffect:\n\n* **Sun:** The next Fire move gains 30% power.\n* **Rain:** The active Pokémon heals 15%.\n* **Sand:** The player receives a one-turn Reflect-like effect reducing physical damage by 25%.\n* **Snow:** The player receives a one-turn Light Screen-like effect reducing special damage by 25%.\n* **Fog:** The active Pokémon gains +1 Accuracy, and its next eligible secondary-effect chance increases by 20 percentage points.\n\nThe Sand and Snow effects are temporary directional screens, not absorbable HP barriers.\n\n**Rank II:** Power, healing, and mitigation increase by approximately one-third.\n\n**Evolution — Lingering Wake:** The aftereffect lasts two turns.",
   },
   {
     id: "adrenal-condition",
@@ -1424,11 +1414,11 @@ export const MOODY_BOONS = [
         id: "community-care",
         name: "Community Care",
         description:
-          "Adjacent party slots receive a reduced version of the rebound.\n\n---\n\n## VII. Barriers, survival, healing, and fainting",
+          "Adjacent active allies receive half of the healing or barrier rebound. Their Attack or Speed rebound lasts one turn; the Sleep rebound still applies only to their next action.",
       },
     ],
     fullDescription:
-      "**Base:** Curing a major status grants a status-specific rebound:\n\n* Burn: +1 Attack.\n* Poison/Toxic: heal 20%.\n* Paralysis: +1 Speed.\n* Sleep: next action gains +1 priority.\n* Frostbite: gain a 25% barrier.\n\n**Rank II:** Healing and barrier values increase, and stat rebounds last for the remainder of the current field appearance.\n\n**Evolution — Rehabilitation:** Each distinct status can trigger its rebound once per battle.\n\n**Evolution — Community Care:** Adjacent party slots receive a reduced version of the rebound.\n\n---\n\n## VII. Barriers, survival, healing, and fainting",
+      "**Base:** Curing a major status grants a status-specific rebound:\n\n* Burn: +1 Attack.\n* Poison/Toxic: heal 20%.\n* Paralysis: +1 Speed.\n* Sleep: next action gains +1 priority.\n* Frostbite: gain a 25% barrier.\n\n**Rank II:** Healing and barrier values increase, and stat rebounds last for the remainder of the current field appearance.\n\n**Evolution — Rehabilitation:** Each distinct status can trigger its rebound once per battle.\n\n**Evolution — Community Care:** Adjacent active allies receive half of the healing or barrier rebound. Their Attack or Speed rebound lasts one turn; the Sleep rebound still applies only to their next action.",
   },
   {
     id: "overflow-ward",
@@ -1738,11 +1728,11 @@ export const MOODY_BOONS = [
         id: "collection-notice",
         name: "Collection Notice",
         description:
-          "If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.\n\n---\n\n## VIII. Economy, capture, items, and team construction",
+          "If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.",
       },
     ],
     fullDescription:
-      "**Base:** The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.\n\nStarting at 65/35 is safer than immediately using 50/50 because the latter creates an enormous healing window.\n\n**Rank II:** The split becomes 50/50.\n\n**Evolution — Debt Restructuring:** Barriers can absorb Damage Debt when it matures.\n\n**Evolution — Collection Notice:** If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.\n\n---\n\n## VIII. Economy, capture, items, and team construction",
+      "**Base:** The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.\n\nStarting at 65/35 is safer than immediately using 50/50 because the latter creates an enormous healing window.\n\n**Rank II:** The split becomes 50/50.\n\n**Evolution — Debt Restructuring:** Barriers can absorb Damage Debt when it matures.\n\n**Evolution — Collection Notice:** If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.",
   },
   {
     id: "compound-interest",
@@ -1751,14 +1741,14 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "economy",
     targetKind: "economy",
-    base: "Unspent money increases by 5% after every boss, with a run-level cap.",
+    base: "After every boss, gain 5% of your current unspent money. Total interest earned is capped at 25% of your current money.",
     rankTwo: "Growth becomes 7.5%.",
     evolutions: [
       {
         id: "patient-capital",
         name: "Patient Capital",
         description:
-          "The cap increases substantially and biome transitions produce an additional smaller interest payment.",
+          "The total-interest cap becomes 50% of current money. Each biome transition also pays 3% of current unspent money within that cap.",
       },
       {
         id: "aggressive-investment",
@@ -1767,7 +1757,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Unspent money increases by 5% after every boss, with a run-level cap.\n\n**Rank II:** Growth becomes 7.5%.\n\n**Evolution — Patient Capital:** The cap increases substantially and biome transitions produce an additional smaller interest payment.\n\n**Evolution — Aggressive Investment:** Growth becomes 10%, but purchasing anything resets accumulated interest growth.",
+      "**Base:** After every boss, gain 5% of your current unspent money. Total interest earned is capped at 25% of your current money.\n\n**Rank II:** Growth becomes 7.5%.\n\n**Evolution — Patient Capital:** The total-interest cap becomes 50% of current money. Each biome transition also pays 3% of current unspent money within that cap.\n\n**Evolution — Aggressive Investment:** Growth becomes 10%, but purchasing anything resets accumulated interest growth.",
   },
   {
     id: "warranty",
@@ -1788,11 +1778,11 @@ export const MOODY_BOONS = [
         id: "extended-warranty",
         name: "Extended Warranty",
         description:
-          "Every party member’s first consumable has a chance not to be consumed, but the selected stack retains guaranteed preservation.\n\nThis remains deliberately rare.",
+          "Every party member’s first consumable has a chance not to be consumed, but the selected stack retains guaranteed preservation.",
       },
     ],
     fullDescription:
-      "**Base:** Select one consumable item stack. Its first activation each battle does not consume a stack.\n\n**Rank II:** Its first two activations do not consume stacks.\n\n**Evolution — Lifetime Warranty:** The first activation is doubled as well as preserved.\n\n**Evolution — Extended Warranty:** Every party member’s first consumable has a chance not to be consumed, but the selected stack retains guaranteed preservation.\n\nThis remains deliberately rare.",
+      "**Base:** Select one consumable item stack. Its first activation each battle does not consume a stack.\n\n**Rank II:** Its first two activations do not consume stacks.\n\n**Evolution — Lifetime Warranty:** The first activation is doubled as well as preserved.\n\n**Evolution — Extended Warranty:** Every party member’s first consumable has a chance not to be consumed, but the selected stack retains guaranteed preservation.",
   },
   {
     id: "recycler",
@@ -1960,11 +1950,11 @@ export const MOODY_BOONS = [
         id: "adaptive-charter",
         name: "Adaptive Charter",
         description:
-          "At ten unique types, the first super-effective hit received by each Pokémon also creates a 15% barrier.\n\nThis makes the boon very strong when deliberately built around, without merely handing out a linear bonus for every typing.",
+          "At ten unique types, the first super-effective hit received by each Pokémon also creates a 15% barrier.",
       },
     ],
     fullDescription:
-      "Count every unique elemental type represented anywhere in the party exactly once. Dual- and triple-typed Pokémon may contribute multiple types, but duplicate types add nothing.\n\n**Base thresholds are cumulative:**\n\n* 4 unique types: +5% maximum HP.\n* 6 unique types: +10% damage.\n* 8 unique types: +8% damage reduction.\n* 10 unique types: +10% Speed.\n* 12 unique types: first damaging move by each Pokémon gains 15% power.\n\n**Rank II:** Thresholds become 3/5/7/9/11.\n\n**Evolution — Cosmopolitan Team:** Every numerical bonus is multiplied by 1.5.\n\n**Evolution — Adaptive Charter:** At ten unique types, the first super-effective hit received by each Pokémon also creates a 15% barrier.\n\nThis makes the boon very strong when deliberately built around, without merely handing out a linear bonus for every typing.",
+      "Count every unique elemental type represented anywhere in the party exactly once. Dual- and triple-typed Pokémon may contribute multiple types, but duplicate types add nothing.\n\n**Base thresholds are cumulative:**\n\n* 4 unique types: +5% maximum HP.\n* 6 unique types: +10% damage.\n* 8 unique types: +8% damage reduction.\n* 10 unique types: +10% Speed.\n* 12 unique types: first damaging move by each Pokémon gains 15% power.\n\n**Rank II:** Thresholds become 3/5/7/9/11.\n\n**Evolution — Cosmopolitan Team:** Every numerical bonus is multiplied by 1.5.\n\n**Evolution — Adaptive Charter:** At ten unique types, the first super-effective hit received by each Pokémon also creates a 15% barrier.",
   },
   {
     id: "monotype-oath",
@@ -2070,7 +2060,7 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "elemental enemy type",
     targetKind: "enemy-type",
-    base: "Select one enemy type. Every ten KOs against that type grants a choice between:\n\n* Increased damage against it.\n* Increased resistance to it.\n* Increased capture effectiveness against it.",
+    base: "Select one enemy type. Every ten KOs against that type grants a choice between:\n\n* +15% damage against it.\n* +15% resistance to its attacks.\n* +15% capture effectiveness against it.",
     rankTwo: "Threshold becomes eight KOs.",
     evolutions: [
       {
@@ -2081,12 +2071,11 @@ export const MOODY_BOONS = [
       {
         id: "broad-hunt",
         name: "Broad Hunt",
-        description:
-          "Select a second type, but both types receive only 75% of the accumulated bonuses.\n\n---\n\n## IX. Bonds, training, and inherited progression",
+        description: "Select a second type, but both types receive only 75% of the accumulated bonuses.",
       },
     ],
     fullDescription:
-      "**Base:** Select one enemy type. Every ten KOs against that type grants a choice between:\n\n* Increased damage against it.\n* Increased resistance to it.\n* Increased capture effectiveness against it.\n\n**Rank II:** Threshold becomes eight KOs.\n\n**Evolution — Apex Hunter:** Boss health segments belonging to that type count as three KOs.\n\n**Evolution — Broad Hunt:** Select a second type, but both types receive only 75% of the accumulated bonuses.\n\n---\n\n## IX. Bonds, training, and inherited progression",
+      "**Base:** Select one enemy type. Every ten KOs against that type grants a choice between:\n\n* +15% damage against it.\n* +15% resistance to its attacks.\n* +15% capture effectiveness against it.\n\n**Rank II:** Threshold becomes eight KOs.\n\n**Evolution — Apex Hunter:** Boss health segments belonging to that type count as three KOs.\n\n**Evolution — Broad Hunt:** Select a second type, but both types receive only 75% of the accumulated bonuses.",
   },
   {
     id: "pair-bond",
@@ -2156,11 +2145,11 @@ export const MOODY_BOONS = [
         id: "veteran-breaker",
         name: "Veteran Breaker",
         description:
-          "Every three segments broken grants a permanent 2% boss-damage bonus, maximum five stacks.\n\nThis line references actual health segments only, not hypothetical shields or affixes.",
+          "Every three segments broken grants a permanent 2% boss-damage bonus, maximum five stacks.\n\nOnly actual boss health segments count.",
       },
     ],
     fullDescription:
-      "**Base:** Whenever the selected Pokémon breaks a boss health segment, it heals 15% and gains 20% damage for two turns.\n\n**Rank II:** Healing becomes 25%; damage becomes 30%.\n\n**Evolution — Segment Eater:** It also restores 3 total PP.\n\n**Evolution — Veteran Breaker:** Every three segments broken grants a permanent 2% boss-damage bonus, maximum five stacks.\n\nThis line references actual health segments only, not hypothetical shields or affixes.",
+      "**Base:** Whenever the selected Pokémon breaks a boss health segment, it heals 15% and gains 20% damage for two turns.\n\n**Rank II:** Healing becomes 25%; damage becomes 30%.\n\n**Evolution — Segment Eater:** It also restores 3 total PP.\n\n**Evolution — Veteran Breaker:** Every three segments broken grants a permanent 2% boss-damage bonus, maximum five stacks.\n\nOnly actual boss health segments count.",
   },
   {
     id: "legacy-slot",
@@ -2180,12 +2169,11 @@ export const MOODY_BOONS = [
       {
         id: "perfect-succession",
         name: "Perfect Succession",
-        description:
-          "One imprint transfers at 100%, but the slot cannot store a second one.\n\n---\n\n## X. Mythic and rule-bending boons",
+        description: "One imprint transfers at 100%, but the slot cannot store a second one.",
       },
     ],
     fullDescription:
-      "**Base:** When the occupant is permanently replaced or released, select one compatible progression-based Pokémon boon it possessed. The slot stores 50% of its stacks or progression for the next occupant.\n\nEligible examples include Chosen One, Mithridatism, Hunter’s Mark, and Bossbreaker. Binary mythic effects are not eligible.\n\n**Rank II:** Inheritance becomes 75%.\n\n**Evolution — Dynasty:** The slot can preserve two separate progression imprints.\n\n**Evolution — Perfect Succession:** One imprint transfers at 100%, but the slot cannot store a second one.\n\n---\n\n## X. Mythic and rule-bending boons",
+      "**Base:** When the occupant is permanently replaced or released, select one compatible progression-based Pokémon boon it possessed. The slot stores 50% of its stacks or progression for the next occupant.\n\nEligible examples include Chosen One, Mithridatism, Hunter’s Mark, and Bossbreaker. Binary mythic effects are not eligible.\n\n**Rank II:** Inheritance becomes 75%.\n\n**Evolution — Dynasty:** The slot can preserve two separate progression imprints.\n\n**Evolution — Perfect Succession:** One imprint transfers at 100%, but the slot cannot store a second one.",
   },
   {
     id: "time-loop",
@@ -2388,7 +2376,7 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "pre-battle information",
     targetKind: "team",
-    base: "Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThis must reveal an authoritative commitment, not an approximate AI prediction.",
+    base: "Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.",
     rankTwo: "The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.",
     evolutions: [
       {
@@ -2404,7 +2392,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThis must reveal an authoritative commitment, not an approximate AI prediction.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the committed action of every currently active enemy is revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
+      "**Base:** Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the committed action of every currently active enemy is revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
   },
   {
     id: "pressure-valve",
@@ -2413,7 +2401,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "Pokémon plus selected conversion",
     targetKind: "pokemon",
-    base: "Any attempted positive stat increase that would exceed the normal +6 cap is converted instead of being wasted.\n\nAt acquisition, choose one valve:\n\n* **Barrier valve:** 8% maximum-HP barrier per excess stage.\n* **Healing valve:** heal 6% per excess stage.\n* **PP valve:** restore 1 PP to the most depleted move per excess stage.\n\nThe trigger is overflow above +6, not above +3.",
+    base: "Any attempted positive stat increase that would exceed the normal +6 cap is converted instead of being wasted.\n\nAt acquisition, choose one valve:\n\n* **Barrier valve:** 8% maximum-HP barrier per excess stage.\n* **Healing valve:** heal 6% per excess stage.\n* **PP valve:** restore 1 PP to the most depleted move per excess stage.\n\nOnly stat stages above the normal +6 cap are converted.",
     rankTwo: "Values become 12% barrier, 10% healing, or 2 PP.",
     evolutions: [
       {
@@ -2428,7 +2416,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Any attempted positive stat increase that would exceed the normal +6 cap is converted instead of being wasted.\n\nAt acquisition, choose one valve:\n\n* **Barrier valve:** 8% maximum-HP barrier per excess stage.\n* **Healing valve:** heal 6% per excess stage.\n* **PP valve:** restore 1 PP to the most depleted move per excess stage.\n\nThe trigger is overflow above +6, not above +3.\n\n**Rank II:** Values become 12% barrier, 10% healing, or 2 PP.\n\n**Evolution — Multi-Valve:** Overflow automatically chooses the currently most useful conversion.\n\n**Evolution — Overpressure:** Every three overflow stages also empower the next damaging move by 50%.",
+      "**Base:** Any attempted positive stat increase that would exceed the normal +6 cap is converted instead of being wasted.\n\nAt acquisition, choose one valve:\n\n* **Barrier valve:** 8% maximum-HP barrier per excess stage.\n* **Healing valve:** heal 6% per excess stage.\n* **PP valve:** restore 1 PP to the most depleted move per excess stage.\n\nOnly stat stages above the normal +6 cap are converted.\n\n**Rank II:** Values become 12% barrier, 10% healing, or 2 PP.\n\n**Evolution — Multi-Valve:** Overflow automatically chooses the currently most useful conversion.\n\n**Evolution — Overpressure:** Every three overflow stages also empower the next damaging move by 50%.",
   },
   {
     id: "negative-space",
@@ -2437,7 +2425,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "Pokémon plus sealed moves",
     targetKind: "move",
-    base: "cannot rely on naturally empty move capacity because the game has no ordinary move-unlearning loop.\n\n**Base:** On acquisition, select one known move to **seal**. The move remains learned and visible but cannot be selected while the boon is active. The Pokémon gains 10% damage and 6% damage reduction.\n\nThe seal cannot remove its final damaging move or a structurally required move.",
+    base: "On acquisition, select one known move to **seal**. The move remains learned and visible but cannot be selected while the boon is active. The Pokémon gains 10% damage and 6% damage reduction.\n\nThe seal cannot remove its final damaging move or a structurally required move.",
     rankTwo: "A second move may be sealed; each sealed move grants the bonus separately.",
     evolutions: [
       {
@@ -2453,7 +2441,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "The boon cannot rely on naturally empty move capacity because the game has no ordinary move-unlearning loop.\n\n**Base:** On acquisition, select one known move to **seal**. The move remains learned and visible but cannot be selected while the boon is active. The Pokémon gains 10% damage and 6% damage reduction.\n\nThe seal cannot remove its final damaging move or a structurally required move.\n\n**Rank II:** A second move may be sealed; each sealed move grants the bonus separately.\n\n**Evolution — Void Specialist:** Up to three moves may be sealed, each granting 12% damage and 8% damage reduction.\n\n**Evolution — Open Form:** Only one move may be sealed, but the Pokémon’s first usable move each battle gains +1 priority and 25% power.\n\nSeals remain fixed until the boon is replaced, evolved, or explicitly retargeted at a biome transition. They cannot be toggled freely between battles.",
+      "**Base:** On acquisition, select one known move to **seal**. The move remains learned and visible but cannot be selected while the boon is active. The Pokémon gains 10% damage and 6% damage reduction.\n\nThe seal cannot remove its final damaging move or a structurally required move.\n\n**Rank II:** A second move may be sealed; each sealed move grants the bonus separately.\n\n**Evolution — Void Specialist:** Up to three moves may be sealed, each granting 12% damage and 8% damage reduction.\n\n**Evolution — Open Form:** Only one move may be sealed, but the Pokémon’s first usable move each battle gains +1 priority and 25% power.\n\nSeals remain fixed until the boon is replaced, evolved, or explicitly retargeted at a biome transition. They cannot be toggled freely between battles.",
   },
 ] as const satisfies readonly MoodyBoonDefinition[];
 
@@ -2630,7 +2618,7 @@ export const MOODY_CURSES = [
     name: "Public Enemy",
     dread: 3,
     description:
-      "Certain trainers may generate seven or eight Pokémon.\n\nBoss trainers also gain **Second Act**: when their final Pokémon first faints, it revives at full HP with one additional full health segment and +1 to all stats.",
+      "Every trainer may generate seven or eight Pokémon. Extra roster slots use legal members from that trainer's normal generation pool.\n\nBoss trainers also gain **Second Act**: when their final Pokémon first faints, it revives at full HP with one additional full health segment and +1 to all stats. Boss trainers are encounters flagged by the game as bosses, including Gym Leaders, Elite Four, Champions, evil-team admins and leaders, major rivals, and equivalent named bosses.",
   },
   {
     id: "mood-swing",
@@ -2646,7 +2634,7 @@ export const MOODY_CURSES = [
     name: "Nemesis Protocol",
     dread: 3,
     description:
-      "Enemy-team boon generation heavily increases counter-weighting against the player’s highest recent Threat Score.\n\nBosses are especially likely to receive boons that pressure the carry’s:\n\n* Physical or special bias\n* Speed dependence\n* Repeated move\n* Setup reliance\n* Weather or terrain\n* Status strategy\n* Healing loop\n* Item concentration\n\nThis modifies fresh enemy generation; it does not create persistent enemy ownership.",
+      "Enemy-team boon generation heavily increases counter-weighting against the player’s highest recent Threat Score.\n\nBosses are especially likely to receive boons that pressure the carry’s:\n\n* Physical or special bias\n* Speed dependence\n* Repeated move\n* Setup reliance\n* Weather or terrain\n* Status strategy\n* Healing loop\n* Item concentration\n\nCounter-weighting applies when each new enemy team is generated.",
   },
   {
     id: "blood-moon",
@@ -2662,7 +2650,7 @@ export const MOODY_CURSES = [
     name: "Reverse Snowball",
     dread: 3,
     description:
-      "Every consecutive battle won without an allied faint grants future enemies 3% increased stats, subject to a safety cap.\n\nThe bonus resets only when **more than half of the player’s current party faints during one battle**.",
+      "Every consecutive battle won without an allied faint grants future enemies 3% increased HP and other stats, up to +30% after ten flawless wins.\n\nThe bonus resets only when **more than half of the player’s current party faints during one battle**.",
   },
   {
     id: "cursed-draft",
@@ -2686,6 +2674,6 @@ export const MOODY_CURSES = [
     name: "Feedback Loop",
     dread: 3,
     description:
-      "Whenever one action activates multiple boon effects, the acting Pokémon suffers feedback damage for every triggered boon after the first:\n\n* Second boon: 4% maximum HP.\n* Third boon: another 6%.\n* Fourth and later: another 8% each.\n\nFeedback cannot directly reduce the Pokémon below 1 HP, but it can leave it exposed to ordinary damage. This specifically punishes extremely dense boon-synergy engines without turning individual boons off.\n\nThis replaces the discarded Usurer’s Gift concept. A boon acquired during the middle of a run cannot coherently say that the player “begins with two additional boons,” so that premise is removed entirely.",
+      "Whenever one action activates multiple boon effects, the acting Pokémon suffers feedback damage for every triggered boon after the first:\n\n* Second boon: 4% maximum HP.\n* Third boon: another 6%.\n* Fourth and later: another 8% each.\n\nFeedback cannot directly reduce the Pokémon below 1 HP, but ordinary damage can still make it faint.",
   },
 ] as const satisfies readonly MoodyCurseDefinition[];
