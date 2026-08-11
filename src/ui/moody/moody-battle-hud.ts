@@ -63,6 +63,10 @@ const PANEL_ROWS = 8;
 const PANEL_ROW_HEIGHT = 8;
 const TRIPLE_Y = 89;
 const PANEL_TEXT_CHARACTER_WIDTH = 1.6;
+const TAB_WIDTH = 10;
+const TAB_HEIGHT = 8;
+const TAB_HIT_WIDTH = 16;
+const TAB_HIT_HEIGHT = 12;
 
 const DETAIL_COLORS: Readonly<Record<MoodyBattleHudDetail["tone"], string>> = {
   boon: "#f8e5a2",
@@ -111,13 +115,13 @@ export function createMoodyBattleHud(
   options: MoodyBattleHudOptions = {},
 ): MoodyBattleHudComponent {
   const side = options.side ?? "left";
-  const tabX = side === "right" ? width - 16 : 0;
+  const tabX = side === "right" ? width - TAB_WIDTH : 0;
   const container = globalScene.add.container(x, y).setName("moody-battle-hud").setVisible(false);
-  const tabBg = globalScene.add.rectangle(tabX, 0, 16, 11, 0x14101c, 0.92).setOrigin(0);
+  const tabBg = globalScene.add.rectangle(tabX, 0, TAB_WIDTH, TAB_HEIGHT, 0x14101c, 0.92).setOrigin(0);
   tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
-  const tabText = addTextObject(tabX + 4, 1, side === "left" ? "<" : ">", TextStyle.SETTINGS_LABEL, {
-    fontSize: "36px",
-    fixedWidth: 8 * 6,
+  const tabText = addTextObject(tabX + 2, 0, side === "left" ? "<" : ">", TextStyle.SETTINGS_LABEL, {
+    fontSize: "30px",
+    fixedWidth: 6 * 6,
     maxLines: 1,
   })
     .setOrigin(0, 0)
@@ -185,7 +189,11 @@ export function createMoodyBattleHud(
       render(lastModel);
     }
   };
-  const tabHit = globalScene.add.zone(tabX, 0, 16, 11).setOrigin(0).setInteractive({ useHandCursor: true });
+  const tabHitX = side === "right" ? width - TAB_HIT_WIDTH : 0;
+  const tabHit = globalScene.add
+    .zone(tabHitX, 0, TAB_HIT_WIDTH, TAB_HIT_HEIGHT)
+    .setOrigin(0)
+    .setInteractive({ useHandCursor: true });
   tabHit.on("pointerdown", toggle);
   container.add(tabHit);
 

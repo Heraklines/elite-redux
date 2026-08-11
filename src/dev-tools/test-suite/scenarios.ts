@@ -1612,6 +1612,19 @@ function setupMoodyAdaptivePartyHarness(): Starter[] {
   return party.slice(0, 4);
 }
 
+function setupMoodyTrainerFlyoutHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({
+    BATTLE_TYPE_OVERRIDE: BattleType.TRAINER,
+    DISABLE_STANDARD_TRAINERS_OVERRIDE: false,
+    ENEMY_SPECIES_OVERRIDE: null,
+    ENEMY_LEVEL_OVERRIDE: 0,
+    ENEMY_ABILITY_OVERRIDE: AbilityId.NONE,
+    ENEMY_MOVESET_OVERRIDE: [],
+  });
+  return party;
+}
+
 function installMoodyUiDemoState(): void {
   const state = demoMoodyState();
   const ids = globalScene.getPlayerParty().map(pokemon => pokemon.id);
@@ -1739,7 +1752,7 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
     label: "UI: Moody trainer boon flyout",
     description: "Violet ability-bar variant with the player trainer portrait attached to a boon trigger.",
     gameMode: GameModes.FUN,
-    setup: setupMoodyUiHarness,
+    setup: setupMoodyTrainerFlyoutHarness,
     onBattleStart: () =>
       openMoodyFlyoutHarness(() => {
         globalScene.ui.pushMoodyTrigger("Mithridatism II: Poison cure 2/3", {
@@ -1754,7 +1767,7 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
     label: "UI: Moody trainer curse flyout",
     description: "Dark-violet ability-bar variant with the player trainer portrait attached to a curse trigger.",
     gameMode: GameModes.FUN,
-    setup: setupMoodyUiHarness,
+    setup: setupMoodyTrainerFlyoutHarness,
     onBattleStart: () =>
       openMoodyFlyoutHarness(() => {
         globalScene.ui.pushMoodyTrigger("Reverse Snowball: enemy stats +9%", {

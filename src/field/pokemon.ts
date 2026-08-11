@@ -7041,14 +7041,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       delay: fixedInt(delay),
       repeat: -1,
       callback: () => {
-        frameThreshold = sprite.anims.msPerFrame / crySoundConfig.rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / crySoundConfig.rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (cry && !cry.pendingRemove) {
           cry.setRate(crySoundConfig.rate * 0.99);
@@ -7130,14 +7133,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       repeat: -1,
       callback: () => {
         ++i;
-        frameThreshold = sprite.anims.msPerFrame / rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (i === transitionIndex && fusionCryKey) {
           SoundFade.fadeOut(globalScene, cry, fixedInt(Math.ceil((duration / rate) * 0.2)));

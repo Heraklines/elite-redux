@@ -88,6 +88,12 @@ describe("Moody draft cadence wiring", () => {
     expect(starterPhase).not.toContain("MOODY_CURSE_SELECT");
   });
 
+  it("keeps MESSAGE in the overlay stack so the opening draft cannot return to a stale target picker", () => {
+    const ui = source("src/ui/ui.ts");
+    expect(ui).toContain("if (chainMode && !clear)");
+    expect(ui).not.toContain("if (chainMode && this.mode && !clear)");
+  });
+
   it("attaches the next random curse after every ten-wave boon draft", () => {
     const phase = source("src/phases/select-moody-boon-phase.ts");
     expect(phase).toContain("const completeDraft = () =>");
@@ -112,6 +118,19 @@ describe("Moody draft cadence wiring", () => {
     expect(hud).toContain("getMoodyBattleHudWrapCharacters(width)");
     expect(hud).toContain("(width - 14) / PANEL_TEXT_CHARACTER_WIDTH");
     expect(hud).not.toContain("(width - 14) / 4.5");
+  });
+
+  it("keeps the collapsed battle drawer compact while retaining a larger touch target", () => {
+    const hud = source("src/ui/moody/moody-battle-hud.ts");
+    expect(hud).toContain("const TAB_WIDTH = 10");
+    expect(hud).toContain("const TAB_HEIGHT = 8");
+    expect(hud).toContain("const TAB_HIT_WIDTH = 16");
+    expect(hud).toContain("const TAB_HIT_HEIGHT = 12");
+  });
+
+  it("cannot spin forever when a missing atlas leaves the fainting battler on a static placeholder", () => {
+    const pokemon = source("src/field/pokemon.ts");
+    expect(pokemon.match(/Number\.isFinite\(msPerFrame\) && msPerFrame > 0/g)).toHaveLength(2);
   });
 });
 

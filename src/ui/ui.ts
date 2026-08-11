@@ -1191,7 +1191,7 @@ export class UI extends Phaser.GameObjects.Container {
           if (clear) {
             this.getHandler().clear();
           }
-          if (chainMode && this.mode && !clear) {
+          if (chainMode && !clear) {
             this.modeChain.push(this.mode);
             globalScene.updateGameInfo();
           }
