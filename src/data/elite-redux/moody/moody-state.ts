@@ -682,3 +682,22 @@ export function getMoodyBoonsForPokemon(pokemonId: number, partySlot?: number): 
     ) ?? []
   );
 }
+
+/** Merge catalog-level progress with the live formation engine counters used by combat boons. */
+export function getMoodyBoonRuntimeProgress(instanceId: string): MoodyBoonProgress | undefined {
+  const boon = currentState?.boons.find(candidate => candidate.instanceId === instanceId);
+  const binding = currentState?.formationRuntime?.bindings.find(
+    candidate => candidate.effect.instanceId === instanceId,
+  );
+  const counters = { ...boon?.progress?.counters, ...binding?.state.counters };
+  const flags = { ...boon?.progress?.flags, ...binding?.state.flags };
+  const values = { ...boon?.progress?.values, ...binding?.state.values };
+  if (Object.keys(counters).length === 0 && Object.keys(flags).length === 0 && Object.keys(values).length === 0) {
+    return;
+  }
+  return {
+    ...(Object.keys(counters).length === 0 ? {} : { counters }),
+    ...(Object.keys(flags).length === 0 ? {} : { flags }),
+    ...(Object.keys(values).length === 0 ? {} : { values }),
+  };
+}

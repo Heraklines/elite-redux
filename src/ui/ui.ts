@@ -36,7 +36,8 @@ import {
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
-import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
+import { getMoodyModeState, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
+import type { MoodyCurseInstance } from "#data/elite-redux/moody/moody-types";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -98,6 +99,7 @@ import {
 import type { MoodyOperationModel, MoodyOperationResult } from "#ui/moody/moody-operation";
 import {
   buildMoodyRecapRows,
+  MOODY_DREAD_LABEL,
   type MoodyChoicePanelModel,
   type MoodyTargetPickerModel,
   type MoodyTransitionSection,
@@ -384,6 +386,11 @@ export class UI extends Phaser.GameObjects.Container {
     this.moodyRuntimeUi?.toggleTriggerFeed();
   }
 
+  /** Open the mirrored current-enemy boon drawer from the command grid or its touch tab. */
+  public toggleMoodyEnemyFeed(): void {
+    this.moodyRuntimeUi?.toggleEnemyFeed();
+  }
+
   /** Mechanics-owned decisions may provide exact rule/tracker/HP state here. */
   public setMoodyBattleHudModel(model: MoodyBattleHudModel | null): void {
     this.moodyRuntimeUi?.setModel(model);
@@ -460,7 +467,30 @@ export class UI extends Phaser.GameObjects.Container {
   /** Open a paged report and resolve after the player confirms or closes it. */
   public showMoodyReport(config: Omit<MoodySectionReportConfig, "onAction">): Promise<"confirm" | "cancel"> {
     return new Promise(resolve => {
-      void this.setOverlayMode(UiMode.MOODY_SECTION_REPORT, { ...config, onAction: resolve });
+      void this.setOverlayMode(UiMode.MOODY_SECTION_REPORT, { ...config, onAction: resolve }).catch(() =>
+        resolve("cancel"),
+      );
+    });
+  }
+
+  /** Reveal the deterministic post-draft curse before battle flow resumes. */
+  public showMoodyCurseReceived(curse: MoodyCurseInstance): Promise<"confirm" | "cancel"> {
+    const definition = MOODY_CURSE_BY_ID.get(curse.curseId);
+    const targetSlot = curse.target?.partySlots?.[0];
+    const lines = [
+      definition?.description ?? "No description available.",
+      ...(targetSlot == null ? [] : [`Bound to party slot ${targetSlot + 1}.`]),
+    ];
+    return this.showMoodyReport({
+      title: "CURSE RECEIVED",
+      sections: [
+        {
+          title: `${definition == null ? "DREAD ?" : MOODY_DREAD_LABEL[definition.dread]} - ${definition?.name ?? curse.curseId}`,
+          lines,
+        },
+      ],
+      confirmLabel: "CONTINUE",
+      requireConfirm: true,
     });
   }
 
@@ -756,6 +786,10 @@ export class UI extends Phaser.GameObjects.Container {
   private processInputInner(button: Button): boolean {
     if (this.overlayActive) {
       return false;
+    }
+
+    if (this.moodyRuntimeUi?.processInput(button, this.mode)) {
+      return true;
     }
 
     const handler = this.getHandler();

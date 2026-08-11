@@ -24,6 +24,7 @@ import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erRecordCoopGiveToPartner } from "#data/elite-redux/er-social-achievement-tracker";
 import {
+  getMoodyBoonRuntimeProgress,
   getMoodyBoonsForPokemon,
   getMoodyModeState,
   MOODY_BOON_BY_ID,
@@ -54,7 +55,7 @@ import type { TurnMove } from "#types/turn-move";
 import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { getMoodyLivePresentationSnapshot, getMoodyPokemonPresentation } from "#ui/moody/moody-live-presentation";
-import { type MoodyAttachmentClass, moodyAttachmentClass } from "#ui/moody/moody-presentation";
+import { type MoodyAttachmentClass, moodyAttachmentClass, moodyProgressLines } from "#ui/moody/moody-presentation";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { addBBCodeTextObject, addTextObject, getTextColor } from "#ui/text";
@@ -216,7 +217,11 @@ export function buildMoodyPartySlotPresentation(
     indicators,
     overflow,
     summary,
-    effectLabels: entries.map(entry => `${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`),
+    effectLabels: entries.flatMap(entry => {
+      const label = `${entry.boon.dormant ? "[Dormant] " : ""}${entry.label}`;
+      const progress = moodyProgressLines(entry.boon, getMoodyBoonRuntimeProgress(entry.boon.instanceId));
+      return progress.length === 0 ? [label] : progress.map(line => `${label} - ${line}`);
+    }),
     effectCount: entries.length,
     curseCount: 0,
     borderColor: indicators[0].color,
@@ -271,6 +276,57 @@ export function getMoodyPartySlotPresentation(
     curseCount: curses.length,
     borderColor: curseIndicator.color,
   };
+}
+
+export interface MoodyPartyMessageLayout {
+  fontSize: string;
+  boxHeight: number;
+  maxLines: number;
+  visibleEffects: number;
+}
+
+/** Keep a short single-effect label readable while allowing dense late-run stacks to fit. */
+export function resolveMoodyPartyMessageLayout(effectCount: number, textLength: number): MoodyPartyMessageLayout {
+  if (effectCount <= 1 && textLength <= 52) {
+    return { fontSize: "84px", boxHeight: 30, maxLines: 2, visibleEffects: 4 };
+  }
+  if (effectCount <= 3 && textLength <= 130) {
+    return { fontSize: "68px", boxHeight: 34, maxLines: 3, visibleEffects: 6 };
+  }
+  if (effectCount <= 6 && textLength <= 260) {
+    return { fontSize: "54px", boxHeight: 40, maxLines: 5, visibleEffects: 9 };
+  }
+  return { fontSize: "44px", boxHeight: 46, maxLines: 7, visibleEffects: 12 };
+}
+
+/** Center the actual reserve count instead of reserving vertical space for a hypothetical eight-mon party. */
+export function resolvePartySlotY(
+  slotIndex: number,
+  onFieldCount: number,
+  partyCount: number,
+  itemManageMode: boolean,
+  doubleBattle: boolean,
+): number {
+  if (slotIndex >= onFieldCount) {
+    const benchIndex = slotIndex - onFieldCount;
+    const benchCount = Math.max(1, partyCount - onFieldCount);
+    const benchTop = -168;
+    const benchBottom = -62;
+    const benchStep =
+      benchCount <= 1
+        ? 0
+        : Math.min(doubleBattle || onFieldCount >= 3 ? 36 : 30, (benchBottom - benchTop) / (benchCount - 1));
+    const usedHeight = benchStep * (benchCount - 1);
+    return (benchTop + benchBottom - usedHeight) / 2 + benchIndex * benchStep;
+  }
+  if (onFieldCount >= 3) {
+    return -164 + (itemManageMode ? -2 : 0) + (itemManageMode ? 35 : 37) * slotIndex;
+  }
+  let y = -148.5;
+  if (doubleBattle) {
+    y += itemManageMode ? -20 : -8;
+  }
+  return y + (itemManageMode ? (doubleBattle ? 47 : 55) : 64) * slotIndex;
 }
 
 /**
@@ -1897,7 +1953,7 @@ export class PartyUiHandler extends MessageUiHandler {
           ].filter(Boolean);
 
     if (presentation == null && runtimeLines.length === 0) {
-      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px");
+      this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize("96px").setMaxLines(2);
       switch (this.partyUiMode) {
         case PartyUiMode.MODIFIER_TRANSFER:
           this.showText(i18next.t("partyUiHandler:partyTransfer"));
@@ -1925,17 +1981,24 @@ export class PartyUiHandler extends MessageUiHandler {
       liveSnapshot?.curseMarkers?.filter(marker => marker.pokemonId === focusedPokemon?.id).map(marker => marker.label)
       ?? [];
     const detailItems = [...new Set([...(presentation?.effectLabels ?? []), ...liveEffectLabels, ...runtimeLines])];
-    const visibleDetails = detailItems.slice(0, 4);
+    const initialLayout = resolveMoodyPartyMessageLayout(detailItems.length, detailItems.join("  |  ").length);
+    const visibleDetails = detailItems.slice(0, initialLayout.visibleEffects);
     const hiddenDetailCount = detailItems.length - visibleDetails.length;
     const moodSummary = [...visibleDetails, hiddenDetailCount > 0 ? `+${hiddenDetailCount} more` : ""]
       .filter(Boolean)
       .join("  |  ");
     text = text.length > 0 ? `${text}\n${moodSummary}` : moodSummary;
 
+    const layout = resolveMoodyPartyMessageLayout(detailItems.length, text.length);
     const messageWidth = 248 * 6;
-    this.message.setFixedSize(messageWidth, 0).setWordWrapWidth(messageWidth, true).setFontSize("60px");
+    this.message
+      .setFixedSize(messageWidth, 0)
+      .setWordWrapWidth(messageWidth, true)
+      .setFontSize(layout.fontSize)
+      .setMaxLines(layout.maxLines);
     this.showText(text, 0);
-    this.partyMessageBox.setSize(262, 40);
+    this.partyMessageBox.setSize(262, layout.boxHeight);
+    this.message.setY(10 - (layout.boxHeight - 30));
   }
 
   private allowBatonModifierSwitch(): boolean {
@@ -2661,24 +2724,13 @@ class PartySlot extends Phaser.GameObjects.Container {
     // tighter step and a higher start than the 1/2-slot single/double layout - otherwise
     // the 3rd on-field slot is spread off the bottom (the reported "3rd mon missing").
     const onFieldCount = globalScene.currentBattle.getBattlerCount();
-    const isTripleField = onFieldCount >= 3;
-
-    let slotPositionY: number;
-    if (isBenched) {
-      const benchIndex = slotIndex - onFieldCount;
-      const benchCount = Math.max(1, globalScene.getPlayerParty().length - onFieldCount);
-      const benchStep = Math.min(isDoubleBattle || isTripleField ? 36 : 28, Math.floor(144 / benchCount));
-      slotPositionY = -196 + benchIndex * benchStep;
-    } else if (isTripleField) {
-      slotPositionY = -160 + (isItemManageMode ? -12 : 0);
-      slotPositionY += (isItemManageMode ? 38 : 44) * slotIndex;
-    } else {
-      slotPositionY = -148.5;
-      if (isDoubleBattle) {
-        slotPositionY += isItemManageMode ? -20 : -8;
-      }
-      slotPositionY += (isItemManageMode ? (isDoubleBattle ? 47 : 55) : 64) * slotIndex;
-    }
+    const slotPositionY = resolvePartySlotY(
+      slotIndex,
+      onFieldCount,
+      globalScene.getPlayerParty().length,
+      isItemManageMode,
+      isDoubleBattle,
+    );
 
     super(globalScene, slotPositionX, slotPositionY);
 
@@ -2697,9 +2749,10 @@ class PartySlot extends Phaser.GameObjects.Container {
   setup(partyUiMode: PartyUiMode, tmMoveId: MoveId) {
     const isItemManageMode = partyUiMode === PartyUiMode.MODIFIER_TRANSFER || partyUiMode === PartyUiMode.DISCARD;
 
+    const compactActive = !this.isBenched && globalScene.currentBattle.getBattlerCount() >= 3;
     this.slotBgKey = this.isBenched
       ? "party_slot"
-      : isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1
+      : compactActive || (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1)
         ? "party_slot_main_short"
         : "party_slot_main";
     const fullSlotBgKey = this.pokemon.hp ? this.slotBgKey : `${this.slotBgKey}${"_fnt"}`;
@@ -2749,7 +2802,7 @@ class PartySlot extends Phaser.GameObjects.Container {
     let descriptionLabelPosition = { x: 32, y: 46 };
 
     // If in item management mode, the active slots are shorter
-    if (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1 && !this.isBenched) {
+    if ((compactActive || (isItemManageMode && globalScene.currentBattle.getBattlerCount() > 1)) && !this.isBenched) {
       namePosition.y -= 8;
       levelLabelPosition.y -= 8;
       hpBarPosition.y -= 8;

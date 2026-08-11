@@ -5,8 +5,14 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
-import { type MoodyFeedEntry, type MoodyTrackerChipModel, orderMoodyTrackerChips } from "#ui/moody/moody-presentation";
+import {
+  type MoodyFeedEntry,
+  type MoodyTrackerChipModel,
+  moodyWrapText,
+  orderMoodyTrackerChips,
+} from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 
 export interface MoodyBattleHpOverlay {
@@ -21,8 +27,16 @@ export interface MoodyBattleHudModel {
   ruleLines: string[];
   trackers: MoodyTrackerChipModel[];
   feed: MoodyFeedEntry[];
+  details?: readonly MoodyBattleHudDetail[];
   hpOverlay?: MoodyBattleHpOverlay;
   hpOverlays?: readonly (MoodyBattleHpOverlay & { pokemonId: number; pokemonName: string })[];
+}
+
+export interface MoodyBattleHudDetail {
+  id: string;
+  title: string;
+  description: string;
+  tone: "boon" | "curse" | "enemy" | "tracker" | "feed";
 }
 
 export interface MoodyBattleHudComponent {
@@ -30,48 +44,118 @@ export interface MoodyBattleHudComponent {
   render(model: MoodyBattleHudModel): void;
   toggleFeed(): void;
   isFeedExpanded(): boolean;
+  processInput(button: Button): boolean;
+  setTripleLayout(triple: boolean): void;
 }
 
-const PANEL_ROWS = 6;
-const PANEL_ROW_HEIGHT = 9;
+export interface MoodyBattleHudOptions {
+  side?: "left" | "right";
+  tripleY?: number;
+  triplePanelPosition?: "above" | "below";
+}
+
+export interface MoodyBattleHudLine {
+  text: string;
+  color: string;
+}
+
+const PANEL_ROWS = 8;
+const PANEL_ROW_HEIGHT = 8;
+const TRIPLE_Y = 89;
+const PANEL_TEXT_CHARACTER_WIDTH = 1.6;
+
+const DETAIL_COLORS: Readonly<Record<MoodyBattleHudDetail["tone"], string>> = {
+  boon: "#f8e5a2",
+  curse: "#dca4ef",
+  enemy: "#f0aa8a",
+  tracker: "#9fd7f2",
+  feed: "#c8c3d5",
+};
 
 function compactTracker(model: MoodyTrackerChipModel): string {
   const urgency = model.urgency === "critical" ? "!! " : model.urgency === "warning" ? "! " : "";
   return `${urgency}${model.label} ${model.value}`;
 }
 
-export function createMoodyBattleHud(x: number, y: number, width: number): MoodyBattleHudComponent {
+export function buildMoodyBattleHudLines(model: MoodyBattleHudModel, maxChars: number): MoodyBattleHudLine[] {
+  if (model.details != null && model.details.length > 0) {
+    return model.details.flatMap(detail => [
+      { text: detail.title, color: DETAIL_COLORS[detail.tone] },
+      ...moodyWrapText(detail.description, maxChars).map(text => ({ text, color: "#ece8f2" })),
+      { text: "", color: "#ece8f2" },
+    ]);
+  }
+
+  const ordered = orderMoodyTrackerChips(model.trackers, model.trackers.length);
+  const lines: MoodyBattleHudLine[] = model.ruleLines.map(text => ({ text, color: "#f8e5a2" }));
+  lines.push(
+    ...ordered.flatMap(tracker => [
+      { text: compactTracker(tracker), color: "#9fd7f2" },
+      ...moodyWrapText(tracker.detail ?? "", maxChars)
+        .filter(Boolean)
+        .map(text => ({ text, color: "#ece8f2" })),
+    ]),
+  );
+  lines.push(...model.feed.map(entry => ({ text: `NOW ${entry.label}`, color: "#c8c3d5" })));
+  return lines.length > 0 ? lines : [{ text: "No active Moody effects.", color: "#c8c3d5" }];
+}
+
+export function getMoodyBattleHudWrapCharacters(width: number): number {
+  return Math.max(24, Math.floor((width - 14) / PANEL_TEXT_CHARACTER_WIDTH));
+}
+
+export function createMoodyBattleHud(
+  x: number,
+  y: number,
+  width: number,
+  options: MoodyBattleHudOptions = {},
+): MoodyBattleHudComponent {
+  const side = options.side ?? "left";
+  const tabX = side === "right" ? width - 16 : 0;
   const container = globalScene.add.container(x, y).setName("moody-battle-hud").setVisible(false);
-  const tabBg = globalScene.add.rectangle(0, 0, 28, 10, 0x14101c, 0.9).setOrigin(0);
+  const tabBg = globalScene.add.rectangle(tabX, 0, 16, 11, 0x14101c, 0.92).setOrigin(0);
   tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
-  const tabText = addTextObject(4, 1, "MOOD", TextStyle.SETTINGS_LABEL, {
-    fontSize: "28px",
-    fixedWidth: 22 * 6,
+  const tabText = addTextObject(tabX + 4, 1, side === "left" ? "<" : ">", TextStyle.SETTINGS_LABEL, {
+    fontSize: "36px",
+    fixedWidth: 8 * 6,
     maxLines: 1,
   })
     .setOrigin(0, 0)
     .setColor("#f8e5a2");
 
-  const panel = globalScene.add.container(0, 11).setVisible(false);
+  const panel = globalScene.add.container(0, 12).setVisible(false);
   const panelBg = globalScene.add
-    .rectangle(0, 0, width, PANEL_ROWS * PANEL_ROW_HEIGHT + 7, 0x14101c, 0.92)
+    .rectangle(0, 0, width, PANEL_ROWS * PANEL_ROW_HEIGHT + 7, 0x14101c, 0.95)
     .setOrigin(0);
   panelBg.setStrokeStyle(1, 0x8f7ab5, 0.75);
   panel.add(panelBg);
   const rows: Phaser.GameObjects.Text[] = [];
   for (let index = 0; index < PANEL_ROWS; index++) {
     const row = addTextObject(4, 3 + index * PANEL_ROW_HEIGHT, "", TextStyle.SETTINGS_LABEL, {
-      fontSize: "34px",
-      fixedWidth: (width - 8) * 6,
+      fontSize: "30px",
+      fixedWidth: (width - 14) * 6,
       maxLines: 1,
     }).setOrigin(0, 0);
     row.setColor("#f8e5a2");
     panel.add(row);
     rows.push(row);
   }
+  const upIndicator = addTextObject(width - 9, 1, "↑", TextStyle.SETTINGS_LABEL, { fontSize: "48px" })
+    .setOrigin(0, 0)
+    .setColor("#f8e5a2")
+    .setVisible(false);
+  const downIndicator = addTextObject(width - 9, PANEL_ROWS * PANEL_ROW_HEIGHT - 4, "↓", TextStyle.SETTINGS_LABEL, {
+    fontSize: "48px",
+  })
+    .setOrigin(0, 0)
+    .setColor("#f8e5a2")
+    .setVisible(false);
+  panel.add([upIndicator, downIndicator]);
   container.add([tabBg, tabText, panel]);
 
   let expanded = false;
+  let tripleLayout = false;
+  let scrollTop = 0;
   let lastModel: MoodyBattleHudModel | null = null;
 
   const render = (model: MoodyBattleHudModel): void => {
@@ -79,41 +163,80 @@ export function createMoodyBattleHud(x: number, y: number, width: number): Moody
     container.setVisible(true);
     panel.setVisible(expanded);
 
-    const ordered = orderMoodyTrackerChips(model.trackers, 3);
-    const activeCount = model.ruleLines.length + ordered.length;
-    tabText.setText(`MOOD ${activeCount}`);
+    tabText.setText(expanded === (side === "left") ? ">" : "<");
     tabBg.setStrokeStyle(1, 0x8f7ab5, 0.8);
 
-    const lines: string[] = [];
-    if (model.ruleLines.length > 0) {
-      lines.push(`RULE ${model.ruleLines[0]}${model.ruleLines.length > 1 ? ` +${model.ruleLines.length - 1}` : ""}`);
-    }
-    lines.push(...ordered.slice(0, 3).map(compactTracker));
-    const latestFeed = model.feed.at(-1)?.label;
-    if (latestFeed != null) {
-      lines.push(`NOW ${latestFeed}`);
-    }
-    const hidden = model.ruleLines.length + ordered.length + (latestFeed == null ? 0 : 1) - lines.length;
-    if (hidden > 0 || lines.length < PANEL_ROWS) {
-      lines.push(hidden > 0 ? `+${hidden} more - open Ledger` : "Full details: Ledger");
-    }
-    rows.forEach((row, index) => row.setText(lines[index] ?? ""));
+    const lines = buildMoodyBattleHudLines(model, getMoodyBattleHudWrapCharacters(width));
+    scrollTop = Math.max(0, Math.min(scrollTop, Math.max(0, lines.length - PANEL_ROWS)));
+    rows.forEach((row, index) => {
+      const line = lines[scrollTop + index];
+      row.setText(line?.text ?? "").setColor(line?.color ?? "#ece8f2");
+    });
+    upIndicator.setVisible(expanded && scrollTop > 0);
+    downIndicator.setVisible(expanded && scrollTop + PANEL_ROWS < lines.length);
   };
 
   const toggle = (): void => {
     expanded = !expanded;
+    if (expanded) {
+      scrollTop = 0;
+    }
     if (lastModel != null) {
       render(lastModel);
     }
   };
-  const tabHit = globalScene.add.zone(0, 0, 28, 10).setOrigin(0).setInteractive({ useHandCursor: true });
+  const tabHit = globalScene.add.zone(tabX, 0, 16, 11).setOrigin(0).setInteractive({ useHandCursor: true });
   tabHit.on("pointerdown", toggle);
   container.add(tabHit);
+
+  const setTripleLayout = (triple: boolean): void => {
+    if (tripleLayout === triple) {
+      return;
+    }
+    tripleLayout = triple;
+    container.setY(triple ? (options.tripleY ?? TRIPLE_Y) : y);
+    panel.setX(triple ? (side === "left" ? 100 : -100) : 0);
+    panel.setY(
+      triple && (options.triplePanelPosition ?? "above") === "above" ? -(PANEL_ROWS * PANEL_ROW_HEIGHT + 8) : 12,
+    );
+  };
+
+  const processInput = (button: Button): boolean => {
+    if (!expanded) {
+      return false;
+    }
+    const lines = lastModel == null ? [] : buildMoodyBattleHudLines(lastModel, getMoodyBattleHudWrapCharacters(width));
+    switch (button) {
+      case Button.UP:
+        scrollTop = Math.max(0, scrollTop - 1);
+        if (lastModel != null) {
+          render(lastModel);
+        }
+        return true;
+      case Button.DOWN:
+        scrollTop = Math.min(Math.max(0, lines.length - PANEL_ROWS), scrollTop + 1);
+        if (lastModel != null) {
+          render(lastModel);
+        }
+        return true;
+      case Button.LEFT:
+      case Button.RIGHT:
+      case Button.CANCEL:
+        toggle();
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  container.setY(y);
 
   return {
     container,
     render,
     toggleFeed: toggle,
     isFeedExpanded: () => expanded,
+    processInput,
+    setTripleLayout,
   };
 }

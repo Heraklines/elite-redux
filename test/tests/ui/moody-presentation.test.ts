@@ -22,6 +22,7 @@ import {
   moodyOptionRowText,
   moodyPageCount,
   moodyPairEmblem,
+  moodyProgressLines,
   moodyTargetSummary,
   moodyWrapText,
   orderMoodyTrackerChips,
@@ -123,13 +124,14 @@ describe("Moody presentation: offer cards", () => {
     expect(card.targetLabel).toBe("TARGET: ?");
   });
 
-  it("rank-up cards carry the exact before/after delta lines", () => {
+  it("rank-up cards show only the concise upgrade delta", () => {
     const offer: MoodyBoonOffer = { offerId: "x", kind: "rank-up", boonId: "bastion-seat" };
     const card = buildMoodyOfferCard(offer);
     expect(card.cardStateLabel).toBe("RANK UP");
-    expect(card.deltaLines).toHaveLength(2);
-    expect(card.deltaLines[0]).toContain("Rank I");
-    expect(card.deltaLines[1]).toContain("Rank II");
+    expect(card.description).toBe("RANK I -> RANK II");
+    expect(card.deltaLines).toHaveLength(1);
+    expect(card.deltaLines[0]).toContain("UPGRADE ->");
+    expect(card.deltaLines[0]).not.toContain("Rank I:");
   });
 
   it("replace cards explain the 12-line discard", () => {
@@ -137,6 +139,32 @@ describe("Moody presentation: offer cards", () => {
     const card = buildMoodyOfferCard(offer);
     expect(card.cardStateLabel).toBe("REPLACE REQUIRED");
     expect(card.deltaLines.join(" ")).toContain("12");
+  });
+});
+
+describe("Moody presentation: quantified progress", () => {
+  it("shows Mithridatism cure thresholds and active percentages", () => {
+    const base = boon("mithridatism", 10, { progress: { counters: { "cures.poison": 2 } } });
+    expect(moodyProgressLines(base)).toEqual(["Poison: 2/3 cures - Resistance I at 3"]);
+
+    const resistant = boon("mithridatism", 10, { progress: { counters: { "cures.poison": 4 } } });
+    expect(moodyProgressLines(resistant)).toEqual(["Poison: 4/6 cures - Resistance I active"]);
+
+    const evolved = boon("mithridatism", 10, {
+      rank: 3,
+      evolutionId: "weaponized-affliction",
+      progress: { counters: { "cures.poison": 6 } },
+    });
+    expect(moodyProgressLines(evolved)).toEqual([
+      "Poison: 6 cures - Resistance II, +25% damage, 20% damage reduction while afflicted",
+    ]);
+  });
+
+  it("never exposes serialized runtime metadata as boon progress", () => {
+    const instance = boon("chosen-one", 10, {
+      progress: { counters: { glory: 4 }, values: { __moodyRuntimeValuesV1: "{}" } },
+    });
+    expect(moodyProgressLines(instance)).toEqual(["Glory: 4"]);
   });
 });
 

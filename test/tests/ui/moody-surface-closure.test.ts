@@ -63,10 +63,18 @@ describe("Moody operation contracts", () => {
 });
 
 describe("Moody draft cadence wiring", () => {
+  it("uses the shared concise delta formatter in the live boon cards", () => {
+    const handler = source("src/ui/handlers/moody-boon-select-ui-handler.ts");
+    expect(handler).toContain("moodyOfferDescription(offer, definition)");
+    expect(handler).toContain("moodyOfferDeltaLines(offer, definition)");
+    expect(handler).not.toContain("CURRENT - Rank I:");
+  });
+
   it("opens with a boon and attaches a random curse only after the boon completes", () => {
     const starterPhase = source("src/phases/select-starter-phase.ts");
     expect(starterPhase).toContain("const completeOpeningDraft = () =>");
     expect(starterPhase).toContain("rollAndCommitMoodyCurse(");
+    expect(starterPhase).toContain("showMoodyCurseReceived(curse)");
     expect(starterPhase).toMatch(/\.setMode\([^,]+, initialDraftWave, completeOpeningDraft\)/);
     expect(starterPhase).toContain(".catch(completeOpeningDraft)");
     expect(starterPhase).not.toContain("MOODY_CURSE_SELECT");
@@ -76,7 +84,26 @@ describe("Moody draft cadence wiring", () => {
     const phase = source("src/phases/select-moody-boon-phase.ts");
     expect(phase).toContain("const completeDraft = () =>");
     expect(phase).toContain("rollAndCommitMoodyCurse(");
+    expect(phase).toContain("showMoodyCurseReceived(curse)");
     expect(phase).toMatch(/setMode\([^,]+, this\.waveIndex, completeDraft\)\.catch\(completeDraft\)/);
+  });
+
+  it("requires confirmation on the post-draft curse report", () => {
+    const ui = source("src/ui/ui.ts");
+    const reportHandler = source("src/ui/moody/moody-section-report-ui-handler.ts");
+    expect(ui).toContain('title: "CURSE RECEIVED"');
+    expect(ui).toContain("requireConfirm: true");
+    expect(reportHandler).toContain("if (this.config.requireConfirm)");
+    expect(reportHandler).toContain("COMPACT_WINDOW_MIN_H");
+    expect(reportHandler).toContain("Math.ceil(this.bodyText.displayHeight) + BODY_TOP + this.footerSpace");
+    expect(reportHandler).toContain("this.reportWindow.setPosition(this.windowX, this.windowY).setSize");
+  });
+
+  it("derives the battle drawer wrapping from the usable panel width", () => {
+    const hud = source("src/ui/moody/moody-battle-hud.ts");
+    expect(hud).toContain("getMoodyBattleHudWrapCharacters(width)");
+    expect(hud).toContain("(width - 14) / PANEL_TEXT_CHARACTER_WIDTH");
+    expect(hud).not.toContain("(width - 14) / 4.5");
   });
 });
 

@@ -33,14 +33,19 @@ export interface MoodySectionReportConfig {
   footer?: string;
   /** When set, ACTION fires onAction("confirm") instead of just closing. */
   confirmLabel?: string;
+  /** Prevent CANCEL from dismissing a report that must be acknowledged. */
+  requireConfirm?: boolean;
   onAction?: (actionId: "confirm" | "cancel") => void;
 }
 
-const WINDOW_X = 6;
-const WINDOW_Y = 16;
-const WINDOW_W = 308;
-const WINDOW_H = 154;
-const TEXT_H = WINDOW_H - 10;
+const FULL_WINDOW_W = 308;
+const FULL_WINDOW_H = 154;
+const COMPACT_WINDOW_W = 278;
+const COMPACT_WINDOW_MIN_H = 50;
+const COMPACT_WINDOW_MAX_H = 108;
+const BODY_TOP = 5;
+const FULL_FOOTER_SPACE = 19;
+const COMPACT_FOOTER_SPACE = 14;
 
 export class MoodySectionReportUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -49,11 +54,19 @@ export class MoodySectionReportUiHandler extends UiHandler {
   private bodyText: Phaser.GameObjects.Text;
   private pageLabel: Phaser.GameObjects.Text;
   private emptyText: Phaser.GameObjects.Text;
+  private reportWindow: Phaser.GameObjects.NineSlice;
+  private bodyMask: Phaser.GameObjects.Graphics;
 
   private config: MoodySectionReportConfig | null = null;
   private page = 0;
   private pageCount = 1;
   private fired = false;
+  private windowX = 6;
+  private windowY = 16;
+  private windowW = FULL_WINDOW_W;
+  private windowH = FULL_WINDOW_H;
+  private footerSpace = FULL_FOOTER_SPACE;
+  private textH = FULL_WINDOW_H - BODY_TOP - FULL_FOOTER_SPACE;
 
   constructor() {
     super(UiMode.MOODY_SECTION_REPORT);
@@ -74,35 +87,37 @@ export class MoodySectionReportUiHandler extends UiHandler {
     this.headerText = addTextObject(w / 2, 3, "", TextStyle.HEADER_LABEL);
     this.headerText.setOrigin(0.5, 0);
     this.container.add(this.headerText);
-    this.footerText = addTextObject(w / 2, h - 9, "", TextStyle.SETTINGS_LABEL, { fontSize: "40px" });
+    this.footerText = addTextObject(w / 2, h - 15, "", TextStyle.SETTINGS_LABEL, { fontSize: "48px" });
     this.footerText.setOrigin(0.5, 1).setAlpha(0.8);
     this.container.add(this.footerText);
 
-    this.container.add(addWindow(WINDOW_X, WINDOW_Y, WINDOW_W, WINDOW_H));
-    this.bodyText = addTextObject(WINDOW_X + 7, WINDOW_Y + 5, "", TextStyle.WINDOW, {
+    this.reportWindow = addWindow(this.windowX, this.windowY, this.windowW, this.windowH);
+    this.container.add(this.reportWindow);
+    this.bodyText = addTextObject(this.windowX + 7, this.windowY + BODY_TOP, "", TextStyle.WINDOW, {
       fontSize: "32px",
-      wordWrap: { width: (WINDOW_W - 14) * 6, useAdvancedWrap: true },
+      wordWrap: { width: (this.windowW - 14) * 6, useAdvancedWrap: true },
     });
     this.bodyText.setOrigin(0, 0);
-    const mask = globalScene.make.graphics();
-    mask.fillStyle(0xffffff);
-    mask.fillRect(WINDOW_X, WINDOW_Y + 2, WINDOW_W, TEXT_H);
-    mask.setScale(6);
-    this.bodyText.setMask(mask.createGeometryMask());
+    this.bodyMask = globalScene.make.graphics();
+    this.bodyMask.fillStyle(0xffffff);
+    this.bodyMask.fillRect(this.windowX, this.windowY + 2, this.windowW, this.textH);
+    this.bodyMask.setScale(6);
+    this.bodyText.setMask(this.bodyMask.createGeometryMask());
     this.container.add(this.bodyText);
 
-    this.pageLabel = addTextObject(WINDOW_X + WINDOW_W - 7, WINDOW_Y + WINDOW_H - 11, "", TextStyle.SETTINGS_LABEL, {
+    this.pageLabel = addTextObject(this.windowX + this.windowW - 7, this.windowY + 4, "", TextStyle.SETTINGS_LABEL, {
       fontSize: "30px",
     });
     this.pageLabel.setOrigin(1, 0).setAlpha(0.8);
     this.container.add(this.pageLabel);
 
-    this.emptyText = addTextObject(w / 2, WINDOW_Y + WINDOW_H / 2, "", TextStyle.SETTINGS_LABEL, {
-      fontSize: "40px",
+    this.emptyText = addTextObject(w / 2, this.windowY + this.windowH / 2, "", TextStyle.SETTINGS_LABEL, {
+      fontSize: "48px",
       align: "center",
     });
     this.emptyText.setOrigin(0.5, 0.5).setAlpha(0.75).setVisible(false);
     this.container.add(this.emptyText);
+    this.container.bringToTop(this.footerText);
   }
 
   show(args: any[]): boolean {
@@ -116,21 +131,51 @@ export class MoodySectionReportUiHandler extends UiHandler {
     this.config = config;
     this.fired = false;
     this.headerText.setText(config.title);
-    this.footerText.setText(
-      config.footer
-        ?? (config.confirmLabel == null ? "↑ ↓ page   X close" : `↑ ↓ page   Z ${config.confirmLabel}   X back`),
-    );
-
+    const compact = config.requireConfirm === true;
+    this.footerSpace = compact ? COMPACT_FOOTER_SPACE : FULL_FOOTER_SPACE;
+    this.windowW = compact ? COMPACT_WINDOW_W : FULL_WINDOW_W;
+    this.windowX = Math.round((globalScene.scaledCanvas.width - this.windowW) / 2);
+    this.bodyText.setFontSize(compact ? 48 : 32);
+    this.bodyText.setWordWrapWidth((this.windowW - 14) * 6, true);
     if (config.sections.length === 0) {
       this.bodyText.setText("");
       this.emptyText.setText("Nothing to report.").setVisible(true);
-      this.pageCount = 1;
     } else {
       this.emptyText.setVisible(false);
       const blocks = config.sections.map(section => `— ${section.title} —\n${section.lines.join("\n")}`);
       this.bodyText.setText(blocks.join("\n\n"));
-      this.pageCount = Math.max(1, Math.ceil(this.bodyText.displayHeight / TEXT_H));
     }
+    this.windowH = compact
+      ? Phaser.Math.Clamp(
+          Math.ceil(this.bodyText.displayHeight) + BODY_TOP + this.footerSpace,
+          COMPACT_WINDOW_MIN_H,
+          COMPACT_WINDOW_MAX_H,
+        )
+      : FULL_WINDOW_H;
+    this.windowY = Math.round((globalScene.scaledCanvas.height - this.windowH) / 2 + (compact ? 7 : 0));
+    this.textH = this.windowH - BODY_TOP - this.footerSpace;
+    this.reportWindow.setPosition(this.windowX, this.windowY).setSize(this.windowW, this.windowH);
+    this.headerText.setY(Math.max(3, this.windowY - 13));
+    this.bodyText.setPosition(this.windowX + 7, this.windowY + BODY_TOP);
+    this.footerText.setPosition(globalScene.scaledCanvas.width / 2, this.windowY + this.windowH - 4);
+    this.pageLabel.setPosition(this.windowX + this.windowW - 7, this.windowY + 4);
+    this.emptyText.setPosition(globalScene.scaledCanvas.width / 2, this.windowY + this.textH / 2);
+    this.bodyMask
+      .clear()
+      .fillStyle(0xffffff)
+      .fillRect(this.windowX, this.windowY + 2, this.windowW, this.textH);
+    this.pageCount = Math.max(1, Math.ceil(this.bodyText.displayHeight / this.textH));
+    const pagedHint = this.pageCount > 1 ? "UP DOWN page   " : "";
+    this.footerText
+      .setText(
+        config.requireConfirm
+          ? `${pagedHint}A ${config.confirmLabel ?? "CONTINUE"}`
+          : (config.footer
+              ?? (config.confirmLabel == null
+                ? `${pagedHint}X close`
+                : `${pagedHint}Z ${config.confirmLabel}   X back`)),
+      )
+      .setAlpha(config.requireConfirm ? 1 : 0.8);
     this.page = 0;
     this.applyPage();
     this.container.setVisible(true);
@@ -141,7 +186,7 @@ export class MoodySectionReportUiHandler extends UiHandler {
 
   private applyPage(): void {
     this.page = Math.max(0, Math.min(this.page, this.pageCount - 1));
-    this.bodyText.y = WINDOW_Y + 5 - this.page * TEXT_H;
+    this.bodyText.y = this.windowY + BODY_TOP - this.page * this.textH;
     this.pageLabel.setText(this.pageCount > 1 ? `${this.page + 1}/${this.pageCount}` : "");
   }
 
@@ -183,6 +228,10 @@ export class MoodySectionReportUiHandler extends UiHandler {
         this.finish("confirm");
         return true;
       case Button.CANCEL:
+        if (this.config.requireConfirm) {
+          this.getUi().playError();
+          return true;
+        }
         this.finish("cancel");
         return true;
       default:

@@ -14,15 +14,29 @@ import {
 } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { deserializeMoodyRuntimeFieldState } from "#data/elite-redux/moody/moody-runtime-field-adapter";
 import { getCurrentMoodyLiveProjection } from "#data/elite-redux/moody/moody-runtime-live-adapter";
-import { getMoodyModeState, MOODY_BOON_BY_ID, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
+import {
+  getMoodyBoonRuntimeProgress,
+  getMoodyModeState,
+  MOODY_BOON_BY_ID,
+  MOODY_CURSE_BY_ID,
+} from "#data/elite-redux/moody/moody-state";
+import type { MoodyBoonInstance } from "#data/elite-redux/moody/moody-types";
+import type { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import {
   createMoodyBattleHud,
   type MoodyBattleHudComponent,
+  type MoodyBattleHudDetail,
   type MoodyBattleHudModel,
 } from "#ui/moody/moody-battle-hud";
 import { getMoodyLivePresentationSnapshot } from "#ui/moody/moody-live-presentation";
-import type { MoodyFeedEntry, MoodyTrackerChipModel } from "#ui/moody/moody-presentation";
+import {
+  type MoodyFeedEntry,
+  type MoodyTrackerChipModel,
+  moodyProgressLines,
+  moodyRankLabel,
+  moodyTargetSummary,
+} from "#ui/moody/moody-presentation";
 
 const BATTLE_MODES = new Set([UiMode.MESSAGE, UiMode.COMMAND, UiMode.FIGHT, UiMode.BALL, UiMode.TARGET_SELECT]);
 
@@ -51,6 +65,30 @@ function debtDueLabel(dueTurn: number | undefined, currentTurn: number): string 
     return "due now";
   }
   return `due in ${remaining} turn${remaining === 1 ? "" : "s"}`;
+}
+
+function boonDetail(instance: MoodyBoonInstance, showTarget = false): MoodyBattleHudDetail {
+  const definition = MOODY_BOON_BY_ID.get(instance.boonId);
+  const evolution =
+    instance.evolutionId == null
+      ? null
+      : definition?.evolutions.find(candidate => candidate.id === instance.evolutionId);
+  const progress = moodyProgressLines(instance, getMoodyBoonRuntimeProgress(instance.instanceId));
+  const effect =
+    evolution?.description
+    ?? (instance.rank >= 2 && definition != null
+      ? `${definition.base}\nRank II: ${definition.rankTwo}`
+      : (definition?.base ?? "No description available."));
+  return {
+    id: instance.instanceId,
+    title: `${instance.dormant ? "DORMANT - " : ""}${definition?.name ?? instance.boonId} ${moodyRankLabel(instance, definition)}`,
+    description: [
+      ...(showTarget ? [`Bound to: ${moodyTargetSummary(instance.target)}`] : []),
+      effect,
+      ...progress.map(line => `Progress: ${line}`),
+    ].join("\n"),
+    tone: "boon",
+  };
 }
 
 export function buildMoodyActiveBattlerOverlays(
@@ -121,6 +159,7 @@ export function buildMoodyActiveBattlerOverlays(
  */
 export class MoodyRuntimeUi {
   private readonly hud: MoodyBattleHudComponent;
+  private readonly enemyHud: MoodyBattleHudComponent;
   private readonly feed: MoodyFeedEntry[] = [];
   private feedOrder = 0;
   private readonly lastProgressByEffect = new Map<string, string>();
@@ -130,6 +169,13 @@ export class MoodyRuntimeUi {
     this.hud = createMoodyBattleHud(0, 54, 120);
     this.hud.container.setDepth(90);
     globalScene.uiContainer.add(this.hud.container);
+    this.enemyHud = createMoodyBattleHud(200, 54, 120, {
+      side: "right",
+      tripleY: 42,
+      triplePanelPosition: "below",
+    });
+    this.enemyHud.container.setDepth(90);
+    globalScene.uiContainer.add(this.enemyHud.container);
   }
 
   pushTrigger(label: string): void {
@@ -151,34 +197,71 @@ export class MoodyRuntimeUi {
     this.hud.toggleFeed();
   }
 
+  toggleEnemyFeed(): void {
+    if (getMoodyEnemyBoonLoadout() != null) {
+      this.enemyHud.toggleFeed();
+    }
+  }
+
+  processInput(button: Button, mode: UiMode): boolean {
+    if (!BATTLE_MODES.has(mode)) {
+      return false;
+    }
+    if (this.hud.isFeedExpanded()) {
+      return this.hud.processInput(button);
+    }
+    return this.enemyHud.isFeedExpanded() && this.enemyHud.processInput(button);
+  }
+
   refresh(mode: UiMode): void {
     const enabled = getFunModeConfig().moodyMode;
     const state = enabled ? getMoodyModeState() : null;
     const visible = state != null && globalScene.currentBattle != null && BATTLE_MODES.has(mode);
     if (!visible) {
       this.hud.container.setVisible(false);
+      this.enemyHud.container.setVisible(false);
       return;
     }
 
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const triple = (arrangement?.playerCapacity ?? 0) >= 3 || (arrangement?.enemyCapacity ?? 0) >= 3;
+    this.hud.setTripleLayout(triple);
+    this.enemyHud.setTripleLayout(triple);
     this.captureProgressChanges(state);
     const model = this.overrideModel ?? this.buildLiveModel(state);
     this.applyBattlerDecorations(state, model);
     this.hud.render(model);
+    const enemy = getMoodyEnemyBoonLoadout();
+    if (enemy == null) {
+      this.enemyHud.container.setVisible(false);
+    } else {
+      const power = enemy.boons.reduce((total, boon) => total + boon.rank, 0);
+      this.enemyHud.render({
+        ruleLines: [`ENEMY BOON POWER: ${power}`],
+        trackers: [],
+        feed: [],
+        details: enemy.boons.map(boon => ({ ...boonDetail(boon, true), tone: "enemy" as const })),
+      });
+    }
   }
 
   destroy(): void {
     this.hud.container.destroy(true);
+    this.enemyHud.container.destroy(true);
   }
 
   private captureProgressChanges(state: NonNullable<ReturnType<typeof getMoodyModeState>>): void {
     const liveIds = new Set<string>();
     for (const boon of state.boons) {
       liveIds.add(boon.instanceId);
-      const current = JSON.stringify({ progress: boon.progress ?? {}, dormant: boon.dormant === true });
+      const current = JSON.stringify({
+        progress: getMoodyBoonRuntimeProgress(boon.instanceId) ?? {},
+        dormant: boon.dormant === true,
+      });
       const previous = this.lastProgressByEffect.get(boon.instanceId);
       if (previous != null && previous !== current) {
         const name = MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId;
-        const counters = Object.entries(boon.progress?.counters ?? {});
+        const counters = Object.entries(getMoodyBoonRuntimeProgress(boon.instanceId)?.counters ?? {});
         const detail =
           counters.length === 0
             ? boon.dormant
@@ -197,7 +280,6 @@ export class MoodyRuntimeUi {
   }
 
   private buildLiveModel(state: NonNullable<ReturnType<typeof getMoodyModeState>>): MoodyBattleHudModel {
-    const enemy = getMoodyEnemyBoonLoadout();
     const rules: string[] = [];
     for (const curse of state.curses) {
       rules.push(`CURSE: ${MOODY_CURSE_BY_ID.get(curse.curseId)?.name ?? curse.curseId}`);
@@ -209,10 +291,6 @@ export class MoodyRuntimeUi {
     for (const globalRule of globalRules) {
       rules.push(MOODY_BOON_BY_ID.get(globalRule.boonId)?.name ?? globalRule.boonId);
     }
-    if (enemy != null && enemy.boons.length > 0) {
-      rules.push(`ENEMY MOOD: ${enemy.boons.length} line${enemy.boons.length === 1 ? "" : "s"}`);
-    }
-
     const numbers = state.fieldRuntime == null ? {} : deserializeMoodyRuntimeFieldState(state.fieldRuntime).numbers;
     const coordinatorBarriers = Object.fromEntries(
       globalScene.getPlayerField(true).map(pokemon => [String(pokemon.id), getMoodyCoordinatorBarrier(pokemon.id)]),
@@ -263,7 +341,7 @@ export class MoodyRuntimeUi {
       });
     }
     for (const boon of state.boons) {
-      const counters = Object.entries(boon.progress?.counters ?? {});
+      const counters = Object.entries(getMoodyBoonRuntimeProgress(boon.instanceId)?.counters ?? {});
       if (counters.length === 0) {
         continue;
       }
@@ -279,10 +357,35 @@ export class MoodyRuntimeUi {
     }
 
     const hpOverlay = activeOverlays[0]?.hpOverlay;
+    const details: MoodyBattleHudDetail[] = [
+      ...state.curses.map(curse => {
+        const definition = MOODY_CURSE_BY_ID.get(curse.curseId);
+        return {
+          id: `curse:${curse.curseId}`,
+          title: `CURSE - ${definition?.name ?? curse.curseId}`,
+          description: definition?.description ?? "No description available.",
+          tone: "curse" as const,
+        };
+      }),
+      ...state.boons.map(boonDetail),
+      ...trackers.map(tracker => ({
+        id: `tracker:${tracker.id}`,
+        title: `${tracker.label} ${tracker.value}`,
+        description: tracker.detail ?? "Live battle tracker.",
+        tone: "tracker" as const,
+      })),
+      ...this.feed.slice(-12).map(entry => ({
+        id: `feed:${entry.order}`,
+        title: "RECENT TRIGGER",
+        description: entry.detail == null ? entry.label : `${entry.label}\n${entry.detail}`,
+        tone: "feed" as const,
+      })),
+    ];
     return {
       ruleLines: rules,
       trackers,
       feed: this.feed.slice(-12),
+      details,
       ...(hpOverlay == null ? {} : { hpOverlay }),
       hpOverlays: activeOverlays.map(overlay => ({
         pokemonId: overlay.pokemonId,

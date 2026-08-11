@@ -26,11 +26,18 @@ export class SelectMoodyBoonPhase extends BattlePhase {
         return;
       }
       completed = true;
-      rollAndCommitMoodyCurse(
+      const curse = rollAndCommitMoodyCurse(
         this.waveIndex,
         globalScene.getPlayerParty().map(pokemon => pokemon.id),
       );
-      this.end();
+      if (curse == null) {
+        this.end();
+        return;
+      }
+      void globalScene.ui.showMoodyCurseReceived(curse).then(
+        () => this.end(),
+        () => this.end(),
+      );
     };
     void globalScene.ui.setMode(UiMode.MOODY_BOON_SELECT, this.waveIndex, completeDraft).catch(completeDraft);
   }

@@ -456,7 +456,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "Pokémon with permanent status progression",
     targetKind: "pokemon",
-    base: "The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status.\n\nResistance is status-specific:\n\n* Burn: reduced residual damage and reduced offensive penalty.\n* Poison/Toxic: reduced damage and slower toxic escalation.\n* Paralysis: reduced Speed penalty and action-loss probability.\n* Sleep: shorter maximum duration.\n* Frostbite: reduced residual damage and reduced offensive penalty.",
+    base: "The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status: a 50% chance to prevent that status before it is applied. Burn, Poison, Toxic, Paralysis, Sleep, and Frostbite are tracked separately.",
     rankTwo: "Every successful cure heals 10% HP.\n\nAfter six cures of the same status, choose an evolution:",
     evolutions: [
       {
@@ -468,11 +468,11 @@ export const MOODY_BOONS = [
         id: "weaponized-affliction",
         name: "Weaponized Affliction",
         description:
-          "It remains statusable, but the status penalties are heavily reduced and it gains 25% damage plus 20% damage reduction while afflicted.",
+          "Resistance I becomes Resistance II, a 75% chance to prevent that status. If the status is applied, the Pokémon gains 25% damage plus 20% damage reduction while afflicted.",
       },
     ],
     fullDescription:
-      "**Base:** The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status.\n\nResistance is status-specific:\n\n* Burn: reduced residual damage and reduced offensive penalty.\n* Poison/Toxic: reduced damage and slower toxic escalation.\n* Paralysis: reduced Speed penalty and action-loss probability.\n* Sleep: shorter maximum duration.\n* Frostbite: reduced residual damage and reduced offensive penalty.\n\n**Rank II:** Every successful cure heals 10% HP.\n\nAfter six cures of the same status, choose an evolution:\n\n**Evolution — Acquired Immunity:** The Pokémon becomes immune to that status.\n\n**Evolution — Weaponized Affliction:** It remains statusable, but the status penalties are heavily reduced and it gains 25% damage plus 20% damage reduction while afflicted.",
+      "**Base:** The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status: a 50% chance to prevent that status before it is applied. Burn, Poison, Toxic, Paralysis, Sleep, and Frostbite are tracked separately.\n\n**Rank II:** Every successful cure heals 10% HP.\n\nAfter six cures of the same status, choose an evolution:\n\n**Evolution — Acquired Immunity:** The Pokémon becomes immune to that status.\n\n**Evolution — Weaponized Affliction:** Resistance I becomes Resistance II, a 75% chance to prevent that status. If the status is applied, the Pokémon gains 25% damage plus 20% damage reduction while afflicted.",
   },
   {
     id: "heirloom-bearer",
@@ -2529,8 +2529,7 @@ export const MOODY_CURSES = [
     number: 10,
     name: "Accumulated Fatigue",
     dread: 1,
-    description:
-      "A Pokémon used in three consecutive waves deals 15% less damage until it sits out one full battle.\n\n---\n\n## Dread II",
+    description: "A Pokémon used in three consecutive waves deals 15% less damage until it sits out one full battle.",
   },
   {
     id: "mortal-wounds",
@@ -2623,7 +2622,7 @@ export const MOODY_CURSES = [
     name: "Sweeper’s Tax",
     dread: 2,
     description:
-      "Track consecutive KOs by the same Pokémon within a battle:\n\n* First KO: 15% maximum-HP recoil.\n* Second KO: 30% recoil and −1 Speed.\n* Third KO: 45% recoil and another −1 Speed.\n* Later KOs: recoil rises by another 15%; Speed continues declining at defined thresholds.\n\nThe chain resets when another ally scores a KO or the battle ends. Switching does not reset it.\n\n---\n\n## Dread III",
+      "Track consecutive KOs by the same Pokémon within a battle:\n\n* First KO: 15% maximum-HP recoil.\n* Second KO: 30% recoil and −1 Speed.\n* Third KO: 45% recoil and another −1 Speed.\n* Later KOs: recoil rises by another 15%; Speed continues declining at defined thresholds.\n\nThe chain resets when another ally scores a KO or the battle ends. Switching does not reset it.",
   },
   {
     id: "public-enemy",

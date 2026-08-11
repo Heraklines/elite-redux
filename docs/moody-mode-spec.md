@@ -303,15 +303,7 @@ The effect does not disappear when the Mentor enters. It simply expires naturall
 
 ### 19. Mithridatism — **Ultra; Pokémon with permanent status progression**
 
-**Base:** The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status.
-
-Resistance is status-specific:
-
-* Burn: reduced residual damage and reduced offensive penalty.
-* Poison/Toxic: reduced damage and slower toxic escalation.
-* Paralysis: reduced Speed penalty and action-loss probability.
-* Sleep: shorter maximum duration.
-* Frostbite: reduced residual damage and reduced offensive penalty.
+**Base:** The Pokémon tracks every major status it suffers and subsequently cures. After curing the same status three times, it gains permanent Resistance I against that status: a 50% chance to prevent that status before it is applied. Burn, Poison, Toxic, Paralysis, Sleep, and Frostbite are tracked separately.
 
 **Rank II:** Every successful cure heals 10% HP.
 
@@ -319,7 +311,7 @@ After six cures of the same status, choose an evolution:
 
 **Evolution — Acquired Immunity:** The Pokémon becomes immune to that status.
 
-**Evolution — Weaponized Affliction:** It remains statusable, but the status penalties are heavily reduced and it gains 25% damage plus 20% damage reduction while afflicted.
+**Evolution — Weaponized Affliction:** Resistance I becomes Resistance II, a 75% chance to prevent that status. If the status is applied, the Pokémon gains 25% damage plus 20% damage reduction while afflicted.
 
 ---
 

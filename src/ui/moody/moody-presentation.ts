@@ -23,6 +23,7 @@ import type {
   MoodyBoonDefinition,
   MoodyBoonInstance,
   MoodyBoonOffer,
+  MoodyBoonProgress,
   MoodyBoonTarget,
   MoodyCurseDefinition,
   MoodyModeSaveData,
@@ -233,6 +234,56 @@ export function moodyProgressText(instance: MoodyBoonInstance): string | undefin
   return `${label} ${value}`;
 }
 
+function moodyProgressKeyLabel(key: string): string {
+  return toTitleCase(
+    key
+      .replace(/^battle\./, "")
+      .replace(/\./g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .trim(),
+  );
+}
+
+/** Human-readable live counters for compact HUD and party surfaces. */
+export function moodyProgressLines(
+  instance: MoodyBoonInstance,
+  progress: MoodyBoonProgress | undefined = instance.progress,
+): string[] {
+  const counters = Object.entries(progress?.counters ?? {}).filter(
+    ([key, value]) => !key.startsWith("__") && Number.isFinite(value),
+  );
+  if (instance.boonId === "mithridatism") {
+    const cures = counters.filter(([key]) => key.startsWith("cures."));
+    return cures.map(([key, value]) => {
+      const status = toTitleCase(key.slice("cures.".length));
+      if (value >= 6 && instance.evolutionId === "acquired-immunity") {
+        return `${status}: ${value} cures - immune`;
+      }
+      if (value >= 6 && instance.evolutionId === "weaponized-affliction") {
+        return `${status}: ${value} cures - Resistance II, +25% damage, 20% damage reduction while afflicted`;
+      }
+      if (value >= 3) {
+        return `${status}: ${value}/6 cures - Resistance I active`;
+      }
+      return `${status}: ${value}/3 cures - Resistance I at 3`;
+    });
+  }
+
+  const lines = counters.map(([key, value]) => `${moodyProgressKeyLabel(key)}: ${value}`);
+  lines.push(
+    ...Object.entries(progress?.flags ?? {})
+      .filter(([key, value]) => !key.startsWith("__") && value)
+      .map(([key]) => `${moodyProgressKeyLabel(key)}: active`),
+  );
+  lines.push(
+    ...Object.entries(progress?.values ?? {})
+      .filter(([key, value]) => !key.startsWith("__") && value !== false && value !== "" && value != null)
+      .map(([key, value]) => `${moodyProgressKeyLabel(key)}: ${String(value)}`),
+  );
+  return lines;
+}
+
 function deriveBadgeState(instance: MoodyBoonInstance, overrides?: MoodyBadgeOverrides): MoodyEffectState {
   if (overrides?.state != null) {
     return overrides.state;
@@ -353,9 +404,9 @@ export interface MoodyCardModel {
 export function moodyOfferDescription(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string {
   switch (offer.kind) {
     case "rank-up":
-      return `Rank II: ${definition.rankTwo}`;
+      return "RANK I -> RANK II";
     case "evolution":
-      return `Evolve: ${definition.evolutions[0].name} or ${definition.evolutions[1].name}.\n\n${definition.base}`;
+      return `CHOOSE: ${definition.evolutions[0].name} OR ${definition.evolutions[1].name}`;
     default:
       return definition.base;
   }
@@ -365,7 +416,7 @@ export function moodyOfferDescription(offer: MoodyBoonOffer, definition: MoodyBo
 export function moodyOfferDeltaLines(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string[] {
   switch (offer.kind) {
     case "rank-up":
-      return [`Rank I: ${definition.base}`, `Rank II: ${definition.rankTwo}`];
+      return [`UPGRADE -> ${definition.rankTwo}`];
     case "evolution":
       return definition.evolutions.map(branch => `${branch.name}: ${branch.description}`);
     case "replace":

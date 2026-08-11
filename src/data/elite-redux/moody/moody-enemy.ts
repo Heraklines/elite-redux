@@ -186,7 +186,11 @@ function assignTarget(definition: MoodyBoonDefinition, party: readonly Pokemon[]
   return { pokemonIds: [primary.id] };
 }
 
-export function generateMoodyEnemyBoonLoadout(party: readonly Pokemon[], waveIndex: number): MoodyEnemyBoonLoadout {
+export function generateMoodyEnemyBoonLoadout(
+  party: readonly Pokemon[],
+  waveIndex: number,
+  counterWeightOverride?: number,
+): MoodyEnemyBoonLoadout {
   const state = getMoodyModeState();
   const budget = getMoodyBoonBudget();
   if (state == null || budget === 0) {
@@ -194,14 +198,15 @@ export function generateMoodyEnemyBoonLoadout(party: readonly Pokemon[], waveInd
   }
   const boons: MoodyBoonInstance[] = [];
   const seed = mix32(state.seed ^ Math.imul(waveIndex + 1, 0x85ebca6b));
-  const fieldCounterWeight = getMoodyRuntimeCounterWeight();
+  const fieldCounterWeight = counterWeightOverride ?? getMoodyRuntimeCounterWeight();
   const counterCandidates = Math.max(
     1,
     Math.ceil(fieldCounterWeight === 1 ? getMoodyCoordinatorCounterWeight() : fieldCounterWeight),
   );
   for (let roll = 0; roll < budget; roll++) {
+    const maxed = new Set(boons.filter(boon => boon.rank === 3).map(boon => boon.boonId));
     const definition = Array.from({ length: counterCandidates }, (_, candidate) =>
-      rollMoodyBoonDefinition(seed, roll * counterCandidates + candidate),
+      rollMoodyBoonDefinition(seed, roll * counterCandidates + candidate, maxed),
     )
       .filter((candidate): candidate is MoodyBoonDefinition => candidate != null)
       .toSorted((left, right) => counterScore(right) - counterScore(left))[0]!;

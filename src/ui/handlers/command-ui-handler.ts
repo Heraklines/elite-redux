@@ -328,6 +328,9 @@ export class CommandUiHandler extends UiHandler {
           } else if (cursor === Command.BALL || cursor === Command.RUN) {
             // Step right from Ball/Run into the 3rd Reset column.
             success = this.setCursor(Command.RESET);
+          } else if (cursor === Command.RESET && getFunModeConfig().moodyMode) {
+            ui.toggleMoodyEnemyFeed();
+            success = true;
           }
           break;
       }

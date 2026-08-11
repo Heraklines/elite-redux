@@ -1,4 +1,5 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import { generateMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import {
   addMoodyCurse,
   commitMoodyBoonOffer,
@@ -147,6 +148,15 @@ describe("Moody Mode run state", () => {
     expect(restoreMoodyModeState(saved)).toBe(true);
     expect(getMoodyBoonBudget()).toBe(4);
     expect(getMoodyModeSaveData()).toEqual(saved);
+  });
+
+  it("spends every player acquisition point on the current enemy loadout", () => {
+    const saved = createMoodyModeState("enemy-parity");
+    saved.acquisitionRolls = 18;
+    expect(restoreMoodyModeState(saved)).toBe(true);
+    const enemy = generateMoodyEnemyBoonLoadout([], 80, 1);
+    expect(enemy.boons.reduce((total, boon) => total + boon.rank, 0)).toBe(saved.acquisitionRolls);
+    expect(enemy.boons.every(boon => boon.rank <= 3)).toBe(true);
   });
 
   it("rejects malformed state instead of partially trusting it", () => {

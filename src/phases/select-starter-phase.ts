@@ -1095,11 +1095,15 @@ export class SelectStarterPhase extends Phase {
             return;
           }
           openingDraftCompleted = true;
-          rollAndCommitMoodyCurse(
+          const curse = rollAndCommitMoodyCurse(
             initialDraftWave,
             party.map(pokemon => pokemon.id),
           );
-          launchRun();
+          if (curse == null) {
+            launchRun();
+            return;
+          }
+          void globalScene.ui.showMoodyCurseReceived(curse).then(launchRun, launchRun);
         };
         void globalScene.ui
           .setMode(UiMode.MOODY_BOON_SELECT, initialDraftWave, completeOpeningDraft)

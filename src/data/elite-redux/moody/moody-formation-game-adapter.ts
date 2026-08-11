@@ -1498,7 +1498,7 @@ export function shouldMoodyFormationPreventStatus(
     return true;
   }
   if (resistance?.tier != null) {
-    const denominator = resistance.tier === 2 ? 2 : 4;
+    const denominator = resistance.tier === 2 ? 4 : 2;
     return target.randBattleSeedInt(denominator) !== 0;
   }
   return false;

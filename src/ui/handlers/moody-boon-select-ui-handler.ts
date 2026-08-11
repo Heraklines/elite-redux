@@ -46,7 +46,13 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { buildPressureValveBoonTarget, buildPressureValveOperation } from "#ui/moody/moody-operation";
-import { inferMoodyCadence, MOODY_CADENCE_LABEL, MOODY_SCOPE_GLYPH } from "#ui/moody/moody-presentation";
+import {
+  inferMoodyCadence,
+  MOODY_CADENCE_LABEL,
+  MOODY_SCOPE_GLYPH,
+  moodyOfferDeltaLines,
+  moodyOfferDescription,
+} from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -446,16 +452,7 @@ export class MoodyBoonSelectUiHandler extends UiHandler {
 
   /** The effect text shown on a card: base text, or rank-up preview / evolve branch names. */
   private cardDescription(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string {
-    switch (offer.kind) {
-      case "rank-up":
-        return `CURRENT - Rank I: ${definition.base}\n\nAFTER - Rank II: ${definition.rankTwo}`;
-      case "evolution":
-        return `CURRENT - Rank II: ${definition.rankTwo}\n\nAFTER A - ${definition.evolutions[0].name}: ${definition.evolutions[0].description}\n\nAFTER B - ${definition.evolutions[1].name}: ${definition.evolutions[1].description}`;
-      case "replace":
-        return `GAIN: ${definition.base}\n\nCONSEQUENCE: choose one current boon line to discard before this is committed.`;
-      default:
-        return definition.base;
-    }
+    return [moodyOfferDescription(offer, definition), ...moodyOfferDeltaLines(offer, definition)].join("\n\n");
   }
 
   private scopeLine(offer: MoodyBoonOffer, definition: MoodyBoonDefinition): string {

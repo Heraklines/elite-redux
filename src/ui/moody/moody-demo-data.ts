@@ -154,6 +154,28 @@ export function demoMoodyBattleHud(): MoodyBattleHudModel {
       { order: 3, label: "Misery Loves Company: damage reduced by 20%" },
       { order: 4, label: "Feedback Loop III: 18 HP queued" },
     ],
+    details: [
+      {
+        id: "curse-fatigue",
+        title: "CURSE - Accumulated Fatigue",
+        description:
+          "A Pokemon used in three consecutive waves deals 15% less damage until it sits out one full battle.",
+        tone: "curse",
+      },
+      {
+        id: "mithridatism",
+        title: "Mithridatism I",
+        description:
+          "After three cures of the same status, gain Resistance I against it.\nProgress: Poison: 1/3 cures - Resistance I at 3",
+        tone: "boon",
+      },
+      {
+        id: "glory",
+        title: "Glory 8/10",
+        description: "Two more Glory stacks until the next permanent offensive increase.",
+        tone: "tracker",
+      },
+    ],
     hpOverlay: { barrier: 64, damageDebt: 38, debtDueLabel: "end of next turn", revivalGlyph: "♦", revivalCharges: 1 },
   };
 }

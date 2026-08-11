@@ -118,7 +118,7 @@ const curses = curseMatches.map((match, index) => {
     number: Number(match[1]),
     name: match[2],
     dread,
-    description: clean(curseSection.slice(bodyStart, bodyEnd).replace(/\n---\s*$/s, "")),
+    description: clean(curseSection.slice(bodyStart, bodyEnd).replace(/\n---[\s\S]*$/s, "")),
   };
 });
 

@@ -69,6 +69,7 @@ import {
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import { setMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import { restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
@@ -1605,6 +1606,12 @@ function setupMoodyUiHarness(): Starter[] {
   ];
 }
 
+function setupMoodyAdaptivePartyHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({ BATTLE_STYLE_OVERRIDE: "triple" });
+  return party.slice(0, 4);
+}
+
 function installMoodyUiDemoState(): void {
   const state = demoMoodyState();
   const ids = globalScene.getPlayerParty().map(pokemon => pokemon.id);
@@ -1622,6 +1629,7 @@ function installMoodyUiDemoState(): void {
         },
   );
   restoreMoodyModeState(state);
+  setMoodyEnemyBoonLoadout({ waveIndex: 31, boons: demoMoodyEnemyPanel().boons });
   const livePresentation = demoMoodyLivePresentation(ids);
   const captureTarget = globalScene.getEnemyField().find(pokemon => pokemon?.isActive(true));
   if (livePresentation.recruiterEye != null && captureTarget != null) {
@@ -1668,6 +1676,14 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
       openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
   },
   {
+    label: "UI: Moody party adaptive",
+    description: "Four-mon triple party with three compact active cards and one vertically centered reserve.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
+  },
+  {
     label: "UI: Moody summary attach",
     description: "Live summary MOOD tab with bound Pokemon, move, item, slot, pair, and team details.",
     gameMode: GameModes.FUN,
@@ -1701,6 +1717,25 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
         globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
         globalScene.ui.pushMoodyTrigger("Bastion Seat II: +64 barrier");
       }),
+  },
+  {
+    label: "UI: Moody battle HUD triple",
+    description: "Triple-battle player and enemy side drawers positioned clear of both three-mon health stacks.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => {
+        globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
+        globalScene.ui.pushMoodyTrigger("Mithridatism: Poison 2/3 cures");
+      }),
+  },
+  {
+    label: "UI: Moody curse received",
+    description: "Mandatory post-draft curse reveal with Dread, exact effect text, target, and confirm-only exit.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.showMoodyCurseReceived({ curseId: "type-tax", acquiredAtWave: 10 })),
   },
   {
     label: "UI: Moody choice queue",
