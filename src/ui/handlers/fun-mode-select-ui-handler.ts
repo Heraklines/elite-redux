@@ -15,7 +15,7 @@ import { addWindow } from "#ui/ui-theme";
 import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
 import BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
-type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed">;
+type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed" | "megaMixMode">;
 
 const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[] = [
   {
@@ -45,8 +45,7 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
   {
     key: "megaMode",
     label: "Mega Mode",
-    description:
-      "Start with a Mega Bracelet. Pokemon without a real Mega can use any Mega Stone as a temporary stat-only Mega.",
+    description: "Start with a Mega Bracelet. Any Mega Stone can create a temporary pseudo-Mega.",
   },
   {
     key: "shuffleStats",
@@ -311,6 +310,16 @@ export class FunModeSelectUiHandler extends UiHandler {
       return false;
     }
     const key = OPTIONS[this.cursor].key;
+    if (key === "megaMode") {
+      const current = this.config.megaMode ? (this.config.megaMixMode ? 2 : 1) : 0;
+      const next = value ? Math.min(2, current + 1) : Math.max(0, current - 1);
+      if (next === current) {
+        return false;
+      }
+      this.config.megaMode = next > 0;
+      this.config.megaMixMode = next === 2;
+      return true;
+    }
     const changed = this.config[key] !== value;
     this.config[key] = value;
     return changed;
@@ -319,7 +328,14 @@ export class FunModeSelectUiHandler extends UiHandler {
   private confirmCurrentSelection(): boolean {
     if (this.cursor < OPTIONS.length) {
       const key = OPTIONS[this.cursor].key;
-      this.config[key] = !this.config[key];
+      if (key === "megaMode") {
+        const current = this.config.megaMode ? (this.config.megaMixMode ? 2 : 1) : 0;
+        const next = (current + 1) % 3;
+        this.config.megaMode = next > 0;
+        this.config.megaMixMode = next === 2;
+      } else {
+        this.config[key] = !this.config[key];
+      }
       return true;
     }
     if (!hasEnabledMode(this.config)) {
@@ -363,16 +379,21 @@ export class FunModeSelectUiHandler extends UiHandler {
     this.valueTexts.forEach((text, index) => {
       const visible = index >= this.visibleStart && index < this.visibleStart + VISIBLE_OPTION_ROWS;
       const rowY = 28 + (index - this.visibleStart) * 16;
-      const enabled = this.config[OPTIONS[index].key] === true;
+      const key = OPTIONS[index].key;
+      const enabled = this.config[key] === true;
+      const valueLabel =
+        key === "megaMode" ? (enabled ? (this.config.megaMixMode ? "FULL" : "STATS") : "OFF") : enabled ? "ON" : "OFF";
       const leftArrow = this.leftArrows[index];
       const rightArrow = this.rightArrows[index];
       this.optionLabels[index].setY(rowY).setVisible(visible);
       text
-        .setText(enabled ? "ON" : "OFF")
+        .setText(valueLabel)
         .setY(rowY)
         .setVisible(visible)
         .setAlpha(enabled ? 1 : 0.55);
-      rightArrow.setPosition(optionsWidth - 20, rowY + 4).setVisible(visible && !enabled);
+      rightArrow
+        .setPosition(optionsWidth - 20, rowY + 4)
+        .setVisible(visible && (key === "megaMode" ? !this.config.megaMixMode : !enabled));
       leftArrow
         .setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y)
         .setVisible(visible && enabled);
@@ -392,7 +413,18 @@ export class FunModeSelectUiHandler extends UiHandler {
         .setPosition(4, 28 + (this.cursor - this.visibleStart) * 16)
         .setSize(optionsWidth - 8, 16);
       this.startCursor.setVisible(false);
-      this.setDescription(OPTIONS[this.cursor].description);
+      const option = OPTIONS[this.cursor];
+      if (option.key === "megaMode") {
+        this.setDescription(
+          this.config.megaMode
+            ? this.config.megaMixMode
+              ? "Full Mix: pseudo-Megas gain the stone's stat delta, one non-duplicate Mega type, and replace innate slots 1 and 3 with the Mega template's innates."
+              : "Stats: pseudo-Megas gain only the stone's stat delta. Their typing and innates stay unchanged."
+            : `${option.description} Choose STATS for stat deltas only or FULL to also inherit a Mega type and its first and third innates.`,
+        );
+      } else {
+        this.setDescription(option.description);
+      }
     } else {
       const anyEnabled = hasEnabledMode(this.config);
       const canReuse = loadLastFunModeConfig() != null;

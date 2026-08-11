@@ -215,6 +215,7 @@ export class SummaryUiHandler extends UiHandler {
   private friendshipOverlay: Phaser.GameObjects.Sprite;
   private permStatsContainer: Phaser.GameObjects.Container;
   private ivContainer: Phaser.GameObjects.Container;
+  private baseStatsContainer: Phaser.GameObjects.Container;
   private statsContainer: Phaser.GameObjects.Container;
   private statsContainerItemTitle: Phaser.GameObjects.Image;
   private statsContainerStatsTitle: Phaser.GameObjects.Image;
@@ -961,9 +962,11 @@ export class SummaryUiHandler extends UiHandler {
         // For vanilla species (1 passive) this collapses to the legacy 2-step toggle.
         this.advanceAbilityCycle();
       } else if (this.cursor === Page.STATS) {
-        //Show IVs
-        this.permStatsContainer.setVisible(!this.permStatsContainer.visible);
-        this.ivContainer.setVisible(!this.ivContainer.visible);
+        const nextView = this.permStatsContainer.visible ? 1 : this.ivContainer.visible ? 2 : 0;
+        this.permStatsContainer.setVisible(nextView === 0);
+        this.ivContainer.setVisible(nextView === 1);
+        this.baseStatsContainer.setVisible(nextView === 2);
+        success = true;
       } else if (this.cursor === Page.MOOD) {
         this.moodyInspectMode = !this.moodyInspectMode;
         this.populatePageContainer(this.summaryPageContainer);
@@ -1476,6 +1479,8 @@ export class SummaryUiHandler extends UiHandler {
         this.statsContainer.add(this.permStatsContainer);
         this.ivContainer = globalScene.add.container(27, 56);
         this.statsContainer.add(this.ivContainer);
+        this.baseStatsContainer = globalScene.add.container(27, 56);
+        this.statsContainer.add(this.baseStatsContainer);
         this.statsContainer.setVisible(true);
 
         this.statsContainerItemTitle = globalScene.add.image(7, 4, getLocalizedSpriteKey("summary_stats_item_title")); // Pixel text 'ITEM'
@@ -1502,6 +1507,7 @@ export class SummaryUiHandler extends UiHandler {
         this.statsContainerExpBarTitle.setOrigin(0, 0);
         this.statsContainer.add(this.statsContainerExpBarTitle);
 
+        const baseStats = this.pokemon?.calculateBaseStats() ?? [];
         PERMANENT_STATS.forEach((stat, s) => {
           const statName = i18next.t(getStatKey(stat));
           const rowIndex = s % 3;
@@ -1530,6 +1536,14 @@ export class SummaryUiHandler extends UiHandler {
           ivLabel.setOrigin(0.5, 0);
           this.permStatsContainer.add(statLabel);
           this.ivContainer.add(ivLabel);
+          const baseStatLabel = addTextObject(
+            116 * colIndex + (colIndex === 1 ? 5 : 0),
+            16 * rowIndex,
+            statName,
+            TextStyle.SUMMARY_STATS,
+          );
+          baseStatLabel.setOrigin(0.5, 0);
+          this.baseStatsContainer.add(baseStatLabel);
 
           // TODO: are those bangs correct?
           const statValueText =
@@ -1544,8 +1558,17 @@ export class SummaryUiHandler extends UiHandler {
           const ivValue = addTextObject(93 + 93 * colIndex, 16 * rowIndex, ivText, TextStyle.WINDOW_ALT);
           ivValue.setOrigin(1, 0);
           this.ivContainer.add(ivValue);
+          const baseStatValue = addTextObject(
+            93 + 93 * colIndex,
+            16 * rowIndex,
+            formatStat(baseStats[stat] ?? 0),
+            TextStyle.WINDOW_ALT,
+          );
+          baseStatValue.setOrigin(1, 0);
+          this.baseStatsContainer.add(baseStatValue);
         });
         this.ivContainer.setVisible(false);
+        this.baseStatsContainer.setVisible(false);
 
         const itemModifiers = (
           globalScene.findModifiers(

@@ -139,6 +139,7 @@ import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
   applyFunMegaStatDelta,
   getFunEnemyMegaChance,
+  getFunMegaMixEffects,
   getFunMegaStoneItems,
   getFunRealMegaChoices,
   isFunPseudoMegaActive,
@@ -2659,6 +2660,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && getFunModeConfig().randomizeTypes
       && (ignoreOverride || this.summonData.types.length === 0);
     const types = new Set(shouldUseRandomTypes ? getFunRandomTypes(this.id, baseTypes) : baseTypes);
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    if (
+      globalScene.gameMode.isFun
+      && getFunModeConfig().megaMixMode
+      && funMegaStone != null
+      && this.isFunPseudoMega()
+    ) {
+      const mixEffects = getFunMegaMixEffects(funMegaStone, [...types]);
+      if (mixEffects?.addedType != null) {
+        types.add(mixEffects.addedType);
+      }
+    }
 
     // become UNKNOWN if no types are present, or remove it if other types are present.
     // TODO: Move this after the added type checks once Roost is refactored to check removed types correctly
@@ -2914,7 +2927,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const customSlot1 = this.getAbilityOverrideForSlot(2);
     const customSlot2 = this.getAbilityOverrideForSlot(3);
     const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
-    const slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    let slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    const mixEffects =
+      globalScene.gameMode.isFun && getFunModeConfig().megaMixMode && funMegaStone != null && this.isFunPseudoMega()
+        ? getFunMegaMixEffects(funMegaStone)
+        : null;
+    if (mixEffects != null) {
+      if (transformOverride?.[0] == null) {
+        slot0 = mixEffects.innate1 === AbilityId.NONE ? null : allAbilities[mixEffects.innate1];
+      }
+      if (transformOverride?.[2] == null) {
+        slot2Id = mixEffects.innate3;
+      }
+    }
     if (transformOverride?.[0] != null) {
       slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }

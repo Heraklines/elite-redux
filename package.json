@@ -12,6 +12,8 @@
     "build:beta": "vite build --mode beta",
     "build:dev": "vite build --mode development",
     "build:app": "vite build --mode app",
+    "build:standalone:no-telemetry": "node scripts/build-without-player-telemetry.mjs",
+    "build:moody-preview": "pnpm build:standalone:no-telemetry",
     "build:standalone": "vite build --mode standalone && node scripts/assemble-cloudflare-dist.mjs && node scripts/check-cloudflare-dist.mjs",
     "preview": "vite preview",
     "test": "vitest run",

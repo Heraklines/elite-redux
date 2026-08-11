@@ -8,8 +8,10 @@ import { getGameMode } from "#app/game-mode";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
   applyFunMegaStatDelta,
+  formatFunMegaMixEffects,
   formatFunMegaStatDelta,
   getFunEnemyMegaChance,
+  getFunMegaMixEffects,
   getFunMegaStoneMetadata,
   isFunPseudoMegaActive,
   shuffleFunStats,
@@ -71,6 +73,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
       megaMode: true,
+      megaMixMode: true,
       shuffleStats: true,
       shuffleEvolutions: true,
       itemChaos: true,
@@ -86,6 +89,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: false,
       randomizeLevelUpMoves: true,
       megaMode: true,
+      megaMixMode: true,
       shuffleStats: true,
       shuffleEvolutions: true,
       itemChaos: true,
@@ -104,6 +108,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: true,
       randomizeLevelUpMoves: false,
       megaMode: true,
+      megaMixMode: true,
       shuffleStats: true,
       shuffleEvolutions: true,
       itemChaos: true,
@@ -120,6 +125,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: true,
       randomizeLevelUpMoves: false,
       megaMode: true,
+      megaMixMode: true,
       shuffleStats: true,
       shuffleEvolutions: true,
       itemChaos: true,
@@ -151,6 +157,7 @@ describe("Fun Mode configuration", () => {
       randomizeAbilities: true,
       randomizeLevelUpMoves: false,
       megaMode: true,
+      megaMixMode: false,
       shuffleStats: false,
       shuffleEvolutions: false,
       itemChaos: false,
@@ -265,7 +272,23 @@ describe("Fun Mega Mode statlines", () => {
     const metadata = getFunMegaStoneMetadata(FormChangeItem.SWAMPERTITE);
     expect(metadata).not.toBeNull();
     expect(metadata!.statDelta.reduce((total, value) => total + value, 0)).toBe(100);
-    expect(formatFunMegaStatDelta(FormChangeItem.SWAMPERTITE)).toContain("Atk +40");
+    expect(formatFunMegaStatDelta(FormChangeItem.SWAMPERTITE)).toContain("Atk+40");
+  });
+
+  it("derives Full Mix type and innate overlays from the Mega template", () => {
+    const metadata = getFunMegaStoneMetadata(FormChangeItem.SWAMPERTITE);
+    const effects = getFunMegaMixEffects(FormChangeItem.SWAMPERTITE);
+    expect(metadata).not.toBeNull();
+    expect(effects).not.toBeNull();
+    expect(metadata!.mixTypeCandidates).toContain(effects!.addedType);
+    expect(effects!.innate1).toBe(metadata!.innateOverrides[0]);
+    expect(effects!.innate3).toBe(metadata!.innateOverrides[1]);
+    expect(formatFunMegaMixEffects(FormChangeItem.SWAMPERTITE)).toContain("I1 Riptide");
+  });
+
+  it("does not add a duplicate type when the recipient already has every Mega template type", () => {
+    const metadata = getFunMegaStoneMetadata(FormChangeItem.SWAMPERTITE)!;
+    expect(getFunMegaMixEffects(FormChangeItem.SWAMPERTITE, metadata.mixTypeCandidates)?.addedType).toBeNull();
   });
 
   it("applies a pseudo-Mega delta before deterministically shuffling the effective line", () => {

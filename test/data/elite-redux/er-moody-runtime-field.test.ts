@@ -661,6 +661,30 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(replacement.state.values["persistent:restless-lead:last-lead"]).toBe(ally.id);
   });
 
+  it("applies Type Tax only to duplicated move types and emits nothing for unaffected types", () => {
+    const event = boonEvent("prismatic-opening").event;
+    const unaffected = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("type-tax")],
+      state: createMoodyRuntimeFieldState(),
+      event,
+    });
+    expect(unaffected.commands).toEqual([]);
+    expect(unaffected.triggeredEffectIds).toEqual([]);
+
+    const duplicated = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("type-tax")],
+      state: state({ numbers: { "persistent:type-tax:type:fire:duplicates": 2 } }),
+      event,
+    });
+    expect(duplicated.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-damage", effectId: "type-tax", multiplier: 0.92 }),
+    );
+  });
+
   it("limits Public Enemy roster growth to trainers and gives boss trainers one complete Second Act", () => {
     const wild = resolveMoodyRuntimeField({
       ownerSide: "player",

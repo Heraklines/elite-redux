@@ -466,7 +466,10 @@ function hideUnrasterizedFunMegaIcon(root: Phaser.GameObjects.Container): void {
   }
 }
 
-async function startBattleWithFunPseudoMega(game: GameManager) {
+async function startBattleWithFunPseudoMega(
+  game: GameManager,
+  options: { fullMix?: boolean; shuffleStats?: boolean } = {},
+) {
   await game.classicMode.startBattle(SpeciesId.PIKACHU);
   const mon = game.scene.getPlayerPokemon();
   if (!mon) {
@@ -480,6 +483,8 @@ async function startBattleWithFunPseudoMega(game: GameManager) {
     randomizeAbilities: false,
     randomizeLevelUpMoves: false,
     megaMode: true,
+    megaMixMode: options.fullMix === true,
+    shuffleStats: options.shuffleStats === true,
   });
   const stone = FormChangeItem.GARCHOMPITE;
   const type = makeFunMegaStoneType(stone);
@@ -1748,6 +1753,13 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN],
   },
+  "fun-mode-mega-full": {
+    render: game => {
+      setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG });
+      return shimUiAndShow(game, UiMode.FUN_MODE_SELECT, []);
+    },
+    steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION, Button.ACTION],
+  },
   // The party SUMMARY screen on its ER ABILITIES page, with a BLACK SHINY (#349) lead so the
   // violet-italic GIFT row ("Gift 1/3") + its "R" key-badge cycle prompt are present. steps
   // fires R (Button.CYCLE_SHINY):
@@ -1791,6 +1803,15 @@ const RECIPES: Record<string, Recipe> = {
       const type = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
       handler.getUi().showTooltip(type.name, type.getDescription(), true);
     },
+    diffTolerance: 40000,
+  },
+  "summary-effective-base-stats": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game, { shuffleStats: true });
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
+    steps: [Button.ACTION, Button.ACTION],
     diffTolerance: 40000,
   },
   "summary-fun-pseudo-mega-fusion-icons": {
@@ -2313,6 +2334,41 @@ const RECIPES: Record<string, Recipe> = {
     field: true,
     prepare: async game => {
       await startBattleWithFunPseudoMega(game);
+      return [];
+    },
+    render: (game, ctx) => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const megaStone = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      const options = [
+        new ModifierTypeOption(megaStone, 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      handler.setCursor(0);
+      handler.cursorObj?.setVisible(false);
+      hideUnrasterizedFunMegaIcon(ctx.fieldRoot);
+      ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
+  "modifier-select-fun-mega-full": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await startBattleWithFunPseudoMega(game, { fullMix: true });
       return [];
     },
     render: (game, ctx) => {

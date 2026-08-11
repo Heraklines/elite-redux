@@ -20,6 +20,7 @@ export interface FunModeConfig {
   randomizeAbilities: boolean;
   randomizeLevelUpMoves: boolean;
   megaMode: boolean;
+  megaMixMode: boolean;
   shuffleStats: boolean;
   shuffleEvolutions: boolean;
   itemChaos: boolean;
@@ -36,6 +37,7 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   randomizeAbilities: true,
   randomizeLevelUpMoves: true,
   megaMode: false,
+  megaMixMode: false,
   shuffleStats: false,
   shuffleEvolutions: false,
   itemChaos: false,
@@ -61,6 +63,7 @@ export function setFunModeConfig(config: FunModeConfig): void {
     randomizeAbilities: config.randomizeAbilities === true,
     randomizeLevelUpMoves: config.randomizeLevelUpMoves === true,
     megaMode: config.megaMode === true,
+    megaMixMode: config.megaMode === true && config.megaMixMode === true,
     shuffleStats: config.shuffleStats === true,
     shuffleEvolutions: config.shuffleEvolutions === true,
     itemChaos: config.itemChaos === true,

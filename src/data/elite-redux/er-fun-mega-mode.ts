@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { allSpecies } from "#data/data-lists";
+import { allAbilities, allSpecies } from "#data/data-lists";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges, type SpeciesFormChange } from "#data/pokemon-forms";
+import { AbilityId } from "#enums/ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
+import { PokemonType } from "#enums/pokemon-type";
+import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { Pokemon } from "#field/pokemon";
 
@@ -17,6 +20,8 @@ export interface FunMegaStoneMetadata {
   sourceName: string;
   targetName: string;
   statDelta: readonly number[];
+  mixTypeCandidates: readonly PokemonType[];
+  innateOverrides: readonly [AbilityId, AbilityId];
 }
 
 let cachedEdgeCount = -1;
@@ -29,6 +34,12 @@ function isMegaFormKey(formKey: string): boolean {
 function formChangeItem(change: SpeciesFormChange): FormChangeItem | null {
   const trigger = change.findTrigger(SpeciesFormChangeItemTrigger) as SpeciesFormChangeItemTrigger | null;
   return trigger?.item ?? null;
+}
+
+function getFormTypes(form: PokemonSpeciesForm): PokemonType[] {
+  return [...new Set([form.type1, form.type2, ...form.getExtraTypes()])].filter(
+    (type): type is PokemonType => type != null && type !== PokemonType.UNKNOWN,
+  );
 }
 
 function rebuildMetadataIfNeeded(): void {
@@ -61,6 +72,11 @@ function rebuildMetadataIfNeeded(): void {
         sourceName: species.getName(sourceForm.formIndex),
         targetName: species.getName(targetForm.formIndex),
         statDelta: targetForm.baseStats.map((stat, index) => stat - sourceForm.baseStats[index]),
+        mixTypeCandidates: [
+          ...getFormTypes(targetForm).filter(type => !getFormTypes(sourceForm).includes(type)),
+          ...getFormTypes(targetForm),
+        ].filter((type, index, types) => types.indexOf(type) === index),
+        innateOverrides: [targetForm.getPassiveAbilities()[0], targetForm.getPassiveAbilities()[2]],
       });
     }
   }
@@ -131,6 +147,28 @@ export function applyFunMegaStatDelta(baseStats: readonly number[], item: FormCh
   return baseStats.map((stat, index) => Math.max(1, stat + (delta?.[index] ?? 0)));
 }
 
+export interface FunMegaMixEffects {
+  addedType: PokemonType | null;
+  innate1: AbilityId;
+  innate3: AbilityId;
+}
+
+export function getFunMegaMixEffects(
+  item: FormChangeItem,
+  currentTypes: readonly PokemonType[] = [],
+): FunMegaMixEffects | null {
+  const metadata = getFunMegaStoneMetadata(item);
+  if (!metadata) {
+    return null;
+  }
+  const occupied = new Set(currentTypes);
+  return {
+    addedType: metadata.mixTypeCandidates.find(type => !occupied.has(type)) ?? null,
+    innate1: metadata.innateOverrides[0],
+    innate3: metadata.innateOverrides[1],
+  };
+}
+
 export function isFunPseudoMegaActive(markedPseudoMega: boolean, recordedStone: unknown, hasHeldStone: boolean): boolean {
   return markedPseudoMega && recordedStone != null && hasHeldStone;
 }
@@ -167,5 +205,17 @@ export function formatFunMegaStatDelta(item: FormChangeItem): string | null {
     return null;
   }
   const labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
-  return metadata.statDelta.map((value, index) => `${labels[index]} ${value >= 0 ? "+" : ""}${value}`).join("  ");
+  return metadata.statDelta.map((value, index) => `${labels[index]}${value >= 0 ? "+" : ""}${value}`).join(" ");
+}
+
+export function formatFunMegaMixEffects(item: FormChangeItem): string | null {
+  const effects = getFunMegaMixEffects(item);
+  if (!effects) {
+    return null;
+  }
+  const typeName = effects.addedType == null ? "No new type" : `+${PokemonType[effects.addedType]}`;
+  const innateName = (abilityId: AbilityId) => allAbilities[abilityId]?.name ?? AbilityId[abilityId] ?? "None";
+  const innate1 = innateName(effects.innate1);
+  const innate3 = innateName(effects.innate3);
+  return innate1 === innate3 ? `${typeName} | I1/I3 ${innate1}` : `${typeName} | I1 ${innate1} | I3 ${innate3}`;
 }

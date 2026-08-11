@@ -1823,11 +1823,6 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
               subjectId: event.user.id,
               multiplier: Math.max(0, 1 - duplicateCount * 0.04),
             });
-          } else {
-            curseCommand("mark-trigger", {
-              subjectId: event.user.id,
-              value: "type-tax-checked",
-            });
           }
         }
         break;

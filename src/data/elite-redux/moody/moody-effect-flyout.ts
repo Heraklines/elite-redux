@@ -1,9 +1,4 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
-import {
-  MOODY_RUNTIME_FIELD_BOON_IDS,
-  MOODY_RUNTIME_FIELD_CURSE_IDS,
-} from "#data/elite-redux/moody/moody-runtime-field";
-import { MOODY_FORMATION_BOON_IDS } from "#data/elite-redux/moody/moody-runtime-formation";
 import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
 
 export type MoodyEffectKind = "boon" | "curse";
@@ -18,20 +13,69 @@ export interface MoodyEffectFlyoutCue {
 
 export type MoodyEffectFlyoutPolicy = "flyout" | "drawer-only";
 
-const COMBAT_TRIGGER_EFFECT_IDS = new Set<string>([
-  ...MOODY_FORMATION_BOON_IDS,
-  ...MOODY_RUNTIME_FIELD_BOON_IDS,
-  ...MOODY_RUNTIME_FIELD_CURSE_IDS,
+/**
+ * Only effects with a discrete, player-visible proc belong here. Persistent stat, damage, type, weather,
+ * formation, and economy modifiers remain available in the Moody drawer without stalling the phase queue.
+ */
+const DISCRETE_COMBAT_FLYOUT_IDS = new Set<string>([
+  "rotating-spotlight",
+  "blood-rival",
+  "survivor-s-pride",
+  "copycat-heart",
+  "mithridatism",
+  "parting-gift",
+  "counterrotation",
+  "tag-combo",
+  "hold-the-line",
+  "revenge-entry",
+  "turntable",
+  "countermelody",
+  "conservation-law",
+  "refrain",
+  "failure-is-data",
+  "overdraft",
+  "final-draft",
+  "prismatic-opening",
+  "elemental-dividend",
+  "microclimate",
+  "eye-of-the-storm",
+  "terrain-weaver",
+  "four-seasons",
+  "battlefield-memory",
+  "shared-antibodies",
+  "status-bank",
+  "volatile-memory",
+  "purge-pulse",
+  "aftercare",
+  "overflow-ward",
+  "shared-cup",
+  "damage-ceiling",
+  "emergency-shell",
+  "guarded-setup",
+  "rest-cycle",
+  "last-rites",
+  "no-one-left-behind",
+  "phoenix-clause",
+  "dead-man-s-action",
+  "slow-to-warm",
+  "fading-momentum",
+  "exposed-flank",
+  "no-retreat",
+  "public-enemy",
+  "nemesis-protocol",
+  "blood-moon",
+  "entropy",
+  "feedback-loop",
 ]);
 
 /**
- * Every catalog entry is classified. Combat effects use the trainer flyout when their runtime emits a
- * discrete trigger; economy, drafting, and other non-combat state changes stay in the Moody drawer.
+ * Every catalog entry is classified. Only discrete combat procs use the trainer flyout; continuous and
+ * non-combat state changes stay in the Moody drawer.
  */
 export const MOODY_EFFECT_FLYOUT_POLICY: Readonly<Record<string, MoodyEffectFlyoutPolicy>> = Object.freeze(
   Object.fromEntries(
     [...MOODY_BOONS, ...MOODY_CURSES].map(
-      definition => [definition.id, COMBAT_TRIGGER_EFFECT_IDS.has(definition.id) ? "flyout" : "drawer-only"] as const,
+      definition => [definition.id, DISCRETE_COMBAT_FLYOUT_IDS.has(definition.id) ? "flyout" : "drawer-only"] as const,
     ),
   ),
 );

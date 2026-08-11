@@ -82,6 +82,11 @@ on:
         required: false
         default: true
         type: boolean
+      collect_player_training_data:
+        description: Collect player battle-decision training data during this build
+        required: false
+        default: true
+        type: boolean
       author:
         description: Staff attribution for the catalog entry
         required: false
@@ -226,8 +231,13 @@ jobs:
             # Showdown/tournament state: isolated staging worker + staging D1.
             # Without this the client falls back to VITE_SERVER_URL (404 no-op).
             echo "VITE_SERVER_URL_TELEMETRY=https://er-telemetry-staging.heraklines.workers.dev"
-            # Player decision telemetry uses an environment-isolated R2 bucket.
-            echo "VITE_TELEMETRY=staging"
+            # Player decision telemetry uses an environment-isolated R2 bucket and can be
+            # disabled independently from the tournament/showdown control-plane endpoint.
+            if [ "${{ inputs.collect_player_training_data }}" = "true" ]; then
+              echo "VITE_TELEMETRY=staging"
+            else
+              echo "VITE_TELEMETRY=off"
+            fi
             echo "VITE_BUILD_SHA=${PROMOTED_SHA}"
             echo "VITE_AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"

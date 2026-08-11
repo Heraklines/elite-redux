@@ -74,7 +74,11 @@ describe("Moody Mode catalog", () => {
     expect(new Set(Object.values(MOODY_EFFECT_FLYOUT_POLICY))).toEqual(new Set(["flyout", "drawer-only"]));
     expect(MOODY_EFFECT_FLYOUT_POLICY.mithridatism).toBe("flyout");
     expect(MOODY_EFFECT_FLYOUT_POLICY["compound-interest"]).toBe("drawer-only");
-    expect(MOODY_EFFECT_FLYOUT_POLICY["reverse-snowball"]).toBe("flyout");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["reverse-snowball"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["type-tax"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["layered-armor"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["brittle-weakness"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["emergency-shell"]).toBe("flyout");
   });
 
   it("preserves the authored Unicode text instead of mojibake", () => {

@@ -7888,3 +7888,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Trainer-owned boon/curse cues reuse the native ability flyout with the approved violet treatment and no redundant TRAINER BOON/CURSE text. The player portrait path remains unchanged. Enemy portraits scan the original untrimmed atlas dimensions, preserve the full horizontal sprite, display the actual upper half, clear inherited tint/flip state, sit after the title, and align their cut edge to the visible banner boundary.
 - Runtime ownership remains complete for all 30 curses and 99 releasable boons. Set Collector is still the sole fail-closed exception and remains excluded from drafting until its curated set catalogue is authored.
 - Verification: engine-neutral Moody gate 15/15 files and 514/514 tests; field gate 3/3 files and 198/198 tests; Phaser/UI gate 9/9 files and 56/56 tests. Repository-wide TypeScript still exits on unrelated baseline failures and reports no diagnostic in any touched file. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+
+2026-08-11 - Full Mix, trigger noise, and telemetry controls
+
+- Added Full Mix as the second Mega Mode variant. Pseudo-Mega stones can now apply their stat delta alone or additionally contribute one non-duplicate Mega type and replace innate slots one and three with the selected Mega template's corresponding innates. Proper Mega evolutions retain their authored forms.
+- Summary Stats Confirm now cycles through calculated stats, IVs, and the effective six-stat base spread. The base-spread view deliberately reuses the native stat rows without an oversized BST heading.
+- Continuous Moody effects are drawer-only. Trigger flyouts are restricted to discrete combat events, and Type Tax no longer emits a false trigger when the acting Pokemon has no duplicated type.
+- Added a general `build:standalone:no-telemetry` target. Staging and production deploy workflows now expose a default-on `collect_player_training_data` switch; disabling it sets only `VITE_TELEMETRY=off` and leaves save, tournament, Showdown, and matchmaking endpoints intact.
+- Moody remains unpromoted until integration verification completes. No normal staging or production deployment was performed.

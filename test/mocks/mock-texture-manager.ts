@@ -32,6 +32,7 @@ export class MockTextureManager {
       tileSprite: this.sprite.bind(this),
       existing: this.existing.bind(this),
       rectangle: this.rectangle.bind(this),
+      zone: this.zone.bind(this),
       // Geometric shapes share the rectangle stub's chainable surface
       // (setStrokeStyle / setVisible / setOrigin / …) — the headless harness
       // draws nothing, so the exact geometry is irrelevant.
@@ -88,6 +89,12 @@ export class MockTextureManager {
     const rectangle = new MockRectangle(this, x, y, width, height, fillColor);
     this.list.push(rectangle);
     return rectangle;
+  }
+
+  zone(x, y, width, height) {
+    const zone = new MockRectangle(this, x, y, width, height, 0);
+    this.list.push(zone);
+    return zone;
   }
 
   // Generic shape stub for ellipse / circle / arc / line / star / triangle /

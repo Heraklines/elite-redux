@@ -247,6 +247,7 @@ const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
   "randomizeAbilities",
   "randomizeLevelUpMoves",
   "megaMode",
+  "megaMixMode",
   "shuffleStats",
   "shuffleEvolutions",
   "itemChaos",

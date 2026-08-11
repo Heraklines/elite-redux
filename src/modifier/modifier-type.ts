@@ -17,6 +17,7 @@ import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
 import {
   canUseFunMegaStone,
+  formatFunMegaMixEffects,
   formatFunMegaStatDelta,
   getFunMegaStoneItems,
   getFunRealMegaChange,
@@ -1697,7 +1698,11 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
       return description;
     }
     const delta = formatFunMegaStatDelta(this.formChangeItem);
-    return delta ? `${description}\nMega stat changes: ${delta}` : description;
+    if (!delta) {
+      return description;
+    }
+    const mix = getFunModeConfig().megaMixMode ? formatFunMegaMixEffects(this.formChangeItem) : null;
+    return `${description}\nMega: ${delta}${mix ? `\nFull: ${mix}` : ""}`;
   }
 
   getPregenArgs(): any[] {
