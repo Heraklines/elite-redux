@@ -658,6 +658,10 @@ impl BattleUiReducer {
         Ok(())
     }
 
+    /// Retained as the staged convenience seam while callers adopt the
+    /// generation-checked `reduce_at` entry point; some hosted all-target
+    /// builds do not exercise this private wrapper yet.
+    #[allow(dead_code)]
     pub(crate) fn reduce(
         &mut self,
         seat: SeatId,
