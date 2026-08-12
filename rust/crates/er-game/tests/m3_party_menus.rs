@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::party_menu::{
     PARTY_CANCEL_OPTION_ID, PartyMenuError, build_party_select, navigate_party_menu,
     party_cancel_option_id, party_option_id,
@@ -12,6 +13,7 @@ use er_game::replacement_menu::{
     ReplacementMenuResult, build_replacement_menu, navigate_replacement_menu,
 };
 use er_state::battle::BattleState;
+use er_state::snapshot::GameState;
 use er_types::SafeU53;
 use er_types::battle_control::{BattleControl, CommandRootControl};
 use er_types::battle_ids::{
@@ -29,9 +31,113 @@ fn invalid_data(message: &'static str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message)
 }
 
-fn adapt_legacy_battle(
-    mut battle: serde_json::Value,
-) -> Result<serde_json::Value, Box<dyn Error>> {
+const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+    "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+const LEGACY_ORACLE_CONTENT_HASH: &str =
+    "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+
+fn required_object<'a>(
+    value: &'a serde_json::Value,
+    field: &'static str,
+    error: &'static str,
+) -> Result<&'a serde_json::Value, Box<dyn Error>> {
+    value
+        .get(field)
+        .filter(|field| field.is_object())
+        .ok_or_else(|| invalid_data(error).into())
+}
+
+fn required_string<'a>(
+    value: &'a serde_json::Value,
+    field: &'static str,
+    error: &'static str,
+) -> Result<&'a str, Box<dyn Error>> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_data(error).into())
+}
+
+fn normalize_selected_content_identity(
+    document: &serde_json::Value,
+    canonical: &mut serde_json::Value,
+    content: &ContentPack,
+) -> Result<(), Box<dyn Error>> {
+    let fixture_hash = required_string(
+        canonical,
+        "content_hash",
+        "initial canonical content_hash is missing or not a string",
+    )?
+    .to_owned();
+    for state_name in ["initial_state", "expected_final_state"] {
+        let state = required_object(
+            document,
+            state_name,
+            "published state is missing or not an object",
+        )?;
+        let peer_canonical = required_object(
+            state,
+            "canonical",
+            "published canonical state is missing or not an object",
+        )?;
+        let peer_hash = required_string(
+            peer_canonical,
+            "content_hash",
+            "published canonical content_hash is missing or not a string",
+        )?;
+        if peer_hash != fixture_hash.as_str() {
+            return Err(invalid_data("published state content hashes disagree").into());
+        }
+    }
+
+    let provenance = required_object(
+        document,
+        "provenance",
+        "published provenance is missing or not an object",
+    )?;
+    let provenance_hash = required_string(
+        provenance,
+        "content_pack_hash",
+        "published provenance content_pack_hash is missing or not a string",
+    )?;
+    let provenance_oracle_sha = required_string(
+        provenance,
+        "oracle_game_sha",
+        "published provenance oracle_game_sha is missing or not a string",
+    )?;
+    if provenance_oracle_sha != content.oracle_game_sha {
+        return Err(invalid_data("published provenance oracle_game_sha disagrees").into());
+    }
+
+    let selected_hash = content.hash.as_str();
+    let selected_digest = selected_hash
+        .strip_prefix("blake3-v1:")
+        .ok_or_else(|| invalid_data("selected content hash has no blake3-v1 prefix"))?;
+    if fixture_hash.as_str() == selected_hash {
+        if provenance_hash != selected_digest {
+            return Err(
+                invalid_data("selected content hash disagrees with provenance digest").into(),
+            );
+        }
+        return Ok(());
+    }
+    if fixture_hash.as_str() != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    {
+        return Err(invalid_data("published content identity is not an allowed pair").into());
+    }
+
+    canonical
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("initial canonical state is not an object"))?
+        .insert(
+            "content_hash".to_owned(),
+            serde_json::Value::String(selected_hash.to_owned()),
+        );
+    Ok(())
+}
+
+fn adapt_legacy_battle(mut battle: serde_json::Value) -> Result<serde_json::Value, Box<dyn Error>> {
     let battle_object = battle
         .as_object_mut()
         .ok_or_else(|| invalid_data("initial canonical battle is not an object"))?;
@@ -88,7 +194,7 @@ fn adapt_legacy_battle(
                 }
                 _ => {
                     return Err(
-                        invalid_data("legacy party status.kind has an invalid shape").into()
+                        invalid_data("legacy party status.kind has an invalid shape").into(),
                     );
                 }
             };
@@ -123,6 +229,24 @@ fn adapt_legacy_battle(
     }
 
     Ok(battle)
+}
+
+fn adapt_legacy_state(
+    mut canonical: serde_json::Value,
+    document: &serde_json::Value,
+    content: &ContentPack,
+) -> Result<serde_json::Value, Box<dyn Error>> {
+    normalize_selected_content_identity(document, &mut canonical, content)?;
+    let battle = canonical
+        .get("battle")
+        .cloned()
+        .ok_or_else(|| invalid_data("initial canonical state has no battle"))?;
+    let battle = adapt_legacy_battle(battle)?;
+    canonical
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("initial canonical state is not an object"))?
+        .insert("battle".to_owned(), battle);
+    Ok(canonical)
 }
 
 fn validate_condition_kind(value: &serde_json::Value) -> Result<(), Box<dyn Error>> {
@@ -185,13 +309,17 @@ fn fixture_battle(name: &str) -> Result<BattleState, Box<dyn Error>> {
         _ => return Err(invalid_data("unknown M3 battle fixture").into()),
     };
     let wire: serde_json::Value = serde_json::from_str(raw)?;
-    let battle = wire
+    let canonical = wire
         .get("initial_state")
         .and_then(|state| state.get("canonical"))
-        .and_then(|canonical| canonical.get("battle"))
         .cloned()
-        .ok_or_else(|| invalid_data("fixture has no initial canonical battle"))?;
-    Ok(serde_json::from_value(adapt_legacy_battle(battle)?)?)
+        .ok_or_else(|| invalid_data("fixture has no initial canonical state"))?;
+    let content = selected_content_pack()?;
+    let canonical = adapt_legacy_state(canonical, &wire, &content)?;
+    let state: GameState = serde_json::from_value(canonical)?;
+    state
+        .battle
+        .ok_or_else(|| invalid_data("initial canonical state has no typed battle").into())
 }
 
 fn command_root(
