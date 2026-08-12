@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use er_canonical::canonical_bytes;
-use er_content::pack::ContentPack;
+use er_content::pack::{ContentPack, selected_content_pack};
 use er_kernel::{BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1};
 use er_protocol::{
     AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalLeaseConfig,
@@ -41,6 +41,10 @@ const LIVE_BATTLE_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
 const LIVE_CONTENT_PACK_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+    "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+const LEGACY_ORACLE_CONTENT_HASH: &str =
+    "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
 fn invalid(message: impl Into<String>) -> Box<dyn Error> {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
@@ -166,14 +170,68 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult<()> {
     Ok(())
 }
 
+fn normalize_legacy_content_pack(
+    artifact: &mut Value,
+    selected: &ContentPack,
+) -> TestResult<()> {
+    selected.validate()?;
+    let (provenance_hash, provenance_oracle_sha) = {
+        let provenance = field(artifact, "provenance")?;
+        (
+            field(provenance, "content_pack_hash")?
+                .as_str()
+                .ok_or_else(|| invalid("published content provenance hash is not a string"))?
+                .to_owned(),
+            field(provenance, "oracle_game_sha")?
+                .as_str()
+                .ok_or_else(|| invalid("published content provenance oracle SHA is not a string"))?
+                .to_owned(),
+        )
+    };
+    let (pack_hash, pack_oracle_sha) = {
+        let pack = field(artifact, "content_pack")?;
+        (
+            field(pack, "hash")?
+                .as_str()
+                .ok_or_else(|| invalid("published content pack hash is not a string"))?
+                .to_owned(),
+            field(pack, "oracle_game_sha")?
+                .as_str()
+                .ok_or_else(|| invalid("published content pack oracle SHA is not a string"))?
+                .to_owned(),
+        )
+    };
+    if pack_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+        || pack_oracle_sha != selected.oracle_game_sha
+        || provenance_oracle_sha != selected.oracle_game_sha
+    {
+        return Err(invalid(
+            "published content artifact is not the exact supported legacy identity",
+        ));
+    }
+
+    let pack = artifact
+        .get_mut("content_pack")
+        .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+    adapt_legacy_content_conditions(pack)?;
+    pack.as_object_mut()
+        .ok_or_else(|| invalid("published content pack is not an object"))?
+        .insert("hash".to_owned(), Value::String(selected.hash.to_string()));
+    Ok(())
+}
+
 fn content_pack() -> TestResult<Arc<ContentPack>> {
-    let wire: Value = serde_json::from_str(LIVE_CONTENT_PACK_FIXTURE)?;
-    let mut value = wire
+    let mut artifact: Value = serde_json::from_str(LIVE_CONTENT_PACK_FIXTURE)?;
+    let selected = selected_content_pack()?;
+    normalize_legacy_content_pack(&mut artifact, &selected)?;
+    let value = artifact
         .get("content_pack")
         .cloned()
         .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
-    adapt_legacy_content_conditions(&mut value)?;
-    Ok(Arc::new(serde_json::from_value(value)?))
+    let decoded: ContentPack = serde_json::from_value(value)?;
+    assert_eq!(decoded, selected);
+    Ok(Arc::new(decoded))
 }
 
 fn canonical_state(fixture: &Value) -> TestResult<&Value> {
@@ -182,6 +240,54 @@ fn canonical_state(fixture: &Value) -> TestResult<&Value> {
 
 fn initial_battle(fixture: &Value) -> TestResult<&Value> {
     field(canonical_state(fixture)?, "battle")
+}
+
+fn normalize_legacy_state_content_identity(
+    fixture: &Value,
+    canonical: &Value,
+    selected: &ContentPack,
+) -> TestResult<Value> {
+    let fixture_hash = field(canonical, "content_hash")?
+        .as_str()
+        .ok_or_else(|| invalid("initial canonical content_hash is not a string"))?
+        .to_owned();
+    let expected_hash = field(
+        field(fixture, "expected_final_state")?,
+        "canonical",
+    )?
+    .get("content_hash")
+    .and_then(Value::as_str)
+    .ok_or_else(|| invalid("expected canonical content_hash is not a string"))?;
+    if expected_hash != fixture_hash {
+        return Err(invalid(
+            "published state content hashes disagree between initial and expected final state",
+        ));
+    }
+    let provenance = field(fixture, "provenance")?;
+    let provenance_hash = field(provenance, "content_pack_hash")?
+        .as_str()
+        .ok_or_else(|| invalid("published provenance content_pack_hash is not a string"))?;
+    let provenance_oracle_sha = field(provenance, "oracle_game_sha")?
+        .as_str()
+        .ok_or_else(|| invalid("published provenance oracle_game_sha is not a string"))?;
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+        || provenance_oracle_sha != selected.oracle_game_sha
+    {
+        return Err(invalid(
+            "fixture content identity is not the exact supported legacy pair",
+        ));
+    }
+
+    let mut normalized = canonical.clone();
+    normalized
+        .as_object_mut()
+        .ok_or_else(|| invalid("initial canonical state is not an object"))?
+        .insert(
+            "content_hash".to_owned(),
+            Value::String(selected.hash.to_string()),
+        );
+    Ok(normalized)
 }
 
 fn kernel_format(battle: &Value) -> TestResult<Value> {
@@ -280,8 +386,16 @@ fn scripted_enemy_policy(battle: &Value) -> TestResult<ScriptedEnemyPolicyV1> {
     Ok(ScriptedEnemyPolicyV1::new(SafeU53::ZERO, vec![scripted])?)
 }
 
-fn battle_config(fixture: &Value, local_seat: SeatId) -> TestResult<BattleGameConfig> {
-    let canonical = canonical_state(fixture)?;
+fn battle_config(
+    fixture: &Value,
+    content: &ContentPack,
+    local_seat: SeatId,
+) -> TestResult<BattleGameConfig> {
+    let canonical = normalize_legacy_state_content_identity(
+        fixture,
+        canonical_state(fixture)?,
+        content,
+    )?;
     let battle = initial_battle(fixture)?;
     let format = kernel_format(battle)?;
     let player_capacity = field(&format, "player_capacity")?
@@ -294,7 +408,7 @@ fn battle_config(fixture: &Value, local_seat: SeatId) -> TestResult<BattleGameCo
         return Err(invalid("live pair fixture must use a single battle format"));
     }
 
-    let mut run_state = canonical.clone();
+    let mut run_state = canonical;
     let run_state_object = run_state
         .as_object_mut()
         .ok_or_else(|| invalid("canonical game state is not an object"))?;
@@ -415,9 +529,9 @@ fn new_live_pair() -> TestResult<(SimulatedPair, Arc<ContentPack>)> {
     let guest = seat(2);
     let connection_generation = generation(1);
     let pair = SimulatedPair::new_battle(SimulatedBattlePairConfig {
-        host_game: battle_config(&fixture, host)?,
+        host_game: battle_config(&fixture, &content, host)?,
         host_protocol: authority_protocol(host, guest, connection_generation)?,
-        guest_game: battle_config(&fixture, guest)?,
+        guest_game: battle_config(&fixture, &content, guest)?,
         guest_protocol: replica_protocol(host, guest, connection_generation)?,
         content: Arc::clone(&content),
         replay_seed: 0x4c_u64,
