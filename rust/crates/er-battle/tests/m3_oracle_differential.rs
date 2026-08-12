@@ -502,6 +502,9 @@ struct LegacyIdentity {
     legacy_pid: u64,
     party_index: u64,
     pokemon_id: PokemonId,
+    /// Retained for strict legacy-schema validation; identity resolution is keyed by `legacy_pid`
+    /// and intentionally does not use this field for oracle comparisons.
+    #[allow(dead_code)]
     side: BattleSide,
 }
 
@@ -2246,7 +2249,7 @@ fn normalize_legacy_action_order(
     Ok(normalized)
 }
 
-fn pokemon_state<'a>(state: &'a GameState, pokemon: PokemonId) -> Option<&'a PokemonState> {
+fn pokemon_state(state: &GameState, pokemon: PokemonId) -> Option<&PokemonState> {
     let battle = state.battle.as_ref()?;
     battle
         .player_party
@@ -2576,11 +2579,12 @@ fn validate_legacy_mutation_metadata(
             }
         };
 
-        let context_matches = match (
-            metadata.kind.as_str(),
-            metadata.phase.as_str(),
-            action.map(|action| action.kind),
-        ) {
+        let context_matches = matches!(
+            (
+                metadata.kind.as_str(),
+                metadata.phase.as_str(),
+                action.map(|action| action.kind),
+            ),
             ("PP_CONSUMPTION", "MovePhase", Some(ResolvedActionKind::Move))
             | ("BATTLE_RNG_CHANGED", "MovePhase", Some(ResolvedActionKind::Move))
             | ("BATTLE_RNG_CHANGED", "MoveEffectPhase", Some(ResolvedActionKind::Move))
@@ -2613,9 +2617,8 @@ fn validate_legacy_mutation_metadata(
             | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
             | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
             | ("TURN_ADVANCE", "TurnEndPhase", Some(_))
-            | ("STATUS_SET", "ObtainStatusEffectPhase", None) => true,
-            _ => false,
-        };
+            | ("STATUS_SET", "ObtainStatusEffectPhase", None)
+        );
         if !context_matches {
             return Err(FixtureError::new(format!(
                 "{case_name}: expected_mutations[{index}] has unsupported exact kind/phase/cause context {}/{}/{}",
@@ -3534,11 +3537,11 @@ fn take_faint_occurrence(
         if used[index] {
             continue;
         }
-        if let BattleMutation::FaintQueued { occurrence } = mutation {
-            if occurrence.pokemon == pokemon {
-                used[index] = true;
-                return Ok(occurrence.id);
-            }
+        if let BattleMutation::FaintQueued { occurrence } = mutation
+            && occurrence.pokemon == pokemon
+        {
+            used[index] = true;
+            return Ok(occurrence.id);
         }
     }
     Err(FixtureError::new(format!(
@@ -4629,13 +4632,12 @@ fn compare_mutation_trace(
         actual
             .iter()
             .position(|mutation| matches!(mutation, BattleMutation::TurnAdvanced { .. })),
-    ) {
-        if command_index >= turn_index {
-            return Err(FixtureError::new(format!(
-                "{case_name}: command-collection clearing is not causally before TURN_ADVANCE"
-            ))
-            .into());
-        }
+    ) && command_index >= turn_index
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: command-collection clearing is not causally before TURN_ADVANCE"
+        ))
+        .into());
     }
     if let Some(outcome_index) = outcome_change_index
         && actual[..outcome_index]
