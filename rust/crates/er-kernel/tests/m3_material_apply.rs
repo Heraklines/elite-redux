@@ -18,6 +18,17 @@ const VICTORY_CASE_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
 const CONTROL_FIXTURE: &str =
     include_str!("../../../fixtures/m3/schema/battle-control-plan-v1.json");
+const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+    "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+const LEGACY_ORACLE_CONTENT_HASH: &str =
+    "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+
+fn is_status_kind_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "NONE" | "POISON" | "TOXIC" | "PARALYSIS" | "SLEEP" | "BURN"
+    )
+}
 
 fn adapt_legacy_condition_kind(condition: &mut Value) -> Result<(), &'static str> {
     let kind = condition
@@ -87,7 +98,8 @@ fn adapt_legacy_game_state(state: &mut Value) -> Result<(), &'static str> {
                 .and_then(|status| status.get_mut("kind"))
                 .ok_or("status kind is missing or invalid")?;
             match kind {
-                Value::String(_) => {}
+                Value::String(tag) if is_status_kind_tag(tag) => {}
+                Value::String(_) => return Err("status kind has an unknown tag"),
                 Value::Object(nested) => {
                     if nested.len() != 1 {
                         return Err("nested status kind has extra or missing fields");
@@ -97,6 +109,9 @@ fn adapt_legacy_game_state(state: &mut Value) -> Result<(), &'static str> {
                         .and_then(Value::as_str)
                         .ok_or("nested status kind is not a string")?
                         .to_owned();
+                    if !is_status_kind_tag(&tag) {
+                        return Err("nested status kind has an unknown tag");
+                    }
                     *kind = Value::String(tag);
                 }
                 _ => return Err("status kind is neither a string nor an exact kind wrapper"),
@@ -110,6 +125,48 @@ fn adapt_legacy_game_state(state: &mut Value) -> Result<(), &'static str> {
             .ok_or("condition is missing")?;
         adapt_legacy_condition_kind(condition)?;
     }
+    Ok(())
+}
+
+fn adapt_legacy_selected_content_hash(
+    state: &mut Value,
+    fixture: &Value,
+    content: &ContentPack,
+) -> Result<(), &'static str> {
+    let state_hash = state
+        .get("content_hash")
+        .and_then(Value::as_str)
+        .ok_or("state content_hash is missing or invalid")?
+        .to_owned();
+    let provenance_hash = fixture
+        .get("provenance")
+        .and_then(Value::as_object)
+        .and_then(|provenance| provenance.get("content_pack_hash"))
+        .and_then(Value::as_str)
+        .ok_or("fixture provenance content_pack_hash is missing or invalid")?
+        .to_owned();
+    let selected_hash = content.hash.as_str();
+    let selected_digest = selected_hash
+        .strip_prefix("blake3-v1:")
+        .ok_or("selected content hash has an invalid prefix")?;
+
+    if state_hash == selected_hash {
+        if provenance_hash == selected_digest {
+            return Ok(());
+        }
+        return Err("selected state hash disagrees with fixture provenance digest");
+    }
+
+    if state_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    {
+        return Err("fixture content identity is not the selected or exact legacy pair");
+    }
+
+    state
+        .as_object_mut()
+        .ok_or("state is not an object")?
+        .insert("content_hash".to_owned(), Value::String(selected_hash.to_owned()));
     Ok(())
 }
 
@@ -143,8 +200,11 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
         .and_then(|value| value.get("canonical"))
         .expect("victory fixture has an initial canonical state")
         .clone();
+    adapt_legacy_selected_content_hash(&mut state_value, &case_value, &content)
+        .expect("legacy selected content hash adapts strictly");
     adapt_legacy_game_state(&mut state_value).expect("legacy initial state adapts strictly");
-    let state = serde_json::from_value(state_value.clone()).expect("initial state is typed");
+    let state: er_state::snapshot::GameState =
+        serde_json::from_value(state_value.clone()).expect("initial state is typed");
     let next_control =
         serde_json::from_str::<er_types::battle_control::BattleControlPlan>(CONTROL_FIXTURE)
             .expect("control fixture is typed");
