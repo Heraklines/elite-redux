@@ -262,8 +262,26 @@ fn public_kernel_selects_battle_before_the_legacy_fixture_dispatch() {
         .find("pub fn step(&mut self, input: KernelInput)")
         .expect("production GameKernel step must stay public");
     assert!(constructor < step);
-    assert!(KERNEL_SOURCE.contains("if let Some(battle) = self.battle.as_mut()"));
-    assert!(KERNEL_SOURCE.contains("battle.step(&mut self.scheduler"));
+    let battle_selection = KERNEL_SOURCE
+        .find("if let Some(battle) = self.battle.as_mut()")
+        .expect("public GameKernel step must select the production Battle mode");
+    let battle_dispatch = KERNEL_SOURCE
+        .find(
+            "let effects = battle\n                .step(&mut self.scheduler, &mut self.terminal, input)",
+        )
+        .expect("public GameKernel step must dispatch through BattleMode::step");
+    let legacy_fixture_dispatch = KERNEL_SOURCE
+        .find("match input {\n            KernelInput::RawInput { seat, event }")
+        .expect("public GameKernel step must retain the legacy fixture dispatch");
+    assert!(step < battle_selection);
+    assert!(
+        battle_selection < battle_dispatch,
+        "GameKernel must dispatch the selected Battle mode through its public step"
+    );
+    assert!(
+        battle_dispatch < legacy_fixture_dispatch,
+        "Battle dispatch must precede the legacy fixture dispatch"
+    );
     assert!(KERNEL_SOURCE.contains("pub fn battle_ui_projection"));
 }
 
