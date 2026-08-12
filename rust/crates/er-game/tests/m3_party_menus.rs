@@ -196,26 +196,21 @@ fn adapt_legacy_battle(mut battle: serde_json::Value) -> Result<serde_json::Valu
                 }
                 serde_json::Value::Object(nested) => {
                     if nested.len() != 1 || !nested.contains_key("kind") {
-                        return Err(
-                            invalid_data(
-                                "legacy party status.kind has an unsupported nested wrapper shape",
-                            )
-                            .into(),
-                        );
+                        return Err(invalid_data(
+                            "legacy party status.kind has an unsupported nested wrapper shape",
+                        )
+                        .into());
                     }
-                    let Some(tag) = nested
-                        .get("kind")
-                        .and_then(serde_json::Value::as_str)
-                    else {
+                    let Some(tag) = nested.get("kind").and_then(serde_json::Value::as_str) else {
                         return Err(
                             invalid_data("legacy party status.kind.kind is not a string").into(),
                         );
                     };
                     if !is_status_kind_tag(tag) {
-                        return Err(
-                            invalid_data("legacy party status.kind.kind has an unsupported value")
-                                .into(),
-                        );
+                        return Err(invalid_data(
+                            "legacy party status.kind.kind has an unsupported value",
+                        )
+                        .into());
                     }
                     serde_json::Value::String(tag.to_owned())
                 }

@@ -202,10 +202,7 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult {
                 "content_pack.capability_manifest.entries[{index}].subject is not an object"
             ))
         })?;
-        if subject.len() != 2
-            || !subject.contains_key("kind")
-            || !subject.contains_key("value")
-        {
+        if subject.len() != 2 || !subject.contains_key("kind") || !subject.contains_key("value") {
             return Err(invalid(format!(
                 "content_pack.capability_manifest.entries[{index}].subject must contain exactly kind and value"
             )));
@@ -227,9 +224,7 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult {
             })?;
             adapt_legacy_content_condition_kind(
                 value,
-                &format!(
-                    "content_pack.capability_manifest.entries[{index}].subject.value"
-                ),
+                &format!("content_pack.capability_manifest.entries[{index}].subject.value"),
             )?;
         }
     }
@@ -343,8 +338,7 @@ fn normalize_legacy_content_identity(
         }
         return Ok(());
     }
-    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
     {
         return Err(invalid(
             "fixture content identity is neither the current selected pair nor the exact published legacy pair",

@@ -123,10 +123,9 @@ fn normalize_legacy_battle_statuses(state_name: &str, battle: &mut Value) -> Tes
 fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> TestResult<Value> {
     match kind {
         Value::String(tag) if tag == "NONE" => Ok(json!({"kind": tag})),
-        Value::String(tag) => Err(invalid_data(format!(
-            "{path} has unsupported legacy value {tag:?}"
-        ))
-        .into()),
+        Value::String(tag) => {
+            Err(invalid_data(format!("{path} has unsupported legacy value {tag:?}")).into())
+        }
         Value::Object(wrapper) => {
             let tag = wrapper
                 .get("kind")
@@ -144,10 +143,9 @@ fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> TestResult<Value> 
                 _ => false,
             };
             if !valid_shape {
-                return Err(invalid_data(format!(
-                    "{path} has an invalid adjacent kind object"
-                ))
-                .into());
+                return Err(
+                    invalid_data(format!("{path} has an invalid adjacent kind object")).into(),
+                );
             }
             Ok(Value::Object(wrapper))
         }
@@ -155,11 +153,7 @@ fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> TestResult<Value> 
     }
 }
 
-fn normalize_legacy_adjacent_field(
-    path: &str,
-    object: &mut Value,
-    field_name: &str,
-) -> TestResult {
+fn normalize_legacy_adjacent_field(path: &str, object: &mut Value, field_name: &str) -> TestResult {
     let object = object
         .as_object_mut()
         .ok_or_else(|| invalid_data(format!("{path} is not an object")))?;
@@ -175,11 +169,11 @@ fn normalize_legacy_adjacent_field(
 fn normalize_legacy_battle_conditions(state_name: &str, battle: &mut Value) -> TestResult {
     for condition_name in ["weather", "terrain"] {
         let condition = field_mut(battle, condition_name)?;
-        let condition_object = condition
-            .as_object()
-            .ok_or_else(|| invalid_data(format!(
+        let condition_object = condition.as_object().ok_or_else(|| {
+            invalid_data(format!(
                 "{state_name}.canonical.battle.{condition_name} is not an object"
-            )))?;
+            ))
+        })?;
         if condition_object.len() != 2
             || !condition_object.contains_key("kind")
             || !condition_object.contains_key("remaining_turns")
@@ -271,16 +265,16 @@ fn normalize_legacy_content_conditions(
         let subject_kind = subject_object
             .get("kind")
             .and_then(Value::as_str)
-            .ok_or_else(|| invalid_data(format!(
-                "content_pack.capability_manifest.entries[{index}].subject.kind is not a string"
-            )))?
+            .ok_or_else(|| {
+                invalid_data(format!(
+                    "content_pack.capability_manifest.entries[{index}].subject.kind is not a string"
+                ))
+            })?
             .to_owned();
         match subject_kind.as_str() {
             "WEATHER" | "TERRAIN" => {
                 normalize_legacy_adjacent_field(
-                    &format!(
-                        "content_pack.capability_manifest.entries[{index}].subject"
-                    ),
+                    &format!("content_pack.capability_manifest.entries[{index}].subject"),
                     subject,
                     "value",
                 )?;
@@ -318,9 +312,9 @@ fn normalize_legacy_fixture_content_identity(
         "content_hash",
     )?
     .as_str()
-    .ok_or_else(|| invalid_data(
-        "expected final canonical content_hash is missing or not a string",
-    ))?;
+    .ok_or_else(|| {
+        invalid_data("expected final canonical content_hash is missing or not a string")
+    })?;
     if expected_hash != initial_hash {
         return Err(invalid_data("published state content hashes disagree").into());
     }
@@ -356,8 +350,7 @@ fn normalize_legacy_fixture_content_identity(
         }
         return Ok(());
     }
-    if initial_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    if initial_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
     {
         return Err(invalid_data(
             "fixture content identity is neither the current selected pair nor the exact published legacy pair",
@@ -371,7 +364,10 @@ fn normalize_legacy_fixture_content_identity(
         canonical
             .as_object_mut()
             .ok_or_else(|| invalid_data("published canonical state is not an object"))?
-            .insert("content_hash".to_owned(), Value::String(selected_hash.clone()));
+            .insert(
+                "content_hash".to_owned(),
+                Value::String(selected_hash.clone()),
+            );
     }
     Ok(())
 }

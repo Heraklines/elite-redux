@@ -124,22 +124,17 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult<()> {
         .ok_or_else(|| invalid("content_pack.capability_manifest.entries is not an array"))?;
 
     for (index, entry) in entries.iter_mut().enumerate() {
-        let subject = entry
-            .get_mut("subject")
-            .ok_or_else(|| {
-                invalid(format!(
-                    "content_pack.capability_manifest.entries[{index}].subject is missing"
-                ))
-            })?;
+        let subject = entry.get_mut("subject").ok_or_else(|| {
+            invalid(format!(
+                "content_pack.capability_manifest.entries[{index}].subject is missing"
+            ))
+        })?;
         let subject = subject.as_object_mut().ok_or_else(|| {
             invalid(format!(
                 "content_pack.capability_manifest.entries[{index}].subject is not an object"
             ))
         })?;
-        if subject.len() != 2
-            || !subject.contains_key("kind")
-            || !subject.contains_key("value")
-        {
+        if subject.len() != 2 || !subject.contains_key("kind") || !subject.contains_key("value") {
             return Err(invalid(format!(
                 "content_pack.capability_manifest.entries[{index}].subject must contain exactly kind and value"
             )));
@@ -161,19 +156,14 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult<()> {
             })?;
             adapt_legacy_condition_kind(
                 value,
-                &format!(
-                    "content_pack.capability_manifest.entries[{index}].subject.value"
-                ),
+                &format!("content_pack.capability_manifest.entries[{index}].subject.value"),
             )?;
         }
     }
     Ok(())
 }
 
-fn normalize_legacy_content_pack(
-    artifact: &mut Value,
-    selected: &ContentPack,
-) -> TestResult<()> {
+fn normalize_legacy_content_pack(artifact: &mut Value, selected: &ContentPack) -> TestResult<()> {
     selected.validate()?;
     let (provenance_hash, provenance_oracle_sha) = {
         let provenance = field(artifact, "provenance")?;
@@ -251,13 +241,10 @@ fn normalize_legacy_state_content_identity(
         .as_str()
         .ok_or_else(|| invalid("initial canonical content_hash is not a string"))?
         .to_owned();
-    let expected_hash = field(
-        field(fixture, "expected_final_state")?,
-        "canonical",
-    )?
-    .get("content_hash")
-    .and_then(Value::as_str)
-    .ok_or_else(|| invalid("expected canonical content_hash is not a string"))?;
+    let expected_hash = field(field(fixture, "expected_final_state")?, "canonical")?
+        .get("content_hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("expected canonical content_hash is not a string"))?;
     if expected_hash != fixture_hash {
         return Err(invalid(
             "published state content hashes disagree between initial and expected final state",
@@ -391,11 +378,8 @@ fn battle_config(
     content: &ContentPack,
     local_seat: SeatId,
 ) -> TestResult<BattleGameConfig> {
-    let canonical = normalize_legacy_state_content_identity(
-        fixture,
-        canonical_state(fixture)?,
-        content,
-    )?;
+    let canonical =
+        normalize_legacy_state_content_identity(fixture, canonical_state(fixture)?, content)?;
     let battle = initial_battle(fixture)?;
     let format = kernel_format(battle)?;
     let player_capacity = field(&format, "player_capacity")?

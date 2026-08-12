@@ -1218,11 +1218,9 @@ fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMateri
                 let continues_scope = previous_offset
                     .is_some_and(|previous| previous.after_state == draw.before_state);
                 if continues_scope {
-                    let previous = previous_offset
-                        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-                    if previous.cardinality.get().checked_sub(1)
-                        != Some(draw.cardinality.get())
-                    {
+                    let previous =
+                        previous_offset.ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+                    if previous.cardinality.get().checked_sub(1) != Some(draw.cardinality.get()) {
                         return Err(BattleMaterialApplyError::InvalidEvidence);
                     }
                 } else {
@@ -1272,18 +1270,15 @@ fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMateri
             }
         }
     }
-    if previous_offset
-        .is_some_and(|previous| previous.cardinality != final_offset_cardinality)
+    if previous_offset.is_some_and(|previous| previous.cardinality != final_offset_cardinality)
         || persisted_run != material.after_state.run_rng.rdg
     {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
-    let persisted_battle =
-        persisted_battle.ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let persisted_battle = persisted_battle.ok_or(BattleMaterialApplyError::InvalidEvidence)?;
     if persisted_battle.battle_seed != material.rng_before.battle_seed
         || persisted_battle.turn != material.rng_before.turn
-        || (material.outcome != BattleOutcome::Ongoing
-            && persisted_battle != material.rng_after)
+        || (material.outcome != BattleOutcome::Ongoing && persisted_battle != material.rng_after)
     {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }

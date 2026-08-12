@@ -941,20 +941,20 @@ mod live_coop_production {
             .and_then(Value::as_array_mut)
             .ok_or_else(|| invalid("published content capability entries are invalid"))?;
         for (index, entry) in entries.iter_mut().enumerate() {
-            let subject = entry
-                .get_mut("subject")
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "published content capability entry {index} subject is missing"
-                    ))
-                })?;
+            let subject = entry.get_mut("subject").ok_or_else(|| {
+                invalid(format!(
+                    "published content capability entry {index} subject is missing"
+                ))
+            })?;
             let subject_kind = subject
                 .get("kind")
                 .and_then(Value::as_str)
                 .map(str::to_owned)
-                .ok_or_else(|| invalid(format!(
-                    "published content capability entry {index} subject kind is not a string"
-                )))?;
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "published content capability entry {index} subject kind is not a string"
+                    ))
+                })?;
             if matches!(subject_kind.as_str(), "WEATHER" | "TERRAIN") {
                 normalize_adjacent_kind(
                     subject,
@@ -1215,9 +1215,7 @@ mod live_coop_production {
         forced_doubles_config_with_content(&content)
     }
 
-    fn forced_doubles_config_with_content(
-        content: &ContentPack,
-    ) -> TestResult<BattleGameConfig> {
+    fn forced_doubles_config_with_content(content: &ContentPack) -> TestResult<BattleGameConfig> {
         let wire: Value = serde_json::from_str(FORCED_REPLACEMENT_FIXTURE)?;
         let mut initial_state = wire
             .get("initial_state")
@@ -1346,9 +1344,7 @@ mod live_coop_production {
         forced_victory_config_with_content(&content)
     }
 
-    fn forced_victory_config_with_content(
-        content: &ContentPack,
-    ) -> TestResult<BattleGameConfig> {
+    fn forced_victory_config_with_content(content: &ContentPack) -> TestResult<BattleGameConfig> {
         let mut config = forced_doubles_config_with_content(content)?;
         for pokemon in &mut config.start.enemy_party {
             pokemon.hp = 1;

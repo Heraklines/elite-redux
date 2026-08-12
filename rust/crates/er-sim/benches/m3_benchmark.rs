@@ -195,9 +195,7 @@ fn normalize_legacy_content_conditions(content: &mut Value) -> TestResult {
             let subject = subject
                 .as_object_mut()
                 .ok_or_else(|| invalid(format!("{path} is not an object")))?;
-            if subject.len() != 2
-                || !subject.contains_key("kind")
-                || !subject.contains_key("value")
+            if subject.len() != 2 || !subject.contains_key("kind") || !subject.contains_key("value")
             {
                 return Err(invalid(format!(
                     "{path} must contain exactly kind and value"
@@ -403,8 +401,7 @@ fn normalize_legacy_content_identity(
         }
         return Ok(());
     }
-    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
     {
         return Err(invalid(
             "battle fixture content identity is not the exact supported legacy pair",

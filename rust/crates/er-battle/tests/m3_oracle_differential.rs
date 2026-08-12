@@ -41,8 +41,8 @@ use er_types::battle_ids::{
     FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
-    ActionDisposition, BattleStat, FaintOccurrence, MoveTarget, ReplacementProgress, ResolvedAction,
-    ResolvedActionKind, StatusKind, StatusState,
+    ActionDisposition, BattleStat, FaintOccurrence, MoveTarget, ReplacementProgress,
+    ResolvedAction, ResolvedActionKind, StatusKind, StatusState,
 };
 use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
 use er_types::{OperationId, SafeU53, SeatId};
@@ -1536,7 +1536,8 @@ fn normalize_legacy_selected_content_identity(
         }
         return Ok(false);
     }
-    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST {
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    {
         return Err(FixtureError::new(format!(
             "{case_name}: content identity {fixture_hash} / {provenance_hash} is neither the selected pair {selected_hash} / {selected_digest} nor the exact published legacy pair"
         )));
@@ -1658,12 +1659,7 @@ fn is_exact_legacy_content_identity(
         "content_hash",
     )?;
     let provenance = object_field(document, case_name, "$", "provenance")?;
-    let provenance_hash = string_field(
-        provenance,
-        case_name,
-        "provenance",
-        "content_pack_hash",
-    )?;
+    let provenance_hash = string_field(provenance, case_name, "provenance", "content_pack_hash")?;
     Ok(fixture_hash != content.hash.as_str()
         && fixture_hash == LEGACY_ORACLE_CONTENT_HASH
         && provenance_hash == LEGACY_ORACLE_CONTENT_DIGEST)
@@ -1732,14 +1728,9 @@ fn canonical_single_near_other_target(
     move_slot: MoveSlotIndex,
     content: &ContentPack,
 ) -> Result<Option<FieldSlot>, Box<dyn Error>> {
-    let battle = state
-        .battle
-        .as_ref()
-        .ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: legacy command state has no battle"
-            ))
-        })?;
+    let battle = state.battle.as_ref().ok_or_else(|| {
+        FixtureError::new(format!("{case_name}: legacy command state has no battle"))
+    })?;
     let field_entry = battle
         .field
         .slots

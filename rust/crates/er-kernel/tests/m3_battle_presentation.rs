@@ -80,6 +80,10 @@ fn plan_identity_and_zero_based_order_are_checked_atomically() -> TestResult {
     let plan = state.plan().ok_or("plan was not installed")?;
     assert_eq!(plan.operation_id(), &operation_id);
     assert_eq!(plan.events(), &[first.clone(), second.clone()]);
+    assert_eq!(state.plans().get(&operation_id), Some(plan));
+    let snapshot = state.snapshot_v1()?;
+    assert_eq!(snapshot.plans.len(), 1);
+    assert_eq!(snapshot.plans[0].operation_id, operation_id);
     assert_eq!(state.blocking_ids().len(), 1);
     assert!(state.is_blocked());
     assert_eq!(state.live_count(), 2);

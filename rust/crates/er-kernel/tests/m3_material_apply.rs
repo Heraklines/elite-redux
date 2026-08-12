@@ -7,8 +7,8 @@ use battle_replica::{
 };
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::material::{
-    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, apply_turn_material,
-    decode_replacement_material, decode_turn_material,
+    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1,
+    apply_turn_material, decode_replacement_material, decode_turn_material,
 };
 use serde_json::{Value, json};
 
@@ -294,16 +294,17 @@ fn adapt_legacy_selected_content_hash(
         return Err("selected state hash disagrees with fixture provenance digest");
     }
 
-    if state_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
-    {
+    if state_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST {
         return Err("fixture content identity is not the selected or exact legacy pair");
     }
 
     state
         .as_object_mut()
         .ok_or("state is not an object")?
-        .insert("content_hash".to_owned(), Value::String(selected_hash.to_owned()));
+        .insert(
+            "content_hash".to_owned(),
+            Value::String(selected_hash.to_owned()),
+        );
     for state_name in ["initial_state", "expected_final_state"] {
         fixture
             .get_mut(state_name)
@@ -311,7 +312,10 @@ fn adapt_legacy_selected_content_hash(
             .and_then(|state| state.get_mut("canonical"))
             .and_then(Value::as_object_mut)
             .ok_or("fixture canonical state is missing or invalid")?
-            .insert("content_hash".to_owned(), Value::String(selected_hash.to_owned()));
+            .insert(
+                "content_hash".to_owned(),
+                Value::String(selected_hash.to_owned()),
+            );
     }
     Ok(())
 }

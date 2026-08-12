@@ -414,7 +414,7 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
                 BattleTargetSelection::implicit(),
             )?,
         )?;
-        let offer = build_scripted_enemy_offer(&state, field_slot, &command, content)?;
+        let offer = build_scripted_enemy_offer(&state, field_slot, &command.command, content)?;
         frontier.push(CommandFrontierEntry::new(
             operation_id,
             None,
