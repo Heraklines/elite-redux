@@ -22,9 +22,7 @@ pub use er_rng::audit::RngDraw;
 pub use er_state::digest::MechanicalStateDigest;
 pub use er_types::LiveResourceSnapshot;
 use er_types::OperationId;
-use er_types::battle_ids::{
-    BattlePresentationEventId, ContentPackHash, MenuInstanceId,
-};
+use er_types::battle_ids::{BattlePresentationEventId, ContentPackHash, MenuInstanceId};
 use er_types::battle_ui::{
     BattlePresentationEvent, BattleUiProjection, PresentationPlanDigest,
     PresentationSettlementOutcome,

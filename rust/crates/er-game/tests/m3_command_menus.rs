@@ -87,10 +87,7 @@ fn command_control_id(kind: &str) -> String {
 fn command_offer() -> TestResult<BattleCommandOffer> {
     offer_with(
         vec![one_move_offer(vec![target_selection(vec![enemy(0)])?])?],
-        vec![OfferedSwitchCommand::new(
-            PartyIndex::new(1)?,
-            pokemon(8)?,
-        )],
+        vec![OfferedSwitchCommand::new(PartyIndex::new(1)?, pokemon(8)?)],
     )
 }
 
@@ -182,10 +179,7 @@ fn command_offer_and_proposal_fixtures_retain_typed_menu_context() -> TestResult
 fn command_root_retains_disabled_nodes_and_rejects_no_legal_path() -> TestResult {
     let offer = offer_with(
         Vec::new(),
-        vec![OfferedSwitchCommand::new(
-            PartyIndex::new(1)?,
-            pokemon(8)?,
-        )],
+        vec![OfferedSwitchCommand::new(PartyIndex::new(1)?, pokemon(8)?)],
     )?;
     let menu = build_command_menu(
         menu_instance(2)?,

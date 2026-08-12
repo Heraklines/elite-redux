@@ -1093,11 +1093,7 @@ pub(crate) fn protocol_next_control_from_plan(
                 .filter(|target| target.1 != *current_occurrence)
                 .map(|target| {
                     replacement_control_address(
-                        target.0,
-                        &target.1,
-                        &target.2,
-                        &target.3,
-                        &target.4,
+                        target.0, &target.1, &target.2, &target.3, &target.4,
                     )
                 })
                 .collect::<Result<Vec<_>, AuthorityTransactionError>>()?;
