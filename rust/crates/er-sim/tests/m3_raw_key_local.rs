@@ -66,10 +66,7 @@ fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> TestResult {
     let normalized = match kind {
         Value::String(tag) if is_status_kind_tag(&tag) => Value::String(tag),
         Value::String(tag) => {
-            return Err(invalid_data(format!(
-                "{path}.kind has unsupported value {tag:?}"
-            ))
-            .into());
+            return Err(invalid_data(format!("{path}.kind has unsupported value {tag:?}")).into());
         }
         Value::Object(wrapper) => {
             if wrapper.len() != 1 || !wrapper.contains_key("kind") {
@@ -91,10 +88,7 @@ fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> TestResult {
             Value::String(tag.to_owned())
         }
         other => {
-            return Err(invalid_data(format!(
-                "{path}.kind has unsupported value {other}"
-            ))
-            .into());
+            return Err(invalid_data(format!("{path}.kind has unsupported value {other}")).into());
         }
     };
     status_object.insert("kind".to_owned(), normalized);
@@ -113,12 +107,88 @@ fn normalize_legacy_battle_statuses(state_name: &str, battle: &mut Value) -> Tes
         for (index, pokemon) in party.iter_mut().enumerate() {
             let status = field_mut(pokemon, "status")?;
             normalize_legacy_status_kind(
-                &format!(
-                    "{state_name}.canonical.battle.{party_name}[{index}].status"
-                ),
+                &format!("{state_name}.canonical.battle.{party_name}[{index}].status"),
                 status,
             )?;
         }
+    }
+    Ok(())
+}
+
+fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> TestResult<Value> {
+    match kind {
+        Value::String(tag) if tag == "NONE" => Ok(json!({"kind": tag})),
+        Value::String(tag) => Err(invalid_data(format!(
+            "{path} has unsupported legacy value {tag:?}"
+        ))
+        .into()),
+        Value::Object(wrapper) => {
+            let tag = wrapper
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid_data(format!("{path}.kind is not a string")))?;
+            let valid_shape = match tag {
+                "NONE" => wrapper.len() == 1,
+                "UNSUPPORTED_ORACLE_CODE" => {
+                    wrapper.len() == 2
+                        && wrapper
+                            .get("value")
+                            .and_then(Value::as_u64)
+                            .is_some_and(|value| u16::try_from(value).is_ok())
+                }
+                _ => false,
+            };
+            if !valid_shape {
+                return Err(invalid_data(format!(
+                    "{path} has an invalid adjacent kind object"
+                ))
+                .into());
+            }
+            Ok(Value::Object(wrapper))
+        }
+        other => Err(invalid_data(format!("{path} has unsupported value {other}")).into()),
+    }
+}
+
+fn normalize_legacy_adjacent_field(
+    path: &str,
+    object: &mut Value,
+    field_name: &str,
+) -> TestResult {
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| invalid_data(format!("{path} is not an object")))?;
+    let kind = object
+        .get(field_name)
+        .cloned()
+        .ok_or_else(|| invalid_data(format!("{path}.{field_name} is missing")))?;
+    let normalized = normalize_legacy_adjacent_kind(&format!("{path}.{field_name}"), kind)?;
+    object.insert(field_name.to_owned(), normalized);
+    Ok(())
+}
+
+fn normalize_legacy_battle_conditions(state_name: &str, battle: &mut Value) -> TestResult {
+    for condition_name in ["weather", "terrain"] {
+        let condition = field_mut(battle, condition_name)?;
+        let condition_object = condition
+            .as_object()
+            .ok_or_else(|| invalid_data(format!(
+                "{state_name}.canonical.battle.{condition_name} is not an object"
+            )))?;
+        if condition_object.len() != 2
+            || !condition_object.contains_key("kind")
+            || !condition_object.contains_key("remaining_turns")
+        {
+            return Err(invalid_data(format!(
+                "{state_name}.canonical.battle.{condition_name} has extra or missing fields"
+            ))
+            .into());
+        }
+        normalize_legacy_adjacent_field(
+            &format!("{state_name}.canonical.battle.{condition_name}"),
+            condition,
+            "kind",
+        )?;
     }
     Ok(())
 }
@@ -129,6 +199,58 @@ fn normalize_legacy_fixture_statuses(fixture: &mut Value) -> TestResult {
         let canonical = field_mut(state, "canonical")?;
         let battle = field_mut(canonical, "battle")?;
         normalize_legacy_battle_statuses(state_name, battle)?;
+        normalize_legacy_battle_conditions(state_name, battle)?;
+    }
+    Ok(())
+}
+
+fn normalize_legacy_content_conditions(artifact: &mut Value) -> TestResult {
+    let content_pack = field_mut(artifact, "content_pack")?;
+    let manifest = field_mut(content_pack, "capability_manifest")?;
+    let entries = field_mut(manifest, "entries")?
+        .as_array_mut()
+        .ok_or_else(|| invalid_data("content_pack.capability_manifest.entries is not an array"))?;
+    for (index, entry) in entries.iter_mut().enumerate() {
+        let subject = field_mut(entry, "subject")?;
+        let subject_object = subject.as_object().ok_or_else(|| {
+            invalid_data(format!(
+                "content_pack.capability_manifest.entries[{index}].subject is not an object"
+            ))
+        })?;
+        if subject_object.len() != 2
+            || !subject_object.contains_key("kind")
+            || !subject_object.contains_key("value")
+        {
+            return Err(invalid_data(format!(
+                "content_pack.capability_manifest.entries[{index}].subject has extra or missing fields"
+            ))
+            .into());
+        }
+        let subject_kind = subject_object
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid_data(format!(
+                "content_pack.capability_manifest.entries[{index}].subject.kind is not a string"
+            )))?
+            .to_owned();
+        match subject_kind.as_str() {
+            "WEATHER" | "TERRAIN" => {
+                normalize_legacy_adjacent_field(
+                    &format!(
+                        "content_pack.capability_manifest.entries[{index}].subject"
+                    ),
+                    subject,
+                    "value",
+                )?;
+            }
+            "MOVE" | "ABILITY" | "STATUS" | "ARENA_CONDITION" => {}
+            other => {
+                return Err(invalid_data(format!(
+                    "content_pack.capability_manifest.entries[{index}].subject has unsupported kind {other:?}"
+                ))
+                .into());
+            }
+        }
     }
     Ok(())
 }
@@ -144,9 +266,7 @@ fn published_case(scenario_id: &str) -> TestResult<BattleFixture> {
     }
     let mut fixture = catalog.load_published_case::<Value>(scenario_id)?;
     normalize_legacy_fixture_statuses(&mut fixture)?;
-    Ok(BattleFixture {
-        fixture,
-    })
+    Ok(BattleFixture { fixture })
 }
 
 fn published_content_pack() -> TestResult<Value> {
@@ -154,7 +274,8 @@ fn published_content_pack() -> TestResult<Value> {
     if !catalog.is_evidence_published() {
         return Err(invalid_data("M3 oracle evidence is not published").into());
     }
-    let artifact = catalog.load_published_supporting_artifact::<Value>("content-pack-v1")?;
+    let mut artifact = catalog.load_published_supporting_artifact::<Value>("content-pack-v1")?;
+    normalize_legacy_content_conditions(&mut artifact)?;
     Ok(field(&artifact, "content_pack")?.clone())
 }
 
