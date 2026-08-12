@@ -20,7 +20,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
-import type { EnemyPokemon } from "#field/pokemon";
+import { type EnemyPokemon, withPokemonActiveAbilitySourceCache } from "#field/pokemon";
 import { FieldPhase } from "#phases/field-phase";
 
 /**
@@ -246,6 +246,12 @@ export class EnemyCommandPhase extends FieldPhase {
 
   /** Roll the enemy AI's command for this slot (the vanilla / co-op-host / disconnect-fallback path). */
   private resolveEnemyAiCommand(): void {
+    withPokemonActiveAbilitySourceCache(() => this.resolveEnemyAiCommandWithCachedAbilities());
+  }
+
+  /** Evaluate one immutable command decision without repeatedly rebuilding every battler's ability set. */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This is the existing complete enemy decision tree.
+  private resolveEnemyAiCommandWithCachedAbilities(): void {
     const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
 
     const battle = globalScene.currentBattle;

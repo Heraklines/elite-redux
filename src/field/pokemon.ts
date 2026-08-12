@@ -10015,16 +10015,6 @@ export class EnemyPokemon extends Pokemon {
 
           const chosenMove = sortedMovePool[chosenMoveIndex];
 
-          // biome-ignore format: For some reason this gets broken into multiple lines
-          console.log("Move Pool:", movePool.map((m) => m.getName()));
-          console.log("Move Scores:", moveScores);
-          // biome-ignore format: For some reason this gets broken into multiple lines
-          console.log("Sorted Move Pool:", sortedMovePool.map((m) => m.getName()));
-          console.log("Chosen Move:", chosenMove.getName());
-          if (erAi.active) {
-            console.log(`ER AI: ${erAi.kind} brain (sharpness ${erAi.sharpness})`);
-          }
-
           return {
             move: chosenMove.moveId,
             targets: moveTargets[chosenMove.moveId],

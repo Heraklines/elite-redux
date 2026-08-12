@@ -7913,3 +7913,12 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Fixed the Fun Mode return-to-title input lock. Leaving the selector now performs a one-way TitlePhase handoff and returns immediately instead of refreshing the retired full-screen handler after the title menu owns input.
 - The complete integrated Moody/Fun/Shiny gate passes 25/25 files and 597/597 tests. The standalone no-player-training-telemetry build passes with 3,574 transformed modules and a validated 1,731-file Cloudflare Pages payload; scoped Biome formatting and `git diff --check` are green.
 - Set Collector remains the sole deliberate Moody content exception and stays excluded from drafting until curated item/vitamin sets are authored. Production remains forbidden; this checkpoint is eligible only for normal staging verification.
+
+2026-08-12 - Triple-battle command profiling
+
+- Confirmed the current staging build has player-training telemetry disabled, so no network or IndexedDB telemetry work runs during turns.
+- A real staging log showed the two enemy decisions in a double battle consuming roughly 1.1s and 1.5s on desktop Firefox before move animation. Triples repeat the same KO, switch-matchup, threat, target, and damage simulations for three enemy slots against up to three opponents.
+- Wrapped each complete enemy AI decision in the existing synchronous active-ability-source cache. This preserves AI scoring and damage behavior while reusing immutable ability/innate/suppression resolution across the many simulations in that command.
+- Removed unconditional move-pool, score-array, sorted-pool, and chosen-move console dumps from the same hot path. They ran for every enemy slot and were multiplied in triples, with additional overhead whenever a browser or the in-game log collector retained console output.
+- Remaining secondary rendering risk: multiple animated Shiny Lab battlers still perform CPU texture refreshes, although their cadence was already reduced for multi battles. This was not identified as the recent regression and was left unchanged.
+- Verification: the enemy-command behavior suite passes 2/2, 12 current triple regression scenarios pass, scoped Biome and `git diff --check` are clean, and the 3,575-module standalone no-player-training-telemetry build plus 1,731-file Cloudflare payload check passes. Seven old triple fixtures now fail only because they still assume the intentionally forbidden wave-1 wild triple; no assertion reaches the optimized command behavior in those cases.
