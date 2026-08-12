@@ -22,6 +22,7 @@ use er_battle::legality::{
 use er_battle::presentation::{PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY};
 use er_battle::resolver::BattleMutation;
 use er_battle::{resolve_replacement, resolve_turn};
+use er_content::moves::find_move;
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_rng::audit::{RngCallsiteId, RngDraw, SeedOffsetContext};
 use er_rng::battle::BattleRngState;
@@ -40,7 +41,7 @@ use er_types::battle_ids::{
     FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
-    ActionDisposition, BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction,
+    ActionDisposition, BattleStat, FaintOccurrence, MoveTarget, ReplacementProgress, ResolvedAction,
     ResolvedActionKind, StatusKind, StatusState,
 };
 use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
@@ -516,6 +517,7 @@ struct LegacyIdentity {
 struct FixtureCommandRecord {
     actor: PokemonId,
     command: BattleCommand,
+    legacy_command: BattleCommand,
     field_slot: FieldSlot,
     operation_id: OperationId,
     owner_seat: Option<SeatId>,
@@ -1492,19 +1494,14 @@ fn normalize_legacy_selected_content_identity(
     field_name: &str,
     canonical: &mut Value,
     content: &ContentPack,
-) -> Result<(), FixtureError> {
+) -> Result<bool, FixtureError> {
     // Keep the published provenance immutable and translate only its exact, known content
     // identity to the validated selected pack used for this replay.
     let canonical_path = format!("{field_name}.canonical");
     let fixture_hash = string_field(canonical, case_name, &canonical_path, "content_hash")?;
     for peer_field_name in ["initial_state", "expected_final_state"] {
         let peer_state = object_field(document, case_name, "$", peer_field_name)?;
-        let peer_canonical = object_field(
-            peer_state,
-            case_name,
-            peer_field_name,
-            "canonical",
-        )?;
+        let peer_canonical = object_field(peer_state, case_name, peer_field_name, "canonical")?;
         let peer_path = format!("{peer_field_name}.canonical");
         let peer_hash = string_field(peer_canonical, case_name, &peer_path, "content_hash")?;
         if peer_hash != fixture_hash {
@@ -1515,18 +1512,9 @@ fn normalize_legacy_selected_content_identity(
     }
 
     let provenance = object_field(document, case_name, "$", "provenance")?;
-    let provenance_hash = string_field(
-        provenance,
-        case_name,
-        "provenance",
-        "content_pack_hash",
-    )?;
-    let provenance_oracle_sha = string_field(
-        provenance,
-        case_name,
-        "provenance",
-        "oracle_game_sha",
-    )?;
+    let provenance_hash = string_field(provenance, case_name, "provenance", "content_pack_hash")?;
+    let provenance_oracle_sha =
+        string_field(provenance, case_name, "provenance", "oracle_game_sha")?;
     if provenance_oracle_sha != content.oracle_game_sha {
         return Err(FixtureError::new(format!(
             "{case_name}: provenance oracle_game_sha {provenance_oracle_sha} disagrees with selected content oracle_game_sha {}",
@@ -1546,11 +1534,9 @@ fn normalize_legacy_selected_content_identity(
                 "{case_name}: selected fixture content hash {fixture_hash} disagrees with provenance digest {provenance_hash}"
             )));
         }
-        return Ok(());
+        return Ok(false);
     }
-    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
-    {
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST {
         return Err(FixtureError::new(format!(
             "{case_name}: content identity {fixture_hash} / {provenance_hash} is neither the selected pair {selected_hash} / {selected_digest} nor the exact published legacy pair"
         )));
@@ -1565,7 +1551,7 @@ fn normalize_legacy_selected_content_identity(
             "content_hash".to_owned(),
             Value::String(selected_hash.to_owned()),
         );
-    Ok(())
+    Ok(true)
 }
 
 fn normalize_legacy_state(
@@ -1578,12 +1564,8 @@ fn normalize_legacy_state(
     let canonical = state
         .get_mut("canonical")
         .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical is missing")))?;
-    normalize_legacy_selected_content_identity(
-        case_name,
-        document,
-        field_name,
-        canonical,
-        content,
+    let legacy_content_identity = normalize_legacy_selected_content_identity(
+        case_name, document, field_name, canonical, content,
     )?;
     let battle = canonical
         .get_mut("battle")
@@ -1637,7 +1619,7 @@ fn normalize_legacy_state(
             _ => unreachable!("condition list contains only weather and terrain"),
         }
     }
-    Ok(())
+    Ok(legacy_content_identity)
 }
 
 fn fixture_state(
@@ -1647,11 +1629,240 @@ fn fixture_state(
     content: &ContentPack,
 ) -> Result<GameState, Box<dyn Error>> {
     let mut value = object_field(document, case_name, "$", field_name)?.clone();
-    normalize_legacy_state(case_name, document, field_name, &mut value, content)?;
+    let legacy_content_identity =
+        normalize_legacy_state(case_name, document, field_name, &mut value, content)?;
     let canonical = value.get("canonical").cloned().ok_or_else(|| {
         FixtureError::new(format!("{case_name}: {field_name}.canonical is missing"))
     })?;
-    Ok(serde_json::from_value(canonical)?)
+    let mut state: GameState = serde_json::from_value(canonical)?;
+    if legacy_content_identity {
+        // The published offer used explicit singleton targets; the selected typed pack
+        // canonically represents a sole NEAR_OTHER target as IMPLICIT.
+        refresh_legacy_command_frontier_offers(case_name, &mut state, content)?;
+    }
+    Ok(state)
+}
+
+fn is_exact_legacy_content_identity(
+    document: &Value,
+    case_name: &str,
+    field_name: &str,
+    content: &ContentPack,
+) -> Result<bool, Box<dyn Error>> {
+    let state = object_field(document, case_name, "$", field_name)?;
+    let canonical = object_field(state, case_name, field_name, "canonical")?;
+    let fixture_hash = string_field(
+        canonical,
+        case_name,
+        &format!("{field_name}.canonical"),
+        "content_hash",
+    )?;
+    let provenance = object_field(document, case_name, "$", "provenance")?;
+    let provenance_hash = string_field(
+        provenance,
+        case_name,
+        "provenance",
+        "content_pack_hash",
+    )?;
+    Ok(fixture_hash != content.hash.as_str()
+        && fixture_hash == LEGACY_ORACLE_CONTENT_HASH
+        && provenance_hash == LEGACY_ORACLE_CONTENT_DIGEST)
+}
+
+fn refresh_legacy_command_frontier_offers(
+    case_name: &str,
+    state: &mut GameState,
+    content: &ContentPack,
+) -> Result<(), Box<dyn Error>> {
+    let frontier = state
+        .battle
+        .as_ref()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: legacy state has no battle")))?
+        .command_state
+        .frontier
+        .clone();
+    let mut offers = Vec::with_capacity(frontier.len());
+    for entry in &frontier {
+        if entry.field_slot.side != BattleSide::Player {
+            return Err(FixtureError::new(format!(
+                "{case_name}: legacy frontier entry {} is not a player command",
+                entry.operation_id
+            ))
+            .into());
+        }
+        let current_actor = state.battle.as_ref().and_then(|battle| {
+            battle
+                .field
+                .slots
+                .iter()
+                .find(|slot| slot.slot == entry.field_slot)
+                .and_then(|slot| slot.occupant)
+        });
+        if current_actor != Some(entry.actor) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: legacy frontier entry {} actor {} does not match its field occupant {:?}",
+                entry.operation_id, entry.actor, current_actor
+            ))
+            .into());
+        }
+        offers.push(build_command_offer(state, entry.field_slot, content)?);
+    }
+
+    let battle = state
+        .battle
+        .as_mut()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: legacy battle disappeared")))?;
+    if battle.command_state.frontier.len() != offers.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy frontier changed while refreshing content-derived offers"
+        ))
+        .into());
+    }
+    for (entry, offer) in battle.command_state.frontier.iter_mut().zip(offers) {
+        entry.offer = offer;
+    }
+    Ok(())
+}
+
+fn canonical_single_near_other_target(
+    case_name: &str,
+    state: &GameState,
+    field_slot: FieldSlot,
+    actor: PokemonId,
+    move_slot: MoveSlotIndex,
+    content: &ContentPack,
+) -> Result<Option<FieldSlot>, Box<dyn Error>> {
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: legacy command state has no battle"
+            ))
+        })?;
+    let field_entry = battle
+        .field
+        .slots
+        .iter()
+        .find(|entry| entry.slot == field_slot)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: legacy command actor {actor} has no field slot {field_slot:?}"
+            ))
+        })?;
+    if field_entry.occupant != Some(actor) {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy command actor {actor} does not occupy field slot {field_slot:?}"
+        ))
+        .into());
+    }
+    let actor_party = match field_slot.side {
+        BattleSide::Player => &battle.player_party,
+        BattleSide::Enemy => &battle.enemy_party,
+    };
+    let actor_state = actor_party
+        .iter()
+        .find(|pokemon| pokemon.id == actor)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: legacy command actor {actor} is absent from its {:?} party",
+                field_slot.side
+            ))
+        })?;
+    let move_state = actor_state
+        .moves
+        .get(usize::from(move_slot.get()))
+        .and_then(Option::as_ref)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: legacy command actor {actor} has no move in slot {}",
+                move_slot.get()
+            ))
+        })?;
+    let definition = find_move(&content.moves, move_state.move_id).map_err(|error| {
+        FixtureError::new(format!(
+            "{case_name}: legacy command actor {actor} has an unknown move {}: {error}",
+            move_state.move_id
+        ))
+    })?;
+    if definition.target != MoveTarget::NearOther {
+        return Ok(None);
+    }
+
+    let mut candidates = battle
+        .field
+        .slots
+        .iter()
+        .filter_map(|entry| {
+            if entry.slot == field_slot {
+                return None;
+            }
+            let capacity = match entry.slot.side {
+                BattleSide::Player => battle.format.player_capacity,
+                BattleSide::Enemy => battle.format.enemy_capacity,
+            };
+            if entry.slot.position >= capacity
+                || !battle.format.adjacency.iter().any(|edge| {
+                    (edge.first == field_slot && edge.second == entry.slot)
+                        || (edge.first == entry.slot && edge.second == field_slot)
+                })
+            {
+                return None;
+            }
+            let occupant = entry.occupant?;
+            let party = match entry.slot.side {
+                BattleSide::Player => &battle.player_party,
+                BattleSide::Enemy => &battle.enemy_party,
+            };
+            let pokemon = party.iter().find(|pokemon| pokemon.id == occupant)?;
+            (!pokemon.fainted && pokemon.hp > 0).then_some(entry.slot)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_unstable();
+    if candidates.len() == 1 {
+        Ok(candidates.first().copied())
+    } else {
+        Ok(None)
+    }
+}
+
+fn normalize_legacy_command_records(
+    case_name: &str,
+    initial: &GameState,
+    records: &mut [FixtureCommandRecord],
+    content: &ContentPack,
+) -> Result<(), Box<dyn Error>> {
+    // Keep the raw command for legacy wire assertions; only typed admission gets the
+    // selected-pack singleton-target spelling, and only after exact target verification.
+    for record in records {
+        let command = match &record.command {
+            BattleCommand::Fight {
+                actor,
+                move_slot,
+                targets: BattleTargetSelection::Selected(targets),
+            } if targets.len() == 1 => Some((*actor, *move_slot, targets[0])),
+            _ => None,
+        };
+        let Some((actor, move_slot, legacy_target)) = command else {
+            continue;
+        };
+        let Some(canonical_target) = canonical_single_near_other_target(
+            case_name,
+            initial,
+            record.field_slot,
+            actor,
+            move_slot,
+            content,
+        )?
+        else {
+            continue;
+        };
+        if legacy_target != canonical_target {
+            continue;
+        }
+        record.command = BattleCommand::fight(actor, move_slot, BattleTargetSelection::Implicit)?;
+    }
+    Ok(())
 }
 
 fn fixture_rng_boundary(
@@ -1879,9 +2090,11 @@ fn fixture_command_records(
             ))
             .into());
         }
+        let legacy_command = command.clone();
         records.push(FixtureCommandRecord {
             actor,
             command,
+            legacy_command,
             field_slot,
             operation_id,
             owner_seat,
@@ -2450,11 +2663,13 @@ fn is_catalogued_legacy_inactive_actor_compaction(
             == FieldSlot::new(BattleSide::Player, 1).expect("valid legacy source slot")
         && record.field_slot
             == FieldSlot::new(BattleSide::Player, 0).expect("valid typed source slot")
-        && action.command_operation_id.as_ref().is_some_and(|operation| {
-            operation.as_str() == "battle/1/wave/1/turn/1/command/player/1/seat/1"
-        })
-        && record.operation_id.as_str()
-            == "battle/1/wave/1/turn/1/command/player/0/seat/1"
+        && action
+            .command_operation_id
+            .as_ref()
+            .is_some_and(|operation| {
+                operation.as_str() == "battle/1/wave/1/turn/1/command/player/1/seat/1"
+            })
+        && record.operation_id.as_str() == "battle/1/wave/1/turn/1/command/player/0/seat/1"
         && record
             .owner_seat
             .is_some_and(|owner_seat| owner_seat.get().get() == 1)
@@ -4451,7 +4666,7 @@ fn assert_json_value(
 }
 
 fn legacy_target_bis(record: &FixtureCommandRecord) -> Vec<u64> {
-    match &record.command {
+    match &record.legacy_command {
         BattleCommand::Fight {
             targets: BattleTargetSelection::Selected(targets),
             ..
@@ -4535,7 +4750,7 @@ fn validate_legacy_command_wire(
     record: &FixtureCommandRecord,
 ) -> Result<(), Box<dyn Error>> {
     let command = u64_field(value, case_name, path, "command")?;
-    match (record.field_slot.side, &record.command) {
+    match (record.field_slot.side, &record.legacy_command) {
         (BattleSide::Player, BattleCommand::Fight { .. }) => {
             assert_keys_with_optional(
                 case_name,
@@ -4668,7 +4883,7 @@ fn validate_legacy_command_boundary(
 
         validate_legacy_command_wire(case_name, &command_path, command, initial, record)?;
         let expected_pre = matches!(
-            (&record.command, record.field_slot.side),
+            (&record.legacy_command, record.field_slot.side),
             (BattleCommand::Fight { .. }, BattleSide::Player)
         );
         if expected_pre {
@@ -5386,7 +5601,12 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     )?;
 
     let identities = legacy_identities(&document, case_name)?;
-    let records = fixture_command_records(&document, case_name)?;
+    let legacy_content_identity =
+        is_exact_legacy_content_identity(&document, case_name, "initial_state", &content)?;
+    let mut records = fixture_command_records(&document, case_name)?;
+    if legacy_content_identity {
+        normalize_legacy_command_records(case_name, &initial, &mut records, &content)?;
+    }
     let replacement_proposals = fixture_replacement_proposals(&document, case_name)?;
     let raw_expected_actions = fixture_action_order(&document, case_name)?;
     let expected_actions =
