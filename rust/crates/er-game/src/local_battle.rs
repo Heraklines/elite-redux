@@ -66,7 +66,13 @@ pub(crate) enum LocalBattleFrontier {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum LocalBattleRequest {
     Command(BattleCommandProposalV1),
+    /// Retained for the complete production request surface when this source
+    /// is included directly by the M3 local-battle contract test.
+    #[allow(dead_code)]
     Replacement(BattleReplacementProposalV1),
+    /// Retained for the internal no-legal-replacement path in the same
+    /// source-including contract-test target.
+    #[allow(dead_code)]
     InternalNoLegalReplacement { occurrence: FaintOccurrenceId },
 }
 
