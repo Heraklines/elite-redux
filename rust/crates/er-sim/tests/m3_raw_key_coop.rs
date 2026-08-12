@@ -135,6 +135,102 @@ fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> 
     Ok(())
 }
 
+fn adapt_legacy_content_condition_kind(value: &mut Value, path: &str) -> TestResult {
+    let normalized = match value {
+        Value::String(tag) if tag == "NONE" => serde_json::json!({"kind": "NONE"}),
+        Value::String(tag) => {
+            return Err(invalid(format!(
+                "{path} must be the published legacy string \"NONE\", got {tag:?}"
+            )));
+        }
+        Value::Object(kind) => {
+            let tag = kind
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid(format!("{path}.kind is not a string")))?;
+            let valid_shape = match tag {
+                "NONE" => kind.len() == 1,
+                "UNSUPPORTED_ORACLE_CODE" => {
+                    kind.len() == 2
+                        && kind
+                            .get("value")
+                            .and_then(Value::as_u64)
+                            .is_some_and(|value| u16::try_from(value).is_ok())
+                }
+                _ => false,
+            };
+            if !valid_shape {
+                return Err(invalid(format!(
+                    "{path} is not an exact WeatherKind/TerrainKind shape"
+                )));
+            }
+            Value::Object(kind.clone())
+        }
+        other => {
+            return Err(invalid(format!(
+                "{path} must be a legacy string or an exact adjacent kind object, got {other}"
+            )));
+        }
+    };
+    *value = normalized;
+    Ok(())
+}
+
+fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult {
+    let manifest = content
+        .get_mut("capability_manifest")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("content_pack.capability_manifest is not an object"))?;
+    let entries = manifest
+        .get_mut("entries")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid("content_pack.capability_manifest.entries is not an array"))?;
+
+    for (index, entry) in entries.iter_mut().enumerate() {
+        let subject = entry.get_mut("subject").ok_or_else(|| {
+            invalid(format!(
+                "content_pack.capability_manifest.entries[{index}].subject is missing"
+            ))
+        })?;
+        let subject = subject.as_object_mut().ok_or_else(|| {
+            invalid(format!(
+                "content_pack.capability_manifest.entries[{index}].subject is not an object"
+            ))
+        })?;
+        if subject.len() != 2
+            || !subject.contains_key("kind")
+            || !subject.contains_key("value")
+        {
+            return Err(invalid(format!(
+                "content_pack.capability_manifest.entries[{index}].subject must contain exactly kind and value"
+            )));
+        }
+        let is_condition = matches!(
+            subject.get("kind").and_then(Value::as_str),
+            Some("WEATHER" | "TERRAIN")
+        );
+        if subject.get("kind").and_then(Value::as_str).is_none() {
+            return Err(invalid(format!(
+                "content_pack.capability_manifest.entries[{index}].subject.kind is not a string"
+            )));
+        }
+        if is_condition {
+            let value = subject.get_mut("value").ok_or_else(|| {
+                invalid(format!(
+                    "content_pack.capability_manifest.entries[{index}].subject.value is missing"
+                ))
+            })?;
+            adapt_legacy_content_condition_kind(
+                value,
+                &format!(
+                    "content_pack.capability_manifest.entries[{index}].subject.value"
+                ),
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let canonical = state
         .get_mut("canonical")
@@ -488,10 +584,11 @@ impl BattlePair {
         guest_config.local_seat = guest;
 
         let content_wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
-        let content_value = content_wire
+        let mut content_value = content_wire
             .get("content_pack")
             .cloned()
             .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
+        adapt_legacy_content_conditions(&mut content_value)?;
         let content = Arc::new(serde_json::from_value(content_value)?);
         let host_kernel = GameKernel::new_battle(
             host_config,
