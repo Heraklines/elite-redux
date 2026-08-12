@@ -24,8 +24,7 @@ use er_types::battle_command::{
     ReplacementProposalFingerprintEntry, ReplacementSelection, ScriptedEnemyPolicyV1,
 };
 use er_types::battle_control::{
-    BattleControl, BattleControlPlan, BattleControlPlanError, BattleMenu,
-    SeatMenuInstanceAllocator,
+    BattleControl, BattleControlPlan, BattleControlPlanError, BattleMenu, SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId, PokemonId};
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};

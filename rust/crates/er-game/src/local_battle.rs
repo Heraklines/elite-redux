@@ -44,7 +44,7 @@ use crate::runtime::{CommandAdmission, GameReduction, GameRuntime, GameRuntimeEr
 // needed by the source-including local-battle contract test, so the production
 // crate does not retain unused crate-private reexports.
 #[cfg(test)]
-pub(crate) use crate::runtime::{BattleGameConfig, BattleStartV1, BATTLE_START_SCHEMA_VERSION};
+pub(crate) use crate::runtime::{BATTLE_START_SCHEMA_VERSION, BattleGameConfig, BattleStartV1};
 
 /// The private phase visible to the local game reducer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
