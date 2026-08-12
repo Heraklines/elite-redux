@@ -32,8 +32,8 @@ use er_protocol::{
 };
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    BattleCommandProposalV1, BattleReplacementProposalV1, ReplacementSelection,
-    ScriptedEnemyPolicyV1, replacement_operation_id,
+    BattleCommandProposalV1, BattleReplacementProposalV1, ScriptedEnemyPolicyV1,
+    replacement_operation_id,
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan, SeatMenuInstanceAllocator};
 use er_types::battle_ids::{AuthorityEpoch, FaintOccurrenceId, FieldSlot, MenuInstanceId};
@@ -370,7 +370,7 @@ pub(crate) fn prepare_authority_turn(
         match admit_command_proposal_with_context(
             &staged_state,
             &control,
-            &prepared_admission,
+            Some(&prepared_admission),
             proposal,
             content,
         )? {
@@ -557,7 +557,7 @@ pub(crate) fn prepare_authority_replacement(
             let admission = admit_replacement_proposal_with_context(
                 &state,
                 &control,
-                &prepared_admission,
+                Some(&prepared_admission),
                 replacement_fingerprints.entries(),
                 &proposal,
                 content,
@@ -1092,7 +1092,13 @@ pub(crate) fn protocol_next_control_from_plan(
                 .iter()
                 .filter(|target| target.1 != *current_occurrence)
                 .map(|target| {
-                    replacement_control_address(target.0, target.1, target.2, target.3, target.4)
+                    replacement_control_address(
+                        target.0,
+                        &target.1,
+                        &target.2,
+                        &target.3,
+                        &target.4,
+                    )
                 })
                 .collect::<Result<Vec<_>, AuthorityTransactionError>>()?;
             Ok(NextControl::Replacement(ReplacementControl {
@@ -1101,7 +1107,7 @@ pub(crate) fn protocol_next_control_from_plan(
                 epoch: current_source.epoch.get(),
                 wave: control_plan.wave.get(),
                 turn: control_plan.turn.get(),
-                occurrence: *current_occurrence,
+                occurrence: (*current_occurrence).into(),
                 field_index: SafeU53::new(u64::from(current_slot.position)).map_err(|source| {
                     AuthorityTransactionError::ControlProjection {
                         reason: source.to_string(),
@@ -1181,7 +1187,7 @@ fn replacement_control_address(
         epoch: source.epoch.get(),
         wave: source.wave.get(),
         turn: source.resolved_turn.get(),
-        occurrence: *occurrence,
+        occurrence: (*occurrence).into(),
         field_index,
     })
 }
