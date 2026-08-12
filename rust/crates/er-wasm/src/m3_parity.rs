@@ -267,6 +267,27 @@ fn battle_config(seed: &str, content: &ContentPack) -> Result<BattleGameConfig, 
         safe(0),
         pokemon_id(2),
         enemy_slot,
+        enemy_command.clone(),
+    )
+    .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let next_turn =
+        TurnIndex::new(safe(2)).map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let next_enemy_operation = scripted_enemy_command_operation_id(
+        battle_id,
+        wave,
+        next_turn,
+        enemy_slot,
+        safe(1),
+    )
+    .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let next_enemy_script = ScriptedEnemyBattleCommandV1::new(
+        next_enemy_operation,
+        battle_id,
+        wave,
+        next_turn,
+        safe(1),
+        pokemon_id(2),
+        enemy_slot,
         enemy_command,
     )
     .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
@@ -293,8 +314,11 @@ fn battle_config(seed: &str, content: &ContentPack) -> Result<BattleGameConfig, 
         },
         local_seat: seat(1),
         wave_seed: format!("{seed}/wave"),
-        scripted_enemy_policy: ScriptedEnemyPolicyV1::new(safe(0), vec![enemy_script])
-            .map_err(|error| M3ParityError::Configuration(error.to_string()))?,
+        scripted_enemy_policy: ScriptedEnemyPolicyV1::new(
+            safe(0),
+            vec![enemy_script, next_enemy_script],
+        )
+        .map_err(|error| M3ParityError::Configuration(error.to_string()))?,
     })
 }
 
