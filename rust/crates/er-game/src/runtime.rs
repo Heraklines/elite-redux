@@ -1708,9 +1708,8 @@ impl GameRuntime {
             {
                 let move_state = pokemon.moves[usize::from(raw)]
                     .ok_or_else(|| ui_rejected("offered move is absent from the actor state"))?;
-                MoveMenuEntry::from_offer(move_state.move_id, move_offer).map_err(|error| {
-                    GameRuntimeError::MoveMenu(MoveMenuError::Entry(error))
-                })?
+                MoveMenuEntry::from_offer(move_state.move_id, move_offer)
+                    .map_err(|error| GameRuntimeError::MoveMenu(MoveMenuError::Entry(error)))?
             } else if let Some(move_state) = pokemon.moves[usize::from(raw)] {
                 MoveMenuEntry::disabled(move_state.move_id)
             } else {
@@ -2561,7 +2560,7 @@ impl GameRuntime {
             )
             .ok_or_else(|| invalid_config("pending no-legal replacement allocator is absent"))?;
         if !matches!(
-            build_replacement_menu(&battle, pending.occurrence, allocator.next_menu_instance_id)?,
+            build_replacement_menu(battle, pending.occurrence, allocator.next_menu_instance_id)?,
             ReplacementMenuResult::NoLegalReplacement { .. }
         ) {
             return Err(GameRuntimeError::ControlProjectionMismatch);
@@ -2617,14 +2616,14 @@ impl GameRuntime {
     }
 
     fn remember_control(&mut self, seat: SeatId, next: BattleControlPlan) {
-        if let Some(previous) = self.control.seat(seat).map(|entry| entry.control.clone()) {
-            if let Some(next_entry) = next.seat(seat) {
-                self.menu_history.push(MenuHistoryEntry {
-                    seat,
-                    from: previous,
-                    to: next_entry.control.clone(),
-                });
-            }
+        if let Some(previous) = self.control.seat(seat).map(|entry| entry.control.clone())
+            && let Some(next_entry) = next.seat(seat)
+        {
+            self.menu_history.push(MenuHistoryEntry {
+                seat,
+                from: previous,
+                to: next_entry.control.clone(),
+            });
         }
     }
 
@@ -2971,10 +2970,9 @@ fn rebuild_remote_command_path(
         .control
         .seat(proposal.owner_seat)
         .map(|entry| &entry.control)
+        && matches!(control, BattleControl::CommandRoot(_))
     {
-        if matches!(control, BattleControl::CommandRoot(_)) {
-            push_unique_replay_control(&mut prior_controls, control);
-        }
+        push_unique_replay_control(&mut prior_controls, control);
     }
     for history in histories
         .iter()
@@ -3078,16 +3076,14 @@ fn rebuild_remote_replacement_path(
     // Replacement proofs use the same installed-parent rule as commands: the
     // current replacement control is a valid prior when admission is captured
     // before the common material boundary records a history transition.
-    if let Some(control) = runtime.control.seat(owner).map(|entry| &entry.control) {
-        if let BattleControl::ReplacementSelect(value) = control {
-            if value.occurrence == occurrence
-                && value.owner_seat == owner
-                && value.field_slot == faint.slot
-                && value.source == faint.source
-            {
-                push_unique_replay_control(&mut prior_controls, control);
-            }
-        }
+    if let Some(control) = runtime.control.seat(owner).map(|entry| &entry.control)
+        && let BattleControl::ReplacementSelect(value) = control
+        && value.occurrence == occurrence
+        && value.owner_seat == owner
+        && value.field_slot == faint.slot
+        && value.source == faint.source
+    {
+        push_unique_replay_control(&mut prior_controls, control);
     }
     for history in histories.iter().filter(|history| history.seat == owner) {
         for control in &history.controls {
@@ -3693,12 +3689,11 @@ fn validate_current_operation_binding(
         .and_then(|faint| faint.owner_seat)
         .ok_or_else(|| invalid_config("replacement operation has no human owner"))?;
     for entry in &control.seats {
-        if entry.decision_operation_id.is_some() {
-            if entry.seat != owner
-                || entry.decision_operation_id.as_ref() != Some(material_operation_id)
-            {
-                return Err(GameRuntimeError::CurrentOperationMismatch);
-            }
+        if entry.decision_operation_id.is_some()
+            && (entry.seat != owner
+                || entry.decision_operation_id.as_ref() != Some(material_operation_id))
+        {
+            return Err(GameRuntimeError::CurrentOperationMismatch);
         }
     }
     Ok(())
