@@ -1,5 +1,13 @@
 #![allow(clippy::too_many_arguments)]
 
+mod snapshot {
+    pub(crate) use er_kernel::snapshot::{
+        HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRepeatSnapshotV2,
+        InputRouterSnapshotV2, PhysicalInputSourceV2, PressedPhysicalInputSnapshotV2,
+        SnapshotError,
+    };
+}
+
 #[path = "../src/battle_ui.rs"]
 mod battle_ui;
 #[path = "../src/input_router.rs"]
@@ -64,8 +72,8 @@ fn command_projection(
         "battle/1/wave/1/turn/1/control/player/0/seat/1/command",
         MenuOptionId::new(selected)?,
         vec![
-            option("command/switch", 1, switch_enabled)?,
-            option("command/fight", 0, true)?,
+            option(switch.as_str(), 1, switch_enabled)?,
+            option(fight.as_str(), 0, true)?,
         ],
         navigation,
     )?;
