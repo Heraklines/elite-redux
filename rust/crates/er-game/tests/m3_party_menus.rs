@@ -497,12 +497,11 @@ fn replacement_graph_uses_stored_source_and_exact_legality() -> Result<(), Box<d
     );
     for option in [&slot_zero, &slot_one, &cancel] {
         assert!(
-            control
+            !control
                 .menu
                 .option(option.clone())
                 .ok_or_else(|| invalid_data("replacement option missing"))?
                 .enabled
-                == false
         );
     }
     assert!(
