@@ -2,6 +2,7 @@ use std::error::Error;
 
 use er_kernel::KernelInput;
 
+#[cfg(target_arch = "wasm32")]
 use er_wasm::m3_parity;
 use er_wasm::m3_parity::{
     M3_PARITY_FIXTURE_SCHEMA_VERSION, M3_PARITY_TRACE_ID, M3ParityError, final_evidence_fixture,
@@ -22,7 +23,7 @@ fn assert_eventwise_contract() -> TestResult {
             .all(|event| matches!(&event.input, KernelInput::RawInput { .. })),
         "M3 parity fixture must cross the raw physical-input boundary for every event"
     );
-    assert_eq!(fixture.snapshot_boundary_after.get().get(), 3);
+    assert_eq!(fixture.snapshot_boundary_after.get(), 3);
     let serialized_trace = final_evidence_trace_json()?;
     let parsed = parse_serialized_trace(&serialized_trace)?;
     assert_eq!(parsed, fixture);
@@ -32,18 +33,17 @@ fn assert_eventwise_contract() -> TestResult {
     assert_eq!(report.trace_id, M3_PARITY_TRACE_ID);
     assert_eq!(report.seed, fixture.seed);
     assert_eq!(
-        report.coverage.raw_event_count.get().get(),
+        report.coverage.raw_event_count.get(),
         fixture.events.len() as u64
     );
-    assert!(report.coverage.presentation_settlement_count.get().get() > 0);
-    assert!(report.coverage.continuation_input_count.get().get() > 0);
-    assert_eq!(report.snapshot_boundary.after_raw_event.get().get(), 3);
+    assert!(report.coverage.presentation_settlement_count.get() > 0);
+    assert!(report.coverage.continuation_input_count.get() > 0);
+    assert_eq!(report.snapshot_boundary.after_raw_event.get(), 3);
     assert_eq!(report.snapshot_boundary.snapshot_schema_version, 2);
     assert!(
         report
             .snapshot_boundary
             .pending_presentation_count
-            .get()
             .get()
             > 0
     );
@@ -64,7 +64,7 @@ fn assert_eventwise_contract() -> TestResult {
             .any(|observation| observation.battle_turn.get().get() > 1)
     );
     for (index, observation) in report.observations.iter().enumerate() {
-        assert_eq!(observation.sequence.get().get(), (index + 1) as u64);
+        assert_eq!(observation.sequence.get(), (index + 1) as u64);
         assert!(observation.virtual_time_ms <= fixture.events.last().unwrap().virtual_time_ms);
         assert!(!observation.effect_digest.is_empty());
         assert!(!observation.state_digest.is_empty());
