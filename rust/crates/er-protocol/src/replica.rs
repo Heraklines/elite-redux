@@ -1601,7 +1601,7 @@ fn decode_snapshot_hex(
     path: &str,
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
-    if raw.len() % 2 != 0 {
+    if !raw.len().is_multiple_of(2) {
         return Err(snapshot_canonical(
             path,
             "canonical payload has odd hex length",
@@ -1774,7 +1774,7 @@ fn parse_replacement_control_id(value: &str) -> Option<NextControl> {
 
 fn parse_replacement_address(value: &str) -> Option<ReplacementControlAddress> {
     let mut fields = value.split(':');
-    Some(ReplacementControlAddress {
+    let address = ReplacementControlAddress {
         operation_id: parse_operation_id(fields.next()?)?,
         owner_seat_id: parse_prefixed_seat(fields.next()?, "s")?,
         epoch: parse_prefixed_u53(fields.next()?, "e")?,
@@ -1782,8 +1782,11 @@ fn parse_replacement_address(value: &str) -> Option<ReplacementControlAddress> {
         turn: parse_prefixed_u53(fields.next()?, "t")?,
         occurrence: parse_prefixed_u53(fields.next()?, "o")?,
         field_index: parse_prefixed_u53(fields.next()?, "f")?,
-    })
-    .filter(|_| fields.next().is_none())
+    };
+    if fields.next().is_some() {
+        return None;
+    }
+    Some(address)
 }
 
 fn parse_shared_interaction_control_id(value: &str) -> Option<NextControl> {
@@ -1890,13 +1893,16 @@ fn parse_interaction_addresses(value: &str) -> Option<Option<Vec<InteractionCont
             .split(',')
             .map(|address| {
                 let mut fields = address.split(':');
-                Some(InteractionControlAddress {
+                let address = InteractionControlAddress {
                     surface_class: decode_uri_component(fields.next()?)?,
                     operation_kind: decode_uri_component(fields.next()?)?,
                     wave: parse_prefixed_u53(fields.next()?, "w")?,
                     turn: parse_prefixed_u53(fields.next()?, "t")?,
-                })
-                .filter(|_| fields.next().is_none())
+                };
+                if fields.next().is_some() {
+                    return None;
+                }
+                Some(address)
             })
             .collect::<Option<Vec<_>>>()?,
     ))

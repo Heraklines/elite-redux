@@ -693,15 +693,14 @@ impl AuthorityLogSnapshotV2 {
                     "presentation settlement must retain the exact bound generation",
                 ));
             }
-            if let Some(max_attempts) = self.max_delivery_attempts {
-                if lease.attempts.as_u64() > max_attempts.get()
-                    || (!lease.stopped && lease.attempts.as_u64() >= max_attempts.get())
-                {
-                    return Err(invalid(
-                        "authority_log.retained",
-                        "delivery attempts/timer do not cross-validate with max_delivery_attempts",
-                    ));
-                }
+            if let Some(max_attempts) = self.max_delivery_attempts
+                && (lease.attempts.as_u64() > max_attempts.get()
+                    || (!lease.stopped && lease.attempts.as_u64() >= max_attempts.get()))
+            {
+                return Err(invalid(
+                    "authority_log.retained",
+                    "delivery attempts/timer do not cross-validate with max_delivery_attempts",
+                ));
             }
         }
         if let Some(entry) = &self.latest_committed {
@@ -1319,29 +1318,30 @@ impl ProtocolRuntimeSnapshotV2 {
                 ));
             }
         }
-        if let Some(control) = &self.pending_control {
-            if control.operation_id.as_str().is_empty() {
-                return Err(invalid(
-                    "protocol.pending_control.operation_id",
-                    "operation identity must not be empty",
-                ));
-            }
-            if control.expected_control_id.is_empty() {
-                return Err(invalid(
-                    "protocol.pending_control.expected_control_id",
-                    "must not be empty",
-                ));
-            }
+        if let Some(control) = &self.pending_control
+            && control.operation_id.as_str().is_empty()
+        {
+            return Err(invalid(
+                "protocol.pending_control.operation_id",
+                "operation identity must not be empty",
+            ));
         }
-        if let (Some(material), Some(control)) = (&self.pending_material, &self.pending_control) {
-            if material.revision != control.revision
-                || material.operation_id != control.operation_id
-            {
-                return Err(invalid(
-                    "protocol.pending_material",
-                    "pending material/control identities must agree when both are present",
-                ));
-            }
+        if let Some(control) = &self.pending_control
+            && control.expected_control_id.is_empty()
+        {
+            return Err(invalid(
+                "protocol.pending_control.expected_control_id",
+                "must not be empty",
+            ));
+        }
+        if let (Some(material), Some(control)) = (&self.pending_material, &self.pending_control)
+            && (material.revision != control.revision
+                || material.operation_id != control.operation_id)
+        {
+            return Err(invalid(
+                "protocol.pending_material",
+                "pending material/control identities must agree when both are present",
+            ));
         }
         if self.disposed
             && (!self.pending_correlations.is_empty()

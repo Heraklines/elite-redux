@@ -521,7 +521,7 @@ fn validate_replacement_digest(
     if fields.next().is_some()
         || length_wire.is_empty()
         || hash_wire.len() != 8
-        || length_wire.bytes().any(|byte| !matches!(byte, b'0'..=b'9'))
+        || length_wire.bytes().any(|byte| !byte.is_ascii_digit())
         || hash_wire
             .bytes()
             .any(|byte| !matches!(byte, b'0'..=b'9' | b'a'..=b'f'))

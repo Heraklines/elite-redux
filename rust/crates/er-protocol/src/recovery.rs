@@ -1927,16 +1927,14 @@ fn validate_recovery_snapshot_state(
     }
     if let (Some(captured_frontier), Some(captured_state)) =
         (snapshot.captured_frontier, snapshot.captured_state)
-    {
-        if captured_frontier != captured_state.control
+        && (captured_frontier != captured_state.control
             || captured_state.control > captured_state.material
-            || captured_state.material > captured_state.received
-        {
-            return Err(recovery_snapshot_invalid(
-                "recovery.captured_state",
-                "captured frontier does not contain an ordered control frontier",
-            ));
-        }
+            || captured_state.material > captured_state.received)
+    {
+        return Err(recovery_snapshot_invalid(
+            "recovery.captured_state",
+            "captured frontier does not contain an ordered control frontier",
+        ));
     }
 
     match phase {
@@ -2129,23 +2127,22 @@ fn validate_recovery_snapshot_state(
         }
     }
 
-    if let Some(request_id) = &snapshot.request_id {
-        if request_id.is_empty() {
-            return Err(recovery_snapshot_invalid(
-                "recovery.request_id",
-                "request identity must not be empty",
-            ));
-        }
+    if let Some(request_id) = &snapshot.request_id
+        && request_id.is_empty()
+    {
+        return Err(recovery_snapshot_invalid(
+            "recovery.request_id",
+            "request identity must not be empty",
+        ));
     }
-    if let (Some(snapshot_bundle), Some(bundle)) = (&snapshot.bundle, bundle) {
-        if snapshot_bundle.correlation_id != bundle.request_id
-            || snapshot.request_id.as_deref() != Some(bundle.request_id.as_str())
-        {
-            return Err(recovery_snapshot_invalid(
-                "recovery.bundle",
-                "canonical bundle identity differs from the active request",
-            ));
-        }
+    if let (Some(snapshot_bundle), Some(bundle)) = (&snapshot.bundle, bundle)
+        && (snapshot_bundle.correlation_id != bundle.request_id
+            || snapshot.request_id.as_deref() != Some(bundle.request_id.as_str()))
+    {
+        return Err(recovery_snapshot_invalid(
+            "recovery.bundle",
+            "canonical bundle identity differs from the active request",
+        ));
     }
     if snapshot.disposed && (!snapshot.timers.is_empty() || bundle.is_some()) {
         return Err(recovery_snapshot_invalid(
@@ -2233,7 +2230,7 @@ fn decode_recovery_hex(
     path: &str,
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
-    if raw.len() % 2 != 0 {
+    if !raw.len().is_multiple_of(2) {
         return Err(recovery_snapshot_canonical(
             path,
             "canonical payload has odd hex length",

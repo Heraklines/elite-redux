@@ -1990,7 +1990,7 @@ fn decode_proposal_hex(
     path: &str,
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
-    if raw.len() % 2 != 0 {
+    if !raw.len().is_multiple_of(2) {
         return Err(proposal_snapshot_canonical(
             path,
             "canonical payload has odd hex length",
