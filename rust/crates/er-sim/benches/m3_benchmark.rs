@@ -124,6 +124,34 @@ fn normalize_nested_kind(object: &mut Value, path: &str, field_name: &str) -> Te
     Ok(())
 }
 
+fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> TestResult {
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+    let kind = object
+        .get(field_name)
+        .cloned()
+        .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
+    let normalized = match kind {
+        Value::String(tag) => json!({"kind": tag}),
+        Value::Object(nested) => {
+            if nested.get("kind").and_then(Value::as_str).is_none() {
+                return Err(invalid(format!(
+                    "{path}.{field_name} has an invalid adjacent kind object"
+                )));
+            }
+            Value::Object(nested)
+        }
+        other => {
+            return Err(invalid(format!(
+                "{path}.{field_name} has unsupported value {other}"
+            )));
+        }
+    };
+    object.insert(field_name.to_owned(), normalized);
+    Ok(())
+}
+
 fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let canonical = state
         .get_mut("canonical")
@@ -193,7 +221,7 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
                 "initial_state canonical battle {condition_name} is missing"
             ))
         })?;
-        normalize_nested_kind(
+        normalize_adjacent_kind(
             condition,
             &format!("initial_state canonical battle {condition_name}"),
             "kind",
