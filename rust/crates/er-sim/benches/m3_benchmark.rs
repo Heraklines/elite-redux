@@ -23,7 +23,7 @@ use er_protocol::{
 use er_sim::{PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair};
 use er_state::battle::BattleState;
 use er_state::snapshot::GameState;
-use er_types::battle_control::BattleControl;
+use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandAdmissionSource,
     CommandFrontierStatus, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
@@ -36,7 +36,7 @@ use er_types::battle_model::BattleOutcome;
 use er_types::battle_ui::PresentationSettlementOutcome;
 use er_types::{
     ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass, UiViewKind,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -133,20 +133,20 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let battle = canonical
         .get_mut("battle")
         .and_then(Value::as_object_mut)
-        .ok_or_else(|| invalid("initial_state.canonical.battle is invalid"))?;
+        .ok_or_else(|| invalid("initial_state canonical battle value is invalid"))?;
 
     let format_slots = battle
         .get("format")
         .and_then(Value::as_object)
         .and_then(|format| format.get("slots"))
         .cloned()
-        .ok_or_else(|| invalid("initial_state.canonical.battle.format.slots is missing"))?;
+        .ok_or_else(|| invalid("initial_state canonical battle format slots are missing"))?;
     let field_slots = battle
         .get("field")
         .and_then(Value::as_object)
         .and_then(|field| field.get("slots"))
         .cloned()
-        .ok_or_else(|| invalid("initial_state.canonical.battle.field.slots is missing"))?;
+        .ok_or_else(|| invalid("initial_state canonical battle field slots are missing"))?;
     if !format_slots.is_array() || !field_slots.is_array() {
         return Err(invalid(
             "initial_state canonical format.slots and field.slots must be arrays",
@@ -160,10 +160,10 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let format = battle
         .get_mut("format")
         .and_then(Value::as_object_mut)
-        .ok_or_else(|| invalid("initial_state.canonical.battle.format is invalid"))?;
+        .ok_or_else(|| invalid("initial_state canonical battle format is invalid"))?;
     if format.remove("slots").is_none() {
         return Err(invalid(
-            "initial_state.canonical.battle.format.slots could not be removed",
+            "initial_state canonical battle format slots could not be removed",
         ));
     }
 
@@ -172,19 +172,17 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
             .get_mut(party_name)
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
-                invalid(format!(
-                    "initial_state.canonical.battle.{party_name} is invalid"
-                ))
+                invalid(format!("initial_state canonical battle {party_name} is invalid"))
             })?;
         for (index, pokemon) in party.iter_mut().enumerate() {
             let status = pokemon.get_mut("status").ok_or_else(|| {
                 invalid(format!(
-                    "initial_state.canonical.battle.{party_name}[{index}].status is missing"
+                    "initial_state canonical battle {party_name}[{index}] status is missing"
                 ))
             })?;
             normalize_nested_kind(
                 status,
-                &format!("initial_state.canonical.battle.{party_name}[{index}].status"),
+                &format!("initial_state canonical battle {party_name}[{index}] status"),
                 "kind",
             )?;
         }
@@ -192,12 +190,12 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     for condition_name in ["weather", "terrain"] {
         let condition = battle.get_mut(condition_name).ok_or_else(|| {
             invalid(format!(
-                "initial_state.canonical.battle.{condition_name} is missing"
+                "initial_state canonical battle {condition_name} is missing"
             ))
         })?;
         normalize_nested_kind(
             condition,
-            &format!("initial_state.canonical.battle.{condition_name}"),
+            &format!("initial_state canonical battle {condition_name}"),
             "kind",
         )?;
     }
@@ -249,7 +247,8 @@ fn lead_indices(battle: &BattleState, side: BattleSide, capacity: u8) -> TestRes
 
 fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicyV1> {
     let mut commands = Vec::new();
-    for position in 0..battle.format.enemy_capacity {
+    let enemy_capacity = battle.format.enemy_capacity;
+    for position in 0..enemy_capacity {
         let field_slot = FieldSlot::new(BattleSide::Enemy, position)?;
         let actor = battle
             .field
@@ -718,7 +717,9 @@ fn state_game<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
         .get("game")
         .ok_or_else(|| invalid(format!("{label} has no canonical game state")))?;
     if !game.is_object() {
-        return Err(invalid(format!("{label}.game is not an object")));
+        return Err(invalid(format!(
+            "{label} canonical game value is not an object"
+        )));
     }
     Ok(game)
 }
@@ -726,9 +727,11 @@ fn state_game<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
 fn state_battle<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
     let battle = state_game(state, label)?
         .get("battle")
-        .ok_or_else(|| invalid(format!("{label}.game has no battle state")))?;
+        .ok_or_else(|| invalid(format!("{label} canonical game has no battle state")))?;
     if !battle.is_object() {
-        return Err(invalid(format!("{label}.game.battle is not an object")));
+        return Err(invalid(format!(
+            "{label} canonical battle value is not an object"
+        )));
     }
     Ok(battle)
 }
@@ -749,7 +752,7 @@ fn state_turn(state: &Value, label: &str) -> TestResult<u64> {
         .and_then(Value::as_u64)
         .ok_or_else(|| {
             invalid(format!(
-                "{label}.game.battle.turn is not a non-negative integer"
+                "{label} canonical battle turn is not a non-negative integer"
             ))
         })
 }
@@ -759,10 +762,10 @@ fn assert_local_victory_terminal(kernel: &GameKernel, label: &str) -> TestResult
     let outcome = state_battle(&snapshot.state, label)?
         .get("outcome")
         .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{label}.game.battle.outcome is not a string")))?;
+        .ok_or_else(|| invalid(format!("{label} canonical battle outcome is not a string")))?;
     if outcome != "VICTORY" {
         return Err(invalid(format!(
-            "{label}.game.battle.outcome is {outcome}, expected VICTORY"
+            "{label} canonical battle outcome is {outcome}, expected VICTORY"
         )));
     }
     let projection = kernel
@@ -795,13 +798,13 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
     battle.command_state.validate()?;
     if battle.turn.get().get() != expected_turn {
         return Err(invalid(format!(
-            "{label}.game.battle.turn is {}, expected {expected_turn}",
+            "{label} canonical battle turn is {}, expected {expected_turn}",
             battle.turn
         )));
     }
     if battle.outcome != BattleOutcome::Ongoing {
         return Err(invalid(format!(
-            "{label}.game.battle.outcome is {:?}, expected ONGOING",
+            "{label} canonical battle outcome is {:?}, expected ONGOING",
             battle.outcome
         )));
     }
@@ -822,7 +825,7 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
         .count();
     if expected_human_pending == 0 || expected_scripted_enemy == 0 {
         return Err(invalid(format!(
-            "{label}.game.battle has no complete occupied player/enemy frontier"
+            "{label} canonical battle has no complete occupied player/enemy frontier"
         )));
     }
 
@@ -900,7 +903,7 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
     }
     if actual_slots != expected_slots {
         return Err(invalid(format!(
-            "{label}.game.battle.command_state.frontier does not exactly cover occupied slots"
+            "{label} command frontier does not exactly cover occupied battle slots"
         )));
     }
     if human_pending != expected_human_pending {
@@ -963,6 +966,92 @@ fn assert_pair_control_convergence(snapshot: &er_sim::PairSnapshot) -> TestResul
         return Err(invalid(
             "two-client supported turn host/guest control projection does not converge",
         ));
+    }
+    Ok(())
+}
+
+fn assert_terminal_control_plan(state: &Value, label: &str) -> TestResult {
+    let plan: BattleControlPlan = serde_json::from_value(state_control(state, label)?.clone())?;
+    plan.validate()?;
+
+    let expected_seats = [seat(1), seat(2)];
+    if plan.seats.len() != expected_seats.len() {
+        return Err(invalid(format!(
+            "{label} terminal control plan has {} seats, expected {}",
+            plan.seats.len(),
+            expected_seats.len()
+        )));
+    }
+    for (entry, expected_seat) in plan.seats.iter().zip(expected_seats) {
+        if entry.seat != expected_seat {
+            return Err(invalid(format!(
+                "{label} terminal control seat {} is not canonical seat {expected_seat}",
+                entry.seat
+            )));
+        }
+        if !matches!(
+            &entry.control,
+            BattleControl::Complete(BattleOutcome::Victory)
+        ) {
+            return Err(invalid(format!(
+                "{label} seat {expected_seat} did not reach Complete(Victory)"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn assert_pair_victory_terminal(
+    snapshot: &er_sim::PairSnapshot,
+    evidence: &TurnEvidence,
+) -> TestResult {
+    let terminal_reason = snapshot
+        .terminal_reason
+        .as_deref()
+        .filter(|reason| !reason.is_empty())
+        .ok_or_else(|| invalid("complete co-op battle has no shared terminal reason"))?;
+
+    assert_pair_mechanical_convergence(snapshot)?;
+    assert_pair_control_convergence(snapshot)?;
+    if snapshot.host.kernel.ui != snapshot.guest.kernel.ui {
+        return Err(invalid(
+            "complete co-op battle host/guest kernel UI state does not converge",
+        ));
+    }
+    if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
+        return Err(invalid(format!(
+            "complete co-op battle authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
+            evidence.authority_turn_commits, evidence.replica_turn_commits
+        )));
+    }
+
+    for (label, endpoint) in [
+        ("complete co-op host", &snapshot.host),
+        ("complete co-op guest", &snapshot.guest),
+    ] {
+        let outcome = state_battle(&endpoint.kernel.state, label)?
+            .get("outcome")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid(format!("{label} canonical battle outcome is not a string")))?;
+        if outcome != "VICTORY" {
+            return Err(invalid(format!(
+                "{label} canonical battle outcome is {outcome}, expected VICTORY"
+            )));
+        }
+        assert_terminal_control_plan(&endpoint.kernel.state, label)?;
+        if endpoint.ui.actionable
+            || endpoint.ui.owner_seat.is_some()
+            || endpoint.ui.kind != UiViewKind::Terminal
+        {
+            return Err(invalid(format!(
+                "{label} did not project a non-actionable ownerless terminal UI"
+            )));
+        }
+        if endpoint.ui.prompt_key.as_deref() != Some(terminal_reason) {
+            return Err(invalid(format!(
+                "{label} terminal UI prompt does not equal the shared terminal reason"
+            )));
+        }
     }
     Ok(())
 }
@@ -1363,14 +1452,11 @@ fn m3_complete_supported_coop_battle() -> TestResult {
         &mut setup_evidence,
     )?;
 
-    // Pair construction and connection are initialization and intentionally
-    // stay outside the elapsed interval for this complete co-op workload.
+    // Content/fixture decoding, pair construction, and the initial reconnect
+    // are initialization and intentionally stay outside the elapsed interval.
     let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
-    let mut counts = Counts {
-        battles: 1,
-        ..Counts::default()
-    };
+    let mut counts = Counts::default();
     let mut pending = Vec::new();
     let mut evidence = TurnEvidence::default();
     for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
@@ -1413,18 +1499,14 @@ fn m3_complete_supported_coop_battle() -> TestResult {
         &mut evidence,
     )?;
     let snapshot = pair.snapshot()?;
-    if snapshot.terminal_reason.is_none() {
-        return Err(invalid(
-            "complete supported co-op workload did not reach a shared terminal boundary",
-        ));
-    }
-    counts.turns = 1;
-    counts.battles = 1;
-    let execution_elapsed_ns = elapsed_ns(execution_started);
+    assert_pair_victory_terminal(&snapshot, &evidence)?;
     absorb(&mut checksum, &snapshot)?;
     let teardown_snapshot = pair.teardown("m3 complete co-op battle teardown")?;
     assert_zero_pair_resources(&teardown_snapshot);
     absorb(&mut checksum, &teardown_snapshot)?;
+    counts.turns = 1;
+    counts.battles = 1;
+    let execution_elapsed_ns = elapsed_ns(execution_started);
     report(
         "complete-supported-coop-battle",
         BENCHMARK_SEED,
@@ -1438,7 +1520,7 @@ fn m3_complete_supported_coop_battle() -> TestResult {
             "input_architecture": "two authority/replica endpoints driven by raw physical keydown/keyUp",
             "fixture": "doubles-single-target with deterministic short-battle enemy boundary",
             "initialization_excluded": true,
-            "terminal": "shared pair terminal boundary",
+            "terminal": "shared victory terminal with converged canonical/control/UI state",
         }),
     )
 }
