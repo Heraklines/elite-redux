@@ -130,6 +130,7 @@ fn legality(error: CommandLegalityError) -> AuthorityCommandError {
 
 /// Result of admitting one human command proposal into the cloned game state.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum CommandAdmissionResult {
     Admitted {
         state: GameState,
@@ -431,7 +432,7 @@ fn admit_new_command(
     validate_command_control_plan(control, battle)?;
 
     let expected_owner = owner_seat_for(&battle.format, proposal.field_slot)
-        .map_err(|source| AuthorityCommandError::Topology(source))?
+        .map_err(AuthorityCommandError::Topology)?
         .ok_or(AuthorityCommandError::CommandControlMismatch {
             reason: "a human proposal must address a player field slot",
         })?;
@@ -496,7 +497,7 @@ pub fn admit_scripted_enemy_frontier(
 ) -> Result<ScriptedEnemyAdmission, AuthorityCommandError> {
     policy
         .validate()
-        .map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
+        .map_err(AuthorityCommandError::ScriptedPolicy)?;
     validate_state_content(state, content).map_err(legality)?;
 
     let mut next_state = state.clone();
@@ -581,7 +582,7 @@ pub fn admit_scripted_enemy_frontier(
 
     next_policy
         .validate()
-        .map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
+        .map_err(AuthorityCommandError::ScriptedPolicy)?;
     validate_state_content(&next_state, content).map_err(legality)?;
     Ok(ScriptedEnemyAdmission {
         state: next_state,
@@ -613,7 +614,7 @@ pub fn project_scripted_policy_for_material(
 ) -> Result<ScriptedEnemyPolicyV1, AuthorityCommandError> {
     policy_before
         .validate()
-        .map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
+        .map_err(AuthorityCommandError::ScriptedPolicy)?;
     validate_state_content(state, content).map_err(legality)?;
 
     let battle = active_battle(state)?;
@@ -657,7 +658,7 @@ pub fn project_scripted_policy_for_material(
 
     expected_policy
         .validate()
-        .map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
+        .map_err(AuthorityCommandError::ScriptedPolicy)?;
     Ok(expected_policy)
 }
 
