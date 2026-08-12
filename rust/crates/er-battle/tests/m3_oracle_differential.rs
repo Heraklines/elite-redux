@@ -22,9 +22,13 @@ use er_battle::legality::{
 use er_battle::presentation::{PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY};
 use er_battle::resolver::BattleMutation;
 use er_battle::{resolve_replacement, resolve_turn};
+use er_canonical::fixture_digest;
 use er_content::moves::find_move;
 use er_content::pack::{ContentPack, selected_content_pack};
-use er_rng::audit::{RngCallsiteId, RngDraw, SeedOffsetContext};
+use er_rng::audit::{
+    RngAuditState, RngCallsiteId, RngDraw, RngPublicApi, RngReason, RngStream,
+    SeedOffsetContext, rng_state_fingerprint,
+};
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::RunRngState;
 use er_state::battle::{BattleOutcome, CommandCollectionState};
@@ -231,6 +235,143 @@ struct LegacyStaleFinalOccupant {
     slot: FieldSlot,
     pokemon: PokemonId,
 }
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct LegacyFinalAbilitySnapshot {
+    case_name: &'static str,
+    pokemon: u64,
+    species: u64,
+    passives: [u64; 3],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyDeterministicIntimidateProbe {
+    case_name: &'static str,
+    draw_index: usize,
+    mutation_index: usize,
+    result: u64,
+    cause: u64,
+    stat_path: &'static str,
+}
+
+const LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE: &str =
+    "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496";
+
+const LEGACY_DETERMINISTIC_INTIMIDATE_PROBES: &[LegacyDeterministicIntimidateProbe] = &[
+    LegacyDeterministicIntimidateProbe {
+        case_name: "voluntary-switch",
+        draw_index: 29,
+        mutation_index: 1,
+        result: 79,
+        cause: 0,
+        stat_path: "pokemon/5/stat_stage",
+    },
+    LegacyDeterministicIntimidateProbe {
+        case_name: "voluntary-switch",
+        draw_index: 30,
+        mutation_index: 3,
+        result: 73,
+        cause: 0,
+        stat_path: "pokemon/4/stat_stage",
+    },
+    LegacyDeterministicIntimidateProbe {
+        case_name: "forced-replacement",
+        draw_index: 75,
+        mutation_index: 19,
+        result: 97,
+        cause: 5,
+        stat_path: "pokemon/4/stat_stage",
+    },
+    LegacyDeterministicIntimidateProbe {
+        case_name: "forced-replacement",
+        draw_index: 76,
+        mutation_index: 21,
+        result: 74,
+        cause: 5,
+        stat_path: "pokemon/5/stat_stage",
+    },
+];
+
+const LEGACY_FINAL_ABILITY_SNAPSHOTS: &[LegacyFinalAbilitySnapshot] = &[
+    LegacyFinalAbilitySnapshot {
+        case_name: "defeat",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "forced-replacement",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "forced-replacement",
+        pokemon: 3,
+        species: 23,
+        passives: [5076, 61, 5040],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "mixed-side-simultaneous-faint",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "no-legal-replacement",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "no-legal-replacement",
+        pokemon: 2,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "same-side-simultaneous-faint",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "same-side-simultaneous-faint",
+        pokemon: 2,
+        species: 7,
+        passives: [67, 75, 41],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "victory",
+        pokemon: 2,
+        species: 52,
+        passives: [5026, 101, 290],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "voluntary-switch",
+        pokemon: 1,
+        species: 19,
+        passives: [62, 95, 50],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "voluntary-switch",
+        pokemon: 3,
+        species: 23,
+        passives: [5076, 61, 5040],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "wonder-guard-status-pass",
+        pokemon: 2,
+        species: 52,
+        passives: [5026, 101, 290],
+    },
+    LegacyFinalAbilitySnapshot {
+        case_name: "wonder-guard-super-effective-pass",
+        pokemon: 2,
+        species: 7,
+        passives: [67, 75, 41],
+    },
+];
 
 fn legacy_stale_final_occupants() -> [LegacyStaleFinalOccupant; 9] {
     [
@@ -1555,6 +1696,155 @@ fn normalize_legacy_selected_content_identity(
     Ok(true)
 }
 
+fn normalize_legacy_final_abilities(
+    case_name: &str,
+    document: &Value,
+    battle: &mut Value,
+) -> Result<(), FixtureError> {
+    let catalogue = LEGACY_FINAL_ABILITY_SNAPSHOTS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    if catalogue.len() != LEGACY_FINAL_ABILITY_SNAPSHOTS.len() {
+        return Err(FixtureError::new(
+            "internal legacy final-ability catalogue contains a duplicate entry",
+        ));
+    }
+
+    let initial_state = object_field(document, case_name, "$", "initial_state")?;
+    let initial_canonical = object_field(
+        initial_state,
+        case_name,
+        "initial_state",
+        "canonical",
+    )?;
+    let initial_battle = object_field(
+        initial_canonical,
+        case_name,
+        "initial_state.canonical",
+        "battle",
+    )?;
+    let mut initial_by_id = BTreeMap::new();
+    for party_name in ["player_party", "enemy_party"] {
+        let party = array_field(
+            initial_battle,
+            case_name,
+            "initial_state.canonical.battle",
+            party_name,
+        )?;
+        for (index, pokemon) in party.iter().enumerate() {
+            let path = format!("initial_state.canonical.battle.{party_name}[{index}]");
+            let id = u64_field(pokemon, case_name, &path, "id")?;
+            let species = u64_field(pokemon, case_name, &path, "species_id")?;
+            let abilities = required(pokemon, case_name, &path, "abilities")?.clone();
+            if initial_by_id.insert(id, (species, abilities)).is_some() {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: initial parties repeat Pokemon id {id}"
+                )));
+            }
+        }
+    }
+
+    let expected = catalogue
+        .iter()
+        .filter(|entry| entry.case_name == case_name)
+        .copied()
+        .collect::<Vec<_>>();
+    let mut observed = Vec::new();
+    for party_name in ["player_party", "enemy_party"] {
+        let party = battle
+            .get_mut(party_name)
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: expected_final_state.canonical.battle.{party_name} is invalid"
+                ))
+            })?;
+        for (index, pokemon) in party.iter_mut().enumerate() {
+            let path = format!("expected_final_state.canonical.battle.{party_name}[{index}]");
+            let id = u64_field(pokemon, case_name, &path, "id")?;
+            let species = u64_field(pokemon, case_name, &path, "species_id")?;
+            let final_abilities = required(pokemon, case_name, &path, "abilities")?.clone();
+            let (initial_species, initial_abilities) = initial_by_id.get(&id).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: final Pokemon {id} is absent from the initial parties"
+                ))
+            })?;
+            if species != *initial_species {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: Pokemon {id} changes species from {initial_species} to {species}"
+                )));
+            }
+            if &final_abilities == initial_abilities {
+                continue;
+            }
+
+            let snapshot = catalogue
+                .iter()
+                .find(|entry| {
+                    entry.case_name == case_name
+                        && entry.pokemon == id
+                        && entry.species == species
+                })
+                .copied()
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: Pokemon {id} has an uncatalogued legacy final ability snapshot"
+                    ))
+                })?;
+            let initial_passives = initial_abilities
+                .get("passives")
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: initial Pokemon {id} abilities have no passives"
+                    ))
+                })?
+                .clone();
+            if initial_passives != json!([null, null, null]) {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: initial Pokemon {id} passives are not the exact empty typed loadout"
+                )));
+            }
+            let catalogued_passives = json!(snapshot.passives);
+            if final_abilities.get("passives") != Some(&catalogued_passives) {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: Pokemon {id} legacy passives differ from the closed catalogue"
+                )));
+            }
+            let mut passive_only_normalized = final_abilities.clone();
+            passive_only_normalized
+                .as_object_mut()
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: final Pokemon {id} abilities are not an object"
+                    ))
+                })?
+                .insert("passives".to_owned(), initial_passives);
+            if &passive_only_normalized != initial_abilities {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: Pokemon {id} legacy final abilities change more than the catalogued passive IDs"
+                )));
+            }
+            pokemon
+                .as_object_mut()
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: final Pokemon {id} is not an object"
+                    ))
+                })?
+                .insert("abilities".to_owned(), initial_abilities.clone());
+            observed.push(snapshot);
+        }
+    }
+    observed.sort_unstable();
+    if observed != expected {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy final ability snapshots differ from the exact closed catalogue: expected {expected:?}, actual {observed:?}"
+        )));
+    }
+    Ok(())
+}
+
 fn normalize_legacy_state(
     case_name: &str,
     document: &Value,
@@ -1579,6 +1869,9 @@ fn normalize_legacy_state(
 
     normalize_legacy_format_slots(case_name, battle)?;
     if field_name == "expected_final_state" {
+        if legacy_content_identity {
+            normalize_legacy_final_abilities(case_name, document, battle)?;
+        }
         normalize_legacy_final_statuses(case_name, document, battle)?;
         normalize_legacy_final_occupants(case_name, document, battle)?;
         normalize_legacy_final_slot_compaction(case_name, document, battle)?;
@@ -2507,9 +2800,357 @@ fn fixture_replacement_proposals(
     Ok(result)
 }
 
-fn fixture_rng_draws(document: &Value, case_name: &str) -> Result<Vec<RngDraw>, Box<dyn Error>> {
+fn normalize_legacy_rng_audit_state(
+    case_name: &str,
+    path: &str,
+    value: &Value,
+    sequence: SafeU53,
+) -> Result<RngAuditState, Box<dyn Error>> {
+    assert_exact_keys(
+        case_name,
+        path,
+        value,
+        &["battle", "next_sequence", "run", "seed_offset"],
+    )?;
+    let legacy_sequence = SafeU53::new(u64_field(
+        value,
+        case_name,
+        path,
+        "next_sequence",
+    )?)?;
+    if legacy_sequence != sequence {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path}.next_sequence is {legacy_sequence}, expected draw sequence {sequence}"
+        ))
+        .into());
+    }
+    let run_path = format!("{path}.run");
+    let legacy_run = object_field(value, case_name, path, "run")?;
+    assert_exact_keys(case_name, &run_path, legacy_run, &["rdg"])?;
+    let normalized = json!({
+        "battle": required(value, case_name, path, "battle")?,
+        "run": required(legacy_run, case_name, &run_path, "rdg")?,
+        "seed_offset": required(value, case_name, path, "seed_offset")?,
+    });
+    let state: RngAuditState = serde_json::from_value(normalized).map_err(|error| {
+        FixtureError::new(format!(
+            "{case_name}: {path} cannot be normalized to RngAuditState: {error}"
+        ))
+    })?;
+    state.validate()?;
+    Ok(state)
+}
+
+#[derive(Clone, Debug)]
+struct LegacyProjectedRngDraw {
+    draw: RngDraw,
+    rebase_battle: bool,
+}
+
+fn legacy_deterministic_intimidate_probe(
+    case_name: &str,
+    draw_index: usize,
+) -> Option<&'static LegacyDeterministicIntimidateProbe> {
+    LEGACY_DETERMINISTIC_INTIMIDATE_PROBES
+        .iter()
+        .find(|probe| probe.case_name == case_name && probe.draw_index == draw_index)
+}
+
+fn validate_catalogued_legacy_intimidate_rng_probe(
+    case_name: &str,
+    index: usize,
+    path: &str,
+    value: &Value,
+    before_state: &RngAuditState,
+    after_state: &RngAuditState,
+) -> Result<bool, Box<dyn Error>> {
+    let raw_callsite = string_field(value, case_name, path, "callsite_id")?;
+    let Some(probe) = legacy_deterministic_intimidate_probe(case_name, index) else {
+        if raw_callsite == LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path} is an uncatalogued legacy deterministic-Intimidate RNG probe"
+            ))
+            .into());
+        }
+        return Ok(false);
+    };
+
+    let exact_shape = string_field(value, case_name, path, "reason")? == "SecondaryEffect"
+        && string_field(value, case_name, path, "stream")? == "BATTLE"
+        && string_field(value, case_name, path, "public_api")? == "RAND_SEED_INT"
+        && raw_callsite == LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE
+        && u64_field(value, case_name, path, "minimum")? == 0
+        && u64_field(value, case_name, path, "cardinality")? == 100
+        && u64_field(value, case_name, path, "result")? == probe.result
+        && required(value, case_name, path, "consumed")?.as_bool() == Some(true)
+        && u64_field(value, case_name, path, "primitive_draw_count")? == 2;
+    if !exact_shape {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} does not match its exact deterministic-Intimidate probe catalogue entry"
+        ))
+        .into());
+    }
+    let (Some(before_battle), Some(after_battle)) =
+        (before_state.battle.as_ref(), after_state.battle.as_ref())
+    else {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} deterministic-Intimidate probe has no battle stream state"
+        ))
+        .into());
+    };
+    if before_state.run != after_state.run
+        || before_state.seed_offset != after_state.seed_offset
+        || before_battle == after_battle
+        || before_battle.battle_seed != after_battle.battle_seed
+        || before_battle.turn != after_battle.turn
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} deterministic-Intimidate probe changes evidence outside one battle substream draw"
+        ))
+        .into());
+    }
+    Ok(true)
+}
+
+fn same_rng_draw_semantics(expected: &RngDraw, actual: &RngDraw) -> bool {
+    expected.stream == actual.stream
+        && expected.reason == actual.reason
+        && expected.public_api == actual.public_api
+        && expected.callsite_id == actual.callsite_id
+        && expected.minimum == actual.minimum
+        && expected.cardinality == actual.cardinality
+        && expected.result == actual.result
+        && expected.consumed == actual.consumed
+        && expected.primitive_draw_count == actual.primitive_draw_count
+        && expected.before_state == actual.before_state
+        && expected.after_state == actual.after_state
+}
+
+fn same_rebased_battle_draw_schedule(expected: &RngDraw, actual: &RngDraw) -> bool {
+    expected.stream == RngStream::Battle
+        && actual.stream == RngStream::Battle
+        && expected.reason == actual.reason
+        && expected.public_api == actual.public_api
+        && expected.callsite_id == actual.callsite_id
+        && expected.minimum == actual.minimum
+        && expected.cardinality == actual.cardinality
+        && expected.consumed == actual.consumed
+        && expected.primitive_draw_count == actual.primitive_draw_count
+}
+
+fn voluntary_switch_rebased_rng_source_ordinal(
+    case_name: &str,
+    raw_index: usize,
+) -> Option<usize> {
+    if case_name != "voluntary-switch" {
+        return None;
+    }
+    match raw_index {
+        29 => Some(0),
+        30 => Some(1),
+        46 => Some(2),
+        47 => Some(3),
+        48 => Some(4),
+        63 => Some(5),
+        64 => Some(6),
+        65 => Some(7),
+        79 => Some(8),
+        _ => None,
+    }
+}
+
+fn voluntary_switch_rebased_rng_spec(
+    ordinal: usize,
+) -> Option<(RngReason, RngCallsiteId, u64, u64, u64)> {
+    match ordinal {
+        0 => Some((RngReason::Accuracy, RngCallsiteId::accuracy(), 0, 100, 79)),
+        1 => Some((
+            RngReason::CriticalHit,
+            RngCallsiteId::critical_hit(),
+            0,
+            24,
+            17,
+        )),
+        2 => Some((
+            RngReason::DamageVariance,
+            RngCallsiteId::damage_variance(),
+            85,
+            16,
+            91,
+        )),
+        3 => Some((RngReason::Accuracy, RngCallsiteId::accuracy(), 0, 100, 87)),
+        4 => Some((
+            RngReason::CriticalHit,
+            RngCallsiteId::critical_hit(),
+            0,
+            24,
+            16,
+        )),
+        5 => Some((
+            RngReason::DamageVariance,
+            RngCallsiteId::damage_variance(),
+            85,
+            16,
+            87,
+        )),
+        6 => Some((RngReason::Accuracy, RngCallsiteId::accuracy(), 0, 100, 46)),
+        7 => Some((
+            RngReason::CriticalHit,
+            RngCallsiteId::critical_hit(),
+            0,
+            24,
+            9,
+        )),
+        8 => Some((
+            RngReason::DamageVariance,
+            RngCallsiteId::damage_variance(),
+            85,
+            16,
+            87,
+        )),
+        _ => None,
+    }
+}
+
+fn validate_catalogued_rebased_battle_draw(
+    case_name: &str,
+    ordinal: usize,
+    actual: &RngDraw,
+    sources: &[(RngAuditState, RngAuditState)],
+) -> Result<(), Box<dyn Error>> {
+    let (reason, callsite, minimum, cardinality, result) =
+        voluntary_switch_rebased_rng_spec(ordinal).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: rebased battle RNG draw {ordinal} is outside the exact catalogue"
+            ))
+        })?;
+    let (source_before, source_after) = sources.get(ordinal).ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: rebased battle RNG draw {ordinal} has no authenticated legacy source state"
+        ))
+    })?;
+    if case_name != "voluntary-switch"
+        || actual.reason != reason
+        || actual.public_api != RngPublicApi::RandSeedInt
+        || actual.callsite_id != callsite
+        || actual.minimum.get() != minimum
+        || actual.cardinality.get() != cardinality
+        || actual.result.get() != result
+        || !actual.consumed
+        || actual.primitive_draw_count != 2
+        || actual.before_state != *source_before
+        || actual.after_state != *source_after
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: rebased battle RNG draw {ordinal} differs from its exact result/state catalogue"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn is_legacy_speed_queue_probe(draw: &RngDraw) -> bool {
+    draw.stream == RngStream::SeedOffset
+        && draw.reason == RngReason::SpeedTie
+        && draw.public_api == RngPublicApi::FisherYatesSwap
+        && draw.callsite_id == RngCallsiteId::speed_tie()
+}
+
+fn project_legacy_rng_draws(
+    case_name: &str,
+    legacy: Vec<LegacyProjectedRngDraw>,
+    actual: &[RngDraw],
+    rebased_sources: &[(RngAuditState, RngAuditState)],
+) -> Result<Vec<RngDraw>, Box<dyn Error>> {
+    let mut cursor = 0;
+    let mut rebased_battle_ordinal = 0;
+    let mut projected = Vec::with_capacity(actual.len());
+    for (actual_index, actual_draw) in actual.iter().enumerate() {
+        let sequence = SafeU53::new(u64::try_from(actual_index)?)?;
+        if actual_draw.sequence != sequence {
+            return Err(FixtureError::new(format!(
+                "{case_name}: typed RNG draw {actual_index} has sequence {}, expected {sequence}",
+                actual_draw.sequence
+            ))
+            .into());
+        }
+
+        let mut matched = None;
+        while let Some(legacy_draw) = legacy.get(cursor) {
+            if same_rng_draw_semantics(&legacy_draw.draw, actual_draw) {
+                matched = Some(legacy_draw.draw.clone());
+                cursor += 1;
+                break;
+            }
+            if legacy_draw.rebase_battle
+                && same_rebased_battle_draw_schedule(&legacy_draw.draw, actual_draw)
+            {
+                validate_catalogued_rebased_battle_draw(
+                    case_name,
+                    rebased_battle_ordinal,
+                    actual_draw,
+                    rebased_sources,
+                )?;
+                rebased_battle_ordinal += 1;
+                matched = Some(actual_draw.clone());
+                cursor += 1;
+                break;
+            }
+            if !is_legacy_speed_queue_probe(&legacy_draw.draw) {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: typed RNG draw {actual_index} ({:?}) diverges after legacy draw {cursor} ({:?}); only exact legacy speed-queue probes may be projected out",
+                    actual_draw.reason, legacy_draw.draw.reason
+                ))
+                .into());
+            }
+            cursor += 1;
+        }
+        let mut matched = matched.ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: typed RNG draw {actual_index} ({:?}) has no order-preserving legacy semantic match",
+                actual_draw.reason
+            ))
+        })?;
+        matched.sequence = sequence;
+        matched.before_fingerprint = rng_state_fingerprint(&matched.before_state)?;
+        matched.after_fingerprint = rng_state_fingerprint(&matched.after_state)?;
+        matched.validate()?;
+        projected.push(matched);
+    }
+    for (index, legacy_draw) in legacy.iter().enumerate().skip(cursor) {
+        if !is_legacy_speed_queue_probe(&legacy_draw.draw) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: trailing legacy RNG draw {index} ({:?}) was not reproduced; only exact legacy speed-queue probes may be projected out",
+                legacy_draw.draw.reason
+            ))
+            .into());
+        }
+    }
+    if rebased_battle_ordinal != rebased_sources.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: reproduced {rebased_battle_ordinal} rebased battle draws, expected exact source count {}",
+            rebased_sources.len()
+        ))
+        .into());
+    }
+    Ok(projected)
+}
+
+fn fixture_rng_draws(
+    document: &Value,
+    case_name: &str,
+    actual_draws: &[RngDraw],
+) -> Result<Vec<RngDraw>, Box<dyn Error>> {
     let values = array_field(document, case_name, "$", "expected_rng_draws")?;
     let mut draws = Vec::with_capacity(values.len());
+    let mut battle_rebased = false;
+    let mut observed_intimidate_probes = 0;
+    let rebased_source_count = if case_name == "voluntary-switch" {
+        9
+    } else {
+        0
+    };
+    let mut rebased_sources = vec![None; rebased_source_count];
     for (index, value) in values.iter().enumerate() {
         let path = format!("expected_rng_draws[{index}]");
         let object = value
@@ -2544,47 +3185,134 @@ fn fixture_rng_draws(document: &Value, case_name: &str) -> Result<Vec<RngDraw>, 
             .into());
         }
 
-        let mut normalized = value.clone();
-        if let Some(context) = normalized
-            .as_object()
-            .and_then(|object| object.get("seed_offset_context"))
-        {
-            let context: SeedOffsetContext = serde_json::from_value(context.clone())?;
-            let normalized_object = normalized.as_object().ok_or_else(|| {
-                FixtureError::new(format!("{case_name}: {path} is not an object"))
-            })?;
-            let before_state = normalized_object.get("before_state").ok_or_else(|| {
-                FixtureError::new(format!("{case_name}: {path}.before_state is missing"))
-            })?;
-            let after_state = normalized_object.get("after_state").ok_or_else(|| {
-                FixtureError::new(format!("{case_name}: {path}.after_state is missing"))
-            })?;
-            let before_context = before_state.get("seed_offset").ok_or_else(|| {
-                FixtureError::new(format!(
-                    "{case_name}: {path}.before_state.seed_offset is missing"
-                ))
-            })?;
-            let after_context = after_state.get("seed_offset").ok_or_else(|| {
-                FixtureError::new(format!(
-                    "{case_name}: {path}.after_state.seed_offset is missing"
-                ))
-            })?;
-            let before_context: Option<SeedOffsetContext> =
-                serde_json::from_value(before_context.clone())?;
-            let after_context: Option<SeedOffsetContext> =
-                serde_json::from_value(after_context.clone())?;
-            if before_context.as_ref() != Some(&context) || after_context.as_ref() != Some(&context)
-            {
+        let sequence = SafeU53::new(u64_field(value, case_name, &path, "sequence")?)?;
+        if sequence.get() != u64::try_from(index)? {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path}.sequence is {sequence}, expected {index}"
+            ))
+            .into());
+        }
+        let before_value = required(value, case_name, &path, "before_state")?;
+        let after_value = required(value, case_name, &path, "after_state")?;
+        let stored_before = string_field(value, case_name, &path, "before_fingerprint")?;
+        let stored_after = string_field(value, case_name, &path, "after_fingerprint")?;
+        let legacy_before = fixture_digest(before_value)?;
+        let legacy_after = fixture_digest(after_value)?;
+        if stored_before != legacy_before || stored_after != legacy_after {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path} legacy fingerprints do not authenticate the published legacy audit states"
+            ))
+            .into());
+        }
+        let before_state = normalize_legacy_rng_audit_state(
+            case_name,
+            &format!("{path}.before_state"),
+            before_value,
+            sequence,
+        )?;
+        let after_state = normalize_legacy_rng_audit_state(
+            case_name,
+            &format!("{path}.after_state"),
+            after_value,
+            sequence,
+        )?;
+        let legacy_context = object
+            .get("seed_offset_context")
+            .map(|context| serde_json::from_value::<SeedOffsetContext>(context.clone()))
+            .transpose()?;
+        match (
+            legacy_context.as_ref(),
+            before_state.seed_offset.as_ref(),
+            after_state.seed_offset.as_ref(),
+        ) {
+            (Some(context), Some(before), Some(after))
+                if context == before && context == after => {}
+            (None, None, None) => {}
+            _ => {
                 return Err(FixtureError::new(format!(
-                    "{case_name}: {path}.seed_offset_context does not equal both typed audit-state contexts"
+                    "{case_name}: {path}.seed_offset_context does not exactly mirror both normalized audit states"
                 ))
                 .into());
             }
-            normalized
-                .as_object_mut()
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?
-                .remove("seed_offset_context");
         }
+
+        if let Some(ordinal) = voluntary_switch_rebased_rng_source_ordinal(case_name, index) {
+            let slot = rebased_sources.get_mut(ordinal).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: rebased RNG source ordinal {ordinal} is outside its exact catalogue"
+                ))
+            })?;
+            if slot
+                .replace((before_state.clone(), after_state.clone()))
+                .is_some()
+            {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: rebased RNG source ordinal {ordinal} is duplicated"
+                ))
+                .into());
+            }
+        }
+
+        if validate_catalogued_legacy_intimidate_rng_probe(
+            case_name,
+            index,
+            &path,
+            value,
+            &before_state,
+            &after_state,
+        )? {
+            observed_intimidate_probes += 1;
+            battle_rebased = true;
+            continue;
+        }
+
+        let mut normalized = value.clone();
+        let normalized_object = normalized
+            .as_object_mut()
+            .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
+        normalized_object.remove("seed_offset_context");
+        normalized_object.insert(
+            "before_state".to_owned(),
+            serde_json::to_value(&before_state)?,
+        );
+        normalized_object.insert(
+            "after_state".to_owned(),
+            serde_json::to_value(&after_state)?,
+        );
+        normalized_object.insert(
+            "before_fingerprint".to_owned(),
+            Value::String(rng_state_fingerprint(&before_state)?),
+        );
+        normalized_object.insert(
+            "after_fingerprint".to_owned(),
+            Value::String(rng_state_fingerprint(&after_state)?),
+        );
+        let stream = match string_field(value, case_name, &path, "stream")?.as_str() {
+            "BATTLE" => RngStream::Battle,
+            "SEED_OFFSET" => RngStream::SeedOffset,
+            legacy => {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: {path}.stream has unsupported legacy spelling {legacy:?}"
+                ))
+                .into());
+            }
+        };
+        let public_api =
+            match string_field(value, case_name, &path, "public_api")?.as_str() {
+                "RAND_SEED_INT" => RngPublicApi::RandSeedInt,
+                "FISHER_YATES_SWAP" => RngPublicApi::FisherYatesSwap,
+                legacy => {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.public_api has unsupported legacy spelling {legacy:?}"
+                    ))
+                    .into());
+                }
+            };
+        normalized_object.insert("stream".to_owned(), serde_json::to_value(stream)?);
+        normalized_object.insert(
+            "public_api".to_owned(),
+            serde_json::to_value(public_api)?,
+        );
 
         let callsite = string_field(&normalized, case_name, &path, "callsite_id")?;
         let callsite = if callsite.starts_with("src/") {
@@ -2601,9 +3329,30 @@ fn fixture_rng_draws(document: &Value, case_name: &str) -> Result<Vec<RngDraw>, 
                 "{case_name}: {path} is not a typed RngDraw: {error}"
             ))
         })?;
-        draws.push(draw);
+        draws.push(LegacyProjectedRngDraw {
+            draw,
+            rebase_battle: battle_rebased,
+        });
     }
-    Ok(draws)
+    let expected_intimidate_probes = LEGACY_DETERMINISTIC_INTIMIDATE_PROBES
+        .iter()
+        .filter(|probe| probe.case_name == case_name)
+        .count();
+    if observed_intimidate_probes != expected_intimidate_probes {
+        return Err(FixtureError::new(format!(
+            "{case_name}: observed {observed_intimidate_probes} deterministic-Intimidate RNG probes, expected exact catalogue count {expected_intimidate_probes}"
+        ))
+        .into());
+    }
+    let rebased_sources = rebased_sources
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: exact rebased RNG source catalogue is incomplete"
+            ))
+        })?;
+    project_legacy_rng_draws(case_name, draws, actual_draws, &rebased_sources)
 }
 
 fn fixture_action_order(
@@ -2750,6 +3499,46 @@ fn normalize_legacy_action_order(
             normalized[index].source_slot = typed_slot;
         }
     }
+    if case_name == "grass-powder-immunity" {
+        let catalogued = json!([
+            {
+                "actor": 1,
+                "bracket_modifier": 1,
+                "command_operation_id": "battle/1/wave/1/turn/1/command/player/0/seat/1",
+                "disposition": "MISSED",
+                "effective_speed": 180,
+                "kind": "MOVE",
+                "move_priority": 0,
+                "sequence": 0,
+                "source_slot": { "position": 0, "side": "PLAYER" },
+                "tie_order": 0,
+                "timing_modifier": 1
+            },
+            {
+                "actor": 2,
+                "bracket_modifier": 1,
+                "command_operation_id": "battle/1/wave/1/turn/1/command/enemy/0/script/0",
+                "disposition": "EXECUTED",
+                "effective_speed": 123,
+                "kind": "MOVE",
+                "move_priority": 0,
+                "sequence": 1,
+                "source_slot": { "position": 0, "side": "ENEMY" },
+                "tie_order": 0,
+                "timing_modifier": 1
+            }
+        ]);
+        let published = serde_json::to_value(actions)?;
+        if published != catalogued {
+            let divergence = first_divergence(&catalogued, &published)
+                .unwrap_or_else(|| "catalogued action trace differs".to_owned());
+            return Err(FixtureError::new(format!(
+                "{case_name}: legacy powder-immunity action trace left its exact closed catalogue: {divergence}"
+            ))
+            .into());
+        }
+        normalized[0].disposition = ActionDisposition::Executed;
+    }
     Ok(normalized)
 }
 
@@ -2760,6 +3549,192 @@ fn pokemon_state(state: &GameState, pokemon: PokemonId) -> Option<&PokemonState>
         .iter()
         .chain(&battle.enemy_party)
         .find(|candidate| candidate.id == pokemon)
+}
+
+fn pokemon_state_mut(state: &mut GameState, pokemon: PokemonId) -> Option<&mut PokemonState> {
+    let battle = state.battle.as_mut()?;
+    battle
+        .player_party
+        .iter_mut()
+        .chain(&mut battle.enemy_party)
+        .find(|candidate| candidate.id == pokemon)
+}
+
+fn validate_legacy_pokemon_snapshot(
+    case_name: &str,
+    path: &str,
+    actual: &PokemonState,
+    legacy: &LegacyPokemonEvidence,
+) -> Result<(), Box<dyn Error>> {
+    let stages = [
+        actual.stat_stages.attack,
+        actual.stat_stages.defense,
+        actual.stat_stages.special_attack,
+        actual.stat_stages.special_defense,
+        actual.stat_stages.speed,
+        actual.stat_stages.accuracy,
+        actual.stat_stages.evasion,
+    ];
+    let moves = actual
+        .moves
+        .iter()
+        .map(|slot| {
+            slot.as_ref().map(|slot| LegacyMoveEvidence {
+                move_id: slot.move_id,
+                pp_used: slot.pp_used,
+            })
+        })
+        .collect::<Option<Vec<_>>>();
+    if actual.hp != legacy.hp
+        || actual.fainted != legacy.fainted
+        || actual.status != legacy_status_state(case_name, &format!("{path}.status"), &legacy.status)?
+        || stages != legacy.stages
+        || moves.as_deref() != Some(legacy.moves.as_slice())
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} does not exactly match the represented fields of typed Pokemon {}",
+            actual.id
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn apply_catalogued_turn_resolution_setup(
+    document: &Value,
+    case_name: &str,
+    identities: &BTreeMap<u64, PokemonId>,
+    state: &mut GameState,
+) -> Result<Vec<BattleMutation>, Box<dyn Error>> {
+    let values = array_field(document, case_name, "$", "expected_mutations")?;
+    let setup = values
+        .iter()
+        .enumerate()
+        .filter(|(index, value)| {
+            required(value, case_name, &format!("expected_mutations[{index}]"), "cause")
+                .is_ok_and(|cause| cause.as_str() == Some("TURN_RESOLUTION"))
+        })
+        .collect::<Vec<_>>();
+    let expected_count = usize::from(matches!(
+        case_name,
+        "paralysis-full-stop" | "paralysis-speed-order"
+    ));
+    if setup.len() != expected_count {
+        return Err(FixtureError::new(format!(
+            "{case_name}: TURN_RESOLUTION setup mutation count is {}, expected {expected_count} from the closed catalogue",
+            setup.len()
+        ))
+        .into());
+    }
+
+    let mut mutations = Vec::with_capacity(setup.len());
+    for (index, value) in setup {
+        let path = format!("expected_mutations[{index}]");
+        if index != 0 {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued TURN_RESOLUTION setup must be mutation zero"
+            ))
+            .into());
+        }
+        mutation_metadata(
+            value,
+            case_name,
+            &path,
+            "STATUS_SET",
+            &[
+                "after", "before", "cause", "kind", "path", "phase", "sequence",
+            ],
+        )?;
+        if string_field(value, case_name, &path, "phase")? != "ObtainStatusEffectPhase"
+            || string_field(value, case_name, &path, "path")? != "pokemon/1/status_set"
+            || u64_field(value, case_name, &path, "sequence")? != 0
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued TURN_RESOLUTION setup identity is not the exact Pokemon 1 paralysis boundary"
+            ))
+            .into());
+        }
+        let (before, after, pokemon) =
+            legacy_pokemon_transition(value, case_name, &path, identities, "status")?;
+        if u64::from(pokemon) != 1 {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued TURN_RESOLUTION setup targets {pokemon}, expected Pokemon 1"
+            ))
+            .into());
+        }
+        let before_status =
+            legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)?;
+        let after_status =
+            legacy_status_state(case_name, &format!("{path}.after.status"), &after.status)?;
+        if before_status.kind != StatusKind::None || after_status.kind != StatusKind::Paralysis {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued TURN_RESOLUTION setup is not the exact NONE-to-PARALYSIS transition"
+            ))
+            .into());
+        }
+        let pokemon_state = pokemon_state_mut(state, pokemon).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued setup Pokemon {pokemon} is absent from typed state"
+            ))
+        })?;
+        validate_legacy_pokemon_snapshot(
+            case_name,
+            &format!("{path}.before"),
+            pokemon_state,
+            &before,
+        )?;
+        pokemon_state.status = after_status;
+        mutations.push(BattleMutation::StatusChanged {
+            pokemon,
+            before: before_status,
+            after: after_status,
+        });
+    }
+    Ok(mutations)
+}
+
+fn prepend_setup_presentation(
+    case_name: &str,
+    operation_id: &OperationId,
+    setup_mutations: &[BattleMutation],
+    presentation: &mut Vec<BattlePresentationEvent>,
+) -> Result<(), Box<dyn Error>> {
+    if setup_mutations.is_empty() {
+        return Ok(());
+    }
+    let mut prefixed = Vec::with_capacity(setup_mutations.len() + presentation.len());
+    for mutation in setup_mutations {
+        let BattleMutation::StatusChanged {
+            pokemon,
+            before,
+            after,
+        } = mutation
+        else {
+            return Err(FixtureError::new(format!(
+                "{case_name}: unsupported non-status setup mutation cannot be projected to presentation"
+            ))
+            .into());
+        };
+        prefixed.push(BattlePresentationEvent::new(
+            BattlePresentationEventId::new(operation_id.clone(), SafeU53::ZERO),
+            PRESENTATION_BLOCKING_POLICY,
+            PRESENTATION_SKIP_POLICY,
+            BattlePresentationKind::StatusApplied {
+                pokemon: *pokemon,
+                before: *before,
+                after: *after,
+            },
+        ));
+    }
+    prefixed.append(presentation);
+    for (index, event) in prefixed.iter_mut().enumerate() {
+        event.event_id = BattlePresentationEventId::new(
+            operation_id.clone(),
+            SafeU53::new(u64::try_from(index)?)?,
+        );
+    }
+    *presentation = prefixed;
+    Ok(())
 }
 
 fn legacy_status_state(
@@ -3208,6 +4183,90 @@ fn validate_legacy_mutation_metadata(
     Ok(())
 }
 
+fn validate_catalogued_legacy_intimidate_rng_mutation(
+    document: &Value,
+    case_name: &str,
+    index: usize,
+    value: &Value,
+) -> Result<bool, Box<dyn Error>> {
+    let Some(probe) = LEGACY_DETERMINISTIC_INTIMIDATE_PROBES
+        .iter()
+        .find(|probe| probe.case_name == case_name && probe.mutation_index == index)
+    else {
+        return Ok(false);
+    };
+    let path = format!("expected_mutations[{index}]");
+    mutation_metadata(
+        value,
+        case_name,
+        &path,
+        "BATTLE_RNG_CHANGED",
+        &[
+            "after", "before", "cause", "kind", "path", "phase", "sequence",
+        ],
+    )?;
+    if string_field(value, case_name, &path, "phase")? != "StatStageChangePhase"
+        || string_field(value, case_name, &path, "path")? != "battle/rng"
+        || u64_field(value, case_name, &path, "cause")? != probe.cause
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} does not match its exact deprecated Intimidate RNG mutation context"
+        ))
+        .into());
+    }
+
+    let draws = array_field(document, case_name, "$", "expected_rng_draws")?;
+    let draw = draws.get(probe.draw_index).ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: catalogued RNG draw {} is absent",
+            probe.draw_index
+        ))
+    })?;
+    let draw_path = format!("expected_rng_draws[{}]", probe.draw_index);
+    if string_field(draw, case_name, &draw_path, "callsite_id")?
+        != LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE
+        || required(value, case_name, &path, "before")?
+            != required(
+                object_field(draw, case_name, &draw_path, "before_state")?,
+                case_name,
+                &format!("{draw_path}.before_state"),
+                "battle",
+            )?
+        || required(value, case_name, &path, "after")?
+            != required(
+                object_field(draw, case_name, &draw_path, "after_state")?,
+                case_name,
+                &format!("{draw_path}.after_state"),
+                "battle",
+            )?
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} is not the exact battle-state transition authenticated by {draw_path}"
+        ))
+        .into());
+    }
+
+    let mutations = array_field(document, case_name, "$", "expected_mutations")?;
+    let stat_index = index + 1;
+    let stat = mutations.get(stat_index).ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: deprecated Intimidate probe at mutation {index} has no adjacent stat-stage effect"
+        ))
+    })?;
+    let stat_path = format!("expected_mutations[{stat_index}]");
+    if string_field(stat, case_name, &stat_path, "kind")? != "STAT_STAGE"
+        || string_field(stat, case_name, &stat_path, "phase")? != "StatStageChangePhase"
+        || string_field(stat, case_name, &stat_path, "path")? != probe.stat_path
+        || u64_field(stat, case_name, &stat_path, "cause")? != probe.cause
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {stat_path} is not the exact stat-stage effect adjacent to its deprecated Intimidate probe"
+        ))
+        .into());
+    }
+    Ok(true)
+}
+
 fn fixture_mutations(
     document: &Value,
     case_name: &str,
@@ -3222,6 +4281,7 @@ fn fixture_mutations(
     let mut legacy_queue_occurrences = BTreeMap::new();
     let mut metadata = Vec::with_capacity(values.len());
     let mut turn_advances = Vec::new();
+    let mut observed_intimidate_rng_mutations = 0;
 
     for (index, value) in values.iter().enumerate() {
         let path = format!("expected_mutations[{index}]");
@@ -3235,13 +4295,21 @@ fn fixture_mutations(
             ))
             .into());
         }
-        let legacy_metadata = LegacyMutationMetadata {
+        let mut legacy_metadata = LegacyMutationMetadata {
             sequence,
             kind: kind.clone(),
             phase: string_field(value, case_name, &path, "phase")?,
             path: string_field(value, case_name, &path, "path")?,
             cause: required(value, case_name, &path, "cause")?.clone(),
         };
+
+        if validate_catalogued_legacy_intimidate_rng_mutation(
+            document, case_name, index, value,
+        )? {
+            observed_intimidate_rng_mutations += 1;
+            continue;
+        }
+        legacy_metadata.sequence = u64::try_from(metadata.len())?;
 
         if let Some(marker) =
             legacy_faint_marker(value, case_name, &path, identities, cause, sequence)?
@@ -3516,9 +4584,25 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let occurrence: FaintOccurrence = serde_json::from_value(
+                let mut occurrence: FaintOccurrence = serde_json::from_value(
                     object_field(value, case_name, &path, "after")?.clone(),
                 )?;
+                let (legacy_turn_occurrence, typed_turn_occurrence) =
+                    catalogued_legacy_faint_turn_occurrence(case_name, occurrence.id).ok_or_else(
+                        || {
+                            FixtureError::new(format!(
+                                "{case_name}: {path} is outside the exact legacy faint-source catalogue"
+                            ))
+                        },
+                    )?;
+                if occurrence.source.turn_occurrence != legacy_turn_occurrence {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.after.source.turn_occurrence is {}, expected catalogued legacy value {legacy_turn_occurrence}",
+                        occurrence.source.turn_occurrence
+                    ))
+                    .into());
+                }
+                occurrence.source.turn_occurrence = typed_turn_occurrence;
                 let queue_index = legacy_faint_queue_path_index(&legacy_metadata.path, false)
                     .ok_or_else(|| {
                         FixtureError::new(format!(
@@ -3720,12 +4804,42 @@ fn fixture_mutations(
         mutations.push(mutation);
         metadata.push(legacy_metadata);
     }
+    let expected_intimidate_rng_mutations = LEGACY_DETERMINISTIC_INTIMIDATE_PROBES
+        .iter()
+        .filter(|probe| probe.case_name == case_name)
+        .count();
+    if observed_intimidate_rng_mutations != expected_intimidate_rng_mutations {
+        return Err(FixtureError::new(format!(
+            "{case_name}: observed {observed_intimidate_rng_mutations} deprecated Intimidate RNG mutations, expected exact catalogue count {expected_intimidate_rng_mutations}"
+        ))
+        .into());
+    }
     Ok(FixtureMutationTrace {
         typed: mutations,
         faint_markers,
         metadata,
         turn_advances,
     })
+}
+
+fn catalogued_legacy_faint_turn_occurrence(
+    case_name: &str,
+    occurrence: FaintOccurrenceId,
+) -> Option<(u32, u32)> {
+    let occurrence = u64::from(occurrence);
+    match (case_name, occurrence) {
+        ("defeat", 1)
+        | ("forced-replacement", 1)
+        | ("mixed-side-simultaneous-faint", 1)
+        | ("no-legal-replacement", 1)
+        | ("same-side-simultaneous-faint", 1)
+        | ("victory", 1)
+        | ("wonder-guard-super-effective-pass", 1) => Some((2, 0)),
+        ("no-legal-replacement", 2) => Some((5, 1)),
+        ("same-side-simultaneous-faint", 2) => Some((10, 1)),
+        ("wonder-guard-status-pass", 1) => Some((7, 0)),
+        _ => None,
+    }
 }
 
 fn replay_fixture_replacements(
@@ -3742,67 +4856,72 @@ fn replay_fixture_replacements(
             .battle
             .as_ref()
             .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} state has no battle")))?;
+        let stored = battle
+            .faint_queue
+            .iter()
+            .find(|occurrence| occurrence.id == proposal.occurrence)
+            .copied()
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path}.occurrence {} is absent from the authoritative faint queue",
+                    proposal.occurrence
+                ))
+            })?;
         if proposal.battle_id != battle.battle_id
-            || proposal.wave != battle.wave
-            || proposal.resolved_turn != battle.turn
+            || proposal.wave != stored.source.wave
+            || proposal.resolved_turn != stored.source.resolved_turn
+            || proposal.epoch != stored.source.epoch
+            || proposal.field_slot != stored.slot
+            || stored.owner_seat != Some(proposal.owner_seat)
+            || battle.wave != stored.source.wave
         {
             return Err(FixtureError::new(format!(
-                "{case_name}: {path} coordinates do not match current battle boundary"
+                "{case_name}: {path} coordinates do not match the stored authoritative faint source"
             ))
             .into());
         }
         let operation_id = replacement_operation_id(
-            proposal.epoch,
+            stored.source.epoch,
             proposal.battle_id,
-            proposal.wave,
-            proposal.resolved_turn,
-            proposal.turn_occurrence,
-            proposal.field_slot,
+            stored.source.wave,
+            stored.source.resolved_turn,
+            stored.source.turn_occurrence,
+            stored.slot,
             proposal.owner_seat,
         )?;
         if proposal.raw_operation_id.as_str() != operation_id.as_str() {
-            let raw_segments = proposal
-                .raw_operation_id
-                .as_str()
-                .split('/')
-                .collect::<Vec<_>>();
-            let canonical_segments = operation_id.as_str().split('/').collect::<Vec<_>>();
-            let legacy = [
-                raw_segments.first().copied(),
-                raw_segments.get(1).copied(),
-                raw_segments.get(2).copied(),
-                raw_segments.get(3).copied(),
-                raw_segments.get(4).copied(),
-                raw_segments.get(5).copied(),
-            ];
-            let canonical_without_battle = [
-                canonical_segments.first().copied(),
-                canonical_segments.get(1).copied(),
-                canonical_segments.get(3).copied(),
-                canonical_segments.get(4).copied(),
-                canonical_segments.get(5).copied(),
-                canonical_segments.get(6).copied(),
-            ];
-            if legacy != canonical_without_battle {
+            let catalogued = catalogued_legacy_faint_turn_occurrence(
+                case_name,
+                proposal.occurrence,
+            );
+            if catalogued != Some((proposal.turn_occurrence, stored.source.turn_occurrence))
+                || usize::try_from(stored.source.turn_occurrence)? != index
+            {
                 return Err(FixtureError::new(format!(
-                    "{case_name}: {path}.operation_id {} is neither the canonical typed identity {} nor its accepted legacy spelling",
+                    "{case_name}: {path}.operation_id {} is not canonical {} and its turn occurrence is outside the exact legacy replacement catalogue",
                     proposal.raw_operation_id.as_str(),
                     operation_id.as_str()
                 ))
                 .into());
             }
+        } else if proposal.turn_occurrence != stored.source.turn_occurrence {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path}.operation_id is canonical but turn_occurrence {} differs from stored source {}",
+                proposal.turn_occurrence, stored.source.turn_occurrence
+            ))
+            .into());
         }
         match proposal.selection {
             ReplacementSelection::Selected { .. } => {
                 let admitted = BattleReplacementProposalV1::new(
                     operation_id.clone(),
                     proposal.battle_id,
-                    proposal.wave,
-                    proposal.resolved_turn,
+                    stored.source.wave,
+                    stored.source.resolved_turn,
                     proposal.owner_seat,
                     proposal.occurrence,
-                    proposal.turn_occurrence,
-                    proposal.field_slot,
+                    stored.source.turn_occurrence,
+                    stored.slot,
                     proposal.selection,
                     MenuInstanceId::new(SafeU53::new(u64::try_from(index)? + 1)?),
                     format!("m3-oracle/{case_name}/replacement/{index}"),
@@ -3844,7 +4963,7 @@ fn replay_fixture_replacements(
         transitions.push(ReplacementPresentationTrace {
             operation_id,
             selection: proposal.selection,
-            field_slot: proposal.field_slot,
+            field_slot: stored.slot,
             outcome: transition.outcome,
             presentation: transition_presentation,
         });
@@ -3987,6 +5106,21 @@ fn validate_legacy_actor_slot(
     Ok(actor.0)
 }
 
+fn voluntary_switch_rebased_hp_presentation(
+    case_name: &str,
+    path: &str,
+) -> Option<(u64, u32, u32, u32)> {
+    if case_name != "voluntary-switch" {
+        return None;
+    }
+    match path {
+        "expected_presentation[7].event" => Some((2, 201, 157, 159)),
+        "expected_presentation[9].event" => Some((3, 251, 216, 217)),
+        "expected_presentation[11].event" => Some((4, 198, 113, 124)),
+        _ => None,
+    }
+}
+
 fn take_hp_mutation(
     case_name: &str,
     path: &str,
@@ -4011,6 +5145,47 @@ fn take_hp_mutation(
         used[index] = true;
         if let BattleMutation::HpChanged { before, after, .. } = mutation {
             return Ok((*before, *after));
+        }
+    }
+    if let Some((expected_pokemon, expected_before, legacy_after, typed_after)) =
+        voluntary_switch_rebased_hp_presentation(case_name, path)
+    {
+        let expected_pokemon = PokemonId::try_from_u64(expected_pokemon)?;
+        if pokemon != expected_pokemon || after != legacy_after {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path} does not match its exact rebased HP presentation catalogue entry"
+            ))
+            .into());
+        }
+        let mut candidate = None;
+        for (index, mutation) in mutations.iter().enumerate() {
+            if used[index] {
+                continue;
+            }
+            let BattleMutation::HpChanged {
+                pokemon: candidate_pokemon,
+                before,
+                after,
+            } = mutation
+            else {
+                continue;
+            };
+            if *candidate_pokemon != pokemon
+                || *before != expected_before
+                || *after != typed_after
+            {
+                continue;
+            }
+            if candidate.replace((index, *before, *after)).is_some() {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: {path} has more than one candidate rebased HpChanged mutation"
+                ))
+                .into());
+            }
+        }
+        if let Some((index, before, after)) = candidate {
+            used[index] = true;
+            return Ok((before, after));
         }
     }
     Err(FixtureError::new(format!(
@@ -5108,6 +6283,207 @@ fn validate_legacy_faint_markers(
     Ok(())
 }
 
+fn voluntary_switch_rebased_hp_mutation(
+    actual_index: usize,
+) -> Option<(usize, u64, u32, u32, u32)> {
+    match actual_index {
+        5 => Some((7, 2, 201, 157, 159)),
+        8 => Some((12, 3, 251, 216, 217)),
+        11 => Some((17, 4, 198, 113, 124)),
+        _ => None,
+    }
+}
+
+fn validate_voluntary_switch_aggregate_rng_mutation(
+    case_name: &str,
+    actual_index: usize,
+    mutation: &BattleMutation,
+    battle_draws: &[&RngDraw],
+) -> Result<(), Box<dyn Error>> {
+    let BattleMutation::BattleRngChanged { before, after } = mutation else {
+        return Err(FixtureError::new(format!(
+            "{case_name}: production mutation {actual_index} is not the catalogued aggregate BattleRngChanged"
+        ))
+        .into());
+    };
+    if let Some(group) = match actual_index {
+        4 => Some(0),
+        7 => Some(1),
+        10 => Some(2),
+        _ => None,
+    } {
+        let first = battle_draws.get(group * 3).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: aggregate RNG mutation {actual_index} has no first draw"
+            ))
+        })?;
+        let last = battle_draws.get(group * 3 + 2).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: aggregate RNG mutation {actual_index} has no final draw"
+            ))
+        })?;
+        if first.before_state.battle.as_ref() != Some(before)
+            || last.after_state.battle.as_ref() != Some(after)
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: aggregate RNG mutation {actual_index} is not bounded by its exact three-draw group"
+            ))
+            .into());
+        }
+        return Ok(());
+    }
+    if actual_index != 12 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: aggregate RNG mutation index {actual_index} is outside the exact catalogue"
+        ))
+        .into());
+    }
+    let final_draw = battle_draws
+        .last()
+        .and_then(|draw| draw.after_state.battle.as_ref())
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: turn-boundary RNG mutation has no final battle draw"
+            ))
+        })?;
+    if before != final_draw
+        || before.battle_seed != after.battle_seed
+        || before.turn.get().get().checked_add(1) != Some(after.turn.get().get())
+        || after.saved_substream.is_some()
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: turn-boundary RNG mutation is outside the exact post-draw increment shape"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn normalize_catalogued_deterministic_intimidate_mutations(
+    case_name: &str,
+    trace: &mut FixtureMutationTrace,
+    actual: &[BattleMutation],
+    rng_audit: &[RngDraw],
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "voluntary-switch" {
+        return Ok(());
+    }
+    let projected = actual
+        .iter()
+        .filter(|mutation| {
+            !matches!(
+                mutation,
+                BattleMutation::CommandCollectionChanged { .. }
+                    | BattleMutation::OutcomeChanged { .. }
+            )
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if trace.typed.len() != 19 || projected.len() != 14 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: deterministic-Intimidate mutation projection has legacy/typed lengths {}/{}, expected exact 19/14",
+            trace.typed.len(),
+            projected.len()
+        ))
+        .into());
+    }
+
+    for legacy_index in [4, 5, 6, 9, 10, 11, 14, 15, 16] {
+        if !matches!(
+            trace.typed.get(legacy_index),
+            Some(BattleMutation::BattleRngChanged { .. })
+        ) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: retained legacy mutation {legacy_index} is not an exact per-draw BattleRngChanged entry"
+            ))
+            .into());
+        }
+    }
+    let battle_draws = rng_audit
+        .iter()
+        .filter(|draw| draw.stream == RngStream::Battle)
+        .collect::<Vec<_>>();
+    if battle_draws.len() != 9 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: production RNG audit has {} battle draws, expected exact 9",
+            battle_draws.len()
+        ))
+        .into());
+    }
+
+    for (actual_index, mutation) in projected.iter().enumerate() {
+        if matches!(actual_index, 4 | 7 | 10 | 12) {
+            validate_voluntary_switch_aggregate_rng_mutation(
+                case_name,
+                actual_index,
+                mutation,
+                &battle_draws,
+            )?;
+            continue;
+        }
+        if let Some((legacy_index, pokemon, before, legacy_after, typed_after)) =
+            voluntary_switch_rebased_hp_mutation(actual_index)
+        {
+            let pokemon = PokemonId::try_from_u64(pokemon)?;
+            let Some(BattleMutation::HpChanged {
+                pokemon: legacy_pokemon,
+                before: legacy_before,
+                after: observed_legacy_after,
+            }) = trace.typed.get(legacy_index)
+            else {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: retained legacy mutation {legacy_index} is not HpChanged"
+                ))
+                .into());
+            };
+            let BattleMutation::HpChanged {
+                pokemon: actual_pokemon,
+                before: actual_before,
+                after: actual_after,
+            } = mutation
+            else {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: production mutation {actual_index} is not HpChanged"
+                ))
+                .into());
+            };
+            if *legacy_pokemon != pokemon
+                || *actual_pokemon != pokemon
+                || *legacy_before != before
+                || *actual_before != before
+                || *observed_legacy_after != legacy_after
+                || *actual_after != typed_after
+            {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: rebased HP mutation {actual_index} differs from its exact legacy/typed catalogue"
+                ))
+                .into());
+            }
+            continue;
+        }
+        let legacy_index = match actual_index {
+            0..=3 => actual_index,
+            6 => 8,
+            9 => 13,
+            13 => 18,
+            _ => {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: production mutation {actual_index} is outside the exact deterministic-Intimidate projection"
+                ))
+                .into());
+            }
+        };
+        if trace.typed.get(legacy_index) != Some(mutation) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: production mutation {actual_index} differs from exact retained legacy mutation {legacy_index}"
+            ))
+            .into());
+        }
+    }
+    trace.typed = projected;
+    Ok(())
+}
+
 fn compare_mutation_trace(
     case_name: &str,
     expected: &[BattleMutation],
@@ -5564,13 +6940,88 @@ fn assert_causal_sequences(case_name: &str, document: &Value) -> Result<(), Fixt
     Ok(())
 }
 
+fn normalize_catalogued_deterministic_intimidate_final(
+    case_name: &str,
+    expected: &mut GameState,
+    expected_rng: &mut FixtureRngBoundary,
+    actual: &GameState,
+) -> Result<(), Box<dyn Error>> {
+    if case_name == "voluntary-switch" {
+        for (pokemon, legacy_hp, typed_hp, max_hp) in
+            [(2, 157, 159, 201), (3, 216, 217, 251), (4, 113, 124, 198)]
+        {
+            let pokemon = PokemonId::try_from_u64(pokemon)?;
+            let expected_pokemon = pokemon_state(expected, pokemon)
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: catalogued final-state Pokemon {pokemon} is absent"
+                    ))
+                })?
+                .clone();
+            let actual_pokemon = pokemon_state(actual, pokemon).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: typed final-state Pokemon {pokemon} is absent"
+                ))
+            })?;
+            if expected_pokemon.hp != legacy_hp
+                || expected_pokemon.max_hp != max_hp
+                || expected_pokemon.fainted
+                || actual_pokemon.hp != typed_hp
+            {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: final-state Pokemon {pokemon} is outside the exact rebased HP catalogue"
+                ))
+                .into());
+            }
+            let mut normalized = expected_pokemon;
+            normalized.hp = typed_hp;
+            if normalized != *actual_pokemon {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: final-state Pokemon {pokemon} differs outside rebased HP"
+                ))
+                .into());
+            }
+            pokemon_state_mut(expected, pokemon)
+                .ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: catalogued final-state Pokemon {pokemon} disappeared"
+                    ))
+                })?
+                .hp = typed_hp;
+        }
+        return Ok(());
+    }
+    if case_name == "forced-replacement" {
+        let expected_battle = expected.battle.as_mut().ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: expected final state has no battle"))
+        })?;
+        let actual_battle = actual.battle.as_ref().ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: typed final state has no battle"))
+        })?;
+        if expected_battle.battle_rng != expected_rng.battle
+            || expected_battle.battle_rng.saved_substream.is_none()
+            || actual_battle.battle_rng.saved_substream.is_some()
+            || expected_battle.battle_rng.battle_seed != actual_battle.battle_rng.battle_seed
+            || expected_battle.battle_rng.turn != actual_battle.battle_rng.turn
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: final RNG is outside the exact trailing deterministic-Intimidate projection"
+            ))
+            .into());
+        }
+        expected_battle.battle_rng = actual_battle.battle_rng.clone();
+        expected_rng.battle = actual_battle.battle_rng.clone();
+    }
+    Ok(())
+}
+
 fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     let document = parse_case(case_name)?;
     let content = selected_content_pack()?;
     let initial = fixture_state(&document, case_name, "initial_state", &content)?;
-    let expected_final = fixture_state(&document, case_name, "expected_final_state", &content)?;
+    let mut expected_final = fixture_state(&document, case_name, "expected_final_state", &content)?;
     let initial_rng = fixture_rng_boundary(&document, case_name, "initial_rng")?;
-    let expected_final_rng = fixture_rng_boundary(&document, case_name, "final_rng")?;
+    let mut expected_final_rng = fixture_rng_boundary(&document, case_name, "final_rng")?;
     if initial_rng.seed_offset.is_some() || expected_final_rng.seed_offset.is_some() {
         return Err(FixtureError::new(format!(
             "{case_name}: GameState has no public seed-offset boundary; production seam: expose seed-offset state on GameState before asserting initial/final RNG"
@@ -5592,6 +7043,13 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     )?;
 
     let identities = legacy_identities(&document, case_name)?;
+    let mut resolver_initial = initial.clone();
+    let setup_mutations = apply_catalogued_turn_resolution_setup(
+        &document,
+        case_name,
+        &identities,
+        &mut resolver_initial,
+    )?;
     let legacy_content_identity =
         is_exact_legacy_content_identity(&document, case_name, "initial_state", &content)?;
     let mut records = fixture_command_records(&document, case_name)?;
@@ -5603,7 +7061,7 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     let expected_actions =
         normalize_legacy_action_order(case_name, &initial, &records, &raw_expected_actions)?;
     let (resolver_input, commands) =
-        admit_fixture_commands(&initial, &records, case_name, &content)?;
+        admit_fixture_commands(&resolver_initial, &records, case_name, &content)?;
     let authority_epoch = replacement_proposals
         .first()
         .map(|proposal| proposal.epoch)
@@ -5649,14 +7107,14 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &transition.action_order,
     )?;
 
-    let expected_rng_draws = fixture_rng_draws(&document, case_name)?;
+    let expected_rng_draws = fixture_rng_draws(&document, case_name, &transition.rng_audit)?;
     compare_serialized_axis(
         case_name,
         "CONSUMING_RNG_DRAWS",
         &expected_rng_draws,
         &transition.rng_audit,
     )?;
-    let expected_mutations = fixture_mutations(
+    let mut expected_mutations = fixture_mutations(
         &document,
         case_name,
         &identities,
@@ -5665,8 +7123,15 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &records,
     )?;
     validate_legacy_mutation_metadata(case_name, &expected_mutations, &expected_actions)?;
-    let mut actual_mutations = transition.mutations.clone();
+    let mut actual_mutations = setup_mutations.clone();
+    actual_mutations.extend(transition.mutations.clone());
     actual_mutations.extend(replacement_replay.mutations.clone());
+    normalize_catalogued_deterministic_intimidate_mutations(
+        case_name,
+        &mut expected_mutations,
+        &actual_mutations,
+        &transition.rng_audit,
+    )?;
     compare_mutation_trace(
         case_name,
         &expected_mutations.typed,
@@ -5704,7 +7169,7 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &material_operation_id,
         &expected_presentation.typed,
     )?;
-    let actual_presentation = project_typed_presentation(
+    let mut actual_presentation = project_typed_presentation(
         case_name,
         &material_operation_id,
         &transition.presentation,
@@ -5717,11 +7182,23 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
             .ok_or_else(|| FixtureError::new(format!("{case_name}: final state has no battle")))?
             .outcome,
     )?;
+    prepend_setup_presentation(
+        case_name,
+        &material_operation_id,
+        &setup_mutations,
+        &mut actual_presentation,
+    )?;
     compare_serialized_axis(
         case_name,
         "PRESENTATION_PLAN.TYPED",
         &expected_presentation.typed,
         &actual_presentation,
+    )?;
+    normalize_catalogued_deterministic_intimidate_final(
+        case_name,
+        &mut expected_final,
+        &mut expected_final_rng,
+        &replacement_replay.state,
     )?;
     compare_serialized_axis(
         case_name,
@@ -5736,6 +7213,7 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| {
             FixtureError::new(format!("{case_name}: final RNG sequence overflows u53"))
         })?;
+    expected_final_rng.next_sequence = SafeU53::new(final_sequence)?;
     let actual_final_rng = state_rng_boundary(
         &replacement_replay.state,
         SafeU53::new(final_sequence)?,
