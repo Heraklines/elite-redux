@@ -1275,8 +1275,14 @@ impl GameRuntime {
                 BattleControl::PartySelect(next)
             }
             BattleControl::PartyOptionSelect(value) => {
-                if option_id != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?
-                    && option_id != MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?
+                if option_id
+                    != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID).map_err(|error| {
+                        GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+                    })?
+                    && option_id
+                        != MenuOptionId::new(PARTY_OPTION_CANCEL_ID).map_err(|error| {
+                            GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+                        })?
                 {
                     return Err(ui_rejected(
                         "party-option identity is not in the frozen graph",
@@ -1432,8 +1438,12 @@ impl GameRuntime {
                 Ok(BattleUiResult::ControlChanged)
             }
             BattleControl::PartyOptionSelect(value) => {
-                let send_out = MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?;
-                let cancel = MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?;
+                let send_out = MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID).map_err(|error| {
+                    GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+                })?;
+                let cancel = MenuOptionId::new(PARTY_OPTION_CANCEL_ID).map_err(|error| {
+                    GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+                })?;
                 if value.menu.selected_option_id == cancel {
                     let menu_id = self.allocate_menu_instance(seat)?;
                     let restored =
@@ -1698,7 +1708,9 @@ impl GameRuntime {
             {
                 let move_state = pokemon.moves[usize::from(raw)]
                     .ok_or_else(|| ui_rejected("offered move is absent from the actor state"))?;
-                MoveMenuEntry::from_offer(move_state.move_id, move_offer)?
+                MoveMenuEntry::from_offer(move_state.move_id, move_offer).map_err(|error| {
+                    GameRuntimeError::MoveMenu(MoveMenuError::Entry(error))
+                })?
             } else if let Some(move_state) = pokemon.moves[usize::from(raw)] {
                 MoveMenuEntry::disabled(move_state.move_id)
             } else {
@@ -1970,7 +1982,9 @@ impl GameRuntime {
                     menu_ids[1],
                 )?;
                 if option_control.menu.selected_option_id
-                    != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?
+                    != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID).map_err(|error| {
+                        GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+                    })?
                     || option_control.menu.control_id != proposal.control_id
                 {
                     return Err(GameRuntimeError::ControlIdentityMismatch);
@@ -2033,7 +2047,10 @@ impl GameRuntime {
             current.menu.instance_id,
             menu_id,
         )?;
-        if option_control.menu.selected_option_id != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?
+        if option_control.menu.selected_option_id
+            != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID).map_err(|error| {
+                GameRuntimeError::PartyOptionMenu(PartyOptionMenuError::OptionId(error))
+            })?
             || option_control.menu.control_id != proposal.control_id
         {
             return Err(GameRuntimeError::ControlIdentityMismatch);
