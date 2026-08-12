@@ -9,7 +9,7 @@ use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, ContentPack,
     apply_turn_material, decode_replacement_material, decode_turn_material,
 };
-use serde_json::json;
+use serde_json::{Value, json};
 
 const MATERIAL_SOURCE: &str = include_str!("../../er-game/src/material.rs");
 const REPLICA_SOURCE: &str = include_str!("../src/battle_replica.rs");
@@ -18,6 +18,100 @@ const VICTORY_CASE_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
 const CONTROL_FIXTURE: &str =
     include_str!("../../../fixtures/m3/schema/battle-control-plan-v1.json");
+
+fn adapt_legacy_condition_kind(condition: &mut Value) -> Result<(), &'static str> {
+    let kind = condition
+        .as_object_mut()
+        .and_then(|condition| condition.get_mut("kind"))
+        .ok_or("condition kind is missing or invalid")?;
+    if let Value::String(tag) = kind {
+        let tag = tag.clone();
+        *kind = json!({"kind": tag});
+    }
+
+    let adjacent = kind
+        .as_object()
+        .ok_or("condition kind is not an adjacent object")?;
+    match adjacent.get("kind").and_then(Value::as_str) {
+        Some("NONE") if adjacent.len() == 1 => Ok(()),
+        Some("UNSUPPORTED_ORACLE_CODE") if adjacent.len() == 2 => {
+            let value = adjacent
+                .get("value")
+                .and_then(Value::as_u64)
+                .ok_or("unsupported condition code is not an unsigned integer")?;
+            if value > u64::from(u16::MAX) {
+                return Err("unsupported condition code exceeds u16");
+            }
+            Ok(())
+        }
+        _ => Err("condition kind has unknown, extra, or malformed fields"),
+    }
+}
+
+fn adapt_legacy_game_state(state: &mut Value) -> Result<(), &'static str> {
+    let battle = state
+        .get_mut("battle")
+        .and_then(Value::as_object_mut)
+        .ok_or("battle is missing or invalid")?;
+
+    let format_slots = battle
+        .get("format")
+        .and_then(Value::as_object)
+        .and_then(|format| format.get("slots"))
+        .and_then(Value::as_array)
+        .ok_or("format.slots is missing or is not an array")?;
+    let field_slots = battle
+        .get("field")
+        .and_then(Value::as_object)
+        .and_then(|field| field.get("slots"))
+        .and_then(Value::as_array)
+        .ok_or("field.slots is missing or is not an array")?;
+    if format_slots != field_slots {
+        return Err("format.slots does not exactly match field.slots");
+    }
+    battle
+        .get_mut("format")
+        .and_then(Value::as_object_mut)
+        .and_then(|format| format.remove("slots"))
+        .ok_or("format.slots could not be removed")?;
+
+    for party_name in ["player_party", "enemy_party"] {
+        let party = battle
+            .get_mut(party_name)
+            .and_then(Value::as_array_mut)
+            .ok_or("party is missing or is not an array")?;
+        for pokemon in party {
+            let kind = pokemon
+                .get_mut("status")
+                .and_then(Value::as_object_mut)
+                .and_then(|status| status.get_mut("kind"))
+                .ok_or("status kind is missing or invalid")?;
+            match kind {
+                Value::String(_) => {}
+                Value::Object(nested) => {
+                    if nested.len() != 1 {
+                        return Err("nested status kind has extra or missing fields");
+                    }
+                    let tag = nested
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .ok_or("nested status kind is not a string")?
+                        .to_owned();
+                    *kind = Value::String(tag);
+                }
+                _ => return Err("status kind is neither a string nor an exact kind wrapper"),
+            }
+        }
+    }
+
+    for condition_name in ["weather", "terrain"] {
+        let condition = battle
+            .get_mut(condition_name)
+            .ok_or("condition is missing")?;
+        adapt_legacy_condition_kind(condition)?;
+    }
+    Ok(())
+}
 
 #[test]
 fn typed_material_codecs_are_closed_and_canonical_only() {
@@ -44,11 +138,12 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
     .expect("content fixture is a typed content pack");
     let case_value: serde_json::Value =
         serde_json::from_str(VICTORY_CASE_FIXTURE).expect("victory fixture is JSON");
-    let state_value = case_value
+    let mut state_value = case_value
         .get("initial_state")
         .and_then(|value| value.get("canonical"))
         .expect("victory fixture has an initial canonical state")
         .clone();
+    adapt_legacy_game_state(&mut state_value).expect("legacy initial state adapts strictly");
     let state = serde_json::from_value(state_value.clone()).expect("initial state is typed");
     let next_control =
         serde_json::from_str::<er_types::battle_control::BattleControlPlan>(CONTROL_FIXTURE)
@@ -56,7 +151,7 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
     let wrong_digest = format!("blake3-v1:{}", "0".repeat(64));
     let rng_before: er_rng::battle::BattleRngState =
         serde_json::from_value(state_value["battle"]["battle_rng"].clone())
-        .expect("battle RNG is typed");
+            .expect("battle RNG is typed");
     let material = BattleTurnMaterialV1 {
         schema_version: 1,
         oracle_game_sha: content.oracle_game_sha.clone(),
