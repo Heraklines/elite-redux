@@ -144,29 +144,53 @@ export function grantMoodyCoordinatorBarrier(pokemonId: number, amount: number):
   });
 }
 
+export function grantMoodySetCollectorBarrier(pokemonId: number, amount: number): void {
+  const added = Math.max(0, Math.floor(amount));
+  if (added === 0) {
+    return;
+  }
+  updateMoodyCoordinatorEffectValues("set-collector", values => {
+    const barriers = numberRecord(values.barriersByPokemon);
+    barriers[String(pokemonId)] = (barriers[String(pokemonId)] ?? 0) + added;
+    return { ...values, barriersByPokemon: barriers };
+  });
+}
+
 export function getMoodyCoordinatorBarrier(pokemonId: number): number {
+  const id = String(pokemonId);
   return (
-    numberRecord(getMoodyCoordinatorEffectState("pressure-valve")?.values?.barriersByPokemon)[String(pokemonId)] ?? 0
+    (numberRecord(getMoodyCoordinatorEffectState("pressure-valve")?.values?.barriersByPokemon)[id] ?? 0)
+    + (numberRecord(getMoodyCoordinatorEffectState("set-collector")?.values?.barriersByPokemon)[id] ?? 0)
   );
 }
 
 export function absorbMoodyCoordinatorBarrier(pokemonId: number, damage: number, simulated: boolean): number {
-  const barrier = getMoodyCoordinatorBarrier(pokemonId);
-  if (barrier <= 0 || damage <= 0) {
+  const totalBarrier = getMoodyCoordinatorBarrier(pokemonId);
+  if (totalBarrier <= 0 || damage <= 0) {
     return damage;
   }
-  const absorbed = Math.min(barrier, damage);
+  const absorbed = Math.min(totalBarrier, damage);
   if (!simulated) {
-    updateMoodyCoordinatorEffectValues("pressure-valve", values => {
-      const barriers = numberRecord(values.barriersByPokemon);
-      const remaining = barrier - absorbed;
-      if (remaining > 0) {
-        barriers[String(pokemonId)] = remaining;
-      } else {
-        delete barriers[String(pokemonId)];
+    let remainingAbsorption = absorbed;
+    for (const effectId of ["pressure-valve", "set-collector"]) {
+      if (remainingAbsorption <= 0) {
+        break;
       }
-      return { ...values, barriersByPokemon: barriers };
-    });
+      updateMoodyCoordinatorEffectValues(effectId, values => {
+        const barriers = numberRecord(values.barriersByPokemon);
+        const id = String(pokemonId);
+        const available = barriers[id] ?? 0;
+        const consumed = Math.min(available, remainingAbsorption);
+        remainingAbsorption -= consumed;
+        const remaining = available - consumed;
+        if (remaining > 0) {
+          barriers[id] = remaining;
+        } else {
+          delete barriers[id];
+        }
+        return { ...values, barriersByPokemon: barriers };
+      });
+    }
   }
   return damage - absorbed;
 }

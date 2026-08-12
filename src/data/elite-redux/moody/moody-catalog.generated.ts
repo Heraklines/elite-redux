@@ -73,11 +73,11 @@ export const MOODY_BOONS = [
         id: "momentum-relay",
         name: "Momentum Relay",
         description:
-          "Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.\n\nMomentum Relay therefore becomes the team-wide evolution of Relay Seat.",
+          "Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.",
       },
     ],
     fullDescription:
-      "**Base:** When the occupant voluntarily switches out, the incoming Pokémon inherits one random positive stat stage from it.\n\n**Rank II:** It transfers up to two total stages, with no more than one stage from each stat.\n\n**Evolution — Perfect Handoff:** It transfers the two highest available stages and removes one negative stage from the incoming Pokémon.\n\n**Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.\n\nMomentum Relay therefore becomes the team-wide evolution of Relay Seat.",
+      "**Base:** When the occupant voluntarily switches out, the incoming Pokémon inherits one random positive stat stage from it.\n\n**Rank II:** It transfers up to two total stages, with no more than one stage from each stat.\n\n**Evolution — Perfect Handoff:** It transfers the two highest available stages and removes one negative stage from the incoming Pokémon.\n\n**Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.",
   },
   {
     id: "echo-seat",
@@ -208,7 +208,7 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "rotating slot",
     targetKind: "slot",
-    base: "One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\nThe party screen displays a prominent star symbol on the current target.",
+    base: "One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.",
     rankTwo: "Experience becomes +75%; first-move power becomes +30%.",
     evolutions: [
       {
@@ -223,7 +223,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\nThe party screen displays a prominent star symbol on the current target.\n\n**Rank II:** Experience becomes +75%; first-move power becomes +30%.\n\n**Evolution — Encore:** If the Star scores a KO, it heals 10% and remains the Star for the following wave.\n\n**Evolution — Ensemble:** The two adjacent slots receive half of the Star’s combat bonus.",
+      "**Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\n**Rank II:** Experience becomes +75%; first-move power becomes +30%.\n\n**Evolution — Encore:** If the Star scores a KO, it heals 10% and remains the Star for the following wave.\n\n**Evolution — Ensemble:** The two adjacent slots receive half of the Star’s combat bonus.",
   },
   {
     id: "last-chair",
@@ -1814,9 +1814,9 @@ export const MOODY_BOONS = [
     number: 75,
     name: "Set Collector",
     rarity: "ultra",
-    scope: "authored item and vitamin sets",
+    scope: "item and vitamin sets",
     targetKind: "item-stack",
-    base: "Three distinct IDs from an authored set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.",
+    base: "Three distinct items from a set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.",
     rankTwo: "One chosen set requires one fewer distinct item.",
     evolutions: [
       {
@@ -1832,7 +1832,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Three distinct IDs from an authored set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.\n\n**Rank II:** One chosen set requires one fewer distinct item.\n\n**Evolution — Curator:** Two different set bonuses can be active simultaneously without conflict.\n\n**Evolution — Complete Collection:** One chosen five-piece becomes stronger: Complete Nutrition +15% all stats; Restoration Kit +35% healing and a 15% barrier; Tactician's Tools +15% accuracy, +1 first-move priority, and +25% first-move power; Volatile Core +25% damage and 25% self-inflicted status damage.",
+      "**Base:** Three distinct items from a set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.\n\n**Rank II:** One chosen set requires one fewer distinct item.\n\n**Evolution — Curator:** Two different set bonuses can be active simultaneously without conflict.\n\n**Evolution — Complete Collection:** One chosen five-piece becomes stronger: Complete Nutrition +15% all stats; Restoration Kit +35% healing and a 15% barrier; Tactician's Tools +15% accuracy, +1 first-move priority, and +25% first-move power; Volatile Core +25% damage and 25% self-inflicted status damage.",
   },
   {
     id: "blood-market",
@@ -2182,7 +2182,7 @@ export const MOODY_BOONS = [
     rarity: "master",
     scope: "boss battle rule",
     targetKind: "rule",
-    base: "Once per boss battle, when the first allied Pokémon would faint, combat rewinds to the beginning of that turn. The player may choose different actions.\n\nAuthoritative RNG remains deterministic: identical actions recreate identical outcomes unless the changed action legitimately alters the RNG path.",
+    base: "Once per boss battle, when the first allied Pokémon would faint, combat rewinds to the beginning of that turn. The player may choose different actions.\n\nRepeating the same actions recreates the same outcome unless a changed action alters what happens next.",
     rankTwo: "The player may decline the automatic rewind and save it for a later faint.",
     evolutions: [
       {
@@ -2198,7 +2198,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Once per boss battle, when the first allied Pokémon would faint, combat rewinds to the beginning of that turn. The player may choose different actions.\n\nAuthoritative RNG remains deterministic: identical actions recreate identical outcomes unless the changed action legitimately alters the RNG path.\n\n**Rank II:** The player may decline the automatic rewind and save it for a later faint.\n\n**Evolution — Deja Vu:** After rewinding, the previously selected enemy actions remain visible before the player recommits.\n\n**Evolution — Second Timeline:** One non-boss battle per ten-wave segment can also be rewound.",
+      "**Base:** Once per boss battle, when the first allied Pokémon would faint, combat rewinds to the beginning of that turn. The player may choose different actions.\n\nRepeating the same actions recreates the same outcome unless a changed action alters what happens next.\n\n**Rank II:** The player may decline the automatic rewind and save it for a later faint.\n\n**Evolution — Deja Vu:** After rewinding, the previously selected enemy actions remain visible before the player recommits.\n\n**Evolution — Second Timeline:** One non-boss battle per ten-wave segment can also be rewound.",
   },
   {
     id: "recapitulation",
@@ -2666,7 +2666,7 @@ export const MOODY_CURSES = [
     name: "Entropy",
     dread: 3,
     description:
-      "At every biome transition, one move on every party Pokémon is temporarily replaced until the following biome transition.\n\nReplacement rules:\n\n* Similar category and approximate power band.\n* Preserve at least one damaging move where possible.\n* Exclude form-controller, signature-structural, one-hit-KO, and required moves.\n* Reveal every replacement before the first battle.\n* Store all results deterministically in run state.\n\nThe full curse applies to the entire party. A reduced variant could affect only one Pokémon, but that would be a lower-Dread version.",
+      "At every biome transition, one move on every party Pokémon is temporarily replaced until the following biome transition.\n\nReplacement rules:\n\n* Similar category and approximate power band.\n* Preserve at least one damaging move where possible.\n* Exclude form-controller, signature-structural, one-hit-KO, and required moves.\n* Reveal every replacement before the first battle.",
   },
   {
     id: "feedback-loop",

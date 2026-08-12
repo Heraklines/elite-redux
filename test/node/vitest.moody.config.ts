@@ -31,7 +31,7 @@ export default defineConfig({
       "./test/data/elite-redux/er-moody-coordinator-gameplay.test.ts",
       "./test/data/elite-redux/er-moody-coordinator-production-reachability.test.ts",
       "./test/data/elite-redux/er-moody-runtime-live-projection.test.ts",
-      "./test/data/elite-redux/er-moody-release-set-collector-block.regression.test.ts",
+      "./test/data/elite-redux/er-moody-set-collector.regression.test.ts",
       "./test/tests/ui/moody-functional-closure.test.ts",
       "./test/tests/ui/moody-presentation.test.ts",
       "./test/tests/ui/moody-surface-closure.test.ts",

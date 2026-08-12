@@ -1,4 +1,5 @@
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import { resolveMoodyActiveItemSets } from "#data/elite-redux/moody/moody-item-sets";
 
 export type MoodyRuntimeStage = "base" | "rank-two" | string;
 export type MoodyRuntimeValue =
@@ -115,7 +116,7 @@ export const MOODY_RUNTIME_CURSE_IDS = [
   ...MOODY_RUNTIME_PROGRESSION_CURSE_IDS,
 ] as const;
 
-export const MOODY_RUNTIME_BLOCKED_IDS = ["set-collector"] as const;
+export const MOODY_RUNTIME_BLOCKED_IDS = [] as const;
 
 const MOODY_RUNTIME_BLOCKED_ID_SET = new Set<string>(MOODY_RUNTIME_BLOCKED_IDS);
 
@@ -505,8 +506,17 @@ function resolveBoon(
         [set("flags.recyclerUsedThisScreen", true)],
       );
     }
-    case "set-collector":
-      return result();
+    case "set-collector": {
+      if (event.kind !== "item-set-query") {
+        return result();
+      }
+      const activeSets = resolveMoodyActiveItemSets(
+        stringArray(event, "ownedDistinctItemIds"),
+        stage,
+        stringValue(event, "chosenSetId") || null,
+      );
+      return result([command("apply-item-set-bonuses", { activeSets })], [set("values.activeItemSets", activeSets)]);
+    }
     case "blood-market": {
       if (event.kind !== "blood-market-purchase") {
         return result();

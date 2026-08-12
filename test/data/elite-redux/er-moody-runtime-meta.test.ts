@@ -210,11 +210,9 @@ describe("Moody runtime meta exact coverage", () => {
     ]);
   });
 
-  it("blocks only Set Collector pending its authored item audit and executes every ready effect", () => {
-    expect(MOODY_RUNTIME_BLOCKED_IDS).toEqual(["set-collector"]);
-    expect(MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "blocked").map(effect => effect.id)).toEqual([
-      "set-collector",
-    ]);
+  it("has no blocked effects and executes every catalog effect", () => {
+    expect(MOODY_RUNTIME_BLOCKED_IDS).toEqual([]);
+    expect(MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "blocked")).toEqual([]);
     for (const meta of MOODY_RUNTIME_EFFECTS.filter(effect => effect.status === "ready")) {
       expect(meta.events.length, meta.id).toBeGreaterThan(0);
       expect(

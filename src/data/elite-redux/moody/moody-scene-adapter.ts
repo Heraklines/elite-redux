@@ -2,7 +2,10 @@ import { globalScene } from "#app/global-scene";
 import {
   absorbMoodyCoordinatorBarrier,
   consumeMoodyCoordinatorMovePower,
+  getMoodyCoordinatorEffectState,
   getMoodyCoordinatorSpectralPower,
+  grantMoodySetCollectorBarrier,
+  updateMoodyCoordinatorEffectValues,
 } from "#data/elite-redux/moody/moody-coordinator-combat-state";
 import { getMoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import {
@@ -23,6 +26,7 @@ import {
   getMoodyFormationMaxHpMultiplier,
   getMoodyFormationSpeedMultiplier,
 } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { decodeMoodyActiveItemSets } from "#data/elite-redux/moody/moody-item-sets";
 import type { MoodyRuntimeFieldState } from "#data/elite-redux/moody/moody-runtime-field";
 import {
   deserializeMoodyRuntimeFieldState,
@@ -67,6 +71,20 @@ function sideOf(pokemon: Pokemon): "player" | "enemy" {
 
 function rawMaxHp(pokemon: Pokemon): number {
   return Math.max(1, pokemon.summonData.stats[Stat.HP] || pokemon.stats[Stat.HP] || 1);
+}
+
+function itemSetBonuses() {
+  return decodeMoodyActiveItemSets(getMoodyCoordinatorEffectState("set-collector")?.values?.activeItemSets);
+}
+
+function itemSetProduct(
+  key: "statMultiplier" | "healingMultiplier" | "accuracyMultiplier" | "damageMultiplier",
+): number {
+  return itemSetBonuses().reduce((value, set) => value * set[key], 1);
+}
+
+function hasFirstMoveFlag(pokemon: Pokemon): boolean {
+  return pokemon.getMoveHistory().every(record => record.move === MoveId.NONE);
 }
 
 function emitEnemyPassiveCues(source: Pokemon, target: Pokemon, effects: MoodyPassiveEffectResult): void {
@@ -330,7 +348,11 @@ export function applyMoodyDamageCalculation(
         * consumeMoodyCoordinatorMovePower(source.id, simulated)
         * getMoodyCoordinatorNegativeSpaceModifiers(source, move.id).outgoingDamageMultiplier
         * getMoodyCoordinatorNegativeSpaceModifiers(target).incomingDamageMultiplier
-        * getMoodyCoordinatorPhaseShiftDamageMultiplier(target, simulated),
+        * getMoodyCoordinatorPhaseShiftDamageMultiplier(target, simulated)
+        * (source.isPlayer() ? itemSetProduct("damageMultiplier") : 1)
+        * (source.isPlayer() && hasFirstMoveFlag(source)
+          ? itemSetBonuses().reduce((value, set) => value * set.firstMovePowerMultiplier, 1)
+          : 1),
     ),
   );
   if (effects.incomingDamageCapMaxHpFraction != null) {
@@ -405,11 +427,12 @@ export function getMoodyStatMultiplier(pokemon: Pokemon, stat: Stat): number {
     pokemon.isEnemy() && fieldEnemyMultiplier === 1 ? getMoodyCoordinatorEnemyStatMultiplier() : fieldEnemyMultiplier;
   const runtimeMultiplier = enemyMultiplier * (stat === Stat.SPD ? getMoodyRuntimeSpeedMultiplier(pokemon) : 1);
   const coordinatorSpeedMultiplier = stat === Stat.SPD ? getMoodyCoordinatorPartyModifiers(pokemon).speedMultiplier : 1;
+  const collectorMultiplier = pokemon.isPlayer() ? itemSetProduct("statMultiplier") : 1;
   if (effects == null) {
-    return formationMultiplier * runtimeMultiplier * coordinatorSpeedMultiplier;
+    return formationMultiplier * runtimeMultiplier * coordinatorSpeedMultiplier * collectorMultiplier;
   }
   if (stat === Stat.HP) {
-    return effects.maxHpMultiplier * formationMultiplier * runtimeMultiplier;
+    return effects.maxHpMultiplier * formationMultiplier * runtimeMultiplier * collectorMultiplier;
   }
   return (
     effects.nonHpStatMultiplier
@@ -417,6 +440,7 @@ export function getMoodyStatMultiplier(pokemon: Pokemon, stat: Stat): number {
     * formationMultiplier
     * enemyMultiplier
     * coordinatorSpeedMultiplier
+    * collectorMultiplier
   );
 }
 
@@ -429,6 +453,9 @@ export function getMoodyMovePriorityDelta(user: Pokemon, move: Move): number {
     + getMoodyCoordinatorPocketPriorityDelta(user)
     + getMoodyCoordinatorNegativeSpaceModifiers(user, move.id).priorityDelta
     + getMoodyCoordinatorPartyModifiers(user, move.type).priorityDelta
+    + (user.isPlayer() && hasFirstMoveFlag(user)
+      ? itemSetBonuses().reduce((value, set) => value + set.firstMovePriorityDelta, 0)
+      : 0)
   );
 }
 
@@ -443,15 +470,30 @@ export function getMoodyPpCost(user: Pokemon, move: PokemonMove, baseCost: numbe
 }
 
 export function getMoodyHealingMultiplier(pokemon: Pokemon): number {
-  return queryMoodySceneEffects({ actor: pokemon, target: pokemon })?.healingMultiplier ?? 1;
+  return (
+    (queryMoodySceneEffects({ actor: pokemon, target: pokemon })?.healingMultiplier ?? 1)
+    * (pokemon.isPlayer() ? itemSetProduct("healingMultiplier") : 1)
+  );
 }
 
-export function grantMoodyItemSetHealingBarrier(_pokemon: Pokemon, _healed: number): number {
-  return 0;
+export function grantMoodyItemSetHealingBarrier(pokemon: Pokemon, healed: number): number {
+  if (!pokemon.isPlayer() || healed <= 0) {
+    return 0;
+  }
+  const fraction = itemSetBonuses().reduce((value, set) => Math.max(value, set.firstHealBarrierFraction), 0);
+  const used = getMoodyCoordinatorEffectState("set-collector")?.values?.firstHealBarrierBattleId;
+  const battleId = String(globalScene.currentBattle?.battleSeed ?? "");
+  if (fraction <= 0 || used === battleId) {
+    return 0;
+  }
+  const amount = Math.max(1, Math.floor(pokemon.getMaxHp() * fraction));
+  grantMoodySetCollectorBarrier(pokemon.id, amount);
+  updateMoodyCoordinatorEffectValues("set-collector", values => ({ ...values, firstHealBarrierBattleId: battleId }));
+  return amount;
 }
 
-export function getMoodySelfStatusDamageMultiplier(_pokemon: Pokemon): number {
-  return 1;
+export function getMoodySelfStatusDamageMultiplier(pokemon: Pokemon): number {
+  return pokemon.isPlayer() ? itemSetBonuses().reduce((value, set) => value * set.selfStatusDamageMultiplier, 1) : 1;
 }
 
 export function getMoodyAccuracyMultiplier(user: Pokemon, target: Pokemon, move: Move): number {
@@ -463,6 +505,7 @@ export function getMoodyAccuracyMultiplier(user: Pokemon, target: Pokemon, move:
   return (
     (effects?.accuracyMultiplier ?? 1)
     * actions.reduce((value, command) => value * (command.accuracyMultiplier ?? 1), 1)
+    * (user.isPlayer() ? itemSetProduct("accuracyMultiplier") : 1)
   );
 }
 

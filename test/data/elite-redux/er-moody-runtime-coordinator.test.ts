@@ -166,18 +166,26 @@ describe("Moody runtime coordinator", () => {
     ).toHaveLength(1);
   });
 
-  it("does not route blocked Set Collector inventory snapshots", () => {
+  it("routes Set Collector inventory snapshots into active bonuses", () => {
     const result = coordinateMoodyRuntime(
       { effects: [{ effectId: "set-collector", stage: "rank-two" }] },
       {
         type: "item-set-query",
         seed: 8,
         ownedDistinctItemIds: ["QUICK_CLAW", "WIDE_LENS"],
-        chosenSetId: "tactician-tools",
+        chosenSetId: "tacticians-tools",
       },
     );
-    expect(result.commands).toEqual([]);
-    expect(result.state.effects[0].state?.values?.activeItemSets).toBeUndefined();
+    expect(result.commands).toEqual([
+      expect.objectContaining({
+        domain: "progression",
+        effectId: "set-collector",
+        kind: "apply-item-set-bonuses",
+      }),
+    ]);
+    expect(result.state.effects[0].state?.values?.activeItemSets).toEqual([
+      expect.objectContaining({ setId: "tacticians-tools", pieceCount: 2, tier: 3, accuracyMultiplier: 1.1 }),
+    ]);
   });
 
   it("routes biome progression without losing effect-local state", () => {

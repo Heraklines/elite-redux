@@ -35,13 +35,7 @@ const RARITY_WEIGHTS: Readonly<Record<MoodyRarity, number>> = {
 };
 
 export const MOODY_BOON_BY_ID = new Map<string, MoodyBoonDefinition>(
-  MOODY_BOONS.map(boon => [
-    boon.id,
-    {
-      ...boon,
-      ...(boon.id === "set-collector" ? { implementationStatus: "blocked" as const } : {}),
-    } as MoodyBoonDefinition,
-  ]),
+  MOODY_BOONS.map(boon => [boon.id, { ...boon } as MoodyBoonDefinition]),
 );
 export const MOODY_CURSE_BY_ID = new Map<string, (typeof MOODY_CURSES)[number]>(
   MOODY_CURSES.map(curse => [curse.id, curse]),

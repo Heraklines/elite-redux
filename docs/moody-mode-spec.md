@@ -95,8 +95,6 @@ The numerical values below are initial balance targets.
 
 **Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.
 
-Momentum Relay therefore becomes the team-wide evolution of Relay Seat.
-
 ---
 
 ### 04. Echo Seat — **Ultra; slot**
@@ -166,8 +164,6 @@ Empty and fainted slots are counted separately, with no cap.
 ### 09. Rotating Spotlight — **Great; rotating slot**
 
 **Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.
-
-The party screen displays a prominent star symbol on the current target.
 
 **Rank II:** Experience becomes +75%; first-move power becomes +30%.
 
@@ -1051,9 +1047,9 @@ Healing received before collection reduces the debt point-for-point. Debt follow
 
 ---
 
-### 75. Set Collector — **Ultra; authored item and vitamin sets**
+### 75. Set Collector — **Ultra; item and vitamin sets**
 
-**Base:** Three distinct IDs from an authored set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.
+**Base:** Three distinct items from a set activate its three-piece bonus; five activate its five-piece bonus. Duplicate stacks do not count. **Complete Nutrition** (HP Up, Protein, Iron, Calcium, Zinc, Carbos): all stats +5%/+10%. **Restoration Kit** (Leftovers, Shell Bell, Healing Charm, Berry Pouch, Reviver Seed): direct healing +15%/+25%, plus a 10% max-HP barrier on the first heal at five pieces. **Tactician's Tools** (Quick Claw, King's Rock, Wide Lens, Grip Claw, Baton): accuracy +10%, then also +1 priority and +10% power to the first move. **Volatile Core** (Toxic Orb, Flame Orb, Frostbite Orb, Focus Band, White Herb): damage +8%/+15%, then self-inflicted status damage is halved.
 
 **Rank II:** One chosen set requires one fewer distinct item.
 
@@ -1315,7 +1311,7 @@ Eligible examples include Chosen One, Mithridatism, Hunter’s Mark, and Bossbre
 
 **Base:** Once per boss battle, when the first allied Pokémon would faint, combat rewinds to the beginning of that turn. The player may choose different actions.
 
-Authoritative RNG remains deterministic: identical actions recreate identical outcomes unless the changed action legitimately alters the RNG path.
+Repeating the same actions recreates the same outcome unless a changed action alters what happens next.
 
 **Rank II:** The player may decline the automatic rewind and save it for a later faint.
 
@@ -1661,9 +1657,6 @@ Replacement rules:
 * Preserve at least one damaging move where possible.
 * Exclude form-controller, signature-structural, one-hit-KO, and required moves.
 * Reveal every replacement before the first battle.
-* Store all results deterministically in run state.
-
-The full curse applies to the entire party. A reduced variant could affect only one Pokémon, but that would be a lower-Dread version.
 
 ### 30. Feedback Loop
 
@@ -1701,4 +1694,3 @@ Feedback cannot directly reduce the Pokémon below 1 HP, but ordinary damage can
 * **Fate Draft:** the battle-law pool needs a much stronger pass; the current collection is inconsistent.
 * **Release Dividend:** successor inheritance remains insufficiently distinctive and potentially exploitable.
 * **Fault Tolerance:** viable but niche; every suppressible ability, item, and boon would need a bespoke “one final enhanced activation” definition.
-* **Set Collector:** included as a valid base line, but its actual content remains blocked on the item-and-vitamin set audit.
