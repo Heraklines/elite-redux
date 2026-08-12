@@ -114,6 +114,9 @@ pub(crate) struct AuthorityReplacementRequest {
 pub(crate) enum AuthorityTransactionError {
     #[error("authority command/replacement admission failed: {0}")]
     Admission(#[from] AuthorityCommandError),
+    // Retained for the frozen error table; the current integration seam does
+    // not construct this adapter-side variant.
+    #[allow(dead_code)]
     #[error("authority battle resolver failed: {0}")]
     BattleResolve(#[source] er_battle::error::BattleResolveError),
     #[error("authority material codec failed: {reason}")]
@@ -134,6 +137,7 @@ pub(crate) enum AuthorityTransactionError {
     EnclosingValidation { reason: String },
     // Kept for the frozen error table; exact replacement duplicates are
     // handled as read-only admission evidence and never emit this variant.
+    #[allow(dead_code)]
     #[error("exact authority replacement stage is already admitted: {operation_id}")]
     Duplicate { operation_id: OperationId },
 }
@@ -156,6 +160,9 @@ pub(crate) struct AuthorityPreparedTransaction {
     prepared: PreparedCommit,
 }
 
+/// The material payloads stay inline to preserve the frozen crate-private
+/// staging shape; boxing either variant would change that integration seam.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum PreparedMaterial {
     Turn(BattleTurnMaterialV1),
     Replacement(BattleReplacementMaterialV1),
@@ -190,6 +197,9 @@ impl AuthorityPreparedTransaction {
         &self.material
     }
 
+    // Retained for staged integration consumers that read the prepared
+    // authority entry through this adapter.
+    #[allow(dead_code)]
     pub(crate) fn kind(&self) -> AuthorityEntryKind {
         self.kind
     }
@@ -198,6 +208,9 @@ impl AuthorityPreparedTransaction {
         &self.presentation
     }
 
+    // Retained for staged integration consumers that inspect the projected
+    // control through this adapter.
+    #[allow(dead_code)]
     pub(crate) fn next_control(&self) -> &NextControl {
         &self.prepared.entry.next_control
     }
@@ -282,6 +295,9 @@ pub(crate) struct AuthorityPublishedTransaction {
     pub(crate) control: BattleControlPlan,
     pub(crate) menu_allocators: Vec<SeatMenuInstanceAllocator>,
     pub(crate) presentation: Vec<BattlePresentationEvent>,
+    // Retained in the frozen published shape for integration-owned consumers;
+    // this adapter does not read the material after publication.
+    #[allow(dead_code)]
     pub(crate) material: PreparedMaterial,
     pub(crate) operation_id: OperationId,
     pub(crate) kind: AuthorityEntryKind,
