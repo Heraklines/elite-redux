@@ -172,6 +172,46 @@ fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> 
     Ok(())
 }
 
+fn normalize_legacy_content_conditions(content: &mut Value) -> TestResult {
+    let manifest = content
+        .get_mut("capability_manifest")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("content_pack.capability_manifest is not an object"))?;
+    let entries = manifest
+        .get_mut("entries")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid("content_pack.capability_manifest.entries is not an array"))?;
+
+    for (index, entry) in entries.iter_mut().enumerate() {
+        let path = format!("content_pack.capability_manifest.entries[{index}].subject");
+        let subject = entry
+            .get_mut("subject")
+            .ok_or_else(|| invalid(format!("{path} is missing")))?;
+        let is_condition = {
+            let subject = subject
+                .as_object_mut()
+                .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+            if subject.len() != 2
+                || !subject.contains_key("kind")
+                || !subject.contains_key("value")
+            {
+                return Err(invalid(format!(
+                    "{path} must contain exactly kind and value"
+                )));
+            }
+            let kind = subject
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid(format!("{path}.kind is not a string")))?;
+            matches!(kind, "WEATHER" | "TERRAIN")
+        };
+        if is_condition {
+            normalize_adjacent_kind(subject, &path, "value")?;
+        }
+    }
+    Ok(())
+}
+
 fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let canonical = state
         .get_mut("canonical")
@@ -252,10 +292,11 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
 
 fn fixture_content_pack() -> TestResult<Arc<ContentPack>> {
     let wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
-    let value = wire
+    let mut value = wire
         .get("content_pack")
         .cloned()
         .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
+    normalize_legacy_content_conditions(&mut value)?;
     Ok(Arc::new(serde_json::from_value(value)?))
 }
 
