@@ -54,7 +54,8 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
         serde_json::from_str::<er_types::battle_control::BattleControlPlan>(CONTROL_FIXTURE)
             .expect("control fixture is typed");
     let wrong_digest = format!("blake3-v1:{}", "0".repeat(64));
-    let rng_before = serde_json::from_value(state_value["battle"]["battle_rng"].clone())
+    let rng_before: er_rng::battle::BattleRngState =
+        serde_json::from_value(state_value["battle"]["battle_rng"].clone())
         .expect("battle RNG is typed");
     let material = BattleTurnMaterialV1 {
         schema_version: 1,
