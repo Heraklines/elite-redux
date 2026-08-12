@@ -254,7 +254,20 @@ mod live_local_production {
     use er_kernel::snapshot::RestorableKernelSnapshotV2;
 
     fn content_pack() -> TestResult<Arc<ContentPack>> {
-        Ok(Arc::new(serde_json::from_value(published_content_pack()?)?))
+        let mut artifact = published_content_pack()?;
+        let selected = er_content::pack::selected_content_pack()?;
+        super::live_coop_production::normalize_legacy_content_pack(&mut artifact, &selected)?;
+        let value = artifact
+            .get("content_pack")
+            .cloned()
+            .ok_or_else(|| invalid("published content artifact has no content_pack"))?;
+        let pack: ContentPack = serde_json::from_value(value)?;
+        if pack != selected {
+            return Err(invalid(
+                "published legacy content pack did not normalize to the current selected content",
+            ));
+        }
+        Ok(Arc::new(pack))
     }
 
     fn snapshot_wire(
@@ -547,8 +560,9 @@ mod live_coop_production {
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
-        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision, OperationId,
-        PhysicalKey, RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
+        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision,
+        OperationId, PhysicalKey, RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId,
+        TimeClass,
     };
     use serde::{Deserialize, Serialize, de::DeserializeOwned};
     use serde_json::Value;
@@ -779,6 +793,10 @@ mod live_coop_production {
 
     const FORCED_REPLACEMENT_FIXTURE: &str =
         include_str!("../../../fixtures/m3/oracle/battle-cases/forced-replacement.json");
+    const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+        "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+    const LEGACY_ORACLE_CONTENT_HASH: &str =
+        "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
     fn invalid(message: impl Into<String>) -> Box<dyn std::error::Error> {
         std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
@@ -826,38 +844,193 @@ mod live_coop_production {
             .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
         let normalized = match kind {
             Value::String(tag) => serde_json::json!({"kind": tag}),
-            Value::Object(nested) => {
-                let tag = nested
-                    .get("kind")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| {
-                        invalid(format!("{path}.{field_name}.kind is not a string"))
-                    })?;
-                let valid_shape = match tag {
-                    "NONE" => nested.len() == 1,
-                    "UNSUPPORTED_ORACLE_CODE" => {
-                        nested.len() == 2
-                            && nested
-                                .get("value")
-                                .and_then(Value::as_u64)
-                                .is_some_and(|value| u16::try_from(value).is_ok())
-                    }
-                    _ => false,
-                };
-                if !valid_shape {
-                    return Err(invalid(format!(
-                        "{path}.{field_name} has an invalid adjacent kind object"
-                    )));
-                }
-                Value::Object(nested)
-            }
+            Value::Object(nested) => Value::Object(nested),
             other => {
                 return Err(invalid(format!(
                     "{path}.{field_name} has unsupported value {other}"
                 )));
             }
         };
+        let adjacent = normalized
+            .as_object()
+            .ok_or_else(|| invalid(format!("{path}.{field_name} is not an object")))?;
+        let tag = adjacent
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid(format!("{path}.{field_name}.kind is not a string")))?;
+        let valid_shape = match tag {
+            "NONE" => adjacent.len() == 1,
+            "UNSUPPORTED_ORACLE_CODE" => {
+                adjacent.len() == 2
+                    && adjacent
+                        .get("value")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|value| u16::try_from(value).is_ok())
+            }
+            _ => false,
+        };
+        if !valid_shape {
+            return Err(invalid(format!(
+                "{path}.{field_name} has an invalid adjacent kind object"
+            )));
+        }
         object.insert(field_name.to_owned(), normalized);
+        Ok(())
+    }
+
+    pub(crate) fn normalize_legacy_content_pack(
+        artifact: &mut Value,
+        selected: &ContentPack,
+    ) -> TestResult {
+        selected.validate()?;
+        let (provenance_hash, provenance_oracle_sha) = {
+            let provenance = artifact
+                .get("provenance")
+                .and_then(Value::as_object)
+                .ok_or_else(|| invalid("published content artifact provenance is missing"))?;
+            let hash = provenance
+                .get("content_pack_hash")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("published content provenance hash is missing"))?;
+            let oracle_sha = provenance
+                .get("oracle_game_sha")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("published content provenance oracle SHA is missing"))?;
+            (hash.to_owned(), oracle_sha.to_owned())
+        };
+        let (pack_hash, pack_oracle_sha) = {
+            let pack = artifact
+                .get("content_pack")
+                .and_then(Value::as_object)
+                .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+            let hash = pack
+                .get("hash")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("published content pack hash is missing"))?;
+            let oracle_sha = pack
+                .get("oracle_game_sha")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("published content pack oracle SHA is missing"))?;
+            (hash.to_owned(), oracle_sha.to_owned())
+        };
+        if pack_hash != LEGACY_ORACLE_CONTENT_HASH
+            || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+            || pack_oracle_sha != selected.oracle_game_sha
+            || provenance_oracle_sha != selected.oracle_game_sha
+        {
+            return Err(invalid(
+                "published content artifact is not the exact supported legacy identity",
+            ));
+        }
+
+        let pack = artifact
+            .get_mut("content_pack")
+            .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+        let manifest = pack
+            .get_mut("capability_manifest")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| invalid("published content capability manifest is invalid"))?;
+        let entries = manifest
+            .get_mut("entries")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| invalid("published content capability entries are invalid"))?;
+        for (index, entry) in entries.iter_mut().enumerate() {
+            let subject = entry
+                .get_mut("subject")
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "published content capability entry {index} subject is missing"
+                    ))
+                })?;
+            let subject_kind = subject
+                .get("kind")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| invalid(format!(
+                    "published content capability entry {index} subject kind is not a string"
+                )))?;
+            if matches!(subject_kind.as_str(), "WEATHER" | "TERRAIN") {
+                normalize_adjacent_kind(
+                    subject,
+                    &format!("content_pack.capability_manifest.entries[{index}].subject"),
+                    "value",
+                )?;
+            }
+        }
+        pack.as_object_mut()
+            .ok_or_else(|| invalid("published content pack is not an object"))?
+            .insert("hash".to_owned(), Value::String(selected.hash.to_string()));
+        Ok(())
+    }
+
+    fn normalize_legacy_content_identity(
+        document: &Value,
+        state: &mut Value,
+        content: &ContentPack,
+    ) -> TestResult {
+        let canonical = state
+            .get_mut("canonical")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| invalid("initial_state.canonical is not an object"))?;
+        let fixture_hash = canonical
+            .get("content_hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("initial_state.canonical.content_hash is missing"))?
+            .to_owned();
+        let expected_hash = document
+            .get("expected_final_state")
+            .and_then(|value| value.get("canonical"))
+            .and_then(|value| value.get("content_hash"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("expected_final_state.canonical.content_hash is missing"))?;
+        if expected_hash != fixture_hash {
+            return Err(invalid(
+                "published state content hashes disagree between initial and expected final state",
+            ));
+        }
+        let provenance = document
+            .get("provenance")
+            .and_then(Value::as_object)
+            .ok_or_else(|| invalid("published fixture provenance is missing"))?;
+        let provenance_hash = provenance
+            .get("content_pack_hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("published fixture provenance hash is missing"))?;
+        let provenance_oracle_sha = provenance
+            .get("oracle_game_sha")
+            .and_then(Value::as_str)
+            .ok_or_else(|| invalid("published fixture provenance oracle SHA is missing"))?;
+        if provenance_oracle_sha != content.oracle_game_sha {
+            return Err(invalid(
+                "published fixture provenance oracle SHA disagrees with selected content",
+            ));
+        }
+
+        let selected = er_content::pack::selected_content_pack()?;
+        let selected_hash = content.hash.as_str();
+        let selected_digest = selected_hash
+            .strip_prefix("blake3-v1:")
+            .ok_or_else(|| invalid("selected content hash has no blake3-v1 prefix"))?;
+        if fixture_hash == selected_hash {
+            if content != &selected || provenance_hash != selected_digest {
+                return Err(invalid(
+                    "selected fixture content identity does not match the current selected content",
+                ));
+            }
+            return Ok(());
+        }
+        if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
+            || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+            || content != &selected
+        {
+            return Err(invalid(
+                "fixture content identity is neither the current selected pair nor the exact published legacy pair",
+            ));
+        }
+        canonical.insert(
+            "content_hash".to_owned(),
+            Value::String(selected_hash.to_owned()),
+        );
         Ok(())
     }
 
@@ -1032,12 +1205,20 @@ mod live_coop_production {
     }
 
     fn forced_doubles_config() -> TestResult<BattleGameConfig> {
+        let content = content_pack()?;
+        forced_doubles_config_with_content(&content)
+    }
+
+    fn forced_doubles_config_with_content(
+        content: &ContentPack,
+    ) -> TestResult<BattleGameConfig> {
         let wire: Value = serde_json::from_str(FORCED_REPLACEMENT_FIXTURE)?;
         let mut initial_state = wire
             .get("initial_state")
             .cloned()
             .ok_or_else(|| invalid("forced-replacement fixture has no initial state"))?;
         normalize_legacy_initial_state(&mut initial_state)?;
+        normalize_legacy_content_identity(&wire, &mut initial_state, content)?;
         let canonical = initial_state
             .get("canonical")
             .cloned()
@@ -1155,7 +1336,14 @@ mod live_coop_production {
     }
 
     fn forced_victory_config() -> TestResult<BattleGameConfig> {
-        let mut config = forced_doubles_config()?;
+        let content = content_pack()?;
+        forced_victory_config_with_content(&content)
+    }
+
+    fn forced_victory_config_with_content(
+        content: &ContentPack,
+    ) -> TestResult<BattleGameConfig> {
+        let mut config = forced_doubles_config_with_content(content)?;
         for pokemon in &mut config.start.enemy_party {
             pokemon.hp = 1;
             pokemon.fainted = false;
@@ -2546,6 +2734,8 @@ mod live_coop_production {
     fn build_hosted_continuation_suite(
         content: Arc<ContentPack>,
     ) -> TestResult<M3ContinuationSuiteV1> {
+        let forced_doubles_config = || forced_doubles_config_with_content(content.as_ref());
+        let forced_victory_config = || forced_victory_config_with_content(content.as_ref());
         let mut scenarios = Vec::with_capacity(REQUIRED_CONTINUATION_BOUNDARIES.len());
 
         {
