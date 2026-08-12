@@ -470,7 +470,7 @@ fn first_divergence_at(path: &str, expected: &Value, actual: &Value) -> Option<S
     }
 }
 
-fn compare_serialized_axis<T: Serialize>(
+fn compare_serialized_axis<T: Serialize + ?Sized>(
     case_name: &str,
     axis_name: &str,
     expected: &T,
@@ -754,12 +754,12 @@ fn normalize_legacy_final_statuses(
         let path = format!("expected_mutations[{index}]");
         let after = object_field(mutation, case_name, &path, "after")?;
         let after_status = object_field(after, case_name, &format!("{path}.after"), "status")?;
-        if u8::try_from(u64_field(
+        if u64_field(
             after_status,
             case_name,
             &format!("{path}.after.status"),
             "effect",
-        )?)? != 7
+        )? != 7
         {
             continue;
         }
