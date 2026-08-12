@@ -29,6 +29,125 @@ fn invalid_data(message: &'static str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message)
 }
 
+fn adapt_legacy_battle(
+    mut battle: serde_json::Value,
+) -> Result<serde_json::Value, Box<dyn Error>> {
+    let battle_object = battle
+        .as_object_mut()
+        .ok_or_else(|| invalid_data("initial canonical battle is not an object"))?;
+
+    let format_slots = battle_object
+        .get("format")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|format| format.get("slots"))
+        .ok_or_else(|| invalid_data("legacy format.slots is missing"))?;
+    let field_slots = battle_object
+        .get("field")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|field| field.get("slots"))
+        .ok_or_else(|| invalid_data("legacy field.slots is missing"))?;
+    if !format_slots.is_array() || !field_slots.is_array() {
+        return Err(invalid_data("legacy format.slots and field.slots must be arrays").into());
+    }
+    if format_slots != field_slots {
+        return Err(invalid_data("legacy format.slots differs from field.slots").into());
+    }
+    battle_object
+        .get_mut("format")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or_else(|| invalid_data("legacy format is not an object"))?
+        .remove("slots");
+
+    for party_name in ["player_party", "enemy_party"] {
+        let party = battle_object
+            .get_mut(party_name)
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| invalid_data("legacy party is not an array"))?;
+        for pokemon in party {
+            let status = pokemon
+                .get_mut("status")
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or_else(|| invalid_data("legacy party status is not an object"))?;
+            let kind = status
+                .get("kind")
+                .cloned()
+                .ok_or_else(|| invalid_data("legacy party status.kind is missing"))?;
+            let normalized = match kind {
+                serde_json::Value::String(_) => kind,
+                serde_json::Value::Object(nested) => {
+                    let Some(tag) = nested
+                        .get("kind")
+                        .and_then(serde_json::Value::as_str)
+                        .filter(|_| nested.len() == 1)
+                    else {
+                        return Err(
+                            invalid_data("legacy party status.kind has an invalid shape").into(),
+                        );
+                    };
+                    serde_json::Value::String(tag.to_owned())
+                }
+                _ => {
+                    return Err(
+                        invalid_data("legacy party status.kind has an invalid shape").into()
+                    );
+                }
+            };
+            status.insert("kind".to_owned(), normalized);
+        }
+    }
+
+    for condition_name in ["weather", "terrain"] {
+        let condition = battle_object
+            .get_mut(condition_name)
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| invalid_data("legacy weather/terrain is not an object"))?;
+        let kind = condition
+            .get("kind")
+            .cloned()
+            .ok_or_else(|| invalid_data("legacy weather/terrain kind is missing"))?;
+        let normalized = match kind {
+            serde_json::Value::String(tag) => {
+                let mut adjacent = serde_json::Map::new();
+                adjacent.insert("kind".to_owned(), serde_json::Value::String(tag));
+                serde_json::Value::Object(adjacent)
+            }
+            serde_json::Value::Object(_) => kind,
+            _ => {
+                return Err(
+                    invalid_data("legacy weather/terrain kind has an invalid shape").into(),
+                );
+            }
+        };
+        validate_condition_kind(&normalized)?;
+        condition.insert("kind".to_owned(), normalized);
+    }
+
+    Ok(battle)
+}
+
+fn validate_condition_kind(value: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid_data("weather/terrain kind is not an object"))?;
+    let kind = object
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_data("weather/terrain kind tag is not a string"))?;
+    match kind {
+        "NONE" if object.len() == 1 => Ok(()),
+        "UNSUPPORTED_ORACLE_CODE"
+            if object.len() == 2
+                && object
+                    .get("value")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|value| u16::try_from(value).is_ok()) =>
+        {
+            Ok(())
+        }
+        _ => Err(invalid_data("weather/terrain kind has an invalid enum shape").into()),
+    }
+}
+
 fn safe(value: u64) -> Result<SafeU53, Box<dyn Error>> {
     Ok(SafeU53::new(value)?)
 }
@@ -72,7 +191,7 @@ fn fixture_battle(name: &str) -> Result<BattleState, Box<dyn Error>> {
         .and_then(|canonical| canonical.get("battle"))
         .cloned()
         .ok_or_else(|| invalid_data("fixture has no initial canonical battle"))?;
-    Ok(serde_json::from_value(battle)?)
+    Ok(serde_json::from_value(adapt_legacy_battle(battle)?)?)
 }
 
 fn command_root(
