@@ -214,6 +214,58 @@ fn normalize_legacy_content_conditions(content: &mut Value) -> TestResult {
     Ok(())
 }
 
+fn normalize_legacy_type_chart(content: &mut Value, selected: &ContentPack) -> TestResult {
+    let entries = content
+        .get_mut("type_chart")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("content_pack.type_chart is not an object"))?
+        .get_mut("entries")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid("content_pack.type_chart.entries is not an array"))?;
+    let expected_pairs = selected
+        .type_chart
+        .entries
+        .iter()
+        .map(|entry| {
+            let value = serde_json::to_value(entry)?;
+            let attack = value
+                .get("attack")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("selected type-chart attack is not a string"))?
+                .to_owned();
+            let defense = value
+                .get("defense")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("selected type-chart defense is not a string"))?
+                .to_owned();
+            Ok((attack, defense))
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+
+    let mut normalized = Vec::with_capacity(entries.len());
+    for (expected_index, (attack, defense)) in expected_pairs.iter().enumerate() {
+        let position = entries.iter().position(|entry| {
+            entry.as_object().is_some_and(|entry| {
+                entry.get("attack").and_then(Value::as_str) == Some(attack.as_str())
+                    && entry.get("defense").and_then(Value::as_str) == Some(defense.as_str())
+            })
+        });
+        let position = position.ok_or_else(|| {
+            invalid(format!(
+                "content_pack.type_chart.entries is missing canonical pair at index {expected_index}"
+            ))
+        })?;
+        normalized.push(entries.remove(position));
+    }
+    if !entries.is_empty() {
+        return Err(invalid(
+            "content_pack.type_chart.entries contains unexpected pairs",
+        ));
+    }
+    *entries = normalized;
+    Ok(())
+}
+
 fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
     let canonical = state
         .get_mut("canonical")
@@ -332,6 +384,7 @@ fn fixture_content_pack() -> TestResult<Arc<ContentPack>> {
     }
 
     let mut value = Value::Object(pack.clone());
+    normalize_legacy_type_chart(&mut value, &selected)?;
     normalize_legacy_content_conditions(&mut value)?;
     value
         .as_object_mut()
