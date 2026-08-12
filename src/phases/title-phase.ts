@@ -2335,22 +2335,20 @@ export class TitlePhase extends Phase {
     if (this.loaded) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
-      globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);
-      if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-        globalScene.phaseManager.pushNew("SummonPhase", 1, true, true);
+      const battlerCount = globalScene.currentBattle.getBattlerCount();
+      for (let i = 0; i < Math.min(battlerCount, availablePartyMembers); i++) {
+        globalScene.phaseManager.pushNew("SummonPhase", i, true, true);
       }
 
       if (
         globalScene.currentBattle.battleType !== BattleType.TRAINER
         && (globalScene.currentBattle.waveIndex > 1 || !globalScene.gameMode.isDaily)
+        && availablePartyMembers > battlerCount
       ) {
         // Format-capacity, not `double ? 2 : 1` (a loaded TRIPLE got one prompt max):
         // a switch prompt per field slot whenever a benched spare exists.
-        const battlerCount = globalScene.currentBattle.getBattlerCount();
-        if (availablePartyMembers > battlerCount) {
-          for (let i = 0; i < battlerCount; i++) {
-            globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
-          }
+        for (let i = 0; i < battlerCount; i++) {
+          globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
         }
       }
     }

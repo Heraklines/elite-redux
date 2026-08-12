@@ -23241,7 +23241,7 @@ export const ER_MOVES: readonly ErMoveDraft[] = [
     "moveConst": "MOVE_RIP_AND_TEAR",
     "name": "Rip and Tear",
     "shortName": "Rip and Tear",
-    "description": "The user tears into the foe with its fangs.",
+    "description": "Tears into the foe, but can't be used twice in a row.",
     "longDescription": "Lowers Speed. 50% chance to bleed. Can't be used twice in a row.",
     "types": [
       11

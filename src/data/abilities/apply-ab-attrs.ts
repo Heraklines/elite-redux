@@ -246,7 +246,9 @@ export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passi
   const { pokemon } = params;
   const { formChangeAbilitiesApplied } = pokemon.turnData;
   const attrFilter = (attr: AbAttrMap["PostSummonAbAttr"]) =>
-    !attr.is("PostSummonFormChangeAbAttr") && !attr.is("PostSummonFormChangeByWeatherAbAttr");
+    attr.shouldActivateOnFormChange()
+    && !attr.is("PostSummonFormChangeAbAttr")
+    && !attr.is("PostSummonFormChangeByWeatherAbAttr");
 
   for (const source of pokemon.getActiveAbilitySources()) {
     if (formChangeAbilitiesApplied.has(source.ability.id)) {

@@ -1027,7 +1027,10 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- "Can't be used twice in a row" (consecutive-use restriction) ----
     case 859: // Hacksaw
     case 893: // Blue Moon (crimson)
-    case 963: // Spectral Serenade (every-other turn)
+    case 963: // Spectral Serenade (sound-based, every-other turn)
+      move.soundBased();
+      move.restriction(consecutiveUseRestriction);
+      break;
     case 964: // Merculight (may fail if used in succession)
     case 1000: // Blue Moon (azure)
       move.restriction(consecutiveUseRestriction);

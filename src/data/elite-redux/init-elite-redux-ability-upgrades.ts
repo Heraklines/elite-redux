@@ -794,6 +794,17 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
       ]),
     );
   });
+  patch(762, ability => {
+    // Qigong contains Fighting Spirit. Keep the composite in sync with the
+    // upgraded constituent: Scrappy replaces the old screen-breaking rider.
+    const retained = ability.attrs.filter(attr => attr.constructor.name !== "RemoveScreensOnTypedAttackAbAttr");
+    return Number(
+      replaceAbilityAttrsOnce(ability, "upgrade:qigong:fighting-spirit-scrappy", [
+        ...retained.map(attr => () => attr),
+        ...allAbilities[AbilityId.SCRAPPY].attrs.map(attr => () => attr),
+      ]),
+    );
+  });
   patch(304, ability =>
     Number(
       appendAbilityAttrsOnce(ability, "upgrade:magical-dust:commanded", [

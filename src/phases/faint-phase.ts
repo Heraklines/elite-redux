@@ -54,6 +54,9 @@ export class FaintPhase extends PokemonPhase {
    */
   private readonly preventInstantRevive: boolean;
 
+  /** Whether an enemy replacement must resolve before the already-queued turn actions continue. */
+  private readonly immediateEnemyReplacement: boolean;
+
   /**
    * The source Pokemon that dealt fatal damage; only present for faints triggered by a move.
    */
@@ -62,11 +65,17 @@ export class FaintPhase extends PokemonPhase {
   /** Immutable authoritative event identity captured before any delayed/re-entrant faint work. */
   private faintSourceAddress: CoopFaintSourceAddress | undefined;
 
-  constructor(battlerIndex: BattlerIndex, preventInstantRevive = false, source?: Pokemon) {
+  constructor(
+    battlerIndex: BattlerIndex,
+    preventInstantRevive = false,
+    source?: Pokemon,
+    immediateEnemyReplacement = false,
+  ) {
     super(battlerIndex);
 
     this.preventInstantRevive = preventInstantRevive;
     this.source = source;
+    this.immediateEnemyReplacement = immediateEnemyReplacement;
   }
 
   public override start(): void {
@@ -322,7 +331,12 @@ export class FaintPhase extends PokemonPhase {
           if (isVersusSession() && (getCoopController()?.role === "host" || isShowdownSyncSession())) {
             globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex, faintSourceAddress);
           } else {
-            globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
+            const replacementArgs = [SwitchType.SWITCH, this.fieldIndex, -1, false, false] as const;
+            if (this.immediateEnemyReplacement) {
+              globalScene.phaseManager.unshiftNew("SwitchSummonPhase", ...replacementArgs);
+            } else {
+              globalScene.phaseManager.pushNew("SwitchSummonPhase", ...replacementArgs);
+            }
           }
           willSwitchIn = true;
         }

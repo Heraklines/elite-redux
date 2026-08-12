@@ -197,8 +197,11 @@ describe.skipIf(!RUN)("combat contract live harness", () => {
     ["double", [SpeciesId.CHARIZARD, SpeciesId.PIKACHU]],
     ["triple", [SpeciesId.CHARIZARD, SpeciesId.PIKACHU, SpeciesId.EEVEE]],
   ] as const)("profiles the complete damaging-candidate preparation for a %s field", async (format, party) => {
-    game.override.battleStyle(format).moveset(MoveId.TACKLE).enemyMoveset(MoveId.SPLASH);
+    game.override.startingWave(2).battleStyle(format).moveset(MoveId.TACKLE).enemyMoveset(MoveId.SPLASH);
     await game.classicMode.startBattle(...party);
+
+    expect(game.scene.getPlayerField()).toHaveLength(party.length);
+    expect(game.scene.getEnemyField()).toHaveLength(party.length);
 
     const samples: number[] = [];
     let candidateCount = 0;

@@ -78,4 +78,38 @@ describe("Fun Mode Full Mix pseudo-Megas", () => {
         .map(ability => ability?.id ?? null),
     ).toEqual(originalInnates);
   });
+
+  test("can disable a pseudo-Mega stone and replace it with another stone", async () => {
+    await game.classicMode.startBattle(SpeciesId.PIKACHU);
+    game.scene.gameMode = getGameMode(GameModes.FUN);
+    setFunModeConfig({
+      ...DEFAULT_FUN_MODE_CONFIG,
+      randomizePokemon: false,
+      randomizeTypes: false,
+      randomizeAbilities: false,
+      randomizeLevelUpMoves: false,
+      megaMode: true,
+    });
+
+    const pokemon = game.scene.getPlayerPokemon()!;
+    const firstType = new FormChangeItemModifierType(FormChangeItem.SWAMPERTITE);
+    firstType.id = "FORM_CHANGE_ITEM";
+    const first = new PokemonFormChangeItemModifier(firstType, pokemon.id, FormChangeItem.SWAMPERTITE, true);
+    expect(game.scene.addModifier(first, true, false, false, true)).toBe(true);
+    expect(pokemon.getFunMegaStone()).toBe(FormChangeItem.SWAMPERTITE);
+
+    first.active = false;
+    expect(first.apply(pokemon, false)).toBe(true);
+    expect(pokemon.getFunMegaStone()).toBeUndefined();
+    expect(pokemon.isFunPseudoMega()).toBe(false);
+
+    const secondType = new FormChangeItemModifierType(FormChangeItem.GYARADOSITE);
+    secondType.id = "FORM_CHANGE_ITEM";
+    const second = new PokemonFormChangeItemModifier(secondType, pokemon.id, FormChangeItem.GYARADOSITE, true);
+    expect(game.scene.addModifier(second, true, false, false, true)).toBe(true);
+    expect(pokemon.getFunMegaStone()).toBe(FormChangeItem.GYARADOSITE);
+    expect(
+      game.scene.getModifiers(PokemonFormChangeItemModifier).filter(modifier => modifier.pokemonId === pokemon.id),
+    ).toEqual([second]);
+  });
 });

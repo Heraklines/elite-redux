@@ -1963,6 +1963,7 @@ export class GameData {
       score: globalScene.score,
       waveIndex: globalScene.currentBattle.waveIndex,
       battleType: globalScene.currentBattle.battleType,
+      battleFormat: globalScene.currentBattle.format.id,
       trainer:
         globalScene.currentBattle.battleType === BattleType.TRAINER
           ? new TrainerData(globalScene.currentBattle.trainer)

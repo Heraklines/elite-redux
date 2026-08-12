@@ -37,6 +37,11 @@ describe.skipIf(!RUN)("ER composite constituents (#130)", () => {
     expect((await attrsOf(762, "AlwaysHitAbAttr")).length).toBeGreaterThan(0);
   });
 
+  it("Qigong (762) inherits Fighting Spirit's Scrappy upgrade", async () => {
+    expect((await attrsOf(762, "IgnoreTypeImmunityAbAttr")).length).toBeGreaterThan(0);
+    expect((await attrsOf(762, "RemoveScreensOnTypedAttackAbAttr")).length).toBe(0);
+  });
+
   it("Stonecutter (881) wires its 'Rock moves ignore abilities' half (MoveAbilityBypassAbAttr)", async () => {
     expect((await attrsOf(881, "MoveAbilityBypassAbAttr")).length).toBeGreaterThan(0);
   });

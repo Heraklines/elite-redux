@@ -214,7 +214,10 @@ function tryFuseOpponents(holder: Pokemon): boolean {
       cmd.skip = true;
     }
     constituent.hp = 0;
-    globalScene.phaseManager.unshiftNew("FaintPhase", slot, true);
+    // This synthetic faint is created at TurnStart, after the turn's actions are already queued.
+    // A normal end-of-queue replacement would therefore miss the whole turn (and can leave the
+    // battle in a one-opponent command state). Seat a legal trainer reserve before those actions.
+    globalScene.phaseManager.unshiftNew("FaintPhase", slot, true, undefined, true);
   } else {
     // Off-field bench mon (not in the field checksum): flag it defeated.
     constituent.hp = 0;

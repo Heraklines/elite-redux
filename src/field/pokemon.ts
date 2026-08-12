@@ -35,7 +35,7 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { EntryHazardTag, isMagicRoomActive, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
-import { fieldSpriteOffset } from "#data/battle-format";
+import { fieldSpriteOffset, fieldSpriteScale } from "#data/battle-format";
 import {
   AutotomizedTag,
   BattlerTag,
@@ -1610,6 +1610,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getSpriteScale(): number {
     const formKey = this.getFormKey();
+    const arrangement = globalScene?.currentBattle?.arrangement;
+    const capacity = arrangement ? (this.isPlayer() ? arrangement.playerCapacity : arrangement.enemyCapacity) : 1;
+    const layoutScale = fieldSpriteScale(this.species.speciesId, formKey, capacity);
     if (
       this.isMax() === true
       || formKey === "segin-starmobile"
@@ -1619,14 +1622,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       || formKey === "caph-starmobile"
     ) {
       // G-Max and starmobiles have flat 1.5x scale
-      return 1.5;
+      return 1.5 * layoutScale;
     }
 
     // TODO: Rather than using -1 as a default... why don't we just change it to 1????????
     if (this.customPokemonData.spriteScale <= 0) {
-      return 1;
+      return layoutScale;
     }
-    return this.customPokemonData.spriteScale;
+    return this.customPokemonData.spriteScale * layoutScale;
   }
 
   /** Resets the pokemon's field sprite properties, including position, alpha, and scale */

@@ -51,4 +51,21 @@ describe.skipIf(!RUN)("ER triple reload", () => {
     expect(globalScene.getPlayerField().filter(p => p.isOnField())).toHaveLength(3);
     expect(globalScene.getEnemyField().filter(p => p.isOnField())).toHaveLength(3);
   });
+
+  it("persists a naturally resolved format instead of re-rolling it on reload", async () => {
+    game.override.startingWave(2).battleStyle("triple");
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+
+    expect(globalScene.currentBattle.format.id).toBe("triple");
+    expect(globalScene.gameData.getSessionSaveData().battleFormat).toBe("triple");
+
+    // A production natural triple has no persistent challenge/override that can
+    // reconstruct it. Removing the harness override recreates that reload path.
+    game.override.battleStyle(null);
+    await game.reload.reloadSession();
+
+    expect(globalScene.currentBattle.format.id).toBe("triple");
+    expect(globalScene.getPlayerField().filter(p => p.isOnField())).toHaveLength(3);
+    expect(globalScene.getEnemyField().filter(p => p.isOnField())).toHaveLength(3);
+  });
 });

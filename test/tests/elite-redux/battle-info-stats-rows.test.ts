@@ -28,7 +28,7 @@ import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
 import { computeBattleInfoStatRows } from "#ui/battle-info-overlay";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -89,5 +89,14 @@ describe.skipIf(!RUN)("BattleInfoOverlay stats rows — Acc/Eva/Crit wiring", ()
     expect(after).toBe(mon.getCritStage(mon, neutral));
     expect(after).toBeGreaterThan(before);
     expect(after).toBe(2);
+  });
+
+  it("caps the displayed Crit row at +4", async () => {
+    game.override.battleStyle("single").enemySpecies(SpeciesId.SNORLAX).enemyAbility(AbilityId.BALL_FETCH);
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.field.getPlayerPokemon();
+    vi.spyOn(mon, "getCritStage").mockReturnValue(6);
+
+    expect(critRow(mon).stage).toBe(4);
   });
 });

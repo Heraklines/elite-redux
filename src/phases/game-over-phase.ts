@@ -1,7 +1,6 @@
 import { pokerogueApi } from "#api/api";
 import { clientSessionId } from "#app/account";
 import { globalScene } from "#app/global-scene";
-import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -39,7 +38,7 @@ import { Unlockables } from "#enums/unlockables";
 import type { Pokemon } from "#field/pokemon";
 import { BattlePhase } from "#phases/battle-phase";
 import type { EndCardPhase } from "#phases/end-card-phase";
-import { achvs, ChallengeAchv } from "#system/achv";
+import { achvs, ChallengeAchv, isEvioliteEligiblePokemon } from "#system/achv";
 import { ArenaData } from "#system/arena-data";
 import { ChallengeData } from "#system/challenge-data";
 import { applyEffects } from "#system/llm-director/consequence-effects";
@@ -469,7 +468,7 @@ export class GameOverPhase extends BattlePhase {
       }
       if (
         !globalScene.gameData.unlocks[Unlockables.EVIOLITE]
-        && globalScene.getPlayerParty().some(p => p.getSpeciesForm(true).speciesId in pokemonEvolutions)
+        && globalScene.getPlayerParty().some(isEvioliteEligiblePokemon)
       ) {
         globalScene.phaseManager.unshiftNew("UnlockPhase", Unlockables.EVIOLITE);
       }

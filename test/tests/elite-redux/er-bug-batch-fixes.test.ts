@@ -143,6 +143,11 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
 
   it("Rip and Tear is a biting move", () => {
     expect(allMoves[ErMoveId.RIP_AND_TEAR].hasFlag(MoveFlags.BITING_MOVE)).toBe(true);
+    expect(allMoves[ErMoveId.RIP_AND_TEAR].effect.toLowerCase()).toContain("can't be used twice");
+  });
+
+  it("Spectral Serenade is a sound move", () => {
+    expect(allMoves[ErMoveId.SPECTRAL_SERENADE].hasFlag(MoveFlags.SOUND_BASED)).toBe(true);
   });
 
   it("Shell Side Arm is a pulse move", () => {
@@ -223,7 +228,7 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
   });
 
   it("Ivy's two-member opening roster does not wrap slot 1 into a second starter in triples", async () => {
-    game.override.startingWave(8).battleStyle("triple");
+    game.override.seed("efWpNOByP7ONH3qs").startingWave(8).battleStyle("triple");
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.EEVEE, SpeciesId.PIKACHU);
 
     expect(game.scene.currentBattle.trainer?.config.trainerType).toBe(TrainerType.RIVAL);
@@ -260,6 +265,9 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
     ]);
     expect(starterRoots.has(enemyParty[0].species.getRootSpeciesId())).toBe(true);
     expect(starterRoots.has(enemyParty[2].species.getRootSpeciesId())).toBe(false);
+    expect(
+      enemyParty.filter(pokemon => pokemon.species.getRootSpeciesId() === SpeciesId.MUDKIP).length,
+    ).toBeLessThanOrEqual(1);
   });
 
   it("rerolls preserve locked tiers exactly and never downgrade unlocked Master rewards", () => {
@@ -293,6 +301,7 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
 
   it("Relic Song changes Meloetta's form in a triple battle", async () => {
     game.override
+      .startingWave(2)
       .battleStyle("triple")
       .moveset([MoveId.RELIC_SONG, MoveId.SPLASH])
       .enemySpecies(SpeciesId.MAGIKARP)
@@ -311,6 +320,7 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
 
   it("the third triple command prompt names the Pokemon from slot 2", async () => {
     game.override
+      .startingWave(2)
       .battleStyle("triple")
       .battleType(BattleType.WILD)
       .disableTrainerWaves()

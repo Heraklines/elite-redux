@@ -133,7 +133,9 @@ export function computeBattleInfoStatRows(mon: Pokemon): { label: string; stage:
     { label: "Spe", stage: mon.getStatStage(Stat.SPD) },
     { label: "Acc", stage: mon.getStatStage(Stat.ACC) },
     { label: "Eva", stage: mon.getStatStage(Stat.EVA) },
-    { label: "Crit", stage: mon.getCritStage(mon, neutralMove) },
+    // The battle engine treats +4 as the effective cap; higher additive sources
+    // remain useful internally but must not draw impossible +5/+6 UI arrows.
+    { label: "Crit", stage: Math.min(4, mon.getCritStage(mon, neutralMove)) },
   ];
 }
 

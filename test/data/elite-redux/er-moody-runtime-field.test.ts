@@ -784,6 +784,10 @@ describe("Moody runtime field deterministic mechanics", () => {
 
   it("applies Type Tax only to duplicated move types and emits nothing for unaffected types", () => {
     const event = boonEvent("prismatic-opening").event;
+    expect(event.kind).toBe("before-move");
+    if (event.kind !== "before-move") {
+      throw new Error("Prismatic Opening fixture must use a before-move event");
+    }
     const unaffected = resolveMoodyRuntimeField({
       ownerSide: "player",
       boons: [],
@@ -804,6 +808,19 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(duplicated.commands).toContainEqual(
       expect.objectContaining({ kind: "modify-damage", effectId: "type-tax", multiplier: 0.92 }),
     );
+
+    const opponent = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("type-tax")],
+      state: state({ numbers: { "persistent:type-tax:type:fire:duplicates": 2 } }),
+      event: {
+        ...event,
+        user: { ...event.user, side: "enemy" },
+      },
+    });
+    expect(opponent.commands).toEqual([]);
+    expect(opponent.triggeredEffectIds).toEqual([]);
   });
 
   it("limits Public Enemy roster growth to trainers and gives boss trainers one complete Second Act", () => {

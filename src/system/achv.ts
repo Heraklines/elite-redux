@@ -14,6 +14,7 @@ import { DexAttr } from "#enums/dex-attr";
 import { PlayerGender } from "#enums/player-gender";
 import { PokemonType } from "#enums/pokemon-type";
 import { getShortenedStatKey, Stat } from "#enums/stat";
+import type { Pokemon } from "#field/pokemon";
 import { ErRelicModifier, TurnHeldItemTransferModifier } from "#modifiers/modifier";
 import { RibbonData } from "#system/ribbons/ribbon-data";
 import type { ConditionFn } from "#types/common";
@@ -29,6 +30,13 @@ export enum AchvTier {
   ULTRA,
   ROGUE,
   MASTER,
+}
+
+/** Whether the Pokemon's current form has at least one evolution and therefore qualifies for Eviolite. */
+export function isEvioliteEligiblePokemon(pokemon: Pokemon): boolean {
+  const evolutions = pokemonEvolutions[pokemon.getSpeciesForm(true).speciesId] ?? [];
+  const formKey = pokemon.getFormKey();
+  return evolutions.some(evolution => evolution.preFormKey == null || evolution.preFormKey === formKey);
 }
 
 export class Achv {
@@ -1202,7 +1210,7 @@ export const achvs = {
     "unevolvedClassicVictory.description",
     "eviolite",
     50,
-    () => globalScene.getPlayerParty().some(p => p.getSpeciesForm(true).speciesId in pokemonEvolutions),
+    () => globalScene.getPlayerParty().some(isEvioliteEligiblePokemon),
   ),
   FLIP_INVERSE: new ChallengeAchv(
     "flipInverse",

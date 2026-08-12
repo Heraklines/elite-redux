@@ -33,4 +33,8 @@ describe("ER TM-compatibility prune", () => {
   it("Salazzle still keeps a comprehensive ER teachable set (not stripped to empty)", () => {
     expect(forwardMoveIds(SpeciesId.SALAZZLE).length).toBeGreaterThan(20);
   });
+
+  it("Charizard can learn Earthquake from the ER TM/tutor pool", () => {
+    expect(forwardMoveIds(SpeciesId.CHARIZARD)).toContain(MoveId.EARTHQUAKE);
+  });
 });

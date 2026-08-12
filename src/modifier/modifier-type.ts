@@ -1650,10 +1650,11 @@ export class FormChangeItemModifierType extends PokemonModifierType implements G
       (_type, args) => new PokemonFormChangeItemModifier(this, (args[0] as PlayerPokemon).id, formChangeItem, true),
       (pokemon: PlayerPokemon) => {
         if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
-          const alreadyHoldingStone = globalScene.findModifier(
-            modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+          const activeStone = globalScene.findModifier(
+            modifier =>
+              modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id && modifier.active,
           );
-          return !alreadyHoldingStone && canUseFunMegaStone(pokemon, this.formChangeItem)
+          return !activeStone && canUseFunMegaStone(pokemon, this.formChangeItem)
             ? null
             : PartyUiHandler.NoEffectMessage;
         }
@@ -2055,7 +2056,10 @@ export class FormChangeItemModifierTypeGenerator extends ModifierTypeGenerator {
             pokemon =>
               !pokemon.isMega()
               && !globalScene.findModifier(
-                modifier => modifier instanceof PokemonFormChangeItemModifier && modifier.pokemonId === pokemon.id,
+                modifier =>
+                  modifier instanceof PokemonFormChangeItemModifier
+                  && modifier.pokemonId === pokemon.id
+                  && modifier.active,
               ),
           );
           if (availablePokemon.length === 0) {

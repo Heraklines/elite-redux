@@ -29,6 +29,7 @@ import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import {
   type BattleFormat,
+  getBattleFormatById,
   legacyFormat,
   SINGLE_FORMAT,
   TRIPLE_BATTLE_GHOST_RARITY,
@@ -1851,6 +1852,7 @@ export class BattleScene extends SceneBase {
     }
 
     const { waveIndex, battleType, trainer: trainerData, mysteryEncounterType: sessionMEType } = fromSession;
+    const savedFormat = getBattleFormatById(fromSession.battleFormat);
     // TODO: Remove fallback once we stop using `-1` as a default value for session data fields (which wastes space)
     const mysteryEncounterType = sessionMEType === -1 ? undefined : sessionMEType;
 
@@ -1886,12 +1888,17 @@ export class BattleScene extends SceneBase {
         break;
     }
 
+    if (savedFormat != null) {
+      fixedDouble = savedFormat !== SINGLE_FORMAT;
+    }
+
     return {
       battleType,
       mysteryEncounterType,
       waveIndex,
       trainerData,
       double: fixedDouble,
+      format: savedFormat,
     } satisfies NewBattleSavedProps;
   }
 
@@ -1945,6 +1952,7 @@ export class BattleScene extends SceneBase {
   private handleSavedBattle(resolved: NewBattleInitialProps, props: NewBattleSavedProps): void {
     resolved.battleType = props.battleType;
     resolved.double = props.double;
+    resolved.format = props.format;
     resolved.trainer = props.trainerData?.toTrainer();
     // Task C7: the versus GUEST reconstructs the host's session, whose trainer is authoritatively the
     // ENEMY side (the guest's OWN team) fielded behind the guest's own profile. On the guest's flipped
@@ -2361,6 +2369,13 @@ export class BattleScene extends SceneBase {
     // retains its independently negotiated singles/doubles/triples format.
     if (this.gameMode.isCoop) {
       return legacyFormat(double);
+    }
+
+    // A resumed battle keeps the exact layout that was live when it was saved.
+    // Re-rolling here can turn a natural double/triple into a single, strand field
+    // occupants, and leave the restored turn with no valid progression path.
+    if (props.format != null) {
+      return props.format;
     }
 
     // Triples Only is a direct format invariant for regular battles. Do not make it
@@ -3952,6 +3967,20 @@ export class BattleScene extends SceneBase {
     this.validateAchvs(ModifierAchv, modifier);
     const modifiersToRemove: PersistentModifier[] = [];
     if (modifier instanceof PersistentModifier) {
+      // In Fun Mega Mode an inactive stone means the player deliberately disabled it.
+      // Retire that stale modifier before installing a replacement; otherwise a same-stone
+      // replacement hits its one-stack cap and different stones accumulate conflicting toggles.
+      if (modifier instanceof PokemonFormChangeItemModifier && this.gameMode.isFun && getFunModeConfig().megaMode) {
+        const inactiveStones = this.modifiers.filter(
+          candidate =>
+            candidate instanceof PokemonFormChangeItemModifier
+            && candidate.pokemonId === modifier.pokemonId
+            && !candidate.active,
+        );
+        for (const inactiveStone of inactiveStones) {
+          this.removeModifier(inactiveStone);
+        }
+      }
       let added = (modifier as PersistentModifier).add(this.modifiers, !!virtual);
       if (!added && !virtual && modifier instanceof PokemonHeldItemModifier) {
         const pokemon = modifier.getPokemon();

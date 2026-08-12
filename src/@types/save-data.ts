@@ -116,6 +116,12 @@ export interface SessionSaveData {
   // TODO: This enum being inside save data is basically useless, being inferrable from the presence or absence of `trainer` and `mysteryEncounterType`.
   // Remove this later on to reduce save size and improve clarity.
   battleType: Exclude<BattleType, BattleType.CLEAR>;
+  /**
+   * The resolved active-battle layout. Natural doubles/triples cannot be safely
+   * re-rolled from the trainer or enemy party on reload, so persist the trusted
+   * format registry id. Absent on legacy saves, which retain the old inference.
+   */
+  battleFormat?: string;
   // TODO: This being nullable NEEDS to be reflected in the type signature
   trainer: TrainerData;
   gameVersion: string;

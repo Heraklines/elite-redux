@@ -2732,6 +2732,11 @@ export abstract class PostSummonAbAttr extends AbAttr {
     return this.activateOnGain;
   }
 
+  /** Whether this entry effect should be replayed after an in-battle form change. */
+  shouldActivateOnFormChange(): boolean {
+    return true;
+  }
+
   canApply(_params: Closed<AbAttrBaseParams>): boolean {
     return true;
   }

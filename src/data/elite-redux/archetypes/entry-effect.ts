@@ -250,6 +250,11 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
     return this.effect.kind;
   }
 
+  /** Entry-only stat boosts (for example Embody Aspect) must not replay when Disguise changes form. */
+  public override shouldActivateOnFormChange(): boolean {
+    return this.effect.kind !== "self-stat-boost";
+  }
+
   /**
    * Single dispatch for all configured sub-effects. Honors the
    * `params.simulated` convention pokerogue uses across the

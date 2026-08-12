@@ -52,6 +52,10 @@ describe.skipIf(!RUN)("ER ability-boost move flags match the 2.65 dex (#449/#453
     expect(allMoves[MoveId.DIRE_CLAW]?.hasFlag(MoveFlags.SLICING_MOVE)).toBe(true);
   });
 
+  it("Fury Swipes is a slicing move", () => {
+    expect(allMoves[MoveId.FURY_SWIPES]?.hasFlag(MoveFlags.SLICING_MOVE)).toBe(true);
+  });
+
   it("EVERY dex-declared boost move carries its ability flag", () => {
     const movesMap = ER_ID_MAP.moves as Record<number, number>;
     const offenders: string[] = [];

@@ -1337,7 +1337,14 @@ export class PartyUiHandler extends MessageUiHandler {
       const formChangeItemModifiers = this.getFormChangeItemsModifiers(pokemon);
       const modifier = formChangeItemModifiers[option - PartyOption.FORM_CHANGE_ITEM];
       modifier.active = !modifier.active;
-      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeItemTrigger, false, true);
+      if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+        // Fun Mega Mode stores pseudo-Mega identity/stats outside the ordinary form registry.
+        // Toggling only the modifier flag left that state applied forever, so route the toggle
+        // through the modifier's state-aware apply path.
+        modifier.apply(pokemon, modifier.active);
+      } else {
+        globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeItemTrigger, false, true);
+      }
       // Co-op (#633 B9b): relay the form toggle so the watcher resolves the SAME modifier (same
       // index into its identical, FIFO-synced form-change-item list) and fires the identical
       // trigger - keeping the hashed formIndex in sync. The watcher replicates

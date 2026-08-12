@@ -36,6 +36,7 @@ describe.skipIf(!RUN)("repro: doubles false game-over with a survivor (#614)", (
     const game = new GameManager(g);
     game.override
       .battleStyle("double")
+      .startingWave(2)
       .enemySpecies(SpeciesId.MAGIKARP)
       .enemyMoveset([MoveId.SURF]) // spread: hits both player mons
       .enemyAbility(AbilityId.BALL_FETCH)
@@ -71,6 +72,7 @@ describe.skipIf(!RUN)("repro: doubles false game-over with a survivor (#614)", (
     const game = new GameManager(g);
     game.override
       .battleStyle("double")
+      .startingWave(2)
       .enemySpecies(SpeciesId.MAGIKARP)
       .enemyMoveset([MoveId.SURF])
       .enemyAbility(AbilityId.BALL_FETCH)

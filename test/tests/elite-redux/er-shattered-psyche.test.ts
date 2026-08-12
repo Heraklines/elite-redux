@@ -26,9 +26,11 @@ import {
   splitFusedHp,
 } from "#data/elite-redux/abilities/shattered-psyche";
 import { AbilityId } from "#enums/ability-id";
+import { BattleType } from "#enums/battle-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -64,6 +66,7 @@ describe.skipIf(!RUN)("ER Shattered Psyche (5968)", () => {
     game = new GameManager(phaserGame);
     game.override
       .criticalHits(false)
+      .startingWave(2)
       .startingLevel(100)
       .enemyLevel(100)
       .ability(SHATTERED)
@@ -135,6 +138,38 @@ describe.skipIf(!RUN)("ER Shattered Psyche (5968)", () => {
     const active = game.scene.getEnemyField().filter(e => e?.isActive(true));
     expect(active.length).toBe(1);
     expect(active[0].getMaxHp(), "max HP unchanged (no re-fuse)").toBe(combined);
+  });
+
+  it("trainer doubles: the absorbed slot is replaced and battle flow reaches the next turn", async () => {
+    game.override
+      .battleType(BattleType.TRAINER)
+      .randomTrainer({ trainerType: TrainerType.ACE_TRAINER })
+      .battleStyle("double")
+      .enemySpecies(SpeciesId.SNORLAX)
+      .moveset([MoveId.SPLASH]);
+    await game.classicMode.startBattle(SpeciesId.MEW, SpeciesId.SNORLAX);
+    // Ability overrides apply to the whole player field; this regression needs one Primal Mew holder,
+    // not two independent Shattered Psyche activations consuming both an active and the reserve.
+    game.scene.getPlayerField()[1].summonData.ability = AbilityId.BALL_FETCH;
+
+    const field = game.scene.getEnemyField();
+    expect(field).toHaveLength(2);
+    game.scene.currentBattle.enemyParty.length = 2;
+    const absorbed = field[1];
+    const reserve = globalScene.addEnemyPokemon(getPokemonSpecies(SpeciesId.MUNCHLAX), 100, absorbed.trainerSlot);
+    game.scene.currentBattle.enemyParty.push(reserve);
+    expect(reserve.isActive(), "the fixture reserve is battle-eligible").toBe(true);
+    expect(reserve.trainerSlot, "the fixture reserve belongs to the absorbed slot's trainer").toBe(
+      absorbed.trainerSlot,
+    );
+
+    game.move.select(MoveId.SPLASH, 0);
+    game.move.select(MoveId.SPLASH, 1);
+    await game.toNextTurn();
+
+    expect(reserve.isOnField(), "the trainer replaces the absorbed constituent").toBe(true);
+    expect(game.scene.getEnemyField(true)).toHaveLength(2);
+    expect(game.scene.currentBattle.turn).toBeGreaterThan(1);
   });
 
   it("singles: the active foe fuses with a seeded bench pick (combined HP, bench mon consumed)", async () => {

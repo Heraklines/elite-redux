@@ -1,4 +1,5 @@
 import { Button } from "#enums/buttons";
+import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -92,5 +93,26 @@ describe("Learn Move Phase", () => {
     const levelReq = bulbasaur.getLevelMoves(5)[0][0];
     expect(bulbasaur.level).toBeGreaterThanOrEqual(levelReq);
     expect(bulbasaur.getMoveset().map(m => m?.moveId)).toEqual(prevMoveset);
+  });
+
+  it("teaches Thunder to Pikachu without stalling or losing the battle screen", async () => {
+    await game.classicMode.startBattle(SpeciesId.PIKACHU);
+    const pikachu = game.field.getPlayerPokemon();
+    game.move.changeMoveset(pikachu, [MoveId.SPLASH, MoveId.GROWL, MoveId.TAIL_WHIP, MoveId.QUICK_ATTACK]);
+
+    game.onNextPrompt("LearnMovePhase", UiMode.CONFIRM, () => game.scene.ui.processInput(Button.ACTION));
+    game.onNextPrompt("LearnMovePhase", UiMode.SUMMARY, () => {
+      game.scene.ui.setCursor(0);
+      game.scene.ui.processInput(Button.ACTION);
+    });
+    game.onNextPrompt("LearnMovePhase", UiMode.CONFIRM, () => game.scene.ui.processInput(Button.ACTION));
+
+    game.scene.phaseManager.unshiftNew("LearnMovePhase", 0, MoveId.THUNDER, LearnMoveType.TM);
+    game.endPhase();
+    await game.phaseInterceptor.to("LearnMovePhase");
+    await game.phaseInterceptor.to("CommandPhase");
+
+    expect(pikachu.getMoveset(true).map(move => move.moveId)).toContain(MoveId.THUNDER);
+    expect(game.scene.ui.getMode()).toBe(UiMode.COMMAND);
   });
 });

@@ -6,6 +6,7 @@ import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { Setting, SettingKeys, settingIndex } from "#system/settings";
 import { CommandUiHandler } from "#ui/command-ui-handler";
+import { openErMapOverlay } from "#ui/er-map-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
@@ -273,6 +274,10 @@ export class UiInputs {
 
   buttonCycleOption(button: Button): void {
     const uiHandler = globalScene.ui?.getHandler();
+    if (button === Button.CYCLE_SHINY && globalScene.ui?.getMode() === UiMode.COMMAND) {
+      openErMapOverlay();
+      return;
+    }
     if (
       button === Button.CYCLE_GENDER
       && globalScene.gameMode?.isFun === true
