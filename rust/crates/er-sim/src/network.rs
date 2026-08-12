@@ -886,8 +886,7 @@ impl FaultNetwork {
         }
         let expected_kind = self.queue[index].kind;
         self.queue[index].payload_corrupted =
-            classify_payload_strict(&self.queue[index].packet.payload)
-                .map_or(true, |actual_kind| actual_kind != expected_kind);
+            classify_payload_strict(&self.queue[index].packet.payload) != Ok(expected_kind);
         increment_diagnostic_counter(&mut self.corrupted_count);
         Ok(())
     }
@@ -1036,8 +1035,8 @@ impl FaultNetworkState {
                     reason: format!("packet {packet_id} has an inconsistent kind family"),
                 });
             }
-            let expected_payload_corrupted = classify_payload_strict(&queued.packet.payload)
-                .map_or(true, |parsed_kind| parsed_kind != queued.kind);
+            let expected_payload_corrupted =
+                classify_payload_strict(&queued.packet.payload) != Ok(queued.kind);
             if queued.payload_corrupted != expected_payload_corrupted {
                 return Err(FaultNetworkError::InvalidState {
                     reason: format!(
@@ -1138,7 +1137,7 @@ fn sorted_endpoints(endpoints: [SeatId; 2]) -> Vec<SeatId> {
 }
 
 fn allocator_contains(next: Option<SafeU53>, allocated: SafeU53) -> bool {
-    next.map_or(true, |next| allocated < next)
+    next.is_none_or(|next| allocated < next)
 }
 
 fn allocator_state(next: u64) -> Option<SafeU53> {
