@@ -1,0 +1,30 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:586f442e982a36f1ad2617c9f9ff25cf412d2cb1:run-31550916588.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:32 GB
+boot:     boot-start@0ms -> loading-complete@22801ms -> title-shown@25169ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     LejwvUGMkjANEBc8q7YgrgM8
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:586f442e982a36f1ad2617c9f9ff25cf412d2cb1:run-31550916588.1","source":"github","sha":"586f442e982a36f1ad2617c9f9ff25cf412d2cb1","workflow":{"provider":"github-actions","runId":"31550916588","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[02:50:14.840] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[02:50:15.139] LOG: [ER] build {"version":1,"id":"github:586f442e982a36f1ad2617c9f9ff25cf412d2cb1:run-31550916588.1","source":"github","sha":"586f442e982a36f1ad2617c9f9ff25cf412d2cb1","workflow":{"provider":"github-actions","runId":"31550916588","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[02:50:15.174] LOG: [dev-tools] loaded — 766 scenarios + Send Logs button
+[02:50:36.672] DEBUG: Destroying loading scene
+[02:50:36.672] DEBUG: Destroyed loading scene
+[02:50:36.727] LOG: Seed: LejwvUGMkjANEBc8q7YgrgM8
+[02:50:36.727] LOG: Wave Seed: LejwvUGMkjANEBc8q7YgrgM8 0
+[02:50:38.091] LOG: %cStart Phase LoginPhase color:green;
+[02:50:38.368] LOG: Client Session: eZZEcgnlO7I6EObaJcw2NcrxGxYnr67P
+[02:50:39.031] LOG: %cStart Phase TitlePhase color:green;
+[02:50:39.037] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
