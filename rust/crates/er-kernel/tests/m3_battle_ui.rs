@@ -8,8 +8,10 @@ mod snapshot {
     };
 }
 
+#[allow(dead_code)] // This path-included production module exposes snapshot APIs covered elsewhere.
 #[path = "../src/battle_ui.rs"]
 mod battle_ui;
+#[allow(dead_code)] // This focused UI harness intentionally exercises only the input-routing surface.
 #[path = "../src/input_router.rs"]
 mod input_router;
 #[path = "../src/ui_reducer.rs"]
