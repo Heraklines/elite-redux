@@ -42,12 +42,16 @@ impl CausalIdentity {
         }
     }
 
-    #[cfg(test)]
+    /// Retained for crate-local inspection; not every all-targets test target
+    /// exercises both causal identity accessors.
+    #[allow(dead_code)]
     pub(crate) fn operation_id(&self) -> Option<&OperationId> {
         self.operation_id.as_ref()
     }
 
-    #[cfg(test)]
+    /// Retained for crate-local inspection; not every all-targets test target
+    /// exercises both causal identity accessors.
+    #[allow(dead_code)]
     pub(crate) fn control_id(&self) -> Option<&str> {
         self.control_id.as_deref()
     }
@@ -475,7 +479,7 @@ impl InternalEventQueue {
     /// Enqueue automatic no-legal-replacement work after game-owned
     /// replacement projection.  This is deliberately crate-private; callers
     /// cannot inject the semantic event through the public queue seam.
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn enqueue_no_legal_replacement(
         &mut self,
         occurrence: FaintOccurrenceId,
