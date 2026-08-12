@@ -1870,7 +1870,7 @@ impl SimulatedPair {
                 self.kernel_mut(endpoint),
                 terminal,
             )
-            .map_err(map_kernel_snapshot_error)?;
+            .map_err(adapter_error)?;
         }
         Ok(())
     }
