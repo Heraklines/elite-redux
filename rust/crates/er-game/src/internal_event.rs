@@ -42,10 +42,12 @@ impl CausalIdentity {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn operation_id(&self) -> Option<&OperationId> {
         self.operation_id.as_ref()
     }
 
+    #[cfg(test)]
     pub(crate) fn control_id(&self) -> Option<&str> {
         self.control_id.as_deref()
     }
@@ -318,6 +320,9 @@ pub struct ControlInstalledPayload {
 /// and compose reducer outputs.  It is hidden from generated docs because its
 /// variants are internal causal work, not a campaign-facing API.
 #[doc(hidden)]
+// This cross-crate event vocabulary is frozen; boxing a payload would change
+// the public Rust shape consumed by `er-kernel`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InternalEvent {
     Button(ButtonEventPayload),
@@ -470,6 +475,7 @@ impl InternalEventQueue {
     /// Enqueue automatic no-legal-replacement work after game-owned
     /// replacement projection.  This is deliberately crate-private; callers
     /// cannot inject the semantic event through the public queue seam.
+    #[cfg(test)]
     pub(crate) fn enqueue_no_legal_replacement(
         &mut self,
         occurrence: FaintOccurrenceId,
