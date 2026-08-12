@@ -515,7 +515,7 @@ fn validate_fixture(fixture: &M3ParityFixture) -> Result<(), M3ParityError> {
             "eventwise trace must not be empty".to_owned(),
         ));
     }
-    let boundary = fixture.snapshot_boundary_after.get().get() as usize;
+    let boundary = fixture.snapshot_boundary_after.into_inner() as usize;
     if boundary == 0 || boundary >= fixture.events.len() {
         return Err(M3ParityError::InvalidFixture(format!(
             "snapshot boundary {} must be before the final event",
@@ -787,7 +787,7 @@ pub fn replay_eventwise(fixture: &M3ParityFixture) -> Result<M3ParityReport, M3P
         let sequence = safe(next_sequence);
         next_sequence = next_sequence.saturating_add(1);
         let observation = step_observation(&mut kernel, event, sequence)?;
-        if index + 1 == fixture.snapshot_boundary_after.get().get() as usize {
+        if index + 1 == fixture.snapshot_boundary_after.into_inner() as usize {
             let (restored, snapshot_boundary) = restore_from_v2_snapshot(
                 kernel,
                 &content,
@@ -797,7 +797,7 @@ pub fn replay_eventwise(fixture: &M3ParityFixture) -> Result<M3ParityReport, M3P
             kernel = restored;
             boundary = Some(snapshot_boundary);
         }
-        if index + 1 > fixture.snapshot_boundary_after.get().get() as usize {
+        if index + 1 > fixture.snapshot_boundary_after.into_inner() as usize {
             continuation_input_count = continuation_input_count.saturating_add(1);
         }
         observations.push(observation);
