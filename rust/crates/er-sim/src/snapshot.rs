@@ -441,6 +441,7 @@ pub enum RestorableKernelInputV2 {
         result: RestorableStorageResultV2,
     },
     RejectedCompatibility {
+        #[serde(rename = "compatibility_kind")]
         kind: RejectedBattleCompatibilityInputV1,
         bytes: CanonicalHexBytes,
     },
@@ -800,7 +801,7 @@ impl EndpointKernelTraceRecorder {
         validate_seed(&replay_seed, "replay_seed")?;
         initial_snapshot
             .validate()
-            .map_err(|error| prefix_snapshot_error("initial_snapshot", error))?;
+            .map_err(|error| prefix_kernel_snapshot_error("initial_snapshot", error))?;
         Ok(Self {
             replay_seed,
             current_snapshot: initial_snapshot.clone(),
@@ -836,7 +837,7 @@ impl EndpointKernelTraceRecorder {
         validate_same_endpoint_snapshot(&self.current_snapshot, &after_snapshot)?;
         after_snapshot
             .validate()
-            .map_err(|error| prefix_snapshot_error("after_snapshot", error))?;
+            .map_err(|error| prefix_kernel_snapshot_error("after_snapshot", error))?;
         validate_endpoint_input(&input, self.current_snapshot.runtime_identity.local_seat)?;
         validate_endpoint_effects(&effects, self.current_snapshot.runtime_identity.local_seat)?;
         validate_rng_audit(&rng_audit, self.last_rng_sequence, "rng_audit")?;
@@ -1315,7 +1316,7 @@ impl EndpointKernelTraceV2 {
         validate_seed(&self.replay_seed, "replay_seed")?;
         self.initial_snapshot
             .validate()
-            .map_err(|error| prefix_snapshot_error("initial_snapshot", error))?;
+            .map_err(|error| prefix_kernel_snapshot_error("initial_snapshot", error))?;
 
         let local_seat = self.initial_snapshot.runtime_identity.local_seat;
         let mut previous_virtual_time_ms = None;
@@ -2288,6 +2289,23 @@ fn prefix_snapshot_error(prefix: &str, error: SnapshotError) -> SnapshotError {
     }
 }
 
+fn prefix_kernel_snapshot_error(
+    prefix: &str,
+    error: er_kernel::snapshot::SnapshotError,
+) -> SnapshotError {
+    match error {
+        er_kernel::snapshot::SnapshotError::Invalid { path, reason } => {
+            invalid(format!("{prefix}.{path}"), reason)
+        }
+        er_kernel::snapshot::SnapshotError::Canonical { path, reason } => {
+            SnapshotError::Canonical {
+                path: format!("{prefix}.{path}"),
+                reason,
+            }
+        }
+    }
+}
+
 fn safe_u53_from_usize(value: usize, path: &str) -> Result<SafeU53, SnapshotError> {
     let value = u64::try_from(value).map_err(|_| invalid(path, "index exceeds u64"))?;
     SafeU53::new(value).map_err(|_| invalid(path, "index exceeds SafeU53"))
@@ -2595,7 +2613,7 @@ fn validate_rng_audit(
 }
 
 fn rng_audit_digest(draws: &[RngDraw]) -> Result<String, SnapshotError> {
-    content_digest(draws).map_err(|error| SnapshotError::Canonical {
+    content_digest(&draws).map_err(|error| SnapshotError::Canonical {
         path: "rng_audit_digest".to_owned(),
         reason: error.to_string(),
     })
