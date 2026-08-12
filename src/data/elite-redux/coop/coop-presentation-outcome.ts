@@ -8,7 +8,7 @@ export type CoopPresentationOutcome =
   | { readonly kind: "rendered"; readonly actorFingerprint?: string }
   | {
       readonly kind: "intentionally-skipped";
-      readonly reason: "animations-disabled" | "off-field-hp";
+      readonly reason: "animations-disabled" | "off-field-hp" | "ability-banners-disabled";
       readonly actorFingerprint?: string;
     }
   | { readonly kind: "failed"; readonly reason: string; readonly actorFingerprint?: string };

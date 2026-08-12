@@ -167,6 +167,7 @@ export const SettingKeys = {
   Move_Info: "MOVE_INFO",
   Show_Moveset_Flyout: "SHOW_MOVESET_FLYOUT",
   Show_Arena_Flyout: "SHOW_ARENA_FLYOUT",
+  Show_Ability_Flyouts: "SHOW_ABILITY_FLYOUTS",
   Show_Moody_Effect_Flyouts: "SHOW_MOODY_EFFECT_FLYOUTS",
   Show_Time_Of_Day_Widget: "SHOW_TIME_OF_DAY_WIDGET",
   Time_Of_Day_Animation: "TIME_OF_DAY_ANIMATION",
@@ -568,6 +569,13 @@ export const Setting: Setting[] = [
     type: SettingType.DISPLAY,
   },
   {
+    key: SettingKeys.Show_Ability_Flyouts,
+    label: "Ability Trigger Banners",
+    options: OFF_ON,
+    default: 1,
+    type: SettingType.DISPLAY,
+  },
+  {
     key: SettingKeys.Show_Moody_Effect_Flyouts,
     label: "Boon & Curse Trigger Banners",
     options: OFF_ON,
@@ -906,6 +914,13 @@ export function setSetting(setting: string, value: number): boolean {
       break;
     case SettingKeys.Show_Arena_Flyout:
       globalScene.showArenaFlyout = Setting[index].options[value].value === "On";
+      break;
+    case SettingKeys.Show_Ability_Flyouts:
+      globalScene.showAbilityFlyouts = Setting[index].options[value].value === "On";
+      if (!globalScene.showAbilityFlyouts && globalScene.abilityBar?.isVisible()) {
+        globalScene.tweens.killTweensOf(globalScene.abilityBar);
+        globalScene.abilityBar.setVisible(false);
+      }
       break;
     case SettingKeys.Show_Moody_Effect_Flyouts:
       globalScene.showMoodyEffectFlyouts = Setting[index].options[value].value === "On";

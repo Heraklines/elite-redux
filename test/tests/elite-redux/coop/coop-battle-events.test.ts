@@ -170,6 +170,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     game = new GameManager(phaserGame);
     game.override
       .battleStyle("double")
+      .startingWave(2)
       .enemySpecies(SpeciesId.MAGIKARP)
       .enemyMoveset(MoveId.SPLASH)
       .moveset([MoveId.TACKLE, MoveId.SPLASH]);
@@ -177,6 +178,7 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
 
   afterEach(() => {
     vi.useRealTimers();
+    globalScene.showAbilityFlyouts = true;
     setCoopPresentationObserver(null);
     setCoopPresentationHardWallMsForTest(null);
     clearCoopRuntime();
@@ -537,6 +539,37 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(cancelTimer, "the real ability completion retires its runtime watchdog").toHaveBeenCalledOnce();
     scheduleSpy.mockRestore();
     sceneTimerSpy.mockRestore();
+  });
+
+  it("a disabled guest ability banner reveals the slot and settles without opening the flyout", async () => {
+    const field = await startCoopGuest();
+    const pokemon = field[0];
+    const partySlot = globalScene.getPlayerParty().indexOf(pokemon);
+    const token = createCoopPresentationOutcomeToken();
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility");
+    const revealSpy = vi.spyOn(pokemon, "revealAbility");
+    const phase = new CoopShowAbilityReplayPhase(
+      pokemon.getBattlerIndex(),
+      pokemon.id,
+      partySlot,
+      pokemon.getAbility().id,
+      false,
+      0,
+      token,
+    );
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+    globalScene.showAbilityFlyouts = false;
+
+    phase.start();
+
+    expect(showSpy).not.toHaveBeenCalled();
+    expect(revealSpy).toHaveBeenCalledWith(false, 0);
+    expect(coopPresentationOutcome(token)).toEqual({
+      kind: "intentionally-skipped",
+      reason: "ability-banners-disabled",
+      actorFingerprint: `player:bi${pokemon.getBattlerIndex()}:slot${partySlot}:p${pokemon.id}`,
+    });
+    expect(endSpy).toHaveBeenCalledOnce();
   });
 
   it("an authority-authored ability teardown forces its hidden terminal state when the tween stalls", async () => {
@@ -1797,6 +1830,33 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     visibleSpy.mockRestore();
     showSpy.mockRestore();
     hideSpy.mockRestore();
+  });
+
+  it("(A) records and reveals an ability without rendering when banners are disabled", async () => {
+    const field = await startCoopHost();
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+    const visibleSpy = vi.spyOn(globalScene.abilityBar, "isVisible").mockReturnValue(false);
+    const showSpy = vi.spyOn(globalScene.abilityBar, "showAbility");
+    const revealSpy = vi.spyOn(hostMon, "revealAbility");
+    globalScene.showAbilityFlyouts = false;
+
+    beginCoopRecording(globalScene.currentBattle.turn);
+    const phase = game.scene.phaseManager.create("ShowAbilityPhase", hostMon.getBattlerIndex(), false, 0);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+    phase.start();
+    const recording = endCoopRecording();
+
+    expect(visibleSpy).toHaveBeenCalled();
+    expect(showSpy).not.toHaveBeenCalled();
+    expect(revealSpy).toHaveBeenCalledWith(false, 0);
+    expect(recording.events.find(event => event.k === "showAbility")).toMatchObject({
+      k: "showAbility",
+      pokemonId: hostMon.id,
+      abilityId: hostMon.getAbility().id,
+      passive: false,
+      passiveSlot: 0,
+    });
+    expect(endSpy).toHaveBeenCalledOnce();
   });
 
   it("(A) the recorder seams are INERT outside a recording (no event leaks, solo unaffected)", async () => {

@@ -365,6 +365,7 @@ export class BattleScene extends SceneBase {
   public showMissingRibbons = false;
   public showMovesetFlyout = true;
   public showArenaFlyout = true;
+  public showAbilityFlyouts = true;
   public showMoodyEffectFlyouts = true;
   public showTimeOfDayWidget = true;
   /** ER: when false, the field stays at daytime brightness (no dusk/night darkening). */

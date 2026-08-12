@@ -112,6 +112,12 @@ export class ShowAbilityPhase extends PokemonPhase {
       ).position;
     }
 
+    if (!globalScene.showAbilityFlyouts) {
+      pokemon.revealAbility(this.passive, this.passiveSlot);
+      this.end();
+      return;
+    }
+
     globalScene.abilityBar.showAbility(this.pokemonName, this.abilityName, this.passive, this.player).then(() => {
       pokemon.revealAbility(this.passive, this.passiveSlot);
 

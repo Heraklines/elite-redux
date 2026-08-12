@@ -22,13 +22,16 @@ interface AbilityRow {
 interface ReviewDensity {
   rowHeight: number;
   pokemonWidth: number;
-  iconScale: number;
+  nameX: number;
+  dividerPadding: number;
+  bottomPadding: number;
+  textRightInset: number;
   nameFontSize: number;
   abilityFontSize: number;
-  descriptionFontSize: number;
+  abilityNameY: number;
   descriptionY: number;
-  descriptionMaxLines: number;
-  descriptionPageLength: number;
+  descriptionFontSize: number;
+  descriptionLineHeight: number;
 }
 
 export class FunAbilityReviewUiHandler extends UiHandler {
@@ -56,40 +59,23 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     this.container = globalScene.add.container(0, -height).setName("fun-ability-review");
     this.container.add(globalScene.add.rectangle(0, 0, width, height, 0x242030, 0.96).setOrigin(0));
 
-    const rowWidth = width - 2;
-    const pokemonWidth = this.density.pokemonWidth;
-    const abilityWidth = Math.floor((rowWidth - pokemonWidth) / 4);
     for (let index = 0; index < 6; index++) {
-      const row = globalScene.add.container(1, 1 + index * 27);
-      const window = addWindow(0, 0, rowWidth, 26).setOrigin(0);
-      const name = addTextObject(14, 2, "", TextStyle.SETTINGS_LABEL, {
-        fontSize: "18px",
-        fixedWidth: (pokemonWidth - 16) * 6,
-        maxLines: 1,
-      }).setOrigin(0);
+      const row = globalScene.add.container(1, 1);
+      const window = addWindow(0, 0, width - 2, 1).setOrigin(0);
+      const name = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL, { maxLines: 1 }).setOrigin(0, 0.5);
       const names: Phaser.GameObjects.Text[] = [];
       const descriptions: Phaser.GameObjects.Text[] = [];
       const dividers: Phaser.GameObjects.Rectangle[] = [];
       const pageSlots: string[][] = [];
       const objects: Phaser.GameObjects.GameObject[] = [window, name];
       for (let slot = 0; slot < 4; slot++) {
-        const x = pokemonWidth + slot * abilityWidth;
-        const divider = globalScene.add.rectangle(x, 2, 1, 22, 0x665c72).setOrigin(0);
+        const divider = globalScene.add.rectangle(0, 0, 1, 1, 0x665c72).setOrigin(0);
         dividers.push(divider);
         objects.push(divider);
-        const abilityName = addTextObject(x + 2, 2, "", TextStyle.SETTINGS_LABEL, {
-          fontSize: "14px",
-          fixedWidth: (abilityWidth - 4) * 6,
-          maxLines: 1,
-        })
+        const abilityName = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL, { maxLines: 1 })
           .setOrigin(0)
           .setColor("#78e898");
-        const description = addTextObject(x + 2, 7, "", TextStyle.SETTINGS_LABEL, {
-          fontSize: "12px",
-          fixedWidth: (abilityWidth - 4) * 6,
-          maxLines: 5,
-        }).setOrigin(0);
-        description.setWordWrapWidth((abilityWidth - 4) * 6, true);
+        const description = addTextObject(0, 0, "", TextStyle.SETTINGS_LABEL, { maxLines: 1 }).setOrigin(0);
         names.push(abilityName);
         descriptions.push(description);
         pageSlots.push([]);
@@ -217,13 +203,20 @@ export class FunAbilityReviewUiHandler extends UiHandler {
   }
 
   private paginateDescription(description: string): string[] {
-    if (description.length <= this.density.descriptionPageLength) {
+    // Measured from pokemon-emerald-pro.ttf: average glyph advance is ~0.36 em
+    // (0.35 lowercase, 0.38 uppercase, 0.19 for spaces). 0.42 leaves headroom
+    // for capitals/digits so pagination rarely overestimates; Phaser's
+    // fixedWidth clips any miscounted line anyway.
+    const canvasWidth = (this.density.textRightInset + 4) * 6;
+    const maxCharsPerLine = Math.max(8, Math.floor(canvasWidth / (this.density.descriptionFontSize * 0.42)));
+    const maxCharsPerPage = maxCharsPerLine * this.descriptionMaxLines();
+    if (description.length <= maxCharsPerPage) {
       return [description];
     }
     const pages: string[] = [];
     let current = "";
     for (const word of description.split(/\s+/)) {
-      if (current && current.length + word.length + 1 > this.density.descriptionPageLength) {
+      if (current && current.length + word.length + 1 > maxCharsPerPage) {
         pages.push(current);
         current = word;
       } else {
@@ -236,10 +229,20 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     return pages.length > 0 ? pages : [description];
   }
 
+  private descriptionMaxLines(): number {
+    return Math.max(
+      1,
+      Math.floor(
+        (this.density.rowHeight - this.density.descriptionY - this.density.bottomPadding)
+          / this.density.descriptionLineHeight,
+      ),
+    );
+  }
+
   private startDescriptionTimer(): void {
     this.descriptionTimer?.remove();
     this.descriptionTimer = globalScene.time.addEvent({
-      delay: 2800,
+      delay: 8000,
       loop: true,
       callback: () => {
         if (!this.container.visible) {
@@ -256,7 +259,7 @@ export class FunAbilityReviewUiHandler extends UiHandler {
       texts.forEach((text, slot) => {
         const pages = this.descriptionPages[pokemonIndex][slot];
         const page = pages.length > 0 ? pages[this.descriptionPage % pages.length] : "";
-        text.setText(page);
+        text.setText(page).setMaxLines(this.descriptionMaxLines());
       });
     });
   }
@@ -264,91 +267,111 @@ export class FunAbilityReviewUiHandler extends UiHandler {
   private getDensity(partySize: number): ReviewDensity {
     const visibleRows = Phaser.Math.Clamp(partySize, 3, 6);
     const rowHeight = Math.floor(162 / visibleRows);
-    if (visibleRows === 3) {
-      return {
-        rowHeight,
-        pokemonWidth: 58,
-        iconScale: 0.42,
-        nameFontSize: 28,
-        abilityFontSize: 23,
-        descriptionFontSize: 19,
-        descriptionY: 11,
-        descriptionMaxLines: 9,
-        descriptionPageLength: 145,
-      };
+    const header = { rowHeight, dividerPadding: 2, textRightInset: 0 };
+    switch (visibleRows) {
+      case 3:
+        return {
+          ...header,
+          pokemonWidth: 58,
+          nameX: 28,
+          bottomPadding: 3,
+          nameFontSize: 44,
+          abilityFontSize: 38,
+          abilityNameY: 4,
+          descriptionY: 10,
+          descriptionFontSize: 34,
+          descriptionLineHeight: 8,
+        };
+      case 4:
+        return {
+          ...header,
+          pokemonWidth: 55,
+          nameX: 27,
+          bottomPadding: 2,
+          nameFontSize: 38,
+          abilityFontSize: 34,
+          abilityNameY: 3,
+          descriptionY: 8,
+          descriptionFontSize: 30,
+          descriptionLineHeight: 7,
+        };
+      case 5:
+        return {
+          ...header,
+          pokemonWidth: 50,
+          nameX: 25,
+          bottomPadding: 2,
+          nameFontSize: 34,
+          abilityFontSize: 31,
+          abilityNameY: 2,
+          descriptionY: 8,
+          descriptionFontSize: 28,
+          descriptionLineHeight: 6.5,
+        };
+      default:
+        return {
+          ...header,
+          pokemonWidth: 44,
+          nameX: 22,
+          bottomPadding: 2,
+          nameFontSize: 32,
+          abilityFontSize: 31,
+          abilityNameY: 2,
+          descriptionY: 9,
+          descriptionFontSize: 30,
+          descriptionLineHeight: 6,
+        };
     }
-    if (visibleRows === 4) {
-      return {
-        rowHeight,
-        pokemonWidth: 55,
-        iconScale: 0.34,
-        nameFontSize: 24,
-        abilityFontSize: 20,
-        descriptionFontSize: 17,
-        descriptionY: 9,
-        descriptionMaxLines: 7,
-        descriptionPageLength: 110,
-      };
-    }
-    if (visibleRows === 5) {
-      return {
-        rowHeight,
-        pokemonWidth: 50,
-        iconScale: 0.28,
-        nameFontSize: 20,
-        abilityFontSize: 18,
-        descriptionFontSize: 16,
-        descriptionY: 8,
-        descriptionMaxLines: 6,
-        descriptionPageLength: 86,
-      };
-    }
-    return {
-      rowHeight,
-      pokemonWidth: 44,
-      iconScale: 0.24,
-      nameFontSize: 18,
-      abilityFontSize: 16,
-      descriptionFontSize: 15,
-      descriptionY: 7,
-      descriptionMaxLines: 5,
-      descriptionPageLength: 68,
-    };
   }
 
   private applyDensity(): void {
     const { width } = globalScene.scaledCanvas;
     const rowWidth = width - 2;
     const abilityWidth = Math.floor((rowWidth - this.density.pokemonWidth) / 4);
+    const lastCellWidth = rowWidth - this.density.pokemonWidth - abilityWidth * 3;
+    this.density.textRightInset = abilityWidth - 5;
     this.rows.forEach((row, rowIndex) => {
       row.setY(1 + rowIndex * this.density.rowHeight);
       this.rowWindows[rowIndex].setSize(rowWidth, this.density.rowHeight - 1);
       const name = this.pokemonNameTexts[rowIndex];
       name
-        .setPosition(16, this.density.rowHeight / 2)
-        .setOrigin(0, 0.5)
-        .setFontSize(this.density.nameFontSize)
-        .setFixedSize((this.density.pokemonWidth - 18) * 6, 0);
+        .setPosition(this.density.nameX, this.density.rowHeight / 2)
+        .setFixedSize(Math.max(12, (this.density.pokemonWidth - this.density.nameX - 3) * 6), 0);
       this.abilityNameTexts[rowIndex].forEach((abilityName, slot) => {
         const x = this.density.pokemonWidth + slot * abilityWidth;
-        this.rowDividers[rowIndex][slot].setPosition(x, 2).setSize(1, Math.max(1, this.density.rowHeight - 5));
-        abilityName
-          .setPosition(x + 2, 2)
-          .setFontSize(this.density.abilityFontSize)
-          .setFixedSize((abilityWidth - 4) * 6, 0);
+        const cellWidth = slot === 3 ? lastCellWidth : abilityWidth;
+        this.rowDividers[rowIndex][slot]
+          .setPosition(x, this.density.dividerPadding)
+          .setSize(1, Math.max(1, this.density.rowHeight - 1 - this.density.dividerPadding * 2));
+        abilityName.setPosition(x + 2, this.density.abilityNameY).setFixedSize(Math.max(12, (cellWidth - 4) * 6), 0);
         const description = this.abilityDescriptionTexts[rowIndex][slot];
         description
           .setPosition(x + 2, this.density.descriptionY)
           .setFontSize(this.density.descriptionFontSize)
-          .setFixedSize((abilityWidth - 4) * 6, 0)
-          .setMaxLines(this.density.descriptionMaxLines);
-        description.setWordWrapWidth((abilityWidth - 4) * 6, true);
+          .setFixedSize(Math.max(12, (cellWidth - 4) * 6), 0)
+          .setMaxLines(this.descriptionMaxLines())
+          .setLineSpacing(Math.max(0, this.density.descriptionLineHeight * 6 - this.density.descriptionFontSize - 9))
+          .setWordWrapWidth(Math.max(12, (cellWidth - 4) * 6), true);
       });
     });
   }
 
+  private fitTextToWidth(text: Phaser.GameObjects.Text, logicalWidth: number): void {
+    text.setFixedSize(0, 0).updateText();
+    const canvasWidth = text.width;
+    const maxCanvasWidth = logicalWidth * 6;
+    if (canvasWidth > maxCanvasWidth) {
+      const currentFontSize = Number.parseInt(text.style.fontSize as string, 10) || 96;
+      text.setFontSize(Math.max(24, Math.floor(currentFontSize * (maxCanvasWidth / canvasWidth))));
+      text.updateText();
+    }
+    text.setFixedSize(maxCanvasWidth, 0);
+  }
+
   private refresh(): void {
     const { width } = globalScene.scaledCanvas;
+    const rowWidth = width - 2;
+    const abilityWidth = Math.floor((rowWidth - this.density.pokemonWidth) / 4);
     this.applyDensity();
     this.rows.forEach((row, index) => {
       const pokemon = this.party[index];
@@ -358,24 +381,29 @@ export class FunAbilityReviewUiHandler extends UiHandler {
         this.descriptionPages[index].forEach(pages => pages.splice(0));
         return;
       }
-      const iconOffsetY = Math.max(1, Math.floor((this.density.rowHeight - 12) / 2));
+      const iconScale = Math.min(0.5, (this.density.rowHeight - 4) / 24);
+      const iconX = Math.floor(this.density.nameX / 2) - 1;
+      const iconOffsetY = Math.max(1, Math.floor((this.density.rowHeight - 32 * iconScale) / 2));
       const icon = globalScene
-        .addPokemonIcon(pokemon, 1, iconOffsetY, this.density.iconScale, this.density.iconScale, true)
-        .setName("pokemon-icon");
+        .addPokemonIcon(pokemon, iconX, iconOffsetY, 0.5, 0, true)
+        .setName("pokemon-icon")
+        .setScale(iconScale);
       row.add(icon);
       const renderedName = pokemon.getNameToRender({ useIllusion: false });
-      this.pokemonNameTexts[index]
-        .setText(renderedName)
-        .setFontSize(
-          renderedName.length > 12
-            ? this.density.nameFontSize - 4
-            : renderedName.length > 9
-              ? this.density.nameFontSize - 2
-              : this.density.nameFontSize,
-        );
+      const nameText = this.pokemonNameTexts[index];
+      nameText.setText(renderedName).setFontSize(this.density.nameFontSize).setLineSpacing(0);
+      this.fitTextToWidth(nameText, this.density.pokemonWidth - this.density.nameX - 3);
       this.abilityRows(pokemon).forEach((ability, slot) => {
         const prefix = slot === 0 ? `R A${pokemon.abilityIndex + 1}/3` : `I${slot}`;
-        this.abilityNameTexts[index][slot].setText(`${prefix} ${ability.name}`);
+        const abilityNameText = this.abilityNameTexts[index][slot];
+        abilityNameText
+          .setText(`${prefix} ${ability.name}`)
+          .setFontSize(this.density.abilityFontSize)
+          .setLineSpacing(0);
+        this.fitTextToWidth(
+          abilityNameText,
+          (slot === 3 ? rowWidth - this.density.pokemonWidth - abilityWidth * 3 : abilityWidth) - 4,
+        );
         this.descriptionPages[index][slot] = this.paginateDescription(ability.description);
       });
     });

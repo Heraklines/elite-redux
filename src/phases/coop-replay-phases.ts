@@ -1187,6 +1187,17 @@ export class CoopShowAbilityReplayPhase extends Phase {
       return;
     }
 
+    if (!globalScene.showAbilityFlyouts) {
+      pokemon.revealAbility(this.passive, this.passiveSlot);
+      settleCoopPresentationOutcome(this.outcomeToken, {
+        kind: "intentionally-skipped",
+        reason: "ability-banners-disabled",
+        actorFingerprint,
+      });
+      this.end();
+      return;
+    }
+
     // Match the ordinary ShowAbilityPhase queue discipline. Requeueing happens before the flyout and
     // does not re-run mechanics; the event has already selected the exact immutable presentation.
     if (globalScene.abilityBar.isVisible()) {
