@@ -82,6 +82,9 @@ fn expected_sequence(index: usize) -> Result<SafeU53, BattlePresentationError> {
 pub(crate) enum BattlePresentationError {
     #[error("presentation state is disposed")]
     Disposed,
+    /// Retained for the staged plan-activation contract; current adapters do
+    /// not construct this variant yet.
+    #[allow(dead_code)]
     #[error("presentation state already has live events or a blocking barrier")]
     PlanActive,
     #[error("presentation state already reported M3_PRESENTATION_FAILED")]
@@ -141,6 +144,8 @@ impl BattlePresentationSettlementReport {
         self.terminal_reason
     }
 
+    /// Retained for settlement adapters and contract-focused callers.
+    #[allow(dead_code)]
     pub(crate) fn is_idempotent(self) -> bool {
         self.idempotent
     }
@@ -150,6 +155,7 @@ impl BattlePresentationSettlementReport {
 /// resource accounting.  Plans remain ordered by operation identity, while
 /// pending, blocking, and outcome projections retain their global BTree order.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(dead_code)] // Retained as the staged typed snapshot contract.
 pub(crate) struct BattlePresentationSnapshot {
     local_endpoint: SeatId,
     plans: BTreeMap<OperationId, BattlePresentationPlan>,
@@ -162,6 +168,8 @@ pub(crate) struct BattlePresentationSnapshot {
     disposed: bool,
 }
 
+/// Accessors retained for staged presentation-contract consumers.
+#[allow(dead_code)]
 impl BattlePresentationSnapshot {
     pub(crate) fn local_endpoint(&self) -> SeatId {
         self.local_endpoint
@@ -271,6 +279,7 @@ impl BattlePresentationState {
         }
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn local_endpoint(&self) -> SeatId {
         self.local_endpoint
     }
@@ -327,24 +336,29 @@ impl BattlePresentationState {
     /// Compatibility accessor for the original single-plan state.  With
     /// multiple plans it returns the most recently installed plan; callers
     /// needing an exact operation must use [`Self::plan_for`].
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn plan(&self) -> Option<&BattlePresentationPlan> {
         self.last_plan_operation_id
             .as_ref()
             .and_then(|operation_id| self.plans.get(operation_id))
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn plan_for(&self, operation_id: &OperationId) -> Option<&BattlePresentationPlan> {
         self.plans.get(operation_id)
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn plan_count(&self) -> usize {
         self.plans.len()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn plan_operation_ids(&self) -> Vec<OperationId> {
         self.plans.keys().cloned().collect()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn blocking_ids(&self) -> &BTreeSet<BattlePresentationEventId> {
         &self.blocking
     }
@@ -359,6 +373,7 @@ impl BattlePresentationState {
         &self.outcomes
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn outcome(
         &self,
         event_id: &BattlePresentationEventId,
@@ -366,18 +381,22 @@ impl BattlePresentationState {
         self.outcomes.get(event_id)
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn live_count(&self) -> usize {
         self.pending.len()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn pending_count(&self) -> usize {
         self.pending.len()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn blocking_count(&self) -> usize {
         self.blocking.len()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn outcome_count(&self) -> usize {
         self.outcomes.len()
     }
@@ -386,14 +405,17 @@ impl BattlePresentationState {
         !self.blocking.is_empty()
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn is_disposed(&self) -> bool {
         self.disposed
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn is_failed(&self) -> bool {
         self.presentation_failed
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn snapshot(&self) -> BattlePresentationSnapshot {
         BattlePresentationSnapshot {
             local_endpoint: self.local_endpoint,
@@ -493,6 +515,7 @@ impl BattlePresentationState {
         Ok(state)
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn restore_snapshot_v1(
         &mut self,
         snapshot: PendingPresentationsSnapshotV1,
@@ -571,6 +594,7 @@ impl BattlePresentationState {
         Ok(report)
     }
 
+    #[allow(dead_code)] // Retained for staged presentation-contract consumers.
     pub(crate) fn record_outcome(
         &mut self,
         endpoint: SeatId,
@@ -595,12 +619,12 @@ impl BattlePresentationState {
     }
 
     pub(crate) fn validate(&self) -> Result<(), BattlePresentationError> {
-        if self.disposed {
-            if !self.plans.is_empty() || !self.pending.is_empty() || !self.blocking.is_empty() {
-                return Err(BattlePresentationError::InvalidState(
-                    "disposed state retains live presentation data",
-                ));
-            }
+        if self.disposed
+            && (!self.plans.is_empty() || !self.pending.is_empty() || !self.blocking.is_empty())
+        {
+            return Err(BattlePresentationError::InvalidState(
+                "disposed state retains live presentation data",
+            ));
         }
 
         for (event_id, event) in &self.event_catalog {
