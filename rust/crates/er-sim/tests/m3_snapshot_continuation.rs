@@ -254,18 +254,24 @@ mod live_local_production {
     use er_kernel::snapshot::RestorableKernelSnapshotV2;
 
     fn content_pack() -> TestResult<Arc<ContentPack>> {
-        let mut artifact = published_content_pack()?;
+        let catalog = load_m3_fixture_catalog()?;
+        if !catalog.is_evidence_published() {
+            return Err(invalid_data("M3 oracle evidence is not published").into());
+        }
+        let mut artifact =
+            catalog.load_published_supporting_artifact::<Value>("content-pack-v1")?;
         let selected = er_content::pack::selected_content_pack()?;
         super::live_coop_production::normalize_legacy_content_pack(&mut artifact, &selected)?;
         let value = artifact
             .get("content_pack")
             .cloned()
-            .ok_or_else(|| invalid("published content artifact has no content_pack"))?;
+            .ok_or_else(|| invalid_data("published content artifact has no content_pack"))?;
         let pack: ContentPack = serde_json::from_value(value)?;
         if pack != selected {
-            return Err(invalid(
+            return Err(invalid_data(
                 "published legacy content pack did not normalize to the current selected content",
-            ));
+            )
+            .into());
         }
         Ok(Arc::new(pack))
     }
