@@ -11,7 +11,7 @@ use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::Instant;
 
-use er_content::pack::ContentPack;
+use er_content::pack::{ContentPack, selected_content_pack};
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
@@ -57,6 +57,10 @@ const VICTORY_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/battle-c
 const DOUBLES_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json");
 const CONTENT_PACK_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+    "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+const LEGACY_ORACLE_CONTENT_HASH: &str =
+    "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
 #[derive(Clone, Debug, Default, Serialize)]
 struct Counts {
@@ -292,20 +296,134 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
 
 fn fixture_content_pack() -> TestResult<Arc<ContentPack>> {
     let wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
-    let mut value = wire
+    let selected = selected_content_pack()?;
+    selected.validate()?;
+
+    let provenance = wire
+        .get("provenance")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("content-pack fixture provenance is missing"))?;
+    let provenance_hash = provenance
+        .get("content_pack_hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("content-pack fixture provenance hash is missing"))?;
+    let provenance_oracle_sha = provenance
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("content-pack fixture provenance oracle SHA is missing"))?;
+    let pack = wire
         .get("content_pack")
-        .cloned()
-        .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("content-pack fixture content_pack is missing"))?;
+    let pack_hash = pack
+        .get("hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("content-pack fixture pack hash is missing"))?;
+    let pack_oracle_sha = pack
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("content-pack fixture pack oracle SHA is missing"))?;
+    if pack_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+        || pack_oracle_sha != selected.oracle_game_sha
+        || provenance_oracle_sha != selected.oracle_game_sha
+    {
+        return Err(invalid(
+            "content-pack fixture is not the exact supported legacy identity",
+        ));
+    }
+
+    let mut value = Value::Object(pack.clone());
     normalize_legacy_content_conditions(&mut value)?;
-    Ok(Arc::new(serde_json::from_value(value)?))
+    value
+        .as_object_mut()
+        .ok_or_else(|| invalid("content-pack fixture content_pack is not an object"))?
+        .insert("hash".to_owned(), Value::String(selected.hash.to_string()));
+    let pack: ContentPack = serde_json::from_value(value)?;
+    if pack != selected {
+        return Err(invalid(
+            "legacy content-pack fixture did not normalize to the selected content",
+        ));
+    }
+    Ok(Arc::new(pack))
 }
 
-fn canonical_state(fixture: &Value) -> TestResult<GameState> {
+fn normalize_legacy_content_identity(
+    document: &Value,
+    state: &mut Value,
+    content: &ContentPack,
+) -> TestResult {
+    let canonical = state
+        .get_mut("canonical")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid("initial_state.canonical is not an object"))?;
+    let fixture_hash = canonical
+        .get("content_hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("initial_state.canonical.content_hash is missing"))?
+        .to_owned();
+    let expected_hash = document
+        .get("expected_final_state")
+        .and_then(|value| value.get("canonical"))
+        .and_then(|value| value.get("content_hash"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("expected_final_state.canonical.content_hash is missing"))?;
+    if expected_hash != fixture_hash {
+        return Err(invalid(
+            "battle fixture state content hashes disagree between initial and expected final state",
+        ));
+    }
+    let provenance = document
+        .get("provenance")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("battle fixture provenance is missing"))?;
+    let provenance_hash = provenance
+        .get("content_pack_hash")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("battle fixture provenance hash is missing"))?;
+    let provenance_oracle_sha = provenance
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("battle fixture provenance oracle SHA is missing"))?;
+    if provenance_oracle_sha != content.oracle_game_sha {
+        return Err(invalid(
+            "battle fixture provenance oracle SHA disagrees with selected content",
+        ));
+    }
+
+    let selected_hash = content.hash.as_str();
+    let selected_digest = selected_hash
+        .strip_prefix("blake3-v1:")
+        .ok_or_else(|| invalid("selected content hash has no blake3-v1 prefix"))?;
+    if fixture_hash == selected_hash {
+        if provenance_hash != selected_digest {
+            return Err(invalid(
+                "selected battle fixture content hash disagrees with provenance digest",
+            ));
+        }
+        return Ok(());
+    }
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    {
+        return Err(invalid(
+            "battle fixture content identity is not the exact supported legacy pair",
+        ));
+    }
+    canonical.insert(
+        "content_hash".to_owned(),
+        Value::String(selected_hash.to_owned()),
+    );
+    Ok(())
+}
+
+fn canonical_state(fixture: &Value, content: &ContentPack) -> TestResult<GameState> {
     let mut initial_state = fixture
         .get("initial_state")
         .cloned()
         .ok_or_else(|| invalid("battle fixture has no initial_state"))?;
     normalize_legacy_initial_state(&mut initial_state)?;
+    normalize_legacy_content_identity(fixture, &mut initial_state, content)?;
     let canonical = initial_state
         .get("canonical")
         .cloned()
@@ -377,10 +495,11 @@ fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicy
 
 fn battle_config(
     fixture: &Value,
+    content: &ContentPack,
     local_seat: SeatId,
     force_short_victory: bool,
 ) -> TestResult<BattleGameConfig> {
-    let canonical = canonical_state(fixture)?;
+    let canonical = canonical_state(fixture, content)?;
     let mut battle = canonical
         .battle
         .clone()
@@ -503,7 +622,7 @@ fn new_local_kernel(
     iteration: u64,
 ) -> TestResult<GameKernel> {
     let local_seat = seat(1);
-    let config = battle_config(fixture, local_seat, false)?;
+    let config = battle_config(fixture, content.as_ref(), local_seat, false)?;
     let protocol = authority_protocol(
         "m3-benchmark-local",
         iteration,
@@ -528,7 +647,7 @@ fn new_pair(
     let guest = seat(2);
     let generation = ConnectionGeneration::new(safe(1));
     Ok(SimulatedPair::new_battle(SimulatedBattlePairConfig {
-        host_game: battle_config(fixture, host, force_short_victory)?,
+        host_game: battle_config(fixture, content.as_ref(), host, force_short_victory)?,
         host_protocol: authority_protocol(
             "m3-benchmark-pair",
             iteration,
@@ -536,7 +655,7 @@ fn new_pair(
             Some(guest),
             generation,
         )?,
-        guest_game: battle_config(fixture, guest, force_short_victory)?,
+        guest_game: battle_config(fixture, content.as_ref(), guest, force_short_victory)?,
         guest_protocol: replica_protocol("m3-benchmark-pair", iteration, host, guest, generation)?,
         content: Arc::clone(content),
         replay_seed: 0x4c,
