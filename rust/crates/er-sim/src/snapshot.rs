@@ -624,6 +624,9 @@ pub struct PairKernelTraceV2 {
     pub entries: Vec<PairTraceEntryV2>,
 }
 
+// This frozen public trace union is constructed and matched across crates;
+// boxing either payload would change that Rust contract.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
@@ -813,6 +816,8 @@ impl EndpointKernelTraceRecorder {
         })
     }
 
+    // The frozen recorder boundary keeps every trace field explicit for callers.
+    #[allow(clippy::too_many_arguments)]
     pub fn record(
         &mut self,
         input: RestorableKernelInputV2,
@@ -916,6 +921,8 @@ impl EndpointKernelTraceRecorder {
     /// Capture the after-state from the owning kernel boundary, then append a
     /// fully validated entry.  The bridge is implemented by the integration
     /// owner; this keeps recorder callers on the real snapshot API.
+    // The frozen recorder boundary keeps every trace field explicit for callers.
+    #[allow(clippy::too_many_arguments)]
     pub fn record_with_kernel<B: GameKernelSnapshotBridge>(
         &mut self,
         input: RestorableKernelInputV2,
@@ -971,6 +978,8 @@ impl PairKernelTraceRecorder {
         })
     }
 
+    // The frozen recorder boundary keeps both endpoints' evidence explicit.
+    #[allow(clippy::too_many_arguments)]
     pub fn record(
         &mut self,
         input: PairOperationV2,
@@ -1133,6 +1142,8 @@ impl PairKernelTraceRecorder {
     /// Capture the after-state from the owning pair boundary, then append a
     /// fully validated entry.  Effect origins and endpoint resource evidence
     /// remain explicit because only the pair owner can observe their order.
+    // The frozen recorder boundary keeps both endpoints' evidence explicit.
+    #[allow(clippy::too_many_arguments)]
     pub fn record_with_pair<B: SimulatedPairSnapshotBridge>(
         &mut self,
         input: PairOperationV2,
@@ -3037,7 +3048,7 @@ where
 fn decode_canonical_bytes(value: &CanonicalHexBytes, path: &str) -> Result<Vec<u8>, SnapshotError> {
     validate_bytes(value, path)?;
     let encoded = value.as_str().as_bytes();
-    if encoded.len() % 2 != 0 {
+    if !encoded.len().is_multiple_of(2) {
         return Err(invalid(
             path,
             "canonical payload contains an odd number of hexadecimal digits",
@@ -3134,7 +3145,7 @@ fn validate_presenter_endpoint(
             .into_iter()
             .find(|event| &event.event_id == event_id)
             .ok_or_else(|| invalid(path, "pending barrier has no planned event"))?;
-        if !pending.iter().any(|entry| &entry.event == &planned) {
+        if !pending.iter().any(|entry| entry.event == planned) {
             return Err(invalid(
                 path,
                 "presenter is missing the endpoint's exact pending event",
@@ -3404,25 +3415,24 @@ impl StorageSnapshotV2 {
                 .request
                 .validate("storage.pending_requests.request")?;
         }
-        if let Some(next_request_id) = self.next_request_id {
-            if self
+        if let Some(next_request_id) = self.next_request_id
+            && self
                 .pending_requests
                 .iter()
                 .any(|request| request.request.request_id() >= next_request_id)
-            {
-                return Err(invalid(
-                    "storage.next_request_id",
-                    "allocator must be above every pending request ID",
-                ));
-            }
+        {
+            return Err(invalid(
+                "storage.next_request_id",
+                "allocator must be above every pending request ID",
+            ));
         }
-        if let Some(fault) = &self.one_shot_fault {
-            if fault.reason.is_empty() {
-                return Err(invalid(
-                    "storage.one_shot_fault.reason",
-                    "must not be empty",
-                ));
-            }
+        if let Some(fault) = &self.one_shot_fault
+            && fault.reason.is_empty()
+        {
+            return Err(invalid(
+                "storage.one_shot_fault.reason",
+                "must not be empty",
+            ));
         }
         if self.disposed
             && (!self.values.is_empty()
