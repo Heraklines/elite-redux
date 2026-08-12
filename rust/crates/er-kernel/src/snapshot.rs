@@ -702,17 +702,16 @@ impl KernelSchedulerSnapshotV2 {
                 ));
             }
         }
-        if let Some(next_timer_id) = self.next_timer_id {
-            if self
+        if let Some(next_timer_id) = self.next_timer_id
+            && self
                 .timers
                 .iter()
                 .any(|timer| timer.registration.timer_id.get() >= next_timer_id)
-            {
-                return Err(invalid(
-                    "scheduler.next_timer_id",
-                    "allocator cursor must be above every live timer ID",
-                ));
-            }
+        {
+            return Err(invalid(
+                "scheduler.next_timer_id",
+                "allocator cursor must be above every live timer ID",
+            ));
         }
         for pause in &self.pauses {
             if pause.time_class == TimeClass::Absolute || pause.reasons.is_empty() {
