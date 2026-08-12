@@ -15,7 +15,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use er_battle::legality::{build_command_offer, build_scripted_enemy_offer};
+use er_battle::legality::{
+    build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
+    validate_replacement_proposal, validate_replacement_selection,
+};
 use er_battle::presentation::{PRESENTATION_BLOCKING_POLICY, PRESENTATION_SKIP_POLICY};
 use er_battle::resolver::BattleMutation;
 use er_battle::{resolve_replacement, resolve_turn};
@@ -27,7 +30,7 @@ use er_state::battle::{BattleOutcome, CommandCollectionState};
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1,
+    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleReplacementProposalV1,
     BattleTargetSelection, CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus,
     CommandSet, ReplacementSelection, ScriptedEnemyBattleCommandV1,
     player_command_operation_id, replacement_operation_id, turn_result_operation_id,
@@ -220,16 +223,62 @@ const REQUIRED_AXES: &[(&str, &[&str])] = &[
     ),
 ];
 
-const LEGACY_STALE_FINAL_OCCUPANTS: &[(&str, usize)] = &[
-    ("defeat", 1),
-    ("mixed-side-simultaneous-faint", 1),
-    ("no-legal-replacement", 2),
-    ("same-side-simultaneous-faint", 2),
-    ("victory", 1),
-    ("wonder-guard-status-pass", 1),
-    ("wonder-guard-super-effective-pass", 1),
-];
-const LEGACY_STALE_FINAL_OCCUPANT_TOTAL: usize = 9;
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct LegacyStaleFinalOccupant {
+    case_name: &'static str,
+    slot: FieldSlot,
+    pokemon: PokemonId,
+}
+
+fn legacy_stale_final_occupants() -> [LegacyStaleFinalOccupant; 9] {
+    [
+        LegacyStaleFinalOccupant {
+            case_name: "defeat",
+            slot: FieldSlot::new(BattleSide::Player, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(1).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "mixed-side-simultaneous-faint",
+            slot: FieldSlot::new(BattleSide::Player, 1).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(1).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "no-legal-replacement",
+            slot: FieldSlot::new(BattleSide::Player, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(1).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "no-legal-replacement",
+            slot: FieldSlot::new(BattleSide::Player, 1).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(2).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "same-side-simultaneous-faint",
+            slot: FieldSlot::new(BattleSide::Player, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(1).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "same-side-simultaneous-faint",
+            slot: FieldSlot::new(BattleSide::Player, 1).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(2).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "victory",
+            slot: FieldSlot::new(BattleSide::Enemy, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(2).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "wonder-guard-status-pass",
+            slot: FieldSlot::new(BattleSide::Enemy, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(2).expect("valid stale catalogue PokemonId"),
+        },
+        LegacyStaleFinalOccupant {
+            case_name: "wonder-guard-super-effective-pass",
+            slot: FieldSlot::new(BattleSide::Enemy, 0).expect("valid stale catalogue slot"),
+            pokemon: PokemonId::try_from_u64(2).expect("valid stale catalogue PokemonId"),
+        },
+    ]
+}
 
 const LEGACY_MESSAGE_CATALOGUE: &[&str] = &[
     "It’s super effective!",
@@ -535,9 +584,19 @@ struct LegacyTurnAdvance {
 }
 
 #[derive(Clone, Debug)]
+struct LegacyMutationMetadata {
+    sequence: u64,
+    kind: String,
+    phase: String,
+    path: String,
+    cause: Value,
+}
+
+#[derive(Clone, Debug)]
 struct FixtureMutationTrace {
     typed: Vec<BattleMutation>,
     faint_markers: Vec<LegacyFaintMarker>,
+    metadata: Vec<LegacyMutationMetadata>,
     turn_advances: Vec<LegacyTurnAdvance>,
 }
 
@@ -997,33 +1056,47 @@ fn normalize_legacy_final_occupants(
                     "{case_name}: canonical final field slot {index}.slot is invalid: {error}"
                 ))
             })?;
-            stale.push((index, occupant, slot, side));
+            let pokemon = PokemonId::try_from_u64(occupant).map_err(|error| {
+                FixtureError::new(format!(
+                    "{case_name}: canonical final field occupant {occupant} is not a typed PokemonId: {error}"
+                ))
+            })?;
+            stale.push((index, pokemon, slot, side));
         }
     }
 
-    let catalogue_total = LEGACY_STALE_FINAL_OCCUPANTS
+    let catalogue = legacy_stale_final_occupants();
+    let mut catalogue_keys = catalogue
         .iter()
-        .map(|(_, count)| *count)
-        .sum::<usize>();
-    if catalogue_total != LEGACY_STALE_FINAL_OCCUPANT_TOTAL {
+        .map(|entry| (entry.case_name, entry.slot, entry.pokemon))
+        .collect::<Vec<_>>();
+    catalogue_keys.sort_unstable();
+    if catalogue_keys.windows(2).any(|entries| entries[0] == entries[1]) {
         return Err(FixtureError::new(format!(
-            "{case_name}: internal stale-occupant catalogue totals {catalogue_total}, expected {LEGACY_STALE_FINAL_OCCUPANT_TOTAL}"
+            "{case_name}: internal stale-final-occupant catalogue contains a duplicate case/slot/Pokemon entry"
         )));
     }
-    let expected_count = LEGACY_STALE_FINAL_OCCUPANTS
+
+    let mut expected = catalogue
         .iter()
-        .find(|(name, _)| *name == case_name)
-        .map(|(_, count)| *count)
-        .unwrap_or(0);
-    if stale.len() != expected_count {
+        .filter(|entry| entry.case_name == case_name)
+        .map(|entry| (entry.slot, entry.pokemon))
+        .collect::<Vec<_>>();
+    expected.sort_unstable();
+    let mut actual = stale
+        .iter()
+        .map(|(_, pokemon, slot, _)| (*slot, *pokemon))
+        .collect::<Vec<_>>();
+    actual.sort_unstable();
+    if actual != expected {
         return Err(FixtureError::new(format!(
-            "{case_name}: expected exactly {expected_count} closed-catalogue stale final occupants, found {}",
-            stale.len()
+            "{case_name}: stale final occupants differ from the exact closed catalogue: expected {expected:?}, actual {actual:?}"
         )));
     }
 
     for (index, occupant, slot, side) in stale {
-        let (hp, fainted, party_side) = party.get(&occupant).copied().ok_or_else(|| {
+        let raw_occupant = u64::from(occupant);
+        let (hp, fainted, party_side) = party.get(&raw_occupant).copied().ok_or_else(|| {
             FixtureError::new(format!(
                 "{case_name}: field occupant {occupant} is absent from the final party"
             ))
@@ -1033,7 +1106,13 @@ fn normalize_legacy_final_occupants(
                 "{case_name}: refusing to sanitize field occupant {occupant}; it is not a same-side hp=0 fainted party member"
             )));
         }
-        validate_legacy_final_faint_context(case_name, document, battle, occupant, slot.side)?;
+        validate_legacy_final_faint_context(
+            case_name,
+            document,
+            battle,
+            raw_occupant,
+            slot.side,
+        )?;
         let slots = battle
             .get_mut("field")
             .and_then(|field| field.get_mut("slots"))
@@ -1673,7 +1752,7 @@ fn admit_fixture_commands(
                     ))
                     .into());
                 }
-                AcceptedBattleCommand::human(BattleCommandProposalV1::new(
+                let proposal = BattleCommandProposalV1::new(
                     record.operation_id.clone(),
                     battle.battle_id,
                     battle.wave,
@@ -1684,7 +1763,9 @@ fn admit_fixture_commands(
                     record.command.clone(),
                     MenuInstanceId::new(SafeU53::new(1)?),
                     format!("m3-oracle/{case_name}/command/{index}"),
-                )?)
+                )?;
+                validate_command_proposal(initial, &proposal, content)?;
+                AcceptedBattleCommand::human(proposal)
             }
             BattleSide::Enemy => {
                 if record.owner_seat.is_some()
@@ -2419,7 +2500,7 @@ fn mutation_metadata(
     path: &str,
     kind: &str,
     fields: &[&str],
-) -> Result<(String, String), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     assert_exact_keys(case_name, path, value, fields)?;
     let actual_kind = string_field(value, case_name, path, "kind")?;
     if actual_kind != kind {
@@ -2428,9 +2509,7 @@ fn mutation_metadata(
         ))
         .into());
     }
-    let phase = string_field(value, case_name, path, "phase")?;
-    let mutation_path = string_field(value, case_name, path, "path")?;
-    Ok((phase, mutation_path))
+    Ok(())
 }
 
 fn mutation_cause(
@@ -2451,6 +2530,135 @@ fn mutation_cause(
     }
 }
 
+fn legacy_faint_queue_path_index(path: &str, replacement: bool) -> Option<usize> {
+    let value = path.strip_prefix("battle.faint_queue[")?;
+    let suffix = if replacement { "].replacement" } else { "]" };
+    value.strip_suffix(suffix)?.parse().ok()
+}
+
+fn validate_legacy_mutation_metadata(
+    case_name: &str,
+    trace: &FixtureMutationTrace,
+    actions: &[ResolvedAction],
+) -> Result<(), Box<dyn Error>> {
+    for (index, metadata) in trace.metadata.iter().enumerate() {
+        if metadata.sequence != u64::try_from(index)? {
+            return Err(FixtureError::new(format!(
+                "{case_name}: retained mutation metadata {index} has sequence {}, expected {index}",
+                metadata.sequence
+            ))
+            .into());
+        }
+        if metadata.path.is_empty() {
+            return Err(FixtureError::new(format!(
+                "{case_name}: expected_mutations[{index}].path is empty"
+            ))
+            .into());
+        }
+        let exact_path_matches = match metadata.kind.as_str() {
+            "BATTLE_RNG_CHANGED" => metadata.path == "battle/rng",
+            "FAINT_QUEUED" | "FAINT_RESOLVED" => {
+                legacy_faint_queue_path_index(&metadata.path, false).is_some()
+            }
+            "FAINT_PROGRESS_CHANGED" => {
+                legacy_faint_queue_path_index(&metadata.path, true).is_some()
+            }
+            "TURN_ADVANCE" => metadata.path == "battle/turn_advance",
+            _ => true,
+        };
+        if !exact_path_matches {
+            return Err(FixtureError::new(format!(
+                "{case_name}: expected_mutations[{index}] kind {} has invalid exact path {:?}",
+                metadata.kind, metadata.path
+            ))
+            .into());
+        }
+
+        let action = match &metadata.cause {
+            Value::Number(value) => {
+                let sequence = value.as_u64().ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: expected_mutations[{index}].cause is not an unsigned action sequence"
+                    ))
+                })?;
+                Some(
+                    actions
+                        .iter()
+                        .find(|action| action.sequence.get() == sequence)
+                        .ok_or_else(|| {
+                            FixtureError::new(format!(
+                                "{case_name}: expected_mutations[{index}].cause {sequence} does not identify the exact retained action sequence"
+                            ))
+                        })?,
+                )
+            }
+            Value::String(value) if value == "TURN_RESOLUTION" => None,
+            cause => {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: expected_mutations[{index}].cause has unsupported retained value {cause}"
+                ))
+                .into());
+            }
+        };
+
+        let context_matches = match (
+            metadata.kind.as_str(),
+            metadata.phase.as_str(),
+            action.map(|action| action.kind),
+        ) {
+            ("PP_CONSUMPTION", "MovePhase", Some(ResolvedActionKind::Move))
+            | ("BATTLE_RNG_CHANGED", "MovePhase", Some(ResolvedActionKind::Move))
+            | ("BATTLE_RNG_CHANGED", "MoveEffectPhase", Some(ResolvedActionKind::Move))
+            | ("HP_DAMAGE", "MoveEffectPhase", Some(ResolvedActionKind::Move))
+            | ("STATUS_SET", "ObtainStatusEffectPhase", Some(ResolvedActionKind::Move))
+            | ("STATUS_SET", "FaintPhase", Some(ResolvedActionKind::Faint))
+            | ("FAINT_QUEUED", "FaintPhase", Some(ResolvedActionKind::Faint))
+            | ("FAINT_PROGRESS_CHANGED", "FaintPhase", Some(ResolvedActionKind::Faint))
+            | ("FAINT_RESOLVED", "FaintPhase", Some(ResolvedActionKind::Faint))
+            | ("HP_DAMAGE", "PostTurnStatusEffectPhase", Some(ResolvedActionKind::ResidualStatus))
+            | ("FAINT_PROGRESS_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
+            | ("FAINT_RESOLVED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
+            | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Switch))
+            | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
+            | ("BATTLE_RNG_CHANGED", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
+            | ("BATTLE_RNG_CHANGED", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
+            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Move))
+            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
+            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
+            | ("TURN_ADVANCE", "TurnEndPhase", Some(_))
+            | ("STATUS_SET", "ObtainStatusEffectPhase", None) => true,
+            _ => false,
+        };
+        if !context_matches {
+            return Err(FixtureError::new(format!(
+                "{case_name}: expected_mutations[{index}] has unsupported exact kind/phase/cause context {}/{}/{}",
+                metadata.kind,
+                metadata.phase,
+                action
+                    .map(|action| format!("{:?}@{}", action.kind, action.sequence))
+                    .unwrap_or_else(|| "TURN_RESOLUTION".to_owned())
+            ))
+            .into());
+        }
+
+        if metadata.kind == "TURN_ADVANCE" {
+            let cause = action.ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: expected_mutations[{index}] TURN_ADVANCE has no action cause"
+                ))
+            })?;
+            if actions.last().map(|action| action.sequence) != Some(cause.sequence) {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: expected_mutations[{index}] TURN_ADVANCE cause {} is not the exact final action sequence",
+                    cause.sequence
+                ))
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn fixture_mutations(
     document: &Value,
     case_name: &str,
@@ -2462,6 +2670,8 @@ fn fixture_mutations(
     let values = array_field(document, case_name, "$", "expected_mutations")?;
     let mut mutations = Vec::with_capacity(values.len());
     let mut faint_markers = Vec::new();
+    let mut legacy_queue_occurrences = BTreeMap::new();
+    let mut metadata = Vec::with_capacity(values.len());
     let mut turn_advances = Vec::new();
 
     for (index, value) in values.iter().enumerate() {
@@ -2476,6 +2686,13 @@ fn fixture_mutations(
             ))
             .into());
         }
+        let legacy_metadata = LegacyMutationMetadata {
+            sequence,
+            kind: kind.clone(),
+            phase: string_field(value, case_name, &path, "phase")?,
+            path: string_field(value, case_name, &path, "path")?,
+            cause: required(value, case_name, &path, "cause")?.clone(),
+        };
 
         if let Some(marker) = legacy_faint_marker(
             value,
@@ -2486,6 +2703,7 @@ fn fixture_mutations(
             sequence,
         )? {
             faint_markers.push(marker);
+            metadata.push(legacy_metadata);
             continue;
         }
 
@@ -2747,6 +2965,44 @@ fn fixture_mutations(
                 let occurrence: FaintOccurrence = serde_json::from_value(
                     object_field(value, case_name, &path, "after")?.clone(),
                 )?;
+                let queue_index = legacy_faint_queue_path_index(&legacy_metadata.path, false)
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {path}.path is not an exact battle.faint_queue[index] path"
+                        ))
+                    })?;
+                if legacy_queue_occurrences
+                    .insert(queue_index, occurrence.id)
+                    .is_some()
+                {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.path repeats legacy faint queue index {queue_index}"
+                    ))
+                    .into());
+                }
+                let cause = cause.ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: {path}.cause must identify the exact faint action"
+                    ))
+                })?;
+                let action_sequence = SafeU53::new(u64::try_from(cause)?)?;
+                let action = actions
+                    .iter()
+                    .find(|action| action.sequence == action_sequence)
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {path}.cause {cause} does not identify its faint action"
+                        ))
+                    })?;
+                if action.kind != ResolvedActionKind::Faint
+                    || action.actor != occurrence.pokemon
+                    || action.source_slot != occurrence.slot
+                {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.cause {cause} does not match the queued Pokemon/slot"
+                    ))
+                    .into());
+                }
                 BattleMutation::FaintQueued { occurrence }
             }
             "FAINT_PROGRESS_CHANGED" => {
@@ -2772,6 +3028,18 @@ fn fixture_mutations(
                     &path,
                     "occurrence",
                 )?)?;
+                let queue_index = legacy_faint_queue_path_index(&legacy_metadata.path, true)
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {path}.path is not an exact battle.faint_queue[index].replacement path"
+                        ))
+                    })?;
+                if legacy_queue_occurrences.get(&queue_index) != Some(&occurrence) {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.path queue index {queue_index} does not correspond to occurrence {occurrence}"
+                    ))
+                    .into());
+                }
                 let before: ReplacementProgress = serde_json::from_value(
                     required(value, case_name, &path, "before")?.clone(),
                 )?;
@@ -2805,6 +3073,18 @@ fn fixture_mutations(
                     &path,
                     "occurrence",
                 )?)?;
+                let queue_index = legacy_faint_queue_path_index(&legacy_metadata.path, false)
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {path}.path is not an exact battle.faint_queue[index] path"
+                        ))
+                    })?;
+                if legacy_queue_occurrences.get(&queue_index) != Some(&occurrence) {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path}.path queue index {queue_index} does not correspond to occurrence {occurrence}"
+                    ))
+                    .into());
+                }
                 BattleMutation::FaintResolved { occurrence }
             }
             "FIELD_CHANGED" => {
@@ -2897,10 +3177,12 @@ fn fixture_mutations(
             }
         };
         mutations.push(mutation);
+        metadata.push(legacy_metadata);
     }
     Ok(FixtureMutationTrace {
         typed: mutations,
         faint_markers,
+        metadata,
         turn_advances,
     })
 }
@@ -2963,6 +3245,32 @@ fn replay_fixture_replacements(
                     operation_id.as_str()
                 ))
                 .into());
+            }
+        }
+        match proposal.selection {
+            ReplacementSelection::Selected { .. } => {
+                let admitted = BattleReplacementProposalV1::new(
+                    operation_id.clone(),
+                    proposal.battle_id,
+                    proposal.wave,
+                    proposal.resolved_turn,
+                    proposal.owner_seat,
+                    proposal.occurrence,
+                    proposal.turn_occurrence,
+                    proposal.field_slot,
+                    proposal.selection,
+                    MenuInstanceId::new(SafeU53::new(u64::try_from(index)? + 1)?),
+                    format!("m3-oracle/{case_name}/replacement/{index}"),
+                )?;
+                validate_replacement_proposal(&state, &admitted, content)?;
+            }
+            ReplacementSelection::NoLegalReplacement => {
+                validate_replacement_selection(
+                    &state,
+                    proposal.occurrence,
+                    &proposal.selection,
+                    content,
+                )?;
             }
         }
         let transition = resolve_replacement(
@@ -4093,14 +4401,18 @@ fn validate_legacy_turn_advances(
             false,
         )?;
         if let Some(cause) = legacy.cause {
-            let action = actions.get(cause).ok_or_else(|| {
+            let cause_sequence = SafeU53::new(u64::try_from(cause)?)?;
+            let action = actions
+                .iter()
+                .find(|action| action.sequence == cause_sequence)
+                .ok_or_else(|| {
                 FixtureError::new(format!(
                     "{case_name}: TURN_ADVANCE[{index}] cause {cause} is outside normalized action order"
                 ))
             })?;
-            if action.command_operation_id.is_none() {
+            if actions.last().map(|candidate| candidate.sequence) != Some(action.sequence) {
                 return Err(FixtureError::new(format!(
-                    "{case_name}: TURN_ADVANCE[{index}] cause {cause} does not identify a command action"
+                    "{case_name}: TURN_ADVANCE[{index}] cause {cause} is not the exact final action"
                 ))
                 .into());
             }
@@ -4197,15 +4509,23 @@ fn validate_legacy_faint_markers(
                     .into());
                 }
                 if let Some(cause) = marker.cause {
-                    let action = actions.get(cause).ok_or_else(|| {
+                    let cause_sequence = SafeU53::new(u64::try_from(cause)?)?;
+                    let action = actions
+                        .iter()
+                        .find(|action| action.sequence == cause_sequence)
+                        .ok_or_else(|| {
                         FixtureError::new(format!(
                             "{case_name}: faint marker {} cause {cause} is outside normalized action order",
                             marker_index
                         ))
                     })?;
-                    if action.command_operation_id.is_none() {
+                    if action.kind != ResolvedActionKind::Faint
+                        || action.actor != marker.pokemon
+                        || action.source_slot != occurrence.slot
+                        || action.command_operation_id.is_some()
+                    {
                         return Err(FixtureError::new(format!(
-                            "{case_name}: faint marker {} cause {cause} does not identify a command action",
+                            "{case_name}: faint marker {} cause {cause} does not identify the exact typed faint action",
                             marker_index
                         ))
                         .into());
@@ -4803,6 +5123,7 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &expected_actions,
         &records,
     )?;
+    validate_legacy_mutation_metadata(case_name, &expected_mutations, &expected_actions)?;
     let mut actual_mutations = transition.mutations.clone();
     actual_mutations.extend(replacement_replay.mutations.clone());
     compare_mutation_trace(
