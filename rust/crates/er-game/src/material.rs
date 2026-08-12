@@ -37,14 +37,14 @@ use er_types::battle_control::{
 };
 use er_types::battle_ids::ContentPackHash;
 use er_types::battle_ids::{
-    BattleId, BattleSide, FieldSlot, MenuInstanceId, MoveId, PokemonId, SafeU53, TurnIndex,
-    WaveIndex,
+    BattleId, BattleSide, FieldSlot, MenuInstanceId, MoveId, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{FaintOccurrence, ReplacementProgress, ResolvedAction};
 use er_types::battle_ui::{
     BattlePresentationEvent, BattlePresentationKind, PresentationBlockingPolicy,
     PresentationPlanDigest, PresentationSkipPolicy,
 };
+use er_types::ids::SafeU53;
 use er_types::{OperationId, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -1671,7 +1671,7 @@ fn party_contains(battle: &BattleState, pokemon: PokemonId) -> bool {
 }
 
 fn party_contains_on_side(battle: &BattleState, pokemon: PokemonId, side: BattleSide) -> bool {
-    let party = match side {
+    let mut party = match side {
         BattleSide::Player => battle.player_party.iter(),
         BattleSide::Enemy => battle.enemy_party.iter(),
     };
