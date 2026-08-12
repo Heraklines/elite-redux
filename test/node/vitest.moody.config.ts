@@ -5,37 +5,28 @@
  */
 
 import { defineConfig } from "vitest/config";
+import { sharedConfig } from "../../vite.config";
 
-// Fast deterministic gate for Moody reducers and their engine-neutral adapters.
-// Phaser/browser integration is intentionally verified by the separate UI and
-// combat scenario harnesses.
+const appConfig = await sharedConfig({ command: "serve", mode: "test", isSsrBuild: false, isPreview: false });
+
+// Deterministic Moody release gate. Globs are deliberate: adding a Moody test
+// must add it to the gate without requiring a second manifest update.
 // biome-ignore lint/style/noDefaultExport: required for vitest
 export default defineConfig({
-  resolve: {
-    tsconfigPaths: true,
-  },
+  ...appConfig,
   test: {
-    name: "moody-node",
-    environment: "node",
+    name: "moody-release",
+    environment: "jsdom",
+    environmentOptions: { jsdom: { resources: "usable" } },
+    setupFiles: ["./test/setup/font-face.setup.ts", "./test/setup/vitest.setup.ts", "./test/setup/matchers.setup.ts"],
     watch: false,
+    restoreMocks: true,
     passWithNoTests: false,
     include: [
-      "./test/data/elite-redux/er-moody-mode.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-coverage.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-formation.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-field.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-meta.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-formation-adapter.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-field-adapter.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-coordinator.test.ts",
-      "./test/data/elite-redux/er-moody-coordinator-gameplay.test.ts",
-      "./test/data/elite-redux/er-moody-coordinator-production-reachability.test.ts",
-      "./test/data/elite-redux/er-moody-runtime-live-projection.test.ts",
-      "./test/data/elite-redux/er-moody-release-set-collector-block.regression.test.ts",
-      "./test/tests/ui/moody-functional-closure.test.ts",
-      "./test/tests/ui/moody-presentation.test.ts",
-      "./test/tests/ui/moody-surface-closure.test.ts",
+      "./test/data/elite-redux/er-moody*.test.ts",
+      "./test/tests/elite-redux/er-moody*.test.ts",
+      "./test/tests/ui/moody*.test.ts",
     ],
-    testTimeout: 10_000,
+    testTimeout: 20_000,
   },
 });

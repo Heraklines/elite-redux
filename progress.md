@@ -7913,3 +7913,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Fixed the Fun Mode return-to-title input lock. Leaving the selector now performs a one-way TitlePhase handoff and returns immediately instead of refreshing the retired full-screen handler after the title menu owns input.
 - The complete integrated Moody/Fun/Shiny gate passes 25/25 files and 597/597 tests. The standalone no-player-training-telemetry build passes with 3,574 transformed modules and a validated 1,731-file Cloudflare Pages payload; scoped Biome formatting and `git diff --check` are green.
 - Set Collector remains the sole deliberate Moody content exception and stays excluded from drafting until curated item/vitamin sets are authored. Production remains forbidden; this checkpoint is eligible only for normal staging verification.
+
+2026-08-12 - Exhaustive Moody release harness
+
+- Added `pnpm moody:gate` as the single auto-discovered release command for Moody data, adapter, regression, UI, and engine suites.
+- Added exhaustive base, rank-II, evolution, curse, target, progress, and JSON wire-format round trips plus player-copy linting for internal/editorial text.
+- Added a real headless `GameManager` battle that verifies player-owned and enemy-owned effects against live battlers and round-trips Moody state through the production session serializer/parser.
+- Verification: 28/28 suites and 622/622 assertions pass. Set Collector remains the sole explicit blocked effect and is not draftable.
