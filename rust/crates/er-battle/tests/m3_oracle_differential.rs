@@ -1560,7 +1560,7 @@ fn normalize_legacy_state(
     field_name: &str,
     state: &mut Value,
     content: &ContentPack,
-) -> Result<(), FixtureError> {
+) -> Result<bool, FixtureError> {
     let canonical = state
         .get_mut("canonical")
         .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical is missing")))?;
