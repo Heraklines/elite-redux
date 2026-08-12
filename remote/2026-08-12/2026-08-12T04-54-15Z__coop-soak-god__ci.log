@@ -1,0 +1,54 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 31564676910 (main)
+timestamp: 2026-08-12T04-54-15Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260812 WAVES=150 - replay this run with:  SOAK_SEED=20260812 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 6 (seed 20260812): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20260812 waves=5/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=1 (fixed=1 random=0) skips={"mysteryEncounterDisabledV1":1} elapsedMs=34121
+[coop-soak] RUN ENDED at wave 6 (seed 20260812) [TitlePhase]: host at terminal phase TitlePhase. Surveyed 5/150 waves under all invariants before the terminal.
+
+----- vitest result tail -----
+[90m [2m❯[22m listOnTimeout node:internal/timers:[2m608:17[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m543:7[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯⎯[39m[1m[41m Uncaught Exception [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: this.message.setFixedSize is not a function[39m
+[36m [2m❯[22m PartyUiHandler.showPartyText src/ui/handlers/party-ui-handler.ts:[2m1976:20[22m[39m
+    [90m1974|[39m
+    [90m1975|[39m     if (presentation == null && runtimeLines.length === 0) {
+    [90m1976|[39m       this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize(…
+    [90m   |[39m                    [31m^[39m
+    [90m1977|[39m       switch (this.partyUiMode) {
+    [90m1978|[39m         case PartyUiMode.MODIFIER_TRANSFER:
+[90m [2m❯[22m PartyUiHandler.clearOptions src/ui/handlers/party-ui-handler.ts:[2m2694:10[22m[39m
+[90m [2m❯[22m PartyUiHandler.processActionButtonForOptions src/ui/handlers/party-ui-handler.ts:[2m1470:12[22m[39m
+[90m [2m❯[22m PartyUiHandler.processOptionMenuInput src/ui/handlers/party-ui-handler.ts:[2m1520:19[22m[39m
+[90m [2m❯[22m PartyUiHandler.processInput src/ui/handlers/party-ui-handler.ts:[2m1563:22[22m[39m
+[90m [2m❯[22m Object.callback test/framework/game-manager.ts:[2m512:20[22m[39m
+[90m [2m❯[22m PromptHandler.doPromptCheck test/helpers/prompt-handler.ts:[2m134:14[22m[39m
+[90m [2m❯[22m Timeout._onTimeout test/helpers/prompt-handler.ts:[2m79:56[22m[39m
+[90m [2m❯[22m listOnTimeout node:internal/timers:[2m608:17[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m543:7[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m1014 errors[39m[22m
+[2m   Start at [22m 04:53:02
+[2m   Duration [22m 71.61s[2m (transform 16.77s, setup 19.81s, import 246ms, tests 51.00s, environment 442ms)[22m
+
