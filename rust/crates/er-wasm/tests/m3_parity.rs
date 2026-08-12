@@ -40,13 +40,7 @@ fn assert_eventwise_contract() -> TestResult {
     assert!(report.coverage.continuation_input_count.get() > 0);
     assert_eq!(report.snapshot_boundary.after_raw_event.get(), 3);
     assert_eq!(report.snapshot_boundary.snapshot_schema_version, 2);
-    assert!(
-        report
-            .snapshot_boundary
-            .pending_presentation_count
-            .get()
-            > 0
-    );
+    assert!(report.snapshot_boundary.pending_presentation_count.get() > 0);
     assert_eq!(
         report.snapshot_boundary.snapshot_digest,
         report.snapshot_boundary.restored_snapshot_digest
