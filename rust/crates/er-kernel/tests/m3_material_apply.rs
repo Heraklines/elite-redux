@@ -138,13 +138,35 @@ fn adapt_legacy_selected_content_hash(
         .and_then(Value::as_str)
         .ok_or("state content_hash is missing or invalid")?
         .to_owned();
-    let provenance_hash = fixture
+    let provenance = fixture
         .get("provenance")
         .and_then(Value::as_object)
-        .and_then(|provenance| provenance.get("content_pack_hash"))
+        .ok_or("fixture provenance is missing or invalid")?;
+    let provenance_hash = provenance
+        .get("content_pack_hash")
         .and_then(Value::as_str)
         .ok_or("fixture provenance content_pack_hash is missing or invalid")?
         .to_owned();
+    let provenance_oracle_sha = provenance
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or("fixture provenance oracle_game_sha is missing or invalid")?;
+    if provenance_oracle_sha != content.oracle_game_sha.as_str() {
+        return Err("fixture provenance oracle_game_sha disagrees with selected content");
+    }
+    for state_name in ["initial_state", "expected_final_state"] {
+        let peer_hash = fixture
+            .get(state_name)
+            .and_then(Value::as_object)
+            .and_then(|state| state.get("canonical"))
+            .and_then(Value::as_object)
+            .and_then(|canonical| canonical.get("content_hash"))
+            .and_then(Value::as_str)
+            .ok_or("fixture canonical content_hash is missing or invalid")?;
+        if peer_hash != state_hash.as_str() {
+            return Err("fixture canonical state hashes disagree");
+        }
+    }
     let selected_hash = content.hash.as_str();
     let selected_digest = selected_hash
         .strip_prefix("blake3-v1:")
