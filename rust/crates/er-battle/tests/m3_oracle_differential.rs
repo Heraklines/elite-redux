@@ -687,6 +687,167 @@ fn normalize_nested_kind(
     Ok(())
 }
 
+fn normalize_adjacent_kind(
+    case_name: &str,
+    path: &str,
+    object: &mut Value,
+    field_name: &str,
+) -> Result<(), FixtureError> {
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
+    let Some(kind) = object.get(field_name).cloned() else {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path}.{field_name} is missing"
+        )));
+    };
+    let normalized = match kind {
+        Value::String(tag) => json!({"kind": tag}),
+        Value::Object(nested) => {
+            if nested.get("kind").and_then(Value::as_str).is_none() {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: {path}.{field_name} has an invalid adjacent kind object"
+                )));
+            }
+            Value::Object(nested)
+        }
+        other => {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path}.{field_name} has unsupported value {other}"
+            )));
+        }
+    };
+    object.insert(field_name.to_owned(), normalized);
+    Ok(())
+}
+
+/// Map the legacy TypeScript `TerrainType` domain into the current tagged
+/// `TerrainKind` wire without erasing non-neutral values.
+fn legacy_terrain_code(
+    case_name: &str,
+    path: &str,
+    value: u64,
+) -> Result<u16, FixtureError> {
+    let code = u16::try_from(value).map_err(|_| {
+        FixtureError::new(format!(
+            "{case_name}: {path} legacy terrain value {value} exceeds u16"
+        ))
+    })?;
+    if code > 5 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path} legacy terrain value {code} is not representable by TerrainType"
+        )));
+    }
+    Ok(code)
+}
+
+fn legacy_terrain_tag_code(
+    case_name: &str,
+    path: &str,
+    tag: &str,
+) -> Result<u16, FixtureError> {
+    match tag {
+        "NONE" => Ok(0),
+        "MISTY" => Ok(1),
+        "ELECTRIC" => Ok(2),
+        "GRASSY" => Ok(3),
+        "PSYCHIC" => Ok(4),
+        "TOXIC" => Ok(5),
+        other => Err(FixtureError::new(format!(
+            "{case_name}: {path} legacy terrain kind {other:?} is unsupported"
+        ))),
+    }
+}
+
+fn legacy_terrain_kind_wire(
+    case_name: &str,
+    path: &str,
+    kind: Value,
+) -> Result<Value, FixtureError> {
+    let code = match kind {
+        Value::Number(number) => {
+            let value = number.as_u64().ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path} legacy terrain value is not an integer"
+                ))
+            })?;
+            legacy_terrain_code(case_name, path, value)?
+        }
+        Value::String(tag) => legacy_terrain_tag_code(case_name, path, &tag)?,
+        Value::Object(nested) => {
+            let tag = nested.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path} legacy terrain kind object has no string kind"
+                ))
+            })?;
+            if tag == "UNSUPPORTED_ORACLE_CODE" {
+                if nested.len() != 2 {
+                    return Err(FixtureError::new(format!(
+                        "{case_name}: {path} unsupported terrain kind has unexpected fields"
+                    )));
+                }
+                let value = nested.get("value").and_then(Value::as_u64).ok_or_else(|| {
+                    FixtureError::new(format!(
+                        "{case_name}: {path} unsupported terrain kind value is not an integer"
+                    ))
+                })?;
+                let value = u16::try_from(value).map_err(|_| {
+                    FixtureError::new(format!(
+                        "{case_name}: {path} unsupported terrain kind value {value} exceeds u16"
+                    ))
+                })?;
+                return Ok(json!({
+                    "kind": "UNSUPPORTED_ORACLE_CODE",
+                    "value": value,
+                }));
+            }
+            if nested.len() != 1 {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: {path} legacy terrain kind has unexpected fields"
+                )));
+            }
+            legacy_terrain_tag_code(case_name, path, tag)?
+        }
+        other => {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {path} legacy terrain kind has unsupported value {other}"
+            )));
+        }
+    };
+
+    if code == 0 {
+        Ok(json!({"kind": "NONE"}))
+    } else {
+        Ok(json!({
+            "kind": "UNSUPPORTED_ORACLE_CODE",
+            "value": code,
+        }))
+    }
+}
+
+fn normalize_legacy_terrain_kind(
+    case_name: &str,
+    path: &str,
+    object: &mut Value,
+    field_name: &str,
+) -> Result<(), FixtureError> {
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
+    let Some(kind) = object.get(field_name).cloned() else {
+        return Err(FixtureError::new(format!(
+            "{case_name}: {path}.{field_name} is missing"
+        )));
+    };
+    let normalized = legacy_terrain_kind_wire(
+        case_name,
+        &format!("{path}.{field_name}"),
+        kind,
+    )?;
+    object.insert(field_name.to_owned(), normalized);
+    Ok(())
+}
+
 fn status_kind_wire(kind: StatusKind) -> &'static str {
     match kind {
         StatusKind::None => "NONE",
@@ -1387,12 +1548,12 @@ fn normalize_legacy_state(
                 "{case_name}: canonical.battle.{condition_name} is missing"
             ))
         })?;
-        normalize_nested_kind(
-            case_name,
-            &format!("canonical.battle.{condition_name}"),
-            condition,
-            "kind",
-        )?;
+        let path = format!("canonical.battle.{condition_name}");
+        match condition_name {
+            "terrain" => normalize_legacy_terrain_kind(case_name, &path, condition, "kind")?,
+            "weather" => normalize_adjacent_kind(case_name, &path, condition, "kind")?,
+            _ => unreachable!("condition list contains only weather and terrain"),
+        }
     }
     Ok(())
 }
