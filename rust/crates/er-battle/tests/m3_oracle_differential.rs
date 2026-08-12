@@ -1590,6 +1590,29 @@ fn seat_id_from_u64(value: u64) -> Result<SeatId, Box<dyn Error>> {
     Ok(SeatId::new(SafeU53::new(value)?))
 }
 
+fn fixture_command_owner_seat(
+    value: &Value,
+    case_name: &str,
+    path: &str,
+) -> Result<Option<SeatId>, Box<dyn Error>> {
+    let owner_seat = required(value, case_name, path, "owner_seat")?;
+    match owner_seat {
+        Value::Null => Ok(None),
+        Value::Number(owner_seat) => {
+            let owner_seat = owner_seat.as_u64().ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path}.owner_seat is not a non-negative integer"
+                ))
+            })?;
+            Ok(Some(seat_id_from_u64(owner_seat)?))
+        }
+        other => Err(FixtureError::new(format!(
+            "{case_name}: {path}.owner_seat has unsupported value {other}"
+        ))
+        .into()),
+    }
+}
+
 fn legacy_identities(
     document: &Value,
     case_name: &str,
@@ -1748,15 +1771,7 @@ fn fixture_command_records(
             serde_json::from_value(required(value, case_name, &path, "field_slot")?.clone())?;
         let operation_id =
             OperationId::new(string_field(value, case_name, &path, "operation_id")?)?;
-        let owner_seat = match required(value, case_name, &path, "owner_seat")? {
-            Value::Null => None,
-            value => Some(seat_id_from_u64(u64_field(
-                value,
-                case_name,
-                &path,
-                "owner_seat",
-            )?)?),
-        };
+        let owner_seat = fixture_command_owner_seat(value, case_name, &path)?;
         let source = fixture_source(
             required(value, case_name, &path, "source")?,
             case_name,
