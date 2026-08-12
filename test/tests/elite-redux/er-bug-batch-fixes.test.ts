@@ -51,6 +51,7 @@ import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import type { PokemonHpRestoreModifier } from "#modifiers/modifier";
 import { resolveRewardRerollTierPolicy } from "#phases/select-modifier-phase";
+import { StatStageChangePhase } from "#phases/stat-stage-change-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { applyChallenges, isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
 import { BooleanHolder } from "#utils/common";
@@ -184,6 +185,17 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
     await game.phaseInterceptor.to("SelectModifierPhase", false);
 
     expect(tackle.ppUsed).toBe(ppBefore);
+  });
+
+  it("discards a queued stat change after its battler leaves the field", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const enemy = game.scene.getEnemyField()[0];
+    const phase = new StatStageChangePhase(enemy.getBattlerIndex(), true, [Stat.ATK], 1);
+    const end = vi.spyOn(phase, "end").mockImplementation(() => undefined);
+    game.scene.field.remove(enemy, false);
+
+    expect(() => phase.start()).not.toThrow();
+    expect(end).toHaveBeenCalledOnce();
   });
 
   it("skips a fainted solo field slot instead of opening its command menu", async () => {

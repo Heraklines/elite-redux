@@ -299,7 +299,11 @@ export function hydrateMoodyLiveProjection(save: MoodyModeSaveData, target: Mood
       target.reward.replacementSacrifices = persisted.reward.replacementSacrifices;
     }
     if (persisted.market != null) {
-      Object.assign(target.market, persisted.market);
+      // Price and item-effect value belong to the current query. Rehydrating an
+      // earlier query's zero/default value made an entire later market free.
+      target.market.automaticBiomeHealing &&= persisted.market.automaticBiomeHealing;
+      target.market.paidWithBloodDebt ||= persisted.market.paidWithBloodDebt;
+      target.market.enhancedPurchase ||= persisted.market.enhancedPurchase;
     }
     if (
       persisted.capture != null

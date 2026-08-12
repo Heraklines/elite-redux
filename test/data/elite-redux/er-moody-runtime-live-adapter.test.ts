@@ -162,6 +162,46 @@ describe("Moody live reward adapters", () => {
     ]);
     expect(recreated.mutationReceipts).toContain("progression:apply-item-set-bonuses");
   });
+
+  it("never restores a stale market price over a newly calculated shop price", () => {
+    const save = emptySave();
+    save.curses.push({
+      curseId: "thin-wallet",
+      acquiredAtWave: 1,
+    });
+    const previous = createMoodyLiveExecutionTarget({
+      market: {
+        price: 0,
+        itemEffectValue: 0,
+        automaticBiomeHealing: false,
+        paidWithBloodDebt: false,
+        enhancedPurchase: false,
+      },
+    });
+    executeMoodyLiveCommand(save, previous, {
+      domain: "economy",
+      effectId: "thin-wallet",
+      kind: "set-market-price",
+      data: { price: 0 },
+    });
+
+    const recreated = createMoodyLiveExecutionTarget(
+      {
+        market: {
+          price: 420,
+          itemEffectValue: 1,
+          automaticBiomeHealing: true,
+          paidWithBloodDebt: false,
+          enhancedPurchase: false,
+        },
+      },
+      structuredClone(save),
+    );
+
+    expect(recreated.market.price).toBe(420);
+    expect(recreated.market.itemEffectValue).toBe(1);
+    expect(recreated.market.automaticBiomeHealing).toBe(false);
+  });
 });
 
 describe("Recruiter's Eye collection planning", () => {

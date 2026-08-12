@@ -190,6 +190,21 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
     }
   });
 
+  it("keeps the opening wild encounter single even when a triple roll or style override would force multi", async () => {
+    const tripleRoll = vi.spyOn(game.scene as unknown as { rollTripleBattle: RollFn }, "rollTripleBattle");
+    tripleRoll.mockReturnValue(true);
+    game.override.battleStyle("triple");
+
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+
+    expect(globalScene.currentBattle.waveIndex).toBe(1);
+    expect(globalScene.currentBattle.battleType).toBe(BattleType.WILD);
+    expect(globalScene.currentBattle.format).toBe(SINGLE_FORMAT);
+    expect(globalScene.getPlayerField(true)).toHaveLength(1);
+    expect(globalScene.getEnemyField(true)).toHaveLength(1);
+    expect(tripleRoll).not.toHaveBeenCalled();
+  });
+
   it("ghost battles roll a triple ~20% of the time (1-in-5)", async () => {
     // Field a REAL ghost trainer through the live GHOST_TRAINERS pipeline, then measure the
     // roll against that trainer instance (it carries the ghost override + a >=3-mon roster).
@@ -287,6 +302,7 @@ describe.skipIf(!RUN)("ER triples roll - observed rates + rolled-path constructi
     // Force the seeded roll to fire WITHOUT any dev style override, then start a normal classic
     // battle: it must resolve to TRIPLE_FORMAT exactly like BATTLE_STYLE_OVERRIDE="triple" does.
     vi.spyOn(game.scene as unknown as { rollTripleBattle: RollFn }, "rollTripleBattle").mockReturnValue(true);
+    game.override.startingWave(2);
 
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
 

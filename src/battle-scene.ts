@@ -30,6 +30,7 @@ import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets
 import {
   type BattleFormat,
   legacyFormat,
+  SINGLE_FORMAT,
   TRIPLE_BATTLE_GHOST_RARITY,
   TRIPLE_BATTLE_RARITY,
   TRIPLE_FORMAT,
@@ -2239,6 +2240,13 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    // The opening wild encounter is always a single battle. This runs before
+    // lures, challenge forcing, and developer overrides so a fresh solo run can
+    // never begin by requiring multiple leads. Co-op still needs both seats.
+    if (battleType === BattleType.WILD && waveIndex === 1 && !this.gameMode.isCoop) {
+      return false;
+    }
+
     // TODO: enforce using the proper override depending on whether it's a trainer or a wild battle
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
@@ -2340,6 +2348,10 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    if (props.battleType === BattleType.WILD && props.waveIndex === 1 && !this.gameMode.isCoop) {
+      return SINGLE_FORMAT;
+    }
+
     // Two-player co-op owns exactly the legacy binary topology. Resolve this before
     // Triples Only, the developer override, and the natural ER roll so a challenge
     // imported from another mode (or a diagnostic override left enabled) cannot create
@@ -2397,6 +2409,9 @@ export class BattleScene extends SceneBase {
     const { battleType, waveIndex, trainer } = props;
     // Only natural wild / trainer battles are eligible.
     if (battleType !== BattleType.WILD && battleType !== BattleType.TRAINER) {
+      return false;
+    }
+    if (battleType === BattleType.WILD && waveIndex === 1 && !this.gameMode.isCoop) {
       return false;
     }
     // Authoritative / challenge / co-op paths must never be surprised into a triple.

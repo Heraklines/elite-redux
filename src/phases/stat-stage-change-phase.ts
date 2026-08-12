@@ -102,6 +102,11 @@ export class StatStageChangePhase extends PokemonPhase {
     }
 
     const pokemon = this.getPokemon();
+    // A queued post-KO stat change can outlive its battler when NewBattlePhase
+    // replaces the defeated field. Treat that stale phase as already resolved.
+    if (pokemon == null) {
+      return this.end();
+    }
     let opponentPokemon: Pokemon | undefined;
 
     /** Gets the position of last enemy or player pokemon that used ability or move, primarily for double battles involving Mirror Armor */
