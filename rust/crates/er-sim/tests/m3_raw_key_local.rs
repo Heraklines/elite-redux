@@ -1,9 +1,9 @@
-//! M3C-09 local raw-key campaigns against the public Battle kernel boundary.
-//!
-//! The command driver below deliberately knows only physical keydown/keyup
-//! events.  Presentation settlement is kept outside that driver because it is
-//! a renderer/environment callback, not a semantic command-selection escape
-//! hatch.
+// M3C-09 local raw-key campaigns against the public Battle kernel boundary.
+//
+// The command driver below deliberately knows only physical keydown/keyup
+// events.  Presentation settlement is kept outside that driver because it is
+// a renderer/environment callback, not a semantic command-selection escape
+// hatch.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -48,6 +48,91 @@ fn field<'a>(object: &'a Value, key: &str) -> TestResult<&'a Value> {
         .map_err(Into::into)
 }
 
+fn is_status_kind_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "NONE" | "POISON" | "TOXIC" | "PARALYSIS" | "SLEEP" | "BURN"
+    )
+}
+
+fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> TestResult {
+    let status_object = status
+        .as_object_mut()
+        .ok_or_else(|| invalid_data(format!("{path} is not an object")))?;
+    let kind = status_object
+        .get("kind")
+        .cloned()
+        .ok_or_else(|| invalid_data(format!("{path}.kind is missing")))?;
+    let normalized = match kind {
+        Value::String(tag) if is_status_kind_tag(&tag) => Value::String(tag),
+        Value::String(tag) => {
+            return Err(invalid_data(format!(
+                "{path}.kind has unsupported value {tag:?}"
+            ))
+            .into());
+        }
+        Value::Object(wrapper) => {
+            if wrapper.len() != 1 || !wrapper.contains_key("kind") {
+                return Err(invalid_data(format!(
+                    "{path}.kind has an unsupported nested wrapper shape"
+                ))
+                .into());
+            }
+            let tag = wrapper
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid_data(format!("{path}.kind.kind is not a string")))?;
+            if !is_status_kind_tag(tag) {
+                return Err(invalid_data(format!(
+                    "{path}.kind.kind has unsupported value {tag:?}"
+                ))
+                .into());
+            }
+            Value::String(tag.to_owned())
+        }
+        other => {
+            return Err(invalid_data(format!(
+                "{path}.kind has unsupported value {other}"
+            ))
+            .into());
+        }
+    };
+    status_object.insert("kind".to_owned(), normalized);
+    Ok(())
+}
+
+fn normalize_legacy_battle_statuses(state_name: &str, battle: &mut Value) -> TestResult {
+    for party_name in ["player_party", "enemy_party"] {
+        let party = field_mut(battle, party_name)?
+            .as_array_mut()
+            .ok_or_else(|| {
+                invalid_data(format!(
+                    "{state_name}.canonical.battle.{party_name} is not an array"
+                ))
+            })?;
+        for (index, pokemon) in party.iter_mut().enumerate() {
+            let status = field_mut(pokemon, "status")?;
+            normalize_legacy_status_kind(
+                &format!(
+                    "{state_name}.canonical.battle.{party_name}[{index}].status"
+                ),
+                status,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn normalize_legacy_fixture_statuses(fixture: &mut Value) -> TestResult {
+    for state_name in ["initial_state", "expected_final_state"] {
+        let state = field_mut(fixture, state_name)?;
+        let canonical = field_mut(state, "canonical")?;
+        let battle = field_mut(canonical, "battle")?;
+        normalize_legacy_battle_statuses(state_name, battle)?;
+    }
+    Ok(())
+}
+
 fn seat(value: u64) -> TestResult<SeatId> {
     Ok(SeatId::new(SafeU53::new(value)?))
 }
@@ -57,8 +142,10 @@ fn published_case(scenario_id: &str) -> TestResult<BattleFixture> {
     if !catalog.is_evidence_published() {
         return Err(invalid_data("M3 oracle evidence is not published").into());
     }
+    let mut fixture = catalog.load_published_case::<Value>(scenario_id)?;
+    normalize_legacy_fixture_statuses(&mut fixture)?;
     Ok(BattleFixture {
-        fixture: catalog.load_published_case::<Value>(scenario_id)?,
+        fixture,
     })
 }
 
