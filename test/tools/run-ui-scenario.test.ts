@@ -71,12 +71,14 @@ import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-typ
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { GameManager } from "#test/framework/game-manager";
+import type { Starter } from "#types/save-data";
 import type { BiomeShopUiHandler } from "#ui/biome-shop-ui-handler";
 import type { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import type { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokemonHatchInfoContainer } from "#ui/pokemon-hatch-info-container";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import { getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import i18next from "i18next";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -211,6 +213,8 @@ interface BlackShinyStarterSnapshot {
   partySize: number;
   blackCount: number;
   partyBlackFlags: boolean[];
+  restoredBlackFromSavedTeam: boolean;
+  restoredRedFromSavedTeam: boolean;
 }
 
 type BlackShinyHandlerInternals = HandlerInternals & {
@@ -219,7 +223,8 @@ type BlackShinyHandlerInternals = HandlerInternals & {
   pokemonSprite: { pipelineData: Record<string, unknown> };
   pokemonLuckText: { text: string };
   spriteLoadAttempts: Map<string, number>;
-  starters: Array<{ erBlackShiny?: boolean }>;
+  starters: Starter[];
+  showdownSeedInFlight: Promise<void> | null;
 };
 
 /**
@@ -227,7 +232,7 @@ type BlackShinyHandlerInternals = HandlerInternals & {
  * add two Black Shinies. This is the reported stale-preview/luck + team-cap path.
  */
 async function snapBlackShinyStarters(game: GameManager): Promise<BlackShinyStarterSnapshot> {
-  const species = [SpeciesId.BULBASAUR, SpeciesId.CHARMANDER].map(id => {
+  const species = [SpeciesId.PASSIMIAN, SpeciesId.CHARMANDER].map(id => {
     const found = allSpecies.find(s => s.speciesId === id);
     if (!found) {
       throw new Error(`missing starter species ${id}`);
@@ -282,6 +287,38 @@ async function snapBlackShinyStarters(game: GameManager): Promise<BlackShinyStar
     true,
   );
 
+  const partySize = internals.starters.length;
+  const blackCount = internals.starters.filter(s => s.erBlackShiny).length;
+  const partyBlackFlags = internals.starters.map(s => !!s.erBlackShiny);
+
+  // Reproduce the production report: the saved team says t4, while the current per-species
+  // preference has drifted back to epic/red. Reconstruction must trust the saved team.
+  const savedBlack = { ...internals.starters[0], erBlackShiny: true } as Starter;
+  // This surface has already verified the real Black preview load above. Keep the reconstruction
+  // assertion deterministic by removing the headless loader's unrelated cry/atlas completion wait.
+  const seedLoadSpy = vi
+    .spyOn(getPokemonSpeciesForm(savedBlack.speciesId, savedBlack.formIndex), "loadAssets")
+    .mockResolvedValue(undefined);
+  internals.starterPreferences[savedBlack.speciesId] = { shiny: true, variant: 2, erBlackShiny: false };
+  internals.originalStarterPreferences[savedBlack.speciesId] = {
+    shiny: true,
+    variant: 2,
+    erBlackShiny: false,
+  };
+  expect(handler.seedTeamFromStarters([savedBlack])).toBe(true);
+  await internals.showdownSeedInFlight;
+  const restoredBlackFromSavedTeam = internals.starters[0]?.erBlackShiny === true;
+
+  // The inverse must also be exact: a saved epic/red shiny must not be silently promoted just
+  // because the current per-species preference happens to point at the Black tier.
+  const savedRed = { ...savedBlack, erBlackShiny: false } as Starter;
+  internals.starterPreferences[savedRed.speciesId] = { shiny: true, variant: 2, erBlackShiny: true };
+  internals.originalStarterPreferences[savedRed.speciesId] = { shiny: true, variant: 2, erBlackShiny: true };
+  expect(handler.seedTeamFromStarters([savedRed])).toBe(true);
+  await internals.showdownSeedInFlight;
+  const restoredRedFromSavedTeam = internals.starters[0]?.erBlackShiny === false;
+  seedLoadSpy.mockRestore();
+
   return {
     enteredBlack,
     previewKey,
@@ -289,9 +326,11 @@ async function snapBlackShinyStarters(game: GameManager): Promise<BlackShinyStar
     luck,
     firstAdded,
     secondAdded,
-    partySize: internals.starters.length,
-    blackCount: internals.starters.filter(s => s.erBlackShiny).length,
-    partyBlackFlags: internals.starters.map(s => !!s.erBlackShiny),
+    partySize,
+    blackCount,
+    partyBlackFlags,
+    restoredBlackFromSavedTeam,
+    restoredRedFromSavedTeam,
   };
 }
 
@@ -702,6 +741,8 @@ describe.skipIf(!RUN)("headless UI runner", () => {
       expect(snap.partySize).toBe(1);
       expect(snap.blackCount).toBe(1);
       expect(snap.partyBlackFlags).toEqual([true]);
+      expect(snap.restoredBlackFromSavedTeam, "saved t4 must survive stale red preferences").toBe(true);
+      expect(snap.restoredRedFromSavedTeam, "saved red must survive stale Black preferences").toBe(true);
 
       console.log("\nRESULT", JSON.stringify({ surface: "starter-black-shiny", errors: [], warnings: [] }));
     },

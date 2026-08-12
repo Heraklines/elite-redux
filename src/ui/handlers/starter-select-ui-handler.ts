@@ -4023,6 +4023,36 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   /**
+   * Rebuild the selected Black Shiny tier from the saved Starter itself.
+   *
+   * `seedTeamFromStarters` already reconstructs every dex-backed appearance bit from the saved
+   * starter, but the Black tier lives outside the dex bitfield. Leaving it behind makes a saved t4
+   * depend on whichever per-species preference happens to be current, which can silently demote it
+   * to its underlying epic/red shiny (or promote a saved red shiny back to black).
+   */
+  private restoreSavedBlackShinySelection(saved: Starter): void {
+    if (saved.erBlackShiny === undefined) {
+      return; // Legacy saved teams retain the pre-existing preference fallback.
+    }
+
+    const { starterDataEntry } = this.getSpeciesData(saved.speciesId);
+    const erBlackShiny = !!starterDataEntry.erBlackShiny && isErBlackShinyStarterSelection(saved);
+    for (const preferences of [this.starterPreferences, this.originalStarterPreferences]) {
+      let attributes = preferences[saved.speciesId];
+      if (!attributes) {
+        attributes = {};
+        preferences[saved.speciesId] = attributes;
+      }
+      attributes.erBlackShiny = erBlackShiny;
+      if (erBlackShiny) {
+        // Keep the saved t4 invariant coherent if stale preferences point at another look.
+        attributes.shiny = true;
+        attributes.variant = 2;
+      }
+    }
+  }
+
+  /**
    * Showdown field-legality gate for a PICK (Task B6). Returns the rejection message when the
    * mon may not be fielded, else null. Delegates the thresholds + strings to the shared
    * `showdownFieldLegalityReason` (the SAME verdict the validator enforces) so the UI and the
@@ -7455,6 +7485,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               item: e.saved.showdownItem,
             });
           }
+          this.restoreSavedBlackShinySelection(e.saved);
           this.addToParty(
             e.species,
             e.dexAttr,
