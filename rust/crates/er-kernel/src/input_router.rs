@@ -553,18 +553,30 @@ impl BattleInputRouter {
         }
     }
 
+    /// Retained for crate-local diagnostics and integration tests that inspect
+    /// the normalized repeat cadence and bindings.
+    #[allow(dead_code)]
     pub(crate) fn input_map(&self) -> &InputMap {
         &self.map
     }
 
+    /// Retained for crate-local lifecycle diagnostics and integration tests
+    /// that verify held physical input is cleared.
+    #[allow(dead_code)]
     pub(crate) fn held_count(&self) -> usize {
         self.held.len()
     }
 
+    /// Retained for crate-local lifecycle diagnostics and integration tests
+    /// that verify logical button locks are cleared.
+    #[allow(dead_code)]
     pub(crate) fn lock_count(&self) -> usize {
         self.locks.len()
     }
 
+    /// Retained for crate-local lifecycle diagnostics and integration tests
+    /// that verify repeat timers are cleared.
+    #[allow(dead_code)]
     pub(crate) fn repeat_count(&self) -> usize {
         self.timers.len()
     }
@@ -578,6 +590,8 @@ impl BattleInputRouter {
         })
     }
 
+    /// Retained for crate-local input-state diagnostics and integration tests.
+    #[allow(dead_code)]
     pub(crate) fn is_held(&self, seat: SeatId, button: GameButton) -> bool {
         self.locks.contains_key(&(seat, button))
     }
@@ -745,6 +759,8 @@ impl BattleInputRouter {
         self.clear(scheduler)
     }
 
+    /// Retained for crate-local lifecycle diagnostics and integration tests.
+    #[allow(dead_code)]
     pub(crate) fn is_disposed(&self) -> bool {
         self.disposed
     }
@@ -758,10 +774,10 @@ impl BattleInputRouter {
             }
         }
         for press in self.pressed.values_mut() {
-            if let BattlePhysicalPress::Accepted(held) = press {
-                if held.timer_id == Some(timer_id) {
-                    held.timer_id = None;
-                }
+            if let BattlePhysicalPress::Accepted(held) = press
+                && held.timer_id == Some(timer_id)
+            {
+                held.timer_id = None;
             }
         }
     }
@@ -1214,6 +1230,10 @@ impl BattleInputRouter {
     /// Restore into an existing router only after checking that its live map
     /// is the production map.  The candidate is built before assignment, so
     /// any rejection leaves the existing owner untouched.
+    /// This in-place seam is retained for callers that already own a router;
+    /// snapshot replay currently constructs candidates through
+    /// `from_snapshot_v2`.
+    #[allow(dead_code)]
     pub(crate) fn restore_snapshot_v2(
         &mut self,
         snapshot: InputRouterSnapshotV2,
