@@ -31,6 +31,13 @@ fn invalid_data(message: &'static str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message)
 }
 
+fn is_status_kind_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "NONE" | "POISON" | "TOXIC" | "PARALYSIS" | "SLEEP" | "BURN"
+    )
+}
+
 const LEGACY_ORACLE_CONTENT_DIGEST: &str =
     "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 const LEGACY_ORACLE_CONTENT_HASH: &str =
@@ -179,17 +186,37 @@ fn adapt_legacy_battle(mut battle: serde_json::Value) -> Result<serde_json::Valu
                 .cloned()
                 .ok_or_else(|| invalid_data("legacy party status.kind is missing"))?;
             let normalized = match kind {
-                serde_json::Value::String(_) => kind,
+                serde_json::Value::String(tag) if is_status_kind_tag(&tag) => {
+                    serde_json::Value::String(tag)
+                }
+                serde_json::Value::String(_) => {
+                    return Err(
+                        invalid_data("legacy party status.kind has an unsupported value").into(),
+                    );
+                }
                 serde_json::Value::Object(nested) => {
+                    if nested.len() != 1 || !nested.contains_key("kind") {
+                        return Err(
+                            invalid_data(
+                                "legacy party status.kind has an unsupported nested wrapper shape",
+                            )
+                            .into(),
+                        );
+                    }
                     let Some(tag) = nested
                         .get("kind")
                         .and_then(serde_json::Value::as_str)
-                        .filter(|_| nested.len() == 1)
                     else {
                         return Err(
-                            invalid_data("legacy party status.kind has an invalid shape").into(),
+                            invalid_data("legacy party status.kind.kind is not a string").into(),
                         );
                     };
+                    if !is_status_kind_tag(tag) {
+                        return Err(
+                            invalid_data("legacy party status.kind.kind has an unsupported value")
+                                .into(),
+                        );
+                    }
                     serde_json::Value::String(tag.to_owned())
                 }
                 _ => {
