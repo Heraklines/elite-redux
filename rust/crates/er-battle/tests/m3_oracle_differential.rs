@@ -2585,39 +2585,94 @@ fn validate_legacy_mutation_metadata(
                 metadata.phase.as_str(),
                 action.map(|action| action.kind),
             ),
-            ("PP_CONSUMPTION", "MovePhase", Some(ResolvedActionKind::Move))
-            | ("BATTLE_RNG_CHANGED", "MovePhase", Some(ResolvedActionKind::Move))
-            | ("BATTLE_RNG_CHANGED", "MoveEffectPhase", Some(ResolvedActionKind::Move))
-            | ("HP_DAMAGE", "MoveEffectPhase", Some(ResolvedActionKind::Move))
-            | ("STATUS_SET", "ObtainStatusEffectPhase", Some(ResolvedActionKind::Move))
-            | ("STATUS_SET", "FaintPhase", Some(ResolvedActionKind::Faint))
-            | ("FAINT_QUEUED", "FaintPhase", Some(ResolvedActionKind::Faint))
-            | ("FAINT_PROGRESS_CHANGED", "FaintPhase", Some(ResolvedActionKind::Faint))
-            | ("FAINT_RESOLVED", "FaintPhase", Some(ResolvedActionKind::Faint))
-            | (
-                "HP_DAMAGE",
-                "PostTurnStatusEffectPhase",
-                Some(ResolvedActionKind::ResidualStatus),
-            )
-            | (
-                "FAINT_PROGRESS_CHANGED",
-                "SwitchSummonPhase",
-                Some(ResolvedActionKind::Replacement),
-            )
-            | ("FAINT_RESOLVED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
-            | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Switch))
-            | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
-            | ("BATTLE_RNG_CHANGED", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
-            | (
+            (
+                "PP_CONSUMPTION",
+                "MovePhase",
+                Some(ResolvedActionKind::Move)
+            ) | (
                 "BATTLE_RNG_CHANGED",
-                "StatStageChangePhase",
-                Some(ResolvedActionKind::Replacement),
-            )
-            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Move))
-            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
-            | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
-            | ("TURN_ADVANCE", "TurnEndPhase", Some(_))
-            | ("STATUS_SET", "ObtainStatusEffectPhase", None)
+                "MovePhase",
+                Some(ResolvedActionKind::Move)
+            ) | (
+                "BATTLE_RNG_CHANGED",
+                "MoveEffectPhase",
+                Some(ResolvedActionKind::Move)
+            ) | (
+                "HP_DAMAGE",
+                "MoveEffectPhase",
+                Some(ResolvedActionKind::Move)
+            ) | (
+                "STATUS_SET",
+                "ObtainStatusEffectPhase",
+                Some(ResolvedActionKind::Move)
+            ) | ("STATUS_SET", "FaintPhase", Some(ResolvedActionKind::Faint))
+                | (
+                    "FAINT_QUEUED",
+                    "FaintPhase",
+                    Some(ResolvedActionKind::Faint)
+                )
+                | (
+                    "FAINT_PROGRESS_CHANGED",
+                    "FaintPhase",
+                    Some(ResolvedActionKind::Faint)
+                )
+                | (
+                    "FAINT_RESOLVED",
+                    "FaintPhase",
+                    Some(ResolvedActionKind::Faint)
+                )
+                | (
+                    "HP_DAMAGE",
+                    "PostTurnStatusEffectPhase",
+                    Some(ResolvedActionKind::ResidualStatus),
+                )
+                | (
+                    "FAINT_PROGRESS_CHANGED",
+                    "SwitchSummonPhase",
+                    Some(ResolvedActionKind::Replacement),
+                )
+                | (
+                    "FAINT_RESOLVED",
+                    "SwitchSummonPhase",
+                    Some(ResolvedActionKind::Replacement)
+                )
+                | (
+                    "FIELD_CHANGED",
+                    "SwitchSummonPhase",
+                    Some(ResolvedActionKind::Switch)
+                )
+                | (
+                    "FIELD_CHANGED",
+                    "SwitchSummonPhase",
+                    Some(ResolvedActionKind::Replacement)
+                )
+                | (
+                    "BATTLE_RNG_CHANGED",
+                    "StatStageChangePhase",
+                    Some(ResolvedActionKind::Switch)
+                )
+                | (
+                    "BATTLE_RNG_CHANGED",
+                    "StatStageChangePhase",
+                    Some(ResolvedActionKind::Replacement),
+                )
+                | (
+                    "STAT_STAGE",
+                    "StatStageChangePhase",
+                    Some(ResolvedActionKind::Move)
+                )
+                | (
+                    "STAT_STAGE",
+                    "StatStageChangePhase",
+                    Some(ResolvedActionKind::Switch)
+                )
+                | (
+                    "STAT_STAGE",
+                    "StatStageChangePhase",
+                    Some(ResolvedActionKind::Replacement)
+                )
+                | ("TURN_ADVANCE", "TurnEndPhase", Some(_))
+                | ("STATUS_SET", "ObtainStatusEffectPhase", None)
         );
         if !context_matches {
             return Err(FixtureError::new(format!(
