@@ -44,6 +44,7 @@ import {
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -7605,7 +7606,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               return;
             }
             if (globalScene.gameMode.isFun) {
-              startRun("youngster");
+              startRun(getFunModeConfig().difficulty);
               return;
             }
             // ER Community Challenge: a launched community card forces its run

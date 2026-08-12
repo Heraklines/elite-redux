@@ -58,6 +58,12 @@ describe("Moody Mode catalog", () => {
       "deliberately extremely rare",
       "screenshot wording",
       "This version",
+      "must be displayed prominently",
+      "needs an explicit amplification adapter",
+      "requires a properly audited move-tag registry",
+      "safer than immediately using",
+      "must prove basic feasibility",
+      "must not create hidden proportional healing",
     ]) {
       expect(playerFacingText).not.toContain(editorialPhrase);
     }
@@ -78,6 +84,9 @@ describe("Moody Mode catalog", () => {
     expect(MOODY_EFFECT_FLYOUT_POLICY["type-tax"]).toBe("drawer-only");
     expect(MOODY_EFFECT_FLYOUT_POLICY["layered-armor"]).toBe("drawer-only");
     expect(MOODY_EFFECT_FLYOUT_POLICY["brittle-weakness"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["blood-rival"]).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY.refrain).toBe("drawer-only");
+    expect(MOODY_EFFECT_FLYOUT_POLICY["no-retreat"]).toBe("drawer-only");
     expect(MOODY_EFFECT_FLYOUT_POLICY["emergency-shell"]).toBe("flyout");
   });
 
@@ -115,6 +124,45 @@ describe("Moody Mode run state", () => {
 
     initializeMoodyModeState("stable-seed");
     expect(getMoodyBoonOffers(10)).toEqual(first);
+  });
+
+  it("keeps upgrades near 30% before the cap and never duplicates a boon within one draft", () => {
+    let upgradeOffers = 0;
+    const sampleCount = 1_000;
+    for (let seed = 0; seed < sampleCount; seed++) {
+      const state = createMoodyModeState(seed);
+      state.boons = MOODY_BOONS.slice(0, 8).map((definition, index) => ({
+        instanceId: `owned:${index}`,
+        boonId: definition.id,
+        rank: 1,
+        acquiredAtWave: 10 + index * 10,
+      }));
+      state.acquisitionRolls = state.boons.length;
+      state.draftIndex = state.boons.length;
+      expect(restoreMoodyModeState(state)).toBe(true);
+      const offers = getMoodyBoonOffers(90);
+      const upgrades = offers.filter(offer => offer.kind === "rank-up" || offer.kind === "evolution");
+      upgradeOffers += upgrades.length;
+      expect(upgrades.length).toBeLessThanOrEqual(1);
+      expect(new Set(offers.map(offer => offer.boonId)).size).toBe(offers.length);
+    }
+    expect(upgradeOffers / (sampleCount * 3)).toBeCloseTo(0.3, 1);
+  });
+
+  it("uses distinct upgrade offers after all 12 boon slots are occupied", () => {
+    const state = createMoodyModeState("full-boon-lineup");
+    state.boons = MOODY_BOONS.slice(0, 12).map((definition, index) => ({
+      instanceId: `owned:${index}`,
+      boonId: definition.id,
+      rank: 1,
+      acquiredAtWave: 10 + index * 10,
+    }));
+    state.acquisitionRolls = state.boons.length;
+    state.draftIndex = state.boons.length;
+    expect(restoreMoodyModeState(state)).toBe(true);
+    const offers = getMoodyBoonOffers(130);
+    expect(offers.every(offer => offer.kind === "rank-up")).toBe(true);
+    expect(new Set(offers.map(offer => offer.boonId)).size).toBe(offers.length);
   });
 
   it("commits and restores the selected Pressure Valve target and conversion", () => {

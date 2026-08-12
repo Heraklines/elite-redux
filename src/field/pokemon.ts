@@ -321,6 +321,7 @@ import { effectiveBattlerId, getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
+  getErShinyLabBattleFxFrameMs,
   getErShinyLabNamePrefixForPokemon,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpriteFxLookForPokemon,
@@ -1716,8 +1717,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.erShinyLabFxTimer) {
       return;
     }
+    const frameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
     this.erShinyLabFxTimer = globalScene.time.addEvent({
-      delay: 100,
+      delay: fixedInt(frameMs),
       loop: true,
       callback: () => {
         if (!this.active || !this.visible || !this.isOnField()) {
@@ -1768,7 +1770,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ...getErShinyLabPokemonBattleSource(this, this.isPlayer(), undefined, look),
       frame: this.getSprite().frame?.name,
     };
-    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime())) {
+    const frameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
+    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime(frameMs, 4_000))) {
       this.erShinyLabFxOverlay.copyTextureTo(this.tintSprite);
       this.getSprite().setVisible(false);
       this.startErShinyLabBattleFxTimer();
@@ -2234,7 +2237,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
   }
 
-  calculateBaseStats(): number[] {
+  calculateBaseStats(includeVitamins = true): number[] {
     const funMegaStone = this.customPokemonData.erFunMegaStone;
     let baseStats = this.getSpeciesForm(true).baseStats.slice(0);
     if (this.isFunPseudoMega() && funMegaStone != null) {
@@ -2260,8 +2263,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         baseStats[s] = Math.ceil(baseStats[s] / 2);
       }
     }
-    // Vitamins
-    globalScene.applyModifiers(BaseStatModifier, this.isPlayer(), this, baseStats);
+    if (includeVitamins) {
+      globalScene.applyModifiers(BaseStatModifier, this.isPlayer(), this, baseStats);
+    }
 
     // ER Bog Witch curse (#508): a permanent "anti-vitamin" - one base stat is
     // cut 10% until the curse is lifted at the Cleansing Font. -1 = uncursed.

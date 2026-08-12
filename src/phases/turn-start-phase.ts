@@ -10,7 +10,6 @@ import {
   isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
-import { recordTelemetryJointActionsCommitted } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { erIsSelfSwitchMove } from "#data/moves/move";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -211,10 +210,6 @@ export class TurnStartPhase extends FieldPhase {
   // Also need a clearer distinction between "turn command" and queued moves
   start() {
     super.start();
-
-    // Solo telemetry only: preserve the complete committed joint action before switches/moves mutate
-    // field ownership. The hook hard-gates co-op, Showdown and tournament sessions.
-    recordTelemetryJointActionsCommitted();
 
     // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the GUEST is a pure
     // renderer - it diverts the WHOLE turn resolution to CoopReplayTurnPhase (which

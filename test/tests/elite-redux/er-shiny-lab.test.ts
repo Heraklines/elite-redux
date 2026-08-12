@@ -45,6 +45,7 @@ import { SpeciesId } from "#enums/species-id";
 import {
   type ErShinyLabSpriteFxLook,
   erShinyLabSpriteFxStateKey,
+  getErShinyLabBattleFxFrameMs,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpeciesIconSource,
   getErShinyLabSpriteFxLookForPokemon,
@@ -60,6 +61,15 @@ import {
 } from "#sprites/variant";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it } from "vitest";
+
+describe("Shiny Lab battle FX performance", () => {
+  it("reduces CPU refresh frequency as more battlers are active", () => {
+    expect(getErShinyLabBattleFxFrameMs(1)).toBe(125);
+    expect(getErShinyLabBattleFxFrameMs(2)).toBe(250);
+    expect(getErShinyLabBattleFxFrameMs(3)).toBe(500);
+    expect(getErShinyLabBattleFxFrameMs(6)).toBe(500);
+  });
+});
 
 type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
 

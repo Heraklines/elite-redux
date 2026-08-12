@@ -21,7 +21,7 @@ import type {
 
 const MOODY_STATE_VERSION = 1 as const;
 const MAX_UNIQUE_BOONS = 12;
-const UPGRADE_FOCUS_THRESHOLD = 8;
+const UPGRADE_DRAFT_CHANCE = 0.9;
 
 export function isMoodyBoonRewardWave(waveIndex: number): boolean {
   return Number.isSafeInteger(waveIndex) && waveIndex > 0 && waveIndex < 200 && waveIndex % 10 === 0;
@@ -487,9 +487,13 @@ export function rollMoodyBoonDefinition(
   seed: number,
   salt: number,
   excluded: ReadonlySet<string> = new Set(),
+  allowed?: ReadonlySet<string>,
 ): MoodyBoonDefinition | null {
   const catalog: readonly MoodyBoonDefinition[] = [...MOODY_BOON_BY_ID.values()];
-  const eligible = catalog.filter(boon => boon.implementationStatus !== "blocked" && !excluded.has(boon.id));
+  const eligible = catalog.filter(
+    boon =>
+      boon.implementationStatus !== "blocked" && !excluded.has(boon.id) && (allowed == null || allowed.has(boon.id)),
+  );
   if (eligible.length === 0) {
     return null;
   }
@@ -527,13 +531,15 @@ function makeOffer(
   waveIndex: number,
   cardIndex: number,
   excludedBoons: ReadonlySet<string>,
+  upgradeCardIndex: number,
 ): MoodyBoonOffer {
   const salt = state.draftIndex * 97 + waveIndex * 17 + cardIndex * 13;
-  const upgradable = state.boons.filter(boon => boon.rank < 3);
+  const upgradable = state.boons.filter(boon => boon.rank < 3 && !excludedBoons.has(boon.boonId));
   const uniqueCount = state.boons.length;
-  const upgradeChance = uniqueCount >= MAX_UNIQUE_BOONS ? 1 : uniqueCount >= UPGRADE_FOCUS_THRESHOLD ? 0.72 : 0.28;
   const existing =
-    seededUnit(state.seed, salt) < upgradeChance ? chooseExisting(state.seed, salt + 1, upgradable) : null;
+    uniqueCount >= MAX_UNIQUE_BOONS || cardIndex === upgradeCardIndex
+      ? chooseExisting(state.seed, salt + 1, upgradable)
+      : null;
   if (existing != null) {
     return {
       offerId: `${state.draftIndex}:${cardIndex}:${existing.boonId}:${existing.rank + 1}`,
@@ -572,8 +578,15 @@ export function getMoodyBoonOffers(waveIndex: number): readonly MoodyBoonOffer[]
   }
   const offers: MoodyBoonOffer[] = [];
   const excluded = new Set<string>();
+  // One upgrade in 90% of three-card drafts averages 30% upgrade offers while
+  // preventing upgrade-only drafts before the 12-line cap.
+  const upgradeSalt = currentState.draftIndex * 193 + waveIndex * 29;
+  const upgradeCardIndex =
+    currentState.boons.length < MAX_UNIQUE_BOONS && seededUnit(currentState.seed, upgradeSalt) < UPGRADE_DRAFT_CHANCE
+      ? Math.floor(seededUnit(currentState.seed, upgradeSalt + 1) * 3)
+      : -1;
   for (let card = 0; card < 3; card++) {
-    const offer = makeOffer(currentState, waveIndex, card, excluded);
+    const offer = makeOffer(currentState, waveIndex, card, excluded, upgradeCardIndex);
     offers.push(offer);
     excluded.add(offer.boonId);
   }

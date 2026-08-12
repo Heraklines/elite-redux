@@ -628,6 +628,127 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(multiplier(boon("prismatic-opening", 3, "prismatic-doctrine"))).toBe(0.65);
   });
 
+  it("applies the reduced Rest Cycle healing at both ranks", () => {
+    const event = boonEvent("rest-cycle").event;
+    const healing = (rank: 1 | 2) =>
+      resolveMoodyRuntimeField({
+        ownerSide: "player",
+        boons: [boon("rest-cycle", rank)],
+        curses: [],
+        state: createMoodyRuntimeFieldState(),
+        event,
+      }).commands.find(command => command.kind === "heal")?.fraction;
+
+    expect(healing(1)).toBe(0.05);
+    expect(healing(2)).toBe(0.1);
+  });
+
+  it("only heals Cauterized after a successful damaging action", () => {
+    const cauterized = boon("burning-resolve", 3, "cauterized");
+    const before = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [cauterized],
+      curses: [],
+      state: createMoodyRuntimeFieldState(),
+      event: boonEvent("burning-resolve").event,
+    });
+    expect(before.commands).not.toContainEqual(expect.objectContaining({ kind: "heal" }));
+
+    const resolved = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [cauterized],
+      curses: [],
+      state: before.state,
+      event: {
+        ...base,
+        kind: "move-resolved",
+        user: player,
+        target: enemy,
+        moveId: "flamethrower",
+        moveType: "fire",
+        category: "special",
+        damaging: true,
+        landed: true,
+        dealtDirectDamage: true,
+        actionId: "cauterized:hit",
+      },
+    });
+    expect(resolved.commands).toContainEqual(
+      expect.objectContaining({ kind: "heal", subjectId: player.id, fraction: 0.05 }),
+    );
+  });
+
+  it("grants Shared Dream's ally stat only after its allowed action lands", () => {
+    const sharedDream = boon("insomniac-dreams", 3, "shared-dream");
+    const actionId = "shared-dream:status";
+    const prepared = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [sharedDream],
+      curses: [],
+      state: createMoodyRuntimeFieldState(),
+      event: {
+        ...boonEvent("insomniac-dreams").event,
+        actionId,
+      } as MoodyRuntimeFieldEvent,
+    });
+    const resolved = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [sharedDream],
+      curses: [],
+      state: prepared.state,
+      event: {
+        ...base,
+        kind: "move-resolved",
+        user: { ...player, status: "sleep" },
+        target: enemy,
+        moveId: "protect",
+        moveType: "normal",
+        category: "status",
+        damaging: false,
+        landed: true,
+        dealtDirectDamage: false,
+        actionId,
+      },
+    });
+    expect(resolved.commands).toContainEqual(
+      expect.objectContaining({
+        kind: "modify-stat",
+        amount: 1,
+        value: "seeded-random",
+        data: expect.objectContaining({ target: "lowest-hp-other-ally", excludePokemonId: player.id }),
+      }),
+    );
+  });
+
+  it("removes Ashen Return's temporary all-stat boost after three turns", () => {
+    const ashen = boon("phoenix-clause", 3, "ashen-return");
+    const revived = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [ashen],
+      curses: [],
+      state: createMoodyRuntimeFieldState(),
+      event: boonEvent("phoenix-clause").event,
+    });
+    expect(revived.commands).toContainEqual(
+      expect.objectContaining({
+        kind: "revive",
+        subjectId: player.id,
+        data: expect.objectContaining({ allStats: 1, statDuration: 3 }),
+      }),
+    );
+
+    const expired = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [ashen],
+      curses: [],
+      state: revived.state,
+      event: { ...base, turn: base.turn + 3, kind: "turn-end", activePokemonIds: [player.id] },
+    });
+    expect(expired.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-stat", subjectId: player.id, amount: -1, value: "all" }),
+    );
+  });
+
   it("records Restless Lead at encounter selection and rejects it on the next battle", () => {
     const selected = resolveMoodyRuntimeField({
       ownerSide: "player",

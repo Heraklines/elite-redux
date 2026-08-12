@@ -68,6 +68,7 @@ describe("Fun Mode configuration", () => {
 
   it("stores independent randomizer toggles", () => {
     setFunModeConfig({
+      difficulty: "hell",
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: false,
@@ -84,6 +85,7 @@ describe("Fun Mode configuration", () => {
       abilityRerollSeed: 4,
     });
     expect(getFunModeConfig()).toEqual({
+      difficulty: "hell",
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: false,
@@ -103,6 +105,7 @@ describe("Fun Mode configuration", () => {
 
   it("persists the last modifier setup without carrying over its reroll seed", () => {
     const config = {
+      difficulty: "hell" as const,
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: true,
@@ -120,6 +123,7 @@ describe("Fun Mode configuration", () => {
     };
     saveLastFunModeConfig(config);
     expect(loadLastFunModeConfig()).toEqual({
+      difficulty: "hell",
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: true,
@@ -152,6 +156,7 @@ describe("Fun Mode configuration", () => {
       }),
     );
     expect(loadLastFunModeConfig()).toMatchObject({
+      difficulty: "youngster",
       randomizePokemon: true,
       randomizeTypes: false,
       randomizeAbilities: true,

@@ -161,8 +161,6 @@ Empty and fainted slots are counted separately, with no cap.
 
 **Evolution — Court of Ashes:** Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.
 
-Current absolute HP should remain unchanged when maximum HP changes; the boon must not create hidden proportional healing.
-
 ---
 
 ### 09. Rotating Spotlight — **Great; rotating slot**
@@ -226,8 +224,6 @@ The party screen displays a prominent star symbol on the current target.
 **Evolution — Masterpiece:** Power becomes 40%, and the move’s final PP guarantees one eligible secondary effect.
 
 **Evolution — School Founder:** The exact-move bonus becomes smaller, but all moves sharing one selected move tag—such as slicing, sound, punch, bite, hammer, bullet, dance, recoil, or multi-hit—gain 15% power.
-
-The tag evolution requires a properly audited move-tag registry. Elemental type is not the same targeting category as a mechanical move tag.
 
 ---
 
@@ -317,8 +313,6 @@ After six cures of the same status, choose an evolution:
 
 **Evolution — Family Treasury:** A second selected item stack receives 20% amplification and suppression protection.
 
-Every item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.
-
 ---
 
 ## III. Switching, pairing, and tempo
@@ -397,8 +391,6 @@ Restrictions:
 
 * **Offbeat:** 15% increased outgoing damage.
 * **Downbeat:** 15% reduced incoming damage.
-
-The current beat must be displayed prominently.
 
 **Rank II:** Both modifiers become 20%.
 
@@ -598,7 +590,7 @@ Explicit type immunities still apply.
 
 **Evolution — Diversified Portfolio:** The Pokémon may trigger again by exploiting a different weakness type.
 
-**Evolution — Compound Elements:** Barrier overflow converts into healing, then into power for the next damaging move.
+**Evolution — Compound Elements:** Barrier above 100% maximum HP converts into healing. Any amount left after reaching full HP grants the next damaging move up to 50% more power, at one percentage point per 1% maximum HP converted.
 
 ---
 
@@ -1013,8 +1005,6 @@ If the target is invalid, the status remains stored.
 
 Healing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.
 
-Starting at 65/35 is safer than immediately using 50/50 because the latter creates an enormous healing window.
-
 **Rank II:** The split becomes 50/50.
 
 **Evolution — Debt Restructuring:** Barriers can absorb Damage Debt when it matures.
@@ -1109,7 +1099,7 @@ Possible objective families include:
 * Win under a designated weather.
 * Complete the boss under a turn limit.
 
-The objective generator must prove basic feasibility from the current party and moves.
+Only objectives that the current party and moves can complete are offered.
 
 **Rank II:** Three feasible contracts are offered and reward quality improves.
 

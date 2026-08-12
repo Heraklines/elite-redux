@@ -1,4 +1,8 @@
 import { globalScene } from "#app/global-scene";
+import {
+  MOODY_PASSIVE_PARTIAL_BOON_IDS,
+  MOODY_PASSIVE_SUPPORTED_BOON_IDS,
+} from "#data/elite-redux/moody/moody-effects";
 import { getMoodyRuntimeCounterWeight } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { getMoodyCoordinatorCounterWeight } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { getMoodyBoonBudget, getMoodyModeState, rollMoodyBoonDefinition } from "#data/elite-redux/moody/moody-state";
@@ -13,6 +17,10 @@ import type { Pokemon } from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 
 let currentEnemyLoadout: MoodyEnemyBoonLoadout | null = null;
+
+export const MOODY_ENEMY_RUNTIME_BOON_IDS: ReadonlySet<string> = new Set(
+  [...MOODY_PASSIVE_SUPPORTED_BOON_IDS].filter(id => !MOODY_PASSIVE_PARTIAL_BOON_IDS.has(id)),
+);
 
 function mix32(value: number): number {
   let mixed = value >>> 0;
@@ -206,7 +214,7 @@ export function generateMoodyEnemyBoonLoadout(
   for (let roll = 0; roll < budget; roll++) {
     const maxed = new Set(boons.filter(boon => boon.rank === 3).map(boon => boon.boonId));
     const definition = Array.from({ length: counterCandidates }, (_, candidate) =>
-      rollMoodyBoonDefinition(seed, roll * counterCandidates + candidate, maxed),
+      rollMoodyBoonDefinition(seed, roll * counterCandidates + candidate, maxed, MOODY_ENEMY_RUNTIME_BOON_IDS),
     )
       .filter((candidate): candidate is MoodyBoonDefinition => candidate != null)
       .toSorted((left, right) => counterScore(right) - counterScore(left))[0]!;

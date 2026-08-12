@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
-import { getMoodyEffectFlyoutCue } from "#data/elite-redux/moody/moody-effect-flyout";
+import { getMoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import {
   type MoodyRuntimeCommand,
   type MoodyRuntimeCommandKind,
@@ -226,16 +226,23 @@ export interface MoodyRuntimeExecutionPort<TPokemon> {
   id(pokemon: TPokemon): number;
   resolveTargets(command: MoodyRuntimeCommand): readonly TPokemon[];
   side(pokemon: TPokemon): "player" | "enemy";
+  currentHp?(pokemon: TPokemon): number;
   maxHp(pokemon: TPokemon): number;
   heal(pokemon: TPokemon, amount: number): void;
   damage(pokemon: TPokemon, amount: number, nonlethal: boolean): void;
-  restorePp(pokemon: TPokemon, amount: number, moveId?: string): void;
+  restorePp(pokemon: TPokemon, amount: number, moveId?: string, distribution?: "most-depleted"): void;
   consumePp(pokemon: TPokemon, amount: number, moveId?: string): void;
   applyStatus(pokemon: TPokemon, status: MoodyRuntimeStatus): void;
   cureStatus(pokemon: TPokemon): void;
   clearNegativeStages(pokemon: TPokemon, amount: number, categoryChoice: boolean): void;
   modifyStat(pokemon: TPokemon, stat: string, stages: number): void;
-  revive(pokemon: TPokemon, fraction: number, extraHealthSegments?: number, allStatStages?: number): void;
+  revive(
+    pokemon: TPokemon,
+    fraction: number,
+    extraHealthSegments?: number,
+    allStatStages?: number,
+    clearStatusAndNegativeStages?: boolean,
+  ): void;
   setWeather(weather: string, turns?: number): void;
   setTerrain(terrain: string, turns?: number): void;
   shortenStatus(pokemon: TPokemon, status: string, turns: number): void;
@@ -334,6 +341,8 @@ const barrierExpiryKey = (battleId: string, pokemonId: number): string =>
   `${battleId}:runtime-barrier:pokemon:${pokemonId}:expires`;
 const barrierTagKey = (battleId: string, pokemonId: number): string =>
   `${battleId}:runtime-barrier:pokemon:${pokemonId}:tag`;
+const barrierStatusBlockKey = (battleId: string, pokemonId: number): string =>
+  `${battleId}:runtime-barrier:pokemon:${pokemonId}:blocks-next-status`;
 
 const MOODY_NEGATIVE_VOLATILES = new Set<BattlerTagType>([
   BattlerTagType.CONFUSED,
@@ -354,6 +363,34 @@ const MOODY_NEGATIVE_VOLATILES = new Set<BattlerTagType>([
   BattlerTagType.ER_DRENCHED,
 ]);
 
+export function cureMoodyStatusImmediately(pokemon: Pick<Pokemon, "resetStatus">): void {
+  pokemon.resetStatus(false, false, false, false);
+}
+
+export function restoreMoodyPp(
+  moves: readonly { ppUsed: number; getMovePp(): number }[],
+  amount: number,
+  distribution?: "most-depleted",
+): void {
+  if (distribution === "most-depleted") {
+    let remaining = amount;
+    for (const move of moves.toSorted(
+      (left, right) => right.ppUsed / Math.max(1, right.getMovePp()) - left.ppUsed / Math.max(1, left.getMovePp()),
+    )) {
+      const restored = Math.min(move.ppUsed, remaining);
+      move.ppUsed -= restored;
+      remaining -= restored;
+      if (remaining <= 0) {
+        break;
+      }
+    }
+    return;
+  }
+  moves.forEach(move => {
+    move.ppUsed = Math.max(0, move.ppUsed - amount);
+  });
+}
+
 function commandPokemonIds(command: MoodyRuntimeCommand): readonly number[] {
   const targetIds = command.targetIds;
   if (targetIds != null && targetIds.length > 0) {
@@ -370,7 +407,9 @@ function commandAmount<TPokemon>(
   if (command.amount != null) {
     return Math.max(0, Math.floor(command.amount));
   }
-  return Math.max(0, Math.floor(port.maxHp(pokemon) * (command.fraction ?? 0)));
+  const basis =
+    command.data?.basis === "current-hp" ? (port.currentHp?.(pokemon) ?? port.maxHp(pokemon)) : port.maxHp(pokemon);
+  return Math.max(0, Math.floor(basis * (command.fraction ?? 0)));
 }
 
 export function executeMoodyRuntimeCommands<TPokemon>(
@@ -416,20 +455,44 @@ export function executeMoodyRuntimeCommands<TPokemon>(
         executedCommands.push(command);
         break;
       case "heal":
-        targets.forEach(pokemon => port.heal(pokemon, commandAmount(command, pokemon, port)));
+        targets.forEach(pokemon =>
+          port.heal(
+            pokemon,
+            commandAmount(command, pokemon, port) / (command.data?.distributeEvenly === true ? targets.length : 1),
+          ),
+        );
         executedCommands.push(command);
         break;
       case "typeless-damage":
       case "nonlethal-damage":
-      case "collect-damage-debt":
         targets.forEach(pokemon =>
           port.damage(pokemon, commandAmount(command, pokemon, port), command.kind === "nonlethal-damage"),
         );
         executedCommands.push(command);
         break;
+      case "collect-damage-debt":
+        targets.forEach(pokemon => {
+          let amount = commandAmount(command, pokemon, port);
+          if (command.data?.barriersMayAbsorb === true) {
+            const key = barrierKey(battleId, port.id(pokemon));
+            const absorbed = Math.min(numbers[key] ?? 0, amount);
+            numbers[key] = Math.max(0, (numbers[key] ?? 0) - absorbed);
+            amount -= absorbed;
+          }
+          if (amount > 0) {
+            port.damage(pokemon, amount, false);
+          }
+        });
+        executedCommands.push(command);
+        break;
       case "restore-pp":
         targets.forEach(pokemon =>
-          port.restorePp(pokemon, Math.max(0, Math.floor(command.amount ?? 1)), command.value?.toString()),
+          port.restorePp(
+            pokemon,
+            Math.max(0, Math.floor(command.amount ?? 1)),
+            command.value?.toString(),
+            command.data?.distribution === "most-depleted" ? "most-depleted" : undefined,
+          ),
         );
         executedCommands.push(command);
         break;
@@ -470,6 +533,9 @@ export function executeMoodyRuntimeCommands<TPokemon>(
             command.fraction ?? 0.25,
             Number(command.data?.healthSegments ?? 0),
             Number(command.data?.allStats ?? 0),
+            command.data?.clearStatusAndNegativeStages === true
+              || command.data?.clearNegativeStages === true
+              || command.data?.clearMajorStatus === true,
           ),
         );
         executedCommands.push(command);
@@ -484,7 +550,29 @@ export function executeMoodyRuntimeCommands<TPokemon>(
         for (const pokemon of targets) {
           const id = port.id(pokemon);
           const key = barrierKey(battleId, id);
-          numbers[key] = Math.max(0, (numbers[key] ?? 0) + commandAmount(command, pokemon, port));
+          const capFraction = Number(command.data?.capMaxHpFraction);
+          const convertsOverflow = command.data?.overflowToHealingAndPower === true;
+          const cap = Number.isFinite(capFraction)
+            ? port.maxHp(pokemon) * capFraction
+            : convertsOverflow
+              ? port.maxHp(pokemon)
+              : Number.POSITIVE_INFINITY;
+          const total = Math.max(0, (numbers[key] ?? 0) + commandAmount(command, pokemon, port));
+          numbers[key] = Math.min(cap, total);
+          if (convertsOverflow && total > cap) {
+            const overflow = total - cap;
+            const hpBefore = port.currentHp?.(pokemon) ?? port.maxHp(pokemon);
+            port.heal(pokemon, overflow);
+            const healed = Math.max(0, (port.currentHp?.(pokemon) ?? hpBefore) - hpBefore);
+            const powerOverflow = Math.max(0, overflow - healed);
+            if (powerOverflow > 0) {
+              const powerKey = `${battleId}:runtime-action:pokemon:${id}:next-power`;
+              numbers[powerKey] = Math.max(
+                numbers[powerKey] ?? 1,
+                1 + Math.min(0.5, powerOverflow / Math.max(1, port.maxHp(pokemon))),
+              );
+            }
+          }
           numbers[barrierExpiryKey(battleId, id)] =
             command.durationTurns == null
               ? Number.MAX_SAFE_INTEGER
@@ -492,13 +580,21 @@ export function executeMoodyRuntimeCommands<TPokemon>(
           if (typeof command.value === "string") {
             lists[barrierTagKey(battleId, id)] = [command.value];
           }
+          if (command.data?.blocksNextStatus === true) {
+            numbers[barrierStatusBlockKey(battleId, id)] = 1;
+          }
         }
         executedCommands.push(command);
         break;
       case "decay-barrier":
-        for (const id of commandPokemonIds(command)) {
+        for (const pokemon of targets) {
+          const id = port.id(pokemon);
           const key = barrierKey(battleId, id);
-          numbers[key] = Math.max(0, (numbers[key] ?? 0) - (command.amount ?? numbers[key] ?? 0));
+          const floorFraction = Number(command.data?.onlyAboveMaxHpFraction);
+          const floor = Number.isFinite(floorFraction) ? port.maxHp(pokemon) * floorFraction : 0;
+          const decay = command.amount ?? port.maxHp(pokemon) * (command.fraction ?? 1);
+          const current = numbers[key] ?? 0;
+          numbers[key] = current <= floor ? current : Math.max(floor, current - decay);
         }
         executedCommands.push(command);
         break;
@@ -778,7 +874,7 @@ function emitMoodyRuntimeTriggerLabels(
     ownerId == null ? undefined : ACTIVE_MOODY_ACTION_IDS.get(ownerId),
   );
   const seen = EMITTED_MOODY_UI_TRIGGERS.get(key) ?? new Set<string>();
-  const freshIds = effectIds.filter(effectId => !seen.has(effectId));
+  const freshIds = effectIds.filter(effectId => shouldShowMoodyEffectFlyout(effectId) && !seen.has(effectId));
   if (freshIds.length === 0) {
     return;
   }
@@ -864,8 +960,9 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
           .slice(0, 1);
       }
       if (command.data?.target === "lowest-hp-other-ally") {
+        const excludedId = Number(command.data?.excludePokemonId ?? command.subjectId);
         return playerParty
-          .filter(pokemon => pokemon.id !== command.subjectId)
+          .filter(pokemon => pokemon.id !== excludedId)
           .toSorted((left, right) => left.hp / left.getMaxHp() - right.hp / right.getMaxHp())
           .slice(0, 1);
       }
@@ -873,6 +970,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
       return subject == null ? [] : (subject.getAllies().slice(0, 1) as readonly Pokemon[]);
     },
     side: pokemon => (pokemon.isPlayer() ? "player" : "enemy"),
+    currentHp: pokemon => pokemon.hp,
     maxHp: pokemon => pokemon.getMaxHp(),
     heal: (pokemon, amount) => {
       const restored = Math.min(Math.max(0, amount), pokemon.getMaxHp() - pokemon.hp);
@@ -887,12 +985,10 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         pokemon.damageAndUpdate(resolved);
       }
     },
-    restorePp: (pokemon, amount, moveId) => {
+    restorePp: (pokemon, amount, moveId, distribution) => {
       const moves =
         moveId == null ? pokemon.getMoveset() : pokemon.getMoveset().filter(move => String(move.moveId) === moveId);
-      moves.forEach(move => {
-        move.ppUsed = Math.max(0, move.ppUsed - amount);
-      });
+      restoreMoodyPp(moves, amount, distribution);
     },
     consumePp: (pokemon, amount, moveId) => {
       const moves =
@@ -905,7 +1001,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         pokemon.doSetStatus(effect);
       }
     },
-    cureStatus: pokemon => pokemon.resetStatus(false),
+    cureStatus: cureMoodyStatusImmediately,
     clearNegativeStages: (pokemon, amount, categoryChoice) => {
       const negativeStats = BATTLE_STATS.filter(stat => pokemon.getStatStage(stat) < 0);
       const negativeTags = pokemon.summonData.tags.filter(tag => MOODY_NEGATIVE_VOLATILES.has(tag.tagType));
@@ -916,7 +1012,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         } else if (negativeTags.length >= (pokemon.status == null ? 0 : 1)) {
           pokemon.findAndRemoveTags(tag => MOODY_NEGATIVE_VOLATILES.has(tag.tagType));
         } else {
-          pokemon.resetStatus(false);
+          cureMoodyStatusImmediately(pokemon);
         }
         return;
       }
@@ -928,7 +1024,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         }
       }
       if (remaining > 0 && pokemon.status != null) {
-        pokemon.resetStatus(false);
+        cureMoodyStatusImmediately(pokemon);
         remaining--;
       }
       if (remaining > 0 && negativeTags[0] != null) {
@@ -938,6 +1034,10 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
     },
     modifyStat: (pokemon, stat, stages) => {
       const battleStats = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
+      if (stat === "all") {
+        battleStats.forEach(battleStat => pokemon.setStatStage(battleStat, pokemon.getStatStage(battleStat) + stages));
+        return;
+      }
       const resolved =
         stat === "highest-offense"
           ? pokemon.getStat(Stat.ATK, false) >= pokemon.getStat(Stat.SPATK, false)
@@ -952,7 +1052,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         pokemon.setStatStage(resolved, pokemon.getStatStage(resolved) + stages);
       }
     },
-    revive: (pokemon, fraction, extraHealthSegments = 0, allStatStages = 0) => {
+    revive: (pokemon, fraction, extraHealthSegments = 0, allStatStages = 0, clearStatusAndNegativeStages = false) => {
       if (pokemon.isFainted(true)) {
         pokemon.resetStatus(true, false, false, false);
         pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * fraction));
@@ -962,6 +1062,14 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
         if (allStatStages > 0) {
           for (const stat of BATTLE_STATS) {
             pokemon.setStatStage(stat, Math.max(pokemon.getStatStage(stat), allStatStages));
+          }
+        }
+        if (clearStatusAndNegativeStages) {
+          pokemon.resetStatus(true, false, false, false);
+          for (const stat of BATTLE_STATS) {
+            if (pokemon.getStatStage(stat) < 0) {
+              pokemon.setStatStage(stat, 0);
+            }
           }
         }
         pokemon.updateInfo(true);
@@ -1135,7 +1243,10 @@ function clearRuntimeAction(pokemonId: number, promoteNext = false): void {
   }
   const state = deserializeMoodyRuntimeFieldState(save);
   const retained = (key: string): boolean =>
-    key === actionKey(pokemonId, "next-power") || key === actionKey(pokemonId, "next-power-type");
+    key === actionKey(pokemonId, "next-power")
+    || key === actionKey(pokemonId, "next-power-type")
+    || key === actionKey(pokemonId, "next-bonus-damage")
+    || key === actionKey(pokemonId, "next-bonus-all-enemies");
   const values = Object.fromEntries(
     Object.entries(state.values).filter(([key]) => !key.startsWith(actionKey(pokemonId, "")) || retained(key)),
   );
@@ -1155,6 +1266,16 @@ function clearRuntimeAction(pokemonId: number, promoteNext = false): void {
     if (nextPowerType != null) {
       values[actionKey(pokemonId, "power-type")] = nextPowerType;
       delete values[actionKey(pokemonId, "next-power-type")];
+    }
+    const nextBonusDamage = numbers[actionKey(pokemonId, "next-bonus-damage")];
+    if (nextBonusDamage != null) {
+      numbers[actionKey(pokemonId, "bonus-damage")] = nextBonusDamage;
+      delete numbers[actionKey(pokemonId, "next-bonus-damage")];
+    }
+    const nextBonusAllEnemies = values[actionKey(pokemonId, "next-bonus-all-enemies")];
+    if (nextBonusAllEnemies != null) {
+      values[actionKey(pokemonId, "bonus-all-enemies")] = nextBonusAllEnemies;
+      delete values[actionKey(pokemonId, "next-bonus-all-enemies")];
     }
   }
   persistRuntimeState({ ...state, values, numbers, lists });
@@ -1223,9 +1344,16 @@ function consumeMoveResolution(pokemon: Pokemon, queuedForCurrentAction: boolean
         }
         break;
       case "queue-next-move-power":
-        numbers[actionKey(pokemon.id, queuedForCurrentAction ? "power" : "next-power")] = command.multiplier ?? 1;
-        if (typeof command.value === "string") {
-          values[actionKey(pokemon.id, queuedForCurrentAction ? "power-type" : "next-power-type")] = command.value;
+        if (command.data?.typelessBonusDamage === true) {
+          numbers[actionKey(pokemon.id, queuedForCurrentAction ? "bonus-damage" : "next-bonus-damage")] =
+            command.amount ?? 0;
+          values[actionKey(pokemon.id, queuedForCurrentAction ? "bonus-all-enemies" : "next-bonus-all-enemies")] =
+            command.data?.allEnemiesReduced === true;
+        } else {
+          numbers[actionKey(pokemon.id, queuedForCurrentAction ? "power" : "next-power")] = command.multiplier ?? 1;
+          if (typeof command.value === "string") {
+            values[actionKey(pokemon.id, queuedForCurrentAction ? "power-type" : "next-power-type")] = command.value;
+          }
         }
         break;
       case "consume-extra-pp":
@@ -1520,6 +1648,12 @@ export function applyMoodyRuntimeBeforeDamage(
   if (actionPower != null && (actionPowerType == null || String(source.getMoveType(move)) === actionPowerType)) {
     resolved *= actionPower;
   }
+  const hitIndex = Math.max(1, source.turnData.hitCount - source.turnData.hitsLeft + 1);
+  if (hitIndex === 1) {
+    const bonusDamage = state.numbers[actionKey(source.id, "bonus-damage")] ?? 0;
+    const allEnemies = state.values[actionKey(source.id, "bonus-all-enemies")] === true;
+    resolved += bonusDamage * (allEnemies ? 0.5 : 1);
+  }
   resolved *= state.numbers[actionKey(source.id, "modify-field-strength")] ?? 1;
   if (
     move.category === MoveCategory.PHYSICAL
@@ -1544,7 +1678,7 @@ export function applyMoodyRuntimeBeforeDamage(
       (target.turnData.moveEffectiveness
         ?? target.getAttackTypeEffectiveness(source.getMoveType(move), { source, move })) > 1,
     poisonDamage: false,
-    hitIndex: Math.max(1, source.turnData.hitCount - source.turnData.hitsLeft + 1),
+    hitIndex,
     sameOriginatingAction: source.turnData.hitsLeft > 0,
   });
   const result = resolveMoodySceneFieldEvent(event, { execute: !simulated, persist: !simulated });
@@ -1649,11 +1783,51 @@ export function notifyMoodyRuntimeHeal(target: Pokemon, requested: number, effec
   );
 }
 
+/**
+ * Full-HP healing phases normally skip {@link Pokemon.heal}. Overflow mechanics still need that
+ * zero-effective heal event so the requested amount can be converted instead of disappearing.
+ */
+export function shouldMoodyRuntimeProcessFullHpHeal(target: Pokemon): boolean {
+  if (!target.isPlayer()) {
+    return false;
+  }
+  const state = getMoodyModeState();
+  if (state == null) {
+    return false;
+  }
+  return state.boons.some(boon => {
+    if (boon.dormant) {
+      return false;
+    }
+    if (boon.boonId === "shared-cup") {
+      return true;
+    }
+    if (boon.boonId !== "overflow-ward") {
+      return false;
+    }
+    if (boon.evolutionId === "overflow-doctrine") {
+      return true;
+    }
+    const pokemonIds = boon.target?.pokemonIds;
+    return pokemonIds == null || pokemonIds.length === 0 || pokemonIds.includes(target.id);
+  });
+}
+
 export function shouldMoodyRuntimePreventStatus(target: Pokemon, effect: StatusEffect, source?: Pokemon): boolean {
   const adapter = createMoodySceneFieldAdapter();
   const status = effect === StatusEffect.FREEZE ? "frostbite" : statusFromEngine(effect);
   if (adapter == null || status == null) {
     return false;
+  }
+  const state = runtimeState();
+  const statusBlockKey = barrierStatusBlockKey(battleId(), target.id);
+  if (
+    state != null
+    && (state.numbers[barrierKey(battleId(), target.id)] ?? 0) > 0
+    && (state.numbers[statusBlockKey] ?? 0) > 0
+  ) {
+    persistRuntimeState({ ...state, numbers: { ...state.numbers, [statusBlockKey]: 0 } });
+    return true;
   }
   const result = resolveMoodySceneFieldEvent(
     adapter.statusAttempt({

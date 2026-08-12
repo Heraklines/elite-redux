@@ -514,7 +514,7 @@ export function buildMoodyCurseCard(definition: MoodyCurseDefinition, impactLine
 
 /** Static mode rules shown during curse setup. */
 export const MOODY_MODE_RULES: readonly string[] = [
-  "One boon draft every ten waves.",
+  "Every ten waves, choose a boon or upgrade and receive a curse.",
   "Maximum 12 unique boon lines.",
   "Duplicate lines produce ranks / evolutions.",
   "Enemy teams generate their own boon loadouts.",
@@ -859,7 +859,7 @@ export function buildMoodyOverviewRows(state: MoodyModeSaveData, waveIndex: numb
     kind: "entry",
     label: `Next draft: wave ${nextDraft}`,
     tint: 0xf8f8f8,
-    detail: "One boon draft follows every boss wave (every ten waves).",
+    detail: "Choose a boon or upgrade every ten waves, then receive a curse.",
   });
   if (state.curses.length > 0) {
     rows.push({ kind: "header", label: "— CURSE —", tint: MUTED_TINT, detail: "" });

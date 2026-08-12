@@ -547,11 +547,25 @@ export function erShinyLabSpriteFxStateKey(
   ].join("|");
 }
 
-export function getErShinyLabSpriteFxTime(): number {
+export function getErShinyLabBattleFxFrameMs(battlerCount: number): number {
+  if (battlerCount >= 3) {
+    return 500;
+  }
+  if (battlerCount >= 2) {
+    return 250;
+  }
+  return 125;
+}
+
+export function getErShinyLabSpriteFxTime(frameMs = 100, loopMs = 0): number {
   const now =
     globalScene.time?.now
     ?? (typeof performance !== "undefined" && Number.isFinite(performance.now()) ? performance.now() : Date.now());
-  return Math.floor(now / 100) / 10;
+  const boundedFrameMs = Math.max(1, Math.floor(frameMs));
+  const frame = Math.floor(now / boundedFrameMs);
+  const loopFrames = Math.floor(loopMs / boundedFrameMs);
+  const displayFrame = loopFrames > 0 ? frame % loopFrames : frame;
+  return (displayFrame * boundedFrameMs) / 1000;
 }
 
 function baseVariantForPalette(look: ErShinyLabSpriteFxLook | null | undefined, variant: Variant): Variant {

@@ -4,7 +4,6 @@ import Overrides from "#app/overrides";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erTacticalGuaranteedFlee } from "#data/elite-redux/er-tactical-items";
-import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -31,7 +30,6 @@ export class AttemptRunPhase extends FieldPhase {
     }
 
     if (escapeRoll < escapeChance.value) {
-      recordTelemetryBattleTerminal("flee");
       // Co-op (#633 GAP 5): the host RESOLVED a successful flee (it is the sole engine). Signal the
       // guest renderer that this wave RESOLVED as a FLEE so it runs the SAME post-battle tail the
       // host queues below (BattleEnd -> optional biome -> NewBattle); without this the guest - which

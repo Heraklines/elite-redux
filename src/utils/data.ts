@@ -242,6 +242,7 @@ export function saveLastChallenges(challenges: readonly { id: number; value: num
 export type SavedFunModeConfig = Omit<FunModeConfig, "abilityRerollSeed">;
 
 const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
+  "difficulty",
   "randomizePokemon",
   "randomizeTypes",
   "randomizeAbilities",
@@ -281,11 +282,20 @@ export function loadLastFunModeConfig(): SavedFunModeConfig | null {
     if (
       !parsed
       || !LEGACY_FUN_MODE_CONFIG_KEYS.every(key => typeof parsed[key] === "boolean")
-      || !FUN_MODE_CONFIG_KEYS.every(key => parsed[key] == null || typeof parsed[key] === "boolean")
+      || !FUN_MODE_CONFIG_KEYS.every(key =>
+        key === "difficulty"
+          ? parsed[key] == null || parsed[key] === "youngster" || parsed[key] === "hell"
+          : parsed[key] == null || typeof parsed[key] === "boolean",
+      )
     ) {
       return null;
     }
-    return Object.fromEntries(FUN_MODE_CONFIG_KEYS.map(key => [key, parsed[key] === true])) as SavedFunModeConfig;
+    return Object.fromEntries(
+      FUN_MODE_CONFIG_KEYS.map(key => [
+        key,
+        key === "difficulty" ? (parsed[key] === "hell" ? "hell" : "youngster") : parsed[key] === true,
+      ]),
+    ) as SavedFunModeConfig;
   } catch {
     return null;
   }

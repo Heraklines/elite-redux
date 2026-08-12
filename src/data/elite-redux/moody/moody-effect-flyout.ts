@@ -19,7 +19,6 @@ export type MoodyEffectFlyoutPolicy = "flyout" | "drawer-only";
  */
 const DISCRETE_COMBAT_FLYOUT_IDS = new Set<string>([
   "rotating-spotlight",
-  "blood-rival",
   "survivor-s-pride",
   "copycat-heart",
   "mithridatism",
@@ -31,7 +30,6 @@ const DISCRETE_COMBAT_FLYOUT_IDS = new Set<string>([
   "turntable",
   "countermelody",
   "conservation-law",
-  "refrain",
   "failure-is-data",
   "overdraft",
   "final-draft",
@@ -60,7 +58,6 @@ const DISCRETE_COMBAT_FLYOUT_IDS = new Set<string>([
   "slow-to-warm",
   "fading-momentum",
   "exposed-flank",
-  "no-retreat",
   "public-enemy",
   "nemesis-protocol",
   "blood-moon",

@@ -7896,3 +7896,20 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Continuous Moody effects are drawer-only. Trigger flyouts are restricted to discrete combat events, and Type Tax no longer emits a false trigger when the acting Pokemon has no duplicated type.
 - Added a general `build:standalone:no-telemetry` target. Staging and production deploy workflows now expose a default-on `collect_player_training_data` switch; disabling it sets only `VITE_TELEMETRY=off` and leaves save, tournament, Showdown, and matchmaking endpoints intact.
 - Moody remains unpromoted until integration verification completes. No normal staging or production deployment was performed.
+
+2026-08-12 - Player-training telemetry removal and Moody performance follow-up
+
+- Removed every runtime integration for the recently added player-training telemetry: startup initialization, command snapshots, joint-action capture, turn/battle/run outcomes, capture/run events, session teardown, and raw UI input/surface/choice emitters. The telemetry implementation files remain dormant for reversibility, while tournament, matchmaking, save, and existing Showdown control-plane behavior remain intact.
+- Reduced Rest Cycle to 5% HP and 1 PP at base and 10% at rank II, with matching player-facing descriptions.
+- Corrected boon draft composition: before the 12-boon cap, upgrades now occupy about 30% of offer slots, no draft can become three upgrades, and one draft cannot repeat the same boon. At the cap, distinct rank-up offers fill the draft.
+- Made Moody trigger banners use fixed wall-clock entrance and hold times, so high game speed no longer makes them disappear immediately.
+- Decoupled Shiny Lab battle refresh cadence from game speed and reduced CPU refresh frequency as active battler count grows. This is a separate older performance improvement, not the identified recent telemetry regression.
+- Verification: targeted Moody/Shiny tests 201/201 green; final standalone no-telemetry build and Cloudflare payload validation green; scoped Biome exits clean with baseline warnings only; `git diff --check` green. No staging or production deployment was performed.
+
+2026-08-12 - Moody/Fun integration release gate
+
+- Fixed Overflow Ward at full HP. Healing phases now preserve the requested overheal event only when an applicable Overflow Ward, Overflow Doctrine, or Shared Cup effect is active, allowing shield conversion without changing ordinary full-HP healing behavior.
+- Fixed Bastion Seat's first-entry detection. It now uses a battle-scoped per-Pokemon entry mark rather than move history retained from previous battles, so the opening barrier is granted exactly once even when the battler has already acted in an earlier encounter.
+- Fixed the Fun Mode return-to-title input lock. Leaving the selector now performs a one-way TitlePhase handoff and returns immediately instead of refreshing the retired full-screen handler after the title menu owns input.
+- The complete integrated Moody/Fun/Shiny gate passes 25/25 files and 597/597 tests. The standalone no-player-training-telemetry build passes with 3,574 transformed modules and a validated 1,731-file Cloudflare Pages payload; scoped Biome formatting and `git diff --check` are green.
+- Set Collector remains the sole deliberate Moody content exception and stays excluded from drafting until curated item/vitamin sets are authored. Production remains forbidden; this checkpoint is eligible only for normal staging verification.

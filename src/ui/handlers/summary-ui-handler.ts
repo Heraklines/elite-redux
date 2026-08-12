@@ -1507,7 +1507,7 @@ export class SummaryUiHandler extends UiHandler {
         this.statsContainerExpBarTitle.setOrigin(0, 0);
         this.statsContainer.add(this.statsContainerExpBarTitle);
 
-        const baseStats = this.pokemon?.calculateBaseStats() ?? [];
+        const baseStats = this.pokemon?.calculateBaseStats(false) ?? [];
         PERMANENT_STATS.forEach((stat, s) => {
           const statName = i18next.t(getStatKey(stat));
           const rowIndex = s % 3;

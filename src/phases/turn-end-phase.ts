@@ -13,7 +13,6 @@ import { erApplyStickyBarbTurnEnd } from "#data/elite-redux/er-tactical-items";
 import { completeMoodyFormationTurn } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { notifyMoodyRuntimeTurnEnd } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { consumeMoodyDeferredDamage } from "#data/elite-redux/moody/moody-scene-adapter";
-import { recordTelemetryTurnOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -48,9 +47,6 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.phaseManager.queueCoopTurnCommitPhase();
     }
 
-    // #player-telemetry: capture the resolved both-sides field OUTCOME for the turn that just ended, so
-    // state transitions are learnable. Passive observer, no-op unless a telemetry build is recording.
-    recordTelemetryTurnOutcome();
     completeMoodyFormationTurn();
     notifyMoodyRuntimeTurnEnd();
     globalScene.currentBattle.incrementTurn();

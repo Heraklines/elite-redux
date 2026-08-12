@@ -1,5 +1,5 @@
 import { globalScene } from "#app/global-scene";
-import { getMoodyEffectFlyoutCue } from "#data/elite-redux/moody/moody-effect-flyout";
+import { getMoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import { MOODY_PASSIVE_SUPPORTED_BOON_IDS } from "#data/elite-redux/moody/moody-effects";
 import { recordMoodyRuntimeActionTriggers } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import {
@@ -218,6 +218,7 @@ const MOVE_TAG_FLAGS: readonly [MoveFlags, readonly string[]][] = [
 ];
 
 const PENDING_ALLY_FAINT_ENTRY_MARK = "pending-ally-faint-entry";
+const FORMATION_ENTRY_SEEN_MARK_PREFIX = "battle-entry-seen:";
 
 function activeFormationBoon(boonId: string): readonly MoodyBoonInstance[] {
   return getMoodyModeState()?.boons.filter(boon => boon.boonId === boonId && boon.dormant !== true) ?? [];
@@ -761,7 +762,11 @@ function emitMoodyFormationTriggers(
     }
     emitted.add(key);
     const effect = effects.get(trace.effectInstanceId);
-    if (effect == null) {
+    if (
+      effect == null
+      || !shouldShowMoodyEffectFlyout(effect.boonId)
+      || (effect.boonId === "turntable" && event.type !== "turn-start")
+    ) {
       continue;
     }
     const name = MOODY_BOON_BY_ID.get(effect.boonId)?.name ?? effect.boonId;
@@ -1180,12 +1185,15 @@ export function notifyMoodyFormationEntry(pokemon: Pokemon, afterAllyFainted?: b
     afterAllyFainted ?? (typeof pendingFaintedPokemonId === "number" && pendingFaintedPokemonId !== pokemon.id);
   if (pendingFaintedPokemonId != null) {
     delete engine.marks[PENDING_ALLY_FAINT_ENTRY_MARK];
-    writeEngineState(engine);
   }
+  const entrySeenKey = `${FORMATION_ENTRY_SEEN_MARK_PREFIX}${pokemon.id}`;
+  const firstEntryThisBattle = engine.marks[entrySeenKey] !== engine.battleId;
+  engine.marks[entrySeenKey] = engine.battleId;
+  writeEngineState(engine);
   dispatchMoodyFormationGameEvent({
     type: "entry",
     pokemon: snapshotMoodyFormationPokemon(pokemon),
-    firstEntryThisBattle: pokemon.getMoveHistory().length === 0,
+    firstEntryThisBattle,
     afterAllyFainted: resolvedAfterAllyFainted,
     allyDamagedEarlierThisTurn: pokemon.getAllies().some(ally => ally.turnData.attacksReceived.length > 0),
   });

@@ -15,6 +15,7 @@ import type { LevelMoves } from "#types/pokemon-level-moves";
 import { randSeedInt, randSeedItem } from "#utils/common";
 
 export interface FunModeConfig {
+  difficulty: "youngster" | "hell";
   randomizePokemon: boolean;
   randomizeTypes: boolean;
   randomizeAbilities: boolean;
@@ -32,6 +33,7 @@ export interface FunModeConfig {
 }
 
 export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
+  difficulty: "youngster",
   randomizePokemon: true,
   randomizeTypes: true,
   randomizeAbilities: true,
@@ -58,6 +60,7 @@ export function getFunModeConfig(): Readonly<FunModeConfig> {
 
 export function setFunModeConfig(config: FunModeConfig): void {
   currentConfig = {
+    difficulty: config.difficulty === "hell" ? "hell" : "youngster",
     randomizePokemon: config.randomizePokemon === true,
     randomizeTypes: config.randomizeTypes === true,
     randomizeAbilities: config.randomizeAbilities === true,

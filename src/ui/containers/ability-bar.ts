@@ -3,6 +3,7 @@ import type { MoodyEffectKind, MoodyEffectSide } from "#data/elite-redux/moody/m
 import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
 import { addTextObject } from "#ui/text";
+import { fixedInt } from "#utils/common";
 import i18next from "i18next";
 
 const defaultBarWidth = 118;
@@ -382,9 +383,9 @@ export class AbilityBar extends Phaser.GameObjects.Container {
     return this.startTween({
       targets: this,
       x: player ? screenLeft : this.screenRight - this.currentBarWidth,
-      duration: 500,
+      duration: fixedInt(400),
       ease: "Sine.easeOut",
-      hold: 1000,
+      hold: fixedInt(1400),
     });
   }
 

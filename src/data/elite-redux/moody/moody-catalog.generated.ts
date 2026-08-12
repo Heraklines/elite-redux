@@ -195,11 +195,11 @@ export const MOODY_BOONS = [
         id: "court-of-ashes",
         name: "Court of Ashes",
         description:
-          "Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.\n\nCurrent absolute HP should remain unchanged when maximum HP changes; the boon must not create hidden proportional healing.",
+          "Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.",
       },
     ],
     fullDescription:
-      "**Base:** Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nEmpty and fainted slots are counted separately, with no cap.\n\n**Rank II:** Empty slots grant +12%; fainted slots grant +8%.\n\n**Evolution — Solitary Kingdom:** Each empty slot additionally grants +5% Speed.\n\n**Evolution — Court of Ashes:** Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.\n\nCurrent absolute HP should remain unchanged when maximum HP changes; the boon must not create hidden proportional healing.",
+      "**Base:** Every truly unoccupied party slot grants all conscious Pokémon +10% maximum HP and damage. Every occupied but fainted slot grants +6%.\n\nEmpty and fainted slots are counted separately, with no cap.\n\n**Rank II:** Empty slots grant +12%; fainted slots grant +8%.\n\n**Evolution — Solitary Kingdom:** Each empty slot additionally grants +5% Speed.\n\n**Evolution — Court of Ashes:** Fainted slots grant the full 10% bonus, and becoming the final conscious Pokémon clears one major status and creates a 20% barrier.",
   },
   {
     id: "rotating-spotlight",
@@ -318,11 +318,11 @@ export const MOODY_BOONS = [
         id: "school-founder",
         name: "School Founder",
         description:
-          "The exact-move bonus becomes smaller, but all moves sharing one selected move tag—such as slicing, sound, punch, bite, hammer, bullet, dance, recoil, or multi-hit—gain 15% power.\n\nThe tag evolution requires a properly audited move-tag registry. Elemental type is not the same targeting category as a mechanical move tag.",
+          "The exact-move bonus becomes smaller, but all moves sharing one selected move tag—such as slicing, sound, punch, bite, hammer, bullet, dance, recoil, or multi-hit—gain 15% power.",
       },
     ],
     fullDescription:
-      "**Base:** Select one exact move. It gains 15% power, and every third use consumes no PP.\n\n**Rank II:** Power becomes 25%; every third use also gains increased secondary-effect probability where applicable.\n\n**Evolution — Masterpiece:** Power becomes 40%, and the move’s final PP guarantees one eligible secondary effect.\n\n**Evolution — School Founder:** The exact-move bonus becomes smaller, but all moves sharing one selected move tag—such as slicing, sound, punch, bite, hammer, bullet, dance, recoil, or multi-hit—gain 15% power.\n\nThe tag evolution requires a properly audited move-tag registry. Elemental type is not the same targeting category as a mechanical move tag.",
+      "**Base:** Select one exact move. It gains 15% power, and every third use consumes no PP.\n\n**Rank II:** Power becomes 25%; every third use also gains increased secondary-effect probability where applicable.\n\n**Evolution — Masterpiece:** Power becomes 40%, and the move’s final PP guarantees one eligible secondary effect.\n\n**Evolution — School Founder:** The exact-move bonus becomes smaller, but all moves sharing one selected move tag—such as slicing, sound, punch, bite, hammer, bullet, dance, recoil, or multi-hit—gain 15% power.",
   },
   {
     id: "improviser",
@@ -491,12 +491,11 @@ export const MOODY_BOONS = [
       {
         id: "family-treasury",
         name: "Family Treasury",
-        description:
-          "A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.",
+        description: "A second selected item stack receives 20% amplification and suppression protection.",
       },
     ],
     fullDescription:
-      "**Base:** Select one exact held-item stack. Its numerical or trigger-based effect becomes 25% stronger and it cannot be stolen or suppressed.\n\n**Rank II:** Amplification becomes 40%.\n\n**Evolution — Living Heirloom:** Its first eligible activation each battle triggers twice.\n\n**Evolution — Family Treasury:** A second selected item stack receives 20% amplification and suppression protection.\n\nEvery item needs an explicit amplification adapter: magnitude, duration, charges, probability, cooldown, stack cap, bespoke behavior, or ineligible. Binary effects cannot simply be multiplied by 1.25.",
+      "**Base:** Select one exact held-item stack. Its numerical or trigger-based effect becomes 25% stronger and it cannot be stolen or suppressed.\n\n**Rank II:** Amplification becomes 40%.\n\n**Evolution — Living Heirloom:** Its first eligible activation each battle triggers twice.\n\n**Evolution — Family Treasury:** A second selected item stack receives 20% amplification and suppression protection.",
   },
   {
     id: "parting-gift",
@@ -626,7 +625,7 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "team rhythm rule",
     targetKind: "rule",
-    base: "Turns alternate between:\n\n* **Offbeat:** 15% increased outgoing damage.\n* **Downbeat:** 15% reduced incoming damage.\n\nThe current beat must be displayed prominently.",
+    base: "Turns alternate between:\n\n* **Offbeat:** 15% increased outgoing damage.\n* **Downbeat:** 15% reduced incoming damage.",
     rankTwo: "Both modifiers become 20%.",
     evolutions: [
       {
@@ -642,7 +641,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Turns alternate between:\n\n* **Offbeat:** 15% increased outgoing damage.\n* **Downbeat:** 15% reduced incoming damage.\n\nThe current beat must be displayed prominently.\n\n**Rank II:** Both modifiers become 20%.\n\n**Evolution — Syncopation:** The first move used on Offbeat gains +1 priority; the first status received on Downbeat is negated.\n\n**Evolution — Double Time:** Each beat lasts two turns and provides a stronger 25% modifier.",
+      "**Base:** Turns alternate between:\n\n* **Offbeat:** 15% increased outgoing damage.\n* **Downbeat:** 15% reduced incoming damage.\n\n**Rank II:** Both modifiers become 20%.\n\n**Evolution — Syncopation:** The first move used on Offbeat gains +1 priority; the first status received on Downbeat is negated.\n\n**Evolution — Double Time:** Each beat lasts two turns and provides a stronger 25% modifier.",
   },
   {
     id: "countermelody",
@@ -951,11 +950,12 @@ export const MOODY_BOONS = [
       {
         id: "compound-elements",
         name: "Compound Elements",
-        description: "Barrier overflow converts into healing, then into power for the next damaging move.",
+        description:
+          "Barrier above 100% maximum HP converts into healing. Any amount left after reaching full HP grants the next damaging move up to 50% more power, at one percentage point per 1% maximum HP converted.",
       },
     ],
     fullDescription:
-      "**Base:** The first time each allied Pokémon exploits an elemental weakness during a battle, it gains a 20% barrier. Exploiting a 4× weakness creates a 40% barrier.\n\n**Rank II:** Values become 25% and 50%.\n\n**Evolution — Diversified Portfolio:** The Pokémon may trigger again by exploiting a different weakness type.\n\n**Evolution — Compound Elements:** Barrier overflow converts into healing, then into power for the next damaging move.",
+      "**Base:** The first time each allied Pokémon exploits an elemental weakness during a battle, it gains a 20% barrier. Exploiting a 4× weakness creates a 40% barrier.\n\n**Rank II:** Values become 25% and 50%.\n\n**Evolution — Diversified Portfolio:** The Pokémon may trigger again by exploiting a different weakness type.\n\n**Evolution — Compound Elements:** Barrier above 100% maximum HP converts into healing. Any amount left after reaching full HP grants the next damaging move up to 50% more power, at one percentage point per 1% maximum HP converted.",
   },
   {
     id: "chromatic-relay",
@@ -1716,7 +1716,7 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.\n\nStarting at 65/35 is safer than immediately using 50/50 because the latter creates an enormous healing window.",
+    base: "The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.",
     rankTwo: "The split becomes 50/50.",
     evolutions: [
       {
@@ -1732,7 +1732,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.\n\nStarting at 65/35 is safer than immediately using 50/50 because the latter creates an enormous healing window.\n\n**Rank II:** The split becomes 50/50.\n\n**Evolution — Debt Restructuring:** Barriers can absorb Damage Debt when it matures.\n\n**Evolution — Collection Notice:** If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.",
+      "**Base:** The selected Pokémon receives 65% of incoming direct damage immediately. The remaining 35% becomes Damage Debt and is paid at the end of the following turn.\n\nHealing received before collection reduces the debt point-for-point. Debt follows the Pokémon through switching and can cause a faint. Total stored debt is capped at 50% maximum HP.\n\n**Rank II:** The split becomes 50/50.\n\n**Evolution — Debt Restructuring:** Barriers can absorb Damage Debt when it matures.\n\n**Evolution — Collection Notice:** If the debt is completely eliminated through healing or barriers, the next damaging move gains power based on the amount erased.",
   },
   {
     id: "compound-interest",
@@ -1865,7 +1865,7 @@ export const MOODY_BOONS = [
     rarity: "ultra",
     scope: "ten-wave contract",
     targetKind: "contract",
-    base: "After a boss, accept one feasible optional objective for the following segment. Completion awards a high-tier item and a chance at a relic.\n\nPossible objective families include:\n\n* No allied faint.\n* No healing.\n* No consecutive move repetition.\n* Use at least five elemental types.\n* Every conscious party member must act.\n* Lowest-level Pokémon scores a KO.\n* Break a boss segment with a designated Pokémon.\n* Do not use super-effective attacks.\n* Inflict several distinct statuses.\n* Do not trigger consumables.\n* Switch a minimum number of times.\n* No Pokémon scores more than one KO.\n* Maintain a marked Pokémon above a health threshold.\n* Win under a designated weather.\n* Complete the boss under a turn limit.\n\nThe objective generator must prove basic feasibility from the current party and moves.",
+    base: "After a boss, accept one feasible optional objective for the following segment. Completion awards a high-tier item and a chance at a relic.\n\nPossible objective families include:\n\n* No allied faint.\n* No healing.\n* No consecutive move repetition.\n* Use at least five elemental types.\n* Every conscious party member must act.\n* Lowest-level Pokémon scores a KO.\n* Break a boss segment with a designated Pokémon.\n* Do not use super-effective attacks.\n* Inflict several distinct statuses.\n* Do not trigger consumables.\n* Switch a minimum number of times.\n* No Pokémon scores more than one KO.\n* Maintain a marked Pokémon above a health threshold.\n* Win under a designated weather.\n* Complete the boss under a turn limit.\n\nOnly objectives that the current party and moves can complete are offered.",
     rankTwo: "Three feasible contracts are offered and reward quality improves.",
     evolutions: [
       {
@@ -1880,7 +1880,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** After a boss, accept one feasible optional objective for the following segment. Completion awards a high-tier item and a chance at a relic.\n\nPossible objective families include:\n\n* No allied faint.\n* No healing.\n* No consecutive move repetition.\n* Use at least five elemental types.\n* Every conscious party member must act.\n* Lowest-level Pokémon scores a KO.\n* Break a boss segment with a designated Pokémon.\n* Do not use super-effective attacks.\n* Inflict several distinct statuses.\n* Do not trigger consumables.\n* Switch a minimum number of times.\n* No Pokémon scores more than one KO.\n* Maintain a marked Pokémon above a health threshold.\n* Win under a designated weather.\n* Complete the boss under a turn limit.\n\nThe objective generator must prove basic feasibility from the current party and moves.\n\n**Rank II:** Three feasible contracts are offered and reward quality improves.\n\n**Evolution — Master Contract:** A substantially harder objective guarantees a Master-tier reward.\n\n**Evolution — Relic Hunter:** Completing a two-segment contract chain guarantees a choice among relics.",
+      "**Base:** After a boss, accept one feasible optional objective for the following segment. Completion awards a high-tier item and a chance at a relic.\n\nPossible objective families include:\n\n* No allied faint.\n* No healing.\n* No consecutive move repetition.\n* Use at least five elemental types.\n* Every conscious party member must act.\n* Lowest-level Pokémon scores a KO.\n* Break a boss segment with a designated Pokémon.\n* Do not use super-effective attacks.\n* Inflict several distinct statuses.\n* Do not trigger consumables.\n* Switch a minimum number of times.\n* No Pokémon scores more than one KO.\n* Maintain a marked Pokémon above a health threshold.\n* Win under a designated weather.\n* Complete the boss under a turn limit.\n\nOnly objectives that the current party and moves can complete are offered.\n\n**Rank II:** Three feasible contracts are offered and reward quality improves.\n\n**Evolution — Master Contract:** A substantially harder objective guarantees a Master-tier reward.\n\n**Evolution — Relic Hunter:** Completing a two-segment contract chain guarantees a choice among relics.",
   },
   {
     id: "recruiter-s-eye",
@@ -1988,8 +1988,8 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "Pokémon",
     targetKind: "pokemon",
-    base: "Choose one Pokémon. While it is at least five levels below the party's average level, it gains +2% Attack, Defense, Sp. Atk, Sp. Def, and Speed for each level it is behind (maximum +20%) and earns 50% more experience.\n\nIf it can still evolve normally, multiply both bonuses by 1.25. Mega Evolution does not affect this check.",
-    rankTwo: "The stat-bonus cap becomes +30%, and the experience bonus becomes +75% before the unevolved multiplier.",
+    base: "A selected Pokémon at least five levels below the current party average gains 2% to non-HP stats per missing level, maximum 20%, and 50% increased experience.\n\nIf it is not fully evolved, both bonuses are multiplied by 1.25. Mega Evolution does not count as an ordinary evolution stage for this check.",
+    rankTwo: "Maximum stat compensation becomes 30%; experience becomes +75%.",
     evolutions: [
       {
         id: "giant-killer",
@@ -2003,7 +2003,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Choose one Pokémon. While it is at least five levels below the party's average level, it gains +2% Attack, Defense, Sp. Atk, Sp. Def, and Speed for each level it is behind (maximum +20%) and earns 50% more experience.\n\nIf it can still evolve normally, multiply both bonuses by 1.25. Mega Evolution does not affect this check.\n\n**Rank II:** The stat-bonus cap becomes +30%, and the experience bonus becomes +75% before the unevolved multiplier.\n\n**Evolution — Giant Killer:** The temporary combat bonus doubles against enemies above its own level.\n\n**Evolution — Graduate:** When it catches up, it retains a permanent 5% stat bonus.",
+      "**Base:** A selected Pokémon at least five levels below the current party average gains 2% to non-HP stats per missing level, maximum 20%, and 50% increased experience.\n\nIf it is not fully evolved, both bonuses are multiplied by 1.25. Mega Evolution does not count as an ordinary evolution stage for this check.\n\n**Rank II:** Maximum stat compensation becomes 30%; experience becomes +75%.\n\n**Evolution — Giant Killer:** The temporary combat bonus doubles against enemies above its own level.\n\n**Evolution — Graduate:** When it catches up, it retains a permanent 5% stat bonus.",
   },
   {
     id: "growth-ring",
@@ -2376,14 +2376,13 @@ export const MOODY_BOONS = [
     rarity: "rogue",
     scope: "pre-battle information",
     targetKind: "team",
-    base: "Before each trainer battle:\n\n1. The enemy roster and active leads are generated.\n2. Every active enemy commits its first action.\n3. The player sees each lead and its committed move.\n4. The player may replace only the opening lead slots once.\n5. The enemy cannot recalculate those committed actions.\n\nThe revealed moves are committed and cannot be recalculated.",
+    base: "Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.",
     rankTwo: "The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.",
     evolutions: [
       {
         id: "parallel-futures",
         name: "Parallel Futures",
-        description:
-          "In doubles or triples, the complete visible moveset, abilities, and item stacks of every active enemy are revealed.",
+        description: "In doubles or triples, the committed action of every currently active enemy is revealed.",
       },
       {
         id: "contingency-plan",
@@ -2393,7 +2392,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** Before each trainer battle:\n\n1. The enemy roster and active leads are generated.\n2. Every active enemy commits its first action.\n3. The player sees each lead and its committed move.\n4. The player may replace only the opening lead slots once.\n5. The enemy cannot recalculate those committed actions.\n\nThe revealed moves are committed and cannot be recalculated.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the complete visible moveset, abilities, and item stacks of every active enemy are revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
+      "**Base:** Before battle:\n\n1. The enemy roster and lead are generated.\n2. The enemy commits its first action.\n3. The player sees the lead and committed action.\n4. The player may reorder the party once.\n5. The enemy cannot recalculate that committed action.\n\nThe revealed action is committed and cannot be recalculated.\n\n**Rank II:** The enemy lead’s complete visible moveset, abilities, and item stacks are also revealed.\n\n**Evolution — Parallel Futures:** In doubles or triples, the committed action of every currently active enemy is revealed.\n\n**Evolution — Contingency Plan:** The player may also change one selected move or held-item arrangement before locking the battle state.",
   },
   {
     id: "pressure-valve",

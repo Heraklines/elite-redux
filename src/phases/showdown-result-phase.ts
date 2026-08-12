@@ -37,7 +37,6 @@ import {
   clearTournamentMatchContext,
   getTournamentMatchContext,
 } from "#data/elite-redux/showdown/tournament-match-context";
-import { endTelemetrySession } from "#data/elite-redux/telemetry/telemetry-recorder";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 
@@ -79,9 +78,6 @@ export class ShowdownResultPhase extends BattlePhase {
 
   start(): void {
     super.start();
-    // PvP matches are commonly shorter than the ordinary wave/time upload thresholds. Close the player
-    // telemetry session at the decisive result so the final decisions are durably flushed before teardown.
-    endTelemetrySession();
     const scene = globalScene;
     const runtime = getCoopRuntime();
 

@@ -269,7 +269,7 @@ export class BiomeShopUiHandler extends UiHandler {
     this.itemNameText.setOrigin(0.5, 0);
     this.shopContainer.add(this.itemNameText);
 
-    this.moodyMarketText = addTextObject(100, 35, "", TextStyle.PARTY, {
+    this.moodyMarketText = addTextObject(100, 20, "", TextStyle.PARTY, {
       fontSize: "26px",
       fixedWidth: 210 * 6,
       maxLines: 1,

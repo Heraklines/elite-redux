@@ -14,6 +14,7 @@ import {
 import {
   applyMoodyRuntimeDamageCommandValues,
   consumeMoodyRuntimePendingCommands,
+  cureMoodyStatusImmediately,
   doesMoodyMoveRaiseUserStats,
   executeMoodyRuntimeCommands,
   getMoodyRuntimeSpeedMultiplier,
@@ -28,16 +29,21 @@ import {
   MOODY_RUNTIME_PASSIVE_OVERLAP,
   type MoodyRuntimeExecutionPort,
   resolveMoodyFaintLaneOrder,
+  restoreMoodyPp,
+  shouldMoodyRuntimeProcessFullHpHeal,
 } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { createMoodyModeState, resetMoodyModeState, restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import type { MoodyBoonInstance, MoodyCurseInstance } from "#data/elite-redux/moody/moody-types";
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("#app/global-scene", () => ({ globalScene: {} }));
+
+afterEach(() => resetMoodyModeState());
 
 interface FakePokemon {
   id: number;
@@ -58,6 +64,7 @@ function fakePort(pokemon: FakePokemon[]): MoodyRuntimeExecutionPort<FakePokemon
       return ids.map(id => pokemon.find(candidate => candidate.id === id)).filter(candidate => candidate != null);
     },
     side: () => "player",
+    currentHp: target => target.hp,
     maxHp: target => target.maxHp,
     heal: (target, amount) => {
       target.hp = Math.min(target.maxHp, target.hp + amount);
@@ -90,12 +97,18 @@ function fakePort(pokemon: FakePokemon[]): MoodyRuntimeExecutionPort<FakePokemon
     modifyStat: (target, stat, stages) => {
       target.stages[stat] = (target.stages[stat] ?? 0) + stages;
     },
-    revive: (target, fraction, extraHealthSegments = 0, allStatStages = 0) => {
+    revive: (target, fraction, extraHealthSegments = 0, allStatStages = 0, clearStatusAndNegativeStages = false) => {
       if (target.hp === 0) {
         target.hp = Math.max(1, Math.floor(target.maxHp * fraction));
         target.extraHealthSegments = extraHealthSegments;
         for (const stat of ["attack", "defense", "special-attack", "special-defense", "speed"]) {
           target.stages[stat] = Math.max(target.stages[stat] ?? 0, allStatStages);
+        }
+        if (clearStatusAndNegativeStages) {
+          delete target.status;
+          target.stages = Object.fromEntries(
+            Object.entries(target.stages).map(([stat, value]) => [stat, Math.max(0, value)]),
+          );
         }
       }
     },
@@ -157,6 +170,22 @@ function command(
 }
 
 describe("Moody live field engine", () => {
+  it("keeps full-HP healing events alive only for applicable overflow mechanics", () => {
+    const state = createMoodyModeState("full-hp-overflow");
+    state.boons = [runtimeBoon("overflow-ward")];
+    expect(restoreMoodyModeState(state)).toBe(true);
+
+    const target = { id: PLAYER.id, isPlayer: () => true } as Pokemon;
+    const other = { id: PLAYER.id + 99, isPlayer: () => true } as Pokemon;
+    expect(shouldMoodyRuntimeProcessFullHpHeal(target)).toBe(true);
+    expect(shouldMoodyRuntimeProcessFullHpHeal(other)).toBe(false);
+
+    state.boons[0].rank = 3;
+    state.boons[0].evolutionId = "overflow-doctrine";
+    expect(restoreMoodyModeState(state)).toBe(true);
+    expect(shouldMoodyRuntimeProcessFullHpHeal(other)).toBe(true);
+  });
+
   it("builds exact live trigger labels and one dedupe key for every resolution in an action", () => {
     expect(
       getMoodyRuntimeTriggerLabels(
@@ -408,6 +437,125 @@ describe("Moody live field engine", () => {
     expect(pokemon[1].hp).toBe(20);
     expect(result.state.numbers["battle-a:runtime-barrier:pokemon:1:amount"]).toBe(30);
     expect(result.preventedStatusPokemonIds.has(1)).toBe(true);
+  });
+
+  it("executes battle-end cures immediately instead of queuing a disposable phase", () => {
+    const resetStatus = vi.fn();
+    cureMoodyStatusImmediately({ resetStatus } as unknown as Pick<Pokemon, "resetStatus">);
+    expect(resetStatus).toHaveBeenCalledExactlyOnceWith(false, false, false, false);
+  });
+
+  it("allocates total PP restoration to the most depleted moves", () => {
+    const moves = [
+      { ppUsed: 8, getMovePp: () => 10 },
+      { ppUsed: 3, getMovePp: () => 5 },
+      { ppUsed: 1, getMovePp: () => 20 },
+    ];
+    restoreMoodyPp(moves, 5, "most-depleted");
+    expect(moves.map(move => move.ppUsed)).toEqual([3, 3, 1]);
+  });
+
+  it("splits Communion healing and enforces barrier caps and Reservoir decay floors", () => {
+    const pokemon: FakePokemon[] = [
+      { id: 1, hp: 20, maxHp: 100, pp: 0, stages: {} },
+      { id: 2, hp: 30, maxHp: 100, pp: 0, stages: {} },
+    ];
+    const port = fakePort(pokemon);
+    const healed = executeMoodyRuntimeCommands(
+      [command("heal", { targetIds: [1, 2], amount: 40, data: { distributeEvenly: true } })],
+      EMPTY_STATE,
+      "battle-distribution",
+      port,
+    );
+    expect(pokemon.map(target => target.hp)).toEqual([40, 50]);
+
+    const capped = executeMoodyRuntimeCommands(
+      [command("apply-barrier", { subjectId: 1, amount: 80, data: { capMaxHpFraction: 0.6 } })],
+      healed.state,
+      "battle-distribution",
+      port,
+    );
+    expect(capped.state.numbers["battle-distribution:runtime-barrier:pokemon:1:amount"]).toBe(60);
+
+    const decayed = executeMoodyRuntimeCommands(
+      [command("decay-barrier", { subjectId: 1, fraction: 0.1, data: { onlyAboveMaxHpFraction: 0.4 } })],
+      capped.state,
+      "battle-distribution",
+      port,
+    );
+    expect(decayed.state.numbers["battle-distribution:runtime-barrier:pokemon:1:amount"]).toBe(50);
+  });
+
+  it("converts Compound Elements overflow into healing and then next-move power", () => {
+    const pokemon: FakePokemon[] = [{ id: 1, hp: 90, maxHp: 100, pp: 0, stages: {} }];
+    const port = fakePort(pokemon);
+    const existing = executeMoodyRuntimeCommands(
+      [command("apply-barrier", { subjectId: 1, amount: 90 })],
+      EMPTY_STATE,
+      "battle-compound",
+      port,
+    );
+    const converted = executeMoodyRuntimeCommands(
+      [command("apply-barrier", { subjectId: 1, amount: 40, data: { overflowToHealingAndPower: true } })],
+      existing.state,
+      "battle-compound",
+      port,
+    );
+    expect(pokemon[0].hp).toBe(100);
+    expect(converted.state.numbers["battle-compound:runtime-barrier:pokemon:1:amount"]).toBe(100);
+    expect(converted.state.numbers["battle-compound:runtime-action:pokemon:1:next-power"]).toBe(1.2);
+  });
+
+  it("records Safe Preparation's one-status block on its live barrier", () => {
+    const pokemon: FakePokemon[] = [{ id: 1, hp: 100, maxHp: 100, pp: 0, stages: {} }];
+    const result = executeMoodyRuntimeCommands(
+      [command("apply-barrier", { subjectId: 1, amount: 20, data: { blocksNextStatus: true } })],
+      EMPTY_STATE,
+      "battle-safe-preparation",
+      fakePort(pokemon),
+    );
+    expect(result.state.numbers["battle-safe-preparation:runtime-barrier:pokemon:1:blocks-next-status"]).toBe(1);
+  });
+
+  it("uses current HP for Oathbound and lets Debt Restructuring barriers absorb collection", () => {
+    const pokemon: FakePokemon[] = [{ id: 1, hp: 40, maxHp: 100, pp: 0, stages: {} }];
+    const port = fakePort(pokemon);
+    executeMoodyRuntimeCommands(
+      [command("nonlethal-damage", { subjectId: 1, fraction: 0.2, data: { basis: "current-hp" } })],
+      EMPTY_STATE,
+      "battle-debt",
+      port,
+    );
+    expect(pokemon[0].hp).toBe(32);
+
+    const barrier = executeMoodyRuntimeCommands(
+      [command("apply-barrier", { subjectId: 1, amount: 20 })],
+      EMPTY_STATE,
+      "battle-debt",
+      port,
+    );
+    const collected = executeMoodyRuntimeCommands(
+      [command("collect-damage-debt", { subjectId: 1, amount: 30, data: { barriersMayAbsorb: true } })],
+      barrier.state,
+      "battle-debt",
+      port,
+    );
+    expect(pokemon[0].hp).toBe(22);
+    expect(collected.state.numbers["battle-debt:runtime-barrier:pokemon:1:amount"]).toBe(0);
+  });
+
+  it("honors revival cleanup flags for Phoenix Clause and Blood Moon", () => {
+    const pokemon: FakePokemon[] = [
+      { id: 1, hp: 0, maxHp: 100, pp: 0, status: "burn", stages: { attack: -2, speed: 1 } },
+    ];
+    executeMoodyRuntimeCommands(
+      [command("revive", { subjectId: 1, fraction: 0.4, data: { clearStatusAndNegativeStages: true } })],
+      EMPTY_STATE,
+      "battle-revive",
+      fakePort(pokemon),
+    );
+    expect(pokemon[0]).toMatchObject({ hp: 40, stages: { attack: 0, speed: 1 } });
+    expect(pokemon[0].status).toBeUndefined();
   });
 
   it("excludes passive-owned pairs and does not exclude Deferred Pain after ownership transfer", () => {

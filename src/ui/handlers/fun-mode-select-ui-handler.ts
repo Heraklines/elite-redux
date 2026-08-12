@@ -9,15 +9,22 @@ import { Button } from "#enums/buttons";
 import { Color, ShadowColor } from "#enums/color";
 import { TextStyle } from "#enums/text-style";
 import type { UiMode } from "#enums/ui-mode";
+import { handoffFunModeToTitle } from "#ui/handlers/fun-mode-title-handoff";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { loadLastFunModeConfig, saveLastFunModeConfig } from "#utils/data";
 import BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
-type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed" | "megaMixMode">;
+type FunModeKey = Exclude<keyof FunModeConfig, "abilityRerollSeed" | "megaMixMode" | "difficulty">;
+type FunModeOptionKey = FunModeKey | "difficulty";
 
-const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[] = [
+const OPTIONS: readonly { key: FunModeOptionKey; label: string; description: string }[] = [
+  {
+    key: "difficulty",
+    label: "Difficulty",
+    description: "Choose Youngster rules or the full Hell difficulty rules for this Fun Mode run.",
+  },
   {
     key: "randomizePokemon",
     label: "Pokemon",
@@ -74,7 +81,7 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
     key: "scrambleMoves",
     label: "Move Scrambler",
     description:
-      "After a Pokemon finishes using a move, that moveset slot becomes a different random implemented move for both sides.",
+      "After a Pokemon finishes using a move, that moveset slot becomes a different random move for both sides.",
   },
   {
     key: "abilityAvalanche",
@@ -84,14 +91,14 @@ const OPTIONS: readonly { key: FunModeKey; label: string; description: string }[
   {
     key: "moodyMode",
     label: "Moody Mode",
-    description: "Draft evolving boons after bosses while enemy teams receive an equal fresh boon budget.",
+    description: "Every 10 waves, choose a boon or upgrade and receive a curse. Enemy trainers also receive boons.",
   },
 ];
 
 const VISIBLE_OPTION_ROWS = 9;
 
 function hasEnabledMode(config: FunModeConfig): boolean {
-  return OPTIONS.some(option => config[option.key]);
+  return OPTIONS.some(option => option.key !== "difficulty" && config[option.key]);
 }
 
 export class FunModeSelectUiHandler extends UiHandler {
@@ -101,6 +108,7 @@ export class FunModeSelectUiHandler extends UiHandler {
   private startText: Phaser.GameObjects.Text;
   private lastSetupButton: Phaser.GameObjects.NineSlice;
   private lastSetupText: Phaser.GameObjects.Text;
+  private rulesText: Phaser.GameObjects.Text;
   private readonly valueTexts: Phaser.GameObjects.Text[] = [];
   private readonly optionLabels: Phaser.GameObjects.Text[] = [];
   private readonly leftArrows: Phaser.GameObjects.Image[] = [];
@@ -135,10 +143,10 @@ export class FunModeSelectUiHandler extends UiHandler {
       .setVisible(false);
     this.lastSetupButton.setPositionRelative(header, headerText.x + headerText.displayWidth + 10, header.height / 2);
     this.lastSetupText.setPosition(this.lastSetupButton.x + 6, this.lastSetupButton.y);
-    const rulesText = addTextObject(width - 6, 7, "Youngster rules  |  No Favor or Vouchers", TextStyle.SETTINGS_LABEL)
+    this.rulesText = addTextObject(width - 6, 7, "Youngster rules  |  No Favor or Vouchers", TextStyle.SETTINGS_LABEL)
       .setOrigin(1, 0)
       .setAlpha(0.8);
-    rulesText.setScale(rulesText.scaleX * 0.7, rulesText.scaleY * 0.7);
+    this.rulesText.setScale(this.rulesText.scaleX * 0.7, this.rulesText.scaleY * 0.7);
 
     const optionsWidth = Math.floor(width * 0.6);
     const optionsWindow = addWindow(0, 24, optionsWidth, height - 26).setOrigin(0);
@@ -209,7 +217,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       headerText,
       this.lastSetupButton,
       this.lastSetupText,
-      rulesText,
+      this.rulesText,
       optionsWindow,
       descriptionWindow,
       startWindow,
@@ -249,9 +257,14 @@ export class FunModeSelectUiHandler extends UiHandler {
         this.startRegionOption = 0;
         success = this.setCursor(OPTIONS.length - 1);
       } else {
-        globalScene.phaseManager.toTitleScreen();
-        globalScene.phaseManager.getCurrentPhase().end();
-        success = true;
+        // This handler is retired synchronously by TitlePhase. Do not fall through to refresh(),
+        // which can mutate the old full-screen surface after the title menu has claimed input.
+        handoffFunModeToTitle({
+          toTitleScreen: () => globalScene.phaseManager.toTitleScreen(),
+          endCurrentPhase: () => globalScene.phaseManager.getCurrentPhase().end(),
+          playSelect: () => this.getUi().playSelect(),
+        });
+        return true;
       }
     } else if (this.onHeaderButton) {
       success = this.processHeaderInput(button);
@@ -310,6 +323,12 @@ export class FunModeSelectUiHandler extends UiHandler {
       return false;
     }
     const key = OPTIONS[this.cursor].key;
+    if (key === "difficulty") {
+      const next = value ? "hell" : "youngster";
+      const changed = this.config.difficulty !== next;
+      this.config.difficulty = next;
+      return changed;
+    }
     if (key === "megaMode") {
       const current = this.config.megaMode ? (this.config.megaMixMode ? 2 : 1) : 0;
       const next = value ? Math.min(2, current + 1) : Math.max(0, current - 1);
@@ -328,7 +347,9 @@ export class FunModeSelectUiHandler extends UiHandler {
   private confirmCurrentSelection(): boolean {
     if (this.cursor < OPTIONS.length) {
       const key = OPTIONS[this.cursor].key;
-      if (key === "megaMode") {
+      if (key === "difficulty") {
+        this.config.difficulty = this.config.difficulty === "youngster" ? "hell" : "youngster";
+      } else if (key === "megaMode") {
         const current = this.config.megaMode ? (this.config.megaMixMode ? 2 : 1) : 0;
         const next = (current + 1) % 3;
         this.config.megaMode = next > 0;
@@ -364,6 +385,9 @@ export class FunModeSelectUiHandler extends UiHandler {
   }
 
   private refresh(): void {
+    this.rulesText.setText(
+      `${this.config.difficulty === "hell" ? "Hell" : "Youngster"} rules  |  No Favor or Vouchers`,
+    );
     if (!this.cursorObject || !this.descriptionText) {
       return;
     }
@@ -380,9 +404,19 @@ export class FunModeSelectUiHandler extends UiHandler {
       const visible = index >= this.visibleStart && index < this.visibleStart + VISIBLE_OPTION_ROWS;
       const rowY = 28 + (index - this.visibleStart) * 16;
       const key = OPTIONS[index].key;
-      const enabled = this.config[key] === true;
+      const enabled = key === "difficulty" || this.config[key] === true;
       const valueLabel =
-        key === "megaMode" ? (enabled ? (this.config.megaMixMode ? "FULL" : "STATS") : "OFF") : enabled ? "ON" : "OFF";
+        key === "difficulty"
+          ? this.config.difficulty.toUpperCase()
+          : key === "megaMode"
+            ? enabled
+              ? this.config.megaMixMode
+                ? "FULL"
+                : "STATS"
+              : "OFF"
+            : enabled
+              ? "ON"
+              : "OFF";
       const leftArrow = this.leftArrows[index];
       const rightArrow = this.rightArrows[index];
       this.optionLabels[index].setY(rowY).setVisible(visible);
@@ -393,10 +427,17 @@ export class FunModeSelectUiHandler extends UiHandler {
         .setAlpha(enabled ? 1 : 0.55);
       rightArrow
         .setPosition(optionsWidth - 20, rowY + 4)
-        .setVisible(visible && (key === "megaMode" ? !this.config.megaMixMode : !enabled));
+        .setVisible(
+          visible
+            && (key === "difficulty"
+              ? this.config.difficulty !== "hell"
+              : key === "megaMode"
+                ? !this.config.megaMixMode
+                : !enabled),
+        );
       leftArrow
         .setPosition(rightArrow.x - Math.round(text.displayWidth) - 10, rightArrow.y)
-        .setVisible(visible && enabled);
+        .setVisible(visible && (key === "difficulty" ? this.config.difficulty !== "youngster" : enabled));
       text.setX(Math.round((leftArrow.x + rightArrow.x + leftArrow.displayWidth) / 2));
       if (this.cursor === startIndex) {
         leftArrow.setTint(0x808080);

@@ -551,6 +551,29 @@ describe("Moody formation live command executor", () => {
     );
   });
 
+  it("grants Bastion Seat on the first entry even when the Pokemon has prior move history", () => {
+    const target = livePokemon(7) as Pokemon & { getMoveHistory: () => TurnMove[] };
+    target.getMoveHistory = () => {
+      throw new Error("entry detection must not use cross-battle move history");
+    };
+    stubLiveParty([target]);
+    const state = createMoodyModeState("live-bastion-seat");
+    state.boons.push({
+      instanceId: "bastion-seat:live",
+      boonId: "bastion-seat",
+      rank: 1,
+      target: { partySlots: [0] },
+      acquiredAtWave: 1,
+    });
+    expect(restoreMoodyModeState(state)).toBe(true);
+
+    notifyMoodyFormationEntry(target);
+    expect(getMoodyFormationEngineState().barriers[String(target.id)]).toBe(20);
+
+    notifyMoodyFormationEntry(target);
+    expect(getMoodyFormationEngineState().barriers[String(target.id)]).toBe(20);
+  });
+
   it("reverses each temporary stat-stage resource exactly once when its duration expires", () => {
     const engine = createEmptyMoodyFormationEngineState();
     const statStageCalls: [number, string, number][] = [];

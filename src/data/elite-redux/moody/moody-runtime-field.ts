@@ -908,13 +908,19 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
               data: { stat: "attack" },
             });
           }
-          if (boon.evolutionId === "cauterized" && event.damaging) {
-            baseCommand("heal", {
-              subjectId: event.user.id,
-              fraction: 0.05,
-              data: { afterDirectDamage: true },
-            });
-          }
+        } else if (
+          event.kind === "move-resolved"
+          && event.user.status === "burn"
+          && event.user.side === input.ownerSide
+          && event.landed
+          && event.dealtDirectDamage
+          && boon.evolutionId === "cauterized"
+          && appliesToPokemon(boon, event.user, "burning-doctrine")
+        ) {
+          baseCommand("heal", {
+            subjectId: event.user.id,
+            fraction: 0.05,
+          });
         } else if (
           event.kind === "before-damage"
           && event.poisonDamage === false
@@ -983,6 +989,18 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         break;
       }
       case "insomniac-dreams": {
+        if (event.kind === "move-resolved") {
+          const actionKey = `${battleKey(id, "shared-dream-action")}:${event.actionId}`;
+          if (boon.evolutionId === "shared-dream" && event.landed && valueAt(currentState(), actionKey, false)) {
+            baseCommand("modify-stat", {
+              amount: 1,
+              value: "seeded-random",
+              data: { target: "lowest-hp-other-ally", excludePokemonId: event.user.id },
+            });
+          }
+          setValue(actionKey, false);
+          break;
+        }
         if (
           event.kind !== "before-move"
           || event.user.side !== input.ownerSide
@@ -1016,12 +1034,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
           });
         }
         if (boon.evolutionId === "shared-dream") {
-          baseCommand("modify-stat", {
-            targetIds: [],
-            amount: 1,
-            value: "seeded-random",
-            data: { afterSuccessfulAction: true },
-          });
+          setValue(`${battleKey(id, "shared-dream-action")}:${event.actionId}`, true);
         }
         break;
       }
@@ -1400,10 +1413,13 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
           data: { distributeEvenly: boon.evolutionId === "communion" },
         });
         if (boon.evolutionId === "overflow-vintage") {
+          const overflow = Math.max(0, amount - (recipients[0].maxHp - recipients[0].currentHp));
+          if (overflow <= 0) {
+            break;
+          }
           baseCommand("apply-barrier", {
             targetIds: recipients.map(recipient => recipient.id),
-            amount,
-            data: { onlyRedirectOverflow: true },
+            amount: overflow,
           });
         }
         break;
@@ -1507,7 +1523,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
           for (const pokemon of event.party.filter(candidate => !candidate.fainted && !entered.has(candidate.id))) {
             baseCommand("heal", {
               subjectId: pokemon.id,
-              fraction: rankTwo(boon) ? 0.25 : 0.15,
+              fraction: rankTwo(boon) ? 0.1 : 0.05,
             });
             baseCommand("restore-pp", {
               subjectId: pokemon.id,
@@ -1623,6 +1639,21 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
         break;
       }
       case "phoenix-clause": {
+        if (event.kind === "turn-end" && boon.evolutionId === "ashen-return") {
+          const expiresKey = battleKey(id, "ashen-expires");
+          const expires = numberAt(currentState(), expiresKey);
+          const revivedPokemonId = numberAt(currentState(), battleKey(id, "ashen-pokemon"));
+          if (expires > 0 && event.turn >= expires && revivedPokemonId > 0) {
+            baseCommand("modify-stat", {
+              subjectId: revivedPokemonId,
+              amount: -1,
+              value: "all",
+            });
+            setNumber(expiresKey, 0);
+            setNumber(battleKey(id, "ashen-pokemon"), 0);
+          }
+          break;
+        }
         if (
           event.kind !== "faint"
           || event.pokemon.side !== input.ownerSide
@@ -1647,6 +1678,10 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
             statDuration: boon.evolutionId === "ashen-return" ? 3 : 0,
           },
         });
+        if (boon.evolutionId === "ashen-return") {
+          setNumber(battleKey(id, "ashen-pokemon"), event.pokemon.id);
+          setNumber(battleKey(id, "ashen-expires"), event.turn + 3);
+        }
         setValue(key, true);
         break;
       }
@@ -1762,7 +1797,7 @@ export function resolveMoodyRuntimeField(input: MoodyRuntimeFieldInput): MoodyRu
             baseCommand("queue-next-move-power", {
               subjectId: event.target.id,
               amount: numberAt(currentState(), erasedKeyFor(event.target.id)),
-              data: { basedOnDebtErased: true },
+              data: { basedOnDebtErased: true, typelessBonusDamage: true },
             });
           }
         } else if (event.kind === "turn-end") {
