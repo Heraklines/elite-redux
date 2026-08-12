@@ -133,7 +133,12 @@ fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> 
         .cloned()
         .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
     let normalized = match kind {
-        Value::String(tag) => json!({"kind": tag}),
+        Value::String(tag) if tag == "NONE" => json!({"kind": tag}),
+        Value::String(tag) => {
+            return Err(invalid(format!(
+                "{path}.{field_name} has an unsupported legacy tag {tag:?}"
+            )));
+        }
         Value::Object(nested) => {
             let tag = nested
                 .get("kind")
