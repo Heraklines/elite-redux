@@ -80,7 +80,22 @@ fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> 
     let normalized = match kind {
         Value::String(tag) => serde_json::json!({"kind": tag}),
         Value::Object(nested) => {
-            if nested.get("kind").and_then(Value::as_str).is_none() {
+            let tag = nested
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid(format!("{path}.{field_name}.kind is not a string")))?;
+            let valid_shape = match tag {
+                "NONE" => nested.len() == 1,
+                "UNSUPPORTED_ORACLE_CODE" => {
+                    nested.len() == 2
+                        && nested
+                            .get("value")
+                            .and_then(Value::as_u64)
+                            .is_some_and(|value| u16::try_from(value).is_ok())
+                }
+                _ => false,
+            };
+            if !valid_shape {
                 return Err(invalid(format!(
                     "{path}.{field_name} has an invalid adjacent kind object"
                 )));
