@@ -207,7 +207,6 @@ mod live_replica_recovery {
 
     use std::collections::BTreeMap;
 
-    use er_content::pack::ContentPack;
     use er_kernel::snapshot::{KernelDeterminismDigest, RestorableKernelSnapshotV2};
     use er_protocol::snapshot::{
         CorrelatedResponseSnapshotV2, PendingRecoverySnapshotV2, ProposalTimerKindV2,
@@ -224,12 +223,19 @@ mod live_replica_recovery {
     use er_types::{LiveResourceSnapshot, RecoveryFenceState};
 
     fn content_pack() -> TestResult<Arc<ContentPack>> {
-        let wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
+        let selected = selected_content_pack()?;
+        let mut wire: Value = serde_json::from_str(CONTENT_PACK_FIXTURE)?;
+        normalize_legacy_content_pack(&mut wire, &selected)?;
         let value = wire
             .get("content_pack")
             .cloned()
             .ok_or_else(|| invalid("content-pack fixture has no content_pack payload"))?;
-        Ok(Arc::new(serde_json::from_value(value)?))
+        let content: ContentPack = serde_json::from_value(value)?;
+        assert_eq!(
+            content, selected,
+            "published legacy content pack did not normalize to the current selected content",
+        );
+        Ok(Arc::new(content))
     }
 
     fn snapshot_wire(
