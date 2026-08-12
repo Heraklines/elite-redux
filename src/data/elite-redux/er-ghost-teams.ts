@@ -34,6 +34,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { getErProgressionWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import {
   type GhostDialogueContext,
   type GhostTrainerProfile,
@@ -1065,8 +1066,9 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   seedGhostPoolFromSharedCache();
 
   const targets: number[] = [];
+  const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
   if (isErGhostChallengeActive()) {
-    const currentBucket = Math.floor((Math.max(1, waveIndex) - 1) / 10) * 10 + 1;
+    const currentBucket = Math.floor((Math.max(1, eligibilityWave) - 1) / 10) * 10 + 1;
     targets.push(currentBucket);
     if (currentBucket + 10 <= 200) {
       targets.push(currentBucket + 10);
@@ -1076,7 +1078,7 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
       ghostWave => ghostWave >= waveIndex && ghostWave - waveIndex <= PREFETCH_LEAD_WAVES,
     );
     if (next != null) {
-      targets.push(next);
+      targets.push(isErSprintRun() ? getErProgressionWave(next) : next);
     }
   }
 
@@ -1225,6 +1227,7 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     return scripted;
   }
   const pool = prefetched ?? [];
+  const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
   // A source run must have ended at or after this wave. Prefer an unseen source
   // within +20; allow +40 only when primary is empty. Snapshot ids, source
   // accounts, and semantic team hashes are never recycled during a run. If both
@@ -1240,13 +1243,13 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   });
   const primary = unseen.filter(
     snapshot =>
-      snapshot.waveReached >= waveIndex
-      && snapshot.waveReached <= waveIndex + GHOST_PRIMARY_WAVE_WINDOW,
+      snapshot.waveReached >= eligibilityWave
+      && snapshot.waveReached <= eligibilityWave + GHOST_PRIMARY_WAVE_WINDOW,
   );
   const fallback = unseen.filter(
     snapshot =>
-      snapshot.waveReached >= waveIndex
-      && snapshot.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW,
+      snapshot.waveReached >= eligibilityWave
+      && snapshot.waveReached <= eligibilityWave + ER_GHOST_WAVE_WINDOW,
   );
   const next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
   if (!next) {
@@ -1610,7 +1613,8 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
       return null;
     }
     const battle = globalScene.currentBattle;
-    const currentWave = battle?.waveIndex ?? snapshot.waveReached;
+    const runWave = battle?.waveIndex ?? snapshot.waveReached;
+    const currentWave = isErSprintRun() ? getErProgressionWave(runWave) : runWave;
     // ER (#422): a team fielded from BEYOND the fairness window (challenge widening
     // / last resort) gets its members devolved - one stage per overshoot band, two
     // past +20, base form past +60 - so a deep team's fully evolved mons don't sweep

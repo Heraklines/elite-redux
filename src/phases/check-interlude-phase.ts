@@ -9,7 +9,7 @@ export class CheckInterludePhase extends Phase {
     const { phaseManager } = globalScene;
     const { waveIndex } = globalScene.currentBattle;
 
-    if (waveIndex % 10 === 0 && globalScene.getEnemyParty().every(p => p.isFainted())) {
+    if (globalScene.gameMode.isBoss(waveIndex) && globalScene.getEnemyParty().every(p => p.isFainted())) {
       phaseManager.onInterlude();
     }
 

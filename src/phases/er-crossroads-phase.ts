@@ -85,11 +85,15 @@ import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
+import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import type { BiomeId } from "#enums/biome-id";
+import { ChallengeType } from "#enums/challenge-type";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
-import { getBiomeName } from "#utils/common";
+import { applyChallenges } from "#utils/challenge-utils";
+import { BooleanHolder, getBiomeName } from "#utils/common";
 
 interface CoopCrossroadsContinuationRecoveryPolicy {
   readonly retryDelayMs: number;
@@ -1257,6 +1261,22 @@ export class ErCrossroadsPhase extends Phase {
       // the locals grow hostile (enemies climb in level + power the longer you
       // stay). Inside the free window this is a no-op (staying is still free).
       erMarkBiomeStay(this.coopSourceWave);
+      if (isErSprintRun() && isMoodyAutomaticBiomeHealingEnabled()) {
+        const healStatus = new BooleanHolder(true);
+        applyChallenges(ChallengeType.PARTY_HEAL, healStatus);
+        if (healStatus.value) {
+          globalScene.phaseManager.unshiftNew("PartyHealPhase", false);
+        } else {
+          globalScene.phaseManager.unshiftNew(
+            "SelectModifierPhase",
+            undefined,
+            undefined,
+            globalScene.gameMode.isFixedBattle(this.coopSourceWave)
+              ? globalScene.gameMode.getFixedBattle(this.coopSourceWave)?.customModifierRewardSettings
+              : undefined,
+          );
+        }
+      }
     }
     this.end();
   }

@@ -67,6 +67,7 @@ import {
   getAuthoritativeMapTravelClassification,
   getMapTravelTarget,
 } from "#data/elite-redux/er-map-nodes";
+import { isErChapterStartWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
@@ -347,7 +348,8 @@ export class SelectBiomePhase extends BattlePhase {
     }
 
     if (
-      (gameMode.isClassic && gameMode.isWaveFinal(nextWaveIndex + 9))
+      (gameMode.isClassic && isErSprintRun() && nextWaveIndex === 96)
+      || (gameMode.isClassic && !isErSprintRun() && gameMode.isWaveFinal(nextWaveIndex + 9))
       || (gameMode.isDaily && gameMode.isWaveFinal(nextWaveIndex))
       || (gameMode.hasShortBiomes && !(nextWaveIndex % 50))
     ) {
@@ -1740,7 +1742,7 @@ export class SelectBiomePhase extends BattlePhase {
         // healing there handed out a free full-heal "just for leaving the biome". Gate
         // it to the 10-wave tick (a biome-ending x0 wave). Mid-biome x0 waves heal via
         // VictoryPhase (#504, which skips biome-ending waves so there is no double-heal).
-        if (nextWaveIndex % 10 === 1) {
+        if (gameMode.isClassic && isErSprintRun() ? isErChapterStartWave(nextWaveIndex) : nextWaveIndex % 10 === 1) {
           const healStatus = new BooleanHolder(true);
           applyChallenges(ChallengeType.PARTY_HEAL, healStatus);
           if (healStatus.value) {

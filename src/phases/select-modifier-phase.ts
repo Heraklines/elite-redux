@@ -328,6 +328,8 @@ export class SelectModifierPhase extends BattlePhase {
   private isCopy: boolean;
 
   private typeOptions: ModifierTypeOption[];
+  private selectedRewardCursor = -1;
+  private modifierSelectCallback: ModifierSelectCallback | null = null;
 
   /**
    * One roll cache per option on this reward surface. Continuation copies share the
@@ -563,6 +565,8 @@ export class SelectModifierPhase extends BattlePhase {
     coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
     coopRewardSurface?: CoopRewardSurfaceIdentity,
     coopRewardPresentationGeneration = 0,
+    private readonly baseOptionCount = 3,
+    private freePicksRemaining = 1,
   ) {
     super();
 
@@ -748,7 +752,18 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op WATCHER (#633 Fix #2): do NOT roll the pool - that would consume luck-divergent
     // seeded draws and shift this client's RNG cursor away from the owner's. Start empty;
     // startCoopWatch() fills typeOptions from the owner's streamed list before the screen opens.
-    this.typeOptions = coopIsWatcher ? [] : this.getModifierTypeOptions(modifierCount);
+    if (coopIsWatcher) {
+      this.typeOptions = [];
+    } else if (this.freePicksRemaining > 1) {
+      // A first-pick reward must resolve synchronously so this same screen can stay open
+      // for pick two. Roll a few spare options, remove nested-picker rewards, then keep
+      // the normal visible count. The second pick uses the full pool as usual.
+      this.typeOptions = this.getModifierTypeOptions(modifierCount + 5)
+        .filter(option => !this.modifierQueuesContinuation(option.type))
+        .slice(0, modifierCount);
+    } else {
+      this.typeOptions = this.getModifierTypeOptions(modifierCount);
+    }
 
     const modifierSelectCallback = (rowCursor: number, cursor: number) => {
       if (rowCursor < 0 || cursor < 0) {
@@ -820,6 +835,7 @@ export class SelectModifierPhase extends BattlePhase {
         }
       }
     };
+    this.modifierSelectCallback = modifierSelectCallback;
     this.coopModifierSelectCallback = modifierSelectCallback;
 
     // Co-op (#633): only the player whose alternating turn it is drives the reward
@@ -936,6 +952,7 @@ export class SelectModifierPhase extends BattlePhase {
       return true;
     }
     const modifierType = this.typeOptions[cursor].type;
+    this.selectedRewardCursor = cursor;
     // Co-op (#633): capture the free-reward pick so it is relayed to the watcher once
     // any party target / sub-option is resolved (or immediately for a non-party item).
     this.coopBeginPending("reward", cursor, 1);
@@ -1557,6 +1574,17 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
 
+    if (cost === -1 && result && this.freePicksRemaining > 1 && !queuesContinuation) {
+      this.freePicksRemaining--;
+      if (this.selectedRewardCursor >= 0 && this.selectedRewardCursor < this.typeOptions.length) {
+        this.typeOptions.splice(this.selectedRewardCursor, 1);
+      }
+      this.selectedRewardCursor = -1;
+      globalScene.ui.clearText();
+      this.resetModifierSelect(this.modifierSelectCallback ?? (() => false));
+      return true;
+    }
+
     if (cost !== -1 && !(modifier.type instanceof RememberMoveModifierType)) {
       if (result) {
         if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
@@ -1845,7 +1873,7 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Function that determines how many reward slots are available
   private getModifierCount(): number {
-    const modifierCountHolder = new NumberHolder(3);
+    const modifierCountHolder = new NumberHolder(this.baseOptionCount);
     globalScene.applyModifiers(ExtraModifierModifier, true, modifierCountHolder);
     globalScene.applyModifiers(TempExtraModifierModifier, true, modifierCountHolder);
 
@@ -1870,7 +1898,7 @@ export class SelectModifierPhase extends BattlePhase {
     // customModifierSettings reward (mystery encounters, the Bargain, fixed battles, LLM
     // victory bundles). Capture them before the override and re-add after (paired with
     // the fill change in getPlayerModifierTypeOptions so the extra slots are generated).
-    const earnedExtraRewards = Math.max(0, modifierCountHolder.value - 3);
+    const earnedExtraRewards = Math.max(0, modifierCountHolder.value - this.baseOptionCount);
 
     // If custom modifiers are specified, overrides default item count
     if (this.customModifierSettings) {
@@ -2064,6 +2092,9 @@ export class SelectModifierPhase extends BattlePhase {
       true,
       { kind: "inherited", address: this.coopSourceAddress },
       this.coopRewardSurface,
+      this.coopRewardPresentationGeneration,
+      this.baseOptionCount,
+      this.freePicksRemaining,
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out

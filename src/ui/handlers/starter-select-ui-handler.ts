@@ -50,6 +50,7 @@ import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { type ErRunPacing, resetErSprintVoucherCredit, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { buildErShinyLabConfig } from "#data/elite-redux/er-shiny-lab-config";
 import {
   decodeErShinyLabLoadout,
@@ -7554,11 +7555,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ui.setModeWithoutClear(
           UiMode.CONFIRM,
           () => {
-            const startRun = (difficulty: ErDifficulty) => {
+            const startRun = (difficulty: ErDifficulty, pacing: ErRunPacing = "normal") => {
               // ER: lock in the chosen run difficulty (drives the ER trainer
               // roster tier for the whole run) and reset the per-run "already
               // encountered" ER trainer set so the new run starts fresh.
               setErDifficulty(difficulty);
+              setErRunPacing(globalScene.gameMode.modeId === GameModes.CLASSIC ? pacing : "normal");
+              resetErSprintVoucherCredit();
               // Co-op (#633): the HOST publishes the authoritative run config
               // (difficulty + challenges) so the guest mirrors it - the run stays
               // coherent (both players get the same difficulty + challenge set).
@@ -7571,6 +7574,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               if (coopHost?.role === "host") {
                 coopHost.broadcastRunConfig({
                   difficulty,
+                  pacing,
                   challenges: globalScene.gameMode.challenges.map(c => ({
                     id: c.id,
                     value: c.value,
@@ -7607,6 +7611,38 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // ER: pick a run difficulty (Youngster / Ace / Elite / Hell)
             // before launching. Hovering a mode shows what it does (#368) in
             // the message box under the option list.
+            const sprintAvailable =
+              import.meta.env.DEV
+              || (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
+            const choosePacing = (difficulty: ErDifficulty) => {
+              if (globalScene.gameMode.modeId !== GameModes.CLASSIC || !sprintAvailable) {
+                startRun(difficulty, "normal");
+                return;
+              }
+              ui.setOverlayMode(UiMode.OPTION_SELECT, {
+                supportHover: true,
+                options: [
+                  {
+                    semanticId: "normal",
+                    label: i18next.t("starterSelectUiHandler:pacingNormal"),
+                    onHover: () => this.showText(i18next.t("starterSelectUiHandler:pacingNormalDesc")),
+                    handler: () => {
+                      startRun(difficulty, "normal");
+                      return true;
+                    },
+                  },
+                  {
+                    semanticId: "sprint",
+                    label: i18next.t("starterSelectUiHandler:pacingSprint"),
+                    onHover: () => this.showText(i18next.t("starterSelectUiHandler:pacingSprintDesc")),
+                    handler: () => {
+                      startRun(difficulty, "sprint");
+                      return true;
+                    },
+                  },
+                ],
+              });
+            };
             const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
               semanticId: key.toLowerCase(),
               label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
@@ -7618,7 +7654,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 this.showText(i18next.t(`starterSelectUiHandler:difficulty${key}Desc`));
               },
               handler: () => {
-                startRun(difficulty);
+                choosePacing(difficulty);
                 return true;
               },
             });
@@ -7682,7 +7718,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                   globalScene.setSeed(cfg.seed);
                   globalScene.resetSeed();
                 }
-                startRun(cfg.difficulty as ErDifficulty);
+                startRun(cfg.difficulty as ErDifficulty, cfg.pacing ?? "normal");
                 return true;
               };
               if (!applyHostConfig()) {

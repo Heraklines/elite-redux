@@ -144,6 +144,8 @@ export interface CoopChallengeConfig {
 export interface CoopRunConfig {
   /** ER difficulty: "youngster" | "ace" | "elite" | "hell". */
   difficulty: string;
+  /** Classic run pacing. Absent from older clients means Normal. */
+  pacing?: "normal" | "sprint";
   /** The active challenge set (empty for a plain run). */
   challenges: CoopChallengeConfig[];
   /**
@@ -1825,6 +1827,7 @@ export class CoopSessionController {
     this.transport.send({
       t: "runConfig",
       difficulty: config.difficulty,
+      ...(config.pacing === undefined ? {} : { pacing: config.pacing }),
       challenges: config.challenges,
       // The host's run seed (#633, LIVE-A) rides along so the guest pins to it.
       ...(config.seed === undefined ? {} : { seed: config.seed }),
@@ -3464,6 +3467,7 @@ export class CoopSessionController {
           this._sessionKind = kind;
           this._runConfig = {
             difficulty: msg.difficulty,
+            ...(msg.pacing == null ? {} : { pacing: msg.pacing }),
             challenges: msg.challenges,
             seed: msg.seed,
             netcodeMode,

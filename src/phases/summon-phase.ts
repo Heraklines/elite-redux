@@ -6,6 +6,7 @@ import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-d
 import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording, isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
+import { isErChapterStartWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { notifyMoodyFormationEntry } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -336,7 +337,9 @@ export class SummonPhase extends PartyMemberPokemonPhase {
     if (
       !this.loaded
       || [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
-      || globalScene.currentBattle.waveIndex % 10 === 1
+      || (globalScene.gameMode.isClassic && isErSprintRun()
+        ? isErChapterStartWave(globalScene.currentBattle.waveIndex)
+        : globalScene.currentBattle.waveIndex % 10 === 1)
     ) {
       // SummonPhase opens the co-op turn recorder before its entry chain. Keep any resulting material
       // form change inside this causal subtree so it settles before the immutable turn commit. Other

@@ -80,6 +80,12 @@ import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-re
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  getErRunPacing,
+  getErSprintVoucherCredit,
+  restoreErSprintVoucherCredit,
+  setErRunPacing,
+} from "#data/elite-redux/er-run-pacing";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
@@ -1977,6 +1983,8 @@ export class GameData {
       // ER: persist the run difficulty so a reload keeps using the chosen ER
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
+      erRunPacing: getErRunPacing(),
+      erSprintVoucherCredit: getErSprintVoucherCredit(),
       funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
       moodyModeState: globalScene.gameMode.isFun && getFunModeConfig().moodyMode ? getMoodyModeSaveData() : undefined,
       // ER: persist the set of trainers already fought this run, so reloading
@@ -5189,6 +5197,8 @@ export class GameData {
     // per-run "already encountered" ER trainer set from the save so a continued
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
+    setErRunPacing(fromSession.erRunPacing ?? "normal");
+    restoreErSprintVoucherCredit(fromSession.erSprintVoucherCredit);
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreGenericTrainerTracking(fromSession.erLastGenericTrainerType);
     restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);

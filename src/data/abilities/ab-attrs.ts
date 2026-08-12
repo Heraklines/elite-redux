@@ -7109,7 +7109,7 @@ export class ForceSwitchOutHelper {
     } else if (globalScene.currentBattle.battleType === BattleType.WILD) {
       const allyPokemon = switchOutTarget.getAlly();
 
-      if (!globalScene.currentBattle.waveIndex || globalScene.currentBattle.waveIndex % 10 === 0) {
+      if (!globalScene.currentBattle.waveIndex || globalScene.gameMode.isBoss(globalScene.currentBattle.waveIndex)) {
         return false;
       }
 

@@ -97,6 +97,12 @@ import {
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  getErMysteryEncounterTarget,
+  getErProgressionWave,
+  isErChapterStartWave,
+  isErSprintRun,
+} from "#data/elite-redux/er-run-pacing";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
@@ -1691,7 +1697,7 @@ export class BattleScene extends SceneBase {
 
   // TODO: Invert the chances for this
   private getDoubleBattleChance(newWaveIndex: number): number {
-    const doubleChance = new NumberHolder(newWaveIndex % 10 === 0 ? 32 : 8);
+    const doubleChance = new NumberHolder(this.gameMode.isBoss(newWaveIndex) ? 32 : 8);
     this.applyModifiers(DoubleBattleChanceBoosterModifier, true, doubleChance);
     for (const p of this.getPlayerField()) {
       // TODO: This passes `null` to `applyAbAttrs`
@@ -1730,7 +1736,7 @@ export class BattleScene extends SceneBase {
         return erEnd;
       }
     }
-    const isWaveIndexMultipleOfTen = !(currentBattle.waveIndex % 10);
+    const isWaveIndexMultipleOfTen = this.gameMode.isBoss(currentBattle.waveIndex);
     const isEndlessOrDaily = this.gameMode.hasShortBiomes || this.gameMode.isDaily;
     const isEndlessFifthWave = this.gameMode.hasShortBiomes && currentBattle.waveIndex % 5 === 0;
     const isWaveIndexMultipleOfFiftyMinusOne = currentBattle.waveIndex % 50 === 49;
@@ -1916,7 +1922,10 @@ export class BattleScene extends SceneBase {
     // Story fixed battles (rival, evil teams, E4, champion) stay scripted.
     // takeGhostForWave is a no-op when the challenge is off (wave 5 is not a
     // scheduled ghost-gauntlet wave), so normal runs are untouched.
-    if (waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER) {
+    if (
+      waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER
+      || (this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun() && waveIndex === 3)
+    ) {
       const ghost = takeGhostForWave(waveIndex, true);
       if (ghost !== null) {
         resolved.battleType = BattleType.TRAINER;
@@ -3001,7 +3010,7 @@ export class BattleScene extends SceneBase {
       this.executeWithSeedOffset(() => {
         isBoss =
           everyWaveBoss
-          || waveIndex % 10 === 0
+          || this.gameMode.isBoss(waveIndex)
           || (totalBossPct > 0 && randSeedInt(100) < totalBossPct)
           || (this.gameMode.hasRandomBosses
             && randSeedInt(100) < Math.min(Math.max(Math.ceil((waveIndex - 250) / 50), 0) * 2, 30));
@@ -3227,7 +3236,7 @@ export class BattleScene extends SceneBase {
     if (!this.currentBattle) {
       return;
     }
-    const isBoss = !(this.currentBattle.waveIndex % 10);
+    const isBoss = this.gameMode.isBoss(this.currentBattle.waveIndex);
     const biomeString: string = getBiomeName(this.arena.biomeId);
     this.fieldUI.moveAbove(this.biomeWaveText, this.luckText);
     this.biomeWaveText
@@ -3939,7 +3948,8 @@ export class BattleScene extends SceneBase {
   }
 
   getWaveMoneyAmount(moneyMultiplier: number): number {
-    const waveIndex = this.currentBattle.waveIndex;
+    const runWave = this.currentBattle.waveIndex;
+    const waveIndex = this.gameMode.modeId === GameModes.CLASSIC ? getErProgressionWave(runWave) : runWave;
     const waveSetIndex = Math.ceil(waveIndex / 10) - 1;
     const moneyValue =
       Math.pow((waveSetIndex + 1 + (0.75 + (((waveIndex - 1) % 10) + 1) / 10)) * 100, 1 + 0.005 * waveSetIndex)
@@ -4995,7 +5005,12 @@ export class BattleScene extends SceneBase {
     const partyMemberExp: number[] = [];
     // EXP value calculation is based off Pokemon.getExpValue
     if (useWaveIndexMultiplier) {
-      expValue = Math.floor((expValue * this.currentBattle.waveIndex) / 5 + 1);
+      const runWave = this.currentBattle.waveIndex;
+      const expWave = this.gameMode.modeId === GameModes.CLASSIC ? getErProgressionWave(runWave) : runWave;
+      expValue = Math.floor((expValue * expWave) / 5 + 1);
+    }
+    if (this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()) {
+      expValue *= 2;
     }
 
     if (participantIds.size > 0) {
@@ -5011,7 +5026,8 @@ export class BattleScene extends SceneBase {
         const pId = partyMember.id;
         const participated = participantIds.has(pId);
         if (participated && pokemonDefeated) {
-          partyMember.addFriendship(FRIENDSHIP_GAIN_FROM_BATTLE);
+          const friendshipMultiplier = this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun() ? 2 : 1;
+          partyMember.addFriendship(FRIENDSHIP_GAIN_FROM_BATTLE * friendshipMultiplier);
           const machoBraceModifier = partyMember.getHeldItems().find(m => m instanceof PokemonIncrementingStatModifier);
           if (machoBraceModifier && machoBraceModifier.stackCount < machoBraceModifier.getMaxStackCount()) {
             machoBraceModifier.stackCount++;
@@ -5111,6 +5127,14 @@ export class BattleScene extends SceneBase {
     const sessionEncounterRate = this.mysteryEncounterSaveData.encounterSpawnChance;
     const encounteredEvents = this.mysteryEncounterSaveData.encounteredEvents;
 
+    if (
+      this.gameMode.modeId === GameModes.CLASSIC
+      && isErSprintRun()
+      && encounteredEvents.some(event => Math.floor((event.waveIndex - 1) / 5) === Math.floor((waveIndex - 1) / 5))
+    ) {
+      return false;
+    }
+
     // MEs can only spawn 3 or more waves after the previous ME, barring overrides
     const canSpawn =
       Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE !== null
@@ -5127,7 +5151,11 @@ export class BattleScene extends SceneBase {
     // flat per-wave weight, which the anti-variance would just cancel out), so the
     // whole run targets more MEs - ~every 5 waves at 1 charm - and every tier scales
     // up commensurately.
-    const effectiveTarget = AVERAGE_ENCOUNTERS_PER_RUN_TARGET + erMysteryCharmTargetBonus();
+    const baseTarget =
+      this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()
+        ? getErMysteryEncounterTarget()
+        : AVERAGE_ENCOUNTERS_PER_RUN_TARGET;
+    const effectiveTarget = baseTarget + erMysteryCharmTargetBonus();
     const expectedEncountersByFloor =
       (effectiveTarget / (highestMysteryEncounterWave - lowestMysteryEncounterWave))
       * (waveIndex - lowestMysteryEncounterWave);
@@ -5170,7 +5198,9 @@ export class BattleScene extends SceneBase {
       this.gameMode.hasMysteryEncounters
       && battleType === BattleType.WILD
       && !this.gameMode.isBoss(waveIndex)
-      && waveIndex % 10 !== 1
+      && !(this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()
+        ? isErChapterStartWave(waveIndex)
+        : waveIndex % 10 === 1)
       && hasOwnedCoopContinuation
       && isBetween(waveIndex, lowestMysteryEncounterWave, highestMysteryEncounterWave)
     );

@@ -24,6 +24,13 @@ import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import {
+  getErProgressionWave,
+  getErStorySourceWave,
+  isErCheckpointWave,
+  isErMajorCheckpointWave,
+  isErSprintRun,
+} from "#data/elite-redux/er-run-pacing";
 import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { isMoodyBoonRewardWave } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
@@ -193,7 +200,7 @@ export class VictoryPhase extends PokemonPhase {
       if (globalScene.gameMode.isCoop) {
         const willSelectModifier =
           (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(currentWaveIndex))
-          && currentWaveIndex % 10 !== 0;
+          && !globalScene.gameMode.isBoss(currentWaveIndex);
         const coopRole = getCoopController()?.role ?? "none";
         console.info(
           `[coop-diag] VictoryPhase win-branch role=${coopRole} battleType=${BattleType[globalScene.currentBattle.battleType]} queuesTrainerVictory=${isTrainerWin} queuesSelectModifier=${willSelectModifier} wave=${currentWaveIndex}`,
@@ -226,14 +233,17 @@ export class VictoryPhase extends PokemonPhase {
         let waveModifierRewardSettings: CustomModifierSettings | undefined;
         if (tailControl.eggLapse) {
           globalScene.phaseManager.pushNew("EggLapsePhase");
+          if (gameMode.modeId === GameModes.CLASSIC && isErSprintRun()) {
+            globalScene.phaseManager.pushNew("EggLapsePhase");
+          }
         }
         if (gameMode.isClassic) {
-          switch (currentWaveIndex) {
+          switch (getErStorySourceWave(currentWaveIndex)) {
             case ClassicFixedBossWaves.RIVAL_1:
             case ClassicFixedBossWaves.RIVAL_2:
               // Get event modifiers for this wave
               timedEventManager
-                .getFixedBattleEventRewards(currentWaveIndex)
+                .getFixedBattleEventRewards(getErStorySourceWave(currentWaveIndex))
                 .map(r => globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes[r]));
               break;
             case ClassicFixedBossWaves.EVIL_BOSS_2:
@@ -242,7 +252,10 @@ export class VictoryPhase extends PokemonPhase {
               break;
           }
         }
-        if (currentWaveIndex % 10) {
+        const sprintClassic = gameMode.modeId === GameModes.CLASSIC && isErSprintRun();
+        const checkpointWave = sprintClassic ? isErCheckpointWave(currentWaveIndex) : !(currentWaveIndex % 10);
+        const progressionWave = sprintClassic ? getErProgressionWave(currentWaveIndex) : currentWaveIndex;
+        if (!checkpointWave) {
           // ER (#217): a cross-player GHOST-team trainer rolls a per-victory reward
           // TIER for the whole reward screen (60% Great, 10% Common, 30% Ultra),
           // BEFORE luck (luck still upgrades from there). Reuses the rival/boss
@@ -261,18 +274,18 @@ export class VictoryPhase extends PokemonPhase {
           if (gameMode.isEndless && currentWaveIndex === 10) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_SHARE);
           }
-          if (gameMode.isClassic && currentWaveIndex === 10) {
+          if (gameMode.isClassic && progressionWave === 10) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_CHARM);
           }
-          if (currentWaveIndex <= 750 && (currentWaveIndex <= 500 || currentWaveIndex % 30 === superExpWave)) {
+          if (progressionWave <= 750 && (progressionWave <= 500 || progressionWave % 30 === superExpWave)) {
             globalScene.phaseManager.pushNew(
               "ModifierRewardPhase",
-              currentWaveIndex % 30 !== superExpWave || currentWaveIndex > 250
+              progressionWave % 30 !== superExpWave || progressionWave > 250
                 ? modifierTypes.EXP_CHARM
                 : modifierTypes.SUPER_EXP_CHARM,
             );
           }
-          if (currentWaveIndex <= 150 && !(currentWaveIndex % 50)) {
+          if (progressionWave <= 150 && !(progressionWave % 50)) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.GOLDEN_POKEBALL);
           }
           if (gameMode.isEndless && !(currentWaveIndex % 50)) {
@@ -302,7 +315,7 @@ export class VictoryPhase extends PokemonPhase {
         // The authoritative guest must NEVER derive this boundary locally. A one-bit disagreement here is
         // the wave-10 split: one queue opens SelectBiomePhase while the other advances without the map.
         const biomeEnding = tailControl.biomeChange;
-        const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
+        const fireBiomeShop = checkpointWave && !gameMode.isDaily;
         const raiseCrossroads =
           !biomeEnding
           && erRouting
@@ -325,6 +338,7 @@ export class VictoryPhase extends PokemonPhase {
           erRouting
           && fireBiomeShop
           && !biomeEnding
+          && !sprintClassic
           && !isCoopAuthoritativeGuest()
           && isMoodyAutomaticBiomeHealingEnabled()
         ) {
@@ -335,12 +349,30 @@ export class VictoryPhase extends PokemonPhase {
           globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);
         }
         queuePostVictoryPresentation?.();
-        if (currentWaveIndex % 10) {
+        if (!checkpointWave) {
           globalScene.phaseManager.pushNew(
             "SelectModifierPhase",
             undefined,
             undefined,
             waveModifierRewardSettings,
+            false,
+            { kind: "wave-boundary" },
+            undefined,
+            0,
+            sprintClassic ? 5 : 3,
+            sprintClassic ? 2 : 1,
+          );
+        } else if (sprintClassic) {
+          const fixedRewardSettings = gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings;
+          const checkpointTier = isErMajorCheckpointWave(currentWaveIndex) ? ModifierTier.ULTRA : ModifierTier.GREAT;
+          globalScene.phaseManager.pushNew(
+            "SelectModifierPhase",
+            undefined,
+            undefined,
+            fixedRewardSettings ?? {
+              guaranteedModifierTiers: new Array(3).fill(checkpointTier),
+              fillRemaining: false,
+            },
             false,
             { kind: "wave-boundary" },
           );

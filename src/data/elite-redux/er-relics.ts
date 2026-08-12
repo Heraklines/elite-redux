@@ -997,7 +997,11 @@ export function erApplyCovenantHeal(): void {
     return;
   }
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  if (wave < COVENANT_WAVE_CADENCE || wave % COVENANT_WAVE_CADENCE !== 0 || wave % 10 === 0) {
+  if (
+    wave < COVENANT_WAVE_CADENCE
+    || wave % COVENANT_WAVE_CADENCE !== 0
+    || globalScene.gameMode.isBoss(wave)
+  ) {
     return;
   }
   if (wave === COVENANT_LAST_WAVE) {

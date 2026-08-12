@@ -25,6 +25,7 @@
 import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { ErRosterTier } from "#data/elite-redux/er-trainer-overlay";
+import { getErProgressionWave } from "#data/elite-redux/er-run-pacing";
 
 /** "mystery" is the DEV-GATED testing gauntlet (#814): rosters behave like hell. */
 export type ErDifficulty = "youngster" | "ace" | "elite" | "hell" | "mystery";
@@ -83,7 +84,8 @@ export function applyErHellEnemyLevelScaling(
   if (topLevel <= 0) {
     return enemyLevels;
   }
-  const handicap = waveIndex < 10 ? 3 : waveIndex < 20 ? 2 : waveIndex < 40 ? 1 : 0;
+  const progressionWave = getErProgressionWave(waveIndex);
+  const handicap = progressionWave < 10 ? 3 : progressionWave < 20 ? 2 : progressionWave < 40 ? 1 : 0;
   const target = Math.max(1, topLevel - handicap);
   return enemyLevels.map(() => target);
 }

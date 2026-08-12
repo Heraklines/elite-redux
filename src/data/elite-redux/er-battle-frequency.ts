@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { erTunedTrainerCadence } from "#data/elite-redux/er-trainer-tuning";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { TrainerType } from "#enums/trainer-type";
@@ -51,6 +52,28 @@ const ER_EXTRA_RIVAL_WAVES: Readonly<Record<string, Readonly<Record<number, Trai
   },
 };
 
+const ER_SPRINT_EXTRA_RIVAL_WAVES: Readonly<Record<string, Readonly<Record<number, TrainerType>>>> = {
+  elite: {
+    22: TrainerType.RIVAL_2,
+    62: TrainerType.RIVAL_4,
+  },
+  hell: {
+    8: TrainerType.RIVAL,
+    22: TrainerType.RIVAL_2,
+    38: TrainerType.RIVAL_3,
+    62: TrainerType.RIVAL_4,
+  },
+};
+
+const ER_SPRINT_CANONICAL_RIVAL_WAVES: ReadonlyArray<readonly [number, TrainerType]> = [
+  [4, TrainerType.RIVAL],
+  [13, TrainerType.RIVAL_2],
+  [28, TrainerType.RIVAL_3],
+  [48, TrainerType.RIVAL_4],
+  [73, TrainerType.RIVAL_5],
+  [98, TrainerType.RIVAL_6],
+];
+
 const ER_CANONICAL_RIVAL_WAVES: ReadonlyArray<readonly [number, TrainerType]> = [
   [ClassicFixedBossWaves.RIVAL_1, TrainerType.RIVAL],
   [ClassicFixedBossWaves.RIVAL_2, TrainerType.RIVAL_2],
@@ -70,13 +93,28 @@ export const ER_TRAINER_CADENCE: Readonly<Record<string, number>> = {
   hell: 2,
 };
 
+/** Resolve the generic trainer slots still needed after authored trainer-class
+ * encounters have consumed a Sprint chapter's quota. */
+export function erSprintForcedTrainerSlots(scheduledSlots: readonly number[]): readonly number[] {
+  const difficulty = getErDifficulty();
+  const scheduled = new Set(scheduledSlots.filter(slot => slot >= 1 && slot <= 4));
+  if (difficulty === "elite") {
+    return scheduled.size > 0 ? [] : [3];
+  }
+  if (difficulty === "hell") {
+    const required = Math.max(0, 3 - scheduled.size);
+    return [2, 3, 4].filter(slot => !scheduled.has(slot)).slice(0, required);
+  }
+  return [];
+}
+
 /**
  * For an Elite/Hell run, the extra-rival {@linkcode TrainerType} to spawn on this
  * wave, or `null` if this wave is not a designated extra-rival wave. On Ace this
  * is always `null` (vanilla behaviour).
  */
 export function erExtraRivalTypeForWave(waveIndex: number): TrainerType | null {
-  const table = ER_EXTRA_RIVAL_WAVES[getErDifficulty()];
+  const table = (isErSprintRun() ? ER_SPRINT_EXTRA_RIVAL_WAVES : ER_EXTRA_RIVAL_WAVES)[getErDifficulty()];
   if (table === undefined) {
     return null;
   }
@@ -84,12 +122,13 @@ export function erExtraRivalTypeForWave(waveIndex: number): TrainerType | null {
 }
 
 export function erRivalWaveSequence(): ReadonlyArray<readonly [number, TrainerType]> {
-  const extra = ER_EXTRA_RIVAL_WAVES[getErDifficulty()];
+  const extra = (isErSprintRun() ? ER_SPRINT_EXTRA_RIVAL_WAVES : ER_EXTRA_RIVAL_WAVES)[getErDifficulty()];
+  const canonical = isErSprintRun() ? ER_SPRINT_CANONICAL_RIVAL_WAVES : ER_CANONICAL_RIVAL_WAVES;
   const waves =
     extra === undefined
-      ? ER_CANONICAL_RIVAL_WAVES
+      ? canonical
       : [
-          ...ER_CANONICAL_RIVAL_WAVES,
+          ...canonical,
           ...Object.entries(extra).map(([wave, trainerType]) => [Number(wave), trainerType] as const),
         ];
   return [...waves].sort(([a], [b]) => a - b);
@@ -100,7 +139,8 @@ export function erRivalWaveOrdinal(waveIndex: number, trainerType: TrainerType):
   if (ordinal >= 0) {
     return ordinal;
   }
-  const fallback = ER_CANONICAL_RIVAL_WAVES.findIndex(([, type]) => type === trainerType);
+  const fallback = (isErSprintRun() ? ER_SPRINT_CANONICAL_RIVAL_WAVES : ER_CANONICAL_RIVAL_WAVES)
+    .findIndex(([, type]) => type === trainerType);
   return fallback >= 0 ? fallback : null;
 }
 
@@ -115,6 +155,11 @@ export function erRivalWaveOrdinal(waveIndex: number, trainerType: TrainerType):
  */
 export function erForcesTrainerWave(waveIndex: number): boolean {
   const difficulty = getErDifficulty();
+  if (isErSprintRun()) {
+    const slot = ((waveIndex - 1) % 5) + 1;
+    return erExtraRivalTypeForWave(waveIndex) === null
+      && ((difficulty === "elite" && slot === 3) || (difficulty === "hell" && slot >= 2 && slot <= 4));
+  }
   // Editor-managed override first (er-trainer-tuning.json), then the default.
   const cadence = erTunedTrainerCadence(difficulty) ?? ER_TRAINER_CADENCE[difficulty];
   if (cadence === undefined) {

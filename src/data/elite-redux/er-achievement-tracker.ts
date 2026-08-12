@@ -706,7 +706,7 @@ function checkCatalogWinFeats(): void {
       erRecordNameFxTrainerWin(nameFxSpecies);
     }
   }
-  if (battle.waveIndex % 10 === 0) {
+  if (globalScene.gameMode.isBoss(battle.waveIndex)) {
     const presetNames = collectNamedPresets();
     if (presetNames.length > 0) {
       erRecordPresetBossWin(presetNames);

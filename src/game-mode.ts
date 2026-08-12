@@ -13,17 +13,32 @@ import {
 import { parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allSpecies } from "#data/data-lists";
 import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
-import { erForcesTrainerWave } from "#data/elite-redux/er-battle-frequency";
+import {
+  erExtraRivalTypeForWave,
+  erForcesTrainerWave,
+  erSprintForcedTrainerSlots,
+} from "#data/elite-redux/er-battle-frequency";
 import { erBiomeTrainerRateMult } from "#data/elite-redux/er-biome-encounters";
 import { erNotorietyTrainerChancePct } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  getErCheckpointInterval,
+  getErGymInterval,
+  getErMysteryEncounterLegalWaves,
+  getErProgressionWave,
+  isErChapterStartWave,
+  isErCheckpointWave,
+  isErSprintRun,
+} from "#data/elite-redux/er-run-pacing";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
-import { classicFixedBattles, type FixedBattleConfigs } from "#trainers/fixed-battle-configs";
+import { classicFixedBattles, type FixedBattleConfigs, sprintFixedBattles } from "#trainers/fixed-battle-configs";
 import type { CustomDailyRunConfig } from "#types/daily-run";
 import { applyChallenges } from "#utils/challenge-utils";
 import { BooleanHolder, randSeedInt, randSeedItem } from "#utils/common";
@@ -174,8 +189,10 @@ export class GameMode implements GameModeConfig {
 
   /** Return the normal player EXP cap for a specific wave. */
   getMaxExpLevelForWave(waveIndex: number): number {
-    const roundedWave = Math.ceil(Math.max(1, waveIndex) / 10) * 10;
-    const difficultyWaveIndex = this.getWaveForDifficulty(roundedWave);
+    const difficultyWaveIndex =
+      this.modeId === GameModes.DAILY
+        ? this.getWaveForDifficulty(Math.ceil(Math.max(1, waveIndex) / 10) * 10)
+        : Math.ceil(this.getWaveForDifficulty(Math.max(1, waveIndex)) / 10) * 10;
     const baseLevel = (1 + difficultyWaveIndex / 2 + Math.pow(difficultyWaveIndex / 25, 2)) * 1.2;
     return Math.ceil(baseLevel / 2) * 2 + 2;
   }
@@ -229,7 +246,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.DAILY:
         return waveIndex + 30 + (ignoreCurveChanges ? 0 : Math.floor(waveIndex / 5));
       default:
-        return waveIndex;
+        return this.modeId === GameModes.CLASSIC ? getErProgressionWave(waveIndex) : waveIndex;
     }
   }
 
@@ -240,6 +257,9 @@ export class GameMode implements GameModeConfig {
    */
   public isWaveTrainer(waveIndex: number): boolean {
     const { arena, offsetGym } = globalScene;
+    const sprint = this.modeId === GameModes.CLASSIC && isErSprintRun();
+    const gymInterval = sprint ? getErGymInterval() : 30;
+    const gymOffset = sprint ? 10 : offsetGym ? 0 : 20;
 
     // Daily spawns trainers on floors 5, 15, 20, 25, 30, 35, 40, and 45
     if (this.isDaily) {
@@ -249,10 +269,13 @@ export class GameMode implements GameModeConfig {
       }
       return waveIndex % 10 === 5 || (!(waveIndex % 10) && waveIndex > 10 && !this.isWaveFinal(waveIndex));
     }
-    if (waveIndex % 30 === (offsetGym ? 0 : 20) && !this.isWaveFinal(waveIndex)) {
+    if (waveIndex % gymInterval === gymOffset && !this.isWaveFinal(waveIndex)) {
       return true;
     }
-    if (waveIndex % 10 !== 1 && waveIndex % 10) {
+    if (
+      (!sprint && waveIndex % 10 !== 1 && waveIndex % 10)
+      || (sprint && !isErChapterStartWave(waveIndex) && !isErCheckpointWave(waveIndex))
+    ) {
       /**
        * Do not check X1 floors since there's a bug that stops trainer sprites from appearing
        * after a X0 full party heal, this also allows for a smoother biome transition for general gameplay feel
@@ -260,13 +283,18 @@ export class GameMode implements GameModeConfig {
       const trainerChance = arena.trainerChance;
       let allowTrainerBattle = true;
       if (trainerChance) {
-        const waveBase = Math.floor(waveIndex / 10) * 10;
+        const chapterInterval = sprint ? getErCheckpointInterval() : 10;
+        const waveBase = Math.floor((waveIndex - 1) / chapterInterval) * chapterInterval;
         // Stop generic trainers from spawning in within 2 waves of a fixed trainer battle
-        for (let w = Math.max(waveIndex - 2, waveBase + 2); w <= Math.min(waveIndex + 2, waveBase + 10); w++) {
+        for (
+          let w = Math.max(waveIndex - 2, waveBase + 2);
+          w <= Math.min(waveIndex + 2, waveBase + chapterInterval);
+          w++
+        ) {
           if (w === waveIndex) {
             continue;
           }
-          if (w % 30 === (offsetGym ? 0 : 20) || this.isFixedBattle(w)) {
+          if (w % gymInterval === gymOffset || this.isFixedBattle(w)) {
             allowTrainerBattle = false;
             break;
           }
@@ -283,6 +311,36 @@ export class GameMode implements GameModeConfig {
           }
         }
       }
+      if (sprint) {
+        const slot = ((waveIndex - 1) % 5) + 1;
+        const difficulty = getErDifficulty();
+        if (isErGhostWave(waveIndex)) {
+          return true;
+        }
+        if (difficulty === "elite" || difficulty === "hell") {
+          const chapterStart = waveIndex - slot + 1;
+          const scheduledSlots: number[] = [];
+          for (let chapterSlot = 1; chapterSlot <= 4; chapterSlot++) {
+            const chapterWave = chapterStart + chapterSlot - 1;
+            if (
+              this.isFixedBattle(chapterWave)
+              || erExtraRivalTypeForWave(chapterWave) !== null
+              || isErGhostWave(chapterWave)
+            ) {
+              scheduledSlots.push(chapterSlot);
+            }
+          }
+          if ((difficulty === "elite" && slot === 3) || (difficulty === "hell" && slot >= 2 && slot <= 4)) {
+            return erSprintForcedTrainerSlots(scheduledSlots).includes(slot);
+          }
+        }
+        if (difficulty === "youngster" && slot === 3) {
+          return false;
+        }
+        if (difficulty === "ace" && slot === 4) {
+          return false;
+        }
+      }
       // ER (#439): the DOJO biome is trainer-DENSE - its "hall of fighters"
       // identity. Every eligible non-boss / non-fixed wave is a trainer battle
       // (on all difficulties; the trainers themselves still come from the normal
@@ -292,7 +350,7 @@ export class GameMode implements GameModeConfig {
       if (
         arena?.biomeId === BiomeId.DOJO
         && allowTrainerBattle
-        && waveIndex % 30 !== (offsetGym ? 0 : 20)
+        && waveIndex % gymInterval !== gymOffset
         && !this.isFixedBattle(waveIndex)
       ) {
         return true;
@@ -314,7 +372,12 @@ export class GameMode implements GameModeConfig {
       //
       // We still skip the EXACT gym / fixed-battle wave, since those already
       // supply their own (scripted) trainer and take precedence downstream.
-      if (erForcesTrainerWave(waveIndex) && waveIndex % 30 !== (offsetGym ? 0 : 20) && !this.isFixedBattle(waveIndex)) {
+      if (
+        !sprint
+        && erForcesTrainerWave(waveIndex)
+        && waveIndex % gymInterval !== gymOffset
+        && !this.isFixedBattle(waveIndex)
+      ) {
         return true;
       }
       // ER (#504): biome NOTORIETY forces more TRAINER battles the longer the
@@ -323,7 +386,7 @@ export class GameMode implements GameModeConfig {
       // pure function of the per-biome start wave, which resets on entry), so the
       // global curve resumes exactly after leaving. Skips the exact gym/fixed wave
       // (those supply their own scripted trainer). Gated to the World Map run.
-      if (erBiomeRoutingActive() && waveIndex % 30 !== (offsetGym ? 0 : 20) && !this.isFixedBattle(waveIndex)) {
+      if (erBiomeRoutingActive() && waveIndex % gymInterval !== gymOffset && !this.isFixedBattle(waveIndex)) {
         const notorietyTrainerPct = erNotorietyTrainerChancePct(waveIndex);
         if (notorietyTrainerPct > 0 && randSeedInt(100) < notorietyTrainerPct) {
           return true;
@@ -346,11 +409,14 @@ export class GameMode implements GameModeConfig {
     switch (this.modeId) {
       case GameModes.DAILY:
         return waveIndex > 10 && waveIndex < 50 && !(waveIndex % 10);
-      default:
+      default: {
+        const sprint = this.modeId === GameModes.CLASSIC && isErSprintRun();
+        const gymInterval = sprint ? getErGymInterval() : 30;
         return (
-          waveIndex % 30 === (offsetGym ? 0 : 20)
+          waveIndex % gymInterval === (sprint ? 10 : offsetGym ? 0 : 20)
           && (biomeType !== BiomeId.END || this.isClassic || this.isWaveFinal(waveIndex))
         );
+      }
     }
   }
 
@@ -384,6 +450,7 @@ export class GameMode implements GameModeConfig {
   isWaveFinal(waveIndex: number, modeId: GameModes = this.modeId): boolean {
     switch (modeId) {
       case GameModes.CLASSIC:
+        return waveIndex === (isErSprintRun() ? 100 : 200);
       case GameModes.CHALLENGE:
       case GameModes.LLM_DIRECTOR:
       case GameModes.COOP:
@@ -407,7 +474,7 @@ export class GameMode implements GameModeConfig {
    * @returns true if waveIndex is a multiple of 10
    */
   isBoss(waveIndex: number): boolean {
-    return waveIndex % 10 === 0;
+    return this.modeId === GameModes.CLASSIC && isErSprintRun() ? isErCheckpointWave(waveIndex) : waveIndex % 10 === 0;
   }
 
   /**
@@ -459,7 +526,7 @@ export class GameMode implements GameModeConfig {
   isFixedBattle(waveIndex: number): boolean {
     const dummyConfig = new FixedBattleConfig();
     return (
-      Object.hasOwn(this.battleConfig, waveIndex)
+      Object.hasOwn(this.getActiveBattleConfig(), waveIndex)
       || applyChallenges(ChallengeType.FIXED_BATTLES, waveIndex, dummyConfig)
     );
   }
@@ -474,7 +541,11 @@ export class GameMode implements GameModeConfig {
     if (applyChallenges(ChallengeType.FIXED_BATTLES, waveIndex, challengeConfig)) {
       return challengeConfig;
     }
-    return this.battleConfig[waveIndex];
+    return this.getActiveBattleConfig()[waveIndex];
+  }
+
+  private getActiveBattleConfig(): FixedBattleConfigs {
+    return this.modeId === GameModes.CLASSIC && isErSprintRun() ? sprintFixedBattles : this.battleConfig;
   }
 
   /**
@@ -548,6 +619,10 @@ export class GameMode implements GameModeConfig {
   getMysteryEncounterLegalWaves(): [minWave: number, maxWave: number] {
     switch (this.modeId) {
       case GameModes.CLASSIC:
+        if (isErSprintRun()) {
+          return getErMysteryEncounterLegalWaves();
+        }
+        return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
       case GameModes.COOP:
       case GameModes.FUN:
         return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;

@@ -9006,7 +9006,7 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
         // wild pokemon cannot switch out with baton pass.
         return (
           !this.isBatonPass()
-          && globalScene.currentBattle.waveIndex % 10 !== 0 // Don't allow wild mons to flee with U-turn et al.
+          && !globalScene.gameMode.isBoss(globalScene.currentBattle.waveIndex) // Don't allow wild bosses to flee with U-turn et al.
           && !(this.selfSwitch && MoveCategory.STATUS !== move.category)
         );
       }

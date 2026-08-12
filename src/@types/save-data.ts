@@ -7,6 +7,7 @@ import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { ErRunPacing } from "#data/elite-redux/er-run-pacing";
 import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import type { TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
@@ -146,6 +147,10 @@ export interface SessionSaveData {
    * backwards compatibility with pre-existing saves (treated as "ace").
    */
   erDifficulty?: ErDifficulty;
+  /** Classic's selected run length. Absent on legacy saves, which are Normal. */
+  erRunPacing?: ErRunPacing;
+  /** Fractional account-voucher progress used only by Classic Sprint. */
+  erSprintVoucherCredit?: number;
   /** Fun Mode randomizer toggles. Absent on every non-Fun and legacy save. */
   funModeConfig?: FunModeConfig;
   /** Moody Mode's run-local boon, curse, progression, and threat ledger. */

@@ -113,6 +113,7 @@ import {
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { getErCustomTrainerSprite } from "#data/elite-redux/er-custom-trainer-sprites";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErProgressionWave } from "#data/elite-redux/er-run-pacing";
 import {
   encodeErShinyLabPreset,
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -1420,6 +1421,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
     return null;
   }
   const difficulty = getErDifficulty();
+  const eligibilityWave = getErProgressionWave(waveIndex);
   const seed = globalScene.seed ?? "";
 
   // DEV-ONLY: a forced named trainer spawns at its first eligible wave, bypassing
@@ -1431,7 +1433,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
       // Force bypasses the challenge-exclusivity gate: the staff picker pins a
       // matching difficulty + in-range wave but cannot start a challenge run, so a
       // challenge-gated trainer is still force-fielded (used-key + floor gates hold).
-      return isErCustomTrainerEligible(forced, waveIndex, difficulty, true) ? forced : null;
+      return isErCustomTrainerEligible(forced, eligibilityWave, difficulty, true) ? forced : null;
     }
     // Unknown key (typo) => fall through to normal density selection.
   }
@@ -1452,7 +1454,7 @@ export function selectErCustomTrainerForWave(waveIndex: number): ErCustomTrainer
   if (waveIndex < anchorWave) {
     return null;
   }
-  const pool = all.filter(t => isErCustomTrainerEligible(t, waveIndex, difficulty));
+  const pool = all.filter(t => isErCustomTrainerEligible(t, eligibilityWave, difficulty));
   if (pool.length === 0) {
     return null;
   }

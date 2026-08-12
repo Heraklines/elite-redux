@@ -1695,6 +1695,7 @@ export type CoopMessage =
   | {
       t: "runConfig";
       difficulty: string;
+      pacing?: "normal" | "sprint";
       challenges: { id: number; value: number; severity: number }[];
       seed?: string;
       netcodeMode?: CoopNetcodeMode;

@@ -38,6 +38,7 @@ import { erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning"
 import { erNotorietyItemRateMult } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErProgressionWave } from "#data/elite-redux/er-run-pacing";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { StatusEffect } from "#enums/status-effect";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
@@ -372,7 +373,7 @@ export function maybeAssignErWardStone(enemy: EnemyPokemon): void {
     }
     const fromWave = SPAWN_FROM_WAVE()[getErDifficulty()];
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    if (fromWave === undefined || wave < fromWave) {
+    if (fromWave === undefined || getErProgressionWave(wave) < fromWave) {
       return;
     }
     const isBoss = enemy.isBoss();
