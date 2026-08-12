@@ -878,7 +878,7 @@ fn validate_action_order(
                         };
                         let pokemon = find_pokemon(battle, action.actor)
                             .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-                        let move = pokemon
+                        let move_definition = pokemon
                             .moves
                             .get(usize::from(move_slot.get()))
                             .and_then(Option::as_ref)
@@ -886,7 +886,7 @@ fn validate_action_order(
                             .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
                         if action.timing_modifier != 1
                             || action.bracket_modifier != 1
-                            || action.move_priority != move.priority
+                            || action.move_priority != move_definition.priority
                         {
                             return Err(BattleMaterialApplyError::InvalidEvidence);
                         }

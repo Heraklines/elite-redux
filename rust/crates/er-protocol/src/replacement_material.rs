@@ -8,10 +8,13 @@
 use std::collections::BTreeSet;
 
 use er_canonical::canonicalize_value;
+use er_types::battle_ids::{
+    AuthorityEpoch, BattleId, BattleSide, FieldSlot, TurnIndex, WaveIndex,
+};
 use er_types::{
-    AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityEpoch, BattleId, BattleSide,
-    FieldSlot, FrameType, OperationId, RawFrame, SafeU53, SeatId, TurnIndex, WaveIndex,
-    battle_command::validate_replacement_operation_id, validate_authority_operation_id,
+    AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, FrameType, OperationId, RawFrame,
+    SafeU53, SeatId, battle_command::validate_replacement_operation_id,
+    validate_authority_operation_id,
 };
 use serde_json::{Map, Value};
 use thiserror::Error;
