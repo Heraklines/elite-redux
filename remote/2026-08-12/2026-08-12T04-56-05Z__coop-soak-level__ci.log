@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 31564676910 (main)
+timestamp: 2026-08-12T04-56-05Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260812 WAVES=55 - replay this run with:  SOAK_SEED=20260812 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 3 (seed 206780945): host at terminal phase TitlePhase. Survey stops here.
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 3 (seed 20260812): wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 2 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-08-12T04-55-27-833Z__seed-20260812__wave-3. Replay: SOAK_SEED=20260812[39m
+
+----- vitest result tail -----
+[90m [2m❯[22m Timeout._onTimeout test/mocks/mock-clock.ts:[2m16:12[22m[39m
+[90m [2m❯[22m listOnTimeout node:internal/timers:[2m608:17[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: this.message.setFixedSize is not a function[39m
+[36m [2m❯[22m PartyUiHandler.showPartyText src/ui/handlers/party-ui-handler.ts:[2m1976:20[22m[39m
+    [90m1974|[39m
+    [90m1975|[39m     if (presentation == null && runtimeLines.length === 0) {
+    [90m1976|[39m       this.message.setFixedSize(0, 0).setWordWrapWidth(0).setFontSize(…
+    [90m   |[39m                    [31m^[39m
+    [90m1977|[39m       switch (this.partyUiMode) {
+    [90m1978|[39m         case PartyUiMode.MODIFIER_TRANSFER:
+[90m [2m❯[22m PartyUiHandler.clearOptions src/ui/handlers/party-ui-handler.ts:[2m2694:10[22m[39m
+[90m [2m❯[22m PartyUiHandler.processActionButtonForOptions src/ui/handlers/party-ui-handler.ts:[2m1498:12[22m[39m
+[90m [2m❯[22m PartyUiHandler.processOptionMenuInput src/ui/handlers/party-ui-handler.ts:[2m1520:19[22m[39m
+[90m [2m❯[22m PartyUiHandler.processInput src/ui/handlers/party-ui-handler.ts:[2m1563:22[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m1076:13[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m757:18[22m[39m
+[90m [2m❯[22m driveHostFaintPickUnderHostCtx test/tools/coop-soak-driver.ts:[2m1072:10[22m[39m
+[90m [2m❯[22m Object.callback test/tools/coop-soak-driver.ts:[2m1126:14[22m[39m
+[90m [2m❯[22m PromptHandler.doPromptCheck test/helpers/prompt-handler.ts:[2m134:14[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m3 errors[39m[22m
+[2m   Start at [22m 04:54:47
+[2m   Duration [22m 77.75s[2m (transform 21.66s, setup 26.06s, import 334ms, tests 50.44s, environment 758ms)[22m
+
