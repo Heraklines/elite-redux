@@ -723,11 +723,7 @@ fn normalize_adjacent_kind(
 
 /// Map the legacy TypeScript `TerrainType` domain into the current tagged
 /// `TerrainKind` wire without erasing non-neutral values.
-fn legacy_terrain_code(
-    case_name: &str,
-    path: &str,
-    value: u64,
-) -> Result<u16, FixtureError> {
+fn legacy_terrain_code(case_name: &str, path: &str, value: u64) -> Result<u16, FixtureError> {
     let code = u16::try_from(value).map_err(|_| {
         FixtureError::new(format!(
             "{case_name}: {path} legacy terrain value {value} exceeds u16"
@@ -741,11 +737,7 @@ fn legacy_terrain_code(
     Ok(code)
 }
 
-fn legacy_terrain_tag_code(
-    case_name: &str,
-    path: &str,
-    tag: &str,
-) -> Result<u16, FixtureError> {
+fn legacy_terrain_tag_code(case_name: &str, path: &str, tag: &str) -> Result<u16, FixtureError> {
     match tag {
         "NONE" => Ok(0),
         "MISTY" => Ok(1),
@@ -839,11 +831,7 @@ fn normalize_legacy_terrain_kind(
             "{case_name}: {path}.{field_name} is missing"
         )));
     };
-    let normalized = legacy_terrain_kind_wire(
-        case_name,
-        &format!("{path}.{field_name}"),
-        kind,
-    )?;
+    let normalized = legacy_terrain_kind_wire(case_name, &format!("{path}.{field_name}"), kind)?;
     object.insert(field_name.to_owned(), normalized);
     Ok(())
 }
