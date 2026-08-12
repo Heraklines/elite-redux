@@ -219,7 +219,7 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
 fn assert_doc_hidden_before(source: &str, item: &str) {
     let position = source
         .find(item)
-        .unwrap_or_else(|| panic!("missing expected source item {item}"));
+        .expect("missing expected source item");
     let preceding = source[..position].lines().rev().take(8);
     assert!(
         preceding
@@ -232,7 +232,7 @@ fn assert_doc_hidden_before(source: &str, item: &str) {
 fn struct_body<'a>(source: &'a str, declaration: &str) -> &'a str {
     let start = source
         .find(declaration)
-        .unwrap_or_else(|| panic!("missing expected struct {declaration}"));
+        .expect("missing expected struct");
     let end = source[start..]
         .find('}')
         .map(|offset| start + offset)
