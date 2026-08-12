@@ -884,6 +884,52 @@ mod live_coop_production {
         Ok(())
     }
 
+    fn normalize_legacy_type_chart(pack: &mut Value, selected: &ContentPack) -> TestResult {
+        let chart = pack
+            .get_mut("type_chart")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| invalid("published content type chart is invalid"))?;
+        let entries = chart
+            .get_mut("entries")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| invalid("published content type-chart entries are invalid"))?;
+        let expected_entries = serde_json::to_value(&selected.type_chart.entries)?
+            .as_array()
+            .cloned()
+            .ok_or_else(|| invalid("selected content type-chart entries are invalid"))?;
+        if entries.len() != expected_entries.len() {
+            return Err(invalid(format!(
+                "published content type-chart entry count is {}, expected {}",
+                entries.len(),
+                expected_entries.len()
+            )));
+        }
+
+        let legacy_entries = entries.clone();
+        let mut normalized = Vec::with_capacity(expected_entries.len());
+        for (index, expected) in expected_entries.iter().enumerate() {
+            let actual = legacy_entries
+                .iter()
+                .find(|entry| {
+                    entry.get("attack") == expected.get("attack")
+                        && entry.get("defense") == expected.get("defense")
+                })
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "published content type-chart entry {index} is missing the selected attack/defense pair"
+                    ))
+                })?;
+            if actual != expected {
+                return Err(invalid(format!(
+                    "published content type-chart entry {index} differs from the selected definition"
+                )));
+            }
+            normalized.push(actual.clone());
+        }
+        *entries = normalized;
+        Ok(())
+    }
+
     pub(crate) fn normalize_legacy_content_pack(
         artifact: &mut Value,
         selected: &ContentPack,
@@ -932,6 +978,7 @@ mod live_coop_production {
         let pack = artifact
             .get_mut("content_pack")
             .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+        normalize_legacy_type_chart(pack, selected)?;
         let manifest = pack
             .get_mut("capability_manifest")
             .and_then(Value::as_object_mut)
@@ -1364,7 +1411,7 @@ mod live_coop_production {
         host_game.local_seat = host;
         let mut guest_game = game;
         guest_game.local_seat = guest;
-        Ok(SimulatedPair::new_battle(SimulatedBattlePairConfig {
+        let mut pair = SimulatedPair::new_battle(SimulatedBattlePairConfig {
             host_game,
             host_protocol: authority_protocol(host, guest, generation(1))?,
             guest_game,
@@ -1372,7 +1419,15 @@ mod live_coop_production {
             content,
             replay_seed,
             initial_storage: BTreeMap::new(),
-        })?)
+        })?;
+        // Battle protocol construction starts at generation one, while the
+        // simulated transport starts at zero. Establish the connected
+        // generation before any trace operation takes its pre-operation
+        // snapshot; this bootstrap is fixture setup, not continuation input.
+        pair.apply(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        })?;
+        Ok(pair)
     }
 
     fn snapshot_wire(pair: &SimulatedPair) -> TestResult<String> {
@@ -1921,15 +1976,7 @@ mod live_coop_production {
     }
 
     fn prime_trace_pair(pair: &mut SimulatedPair) -> TestResult {
-        // `new_battle` starts the production protocol at generation one while
-        // the pair transport starts at generation zero.  Synchronize that
-        // public transport boundary before driving physical input.
-        apply_trace_operation(
-            pair,
-            PairOperationV2::Reconnect {
-                endpoint: PairEndpoint::Host,
-            },
-        )?;
+        // `new_battle_pair` establishes generation one before trace capture.
         for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             for _ in 0..3 {
                 raw_press_v2(pair, endpoint, PhysicalKey::Enter)?;
@@ -1954,12 +2001,6 @@ mod live_coop_production {
     }
 
     fn reach_guest_proposal_pending(pair: &mut SimulatedPair) -> TestResult {
-        apply_trace_operation(
-            pair,
-            PairOperationV2::Reconnect {
-                endpoint: PairEndpoint::Host,
-            },
-        )?;
         reach_one_doubles_command_pending(pair)?;
         for _ in 0..8 {
             if guest_proposal_pending(&pair.snapshot_v2()?) {
@@ -2744,12 +2785,6 @@ mod live_coop_production {
             let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1101)?;
             apply_trace_operation(
                 &mut pair,
-                PairOperationV2::Reconnect {
-                    endpoint: PairEndpoint::Host,
-                },
-            )?;
-            apply_trace_operation(
-                &mut pair,
                 raw_key_down_v2(PairEndpoint::Host, PhysicalKey::Space),
             )?;
             apply_trace_operation(
@@ -2778,12 +2813,6 @@ mod live_coop_production {
 
         {
             let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1102)?;
-            apply_trace_operation(
-                &mut pair,
-                PairOperationV2::Reconnect {
-                    endpoint: PairEndpoint::Host,
-                },
-            )?;
             reach_one_doubles_command_pending(&mut pair)?;
             scenarios.push(trace_boundary(
                 "doubles-one-command-pending",
@@ -3076,12 +3105,6 @@ mod live_coop_production {
 
         {
             let mut pair = new_battle_pair(forced_victory_config()?, Arc::clone(&content), 1109)?;
-            apply_trace_operation(
-                &mut pair,
-                PairOperationV2::Reconnect {
-                    endpoint: PairEndpoint::Host,
-                },
-            )?;
             for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
                 for _ in 0..8 {
                     if endpoint_commands_complete(&pair.snapshot_v2()?, endpoint) {
