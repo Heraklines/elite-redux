@@ -95,6 +95,7 @@ The numerical values below are initial balance targets.
 
 **Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.
 
+Momentum Relay therefore becomes the team-wide evolution of Relay Seat.
 
 ---
 
@@ -166,6 +167,7 @@ Empty and fainted slots are counted separately, with no cap.
 
 **Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.
 
+The party screen displays a prominent star symbol on the current target.
 
 **Rank II:** Experience becomes +75%; first-move power becomes +30%.
 

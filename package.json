@@ -69,7 +69,6 @@
     "er:verify-assets": "node scripts/elite-redux/verify-assets.mjs",
     "er:test": "vitest run test/data/elite-redux",
     "er:scenario": "node scripts/run-scenario.mjs",
-    "moody:gate": "vitest run --config test/node/vitest.moody.config.ts --no-color",
     "coop:gate": "node scripts/run-coop-gate.mjs"
   },
   "dependencies": {

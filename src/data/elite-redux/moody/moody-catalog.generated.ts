@@ -73,11 +73,11 @@ export const MOODY_BOONS = [
         id: "momentum-relay",
         name: "Momentum Relay",
         description:
-          "Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.",
+          "Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.\n\nMomentum Relay therefore becomes the team-wide evolution of Relay Seat.",
       },
     ],
     fullDescription:
-      "**Base:** When the occupant voluntarily switches out, the incoming Pokémon inherits one random positive stat stage from it.\n\n**Rank II:** It transfers up to two total stages, with no more than one stage from each stat.\n\n**Evolution — Perfect Handoff:** It transfers the two highest available stages and removes one negative stage from the incoming Pokémon.\n\n**Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.",
+      "**Base:** When the occupant voluntarily switches out, the incoming Pokémon inherits one random positive stat stage from it.\n\n**Rank II:** It transfers up to two total stages, with no more than one stage from each stat.\n\n**Evolution — Perfect Handoff:** It transfers the two highest available stages and removes one negative stage from the incoming Pokémon.\n\n**Evolution — Momentum Relay:** Every voluntary switch by the team transfers one random positive stage, once per Pokémon per battle.\n\nMomentum Relay therefore becomes the team-wide evolution of Relay Seat.",
   },
   {
     id: "echo-seat",
@@ -208,7 +208,7 @@ export const MOODY_BOONS = [
     rarity: "great",
     scope: "rotating slot",
     targetKind: "slot",
-    base: "One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.",
+    base: "One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\nThe party screen displays a prominent star symbol on the current target.",
     rankTwo: "Experience becomes +75%; first-move power becomes +30%.",
     evolutions: [
       {
@@ -223,7 +223,7 @@ export const MOODY_BOONS = [
       },
     ],
     fullDescription:
-      "**Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\n**Rank II:** Experience becomes +75%; first-move power becomes +30%.\n\n**Evolution — Encore:** If the Star scores a KO, it heals 10% and remains the Star for the following wave.\n\n**Evolution — Ensemble:** The two adjacent slots receive half of the Star’s combat bonus.",
+      "**Base:** One occupied slot becomes the Star each wave, following a deterministic seeded rotation. The Star gains 50% more experience and 20% power on its first damaging move.\n\nThe party screen displays a prominent star symbol on the current target.\n\n**Rank II:** Experience becomes +75%; first-move power becomes +30%.\n\n**Evolution — Encore:** If the Star scores a KO, it heals 10% and remains the Star for the following wave.\n\n**Evolution — Ensemble:** The two adjacent slots receive half of the Star’s combat bonus.",
   },
   {
     id: "last-chair",
