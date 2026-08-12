@@ -73,7 +73,9 @@ pub(crate) enum LocalBattleRequest {
     /// Retained for the internal no-legal-replacement path in the same
     /// source-including contract-test target.
     #[allow(dead_code)]
-    InternalNoLegalReplacement { occurrence: FaintOccurrenceId },
+    InternalNoLegalReplacement {
+        occurrence: FaintOccurrenceId,
+    },
 }
 
 /// The material kind used by the common typed codec/applier path.

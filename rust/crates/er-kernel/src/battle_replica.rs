@@ -140,11 +140,9 @@ pub(crate) fn apply_authority_material(
         AuthorityEntryKind::InteractionCommit
         | AuthorityEntryKind::ControlCommit
         | AuthorityEntryKind::WaveAdvance
-        | AuthorityEntryKind::TerminalCommit => {
-            Err(ReplicaApplyError::ProtocolViolation(
-                ProtocolViolation::MalformedBattleMaterial,
-            ))
-        }
+        | AuthorityEntryKind::TerminalCommit => Err(ReplicaApplyError::ProtocolViolation(
+            ProtocolViolation::MalformedBattleMaterial,
+        )),
     }
 }
 
