@@ -6,6 +6,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { ER_OMNIFORM_COMPOSITE_PART_ID, MANUAL_COMPOSITE_PARTS } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   applyFunMegaStatDelta,
   formatFunMegaMixEffects,
@@ -26,6 +27,7 @@ import {
   getFunRandomLevelMoves,
   getFunRandomTypes,
   getFunScrambledMoveId,
+  isFunRandomAbilityEligible,
   rerollFunAbilities,
   resetFunModeConfig,
   rollFunTerrain,
@@ -34,6 +36,7 @@ import {
 } from "#data/elite-redux/er-fun-mode";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { CustomPokemonData } from "#data/pokemon/pokemon-data";
+import type { AbilityId } from "#enums/ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -192,6 +195,28 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
       ids.add(id);
     }
     expect(ids.size).toBe(6);
+  });
+
+  it("excludes Omniform and every Omniform composite from random abilities and Avalanche", () => {
+    const omniformAbilities = [
+      ER_OMNIFORM_COMPOSITE_PART_ID,
+      ...Object.entries(MANUAL_COMPOSITE_PARTS)
+        .filter(([, def]) => def.constituents.includes(ER_OMNIFORM_COMPOSITE_PART_ID))
+        .map(([abilityId]) => Number(abilityId)),
+    ] as AbilityId[];
+
+    expect(omniformAbilities.length).toBeGreaterThan(1);
+    for (const abilityId of omniformAbilities) {
+      expect(isFunRandomAbilityEligible(abilityId)).toBe(false);
+    }
+
+    setFunModeConfig({ ...getFunModeConfig(), abilityAvalanche: true });
+    for (let pokemonId = 1; pokemonId <= 200; pokemonId++) {
+      for (let slot = 0; slot < 6; slot++) {
+        expect(omniformAbilities).not.toContain(getFunRandomAbilityId(pokemonId, slot));
+      }
+      expect(getFunAbilityAvalancheIds(pokemonId, 200)).not.toEqual(expect.arrayContaining(omniformAbilities));
+    }
   });
 
   it("rerolls the whole party seed without destabilizing the selected result", () => {

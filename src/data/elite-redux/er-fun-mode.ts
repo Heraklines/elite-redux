@@ -5,6 +5,10 @@
  */
 
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
+import {
+  ER_OMNIFORM_COMPOSITE_PART_ID,
+  MANUAL_COMPOSITE_PARTS,
+} from "#data/elite-redux/abilities/composite-newcomers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -100,9 +104,44 @@ function deterministicIndex(pokemonId: number, salt: number, length: number): nu
   return length > 0 ? mix32((pokemonId ^ Math.imul(salt, 0x9e3779b1)) >>> 0) % length : 0;
 }
 
+/**
+ * Omniform is tied to the Partner Eevee form chain and is not safe on an
+ * arbitrary species. Keep both the standalone ability and every manual
+ * composite that contains it out of Fun Mode random assignment.
+ *
+ * The recursive walk also protects future nested composites added through the
+ * ER editor instead of relying on a brittle list of today's Partner abilities.
+ */
+export function isFunRandomAbilityEligible(abilityId: AbilityId): boolean {
+  const containsOmniform = (candidate: number, visiting: Set<number>): boolean => {
+    if (candidate === ER_OMNIFORM_COMPOSITE_PART_ID) {
+      return true;
+    }
+    if (visiting.has(candidate)) {
+      return false;
+    }
+    const composite = MANUAL_COMPOSITE_PARTS[candidate];
+    if (!composite) {
+      return false;
+    }
+    visiting.add(candidate);
+    const result = composite.constituents.some(constituent => containsOmniform(constituent, visiting));
+    visiting.delete(candidate);
+    return result;
+  };
+
+  return !containsOmniform(abilityId, new Set());
+}
+
 function abilityPool(): AbilityId[] {
   cachedAbilityPool ??= allAbilities
-    .filter(ability => ability != null && ability.id !== AbilityId.NONE && !ability.unimplemented)
+    .filter(
+      ability =>
+        ability != null
+        && ability.id !== AbilityId.NONE
+        && !ability.unimplemented
+        && isFunRandomAbilityEligible(ability.id),
+    )
     .map(ability => ability.id);
   return cachedAbilityPool;
 }

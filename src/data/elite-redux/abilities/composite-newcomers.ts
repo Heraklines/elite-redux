@@ -145,7 +145,9 @@ const DUAL_WIELD = 5169; // Minigun constituent (ER custom)
 // composite so the composite drives the adaptive transform AND keeps the base
 // innate's own effect. The remaining constituents are each base eeveelution's
 // FIRST innate (verified live from the ER-patched kit at authoring time).
-const OMNIFORM = 5929;
+/** Lightweight Omniform id for composite metadata consumers. */
+export const ER_OMNIFORM_COMPOSITE_PART_ID = 5929;
+const OMNIFORM = ER_OMNIFORM_COMPOSITE_PART_ID;
 const FLUFFY = 218; // base Eevee innate[0] (also Nimbeon innate[0])
 const STAMINA = 192; // Ryuveon innate[0] (vanilla)
 const STAINLESS_STEEL = 5530; // Titaneon innate[0] (ER custom)

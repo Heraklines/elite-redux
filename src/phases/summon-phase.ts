@@ -212,6 +212,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
             pokemon.showInfo();
             pokemon.playAnim();
             pokemon.setVisible(true);
+            // A between-wave party reorder hides the former field occupant by
+            // setting both visible=false and alpha=0. U-turn can later summon
+            // that same object; restoring visibility alone leaves it fully
+            // transparent even though the switch completed successfully.
+            pokemon.setAlpha(1);
             pokemon.getSprite().setVisible(true);
             pokemon.setScale(0.5);
             pokemon.tint(getPokeballTintColor(pokemon.getPokeball(true)));

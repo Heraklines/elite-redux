@@ -119,6 +119,7 @@ import {
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
   readErShinyLabSpriteSourcePixels,
+  resetErShinyLabSpriteFxTexture,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import type { Variant } from "#sprites/variant";
 import {
@@ -4677,6 +4678,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     species: PokemonSpecies,
     props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
   ): void {
+    // Party slots are reused as starters are added, removed, or reordered. Drop
+    // the prior slot occupant's generated-FX source before rendering the new
+    // species so an FX cache/source miss cannot restore a stale icon.
+    resetErShinyLabSpriteFxTexture(icon);
     const renderStage = this.showdownRenderStage(species.speciesId);
     const iconSpecies = renderStage?.species ?? species;
     const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
@@ -6060,7 +6065,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   private resetStarterIconSlot(index: number): void {
     const icon = this.starterIcons[index];
-    clearErShinyLabSpriteFxTexture(icon, false);
+    resetErShinyLabSpriteFxTexture(icon, false);
     icon.setTexture("pokemon_icons_0").setFrame("unknown");
   }
 

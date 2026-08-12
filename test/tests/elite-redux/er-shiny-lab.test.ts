@@ -51,6 +51,7 @@ import {
   getErShinyLabSpriteFxLookForPokemon,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
+  resetErShinyLabSpriteFxTexture,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import {
   ensureErShinyLabPaletteVariantCache,
@@ -68,6 +69,35 @@ describe("Shiny Lab battle FX performance", () => {
     expect(getErShinyLabBattleFxFrameMs(2)).toBe(250);
     expect(getErShinyLabBattleFxFrameMs(3)).toBe(500);
     expect(getErShinyLabBattleFxFrameMs(6)).toBe(500);
+  });
+});
+
+describe("Shiny Lab reusable mini-icon slots", () => {
+  it("forgets the previous species source when a starter-party slot is reused", () => {
+    const fxData = {
+      key: null,
+      sourceKey: "pokemon_icons_0",
+      sourceFrame: "pidgey",
+      sourceOriginX: 0.5,
+      sourceOriginY: 0.5,
+      state: "pidgey-look",
+    };
+    const sprite = {
+      pipelineData: {
+        erShinyLabFx: fxData,
+      },
+    } as unknown as Phaser.GameObjects.Sprite;
+
+    resetErShinyLabSpriteFxTexture(sprite, false);
+
+    expect(fxData).toMatchObject({
+      key: null,
+      sourceKey: null,
+      sourceFrame: null,
+      sourceOriginX: undefined,
+      sourceOriginY: undefined,
+      state: undefined,
+    });
   });
 });
 

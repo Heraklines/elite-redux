@@ -68,8 +68,8 @@ interface SpriteFxData {
   key?: string | null;
   sourceKey?: string | null;
   sourceFrame?: string | number | null;
-  sourceOriginX?: number;
-  sourceOriginY?: number;
+  sourceOriginX?: number | undefined;
+  sourceOriginY?: number | undefined;
   state?: string | undefined;
 }
 
@@ -669,6 +669,21 @@ export function clearErShinyLabSpriteFxTexture(sprite: Phaser.GameObjects.Sprite
   data.key = null;
   data.state = undefined;
   releaseGeneratedTexture(oldKey);
+}
+
+/**
+ * Fully retires a generated mini-sprite texture before the same UI slot is
+ * reused for another Pokemon. `clearErShinyLabSpriteFxTexture` deliberately
+ * remembers its source for recurring animation refreshes; reusable party slots
+ * must forget that source or a failed render can restore the previous species.
+ */
+export function resetErShinyLabSpriteFxTexture(sprite: Phaser.GameObjects.Sprite, restoreSource = true): void {
+  const data = spriteFxData(sprite);
+  clearErShinyLabSpriteFxTexture(sprite, restoreSource);
+  data.sourceKey = null;
+  data.sourceFrame = null;
+  data.sourceOriginX = undefined;
+  data.sourceOriginY = undefined;
 }
 
 export function applyErShinyLabSpriteFxTexture(

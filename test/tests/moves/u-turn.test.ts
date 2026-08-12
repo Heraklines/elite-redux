@@ -101,6 +101,23 @@ describe("Moves - U-turn", () => {
     expect(game.field.getPlayerPokemon().species.speciesId).toBe(SpeciesId.SHUCKLE);
   });
 
+  it("restores a reordered bench Pokemon's alpha when U-turn summons it", async () => {
+    await game.classicMode.startBattle(SpeciesId.AIPOM, SpeciesId.DRUDDIGON);
+    const incoming = game.scene.getPlayerParty()[1];
+    // Mirrors the presentation state left by a between-wave Check Team reorder.
+    incoming.setVisible(false).setAlpha(0);
+
+    game.move.select(MoveId.U_TURN);
+    await game.phaseInterceptor.to("SwitchPhase", false);
+    game.doSelectPartyPokemon(1);
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    expect(game.field.getPlayerPokemon()).toBe(incoming);
+    expect(incoming.visible).toBe(true);
+    expect(incoming.alpha).toBe(1);
+    expect(incoming.getSprite().visible || incoming.isErShinyLabFxOverlayVisible()).toBe(true);
+  });
+
   it("should not crash when KOing the user from a reactive effect", async () => {
     game.override.enemyAbility(AbilityId.ROUGH_SKIN);
     await game.classicMode.startBattle(SpeciesId.SHEDINJA, SpeciesId.FEEBAS);
