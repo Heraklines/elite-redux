@@ -94,6 +94,47 @@ fn kernel_format(battle: &Value) -> TestResult<Value> {
     Ok(format)
 }
 
+fn adapt_party_status_kinds(party: &Value, party_name: &str) -> TestResult<Value> {
+    let mut adapted = party.clone();
+    let pokemon = adapted
+        .as_array_mut()
+        .ok_or_else(|| invalid(format!("{party_name} is not an array")))?;
+
+    for (index, pokemon) in pokemon.iter_mut().enumerate() {
+        let pokemon = pokemon
+            .as_object_mut()
+            .ok_or_else(|| invalid(format!("{party_name}[{index}] is not an object")))?;
+        let status = pokemon
+            .get_mut("status")
+            .ok_or_else(|| invalid(format!("{party_name}[{index}].status is missing")))?
+            .as_object_mut()
+            .ok_or_else(|| invalid(format!("{party_name}[{index}].status is not an object")))?;
+        let kind = status
+            .get_mut("kind")
+            .ok_or_else(|| invalid(format!("{party_name}[{index}].status.kind is missing")))?;
+        let unwrapped = match kind {
+            Value::String(_) => continue,
+            Value::Object(wrapper) if wrapper.len() == 1 => wrapper
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "{party_name}[{index}].status.kind must be a string or an exact one-field kind wrapper"
+                    ))
+                })?
+                .to_owned(),
+            _ => {
+                return Err(invalid(format!(
+                    "{party_name}[{index}].status.kind must be a string or an exact one-field kind wrapper"
+                )));
+            }
+        };
+        *kind = Value::String(unwrapped);
+    }
+
+    Ok(adapted)
+}
+
 fn enemy_actor(battle: &Value) -> TestResult<er_types::battle_ids::PokemonId> {
     let slots = field(field(battle, "field")?, "slots")?
         .as_array()
@@ -172,13 +213,17 @@ fn battle_config(fixture: &Value, local_seat: SeatId) -> TestResult<BattleGameCo
         .as_str()
         .ok_or_else(|| invalid("battle wave seed is not a string"))?
         .to_owned();
+    let player_party =
+        adapt_party_status_kinds(field(battle, "player_party")?, "battle.player_party")?;
+    let enemy_party =
+        adapt_party_status_kinds(field(battle, "enemy_party")?, "battle.enemy_party")?;
     Ok(BattleGameConfig {
         run_state: serde_json::from_value(run_state)?,
         start: BattleStartV1 {
             schema_version: 1,
             format: serde_json::from_value(format)?,
-            player_party: serde_json::from_value(field(battle, "player_party")?.clone())?,
-            enemy_party: serde_json::from_value(field(battle, "enemy_party")?.clone())?,
+            player_party: serde_json::from_value(player_party)?,
+            enemy_party: serde_json::from_value(enemy_party)?,
             player_leads: vec![PartyIndex::try_from(0_u64)?],
             enemy_leads: vec![PartyIndex::try_from(0_u64)?],
         },
