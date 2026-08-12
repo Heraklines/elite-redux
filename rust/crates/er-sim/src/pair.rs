@@ -1581,7 +1581,7 @@ impl SimulatedPair {
                         self.step_kernel_input(endpoint, input, generated_events, budget)?;
                     self.trace_audit
                         .effect_origins
-                        .extend(std::iter::repeat(endpoint).take(effects.len()));
+                        .extend(std::iter::repeat_n(endpoint, effects.len()));
                     generated_effects.extend(effects.iter().cloned());
                     for effect in effects.into_iter().rev() {
                         work.push_front(PairWork::Effect(effect));
@@ -1594,7 +1594,7 @@ impl SimulatedPair {
                             self.step_kernel_input(endpoint, input, generated_events, budget)?;
                         self.trace_audit
                             .effect_origins
-                            .extend(std::iter::repeat(endpoint).take(effects.len()));
+                            .extend(std::iter::repeat_n(endpoint, effects.len()));
                         generated_effects.extend(effects.iter().cloned());
                         batch_effects.extend(effects);
                     }
@@ -3216,7 +3216,7 @@ where
 
 fn decode_hex(value: &CanonicalHexBytes, path: &str) -> Result<Vec<u8>, SnapshotError> {
     let text = value.as_str().as_bytes();
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return Err(pair_snapshot_invalid(path, "hex payload has odd length"));
     }
     text.chunks_exact(2)
