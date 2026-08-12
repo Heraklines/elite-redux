@@ -44,6 +44,7 @@ use crate::runtime::{CommandAdmission, GameReduction, GameRuntime, GameRuntimeEr
 // needed by the source-including local-battle contract test, so the production
 // crate does not retain unused crate-private reexports.
 #[cfg(test)]
+#[allow(unused_imports)]
 pub(crate) use crate::runtime::{BATTLE_START_SCHEMA_VERSION, BattleGameConfig, BattleStartV1};
 
 /// The private phase visible to the local game reducer.
@@ -200,7 +201,7 @@ pub(crate) enum LocalBattleProgress {
     Waiting {
         frontier: LocalBattleFrontier,
     },
-    MaterialInstalled(LocalBattleMaterialResult),
+    MaterialInstalled(Box<LocalBattleMaterialResult>),
     /// The runtime's canonical admission ledger already contains this exact
     /// proposal. The runtime intentionally does not retain old material, so a
     /// duplicate is a no-op rather than a second resolver/material pass.
@@ -667,7 +668,9 @@ fn finish_material(
     runtime
         .install_resolution(&prepared.resolution)
         .map_err(|error| LocalBattleError::Runtime(error.into()))?;
-    Ok(LocalBattleProgress::MaterialInstalled(prepared.result))
+    Ok(LocalBattleProgress::MaterialInstalled(Box::new(
+        prepared.result,
+    )))
 }
 
 fn build_turn_material(
@@ -747,7 +750,7 @@ fn build_replacement_material(
         wave: before_battle.wave,
         resolved_turn: transition.occurrence.source.resolved_turn,
         occurrence: transition.occurrence,
-        selection: transition.selection.clone(),
+        selection: transition.selection,
         before_digest: transition.before_digest.clone(),
         after_digest: transition.after_digest.clone(),
         mutations: transition.mutations.clone(),
