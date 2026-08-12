@@ -1,3 +1,10 @@
+mod snapshot {
+    pub(crate) use er_kernel::snapshot::{
+        PendingPresentationsSnapshotV1, PresentationOutcomeSnapshotV1,
+        PresentationPlanSnapshotV1, SnapshotError,
+    };
+}
+
 #[path = "../src/battle_presentation.rs"]
 mod battle_presentation;
 
