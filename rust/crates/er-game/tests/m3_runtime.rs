@@ -918,13 +918,13 @@ mod m3_oracle_control_axis8 {
                     "{case}: {path}.occupant is not null or an unsigned integer"
                 )));
             };
-            if let Some(expected_slot) = expected_slot {
-                if expected_slot.3 != occupant_id {
-                    return Err(boxed(format!(
-                        "{case}: known legacy stale occupant at {side} position {position} has unexpected pokemon {occupant_id}, expected {}",
-                        expected_slot.3
-                    )));
-                }
+            if let Some(expected_slot) = expected_slot
+                && expected_slot.3 != occupant_id
+            {
+                return Err(boxed(format!(
+                    "{case}: known legacy stale occupant at {side} position {position} has unexpected pokemon {occupant_id}, expected {}",
+                    expected_slot.3
+                )));
             }
             let party = match side {
                 "PLAYER" => &player_party,
