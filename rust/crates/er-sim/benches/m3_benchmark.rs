@@ -33,10 +33,10 @@ use er_types::battle_ids::{
     BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex,
 };
 use er_types::battle_model::BattleOutcome;
-use er_types::battle_ui::PresentationSettlementOutcome;
+use er_types::battle_ui::{BattleUiProjection, PresentationSettlementOutcome};
 use er_types::{
     ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass, UiViewKind,
+    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TerminalState, TimeClass,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -746,6 +746,21 @@ fn state_control<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
     Ok(control)
 }
 
+fn state_battle_ui(state: &Value, label: &str) -> TestResult<BattleUiProjection> {
+    let projection = state
+        .get("ui")
+        .ok_or_else(|| invalid(format!("{label} has no Battle UI projection")))?;
+    Ok(serde_json::from_value(projection.clone())?)
+}
+
+fn state_terminal(state: &Value, label: &str) -> TestResult<TerminalState> {
+    let terminal = state
+        .get("terminal")
+        .filter(|terminal| !terminal.is_null())
+        .ok_or_else(|| invalid(format!("{label} has no terminal root")))?;
+    Ok(serde_json::from_value(terminal.clone())?)
+}
+
 fn state_turn(state: &Value, label: &str) -> TestResult<u64> {
     state_battle(state, label)?
         .get("turn")
@@ -958,14 +973,45 @@ fn assert_pair_control_convergence(snapshot: &er_sim::PairSnapshot) -> TestResul
             "two-client supported turn host/guest battle control plan does not converge",
         ));
     }
-    let mut host_ui = snapshot.host.ui.clone();
-    let mut guest_ui = snapshot.guest.ui.clone();
-    host_ui.owner_seat = None;
-    guest_ui.owner_seat = None;
-    if host_ui != guest_ui {
+    let plan: BattleControlPlan = serde_json::from_value(host_control.clone())?;
+    let host_ui = state_battle_ui(&snapshot.host.kernel.state, "two-client host state")?;
+    let guest_ui = state_battle_ui(&snapshot.guest.kernel.state, "two-client guest state")?;
+    if host_ui.schema_version != guest_ui.schema_version
+        || host_ui.battle_id != guest_ui.battle_id
+        || host_ui.wave != guest_ui.wave
+        || host_ui.turn != guest_ui.turn
+        || host_ui.actionable != guest_ui.actionable
+    {
         return Err(invalid(
-            "two-client supported turn host/guest control projection does not converge",
+            "two-client host/guest Battle UI projection boundary does not converge",
         ));
+    }
+    for (label, projection, expected_seat) in [
+        ("two-client host", &host_ui, seat(1)),
+        ("two-client guest", &guest_ui, seat(2)),
+    ] {
+        if projection.battle_id != plan.battle_id
+            || projection.wave != plan.wave
+            || projection.turn != plan.turn
+        {
+            return Err(invalid(format!(
+                "{label} Battle UI coordinates differ from the canonical control plan"
+            )));
+        }
+        let expected_control = plan
+            .seats
+            .iter()
+            .find(|entry| entry.seat == expected_seat)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "{label} canonical control plan omits seat {expected_seat}"
+                ))
+            })?;
+        if &projection.seat_control != expected_control {
+            return Err(invalid(format!(
+                "{label} Battle UI does not exactly project seat {expected_seat} control"
+            )));
+        }
     }
     Ok(())
 }
@@ -1020,9 +1066,17 @@ fn assert_pair_victory_terminal(
         )));
     }
 
-    for (label, endpoint) in [
-        ("complete co-op host", &snapshot.host),
-        ("complete co-op guest", &snapshot.guest),
+    let host_terminal = state_terminal(&snapshot.host.kernel.state, "complete co-op host")?;
+    let guest_terminal = state_terminal(&snapshot.guest.kernel.state, "complete co-op guest")?;
+    if host_terminal != guest_terminal || host_terminal.reason != terminal_reason {
+        return Err(invalid(
+            "complete co-op battle host/guest terminal roots do not equal the shared terminal",
+        ));
+    }
+
+    for (label, endpoint, expected_seat) in [
+        ("complete co-op host", &snapshot.host, seat(1)),
+        ("complete co-op guest", &snapshot.guest, seat(2)),
     ] {
         let outcome = state_battle(&endpoint.kernel.state, label)?
             .get("outcome")
@@ -1034,17 +1088,16 @@ fn assert_pair_victory_terminal(
             )));
         }
         assert_terminal_control_plan(&endpoint.kernel.state, label)?;
-        if endpoint.ui.actionable
-            || endpoint.ui.owner_seat.is_some()
-            || endpoint.ui.kind != UiViewKind::Terminal
+        let projection = state_battle_ui(&endpoint.kernel.state, label)?;
+        if projection.actionable
+            || projection.seat_control.seat != expected_seat
+            || !matches!(
+                &projection.seat_control.control,
+                BattleControl::Complete(BattleOutcome::Victory)
+            )
         {
             return Err(invalid(format!(
-                "{label} did not project a non-actionable ownerless terminal UI"
-            )));
-        }
-        if endpoint.ui.prompt_key.as_deref() != Some(terminal_reason) {
-            return Err(invalid(format!(
-                "{label} terminal UI prompt does not equal the shared terminal reason"
+                "{label} did not project non-actionable Complete(Victory) Battle UI for seat {expected_seat}"
             )));
         }
     }
