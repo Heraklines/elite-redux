@@ -142,6 +142,11 @@ pub(crate) struct BattleModeSnapshotParts {
 }
 
 #[derive(Clone, Debug)]
+// The authority and replica variants own live protocol graphs whose inline
+// ownership is part of the state machine's mutation and snapshot paths.
+// Boxing either branch would ripple through those ownership paths, so allow
+// this enum's large-variant layout specifically.
+#[allow(clippy::large_enum_variant)]
 enum BattleProtocolState {
     Authority {
         context: FrameContext,
@@ -413,13 +418,15 @@ impl BattleMode {
     }
 
     pub(crate) fn live_resources(&self, scheduler: &KernelScheduler) -> LiveResourceSnapshot {
-        let mut snapshot = LiveResourceSnapshot::default();
-        snapshot.timers = scheduler
-            .live_timers()
-            .into_iter()
-            .map(|timer| timer.timer_id)
-            .collect();
-        snapshot.battle_presentations = self.presentations.pending_ids().clone();
+        let mut snapshot = LiveResourceSnapshot {
+            timers: scheduler
+                .live_timers()
+                .into_iter()
+                .map(|timer| timer.timer_id)
+                .collect(),
+            battle_presentations: self.presentations.pending_ids().clone(),
+            ..Default::default()
+        };
         if self.terminal_fenced {
             return snapshot;
         }
