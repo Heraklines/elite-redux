@@ -231,6 +231,40 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult {
     Ok(())
 }
 
+fn normalize_legacy_type_chart(content_pack: &mut Value, selected: &ContentPack) -> TestResult {
+    let expected_entries = serde_json::to_value(&selected.type_chart.entries)?
+        .as_array()
+        .cloned()
+        .ok_or_else(|| invalid("selected type chart entries are not an array"))?;
+    let type_chart = content_pack
+        .get_mut("type_chart")
+        .ok_or_else(|| invalid("published content pack type_chart is missing"))?;
+    let entries = type_chart
+        .get_mut("entries")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid("published type chart entries are not an array"))?;
+    let legacy_entries = entries.clone();
+    if legacy_entries.len() != expected_entries.len() {
+        return Err(invalid(
+            "published type chart entry count differs from selected content",
+        ));
+    }
+    for (index, expected) in expected_entries.iter().enumerate() {
+        if legacy_entries
+            .iter()
+            .filter(|entry| *entry == expected)
+            .count()
+            != 1
+        {
+            return Err(invalid(format!(
+                "published type chart does not contain selected entry at index {index}"
+            )));
+        }
+    }
+    *entries = expected_entries;
+    Ok(())
+}
+
 fn normalize_legacy_content_pack(artifact: &mut Value, selected: &ContentPack) -> TestResult {
     selected.validate()?;
     let (provenance_hash, provenance_oracle_sha) = {
@@ -276,6 +310,7 @@ fn normalize_legacy_content_pack(artifact: &mut Value, selected: &ContentPack) -
     let pack = artifact
         .get_mut("content_pack")
         .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+    normalize_legacy_type_chart(pack, selected)?;
     adapt_legacy_content_conditions(pack)?;
     pack.as_object_mut()
         .ok_or_else(|| invalid("published content pack is not an object"))?

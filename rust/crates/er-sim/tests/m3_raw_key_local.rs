@@ -203,6 +203,40 @@ fn normalize_legacy_fixture_statuses(fixture: &mut Value) -> TestResult {
     Ok(())
 }
 
+fn normalize_legacy_type_chart(
+    content_pack: &mut Value,
+    selected: &er_content::pack::ContentPack,
+) -> TestResult {
+    let expected_entries = serde_json::to_value(&selected.type_chart.entries)?
+        .as_array()
+        .cloned()
+        .ok_or_else(|| invalid_data("selected type chart entries are not an array"))?;
+    let type_chart = field_mut(content_pack, "type_chart")?;
+    let entries = field_mut(type_chart, "entries")?
+        .as_array_mut()
+        .ok_or_else(|| invalid_data("published type chart entries are not an array"))?;
+    let legacy_entries = entries.clone();
+    if legacy_entries.len() != expected_entries.len() {
+        return Err(invalid_data("published type chart entry count differs from selected content")
+            .into());
+    }
+    for (index, expected) in expected_entries.iter().enumerate() {
+        if legacy_entries
+            .iter()
+            .filter(|entry| *entry == expected)
+            .count()
+            != 1
+        {
+            return Err(invalid_data(format!(
+                "published type chart does not contain selected entry at index {index}"
+            ))
+            .into());
+        }
+    }
+    *entries = expected_entries;
+    Ok(())
+}
+
 fn normalize_legacy_content_conditions(
     artifact: &mut Value,
     selected: &er_content::pack::ContentPack,
@@ -242,6 +276,7 @@ fn normalize_legacy_content_conditions(
     }
 
     let content_pack = field_mut(artifact, "content_pack")?;
+    normalize_legacy_type_chart(content_pack, selected)?;
     let manifest = field_mut(content_pack, "capability_manifest")?;
     let entries = field_mut(manifest, "entries")?
         .as_array_mut()
