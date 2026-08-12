@@ -35,7 +35,7 @@ use er_types::{
     RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T> = Result<T, Box<dyn Error>>;
 
 fn safe(value: u64) -> SafeU53 {
     match SafeU53::new(value) {
@@ -238,7 +238,7 @@ fn assert_zero_live_resources(kernel: &GameKernel) {
 }
 
 #[test]
-fn m3_dispose_clears_every_live_resource_and_is_idempotent() -> TestResult {
+fn m3_dispose_clears_every_live_resource_and_is_idempotent() -> TestResult<()> {
     let mut kernel = battle_kernel()?;
     assert!(!kernel.live_resources().controls.is_empty());
 
