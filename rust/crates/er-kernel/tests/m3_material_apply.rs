@@ -5,9 +5,10 @@ use battle_replica::{
     M3_CONTENT_HASH_MISMATCH, M3_INVALID_AUTHORITY_MATERIAL, M3_MALFORMED_BATTLE_MATERIAL,
     ProtocolViolation, ReplicaApplyError, map_material_apply_error,
 };
+use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::material::{
-    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, ContentPack,
-    apply_turn_material, decode_replacement_material, decode_turn_material,
+    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, apply_turn_material,
+    decode_replacement_material, decode_turn_material,
 };
 use serde_json::{Value, json};
 
@@ -192,9 +193,59 @@ fn adapt_legacy_content_pack_condition_subjects(
     Ok(())
 }
 
+fn adapt_legacy_content_pack(
+    artifact: &mut Value,
+    selected: &ContentPack,
+) -> Result<(), &'static str> {
+    let provenance = artifact
+        .get("provenance")
+        .and_then(Value::as_object)
+        .ok_or("content fixture provenance is missing or invalid")?;
+    let provenance_hash = provenance
+        .get("content_pack_hash")
+        .and_then(Value::as_str)
+        .ok_or("content fixture provenance content_pack_hash is missing or invalid")?;
+    let provenance_oracle_sha = provenance
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or("content fixture provenance oracle_game_sha is missing or invalid")?;
+    let content_pack = artifact
+        .get("content_pack")
+        .and_then(Value::as_object)
+        .ok_or("content fixture content_pack is missing or invalid")?;
+    let pack_hash = content_pack
+        .get("hash")
+        .and_then(Value::as_str)
+        .ok_or("content fixture content_pack hash is missing or invalid")?;
+    let pack_oracle_sha = content_pack
+        .get("oracle_game_sha")
+        .and_then(Value::as_str)
+        .ok_or("content fixture content_pack oracle_game_sha is missing or invalid")?;
+    if pack_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+        || pack_oracle_sha != selected.oracle_game_sha.as_str()
+        || provenance_oracle_sha != selected.oracle_game_sha.as_str()
+    {
+        return Err("content fixture is not the exact supported legacy identity");
+    }
+
+    let content_pack = artifact
+        .get_mut("content_pack")
+        .ok_or("content fixture content_pack is missing")?;
+    adapt_legacy_content_pack_condition_subjects(content_pack)?;
+    content_pack
+        .as_object_mut()
+        .ok_or("content fixture content_pack is not an object")?
+        .insert(
+            "hash".to_owned(),
+            Value::String(selected.hash.as_str().to_owned()),
+        );
+    Ok(())
+}
+
 fn adapt_legacy_selected_content_hash(
     state: &mut Value,
-    fixture: &Value,
+    fixture: &mut Value,
     content: &ContentPack,
 ) -> Result<(), &'static str> {
     let state_hash = state
@@ -253,6 +304,15 @@ fn adapt_legacy_selected_content_hash(
         .as_object_mut()
         .ok_or("state is not an object")?
         .insert("content_hash".to_owned(), Value::String(selected_hash.to_owned()));
+    for state_name in ["initial_state", "expected_final_state"] {
+        fixture
+            .get_mut(state_name)
+            .and_then(Value::as_object_mut)
+            .and_then(|state| state.get_mut("canonical"))
+            .and_then(Value::as_object_mut)
+            .ok_or("fixture canonical state is missing or invalid")?
+            .insert("content_hash".to_owned(), Value::String(selected_hash.to_owned()));
+    }
     Ok(())
 }
 
@@ -270,14 +330,11 @@ fn typed_material_codecs_are_closed_and_canonical_only() {
 
 #[test]
 fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
+    let selected = selected_content_pack().expect("selected content pack is valid");
     let mut content_value: serde_json::Value =
         serde_json::from_str(CONTENT_FIXTURE).expect("content fixture is JSON");
-    adapt_legacy_content_pack_condition_subjects(
-        content_value
-            .get_mut("content_pack")
-            .expect("content fixture has content_pack"),
-    )
-    .expect("legacy content capability subjects adapt strictly");
+    adapt_legacy_content_pack(&mut content_value, &selected)
+        .expect("legacy content pack adapts strictly");
     let content: ContentPack = serde_json::from_value(
         content_value
             .get("content_pack")
@@ -285,14 +342,15 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
             .clone(),
     )
     .expect("content fixture is a typed content pack");
-    let case_value: serde_json::Value =
+    assert_eq!(content, selected);
+    let mut case_value: serde_json::Value =
         serde_json::from_str(VICTORY_CASE_FIXTURE).expect("victory fixture is JSON");
     let mut state_value = case_value
         .get("initial_state")
         .and_then(|value| value.get("canonical"))
         .expect("victory fixture has an initial canonical state")
         .clone();
-    adapt_legacy_selected_content_hash(&mut state_value, &case_value, &content)
+    adapt_legacy_selected_content_hash(&mut state_value, &mut case_value, &content)
         .expect("legacy selected content hash adapts strictly");
     adapt_legacy_game_state(&mut state_value).expect("legacy initial state adapts strictly");
     let state: er_state::snapshot::GameState =
