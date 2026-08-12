@@ -722,10 +722,12 @@ fn validate_turn_evidence(
         &material.presentation_digest,
         &material.operation_id,
         material.outcome,
-        &material.mutations,
-        &material.before_state,
-        &material.after_state,
-        content,
+        PresentationValidationContext {
+            mutations: &material.mutations,
+            before_state: &material.before_state,
+            after_state: &material.after_state,
+            content,
+        },
     )?;
     Ok(())
 }
@@ -745,10 +747,12 @@ fn validate_replacement_evidence(
         &material.presentation_digest,
         &material.operation_id,
         material.outcome,
-        &material.mutations,
-        &material.before_state,
-        &material.after_state,
-        content,
+        PresentationValidationContext {
+            mutations: &material.mutations,
+            before_state: &material.before_state,
+            after_state: &material.after_state,
+            content,
+        },
     )?;
     Ok(())
 }
@@ -914,15 +918,19 @@ fn validate_action_order(
     Ok(())
 }
 
+struct PresentationValidationContext<'a> {
+    mutations: &'a [BattleMutation],
+    before_state: &'a GameState,
+    after_state: &'a GameState,
+    content: &'a ContentPack,
+}
+
 fn validate_presentation(
     presentation: &[BattlePresentationEvent],
     stated_digest: &PresentationPlanDigest,
     operation_id: &OperationId,
     outcome: BattleOutcome,
-    mutations: &[BattleMutation],
-    before_state: &GameState,
-    after_state: &GameState,
-    content: &ContentPack,
+    context: PresentationValidationContext<'_>,
 ) -> Result<(), BattleMaterialApplyError> {
     for (index, event) in presentation.iter().enumerate() {
         let sequence = SafeU53::new(
@@ -936,7 +944,13 @@ fn validate_presentation(
         {
             return Err(BattleMaterialApplyError::InvalidEvidence);
         }
-        validate_presentation_kind(&event.kind, mutations, before_state, after_state, content)?;
+        validate_presentation_kind(
+            &event.kind,
+            context.mutations,
+            context.before_state,
+            context.after_state,
+            context.content,
+        )?;
     }
     let computed = compute_presentation_plan_digest(presentation)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
