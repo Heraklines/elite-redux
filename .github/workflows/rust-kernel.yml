@@ -4105,7 +4105,7 @@ jobs:
             } catch (error) {
               console.log(`benchmark_identity=unavailable reason=${error.message}`);
             }
-            NODE
+          NODE
           else
             echo "benchmark_identity=unavailable result_not_emitted=true" >> rust-ci-summary/summary.txt
           fi
