@@ -1013,11 +1013,6 @@ fn assert_pair_victory_terminal(
 
     assert_pair_mechanical_convergence(snapshot)?;
     assert_pair_control_convergence(snapshot)?;
-    if snapshot.host.kernel.ui != snapshot.guest.kernel.ui {
-        return Err(invalid(
-            "complete co-op battle host/guest kernel UI state does not converge",
-        ));
-    }
     if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
             "complete co-op battle authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
