@@ -784,6 +784,144 @@ mod live_coop_production {
         std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
     }
 
+    fn normalize_nested_kind(object: &mut Value, path: &str, field_name: &str) -> TestResult {
+        let object = object
+            .as_object_mut()
+            .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+        let kind = object
+            .get(field_name)
+            .cloned()
+            .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
+        let normalized = match kind {
+            Value::String(_) => kind,
+            Value::Object(nested) => {
+                if nested.len() != 1 || !nested.contains_key("kind") {
+                    return Err(invalid(format!(
+                        "{path}.{field_name} has an unsupported nested kind shape"
+                    )));
+                }
+                let tag = nested
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| invalid(format!("{path}.{field_name}.kind is not a string")))?;
+                Value::String(tag.to_owned())
+            }
+            other => {
+                return Err(invalid(format!(
+                    "{path}.{field_name} has unsupported value {other}"
+                )));
+            }
+        };
+        object.insert(field_name.to_owned(), normalized);
+        Ok(())
+    }
+
+    fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> TestResult {
+        let object = object
+            .as_object_mut()
+            .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+        let kind = object
+            .get(field_name)
+            .cloned()
+            .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
+        let normalized = match kind {
+            Value::String(tag) => serde_json::json!({"kind": tag}),
+            Value::Object(nested) => {
+                if nested.get("kind").and_then(Value::as_str).is_none() {
+                    return Err(invalid(format!(
+                        "{path}.{field_name} has an invalid adjacent kind object"
+                    )));
+                }
+                Value::Object(nested)
+            }
+            other => {
+                return Err(invalid(format!(
+                    "{path}.{field_name} has unsupported value {other}"
+                )));
+            }
+        };
+        object.insert(field_name.to_owned(), normalized);
+        Ok(())
+    }
+
+    fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
+        let canonical = state
+            .get_mut("canonical")
+            .ok_or_else(|| invalid("initial_state.canonical is missing"))?;
+        let battle = canonical
+            .get_mut("battle")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| invalid("initial_state canonical battle value is invalid"))?;
+
+        let format_slots = battle
+            .get("format")
+            .and_then(Value::as_object)
+            .and_then(|format| format.get("slots"))
+            .cloned()
+            .ok_or_else(|| invalid("initial_state canonical battle format slots are missing"))?;
+        let field_slots = battle
+            .get("field")
+            .and_then(Value::as_object)
+            .and_then(|field| field.get("slots"))
+            .cloned()
+            .ok_or_else(|| invalid("initial_state canonical battle field slots are missing"))?;
+        if !format_slots.is_array() || !field_slots.is_array() {
+            return Err(invalid(
+                "initial_state canonical format.slots and field.slots must be arrays",
+            ));
+        }
+        if format_slots != field_slots {
+            return Err(invalid(
+                "initial_state canonical format.slots does not equal field.slots",
+            ));
+        }
+        let format = battle
+            .get_mut("format")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| invalid("initial_state canonical battle format is invalid"))?;
+        if format.remove("slots").is_none() {
+            return Err(invalid(
+                "initial_state canonical battle format slots could not be removed",
+            ));
+        }
+
+        for party_name in ["player_party", "enemy_party"] {
+            let party = battle
+                .get_mut(party_name)
+                .and_then(Value::as_array_mut)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "initial_state canonical battle {party_name} is invalid"
+                    ))
+                })?;
+            for (index, pokemon) in party.iter_mut().enumerate() {
+                let status = pokemon.get_mut("status").ok_or_else(|| {
+                    invalid(format!(
+                        "initial_state canonical battle {party_name}[{index}] status is missing"
+                    ))
+                })?;
+                normalize_nested_kind(
+                    status,
+                    &format!("initial_state canonical battle {party_name}[{index}] status"),
+                    "kind",
+                )?;
+            }
+        }
+        for condition_name in ["weather", "terrain"] {
+            let condition = battle.get_mut(condition_name).ok_or_else(|| {
+                invalid(format!(
+                    "initial_state canonical battle {condition_name} is missing"
+                ))
+            })?;
+            normalize_adjacent_kind(
+                condition,
+                &format!("initial_state canonical battle {condition_name}"),
+                "kind",
+            )?;
+        }
+        Ok(())
+    }
+
     fn safe(value: u64) -> SafeU53 {
         SafeU53::new(value).unwrap_or(SafeU53::ZERO)
     }
@@ -878,9 +1016,13 @@ mod live_coop_production {
 
     fn forced_doubles_config() -> TestResult<BattleGameConfig> {
         let wire: Value = serde_json::from_str(FORCED_REPLACEMENT_FIXTURE)?;
-        let canonical = wire
+        let mut initial_state = wire
             .get("initial_state")
-            .and_then(|value| value.get("canonical"))
+            .cloned()
+            .ok_or_else(|| invalid("forced-replacement fixture has no initial state"))?;
+        normalize_legacy_initial_state(&mut initial_state)?;
+        let canonical = initial_state
+            .get("canonical")
             .cloned()
             .ok_or_else(|| invalid("forced-replacement fixture has no initial canonical state"))?;
         let canonical_state: GameState = serde_json::from_value(canonical)?;
