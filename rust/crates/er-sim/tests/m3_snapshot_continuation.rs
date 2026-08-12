@@ -535,6 +535,7 @@ mod live_coop_production {
         RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION, RestorablePacketKindV2, RestorablePairSnapshotV2,
     };
     use er_sim::{PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair};
+    use er_state::snapshot::GameState;
     use er_types::battle_command::{
         AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandFrontierStatus,
         ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1, scripted_enemy_command_operation_id,
@@ -546,7 +547,7 @@ mod live_coop_production {
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
-        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision,
+        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision, OperationId,
         PhysicalKey, RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
     };
     use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -882,7 +883,7 @@ mod live_coop_production {
             .and_then(|value| value.get("canonical"))
             .cloned()
             .ok_or_else(|| invalid("forced-replacement fixture has no initial canonical state"))?;
-        let canonical_state = serde_json::from_value(canonical)?;
+        let canonical_state: GameState = serde_json::from_value(canonical)?;
         let battle = canonical_state
             .battle
             .clone()
@@ -1626,20 +1627,21 @@ mod live_coop_production {
         pair: &mut SimulatedPair,
     ) -> TestResult<(OperationId, String)> {
         reach_guest_proposal_pending(pair)?;
-        let proposal = first_packet_v2(
+        let proposal_packet = first_packet_v2(
             &pair.snapshot_v2()?,
             RestorablePacketKindV2::CommandProposal,
             PairEndpoint::Guest,
             PairEndpoint::Host,
             generation(1),
         )?;
-        let proposal: ProposalMessage = decode_canonical_packet(&proposal.body, "guest proposal")?;
+        let proposal: ProposalMessage =
+            decode_canonical_packet(&proposal_packet.body, "guest proposal")?;
         let proposal_identity = (proposal.operation_id.clone(), proposal.fingerprint.clone());
         apply_trace_operation(
             pair,
             PairOperationV2::Fault {
                 operation: FaultOperationV2::Deliver {
-                    packet_id: proposal.packet_id,
+                    packet_id: proposal_packet.packet_id,
                 },
             },
         )?;
@@ -2302,6 +2304,7 @@ mod live_coop_production {
             PhysicalKey::ArrowDown,
             "replacement-menu-later-continuation",
         )?;
+        Ok(())
     }
 
     #[test]
