@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use er_canonical::canonical_bytes;
@@ -301,7 +302,7 @@ fn live_pair_trace_step(
 
 fn canonical_json_round_trip<T>(value: &T) -> TestResult<T>
 where
-    T: Serialize + DeserializeOwned + PartialEq,
+    T: Serialize + DeserializeOwned + PartialEq + Debug,
 {
     let canonical = canonical_bytes(value)?;
     let json: Value = serde_json::from_slice(&canonical)?;
