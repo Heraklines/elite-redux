@@ -18,7 +18,7 @@ use er_types::battle_command::{
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_ids::{
-    BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PokemonId,
+    BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId,
 };
 use er_types::battle_ui::{MenuNavigationEdge, NavigationDirection};
 use er_types::{MenuOptionId, SafeU53, SeatId};
@@ -88,7 +88,7 @@ fn command_offer() -> TestResult<BattleCommandOffer> {
     offer_with(
         vec![one_move_offer(vec![target_selection(vec![enemy(0)])?])?],
         vec![OfferedSwitchCommand::new(
-            er_types::PartyIndex::new(1)?,
+            PartyIndex::new(1)?,
             pokemon(8)?,
         )],
     )
@@ -183,7 +183,7 @@ fn command_root_retains_disabled_nodes_and_rejects_no_legal_path() -> TestResult
     let offer = offer_with(
         Vec::new(),
         vec![OfferedSwitchCommand::new(
-            er_types::PartyIndex::new(1)?,
+            PartyIndex::new(1)?,
             pokemon(8)?,
         )],
     )?;
