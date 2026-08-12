@@ -1,7 +1,7 @@
 mod snapshot {
     pub(crate) use er_kernel::snapshot::{
-        PendingPresentationsSnapshotV1, PresentationOutcomeSnapshotV1,
-        PresentationPlanSnapshotV1, SnapshotError,
+        PendingPresentationsSnapshotV1, PresentationOutcomeSnapshotV1, PresentationPlanSnapshotV1,
+        SnapshotError,
     };
 }
 

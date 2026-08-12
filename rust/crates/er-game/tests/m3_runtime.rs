@@ -331,6 +331,10 @@ mod m3_oracle_control_axis8 {
         ("wonder-guard-super-effective-pass", "ENEMY", 0, 2),
     ];
     const LEGACY_STALE_OCCUPANT_COUNT: usize = 9;
+    const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+        "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+    const LEGACY_ORACLE_CONTENT_HASH: &str =
+        "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
     fn boxed(message: impl Into<String>) -> Box<dyn Error> {
         Box::new(std::io::Error::new(
@@ -636,6 +640,45 @@ mod m3_oracle_control_axis8 {
         };
         object.insert(field_name.to_owned(), normalized);
         Ok(())
+    }
+
+    fn validate_adjacent_condition_kind(
+        case: &str,
+        path: &str,
+        object: &Value,
+        field_name: &str,
+    ) -> TestResult {
+        let object = object
+            .as_object()
+            .ok_or_else(|| boxed(format!("{case}: {path} is not an object")))?;
+        let nested = object
+            .get(field_name)
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: {path}.{field_name} is not an adjacent kind object"
+                ))
+            })?;
+        let tag = nested
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| boxed(format!("{case}: {path}.{field_name}.kind is not a string")))?;
+        let exact_shape = match tag {
+            "NONE" => nested.len() == 1,
+            "UNSUPPORTED_ORACLE_CODE" => {
+                nested.len() == 2
+                    && nested
+                        .get("value")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|value| u16::try_from(value).is_ok())
+            }
+            _ => false,
+        };
+        require(
+            case,
+            exact_shape,
+            format!("{path}.{field_name} has an unsupported adjacent kind shape"),
+        )
     }
 
     fn legacy_replacement_queue_is_resolved(case: &str, queue: &Value) -> TestResult<bool> {
@@ -1032,6 +1075,74 @@ mod m3_oracle_control_axis8 {
         Ok(())
     }
 
+    fn normalize_legacy_content_identity(
+        case: &str,
+        fixture: &Value,
+        canonical: &mut Value,
+        content: &er_content::pack::ContentPack,
+    ) -> TestResult {
+        let fixture_hash = string_field(case, canonical, "content_hash")?.to_owned();
+        for peer_name in ["initial_state", "expected_final_state"] {
+            let peer = required(case, required(case, fixture, peer_name)?, "canonical")?;
+            let peer_hash = string_field(case, peer, "content_hash")?;
+            require(
+                case,
+                peer_hash == fixture_hash,
+                format!(
+                    "published state content hashes disagree: expected {fixture_hash}, got {peer_hash} in {peer_name}.canonical"
+                ),
+            )?;
+        }
+
+        let provenance = required(case, fixture, "provenance")?;
+        let provenance_hash = string_field(case, provenance, "content_pack_hash")?;
+        let provenance_oracle_sha = string_field(case, provenance, "oracle_game_sha")?;
+        require(
+            case,
+            provenance_oracle_sha == content.oracle_game_sha,
+            format!(
+                "provenance oracle_game_sha {provenance_oracle_sha} differs from selected content oracle_game_sha {}",
+                content.oracle_game_sha
+            ),
+        )?;
+
+        let selected_hash = content.hash.as_str();
+        let selected_digest = selected_hash.strip_prefix("blake3-v1:").ok_or_else(|| {
+            boxed(format!(
+                "{case}: selected content hash {selected_hash} has no blake3-v1 prefix"
+            ))
+        })?;
+        if fixture_hash == selected_hash {
+            return require(
+                case,
+                provenance_hash == selected_digest,
+                format!(
+                    "selected fixture content hash {fixture_hash} differs from provenance digest {provenance_hash}"
+                ),
+            );
+        }
+        require(
+            case,
+            fixture_hash == LEGACY_ORACLE_CONTENT_HASH
+                && provenance_hash == LEGACY_ORACLE_CONTENT_DIGEST,
+            format!(
+                "content identity {fixture_hash} / {provenance_hash} is neither selected nor the exact published legacy pair"
+            ),
+        )?;
+        canonical
+            .as_object_mut()
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: expected_final_state.canonical is not an object"
+                ))
+            })?
+            .insert(
+                "content_hash".to_owned(),
+                Value::String(selected_hash.to_owned()),
+            );
+        Ok(())
+    }
+
     fn normalize_legacy_state(case: &str, state: &mut Value) -> TestResult {
         let battle = state
             .get_mut("battle")
@@ -1060,12 +1171,12 @@ mod m3_oracle_control_axis8 {
             }
         }
         for condition_name in ["weather", "terrain"] {
-            let condition = battle.get_mut(condition_name).ok_or_else(|| {
+            let condition = battle.get(condition_name).ok_or_else(|| {
                 boxed(format!(
                     "{case}: canonical.battle.{condition_name} is missing"
                 ))
             })?;
-            normalize_nested_kind(
+            validate_adjacent_condition_kind(
                 case,
                 &format!("canonical.battle.{condition_name}"),
                 condition,
@@ -1075,7 +1186,11 @@ mod m3_oracle_control_axis8 {
         normalize_legacy_stale_occupants(case, battle)
     }
 
-    fn parse_expected_final_state(case: &str, fixture: &Value) -> TestResult<GameState> {
+    fn parse_expected_final_state(
+        case: &str,
+        fixture: &Value,
+        content: &er_content::pack::ContentPack,
+    ) -> TestResult<GameState> {
         let expected_final_state = required(case, fixture, "expected_final_state")?;
         require_object_keys(
             case,
@@ -1092,6 +1207,7 @@ mod m3_oracle_control_axis8 {
         let canonical = required(case, expected_final_state, "canonical")?;
         require_legacy_format_slots_mirror(case, canonical)?;
         let mut production_canonical = canonical.clone();
+        normalize_legacy_content_identity(case, fixture, &mut production_canonical, content)?;
         normalize_legacy_state(case, &mut production_canonical)?;
         let format = production_canonical
             .get_mut("battle")
@@ -1943,7 +2059,7 @@ mod m3_oracle_control_axis8 {
     ) -> TestResult {
         let fixture = parse_fixture(case, source)?;
         let control = expected_control(case, &fixture)?;
-        let state = parse_expected_final_state(case, &fixture)?;
+        let state = parse_expected_final_state(case, &fixture, content)?;
         state.validate().map_err(|error| {
             boxed(format!(
                 "{case}: expected final state failed validation: {error}"
