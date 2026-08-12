@@ -59,12 +59,18 @@ impl ReplicaApplyError {
         }
     }
 
+    /// Retained for the staged recovery contract until its transport caller is wired.
+    #[allow(dead_code)]
     pub const fn is_recoverable(self) -> bool {
         matches!(self, Self::BeforeDigestMismatch)
     }
 }
 
 /// Apply a canonical TURN payload received from the Authority.
+///
+/// This private byte adapter remains staged for direct transport callers; its
+/// decode-and-map semantics are part of the replica boundary.
+#[allow(dead_code)]
 fn apply_turn_material_bytes(
     current: &BattleMaterialApplyContext,
     bytes: &[u8],
@@ -77,6 +83,10 @@ fn apply_turn_material_bytes(
 }
 
 /// Apply a canonical REPLACEMENT payload received from the Authority.
+///
+/// This private byte adapter remains staged for direct transport callers; its
+/// decode-and-map semantics are part of the replica boundary.
+#[allow(dead_code)]
 fn apply_replacement_material_bytes(
     current: &BattleMaterialApplyContext,
     bytes: &[u8],
@@ -131,9 +141,9 @@ pub(crate) fn apply_authority_material(
         | AuthorityEntryKind::ControlCommit
         | AuthorityEntryKind::WaveAdvance
         | AuthorityEntryKind::TerminalCommit => {
-            return Err(ReplicaApplyError::ProtocolViolation(
+            Err(ReplicaApplyError::ProtocolViolation(
                 ProtocolViolation::MalformedBattleMaterial,
-            ));
+            ))
         }
     }
 }
