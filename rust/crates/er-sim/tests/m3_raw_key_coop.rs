@@ -73,12 +73,35 @@ fn normalize_adjacent_kind(object: &mut Value, path: &str, field_name: &str) -> 
     let object = object
         .as_object_mut()
         .ok_or_else(|| invalid(format!("{path} is not an object")))?;
+    if object.len() != 2
+        || !object.contains_key(field_name)
+        || !object.contains_key("remaining_turns")
+    {
+        return Err(invalid(format!(
+            "{path} must have exactly kind and remaining_turns fields"
+        )));
+    }
+    if object
+        .get("remaining_turns")
+        .and_then(Value::as_u64)
+        .and_then(|value| u16::try_from(value).ok())
+        .is_none()
+    {
+        return Err(invalid(format!(
+            "{path}.remaining_turns is not a valid u16"
+        )));
+    }
     let kind = object
         .get(field_name)
         .cloned()
         .ok_or_else(|| invalid(format!("{path}.{field_name} is missing")))?;
     let normalized = match kind {
-        Value::String(tag) => serde_json::json!({"kind": tag}),
+        Value::String(tag) if tag == "NONE" => serde_json::json!({"kind": "NONE"}),
+        Value::String(tag) => {
+            return Err(invalid(format!(
+                "{path}.{field_name} has an unknown legacy tag {tag:?}"
+            )));
+        }
         Value::Object(nested) => {
             let tag = nested
                 .get("kind")
