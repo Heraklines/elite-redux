@@ -213,7 +213,8 @@ mod live_replica_recovery {
         CorrelatedResponseSnapshotV2, PendingRecoverySnapshotV2, ProposalTimerKindV2,
     };
     use er_sim::snapshot::{
-        QueuedPacketSnapshotV2, RestorablePacketKindV2, RestorablePairSnapshotV2,
+        PacketDispositionV2, QueuedPacketSnapshotV2, RestorablePacketKindV2,
+        RestorablePairSnapshotV2,
     };
     use er_sim::{
         FaultOperation, FrameCorruption, PairEndpoint, PairOperation, SimulatedBattlePairConfig,
