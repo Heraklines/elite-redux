@@ -1161,7 +1161,7 @@ fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMateri
     {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
-    let mut previous = None;
+    let mut previous: Option<&RngDraw> = None;
     for (index, draw) in material.rng_audit.iter().enumerate() {
         draw.validate()
             .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
