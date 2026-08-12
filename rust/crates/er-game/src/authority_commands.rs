@@ -25,6 +25,7 @@ use er_types::battle_command::{
 };
 use er_types::battle_control::{
     BattleControl, BattleControlPlan, BattleControlPlanError, BattleMenu,
+    SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId, PokemonId};
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
@@ -945,10 +946,8 @@ fn validate_control_identity<'a>(
     if !active.is_actionable() || active.owner_seat() != Some(owner_seat) {
         return Err(AuthorityCommandError::ControlNotActionable { seat: owner_seat });
     }
-    if let Some(prepared) = prepared {
-        if owner_seat != authority_seat {
-            validate_replayed_path(&seat.control, active, owner_seat)?;
-        }
+    if prepared.is_some() && owner_seat != authority_seat {
+        validate_replayed_path(&seat.control, active, owner_seat)?;
     }
     let menu = current_menu(active)
         .ok_or(AuthorityCommandError::ControlNotActionable { seat: owner_seat })?;
@@ -1178,7 +1177,7 @@ fn validate_replacement_control(
             None,
         ),
         BattleControl::PartyOptionSelect(value) => {
-            let Some(BattleControl::ReplacementSelect(parent)) = value.cancel_to.as_ref() else {
+            let BattleControl::ReplacementSelect(parent) = value.cancel_to.as_ref() else {
                 return Err(AuthorityCommandError::ReplacementControlMismatch {
                     reason: "replacement PartyOptionSelect has a non-replacement parent",
                 });

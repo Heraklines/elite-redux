@@ -40,9 +40,11 @@ use crate::material::{
 };
 use crate::runtime::{CommandAdmission, GameReduction, GameRuntime, GameRuntimeError};
 
-// The canonical configuration lives in `runtime`; these aliases are kept
-// crate-private so the local lane cannot grow a second config/start schema.
-pub(crate) use crate::runtime::{BATTLE_START_SCHEMA_VERSION, BattleGameConfig, BattleStartV1};
+// The canonical configuration lives in `runtime`; these aliases are only
+// needed by the source-including local-battle contract test, so the production
+// crate does not retain unused crate-private reexports.
+#[cfg(test)]
+pub(crate) use crate::runtime::{BattleGameConfig, BattleStartV1, BATTLE_START_SCHEMA_VERSION};
 
 /// The private phase visible to the local game reducer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

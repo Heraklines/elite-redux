@@ -8,13 +8,13 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use er_battle::error::BattleResolveError;
 use er_battle::legality::{
     build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
     validate_replacement_proposal, validate_replacement_selection, validate_state_content,
 };
 use er_battle::{
-    BattleNextDecision, BattleResolveError, resolve_replacement, resolve_turn,
-    validate_battle_mutation_evidence,
+    BattleNextDecision, resolve_replacement, resolve_turn, validate_battle_mutation_evidence,
 };
 use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
@@ -3807,7 +3807,7 @@ fn validate_replacement_transition_identity(
     let stored = before
         .faint_queue
         .iter()
-        .find(|faint| faint.id == transition.occurrence)
+        .find(|faint| faint.id == transition.occurrence.id)
         .ok_or_else(|| invalid_config("replacement transition occurrence is not stored"))?;
     let owner = stored
         .owner_seat
