@@ -40,8 +40,8 @@ use er_types::battle_ids::{
     FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
-    BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction, ResolvedActionKind,
-    StatusKind, StatusState,
+    ActionDisposition, BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction,
+    ResolvedActionKind, StatusKind, StatusState,
 };
 use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
 use er_types::{OperationId, SafeU53, SeatId};
@@ -49,6 +49,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const ORACLE_MANIFEST: &str = include_str!("../../../fixtures/m3/m3-oracle-manifest.json");
+const LEGACY_ORACLE_CONTENT_DIGEST: &str =
+    "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
+const LEGACY_ORACLE_CONTENT_HASH: &str =
+    "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
 const FROZEN_CASES: &[(&str, &str)] = &[
     (
@@ -1482,15 +1486,105 @@ fn normalize_legacy_final_slot_compaction(
     Ok(())
 }
 
+fn normalize_legacy_selected_content_identity(
+    case_name: &str,
+    document: &Value,
+    field_name: &str,
+    canonical: &mut Value,
+    content: &ContentPack,
+) -> Result<(), FixtureError> {
+    // Keep the published provenance immutable and translate only its exact, known content
+    // identity to the validated selected pack used for this replay.
+    let canonical_path = format!("{field_name}.canonical");
+    let fixture_hash = string_field(canonical, case_name, &canonical_path, "content_hash")?;
+    for peer_field_name in ["initial_state", "expected_final_state"] {
+        let peer_state = object_field(document, case_name, "$", peer_field_name)?;
+        let peer_canonical = object_field(
+            peer_state,
+            case_name,
+            peer_field_name,
+            "canonical",
+        )?;
+        let peer_path = format!("{peer_field_name}.canonical");
+        let peer_hash = string_field(peer_canonical, case_name, &peer_path, "content_hash")?;
+        if peer_hash != fixture_hash {
+            return Err(FixtureError::new(format!(
+                "{case_name}: published state content hashes disagree: {canonical_path}.content_hash is {fixture_hash}, {peer_path}.content_hash is {peer_hash}"
+            )));
+        }
+    }
+
+    let provenance = object_field(document, case_name, "$", "provenance")?;
+    let provenance_hash = string_field(
+        provenance,
+        case_name,
+        "provenance",
+        "content_pack_hash",
+    )?;
+    let provenance_oracle_sha = string_field(
+        provenance,
+        case_name,
+        "provenance",
+        "oracle_game_sha",
+    )?;
+    if provenance_oracle_sha != content.oracle_game_sha {
+        return Err(FixtureError::new(format!(
+            "{case_name}: provenance oracle_game_sha {provenance_oracle_sha} disagrees with selected content oracle_game_sha {}",
+            content.oracle_game_sha
+        )));
+    }
+
+    let selected_hash = content.hash.as_str();
+    let selected_digest = selected_hash.strip_prefix("blake3-v1:").ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: selected content hash {selected_hash} has no blake3-v1 prefix"
+        ))
+    })?;
+    if fixture_hash == selected_hash {
+        if provenance_hash != selected_digest {
+            return Err(FixtureError::new(format!(
+                "{case_name}: selected fixture content hash {fixture_hash} disagrees with provenance digest {provenance_hash}"
+            )));
+        }
+        return Ok(());
+    }
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
+        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: content identity {fixture_hash} / {provenance_hash} is neither the selected pair {selected_hash} / {selected_digest} nor the exact published legacy pair"
+        )));
+    }
+
+    canonical
+        .as_object_mut()
+        .ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: {canonical_path} is not an object"))
+        })?
+        .insert(
+            "content_hash".to_owned(),
+            Value::String(selected_hash.to_owned()),
+        );
+    Ok(())
+}
+
 fn normalize_legacy_state(
     case_name: &str,
     document: &Value,
     field_name: &str,
     state: &mut Value,
+    content: &ContentPack,
 ) -> Result<(), FixtureError> {
     let canonical = state
         .get_mut("canonical")
         .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical is missing")))?;
+    normalize_legacy_selected_content_identity(
+        case_name,
+        document,
+        field_name,
+        canonical,
+        content,
+    )?;
     let battle = canonical
         .get_mut("battle")
         .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical.battle is missing")))?;
@@ -1550,9 +1644,10 @@ fn fixture_state(
     document: &Value,
     case_name: &str,
     field_name: &str,
+    content: &ContentPack,
 ) -> Result<GameState, Box<dyn Error>> {
     let mut value = object_field(document, case_name, "$", field_name)?.clone();
-    normalize_legacy_state(case_name, document, field_name, &mut value)?;
+    normalize_legacy_state(case_name, document, field_name, &mut value, content)?;
     let canonical = value.get("canonical").cloned().ok_or_else(|| {
         FixtureError::new(format!("{case_name}: {field_name}.canonical is missing"))
     })?;
@@ -2336,6 +2431,40 @@ fn initial_field_slot_for_pokemon(state: &GameState, pokemon: PokemonId) -> Opti
         .find_map(|entry| (entry.occupant == Some(pokemon)).then_some(entry.slot))
 }
 
+fn is_catalogued_legacy_inactive_actor_compaction(
+    case_name: &str,
+    index: usize,
+    action: &ResolvedAction,
+    record: &FixtureCommandRecord,
+    actions: &[ResolvedAction],
+) -> bool {
+    // After actor 1 faints, the legacy runtime reports its inactive queued move in the slot
+    // vacated by actor 2's simultaneous left-compaction. Typed command identity stays at slot 0.
+    case_name == "mixed-side-simultaneous-faint"
+        && actions.len() == 5
+        && index == 4
+        && action.kind == ResolvedActionKind::Move
+        && action.disposition == ActionDisposition::SkippedActorInactive
+        && u64::from(action.actor) == 1
+        && action.source_slot
+            == FieldSlot::new(BattleSide::Player, 1).expect("valid legacy source slot")
+        && record.field_slot
+            == FieldSlot::new(BattleSide::Player, 0).expect("valid typed source slot")
+        && action.command_operation_id.as_ref().is_some_and(|operation| {
+            operation.as_str() == "battle/1/wave/1/turn/1/command/player/1/seat/1"
+        })
+        && record.operation_id.as_str()
+            == "battle/1/wave/1/turn/1/command/player/0/seat/1"
+        && record
+            .owner_seat
+            .is_some_and(|owner_seat| owner_seat.get().get() == 1)
+        && actions.get(1).is_some_and(|prior| {
+            prior.kind == ResolvedActionKind::Faint
+                && prior.actor == action.actor
+                && prior.source_slot == record.field_slot
+        })
+}
+
 fn normalize_legacy_action_order(
     case_name: &str,
     initial: &GameState,
@@ -2369,9 +2498,14 @@ fn normalize_legacy_action_order(
                     prior.kind == ResolvedActionKind::Faint
                         && prior.source_slot.side == record.field_slot.side
                 });
-                if action.source_slot.side != record.field_slot.side
-                    || action.source_slot.position >= record.field_slot.position
-                    || !prior_faint
+                let supported_forward_compaction = action.source_slot.side
+                    == record.field_slot.side
+                    && action.source_slot.position < record.field_slot.position
+                    && prior_faint;
+                if !supported_forward_compaction
+                    && !is_catalogued_legacy_inactive_actor_compaction(
+                        case_name, index, action, record, actions,
+                    )
                 {
                     return Err(FixtureError::new(format!(
                         "{case_name}: expected action {index} has an unsupported legacy source-slot compaction from {:?} to {:?}",
@@ -5227,8 +5361,8 @@ fn assert_causal_sequences(case_name: &str, document: &Value) -> Result<(), Fixt
 fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     let document = parse_case(case_name)?;
     let content = selected_content_pack()?;
-    let initial = fixture_state(&document, case_name, "initial_state")?;
-    let expected_final = fixture_state(&document, case_name, "expected_final_state")?;
+    let initial = fixture_state(&document, case_name, "initial_state", &content)?;
+    let expected_final = fixture_state(&document, case_name, "expected_final_state", &content)?;
     let initial_rng = fixture_rng_boundary(&document, case_name, "initial_rng")?;
     let expected_final_rng = fixture_rng_boundary(&document, case_name, "final_rng")?;
     if initial_rng.seed_offset.is_some() || expected_final_rng.seed_offset.is_some() {
@@ -5248,7 +5382,7 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         case_name,
         "INITIAL_STATE_CANONICAL",
         &initial,
-        &fixture_state(&document, case_name, "initial_state")?,
+        &fixture_state(&document, case_name, "initial_state", &content)?,
     )?;
 
     let identities = legacy_identities(&document, case_name)?;
