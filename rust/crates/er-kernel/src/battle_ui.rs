@@ -59,6 +59,9 @@ pub(crate) struct BattleUiAdapter {
 }
 
 impl BattleUiAdapter {
+    // Retained staged constructor for custom-map adapter callers; production
+    // kernel construction currently enters through `with_default_map`.
+    #[allow(dead_code)]
     pub(crate) fn new(
         local_seat: SeatId,
         projection: BattleUiProjection,
@@ -94,6 +97,9 @@ impl BattleUiAdapter {
         self.reducer.projection()
     }
 
+    // Retained staged menu-instance inspection seam; internal routing reads
+    // the reducer directly while the adapter API remains available to callers.
+    #[allow(dead_code)]
     pub(crate) fn current_menu_instance_id(&self) -> Option<MenuInstanceId> {
         self.reducer.current_menu_instance_id()
     }
@@ -183,6 +189,9 @@ impl BattleUiAdapter {
         )
     }
 
+    // Retained staged in-place snapshot restore seam; the kernel bridge
+    // currently rebuilds the adapter through `from_snapshot_parts_v2`.
+    #[allow(dead_code)]
     pub(crate) fn restore_snapshot_v2(
         &mut self,
         snapshot: BattleUiAdapterSnapshot,
@@ -223,6 +232,9 @@ impl BattleUiAdapter {
         self.route_raw_input_unchecked(seat, event, scheduler)
     }
 
+    // Retained staged one-call input wrapper; the production kernel uses
+    // split routing followed by queued UI reduction.
+    #[allow(dead_code)]
     pub(crate) fn handle_raw_input(
         &mut self,
         seat: SeatId,
@@ -262,6 +274,9 @@ impl BattleUiAdapter {
         self.route_timer_fired_unchecked(endpoint, timer_id, scheduler)
     }
 
+    // Retained staged one-call timer wrapper; the production kernel uses
+    // split routing followed by queued UI reduction.
+    #[allow(dead_code)]
     pub(crate) fn timer_fired(
         &mut self,
         endpoint: SeatId,
@@ -390,6 +405,9 @@ impl BattleUiAdapter {
         }
     }
 
+    // Retained staged lifecycle inspection seam; kernel teardown calls
+    // `dispose` directly without querying this flag.
+    #[allow(dead_code)]
     pub(crate) fn is_disposed(&self) -> bool {
         self.disposed
     }
@@ -402,6 +420,9 @@ impl BattleUiAdapter {
         }
     }
 
+    // Supports the retained one-call wrappers above; production input follows
+    // the kernel's split routing and queued reduction path.
+    #[allow(dead_code)]
     fn consume_routed(
         &mut self,
         routed: BattleInputOutput,
