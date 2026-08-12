@@ -2526,6 +2526,16 @@ fn validate_endpoint_effects(
     Ok(())
 }
 
+fn validate_timer_owner(owner: &er_types::TimerOwner, path: &str) -> Result<(), SnapshotError> {
+    if owner.owner_id.is_empty() || owner.address.is_empty() || owner.reason.is_empty() {
+        return Err(invalid(
+            path,
+            "timer owner ID, address, and reason must all be non-empty",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_restorable_timer(
     timer: &RestorableTimerSnapshotV2,
     path: &str,
