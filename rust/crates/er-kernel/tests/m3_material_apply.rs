@@ -128,6 +128,70 @@ fn adapt_legacy_game_state(state: &mut Value) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn adapt_legacy_content_pack_condition_subjects(
+    content_pack: &mut Value,
+) -> Result<(), &'static str> {
+    let entries = content_pack
+        .get_mut("capability_manifest")
+        .and_then(Value::as_object_mut)
+        .and_then(|manifest| manifest.get_mut("entries"))
+        .and_then(Value::as_array_mut)
+        .ok_or("capability manifest entries are missing or invalid")?;
+
+    for entry in entries {
+        let subject = entry
+            .get_mut("subject")
+            .and_then(Value::as_object_mut)
+            .ok_or("capability subject is missing or invalid")?;
+        let subject_kind = subject
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or("capability subject kind is missing or invalid")?;
+        if !matches!(subject_kind, "WEATHER" | "TERRAIN") {
+            continue;
+        }
+        if subject.len() != 2 || !subject.contains_key("value") {
+            return Err("weather/terrain capability subject has extra or missing fields");
+        }
+
+        let value = subject
+            .get("value")
+            .cloned()
+            .ok_or("weather/terrain capability subject value is missing")?;
+        let normalized = match value {
+            Value::String(tag) if tag == "NONE" => json!({"kind": "NONE"}),
+            Value::String(_) => {
+                return Err("weather/terrain capability subject has an unknown legacy tag");
+            }
+            Value::Object(adjacent) => {
+                match adjacent.get("kind").and_then(Value::as_str) {
+                    Some("NONE") if adjacent.len() == 1 => {}
+                    Some("UNSUPPORTED_ORACLE_CODE") if adjacent.len() == 2 => {
+                        let value = adjacent
+                            .get("value")
+                            .and_then(Value::as_u64)
+                            .ok_or("unsupported weather/terrain code is not an unsigned integer")?;
+                        if value > u64::from(u16::MAX) {
+                            return Err("unsupported weather/terrain code exceeds u16");
+                        }
+                    }
+                    _ => {
+                        return Err(
+                            "weather/terrain capability subject has an unknown, extra, or malformed adjacent tag",
+                        );
+                    }
+                }
+                Value::Object(adjacent)
+            }
+            _ => {
+                return Err("weather/terrain capability subject has an invalid value");
+            }
+        };
+        subject.insert("value".to_owned(), normalized);
+    }
+    Ok(())
+}
+
 fn adapt_legacy_selected_content_hash(
     state: &mut Value,
     fixture: &Value,
@@ -206,8 +270,14 @@ fn typed_material_codecs_are_closed_and_canonical_only() {
 
 #[test]
 fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
-    let content_value: serde_json::Value =
+    let mut content_value: serde_json::Value =
         serde_json::from_str(CONTENT_FIXTURE).expect("content fixture is JSON");
+    adapt_legacy_content_pack_condition_subjects(
+        content_value
+            .get_mut("content_pack")
+            .expect("content fixture has content_pack"),
+    )
+    .expect("legacy content capability subjects adapt strictly");
     let content: ContentPack = serde_json::from_value(
         content_value
             .get("content_pack")
